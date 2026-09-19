@@ -117,6 +117,33 @@ batch:
 All 28 can be deleted except the 2 ark branches, which should be closed only
 once whoever owns the arkworks version decision has looked at them.
 
+**Update 7 (2026-09-19):** `ci/path-filter-heavy-gates-20260910`,
+`ci/consolidate-workflows-20260910`, and `ops/drain-actions-queue-20260911`
+checked directly against current master's tip (all three predate `01d2b64e5`
+"make local CI authoritative and drain hosted workflow noise"):
+
+- `ci/consolidate-workflows-20260910` deletes 7 redundant workflow files
+  (`build.yml`, `ci.yml`, `codeql-analysis.yml`, `full-ci.yml`, `rust.yml`,
+  `snyk.yml`, `v04-ship-gate.yml`). All 7 are already gone from master —
+  deleted by `3ab374015` "ci: consolidate redundant GitHub Actions
+  workflows". Fully redundant.
+- `ci/path-filter-heavy-gates-20260910` adds/tunes `paths:` filters on
+  `pull_request`/`push` triggers for 9 workflow files, to scope expensive
+  hosted-CI gates to relevant changes. Moot: `01d2b64e5` already stripped
+  every `pull_request`/`push` trigger repo-wide (confirmed on
+  `benchmark-regression.yml`: master now has `on: workflow_dispatch` only,
+  comment "GitHub-hosted CI is disabled for this repo; run manually on the
+  local x3 runner") — there's no push/PR trigger left for these path filters
+  to scope. The premise the branch optimizes for no longer exists.
+- `ops/drain-actions-queue-20260911` adds `queue-drain.yml` and trims
+  `release-hardening.yml`'s triggers. `01d2b64e5` already deleted
+  `queue-drain.yml` outright (-69 lines, filed under "hosted workflow
+  noise") and already reduced `release-hardening.yml` to `workflow_dispatch`
+  only — same end state the branch was going for, reached a different way.
+
+All three are archival; none should be merged. Recommend closing the PRs (if
+any) and deleting the branches.
+
 **Running tally:** 5 of 6 "flagged as real" queue entries checked this
 session were fully superseded (private-mempool, compile-break,
 live-transport-fix, pr-181-check, svm-htlc-custody); 1 was genuine
@@ -170,7 +197,7 @@ revisit.
 | `feat/idempotent-cross-domain-coordinator-20260911-pre-rebase-20260917` | 1 | 2 files | archival — verified 2026-09-19, same evidence as its sibling row above: rebased sibling branch fully lands in master, this pre-rebase snapshot's tree is a strict subset. Do not merge |
 | `wip/chatgpt-mainnet-attestation-20260918`, `wip/consolidation-20260917/chatgpt-mainnet` | 1 each | 22 files | snapshot of uncommitted work |
 | `archive/stale-x3lang-trading-wip-20260918` | 3 | 68 files | archival |
-| `ci/path-filter-heavy-gates-20260910` (9), `ci/consolidate-workflows-20260910` (7), `ops/drain-actions-queue-20260911` (1) | 1–9 | workflow files | the CI routing they implement has moved on (`01d2b64e5` and successors) |
+| `ci/path-filter-heavy-gates-20260910` (9), `ci/consolidate-workflows-20260910` (7), `ops/drain-actions-queue-20260911` (1) | 1–9 | workflow files | verified 2026-09-19 as archival (see Update 7) — `01d2b64e5` already reached the same or a further end state for all three |
 | `preserve/20260918/*` (28 branches) | 0–13 | mixed | verified 2026-09-19 as a batch (see Update 6) — 26 fully archival/redundant, 2 (`cargo/ark-ec-0.6.0`, `cargo/ark-ff-0.6.0`) are a stale dependency bump that needs fresh work, not a merge |
 
 ## Dependency heads (21)
