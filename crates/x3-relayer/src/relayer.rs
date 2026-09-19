@@ -717,6 +717,12 @@ impl RelayerSafetyPipeline {
         // (`proof_id`) used for dispute bookkeeping below.
         let signed_message =
             x3_verification_router::solana_attestation_message(proof.slot, &proof.blockhash);
+        // KNOWN GAP (tracked in issue #351, same root cause: no governance/
+        // config-sourced SVM validator set is wired into this pipeline yet):
+        // `AttestationSet::new` performs no authorization check, so a
+        // self-generated keypair signs just as validly as a real validator's.
+        // Use `AttestationSet::with_authorized_validators` here once such a
+        // set exists for this relayer.
         let mut attestations = AttestationSet::new(signed_message);
         for signature in proof.validator_signatures.iter() {
             let attestation = Attestation {

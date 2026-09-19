@@ -161,10 +161,23 @@ impl ConfidentialGpuRuntime {
     }
 
     /// Participate in DKG ceremony.
+    ///
+    /// Requires a prior successful `initialize()` (status `WaitingForDkg`):
+    /// in particular this must be unreachable from `RuntimeStatus::Error`, or
+    /// a runtime whose attestation failed could still complete DKG and reach
+    /// `Active` on a report nothing backs.
     pub fn participate_in_dkg(
         &mut self,
         peer_commitments: &[threshold::DkgCommitment],
     ) -> Result<threshold::DkgShare, ConfidentialGpuError> {
+        if self.status != RuntimeStatus::WaitingForDkg {
+            return Err(ConfidentialGpuError::DkgFailed(format!(
+                "cannot participate in DKG from status {:?}; a successful initialize() \
+                 (status WaitingForDkg) is required first",
+                self.status
+            )));
+        }
+
         let share = self.dkg.participate(peer_commitments)?;
 
         if self.dkg.is_complete() {
@@ -177,10 +190,21 @@ impl ConfidentialGpuRuntime {
     /// Accept and verify a private DKG share addressed to this validator.
     /// The runtime becomes active only after the complete committee share set
     /// has passed Feldman verification.
+    ///
+    /// Requires a prior successful `initialize()` (status `WaitingForDkg`) —
+    /// see [`Self::participate_in_dkg`].
     pub fn accept_dkg_share(
         &mut self,
         share: threshold::DkgShare,
     ) -> Result<(), ConfidentialGpuError> {
+        if self.status != RuntimeStatus::WaitingForDkg {
+            return Err(ConfidentialGpuError::DkgFailed(format!(
+                "cannot accept a DKG share from status {:?}; a successful initialize() \
+                 (status WaitingForDkg) is required first",
+                self.status
+            )));
+        }
+
         self.dkg.accept_share(share)?;
         if self.dkg.is_complete() {
             self.status = RuntimeStatus::Active;
@@ -343,6 +367,29 @@ mod tests {
             matches!(&err, ConfidentialGpuError::AttestationFailed(msg) if msg.contains("attestation")),
             "expected an attestation-stage failure, got: {err:?}"
         );
+        assert_eq!(runtime.status(), RuntimeStatus::Error);
+    }
+
+    /// Error must be a dead end: a runtime whose attestation failed must not
+    /// be able to complete DKG and reach Active on the strength of a report
+    /// that was never actually produced.
+    #[test]
+    #[cfg(not(feature = "simulated-attestation"))]
+    fn dkg_entry_points_reject_a_runtime_stuck_in_error() {
+        let mut runtime = ConfidentialGpuRuntime::new(ConfidentialGpuConfig::default());
+        assert!(runtime.initialize().is_err());
+        assert_eq!(runtime.status(), RuntimeStatus::Error);
+
+        assert!(runtime.participate_in_dkg(&[]).is_err());
+        assert_eq!(runtime.status(), RuntimeStatus::Error);
+
+        let bogus_share = threshold::DkgShare {
+            from: 0,
+            to: 0,
+            share: [0u8; 32],
+            proof: Vec::new(),
+        };
+        assert!(runtime.accept_dkg_share(bogus_share).is_err());
         assert_eq!(runtime.status(), RuntimeStatus::Error);
     }
 

@@ -6,6 +6,14 @@
 //! verified with Ed25519 before they are admitted to the set: a rejected
 //! attestation contributes no weight and is not stored, so quorum cannot be
 //! reached with forged, truncated, zero-key, or mismatched-statement material.
+//!
+//! A valid signature only proves the caller controls *some* private key, not
+//! that the key belongs to an authorized validator — a self-generated
+//! keypair signs just as validly as a real validator's. `new` alone does not
+//! check this; use [`AttestationSet::with_authorized_validators`] whenever
+//! the caller has a real, governance-sourced validator set to check against.
+//! (As of this writing `x3-relayer`'s SVM proof path — the one production
+//! caller — does not have one wired in; see the tracked follow-up issue.)
 
 use std::collections::{HashMap, HashSet};
 
@@ -45,6 +53,10 @@ pub enum AttestationError {
     /// statements and still reach `has_quorum`.
     StatementMismatch,
     SignatureVerificationFailed,
+    /// The public key verified the signature but is not in the configured
+    /// set of authorized validators. Only returned when the set was built
+    /// with [`AttestationSet::with_authorized_validators`].
+    UnauthorizedValidator,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +64,9 @@ pub struct AttestationSet {
     statement_hash: [u8; 32],
     attestations: HashMap<ValidatorId, Attestation>,
     total_weight: u64,
+    /// `None` means no authorization check is performed — any key that
+    /// verifies is accepted. See the module-level warning about this.
+    authorized_validators: Option<HashSet<[u8; PUBLIC_KEY_LEN]>>,
 }
 
 impl AttestationSet {
@@ -60,6 +75,23 @@ impl AttestationSet {
             statement_hash,
             attestations: HashMap::new(),
             total_weight: 0,
+            authorized_validators: None,
+        }
+    }
+
+    /// Like [`AttestationSet::new`], but every admitted attestation's public
+    /// key must also be a member of `authorized_validators` — a signature
+    /// from an unlisted (e.g. self-generated) key is rejected regardless of
+    /// how cryptographically valid it is.
+    pub fn with_authorized_validators(
+        statement_hash: [u8; 32],
+        authorized_validators: impl IntoIterator<Item = [u8; PUBLIC_KEY_LEN]>,
+    ) -> Self {
+        Self {
+            statement_hash,
+            attestations: HashMap::new(),
+            total_weight: 0,
+            authorized_validators: Some(authorized_validators.into_iter().collect()),
         }
     }
 
@@ -80,6 +112,12 @@ impl AttestationSet {
 
         if attestation.public_key.iter().all(|byte| *byte == 0) {
             return Err(AttestationError::InvalidPublicKey);
+        }
+
+        if let Some(authorized) = &self.authorized_validators {
+            if !authorized.contains(&attestation.public_key) {
+                return Err(AttestationError::UnauthorizedValidator);
+            }
         }
 
         let verifying_key = VerifyingKey::from_bytes(&attestation.public_key)
@@ -252,6 +290,32 @@ mod tests {
 
         assert_eq!(set.total_weight(), 30);
         assert_eq!(set.unique_validators(), 1);
+    }
+
+    #[test]
+    fn with_authorized_validators_accepts_a_listed_key() {
+        let key = signing_key(20);
+        let mut set =
+            AttestationSet::with_authorized_validators([7; 32], [key.verifying_key().to_bytes()]);
+        set.add_attestation(signed_attestation("alice", [7; 32], 40, 20))
+            .unwrap();
+        assert_eq!(set.total_weight(), 40);
+    }
+
+    #[test]
+    fn with_authorized_validators_rejects_a_self_generated_key() {
+        // A perfectly valid signature from a key nobody authorized — this is
+        // exactly what `new` alone cannot catch.
+        let mut set = AttestationSet::with_authorized_validators(
+            [7; 32],
+            [signing_key(21).verifying_key().to_bytes()],
+        );
+        assert_eq!(
+            set.add_attestation(signed_attestation("mallory", [7; 32], 1000, 22)),
+            Err(AttestationError::UnauthorizedValidator)
+        );
+        assert_eq!(set.total_weight(), 0);
+        assert!(!set.has_quorum(1));
     }
 
     #[test]
