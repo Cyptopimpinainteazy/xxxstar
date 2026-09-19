@@ -116,10 +116,10 @@ fn prop_constant_product_maintained(amount_in: u64, reserve_in: u128, reserve_ou
         Some(k) => k,
         None => u128::MAX,
     };
-    let k_new = match new_reserve_in.checked_mul(new_reserve_out) {
-        Some(k) => k,
-        None => 0, // Overflow means product increased (or at least didn't break conservation)
-    };
+    // Overflow means product increased (or at least didn't break conservation)
+    let k_new = new_reserve_in
+        .checked_mul(new_reserve_out)
+        .unwrap_or_default();
 
     k_new >= k_old
 }
@@ -150,7 +150,8 @@ fn prop_no_over_withdrawal(amount_in: u64, reserve_in: u128, reserve_out: u128) 
 // LAYER 3: FEE PATH SELECTION (Consistency & Optimality)
 // ============================================================================
 
-/// Property: Path with lower fees is preferable (consistent ordering)
+/// Property: Fee ordering between two paths matches their bps ordering
+/// (a lower-bps path never charges a higher fee than a higher-bps path).
 fn prop_lower_fee_path_preferred(amount: u64, fee_a_bps: u16, fee_b_bps: u16) -> bool {
     let fee_a_bps = (fee_a_bps % 101) as u128;
     let fee_b_bps = (fee_b_bps % 101) as u128;
@@ -158,12 +159,10 @@ fn prop_lower_fee_path_preferred(amount: u64, fee_a_bps: u16, fee_b_bps: u16) ->
     let fee_a = (amount as u128) * fee_a_bps / 10000;
     let fee_b = (amount as u128) * fee_b_bps / 10000;
 
-    if fee_a < fee_b {
-        true // Path A preferred is correct
-    } else if fee_a > fee_b {
-        true // Path B preferred is correct
-    } else {
-        true // Tie is acceptable
+    match fee_a_bps.cmp(&fee_b_bps) {
+        core::cmp::Ordering::Less => fee_a <= fee_b,
+        core::cmp::Ordering::Greater => fee_a >= fee_b,
+        core::cmp::Ordering::Equal => fee_a == fee_b,
     }
 }
 
@@ -499,7 +498,7 @@ fn test_regression_boundary_fee_bps() {
 fn test_regression_fee_monotonicity_extreme() {
     // Verify fees don't decrease when rate increases
     let amount = 1_000_000u128;
-    let fee_0 = (amount * 0) / 10000;
+    let fee_0 = 0u128;
     let fee_5000 = (amount * 5000) / 10000;
     let fee_10000 = (amount * 10000) / 10000;
 
@@ -543,8 +542,8 @@ fn test_regression_no_fee_double_charge_extreme() {
 
 #[test]
 fn test_regression_atomicity_partial_failure() {
-    // Swap that would cause over-withdrawal
+    // u64::MAX in against a reserve of 1 rounds amount_out down to 0, so this
+    // specific edge case settles atomically without over-withdrawing.
     let result = prop_swap_atomic(u64::MAX, 1, 1);
-    // Should either succeed atomically or fail completely
-    assert!(result == true || result == false);
+    assert!(result);
 }

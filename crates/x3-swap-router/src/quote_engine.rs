@@ -1,6 +1,5 @@
 use crate::routing::SwapRoute;
 use crate::{SwapParams, SwapRouterError};
-use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use sp_core::U256;
 
@@ -25,7 +24,7 @@ impl QuoteEngine {
         &self,
         params: &SwapParams,
     ) -> Result<Vec<QuoteResult>, SwapRouterError> {
-        Ok(alloc::vec![QuoteResult {
+        Ok(vec![QuoteResult {
             route: SwapRoute {
                 hops: Vec::new(),
                 amount_in: params.amount_in,
