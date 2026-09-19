@@ -12486,6 +12486,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-control"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 39.0.0",
+ "sp-io 44.0.0",
+ "sp-runtime 45.0.0",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "pallet-x3-cross-vm-router"
 version = "0.1.0"
 dependencies = [

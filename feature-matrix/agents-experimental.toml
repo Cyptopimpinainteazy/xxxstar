@@ -14,7 +14,7 @@ confidence = "medium"
 launch_scope = "dev_tooling"
 claim_risk = false
 blockers = ["Privileged control surface needs security review"]
-evidence = ["pallets/pallet-x3-control", "note: Pallet exists on master"]
+evidence = ["pallets/pallet-x3-control", "note: 2026-09-19 joined the workspace and has 10 tests; its authority check had accepted ControlAuthority::Governance from any signed account and was fixed in the same change"]
 
 [[feature]]
 id = "X3-AGENT-002"
