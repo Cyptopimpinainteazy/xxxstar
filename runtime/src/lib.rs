@@ -3898,11 +3898,10 @@ impl_runtime_apis! {
         }
 
         fn validate_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
-            // Stateless validation: check payload length without mutating state.
-            if raw_tx.len() < (20 + 20 + 16 + 4) {
-                return Err(b"invalid payload: too short".to_vec());
-            }
-            Ok(vec![])
+            // See `validate_raw_evm_transaction`: this checks the RLP envelope and
+            // returns the payload it validated. It previously returned an empty
+            // vector after a bare length floor.
+            validate_raw_evm_transaction(raw_tx)
         }
 
         fn chain_id() -> u64 {
@@ -4692,6 +4691,125 @@ pub fn runtime_uses_mock_vm_adapters() -> bool {
     let x3 = core::any::type_name::<<Runtime as pallet_x3_kernel::Config>::X3Adapter>();
 
     evm.contains("MockEvmAdapter") || svm.contains("MockSvmAdapter") || x3.contains("MockX3Adapter")
+}
+
+/// Structural check that `raw_tx` is a complete RLP-encoded EVM transaction.
+///
+/// This is the envelope check the runtime can perform without an EVM client: it
+/// confirms the bytes are a typed (EIP-2718) or legacy transaction whose RLP
+/// header declares exactly the payload length. It does **not** verify the
+/// signature or the field values — recovering the sender needs a real EVM
+/// client, which the `submit_evm_transaction` path still lacks.
+///
+/// The runtime API implementation used to answer `Ok(vec![])` — an *empty*
+/// transaction — after a bare length floor (`len() < 20 + 20 + 16 + 4`), while
+/// the trait's default implementation (and the kernel's) return the payload they
+/// validated; any caller that used the result got nothing back.
+pub fn validate_raw_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
+    let bytes = raw_tx.as_slice();
+
+    let complete_list = match bytes.first() {
+        None => return Err(b"invalid EVM transaction: empty payload".to_vec()),
+        // EIP-2718 typed transaction: an envelope byte, then an RLP list.
+        Some(&b) if (0x01..=0x7f).contains(&b) => {
+            rlp_total_len(&bytes[1..]) == Some(bytes.len() - 1)
+        }
+        // Legacy transaction: a single RLP list.
+        Some(&b) if b >= 0xc0 => rlp_total_len(bytes) == Some(bytes.len()),
+        Some(_) => false,
+    };
+
+    if !complete_list {
+        return Err(b"invalid EVM transaction: not a complete RLP list".to_vec());
+    }
+
+    Ok(raw_tx)
+}
+
+/// Total encoded length of the RLP list starting at `bytes`, if its header is
+/// well formed. Callers compare the result against their buffer length.
+fn rlp_total_len(bytes: &[u8]) -> Option<usize> {
+    let first = *bytes.first()?;
+    let (payload_len, header_len) = match first {
+        // Short list: the payload length is in the header byte itself.
+        0xc0..=0xf7 => ((first - 0xc0) as usize, 1usize),
+        // Long list: the next 1..=8 bytes carry the payload length.
+        0xf8..=0xff => {
+            let len_of_len = (first - 0xf7) as usize;
+            let header_end = 1 + len_of_len;
+            if bytes.len() < header_end {
+                return None;
+            }
+            let mut declared = 0usize;
+            for &byte in &bytes[1..header_end] {
+                declared = declared.checked_mul(256)?.checked_add(byte as usize)?;
+            }
+            (declared, header_end)
+        }
+        _ => return None,
+    };
+
+    header_len.checked_add(payload_len)
+}
+
+#[cfg(all(test, feature = "std"))]
+mod evm_transaction_envelope_tests {
+    use super::validate_raw_evm_transaction;
+
+    /// Minimal legacy transaction: one RLP list of nine empty fields
+    /// (`0xc9` header followed by nine `0x80`s).
+    fn minimal_legacy() -> Vec<u8> {
+        let mut tx = vec![0xc9];
+        tx.extend(std::iter::repeat_n(0x80u8, 9));
+        tx
+    }
+
+    /// The regression this replaced: the runtime API returned an **empty**
+    /// vector as the "validated" transaction.
+    #[test]
+    fn a_valid_transaction_is_returned_unchanged() {
+        let tx = minimal_legacy();
+        let validated = validate_raw_evm_transaction(tx.clone()).expect("valid envelope");
+        assert_eq!(
+            validated, tx,
+            "the payload must be returned, not an empty vec"
+        );
+    }
+
+    #[test]
+    fn a_typed_transaction_envelope_is_accepted() {
+        let mut tx = vec![0x02];
+        tx.extend(minimal_legacy());
+        assert!(validate_raw_evm_transaction(tx).is_ok());
+    }
+
+    #[test]
+    fn a_truncated_payload_is_rejected() {
+        let mut tx = minimal_legacy();
+        tx.pop();
+        assert!(
+            validate_raw_evm_transaction(tx).is_err(),
+            "a header that declares more bytes than are present must not validate"
+        );
+    }
+
+    #[test]
+    fn empty_and_non_list_payloads_are_rejected() {
+        assert!(validate_raw_evm_transaction(Vec::new()).is_err());
+        assert!(validate_raw_evm_transaction(vec![0x80]).is_err());
+        assert!(validate_raw_evm_transaction(vec![0x00]).is_err());
+    }
+
+    #[test]
+    fn long_list_headers_declare_their_length() {
+        let mut tx = vec![0xf8, 0x0a];
+        tx.extend(std::iter::repeat_n(0x80u8, 10));
+        assert!(validate_raw_evm_transaction(tx.clone()).is_ok());
+
+        let mut overstated = tx;
+        overstated[1] = 0x0b;
+        assert!(validate_raw_evm_transaction(overstated).is_err());
+    }
 }
 
 #[cfg(all(test, feature = "std"))]
