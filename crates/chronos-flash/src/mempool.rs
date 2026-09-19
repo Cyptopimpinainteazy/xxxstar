@@ -12,6 +12,14 @@ use crate::error::{ChronosError, ChronosResult};
 use crate::intent::{IntentDetector, SwapIntent};
 use crate::types::{Address, ChainId, ChainStatus, Hash, MempoolStats, Timestamp};
 
+/// Message for every mempool path that has no client behind it.
+///
+/// Each `connect` used to set `is_connected = true` and return `Ok(())` without
+/// opening anything, so a trading loop could believe it was watching a live
+/// mempool while reading nothing at all.
+const NOT_IMPLEMENTED: &str =
+    "mempool streaming is not implemented: no websocket/bloxroute/flashbots client is wired up";
+
 /// Multi-chain mempool scanner
 pub struct MempoolScanner {
     config: MempoolConfig,
@@ -155,18 +163,13 @@ impl ChainScanner {
 
     /// Fetch pending transactions from RPC
     async fn fetch_pending_transactions(&mut self) -> ChronosResult<Vec<PendingTx>> {
-        // In production, this would connect to actual RPC endpoints
-        // Using WebSocket subscription for pending txs
-
-        // For now, simulate fetching (real implementation needs:
-        // - eth_subscribe for pending txs
-        // - eth_getBlockByNumber("pending", true)
-        // - bloxroute/flashbots mempool streams
-
-        self.is_connected = true;
-
-        // Simulated pending transactions for testing
-        Ok(vec![])
+        // There is no mempool client here: fetching pending transactions needs
+        // an `eth_subscribe` websocket, `eth_getBlockByNumber("pending", true)`
+        // or a bloxroute/flashbots stream, none of which is wired up. This used
+        // to set `is_connected = true` and return an empty vector, so a scanner
+        // reported itself connected while reading nothing — and `ChainStatus`
+        // published that as healthy.
+        Err(ChronosError::MempoolScanFailed(NOT_IMPLEMENTED.to_string()))
     }
 
     /// Remove stale transactions
@@ -224,17 +227,21 @@ impl MempoolStream {
 
     /// Connect to mempool WebSocket stream
     pub async fn connect(&mut self) -> ChronosResult<()> {
-        // In production:
-        // - Connect to bloxroute/flashbots mempool stream
-        // - Subscribe to pending transactions
-        // - Filter by DEX router addresses
-
-        self.is_connected = true;
-        Ok(())
+        // No websocket client is wired up. Setting `is_connected = true` and
+        // returning `Ok(())` made a stub indistinguishable from a live stream,
+        // and `subscribe` then handed back a receiver that never receives.
+        let _ = &self.endpoint;
+        Err(ChronosError::MempoolScanFailed(NOT_IMPLEMENTED.to_string()))
     }
 
     /// Subscribe to pending transactions
     pub async fn subscribe(&mut self) -> ChronosResult<mpsc::Receiver<PendingTx>> {
+        if !self.is_connected {
+            return Err(ChronosError::MempoolScanFailed(
+                "cannot subscribe to a mempool stream that is not connected".to_string(),
+            ));
+        }
+
         let (tx, rx) = mpsc::channel(10000);
 
         // Spawn background task to receive transactions
@@ -272,13 +279,9 @@ impl BloxrouteMempoolStream {
 
     /// Connect to Bloxroute mempool stream
     pub async fn connect(&mut self) -> ChronosResult<()> {
-        // Bloxroute provides:
-        // - 100ms+ faster mempool data
-        // - Cross-chain mempool aggregation
-        // - Transaction simulation
-
-        self.is_connected = true;
-        Ok(())
+        // Bloxroute would give faster mempool data, but no client exists.
+        let _ = &self.auth_token;
+        Err(ChronosError::MempoolScanFailed(NOT_IMPLEMENTED.to_string()))
     }
 }
 
@@ -298,13 +301,9 @@ impl FlashbotsMempoolStream {
 
     /// Connect to Flashbots relay for private transaction hints
     pub async fn connect(&mut self) -> ChronosResult<()> {
-        // Flashbots provides:
-        // - Private transaction hints (searcher bundle tips)
-        // - Block builder preferences
-        // - MEV-share orderflow
-
-        self.is_connected = true;
-        Ok(())
+        // Flashbots would give private hints, but no relay client exists.
+        let _ = &self.relay_url;
+        Err(ChronosError::MempoolScanFailed(NOT_IMPLEMENTED.to_string()))
     }
 }
 
@@ -365,4 +364,42 @@ pub trait MempoolProvider {
     async fn get_pending(&mut self) -> ChronosResult<Vec<PendingTx>>;
     fn chain_id(&self) -> ChainId;
     fn is_connected(&self) -> bool;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every `connect` used to answer `Ok(())` without opening anything. A
+    /// trading loop that trusted it would be acting on a mempool it never read.
+    #[tokio::test]
+    async fn mempool_connects_refuse_instead_of_claiming_success() {
+        let mut stream = MempoolStream::new(1, "wss://example.invalid".to_string());
+        let err = stream.connect().await.expect_err("connect must refuse");
+        assert!(err.to_string().contains("not implemented"), "{err}");
+        assert!(
+            !stream.is_connected,
+            "a refused connection must not report itself connected"
+        );
+
+        let mut bloxroute = BloxrouteMempoolStream::new("token".to_string());
+        assert!(bloxroute.connect().await.is_err());
+        assert!(!bloxroute.is_connected);
+
+        let mut flashbots = FlashbotsMempoolStream::new("https://relay.invalid".to_string());
+        assert!(flashbots.connect().await.is_err());
+        assert!(!flashbots.is_connected);
+    }
+
+    /// Subscribing to a stream that was never connected is refused rather than
+    /// handing back a receiver that never receives.
+    #[tokio::test]
+    async fn subscribe_requires_a_connection() {
+        let mut stream = MempoolStream::new(1, "wss://example.invalid".to_string());
+        let err = stream
+            .subscribe()
+            .await
+            .expect_err("subscribe must refuse without a connection");
+        assert!(err.to_string().contains("not connected"), "{err}");
+    }
 }

@@ -182,7 +182,10 @@ impl ChronosOracle {
         log::info!(
             "✨ Time-warp complete! Latency: {}ms, Time advantage: {}ms",
             elapsed.as_millis(),
-            result.time_advantage_ms.abs()
+            match result.time_advantage_ms {
+                Some(ms) => ms.abs().to_string(),
+                None => "not measured".to_string(),
+            }
         );
 
         Ok(())
@@ -226,9 +229,11 @@ impl ChronosOracle {
             let n = metrics.bundles_executed as f64;
             metrics.avg_latency_ms =
                 (metrics.avg_latency_ms * (n - 1.0) + result.latency_ms as f64) / n;
-            metrics.avg_time_advantage_ms = (metrics.avg_time_advantage_ms * (n - 1.0)
-                + result.time_advantage_ms.abs() as f64)
-                / n;
+            // Only fold in a measured advantage; an unmeasured one is not zero.
+            if let Some(advantage_ms) = result.time_advantage_ms {
+                metrics.avg_time_advantage_ms =
+                    (metrics.avg_time_advantage_ms * (n - 1.0) + advantage_ms.abs() as f64) / n;
+            }
 
             metrics.success_rate =
                 metrics.bundles_executed as f64 / (metrics.bundles_executed + 1) as f64;

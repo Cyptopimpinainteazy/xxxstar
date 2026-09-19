@@ -122,7 +122,13 @@ pub struct ExecutionResult {
     pub gas_used: Gas,
     pub tx_hashes: Vec<TxHash>,
     pub latency_ms: u64,
-    pub time_advantage_ms: i64, // Negative = executed before user submitted
+    /// Measured lead over the user's original submission, or `None` when it was
+    /// not measured. Negative means we executed before the user's transaction.
+    ///
+    /// This used to be an `i64` that the time-warp executor filled with a
+    /// hardcoded `-200` for every bundle ("200 ms time advantage"), which is a
+    /// claim about execution timing that nothing measured.
+    pub time_advantage_ms: Option<i64>,
     pub executed_at: Timestamp,
 }
 
