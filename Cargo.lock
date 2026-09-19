@@ -28143,7 +28143,7 @@ dependencies = [
  "proptest",
  "serde",
  "sp-core 39.0.0",
- "sp-std",
+ "sp-std 14.0.0",
  "tokio",
 ]
 
