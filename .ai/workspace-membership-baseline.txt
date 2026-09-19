@@ -8,6 +8,5 @@
 # crate appears in neither list, or when a fixed entry stays here.
 
 loom-concurrency
-pallet-x3-control
 x3-mobile-sdk
 x3-pq
