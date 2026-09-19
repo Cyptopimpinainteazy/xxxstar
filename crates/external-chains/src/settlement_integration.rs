@@ -260,14 +260,22 @@ impl SettlementCoordinator {
             });
         }
 
-        // 2. In production: check slippage bounds against live prices
-        // For now: pass if pre-submission checks structure is correct
-
-        // 3. In production: verify bridge/settlement path exists and has liquidity
-        // For now: pass
-
-        // 4. In production: check reconciliation lag against settlement provider
-        // For now: pass
+        // 2-4 used to be three "For now: pass" placeholders: slippage bounds were
+        // never compared against live prices, the bridge/settlement path's
+        // liquidity was never looked up, and reconciliation lag was never read.
+        // A route therefore "passed" pre-submission with only its quote freshness
+        // checked. They are now explicit rejections, so the gate fails closed
+        // until each check is implemented (`passed` is computed from the list).
+        rejections.push(PreSubmissionRejection::SettlementPathUnavailable {
+            reason: "slippage bounds are not checked against live prices yet".to_string(),
+        });
+        rejections.push(PreSubmissionRejection::SettlementPathUnavailable {
+            reason: "bridge/settlement path liquidity is not looked up yet".to_string(),
+        });
+        rejections.push(PreSubmissionRejection::SettlementPathUnavailable {
+            reason: "reconciliation lag against the settlement provider is not read yet"
+                .to_string(),
+        });
 
         PreSubmissionCheckResult {
             passed: rejections.is_empty(),
@@ -469,9 +477,31 @@ mod tests {
         };
 
         let result = coord.pre_submission_check(&H256::from_low_u64_be(2), 5_000);
+        // The quote is fresh, so there is no `QuoteStale` rejection — but the
+        // gate still does not pass, because the slippage, path-liquidity and
+        // reconciliation checks are unimplemented and now say so rather than
+        // passing silently.
         assert!(
-            result.passed,
-            "quote should still be fresh at 4 seconds ago"
+            !result
+                .rejections
+                .iter()
+                .any(|r| matches!(r, PreSubmissionRejection::QuoteStale { .. })),
+            "quote should still be fresh at 4 seconds ago: {:?}",
+            result.rejections
+        );
+        assert!(
+            !result.passed,
+            "unimplemented checks must not pass the gate"
+        );
+        assert!(
+            result
+                .rejections
+                .iter()
+                .filter(|r| matches!(r, PreSubmissionRejection::SettlementPathUnavailable { .. }))
+                .count()
+                >= 3,
+            "the three unimplemented checks are reported: {:?}",
+            result.rejections
         );
     }
 

@@ -386,24 +386,15 @@ impl ChainAdapter for BaseAdapter {
     async fn verify_message_proof(
         &self,
         _message: &ChainMessage,
-        proof: &[u8],
+        _proof: &[u8],
     ) -> AdapterResult<bool> {
-        // For L2s: verify against L1 state root
-        // Base uses OP Stack's state commitment chain
-        // Verify proof is non-empty and has valid structure
-        if proof.is_empty() {
-            return Ok(false);
-        }
-
-        // Minimum proof length: 32 bytes state root + 32 bytes storage proof
-        if proof.len() < 64 {
-            return Ok(false);
-        }
-
-        // In production: verify Merkle-Patricia trie proof against L1 state root
-        // For now, validate proof structure (non-zero data)
-        let has_nonzero = proof.iter().any(|&b| b != 0);
-        Ok(has_nonzero)
+        // Refused, not shape-checked. The previous body accepted any proof of at
+        // least 64 bytes containing one non-zero byte — it never touched the L1
+        // state root it claims to verify against (the comment said so: "In
+        // production: verify Merkle-Patricia trie proof against L1 state root").
+        // Verifying an OP-Stack message means walking the output-root proof to
+        // the L1 `L2OutputOracle`, which is not implemented here.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
     async fn finalize_transfer(&self, transfer_id: H256, proof: Vec<u8>) -> AdapterResult<H256> {
