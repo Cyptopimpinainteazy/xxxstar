@@ -682,18 +682,26 @@ fn verify_btc_merkle_proof(txid: &[u8; 32], merkle_root: &[u8; 32], proof: &[u8]
 /// Verifies Bitcoin SPV proofs: header-chain linkage (`sha256d`), the merkle
 /// proof against the last header's merkle root, and the confirmation count.
 ///
-/// **Vault signer approvals are not verified.** An earlier version carried
-/// `vault_threshold` / `vault_total_signers` and documented that SPV-verified
-/// deposits must be backed by that many vault signers — but `verify` never read
-/// those fields, so the policy only looked enforced. They were **removed**
-/// rather than "enforced" by counting approvals, because
-/// `BtcVault::add_signer_approval` stores signer signature bytes *without
-/// verifying them* (issue #272), so counting them would prove nothing.
+/// **Vault signer approvals are not consulted here.** An earlier version
+/// carried `vault_threshold` / `vault_total_signers` and documented that
+/// SPV-verified deposits must be backed by that many vault signers — but
+/// `verify` never read those fields, so the policy only looked enforced.
+/// They were **removed** rather than "enforced" by counting approvals,
+/// because at the time `BtcVault::add_signer_approval` stored signer
+/// signature bytes *without verifying them*, so counting them would have
+/// proven nothing.
 ///
-/// Deposits are therefore credited on the SPV proof plus confirmations. If
-/// vault-signer authorization is wanted, it needs a signed message format and a
-/// payload extension — exactly what the Solana path got in
-/// `SOLANA_FINALIZED_FORMAT_V1`.
+/// `add_signer_approval` now does verify each approval (real secp256k1 ECDSA
+/// against a domain-separated, deposit-bound message — issue #272), so that
+/// specific gap is closed. This verifier still doesn't read the vault's
+/// approval state, though: that would mean this crate depending on
+/// `x3-bitcoin-vault`'s deposit bookkeeping, which is a real architectural
+/// decision (do SPV confirmation and signer quorum stay two independently
+/// satisfiable gates, or does one wrap the other?) that #272 didn't make and
+/// this fix isn't the place to make either.
+///
+/// Deposits are therefore credited on the SPV proof plus confirmations,
+/// independent of vault signer approvals.
 pub struct BitcoinSpvVerifier {
     pub min_confirmations: u64,
 }
