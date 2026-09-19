@@ -138,6 +138,12 @@ mod precompiles;
 #[cfg(feature = "frontier")]
 use precompiles::FrontierPrecompiles;
 
+// Runtime-level tests (settlement wiring, genesis). This file existed as an
+// undeclared, assertion-free placeholder for a long time; it is a real test
+// module now (see the note at the top of `tests.rs`).
+#[cfg(all(test, feature = "std"))]
+mod tests;
+
 pub mod fraud_proofs;
 
 #[cfg(any(feature = "std", test))]
