@@ -213,6 +213,18 @@ GATES_FAST=(
   # axum 0.7 still has). The library and binary are covered; its tests are a
   # recorded follow-up rather than something this gate pretends to check.
   "nested workspaces:for d in crates/x3-swarm-core services/x3-swarm-api services/x3-swarm-worker services/x3-solvency-sidecar; do echo \"== \$d\"; CARGO_TARGET_DIR=\"/tmp/x3-nested-\$(basename \"\$d\")\" cargo check --locked --all-targets --manifest-path \"\$d/Cargo.toml\" || exit 1; done; echo '== crates/x3-sidecar (lib+bin only; its tests are a follow-up)'; CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo check --locked --manifest-path crates/x3-sidecar/Cargo.toml || exit 1"
+  # `AGENTS.md` asks for `pnpm test`, `pnpm build` and `npm test` before any
+  # task is called complete. Nothing in this harness ran any of them, and
+  # nothing else did either: **412 tests across twelve JS projects** had never
+  # executed. There is no workspace lockfile — the root package.json drives 21
+  # independent `npm --prefix` projects — so each one installs from its own
+  # committed lockfile when `node_modules` is missing, then runs its suite.
+  # Offline, the install fails and the gate reports BLOCKED rather than green.
+  # Tests only, deliberately: `npm run build` passes, but it writes into
+  # **tracked** output (12 deleted + 4 modified files under the committed
+  # `dist/` directories of apps/x3-desktop, packages/polkawallet-plugin and
+  # packages/atomic-swap-sdk), so builds need their own tier.
+  "js sdk tests:for d in packages/ts-sdk packages/atomic-swap-sdk packages/blockchain-connector packages/x3-foundry-sdk packages/polkawallet-bridge-adapter packages/polkawallet-plugin apps/shared apps/wallet apps/inferstructor-dashboard apps/x3-desktop tests/wallet-integration; do echo \"== \$d\"; ( cd \"\$d\" && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test ) || exit 1; done; echo '== apps/x3-studio (pnpm)'; ( cd apps/x3-studio && { [ -d node_modules ] || corepack pnpm install --prefer-offline; } && corepack pnpm test ) || exit 1"
   # Two configurations of the proof-verification router, because the `--deep`
   # workspace build unifies `test-verifier` through the gateway pallet's
   # dev-dependency and would therefore never exercise the fail-closed posture.
