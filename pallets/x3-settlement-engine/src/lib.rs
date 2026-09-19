@@ -2226,6 +2226,27 @@ pub mod pallet {
             }
         }
 
+        /// The two roots a cross-chain proof is verified against, or `None` when
+        /// the proof does not carry both.
+        ///
+        /// `merkle_proof` states the state root first and the second root the
+        /// chain's verifier compares — the transaction/receipt root on EVM, the
+        /// validator-set hash on SVM. Both call sites used to read them with
+        /// `first().copied().unwrap_or_default()` and `get(1).copied()...`, and
+        /// `unwrap_or_default()` on an `H256` is thirty-two zero bytes: a proof
+        /// that carried fewer than two entries was verified against roots it
+        /// never stated, and the result came back as the validator's answer.
+        /// Whether that is exploitable depends on the validator — against a
+        /// canonical header whose roots are zero it passes — so the fix does not
+        /// depend on the answer: a proof that does not carry what it is verified
+        /// against is refused, not completed.
+        fn proof_roots(merkle_proof: &[H256]) -> Option<(H256, H256)> {
+            match merkle_proof {
+                [state_root, second, ..] => Some((*state_root, *second)),
+                _ => None,
+            }
+        }
+
         /// Verify EVM receipt proof
         /// Bridge Integration: Calls cross-chain-validator to verify against canonical headers
         fn verify_evm_receipt_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
@@ -2238,8 +2259,10 @@ pub mod pallet {
                 return Ok(false);
             }
 
-            // Validate proof structure
-            if proof.merkle_proof.is_empty() || proof.receipt_data.is_empty() {
+            // Validate proof structure. The roots the proof is verified against
+            // are read through `proof_roots` below, which is also what requires
+            // the proof to carry both of them; this only checks the receipt.
+            if proof.receipt_data.is_empty() {
                 return Ok(false);
             }
             if proof.confirmations < 1 {
@@ -2272,9 +2295,9 @@ pub mod pallet {
             // Use block_hash directly from proof
             let block_hash = proof.block_hash;
 
-            // Extract state_root and merkle_root from merkle_proof (use first two entries)
-            let state_root = proof.merkle_proof.first().copied().unwrap_or_default();
-            let merkle_root = proof.merkle_proof.get(1).copied().unwrap_or_default();
+            let Some((state_root, merkle_root)) = Self::proof_roots(&proof.merkle_proof) else {
+                return Ok(false);
+            };
 
             // Call cross-chain-validator to verify against canonical header
             let valid = T::CrossChainValidator::verify_evm_proof(
@@ -2284,7 +2307,7 @@ pub mod pallet {
                 merkle_root,
             );
 
-            Ok(valid && !proof.merkle_proof.is_empty())
+            Ok(valid)
         }
 
         /// Validate RLP-encoded receipt structure
@@ -2438,9 +2461,10 @@ pub mod pallet {
             // Use block_hash directly from proof (already validated above)
             let block_hash = proof.block_hash;
 
-            // Extract state_root and validator_set_hash from merkle_proof (use first two entries)
-            let state_root = proof.merkle_proof.first().copied().unwrap_or_default();
-            let validator_set_hash = proof.merkle_proof.get(1).copied().unwrap_or_default();
+            let Some((state_root, validator_set_hash)) = Self::proof_roots(&proof.merkle_proof)
+            else {
+                return Ok(false);
+            };
 
             // Call cross-chain-validator to verify against canonical slot header
             let valid = T::CrossChainValidator::verify_svm_proof(

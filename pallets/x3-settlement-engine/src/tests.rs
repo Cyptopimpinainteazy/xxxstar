@@ -504,7 +504,13 @@ fn create_evm_receipt_proof() -> SettlementProof {
         tx_hash,
         block_hash: H256::from([2u8; 32]),
         confirmations: 12,
-        merkle_proof: (vec![H256::from([3u8; 32])]).try_into().unwrap(),
+        // Two entries, because the module verifies the proof against the
+        // first two: a state root and the transaction root. A one-entry proof
+        // used to have its second root invented as thirty-two zero bytes; see
+        // `a_proof_that_does_not_carry_both_roots_is_refused`.
+        merkle_proof: (vec![H256::from([3u8; 32]), H256::from([7u8; 32])])
+            .try_into()
+            .unwrap(),
         receipt_data: receipt_data.try_into().unwrap(),
     }
 }
@@ -552,7 +558,11 @@ fn create_solana_proof() -> SettlementProof {
         tx_hash: H256::from([4u8; 32]),
         block_hash: H256::from(blockhash_bytes),
         confirmations: 32,
-        merkle_proof: (vec![H256::from([6u8; 32])]).try_into().unwrap(),
+        // Two entries: the state root and the validator-set hash, which is
+        // what `verify_svm_proof` is handed. See the EVM helper above.
+        merkle_proof: (vec![H256::from([6u8; 32]), H256::from([8u8; 32])])
+            .try_into()
+            .unwrap(),
         receipt_data: tx_data.try_into().unwrap(),
     }
 }
@@ -793,7 +803,9 @@ fn settlement_fails_with_empty_receipt() {
             tx_hash: H256::from([1u8; 32]),
             block_hash: H256::from([2u8; 32]),
             confirmations: 12,
-            merkle_proof: (vec![H256::from([3u8; 32])]).try_into().unwrap(),
+            merkle_proof: (vec![H256::from([3u8; 32]), H256::from([7u8; 32])])
+                .try_into()
+                .unwrap(),
             receipt_data: vec![].try_into().unwrap(), // Empty = invalid
         };
 
@@ -935,7 +947,9 @@ fn settlement_fails_with_invalid_evm_proof() {
             tx_hash: H256::from([1u8; 32]),
             block_hash: H256::from([2u8; 32]),
             confirmations: 12,
-            merkle_proof: (vec![H256::from([3u8; 32])]).try_into().unwrap(),
+            merkle_proof: (vec![H256::from([3u8; 32]), H256::from([7u8; 32])])
+                .try_into()
+                .unwrap(),
             receipt_data: vec![].try_into().unwrap(), // Empty = invalid
         };
 
@@ -1431,7 +1445,9 @@ fn multiple_parallel_settlements_independent() {
                     tx_hash,
                     block_hash: H256::from(sp_io::hashing::keccak_256(intent_id.as_bytes())),
                     confirmations: 12,
-                    merkle_proof: (vec![H256::from([3u8; 32])]).try_into().unwrap(),
+                    merkle_proof: (vec![H256::from([3u8; 32]), H256::from([7u8; 32])])
+                        .try_into()
+                        .unwrap(),
                     receipt_data: receipt_data.try_into().unwrap(),
                 }
             };
@@ -2969,4 +2985,44 @@ fn submit_canonical_claim_proof_set(intent_id: H256) {
         intent_id,
         proof_set,
     ));
+}
+
+#[test]
+fn a_proof_that_does_not_carry_both_roots_is_refused() {
+    // A cross-chain proof is verified against the first two entries of its
+    // `merkle_proof`: the state root and, for the chain's verifier, the
+    // transaction/receipt root (EVM) or the validator-set hash (SVM). Both sites
+    // read those two with `first().copied().unwrap_or_default()` and
+    // `get(1).copied().unwrap_or_default()`, and `unwrap_or_default()` on an
+    // `H256` is thirty-two zero bytes — so a proof carrying fewer than two
+    // entries was verified against roots it never stated and the result was
+    // returned as the validator's answer. The EVM site's
+    // `valid && !proof.merkle_proof.is_empty()` was the author reaching for this
+    // check and getting the length wrong (non-empty is one entry); the SVM site
+    // had no check at all.
+    //
+    // The test asserts the positive case first, so it cannot pass by the module
+    // refusing every proof: the same fixture with its two roots verifies, and
+    // shortening that list is the only change.
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        for (chain, mut proof) in [
+            (ExternalChainId::Ethereum, create_evm_receipt_proof()),
+            (ExternalChainId::Solana, create_solana_proof()),
+        ] {
+            assert!(
+                Pallet::<Test>::verify_proof(&chain, &proof).unwrap(),
+                "the fixture must verify before its roots are removed: {chain:?}"
+            );
+            for length in [0usize, 1] {
+                proof.merkle_proof =
+                    BoundedVec::try_from(vec![H256::from([9u8; 32]); length]).unwrap();
+                assert!(
+                    !Pallet::<Test>::verify_proof(&chain, &proof).unwrap(),
+                    "a proof with {length} merkle_proof entries must be refused for {chain:?}: the \
+                     roots it would be verified against are not in it"
+                );
+            }
+        }
+    });
 }
