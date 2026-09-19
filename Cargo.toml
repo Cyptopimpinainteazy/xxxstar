@@ -287,6 +287,8 @@ members = [
     "pallets/pallet-x3-control",
     # Burn-down batch 14 (issue #274).
     "crates/x3-pq",
+    # Burn-down batch 15 (issue #274).
+    "crates/x3-mobile-sdk",
 ]
 default-members = ["node"]
 resolver = "2"

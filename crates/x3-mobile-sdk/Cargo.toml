@@ -7,17 +7,16 @@ description = "X3 Mobile Wallet SDK for iOS/Android via React Native"
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 hex = "0.4"
-sp-core = { workspace = true }
+url = "2.5"
+urlencoding = "2.1"
+uuid = { version = "1.6", features = ["v4"] }
 sp-runtime = { workspace = true }
-substrate-api-client = "0.20"
 ed25519-zebra = "3.1"
 k256 = { version = "0.13", features = ["ecdsa"] }
 sha2 = "0.10"
 bip32 = "0.5"
 bip39 = "2.0"
-blake2 = "0.10"
 rand = "0.8"
 chrono = "0.4"
 thiserror = "1.0"
@@ -25,10 +24,8 @@ tracing = "0.1"
 bytes = "1.5"
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
 
-[dev-dependencies]
-tokio-test = "0.4"
-mockall = "0.12"
-
-[[test]]
-name = "mobile_wallet_integration"
-path = "tests/integration_tests.rs"
+# Removed with the burn-down: `serde_json`, `sp-core`, `blake2` and the two
+# dev-dependencies were never referenced by any module, and `substrate-api-client`
+# (a large tree) was not either. The `[[test]] mobile_wallet_integration` target
+# pointed at `tests/integration_tests.rs`, which does not exist — no test target
+# has ever been buildable from this manifest.

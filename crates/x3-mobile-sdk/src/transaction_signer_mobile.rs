@@ -1,5 +1,5 @@
 //! Mobile transaction signing
-//! 
+//!
 //! Handles transaction signing on-device without exposing private keys.
 //! Supports ED25519 and ECDSA signatures.
 
@@ -56,11 +56,17 @@ struct SigningQueueEntry {
     priority: SigningPriority,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum SigningPriority {
+/// How urgent a queued signing request is. The queue is drained
+/// highest-priority-first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum SigningPriority {
+    /// Batch operations.
     Low = 0,
+    /// Ordinary user transactions (the default).
     Normal = 1,
+    /// Time-sensitive, e.g. a liquidation guard.
     High = 2,
+    /// Must go out before anything else, e.g. an emergency exit.
     Critical = 3,
 }
 
@@ -68,10 +74,10 @@ enum SigningPriority {
 pub struct MobileTransactionSigner {
     // Private keys stored securely (in production: iOS Secure Enclave / Android KeyStore)
     private_keys: std::sync::Mutex<std::collections::HashMap<String, Vec<u8>>>,
-    
+
     // Pending signing requests queue
     signing_queue: tokio::sync::Mutex<Vec<SigningQueueEntry>>,
-    
+
     // Signing timeout (120 seconds = 2 minutes)
     signing_timeout: i64,
 }
@@ -97,8 +103,11 @@ impl MobileTransactionSigner {
             return Err(SdkError::SigningError("Invalid key size".to_string()));
         }
 
-        let mut keys = self.private_keys.lock().expect("private_keys mutex poisoned");
-        
+        let mut keys = self
+            .private_keys
+            .lock()
+            .expect("private_keys mutex poisoned");
+
         // Store with algorithm prefix
         let key_id = format!("{}:{:?}", address, algorithm);
         keys.insert(key_id, private_key.to_vec());
@@ -109,8 +118,11 @@ impl MobileTransactionSigner {
 
     /// Remove account (secure deletion)
     pub async fn remove_account(&self, address: &str) -> Result<(), SdkError> {
-        let mut keys = self.private_keys.lock().expect("private_keys mutex poisoned");
-        
+        let mut keys = self
+            .private_keys
+            .lock()
+            .expect("private_keys mutex poisoned");
+
         // Remove all algorithm variants
         keys.retain(|k, v| {
             if k.starts_with(address) {
@@ -133,7 +145,7 @@ impl MobileTransactionSigner {
         algorithm: SignatureAlgorithm,
     ) -> SigningRequest {
         let now = chrono::Utc::now().timestamp();
-        
+
         SigningRequest {
             request_id: uuid::Uuid::new_v4().to_string(),
             payload,
@@ -146,30 +158,41 @@ impl MobileTransactionSigner {
 
     /// Queue a signing request (user reviews and approves)
     pub async fn queue_signing_request(&self, request: SigningRequest) -> Result<String, SdkError> {
+        self.queue_signing_request_with_priority(request, SigningPriority::Normal)
+            .await
+    }
+
+    /// Queue a signing request at a given priority.
+    ///
+    /// The queue already drained highest-priority-first, but every entry was
+    /// created with `Normal`, so the ordering could never matter. `High` and
+    /// `Critical` are reachable through this entry point.
+    pub async fn queue_signing_request_with_priority(
+        &self,
+        request: SigningRequest,
+        priority: SigningPriority,
+    ) -> Result<String, SdkError> {
         if request.is_expired() {
             return Err(SdkError::SigningError("Request expired".to_string()));
         }
 
         let request_id = request.request_id.clone();
-        
-        let entry = SigningQueueEntry {
-            request,
-            priority: SigningPriority::Normal,
-        };
+
+        let entry = SigningQueueEntry { request, priority };
 
         self.signing_queue.lock().await.push(entry);
 
-        tracing::info!("Queued signing request: {}", request_id);
+        tracing::info!("Queued signing request: {} ({:?})", request_id, priority);
         Ok(request_id)
     }
 
     /// Get pending signing requests
     pub async fn get_pending_requests(&self) -> Result<Vec<SigningRequest>, SdkError> {
         let mut queue = self.signing_queue.lock().await;
-        
+
         // Remove expired requests
         queue.retain(|entry| !entry.request.is_expired());
-        
+
         // Sort by priority
         queue.sort_by_key(|entry| std::cmp::Reverse(entry.priority));
 
@@ -177,32 +200,31 @@ impl MobileTransactionSigner {
     }
 
     /// Approve and sign a request
-    pub async fn approve_and_sign(
-        &self,
-        request_id: &str,
-    ) -> Result<SignedTransaction, SdkError> {
+    pub async fn approve_and_sign(&self, request_id: &str) -> Result<SignedTransaction, SdkError> {
         let mut queue = self.signing_queue.lock().await;
 
-        if let Some(pos) = queue.iter().position(|entry| entry.request.request_id == request_id) {
+        if let Some(pos) = queue
+            .iter()
+            .position(|entry| entry.request.request_id == request_id)
+        {
             let entry = queue.remove(pos);
             let request = entry.request;
 
             // Find private key
-            let keys = self.private_keys.lock().expect("private_keys mutex poisoned");
+            let keys = self
+                .private_keys
+                .lock()
+                .expect("private_keys mutex poisoned");
             let key_id = format!("{}:{:?}", request.account_address, request.algorithm);
-            
+
             let private_key = keys
                 .get(&key_id)
                 .ok_or_else(|| SdkError::SigningError("Account not found".to_string()))?;
 
             // Sign payload
             let signature = match request.algorithm {
-                SignatureAlgorithm::ED25519 => {
-                    sign_ed25519(private_key, &request.payload)?
-                }
-                SignatureAlgorithm::ECDSA => {
-                    sign_ecdsa(private_key, &request.payload)?
-                }
+                SignatureAlgorithm::ED25519 => sign_ed25519(private_key, &request.payload)?,
+                SignatureAlgorithm::ECDSA => sign_ecdsa(private_key, &request.payload)?,
             };
 
             // Derive public key from private key
@@ -229,7 +251,10 @@ impl MobileTransactionSigner {
     pub async fn reject_signing_request(&self, request_id: &str) -> Result<(), SdkError> {
         let mut queue = self.signing_queue.lock().await;
 
-        if let Some(pos) = queue.iter().position(|entry| entry.request.request_id == request_id) {
+        if let Some(pos) = queue
+            .iter()
+            .position(|entry| entry.request.request_id == request_id)
+        {
             let _ = queue.remove(pos);
             tracing::info!("Rejected signing request: {}", request_id);
             Ok(())
@@ -241,7 +266,10 @@ impl MobileTransactionSigner {
     }
 
     /// Bulk sign requests (batch signing)
-    pub async fn batch_sign(&self, request_ids: Vec<String>) -> Result<Vec<SignedTransaction>, SdkError> {
+    pub async fn batch_sign(
+        &self,
+        request_ids: Vec<String>,
+    ) -> Result<Vec<SignedTransaction>, SdkError> {
         let mut results = Vec::new();
 
         for request_id in request_ids {
@@ -266,12 +294,8 @@ impl MobileTransactionSigner {
         algorithm: SignatureAlgorithm,
     ) -> Result<bool, SdkError> {
         match algorithm {
-            SignatureAlgorithm::ED25519 => {
-                verify_ed25519_sig(payload, signature, public_key)
-            }
-            SignatureAlgorithm::ECDSA => {
-                verify_ecdsa_sig(payload, signature, public_key)
-            }
+            SignatureAlgorithm::ED25519 => verify_ed25519_sig(payload, signature, public_key),
+            SignatureAlgorithm::ECDSA => verify_ecdsa_sig(payload, signature, public_key),
         }
     }
 
@@ -289,8 +313,12 @@ impl MobileTransactionSigner {
 }
 
 // ============================================================================
-// Cryptographic signing functions (placeholder implementations)
-// In production: use proper cryptographic libraries
+// Cryptographic signing functions.
+//
+// These are real: ed25519-zebra for Ed25519 and RustCrypto's k256 for ECDSA.
+// (The header used to call them placeholder implementations, which was wrong in
+// the direction that matters least but still wrong.) What this crate does not
+// have is a chain client — see `MobileWallet::fetch_balance`.
 // ============================================================================
 
 fn sign_ed25519(private_key: &[u8], payload: &[u8]) -> Result<Vec<u8>, SdkError> {
@@ -299,7 +327,9 @@ fn sign_ed25519(private_key: &[u8], payload: &[u8]) -> Result<Vec<u8>, SdkError>
         .map_err(|_| SdkError::Crypto("ed25519 private key must be 32 bytes".to_string()))?;
     let signing_key = ed25519_zebra::SigningKey::from(seed);
     let signature = signing_key.sign(payload);
-    Ok(signature.to_bytes().to_vec())
+    // ed25519-zebra 3.x exposes no `to_bytes`; the conversion is `From`.
+    let bytes: [u8; 64] = signature.into();
+    Ok(bytes.to_vec())
 }
 
 fn sign_ecdsa(private_key: &[u8], payload: &[u8]) -> Result<Vec<u8>, SdkError> {
@@ -312,43 +342,57 @@ fn sign_ecdsa(private_key: &[u8], payload: &[u8]) -> Result<Vec<u8>, SdkError> {
     Ok(sig.to_vec())
 }
 
-fn derive_public_key(algorithm: &SignatureAlgorithm, private_key: &[u8]) -> Result<Vec<u8>, SdkError> {
+fn derive_public_key(
+    algorithm: &SignatureAlgorithm,
+    private_key: &[u8],
+) -> Result<Vec<u8>, SdkError> {
     match algorithm {
         SignatureAlgorithm::ED25519 => {
-            let seed: [u8; 32] = private_key
-                .try_into()
-                .map_err(|_| SdkError::Crypto("ed25519 private key must be 32 bytes".to_string()))?;
+            let seed: [u8; 32] = private_key.try_into().map_err(|_| {
+                SdkError::Crypto("ed25519 private key must be 32 bytes".to_string())
+            })?;
             let signing_key = ed25519_zebra::SigningKey::from(seed);
             let verification_key = ed25519_zebra::VerificationKey::from(&signing_key);
-            Ok(verification_key.as_bytes().to_vec())
+            let bytes: [u8; 32] = verification_key.into();
+            Ok(bytes.to_vec())
         }
         SignatureAlgorithm::ECDSA => {
             use k256::ecdsa::SigningKey;
-            let signing_key = SigningKey::from_slice(private_key)
-                .map_err(|e| SdkError::Crypto(e.to_string()))?;
+            let signing_key =
+                SigningKey::from_slice(private_key).map_err(|e| SdkError::Crypto(e.to_string()))?;
             Ok(signing_key.verifying_key().to_sec1_bytes().to_vec())
         }
     }
 }
 
-fn verify_ed25519_sig(payload: &[u8], signature: &[u8], public_key: &[u8]) -> Result<bool, SdkError> {
+fn verify_ed25519_sig(
+    payload: &[u8],
+    signature: &[u8],
+    public_key: &[u8],
+) -> Result<bool, SdkError> {
     let pk_bytes: [u8; 32] = public_key
         .try_into()
         .map_err(|_| SdkError::Crypto("ed25519 public key must be 32 bytes".to_string()))?;
     let sig_bytes: [u8; 64] = signature
         .try_into()
         .map_err(|_| SdkError::Crypto("ed25519 signature must be 64 bytes".to_string()))?;
-    let pk = ed25519_zebra::VerificationKey::from(pk_bytes);
+    // `try_from` validates that the bytes are a point on the curve; `from` does
+    // not exist for this type. A public key that is not a valid point is a
+    // malformed key, not a verification failure.
+    let pk = ed25519_zebra::VerificationKey::try_from(pk_bytes).map_err(|_| {
+        SdkError::Crypto("ed25519 public key is not a valid curve point".to_string())
+    })?;
     let sig = ed25519_zebra::Signature::from(sig_bytes);
-    Ok(pk.verify(payload, &sig).is_ok())
+    // `verify` takes (signature, message) — the arguments here used to be the
+    // other way round.
+    Ok(pk.verify(&sig, payload).is_ok())
 }
 
 fn verify_ecdsa_sig(payload: &[u8], signature: &[u8], public_key: &[u8]) -> Result<bool, SdkError> {
     use k256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
-    let sig = Signature::from_slice(signature)
-        .map_err(|e| SdkError::Crypto(e.to_string()))?;
-    let vk = VerifyingKey::from_sec1_bytes(public_key)
-        .map_err(|e| SdkError::Crypto(e.to_string()))?;
+    let sig = Signature::from_slice(signature).map_err(|e| SdkError::Crypto(e.to_string()))?;
+    let vk =
+        VerifyingKey::from_sec1_bytes(public_key).map_err(|e| SdkError::Crypto(e.to_string()))?;
     Ok(vk.verify(payload, &sig).is_ok())
 }
 
@@ -363,10 +407,13 @@ mod tests {
             payload: vec![1, 2, 3],
             algorithm: SignatureAlgorithm::ED25519,
             account_address: "x3:account".to_string(),
-            request_time: 0,
-            expires_at: 999999999,
+            request_time: chrono::Utc::now().timestamp(),
+            // `999999999` is 2001-09-08, so the request was always expired and
+            // this assertion could not hold.
+            expires_at: chrono::Utc::now().timestamp() + 300,
         };
         assert!(!request.is_expired());
+        assert!(request.remaining_seconds() > 0);
     }
 
     #[test]
@@ -403,7 +450,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_signing_request() {
         let signer = MobileTransactionSigner::new(120);
-        
+
         let request = signer.create_signing_request(
             vec![1, 2, 3],
             "x3:account".to_string(),
@@ -417,7 +464,7 @@ mod tests {
     #[tokio::test]
     async fn test_queue_signing_request() {
         let signer = MobileTransactionSigner::new(120);
-        
+
         let request = signer.create_signing_request(
             vec![1, 2, 3],
             "x3:account".to_string(),
@@ -431,9 +478,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_queue_drains_highest_priority_first() {
+        let signer = MobileTransactionSigner::new(120);
+
+        let queued = |id: &str, priority: SigningPriority| {
+            let request = signer.create_signing_request(
+                vec![1, 2, 3],
+                "x3:account".to_string(),
+                SignatureAlgorithm::ED25519,
+            );
+            let request = SigningRequest {
+                request_id: id.to_string(),
+                ..request
+            };
+            let signer = &signer;
+            async move {
+                signer
+                    .queue_signing_request_with_priority(request, priority)
+                    .await
+            }
+        };
+
+        // Queued lowest-first, so the order can only come from the priority.
+        queued("low", SigningPriority::Low).await.unwrap();
+        queued("critical", SigningPriority::Critical).await.unwrap();
+        queued("normal", SigningPriority::Normal).await.unwrap();
+        queued("high", SigningPriority::High).await.unwrap();
+
+        let pending = signer.get_pending_requests().await.unwrap();
+        let order: Vec<&str> = pending.iter().map(|r| r.request_id.as_str()).collect();
+        assert_eq!(order, vec!["critical", "high", "normal", "low"]);
+    }
+
+    #[tokio::test]
     async fn test_get_pending_requests() {
         let signer = MobileTransactionSigner::new(120);
-        
+
         let request = signer.create_signing_request(
             vec![1, 2, 3],
             "x3:account".to_string(),
@@ -441,7 +521,7 @@ mod tests {
         );
 
         signer.queue_signing_request(request.clone()).await.unwrap();
-        
+
         let pending = signer.get_pending_requests().await.unwrap();
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].request_id, request.request_id);
@@ -450,7 +530,7 @@ mod tests {
     #[tokio::test]
     async fn test_reject_signing_request() {
         let signer = MobileTransactionSigner::new(120);
-        
+
         let request = signer.create_signing_request(
             vec![1, 2, 3],
             "x3:account".to_string(),
@@ -459,7 +539,7 @@ mod tests {
 
         let request_id = request.request_id.clone();
         signer.queue_signing_request(request).await.unwrap();
-        
+
         let result = signer.reject_signing_request(&request_id).await;
         assert!(result.is_ok());
 
@@ -484,7 +564,7 @@ mod tests {
     #[tokio::test]
     async fn test_queue_size() {
         let signer = MobileTransactionSigner::new(120);
-        
+
         let request1 = signer.create_signing_request(
             vec![1],
             "x3:account".to_string(),
@@ -506,7 +586,7 @@ mod tests {
     #[tokio::test]
     async fn test_clear_queue() {
         let signer = MobileTransactionSigner::new(120);
-        
+
         let request = signer.create_signing_request(
             vec![1, 2, 3],
             "x3:account".to_string(),
