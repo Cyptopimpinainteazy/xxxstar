@@ -4,6 +4,7 @@
 //! Chain ID: 137
 
 use crate::adapter::*;
+use crate::error::ExternalChainError;
 use crate::ChainType;
 use sp_core::{H160, H256, U256};
 use sp_std::vec::Vec;
@@ -92,8 +93,13 @@ impl PolygonAdapter {
     /// Get checkpoint data for exit proofs
     #[allow(dead_code)]
     async fn get_checkpoint(&self, _block_number: u64) -> AdapterResult<H256> {
-        // Polygon uses checkpoints submitted to Ethereum
-        Ok(H256::zero())
+        // Refused: this returned the zero hash for every block, which reads as
+        // "this block has a checkpoint and it is zero". Polygon checkpoints are
+        // submitted to Ethereum, and this adapter cannot read Ethereum state.
+        Err(ExternalChainError::adapter_unimplemented(
+            "polygon: checkpoints live on Ethereum's RootChain contract; this adapter cannot \
+             read them and refuses rather than returning the zero hash",
+        ))
     }
 }
 
@@ -108,75 +114,85 @@ impl ChainAdapter for PolygonAdapter {
     }
 
     async fn is_connected(&self) -> bool {
-        true
+        // Real `eth_chainId` probe: the endpoint must answer *as this chain*.
+        matches!(
+            crate::evm_rpc::chain_id(&crate::evm_rpc::url(&self.config)).await,
+            Ok(id) if id == self.config.chain_type
+        )
     }
 
     async fn get_block_number(&self) -> AdapterResult<u64> {
-        Ok(65_000_000) // Polygon block number
+        crate::evm_rpc::block_number(&crate::evm_rpc::url(&self.config)).await
     }
 
-    async fn get_balance(&self, _address: H160) -> AdapterResult<U256> {
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_balance(&self, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::balance(&crate::evm_rpc::url(&self.config), address).await
     }
 
-    async fn get_token_balance(&self, _token: H160, _address: H160) -> AdapterResult<U256> {
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_token_balance(&self, token: H160, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::token_balance(&crate::evm_rpc::url(&self.config), token, address).await
     }
 
-    async fn send_message(&self, message: ChainMessage) -> AdapterResult<H256> {
-        // Uses StateSender for Polygon->Ethereum messages
-        Ok(message.hash())
+    async fn send_message(&self, _message: ChainMessage) -> AdapterResult<H256> {
+        // Refused, not invented: this returned `message.hash()` for a message
+        // that was never broadcast through StateSender.
+        Err(ExternalChainError::adapter_unimplemented(
+            "polygon: send_message needs a signed StateSender transaction and this adapter has \
+             no signer",
+        ))
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        // Query StateSync events
-        Ok(vec![])
+        // Refused: an empty list reads as "no StateSync events".
+        Err(ExternalChainError::adapter_unimplemented(
+            "polygon: receive_messages cannot decode StateSync events yet",
+        ))
     }
 
-    async fn initiate_transfer(&self, transfer: CrossChainTransfer) -> AdapterResult<H256> {
-        // Deposit via RootChainManager (Ethereum->Polygon)
-        // Or burn via ChildToken (Polygon->Ethereum)
-        Ok(transfer.id)
+    async fn initiate_transfer(&self, _transfer: CrossChainTransfer) -> AdapterResult<H256> {
+        // Refused: this returned `transfer.id` for a deposit/burn never sent.
+        Err(ExternalChainError::adapter_unimplemented(
+            "polygon: initiate_transfer needs a signed RootChainManager/ChildToken transaction \
+             and this adapter has no signer",
+        ))
     }
 
     async fn check_transfer_status(&self, _transfer_id: H256) -> AdapterResult<TransferStatus> {
-        // Check checkpoint inclusion for exits
-        Ok(TransferStatus::Completed)
+        // Refused: this answered `Completed` for every transfer id.
+        Err(ExternalChainError::adapter_unimplemented(
+            "polygon: check_transfer_status needs checkpoint inclusion, which this adapter cannot \
+             read; refusing rather than reporting every transfer as complete",
+        ))
     }
 
     async fn verify_message_proof(
         &self,
         _message: &ChainMessage,
-        proof: &[u8],
+        _proof: &[u8],
     ) -> AdapterResult<bool> {
-        // Polygon uses Merkle proof against checkpoint
-        // Requires block to be checkpointed (~30 min to 1 hr)
-        Ok(!proof.is_empty())
+        // Refused, not shape-checked: a Polygon exit proof is a Merkle proof
+        // against a checkpointed root, and `!proof.is_empty()` is not that.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
-    async fn finalize_transfer(&self, transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
-        // Call exit() on RootChainManager with proof
-        Ok(transfer_id)
+    async fn finalize_transfer(&self, _transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
+        // Refused: this returned the transfer id as though `exit()` had run.
+        Err(ExternalChainError::adapter_unimplemented(
+            "polygon: finalize_transfer needs a signed RootChainManager exit and a proof this \
+             adapter cannot verify",
+        ))
     }
 
     async fn estimate_gas_price(&self) -> AdapterResult<U256> {
-        // Polygon has very low gas prices
-        Ok(U256::from(30_000_000_000u64)) // 30 gwei
+        crate::evm_rpc::gas_price(&crate::evm_rpc::url(&self.config)).await
     }
 
     async fn get_transaction_receipt(
         &self,
         tx_hash: H256,
     ) -> AdapterResult<Option<TransactionReceipt>> {
-        Ok(Some(TransactionReceipt {
-            tx_hash,
-            block_number: 65_000_000,
-            block_hash: H256::zero(),
-            tx_index: 0,
-            success: true,
-            gas_used: 21_000,
-            logs: vec![],
-        }))
+        // Refused: this reported `success: true` for every transaction hash.
+        crate::evm_rpc::receipt(&crate::evm_rpc::url(&self.config), tx_hash).await
     }
 }
 

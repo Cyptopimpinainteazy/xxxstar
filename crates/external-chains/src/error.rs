@@ -60,6 +60,16 @@ pub enum ExternalChainError {
     /// verifier used to answer `Ok(true)` for any non-empty proof blob, which
     /// is indistinguishable from a proof that actually verified.
     VerificationUnavailable,
+    /// The adapter has no implementation for this operation, so nothing ran.
+    ///
+    /// Distinct from every other variant here: those describe an outcome of an
+    /// attempt, while this says no attempt was possible. It exists because the
+    /// chain adapters used to answer these calls with invented values — a
+    /// balance of exactly 1 ETH for any address, `Completed` for any transfer,
+    /// a transaction hash for a message that was never broadcast. A fabricated
+    /// success is worse than a refusal: the relayer cannot tell it apart from
+    /// the real thing.
+    AdapterUnimplemented(Vec<u8>),
 }
 
 impl ExternalChainError {
@@ -91,6 +101,11 @@ impl ExternalChainError {
     /// Create internal error
     pub fn internal(msg: &str) -> Self {
         Self::InternalError(msg.as_bytes().to_vec())
+    }
+
+    /// Refuse an operation this adapter has no implementation for.
+    pub fn adapter_unimplemented(msg: &str) -> Self {
+        Self::AdapterUnimplemented(msg.as_bytes().to_vec())
     }
 }
 
@@ -127,6 +142,11 @@ impl core::fmt::Display for ExternalChainError {
             Self::VerificationUnavailable => write!(
                 f,
                 "no verifier is implemented for this proof type; refusing to verify"
+            ),
+            Self::AdapterUnimplemented(msg) => write!(
+                f,
+                "adapter has no implementation for this operation: {}",
+                String::from_utf8_lossy(msg)
             ),
             Self::InternalError(msg) => {
                 write!(f, "Internal error: {}", String::from_utf8_lossy(msg))

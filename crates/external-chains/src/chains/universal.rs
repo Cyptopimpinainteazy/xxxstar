@@ -200,79 +200,89 @@ impl ChainAdapter for UniversalEvmAdapter {
     }
 
     async fn is_connected(&self) -> bool {
-        // In production: check RPC connectivity
-        true
+        // Real `eth_chainId` probe: the endpoint must answer *as this chain*.
+        matches!(
+            crate::evm_rpc::chain_id(&crate::evm_rpc::url(&self.config)).await,
+            Ok(id) if id == self.info.chain_id
+        )
     }
 
     async fn get_block_number(&self) -> AdapterResult<u64> {
-        // In production: eth_blockNumber RPC call
-        // Estimate based on block time
-        let estimated = 20_000_000u64; // Base estimate
-        Ok(estimated)
+        crate::evm_rpc::block_number(&crate::evm_rpc::url(&self.config)).await
     }
 
-    async fn get_balance(&self, _address: H160) -> AdapterResult<U256> {
-        // In production: eth_getBalance RPC call
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_balance(&self, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::balance(&crate::evm_rpc::url(&self.config), address).await
     }
 
-    async fn get_token_balance(&self, _token: H160, _address: H160) -> AdapterResult<U256> {
-        // In production: ERC20 balanceOf call
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_token_balance(&self, token: H160, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::token_balance(&crate::evm_rpc::url(&self.config), token, address).await
     }
 
-    async fn send_message(&self, message: ChainMessage) -> AdapterResult<H256> {
-        // Generic cross-chain message
-        Ok(message.hash())
+    async fn send_message(&self, _message: ChainMessage) -> AdapterResult<H256> {
+        // Refused, not invented: a universal adapter cannot know this chain's
+        // messaging contract, so it cannot send anything. It used to return
+        // `message.hash()` for a message that was never broadcast anywhere.
+        Err(ExternalChainError::adapter_unimplemented(
+            "universal: this chain's messaging contract is not configured, so no message can be \
+             sent; refusing rather than returning a hash for an unsent message",
+        ))
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        Ok(vec![])
+        // Refused: an empty list reads as "no pending messages".
+        Err(ExternalChainError::adapter_unimplemented(
+            "universal: no message decoder is configured for this chain; refusing rather than \
+             reporting an empty message queue",
+        ))
     }
 
-    async fn initiate_transfer(&self, transfer: CrossChainTransfer) -> AdapterResult<H256> {
-        Ok(transfer.id)
+    async fn initiate_transfer(&self, _transfer: CrossChainTransfer) -> AdapterResult<H256> {
+        // Refused: this returned `transfer.id` for a transfer never sent.
+        Err(ExternalChainError::adapter_unimplemented(
+            "universal: no bridge contract is configured for this chain, so no transfer can be \
+             initiated; refusing rather than returning an id for an uninitiated transfer",
+        ))
     }
 
     async fn check_transfer_status(&self, _transfer_id: H256) -> AdapterResult<TransferStatus> {
-        Ok(TransferStatus::Completed)
+        // Refused: this answered `Completed` for every transfer id, including
+        // ids that do not exist.
+        Err(ExternalChainError::adapter_unimplemented(
+            "universal: nothing here can tell a relayed transfer from an unrelayed one; refusing \
+             rather than reporting every transfer as complete",
+        ))
     }
 
     async fn verify_message_proof(
         &self,
         _message: &ChainMessage,
-        proof: &[u8],
+        _proof: &[u8],
     ) -> AdapterResult<bool> {
-        Ok(!proof.is_empty())
+        // Refused, not shape-checked: `!proof.is_empty()` accepts any byte
+        // string, and no per-chain verifier exists here to do better.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
-    async fn finalize_transfer(&self, transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
-        Ok(transfer_id)
+    async fn finalize_transfer(&self, _transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
+        // Refused: this returned the transfer id as though finalization had run.
+        Err(ExternalChainError::adapter_unimplemented(
+            "universal: no finalization path is configured for this chain; refusing rather than \
+             returning an id for an unfinalized transfer",
+        ))
     }
 
     async fn estimate_gas_price(&self) -> AdapterResult<U256> {
-        // Default gas prices vary by chain
-        let base_price = if self.info.is_l2 {
-            1_000_000u64 // L2s are cheap
-        } else {
-            20_000_000_000u64 // L1s ~20 gwei
-        };
-        Ok(U256::from(base_price))
+        crate::evm_rpc::gas_price(&crate::evm_rpc::url(&self.config)).await
     }
 
     async fn get_transaction_receipt(
         &self,
         tx_hash: H256,
     ) -> AdapterResult<Option<TransactionReceipt>> {
-        Ok(Some(TransactionReceipt {
-            tx_hash,
-            block_number: 20_000_000,
-            block_hash: H256::zero(),
-            tx_index: 0,
-            success: true,
-            gas_used: 21_000,
-            logs: vec![],
-        }))
+        // Refused: this reported `success: true` at block 20_000_000 for every
+        // transaction hash, including hashes that were never mined.
+        crate::evm_rpc::receipt(&crate::evm_rpc::url(&self.config), tx_hash).await
     }
 }
 
@@ -342,13 +352,38 @@ mod tests {
         assert_eq!(&calldata[0..4], &[0xa9, 0x05, 0x9c, 0xbb]);
     }
 
+    /// An endpoint that answers nothing must produce no answers.
+    ///
+    /// This replaces a test that asserted `is_connected().await == true` and
+    /// `get_balance(zero) > 0` for a public RPC endpoint. It passed without a
+    /// network because the adapter invented both: `is_connected` returned a
+    /// constant `true` and `get_balance` a constant 1 ETH for every address.
+    /// Pointing the adapter at a port nothing listens on is the honest version
+    /// of the same check — a chain adapter must not be able to produce a
+    /// balance, a block number or a connectivity claim out of nothing.
     #[tokio::test]
-    async fn test_adapter_methods() {
-        let adapter = adapter_for(137).unwrap(); // Polygon
-        assert!(adapter.is_connected().await);
+    async fn an_endpoint_that_answers_nothing_produces_no_answers() {
+        let adapter = onboard_external_adapter(
+            137,
+            "http://127.0.0.1:1",
+            H160::from_low_u64_be(0xBEEF),
+            H160::from_low_u64_be(0xCAFE),
+            1,
+        )
+        .unwrap();
 
-        let balance = adapter.get_balance(H160::zero()).await.unwrap();
-        assert!(balance > U256::zero());
+        assert!(
+            !adapter.is_connected().await,
+            "an endpoint that is not answering is not connected"
+        );
+        assert!(
+            adapter.get_balance(H160::zero()).await.is_err(),
+            "a balance must come from the chain, not from a constant"
+        );
+        assert!(
+            adapter.get_block_number().await.is_err(),
+            "a block number must come from the chain"
+        );
     }
 
     #[test]

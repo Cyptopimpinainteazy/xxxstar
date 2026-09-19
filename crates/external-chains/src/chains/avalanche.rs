@@ -4,6 +4,7 @@
 //! Chain ID: 43114
 
 use crate::adapter::*;
+use crate::error::ExternalChainError;
 use crate::ChainType;
 use sp_core::{H160, H256, U256};
 use sp_std::vec::Vec;
@@ -84,16 +85,23 @@ impl AvalancheAdapter {
     /// Avalanche-specific: Get P-Chain block height
     #[allow(dead_code)]
     async fn get_p_chain_height(&self) -> AdapterResult<u64> {
-        // Avalanche has multiple chains (X, P, C)
-        // P-Chain is for staking/validation
-        Ok(50_000_000)
+        // Refused: this returned a constant 50_000_000. The P-Chain speaks a
+        // different RPC (`platform.getHeight`) from the C-Chain's JSON-RPC, and
+        // this adapter only knows the latter.
+        Err(ExternalChainError::adapter_unimplemented(
+            "avalanche: the P-Chain uses platform.* RPC, not Ethereum JSON-RPC; refusing rather \
+             than returning a constant height",
+        ))
     }
 
     /// Check if subnet is validated
     #[allow(dead_code)]
     async fn is_subnet_validated(&self, _subnet_id: H256) -> AdapterResult<bool> {
-        // Avalanche subnets can have custom validation
-        Ok(true)
+        // Refused: this answered `true` for every subnet id, including ones
+        // that do not exist. Subnet validation is P-Chain state.
+        Err(ExternalChainError::adapter_unimplemented(
+            "avalanche: subnet validation is P-Chain state this adapter cannot query",
+        ))
     }
 }
 
@@ -108,74 +116,87 @@ impl ChainAdapter for AvalancheAdapter {
     }
 
     async fn is_connected(&self) -> bool {
-        true
+        // Real `eth_chainId` probe: the endpoint must answer *as this chain*.
+        matches!(
+            crate::evm_rpc::chain_id(&crate::evm_rpc::url(&self.config)).await,
+            Ok(id) if id == self.config.chain_type
+        )
     }
 
     async fn get_block_number(&self) -> AdapterResult<u64> {
-        Ok(55_000_000) // C-Chain block number
+        crate::evm_rpc::block_number(&crate::evm_rpc::url(&self.config)).await
     }
 
-    async fn get_balance(&self, _address: H160) -> AdapterResult<U256> {
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_balance(&self, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::balance(&crate::evm_rpc::url(&self.config), address).await
     }
 
-    async fn get_token_balance(&self, _token: H160, _address: H160) -> AdapterResult<U256> {
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_token_balance(&self, token: H160, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::token_balance(&crate::evm_rpc::url(&self.config), token, address).await
     }
 
-    async fn send_message(&self, message: ChainMessage) -> AdapterResult<H256> {
-        // Uses Teleporter for native cross-subnet messaging
-        Ok(message.hash())
+    async fn send_message(&self, _message: ChainMessage) -> AdapterResult<H256> {
+        // Refused, not invented: this returned `message.hash()` for a message
+        // that was never broadcast through Teleporter.
+        Err(ExternalChainError::adapter_unimplemented(
+            "avalanche: send_message needs a signed Teleporter transaction and this adapter has \
+             no signer",
+        ))
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        // Query TeleporterMessageReceived events
-        Ok(vec![])
+        // Refused: an empty list reads as "no Teleporter messages" no matter
+        // what the chain said.
+        Err(ExternalChainError::adapter_unimplemented(
+            "avalanche: receive_messages cannot decode TeleporterMessageReceived events yet",
+        ))
     }
 
-    async fn initiate_transfer(&self, transfer: CrossChainTransfer) -> AdapterResult<H256> {
-        // Use Teleporter or Avalanche Bridge
-        Ok(transfer.id)
+    async fn initiate_transfer(&self, _transfer: CrossChainTransfer) -> AdapterResult<H256> {
+        // Refused: this returned `transfer.id` for a transfer never sent.
+        Err(ExternalChainError::adapter_unimplemented(
+            "avalanche: initiate_transfer needs a signed Teleporter/Bridge transaction and this \
+             adapter has no signer",
+        ))
     }
 
     async fn check_transfer_status(&self, _transfer_id: H256) -> AdapterResult<TransferStatus> {
-        // Avalanche has instant finality via Snowman consensus
-        Ok(TransferStatus::Completed)
+        // Refused: this answered `Completed` for every transfer id.
+        Err(ExternalChainError::adapter_unimplemented(
+            "avalanche: check_transfer_status needs the destination Teleporter state; nothing \
+             here can tell a relayed message from an unrelayed one",
+        ))
     }
 
     async fn verify_message_proof(
         &self,
         _message: &ChainMessage,
-        proof: &[u8],
+        _proof: &[u8],
     ) -> AdapterResult<bool> {
-        // Avalanche has instant finality - no challenge period
-        // Proof is validator signature aggregation
-        Ok(!proof.is_empty())
+        // Refused, not shape-checked: Teleporter proofs are validator
+        // signature aggregations, and `!proof.is_empty()` is not that.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
-    async fn finalize_transfer(&self, transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
-        // Teleporter handles automatic finalization
-        Ok(transfer_id)
+    async fn finalize_transfer(&self, _transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
+        // Refused: this returned the transfer id as though finalization had
+        // happened.
+        Err(ExternalChainError::adapter_unimplemented(
+            "avalanche: finalize_transfer needs a signed delivery transaction and a proof this \
+             adapter cannot verify",
+        ))
     }
 
     async fn estimate_gas_price(&self) -> AdapterResult<U256> {
-        // Avalanche uses dynamic fees
-        Ok(U256::from(25_000_000_000u64)) // 25 nAVAX
+        crate::evm_rpc::gas_price(&crate::evm_rpc::url(&self.config)).await
     }
 
     async fn get_transaction_receipt(
         &self,
         tx_hash: H256,
     ) -> AdapterResult<Option<TransactionReceipt>> {
-        Ok(Some(TransactionReceipt {
-            tx_hash,
-            block_number: 55_000_000,
-            block_hash: H256::zero(),
-            tx_index: 0,
-            success: true,
-            gas_used: 21_000,
-            logs: vec![],
-        }))
+        // Refused: this reported `success: true` for every transaction hash.
+        crate::evm_rpc::receipt(&crate::evm_rpc::url(&self.config), tx_hash).await
     }
 }
 

@@ -139,3 +139,72 @@ neither list or when a repaired one stays in the baseline.
 
 Findings 3 and 4 (`unwrap()` / `panic!()` counts) remain open and are unchanged
 by either update.
+
+---
+
+## Status update — 2026-09-19
+
+**New finding 6 — the chain adapters fabricated every bridge answer (CRITICAL).**
+
+Finding 1 fixed the *verifier* side of a forged-proof path. The adapters in
+`crates/external-chains/src/chains/` were the same class of problem one layer
+down, and `finding 1`'s fix does not cover them: they are the objects a relayer
+obtains from `create_adapter()` / `create_all_adapters()`.
+
+| file | what it answered | with what |
+| --- | --- | --- |
+| `arbitrum.rs`, `avalanche.rs`, `bnb.rs`, `polygon.rs`, `universal.rs` | `check_transfer_status` | `Ok(TransferStatus::Completed)` for **every** transfer id |
+| the same five | `verify_message_proof` | `Ok(!proof.is_empty())` — any non-empty byte string is a proof |
+| the same five | `send_message` | `Ok(message.hash())` for a message never broadcast |
+| the same five | `initiate_transfer` | `Ok(transfer.id)` for a transfer never sent |
+| the same five | `finalize_transfer` | `Ok(transfer_id)` for a transfer never finalized |
+| the same five | `receive_messages` | `Ok(vec![])` — "no pending messages", always |
+| the same five | `is_connected` | `true`, unconditionally |
+| the same five | `get_balance` / `get_token_balance` | exactly `1 ETH`, for every address |
+| the same five | `get_block_number` | a hardcoded constant |
+| the same five | `get_transaction_receipt` | `success: true` at a constant block, for every hash |
+| `base.rs` | `send_message`, `initiate_transfer`, `finalize_transfer` | `eth_call` (which changes no state) followed by `Ok(id)` |
+| `base.rs` | `check_transfer_status` | `Completed` inferred from the *source* receipt |
+| `base.rs` | `receive_messages` | `Ok(vec![])` after discarding the logs it fetched |
+
+The dangerous rows are the first two. A relayer that asks an adapter whether a
+transfer is complete, or whether a proof is valid, gets "yes" — for a transfer
+that does not exist and for a five-byte array. `MockChainAdapter` (finding 2) was
+gated for exactly this behaviour; these were not mocks, they shipped in every
+build, and their own unit tests asserted the fabricated values (only the encoder
+tests ever ran, and the one test that touched a live behaviour,
+`test_adapter_methods`, passed because `get_balance` returned a constant).
+
+**Status: resolved by refusal.** Every operation the adapters cannot perform now
+returns `ExternalChainError::AdapterUnimplemented` (new variant, documented as
+"nothing ran"), and every operation they *can* perform is a real JSON-RPC call
+through a single shared client, `crates/external-chains/src/evm_rpc.rs`, which
+also removed five copies of the request encoder, the hex parsers and the RPC
+plumbing. `verify_message_proof` returns `VerificationUnavailable`, the same
+answer finding 1 gave the router's stub strategies.
+
+Evidence:
+
+```
+cargo test -p x3-external-chains        # 75 lib + 6 integration, 0 failed
+cargo clippy -p x3-external-chains --all-targets -- -D warnings   # clean
+```
+
+`tests/adapters_refuse_unimplemented_operations.rs` walks `create_all_adapters()`
+and fails if any adapter reports a send, an initiation, a completion, a
+finalization, a verified proof or an empty message queue it did not produce. The
+only test removed was the one asserting the fabricated values, and it was
+replaced by `an_endpoint_that_answers_nothing_produces_no_answers`, which points
+an adapter at a dead port and requires it to report nothing.
+
+**Still unwritten, and now explicit:** decoding `SentMessage` / `L2ToL1Tx` /
+`StateSync` / `TeleporterMessageReceived` logs into `ChainMessage`s; the
+transfer-status and proof paths (they need a destination client and a verifier);
+and log parsing inside `get_transaction_receipt`, which now *refuses* a receipt
+that carries logs rather than returning `logs: []` — a bridge receipt always
+does, so this is a real gap, not a cosmetic one.
+
+Also noted while here: `crates/external-chains/src/lib.rs` carries a blanket
+`#![allow(clippy::all, dead_code, unused_imports, ...)]`, which is why none of
+the above produced a warning. Removing it is a separate task; it will surface
+the rest of the crate's dead code.
