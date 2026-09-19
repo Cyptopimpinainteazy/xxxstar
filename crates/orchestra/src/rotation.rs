@@ -1,9 +1,9 @@
 //! Rotation coordinator — orchestrates on-chain ↔ off-chain jury duty.
 
-use crate::agent::identity::{AgentDomain, AgentId, AlignmentScore};
+use crate::agent::identity::AgentId;
 use crate::agent::off_chain::{OffChainAgent, OffChainRole};
 use crate::agent::on_chain::OnChainAgent;
-use crate::jury::rotation::{JuryRotation, RotationConfig, RotationResult};
+use crate::jury::rotation::{JuryRotation, RotationConfig};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
@@ -93,15 +93,26 @@ impl RotationCoordinator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::identity::OrchestraSection;
+    use crate::agent::identity::{AgentDomain, AlignmentScore, OrchestraSection};
 
     fn make_agents(n: usize) -> Vec<OnChainAgent> {
+        // Spread the pool across the four sections: `max_section_proportion`
+        // caps how much of a jury may come from one section, so an all-Strings
+        // pool could never seat the jurors these tests ask for. That cap has its
+        // own test in `jury::rotation`.
+        let sections = [
+            OrchestraSection::Strings,
+            OrchestraSection::Brass,
+            OrchestraSection::Percussion,
+            OrchestraSection::Woodwinds,
+        ];
+
         (0..n)
             .map(|i| {
                 let mut agent = OnChainAgent::new(
                     i as u32,
                     format!("agent-{}", i),
-                    OrchestraSection::Strings,
+                    sections[i % sections.len()],
                 );
                 agent.identity.alignment = AlignmentScore::new(150);
                 agent
@@ -115,12 +126,8 @@ mod tests {
         let coordinator = RotationCoordinator::new(Default::default());
         let seed = [1u8; 32];
 
-        let (session, off_chain) = coordinator.rotate_to_jury(
-            &mut agents,
-            3,
-            &seed,
-            "session-001".into(),
-        );
+        let (session, off_chain) =
+            coordinator.rotate_to_jury(&mut agents, 3, &seed, "session-001".into());
 
         assert_eq!(session.selected.len(), off_chain.len());
         assert_eq!(off_chain.len(), 3);
@@ -135,12 +142,8 @@ mod tests {
         let coordinator = RotationCoordinator::new(Default::default());
         let seed = [2u8; 32];
 
-        let (session, _off_chain) = coordinator.rotate_to_jury(
-            &mut agents,
-            2,
-            &seed,
-            "session-002".into(),
-        );
+        let (session, _off_chain) =
+            coordinator.rotate_to_jury(&mut agents, 2, &seed, "session-002".into());
 
         let returned = coordinator.return_from_jury(&mut agents, &session);
         assert_eq!(returned.len(), 2);

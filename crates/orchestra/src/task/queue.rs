@@ -1,10 +1,9 @@
 //! Task queue — manages .md task specs, priority ordering, filesystem watching.
 
-use super::spec::{TaskParseError, TaskPriority, TaskSpec};
-use crate::score::TaskClassification;
+use super::spec::{TaskParseError, TaskSpec};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// Status of a task in the queue.
@@ -100,9 +99,9 @@ impl TaskQueue {
         }
 
         let pattern = format!("{}/**/*.md", self.tasks_dir.display());
-        for entry in glob::glob(&pattern).map_err(|e| {
-            TaskParseError::IoError(format!("Glob error: {}", e))
-        })? {
+        for entry in glob::glob(&pattern)
+            .map_err(|e| TaskParseError::IoError(format!("Glob error: {}", e)))?
+        {
             match entry {
                 Ok(path) => match TaskSpec::load_from_file(&path) {
                     Ok(spec) => {

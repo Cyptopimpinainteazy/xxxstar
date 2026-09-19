@@ -97,10 +97,7 @@ impl VoteAggregator {
     }
 
     /// Apply aggregation results to the task queue — approve or reject tasks.
-    pub fn apply_to_queue(
-        result: &AggregationResult,
-        queue: &mut crate::task::TaskQueue,
-    ) {
+    pub fn apply_to_queue(result: &AggregationResult, queue: &mut crate::task::TaskQueue) {
         for task_result in &result.task_results {
             if task_result.approved {
                 queue.jury_approve(&task_result.task_id);
@@ -114,8 +111,8 @@ impl VoteAggregator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jury::session::{JurySession, SessionConfig};
     use crate::agent::identity::OrchestraSection;
+    use crate::jury::session::{JurySession, SessionConfig};
 
     fn make_session_with_tasks() -> JurySession {
         let mut session = JurySession::new(
@@ -126,9 +123,15 @@ mod tests {
             },
         );
 
-        session.add_member(1, OrchestraSection::Strings, false).unwrap();
-        session.add_member(2, OrchestraSection::Brass, true).unwrap();
-        session.add_member(3, OrchestraSection::Percussion, false).unwrap();
+        session
+            .add_member(1, OrchestraSection::Strings, false)
+            .unwrap();
+        session
+            .add_member(2, OrchestraSection::Brass, true)
+            .unwrap();
+        session
+            .add_member(3, OrchestraSection::Percussion, false)
+            .unwrap();
 
         session.add_task("task-001".into());
         session.add_task("task-002".into());
@@ -161,10 +164,7 @@ mod tests {
         let mut session = make_session_with_tasks();
         session.close_voting().unwrap();
 
-        let vote_counts = vec![
-            ("task-001".into(), 3, 0),
-            ("task-002".into(), 2, 1),
-        ];
+        let vote_counts = vec![("task-001".into(), 3, 0), ("task-002".into(), 2, 1)];
 
         let result = VoteAggregator::aggregate(&mut session, &vote_counts);
         assert_eq!(result.stats.tasks_approved, 2);

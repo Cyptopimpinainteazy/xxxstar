@@ -7,5 +7,5 @@ pub mod on_chain;
 
 pub use identity::{AgentIdentity, AlignmentScore};
 pub use lifecycle::{AgentLifecycle, LifecycleEvent, SpawnParams};
-pub use off_chain::{OffChainAgent, OffChainRole};
+pub use off_chain::{OffChainAgent, OffChainRole, StressObservation, StressTestResult};
 pub use on_chain::{OnChainAgent, OnChainStatus};

@@ -137,6 +137,20 @@ pub struct StressTestResult {
     pub timestamp: DateTime<Utc>,
 }
 
+/// What a stress scenario actually did, as measured by the harness that ran it.
+///
+/// This exists so that a stress result can only ever report an observation that
+/// was made. There is no constructor that means "assume it held up".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StressObservation {
+    /// Whether the system maintained integrity under the scenario.
+    pub integrity_maintained: bool,
+    /// The failure mode observed, if any.
+    pub failure_mode: Option<String>,
+    /// What the harness recommends changing.
+    pub recommendations: Vec<String>,
+}
+
 impl OffChainAgent {
     /// Create a new off-chain agent for a specific session.
     pub fn new(
@@ -253,20 +267,28 @@ impl OffChainAgent {
         Ok(commitment)
     }
 
-    /// Run a stress test simulation (StressTester role only).
-    pub fn run_stress_test(&mut self, scenario: &str) -> Option<StressTestResult> {
+    /// Record the outcome of a stress scenario the caller actually ran.
+    ///
+    /// Returns `None` when this agent is not a stress tester. The Orchestra does
+    /// not run the scenario itself — network partitions, load spikes and
+    /// byzantine peers need a real harness — so the agent records what that
+    /// harness observed rather than asserting an integrity it never measured.
+    pub fn record_stress_result(
+        &mut self,
+        scenario: &str,
+        observation: StressObservation,
+    ) -> Option<StressTestResult> {
         if self.role != OffChainRole::StressTester {
             return None;
         }
 
         self.status = OffChainStatus::StressTesting;
 
-        // Simulate — in production this would run actual scenario execution
         let result = StressTestResult {
             scenario: scenario.to_string(),
-            integrity_maintained: true, // placeholder
-            failure_mode: None,
-            recommendations: vec![],
+            integrity_maintained: observation.integrity_maintained,
+            failure_mode: observation.failure_mode,
+            recommendations: observation.recommendations,
             timestamp: Utc::now(),
         };
 
@@ -320,28 +342,62 @@ mod tests {
         assert_eq!(agent.vote_commitments.len(), 1);
     }
 
-    #[test]
-    fn stress_tester_can_run_tests() {
-        let mut agent = OffChainAgent::new(
+    fn stress_tester() -> OffChainAgent {
+        OffChainAgent::new(
             5,
             "stressor".into(),
             OrchestraSection::Woodwinds,
             OffChainRole::StressTester,
-        );
-
-        let result = agent.run_stress_test("network-partition").unwrap();
-        assert_eq!(result.scenario, "network-partition");
-        assert!(result.integrity_maintained);
+        )
     }
 
     #[test]
-    fn non_stress_tester_cannot_run_tests() {
+    fn a_stress_result_reports_what_the_harness_measured() {
+        let mut agent = stress_tester();
+
+        let result = agent
+            .record_stress_result(
+                "network-partition",
+                StressObservation {
+                    integrity_maintained: false,
+                    failure_mode: Some("quorum lost for 40 blocks".into()),
+                    recommendations: vec!["widen the validator set".into()],
+                },
+            )
+            .expect("a stress tester can record a result");
+
+        assert_eq!(result.scenario, "network-partition");
+        assert!(
+            !result.integrity_maintained,
+            "the recorded result must not upgrade a failure to a pass"
+        );
+        assert_eq!(
+            result.failure_mode.as_deref(),
+            Some("quorum lost for 40 blocks")
+        );
+        assert_eq!(result.recommendations, vec!["widen the validator set"]);
+        assert_eq!(agent.stress_test_results.len(), 1);
+    }
+
+    #[test]
+    fn non_stress_tester_cannot_record_a_result() {
         let mut agent = OffChainAgent::new(
             5,
             "juror".into(),
             OrchestraSection::Woodwinds,
             OffChainRole::JuryMember,
         );
-        assert!(agent.run_stress_test("network-partition").is_none());
+
+        let recorded = agent.record_stress_result(
+            "network-partition",
+            StressObservation {
+                integrity_maintained: true,
+                failure_mode: None,
+                recommendations: vec![],
+            },
+        );
+
+        assert!(recorded.is_none());
+        assert!(agent.stress_test_results.is_empty());
     }
 }
