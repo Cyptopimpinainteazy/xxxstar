@@ -13,7 +13,6 @@
 
 pub mod types;
 
-use parity_scale_codec::{Decode, Encode};
 use sp_core::crypto::Pair as PairCrypto;
 use sp_std::vec::Vec;
 
@@ -72,22 +71,22 @@ impl PQManager {
         }
     }
 
-    /// Rotate to new keypair
-    pub fn rotate_keys(&mut self) -> Result<(), PQError> {
-        if !self.rotation_schedule.should_rotate()? {
+    /// Rotate to new keypair, if `current_block` is due.
+    pub fn rotate_keys(&mut self, current_block: u64) -> Result<(), PQError> {
+        if !self.rotation_schedule.should_rotate(current_block)? {
             return Ok(());
         }
 
         let new_keypair = Self::generate_keypair(self.scheme)?;
         self.keypair = new_keypair;
-        self.rotation_schedule.record_rotation()?;
+        self.rotation_schedule.record_rotation(current_block)?;
 
         Ok(())
     }
 
     /// Check if keys need rotation
-    pub fn needs_rotation(&self) -> Result<bool, PQError> {
-        self.rotation_schedule.should_rotate()
+    pub fn needs_rotation(&self, current_block: u64) -> Result<bool, PQError> {
+        self.rotation_schedule.should_rotate(current_block)
     }
 
     /// Get current public key
@@ -270,36 +269,36 @@ pub struct KeyRotationSchedule {
 }
 
 impl KeyRotationSchedule {
-    /// Create default rotation schedule (every 100,000 blocks)
-    pub fn default() -> Self {
+    /// Check whether rotation is due at `current_block`.
+    ///
+    /// The block number is a parameter, the way `node/src/authority.rs` already
+    /// does it for session keys. This used to read `b"current_block"` out of
+    /// `sp_io` storage: a key no runtime writes, which panicked with
+    /// `get_version_1 called outside of an Externalities-provided environment`
+    /// anywhere but inside a runtime, and whose subtraction panicked on
+    /// underflow when a schedule was created ahead of the chain.
+    pub fn should_rotate(&self, current_block: u64) -> Result<bool, PQError> {
+        Ok(current_block.saturating_sub(self.last_rotation) >= self.rotation_interval)
+    }
+
+    /// Record that the keys were rotated at `current_block`.
+    ///
+    /// The schedule is in-memory state. The old version also wrote
+    /// `b"pq_last_rotation"` straight into `sp_io` storage, outside any pallet's
+    /// storage prefix; persistence belongs to whoever owns the key material.
+    pub fn record_rotation(&mut self, current_block: u64) -> Result<(), PQError> {
+        self.last_rotation = current_block;
+        Ok(())
+    }
+}
+
+impl Default for KeyRotationSchedule {
+    /// A schedule that rotates every 100,000 blocks.
+    fn default() -> Self {
         Self {
             last_rotation: 0,
             rotation_interval: 100_000,
         }
-    }
-
-    /// Check if rotation is due
-    pub fn should_rotate(&self) -> Result<bool, PQError> {
-        // Get current block number (simplified)
-        let current_block = sp_io::storage::get(b"current_block")
-            .map(|data| u64::decode(&mut &data[..]).unwrap_or(0))
-            .unwrap_or(0);
-
-        Ok(current_block - self.last_rotation >= self.rotation_interval)
-    }
-
-    /// Record key rotation
-    pub fn record_rotation(&mut self) -> Result<(), PQError> {
-        let current_block = sp_io::storage::get(b"current_block")
-            .map(|data| u64::decode(&mut &data[..]).unwrap_or(0))
-            .unwrap_or(0);
-
-        self.last_rotation = current_block;
-
-        // Store in persistent storage
-        sp_io::storage::set(b"pq_last_rotation", &self.last_rotation.encode());
-
-        Ok(())
     }
 }
 
@@ -314,6 +313,11 @@ pub struct PQValidatorIdentity {
 }
 
 impl PQValidatorIdentity {
+    /// The validator this identity belongs to.
+    pub fn validator_id(&self) -> u64 {
+        self.validator_id
+    }
+
     /// Create new validator identity with PQ keys
     pub fn new(validator_id: u64, pq_scheme: PQScheme) -> Result<Self, PQError> {
         let pq_manager = PQManager::new(pq_scheme)?;
@@ -332,9 +336,9 @@ impl PQValidatorIdentity {
     }
 
     /// Rotate validator keys if needed
-    pub fn rotate_keys_if_needed(&mut self) -> Result<bool, PQError> {
-        if self.pq_manager.needs_rotation()? {
-            self.pq_manager.rotate_keys()?;
+    pub fn rotate_keys_if_needed(&mut self, current_block: u64) -> Result<bool, PQError> {
+        if self.pq_manager.needs_rotation(current_block)? {
+            self.pq_manager.rotate_keys(current_block)?;
             // Update hybrid signer with new keys
             self.hybrid_signer = HybridSigner::new(self.pq_manager.scheme)?;
             Ok(true)
@@ -355,6 +359,11 @@ pub struct PQAccountManager {
 }
 
 impl PQAccountManager {
+    /// The account these PQ keys protect.
+    pub fn account(&self) -> sp_core::H160 {
+        self.account
+    }
+
     /// Enable PQ protection for account
     pub fn enable_pq(&mut self, scheme: PQScheme) -> Result<(), PQError> {
         self.pq_manager = Some(PQManager::new(scheme)?);
@@ -465,8 +474,14 @@ mod tests {
         let signature = manager.sign(message).unwrap();
         let public_key = manager.public_key();
 
-        let verified = manager.verify(message, &signature, public_key).unwrap();
-        assert!(verified);
+        // Signing is a placeholder (`blake2_256(message)` padded to the nominal
+        // signature size), so nothing here can check a signature. Verification
+        // refuses instead of answering `true` for a check it never performed.
+        // See issue #285.
+        assert!(matches!(
+            manager.verify(message, &signature, public_key),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -524,8 +539,10 @@ mod tests {
         let signature = manager.sign(message).unwrap();
         let public_key = manager.public_key();
 
-        let verified = manager.verify(message, &signature, public_key).unwrap();
-        assert!(verified);
+        assert!(matches!(
+            manager.verify(message, &signature, public_key),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -543,8 +560,10 @@ mod tests {
         let signature = manager.sign(message).unwrap();
         let public_key = manager.public_key();
 
-        let verified = manager.verify(message, &signature, public_key).unwrap();
-        assert!(verified);
+        assert!(matches!(
+            manager.verify(message, &signature, public_key),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -556,8 +575,19 @@ mod tests {
         let signature = manager.sign(message1).unwrap();
         let public_key = manager.public_key();
 
-        let verified = manager.verify(message2, &signature, public_key).unwrap();
-        assert!(!verified);
+        // A different message is refused — and so is the message that was
+        // actually signed. The refusal is unconditional, which is the only
+        // honest answer while the verifier is a placeholder: a verifier that
+        // returned `true` for the second call would be accepting
+        // `blake2_256(message) || padding` as a signature.
+        assert!(matches!(
+            manager.verify(message2, &signature, public_key),
+            Err(PQError::VerificationUnavailable)
+        ));
+        assert!(matches!(
+            manager.verify(message1, &signature, public_key),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -569,10 +599,14 @@ mod tests {
         let signature = manager1.sign(message).unwrap();
         let wrong_public_key = manager2.public_key();
 
-        let verified = manager1
-            .verify(message, &signature, wrong_public_key)
-            .unwrap();
-        assert!(!verified);
+        assert!(matches!(
+            manager1.verify(message, &signature, wrong_public_key),
+            Err(PQError::VerificationUnavailable)
+        ));
+        assert!(matches!(
+            manager1.verify(message, &signature, manager1.public_key()),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -597,10 +631,14 @@ mod tests {
         let classical_pk = hybrid.classical_key.public();
         let pq_pk = hybrid.pq_manager.public_key();
 
-        let verified = hybrid
-            .verify_hybrid(message, &hybrid_sig, classical_pk, pq_pk)
-            .unwrap();
-        assert!(verified);
+        // The classical half would verify — sr25519 is real — but the
+        // post-quantum half cannot, and a hybrid signature is only valid when
+        // both halves are. The call refuses rather than reporting the
+        // classical half's answer as the hybrid one.
+        assert!(matches!(
+            hybrid.verify_hybrid(message, &hybrid_sig, &classical_pk, pq_pk),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -614,10 +652,10 @@ mod tests {
         let wrong_classical_pk = hybrid2.classical_key.public();
         let pq_pk = hybrid1.pq_manager.public_key();
 
-        let verified = hybrid1
-            .verify_hybrid(message, &hybrid_sig, &wrong_classical_pk, pq_pk)
-            .unwrap();
-        assert!(!verified);
+        assert!(matches!(
+            hybrid1.verify_hybrid(message, &hybrid_sig, &wrong_classical_pk, pq_pk),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -631,29 +669,23 @@ mod tests {
         let classical_pk = hybrid1.classical_key.public();
         let wrong_pq_pk = hybrid2.pq_manager.public_key();
 
-        let verified = hybrid1
-            .verify_hybrid(message, &hybrid_sig, classical_pk, wrong_pq_pk)
-            .unwrap();
-        assert!(!verified);
+        assert!(matches!(
+            hybrid1.verify_hybrid(message, &hybrid_sig, &classical_pk, wrong_pq_pk),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
     fn test_key_rotation_schedule_should_rotate() {
-        let mut schedule = KeyRotationSchedule {
+        let schedule = KeyRotationSchedule {
             last_rotation: 0,
             rotation_interval: 1000,
         };
 
-        // Should not rotate initially
-        assert!(!schedule.should_rotate().unwrap());
-
-        // Simulate block advancement
-        // In real implementation, this would read from storage
-        // For test, we manually set
-        schedule.last_rotation = 2000;
-
-        // Should rotate now
-        // Note: This test would need storage mocking in real implementation
+        assert!(!schedule.should_rotate(0).unwrap());
+        assert!(!schedule.should_rotate(999).unwrap());
+        assert!(schedule.should_rotate(1_000).unwrap());
+        assert!(schedule.should_rotate(5_000).unwrap());
     }
 
     #[test]
@@ -663,9 +695,14 @@ mod tests {
             rotation_interval: 1000,
         };
 
-        schedule.record_rotation().unwrap();
-        // In real implementation, this would update storage
-        // For test, we verify the method doesn't panic
+        schedule.record_rotation(2_000).unwrap();
+
+        assert_eq!(schedule.last_rotation, 2_000);
+        assert!(!schedule.should_rotate(2_999).unwrap());
+        assert!(schedule.should_rotate(3_000).unwrap());
+        // A chain that is behind the recorded rotation must not underflow: this
+        // is the subtraction that used to panic.
+        assert!(!schedule.should_rotate(10).unwrap());
     }
 
     #[test]
@@ -673,19 +710,33 @@ mod tests {
         let mut manager = PQManager::new(PQScheme::Dilithium3).unwrap();
         let original_key = manager.public_key().clone();
 
-        manager.rotate_keys().unwrap();
+        // Not due yet: the default interval is 100_000 blocks.
+        manager.rotate_keys(0).unwrap();
+        assert_eq!(original_key.0, manager.public_key().0);
+
+        manager.rotate_keys(100_000).unwrap();
 
         let new_key = manager.public_key();
-        // Keys should be different after rotation
-        assert_ne!(original_key.0, new_key.0);
+        // The rotation bookkeeping advanced ...
+        assert_eq!(manager.rotation_schedule.last_rotation, 100_000);
+        // ... but the key material did not change, because key generation is a
+        // placeholder that returns zeroed buffers of the nominal size (issue
+        // #285). The second assertion pins that: the day real key generation
+        // lands, it fails, and this test must assert `assert_ne!` instead.
+        assert_eq!(original_key.0, new_key.0);
+        assert!(
+            new_key.0.iter().all(|byte| *byte == 0),
+            "key generation is still a placeholder: keys must be zeroed"
+        );
     }
 
     #[test]
     fn test_pq_manager_needs_rotation() {
         let manager = PQManager::new(PQScheme::Dilithium3).unwrap();
 
-        // Initially should not need rotation
-        assert!(!manager.needs_rotation().unwrap());
+        assert!(!manager.needs_rotation(0).unwrap());
+        assert!(!manager.needs_rotation(99_999).unwrap());
+        assert!(manager.needs_rotation(100_000).unwrap());
     }
 
     #[test]
@@ -694,7 +745,9 @@ mod tests {
 
         assert_eq!(identity.validator_id, 42);
         assert_eq!(identity.pq_manager.scheme, PQScheme::Falcon512);
-        assert_eq!(identity.last_rotation, 0);
+        // The rotation counter lives on the key manager's schedule, not on the
+        // identity.
+        assert_eq!(identity.pq_manager.rotation_schedule.last_rotation, 0);
     }
 
     #[test]
@@ -706,18 +759,23 @@ mod tests {
 
         // Should have both classical and PQ signatures
         assert_eq!(signature.classical.0.len(), 64);
-        assert!(signature.post_quantum.0.len() > 0);
+        assert!(!signature.post_quantum.0.is_empty());
     }
 
     #[test]
     fn test_pq_validator_identity_key_rotation() {
         let mut identity = PQValidatorIdentity::new(1, PQScheme::Dilithium3).unwrap();
-        let original_key = identity.pq_manager.public_key().clone();
 
-        // Key rotation should work
-        let rotated = identity.rotate_keys_if_needed().unwrap();
-        // May or may not rotate depending on schedule
-        assert!(rotated || !rotated); // Just ensure it doesn't panic
+        // Not due yet, so the identity keeps its keys ...
+        assert!(!identity.rotate_keys_if_needed(0).unwrap());
+        assert_eq!(identity.pq_manager.rotation_schedule.last_rotation, 0);
+
+        // ... and rotates once the default interval has elapsed.
+        assert!(identity.rotate_keys_if_needed(100_000).unwrap());
+        assert_eq!(identity.pq_manager.rotation_schedule.last_rotation, 100_000);
+        // The hybrid signer is rebuilt around the rotated keys, so it still
+        // signs.
+        assert!(identity.sign_validator_message(b"after rotation").is_ok());
     }
 
     #[test]
@@ -767,14 +825,15 @@ mod tests {
         };
 
         // Without PQ enabled
-        let result = manager.sign_transaction(b"test tx");
-        assert!(result.is_none());
+        assert!(manager.sign_transaction(b"test tx").unwrap().is_none());
 
         // With PQ enabled
         manager.enable_pq(PQScheme::Dilithium3).unwrap();
-        let result = manager.sign_transaction(b"test tx");
-        assert!(result.is_some());
-        assert!(result.unwrap().0.len() > 0);
+        let signature = manager
+            .sign_transaction(b"test tx")
+            .unwrap()
+            .expect("a PQ-enabled account signs");
+        assert_eq!(signature.0.len(), 3293);
     }
 
     #[test]
@@ -791,10 +850,10 @@ mod tests {
         let signature = manager.sign_transaction(tx).unwrap().unwrap();
         let public_key = manager.pq_manager.as_ref().unwrap().public_key().clone();
 
-        let verified = manager
-            .verify_transaction_signature(tx, &signature, &public_key)
-            .unwrap();
-        assert!(verified);
+        assert!(matches!(
+            manager.verify_transaction_signature(tx, &signature, &public_key),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -811,10 +870,12 @@ mod tests {
         let wrong_sig = PQSignature(vec![0; 3293]); // Zero signature
         let public_key = manager.pq_manager.as_ref().unwrap().public_key().clone();
 
-        let verified = manager
-            .verify_transaction_signature(tx, &wrong_sig, &public_key)
-            .unwrap();
-        assert!(!verified);
+        // A zero signature and a real one are both refused: the account-level
+        // verifier has no post-quantum verifier behind it either.
+        assert!(matches!(
+            manager.verify_transaction_signature(tx, &wrong_sig, &public_key),
+            Err(PQError::VerificationUnavailable)
+        ));
     }
 
     #[test]
@@ -890,32 +951,41 @@ mod tests {
 
     #[test]
     fn test_pq_validator_identity_struct() {
-        let pq_public_key = PQPublicKey(vec![1, 2, 3]);
-        let identity = PQValidatorIdentity {
-            validator_id: 42,
-            pq_public_key,
-            last_rotation: 12345,
-        };
+        // The identity has no `pq_public_key` / `last_rotation` fields: it owns
+        // a key manager and a hybrid signer instead. Assert the surface that
+        // exists.
+        let identity = PQValidatorIdentity::new(42, PQScheme::Sphincs256).unwrap();
 
         assert_eq!(identity.validator_id, 42);
-        assert_eq!(identity.pq_public_key.0, vec![1, 2, 3]);
-        assert_eq!(identity.last_rotation, 12345);
+        assert_eq!(identity.pq_manager.scheme, PQScheme::Sphincs256);
+        assert_eq!(identity.pq_manager.public_key().0.len(), 64);
+        assert_eq!(
+            identity.hybrid_signer.pq_manager.scheme,
+            PQScheme::Sphincs256
+        );
     }
 
     #[test]
-    fn test_pq_account_config_struct() {
+    fn test_pq_account_manager_struct() {
+        // This replaces a test of `PQAccountConfig`, a type that does not exist
+        // in this crate (it has never compiled against one).
         let account = sp_core::H160::from_low_u64_be(12345);
-        let config = PQAccountConfig {
+        let mut manager = PQAccountManager {
             account,
-            pq_scheme: Some(PQScheme::Falcon512),
-            hybrid_enabled: true,
-            last_rotation: 67890,
+            pq_manager: None,
+            hybrid_enabled: false,
         };
 
-        assert_eq!(config.account, account);
-        assert_eq!(config.pq_scheme, Some(PQScheme::Falcon512));
-        assert!(config.hybrid_enabled);
-        assert_eq!(config.last_rotation, 67890);
+        assert_eq!(manager.account, account);
+        assert!(manager.pq_manager.is_none());
+        assert!(!manager.hybrid_enabled);
+
+        manager.enable_pq(PQScheme::Falcon512).unwrap();
+        assert_eq!(
+            manager.pq_manager.as_ref().unwrap().scheme,
+            PQScheme::Falcon512
+        );
+        assert!(manager.hybrid_enabled);
     }
 
     #[test]

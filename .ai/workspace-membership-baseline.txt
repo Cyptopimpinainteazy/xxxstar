@@ -9,4 +9,3 @@
 
 loom-concurrency
 x3-mobile-sdk
-x3-pq
