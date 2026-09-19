@@ -68,6 +68,21 @@ count is 27, not 28; the other 27 rows have not been individually re-verified
 this way, so treat "real" as provisional per-row, not just per-count, until
 each one gets the same direct-file-check treatment before merging.
 
+**Update 2:** `finish/x3vm-live-transport-fix` verified archival too (see its
+row) — every piece (finality range-scan fix, settlement-engine auto-refund
+reschedule, runtime-signer intent-id resolution, the blst patch removal, the
+CI workflow) already exists on master via convergent implementation; master
+just organized the transport export differently
+(`x3vm_native::NativeX3NodeTransport` vs. this branch's `x3vm_node` exports).
+Real count is now 26. Running tally this session: 3 of 4 "flagged as real"
+entries checked turned out superseded (private-mempool, compile-break, this
+one) against 1 genuine find (`feat/x3vm-durable-recovery-20260911`, landed as
+#303) — the census's automated signals (git cherry, conflict-file counts)
+are proving to be a weak prior for this repo specifically, probably because
+so much of this queue is itself the product of many parallel agents
+independently reimplementing the same fixes. Direct-file-check before
+merging, not just before trusting "real," is the load-bearing step.
+
 | Branch | pending | conflict files | disposition |
 | --- | --- | --- | --- |
 | `agents/setup-instructions-request` | 1 | — (clean) | landed in batch 6 |
@@ -82,7 +97,7 @@ each one gets the same direct-file-check treatment before merging.
 | `archive/pr126-pre-master-rewrite-20260909` | 66 | no merge base | archival |
 | `your-task-branch` (14), `t5/fix-annotations-20260522-1458` (13), `pr-181-check` (12) | 12–14 | real | May/September snapshots; triage individually |
 | `fix/master-trading-core-compile-break` | 4 | 20 files | archival — verified 2026-09-18: every function/struct/test this branch adds (including exact test names) already exists on master verbatim, landed independently via #133/#212/#216/#223. The `git cherry`/`conflict-files` signals alone made this look like real unlanded work; a direct file check (not a triple-dot diff against the branch's own stale base) showed 100% overlap. Same pattern as `fix/private-mempool-real-shamir-threshold` (PR #288) above — do not merge, it would revert to an older tree shape |
-| `finish/x3vm-live-transport-fix` | 4 | 16 files | real, but `finish/x3vm-live-transport` already landed |
+| `finish/x3vm-live-transport-fix` | 4 | 16 files | archival — verified 2026-09-18: finality range-scan fix, settlement-engine auto-refund reschedule, runtime-signer intent-id resolution, blst patch removal, and the CI workflow all already on master via convergent implementation; master just organized the transport export differently. Do not merge |
 | `feat/x3vm-durable-recovery-20260911` | 4 | 2 files | newer versions of the same files landed — verify before merging |
 | `feat/secret-release-firewall-20260911` | 3 | `crates/x3-atomic-swap/src/secret_release.rs` | superseded by `feat/live-secret-release-firewall-20260911` (in master) |
 | `feat/canonical-cross-domain-proof-bundle-20260911-pre-rebase-20260917` | 3 | `crates/x3-atomic-swap/{lib,proof_bundle}.rs` | pre-rebase copy; the rebased branch is in master |
