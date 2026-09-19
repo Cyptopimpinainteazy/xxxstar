@@ -3,7 +3,7 @@
 //! Handles cross-chain settlement verification, proof generation,
 //! and finalization of cross-chain transfers.
 
-use crate::adapter::CrossChainTransfer;
+use crate::adapter::{CrossChainTransfer, TransferStatus};
 use crate::error::ExternalChainError;
 use crate::ChainType;
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
@@ -239,58 +239,56 @@ impl SettlementVerifier {
     fn verify_merkle_proof(
         &self,
         _transfer: &CrossChainTransfer,
-        proof: &SettlementProof,
+        _proof: &SettlementProof,
     ) -> SettlementResult<bool> {
-        // Verify merkle proof structure
-        if proof.merkle_proof.is_empty() {
-            return Ok(false);
-        }
-
-        // In production: verify against state root
-        // For now: basic validation
-        Ok(!proof.receipt_proof.is_empty())
+        // No merkle-trie verifier is wired into this crate. The previous body
+        // accepted any proof with a non-empty `receipt_proof` and claimed
+        // `Ok(true)` — a data-shape check reported as verification, which is
+        // indistinguishable from a real one at the call site. See
+        // docs/reports/SECURITY_BLOCKERS.md finding 1: the verification router
+        // refuses proofs the same way until a verifier exists.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
     fn verify_light_client_proof(
         &self,
         _transfer: &CrossChainTransfer,
-        proof: &SettlementProof,
+        _proof: &SettlementProof,
     ) -> SettlementResult<bool> {
-        // Verify light client header
-        Ok(!proof.witness.is_empty())
+        // No light-client verifier: `Ok(!proof.witness.is_empty())` accepted any
+        // non-empty header blob.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
     fn verify_zk_proof(
         &self,
         _transfer: &CrossChainTransfer,
-        proof: &SettlementProof,
+        _proof: &SettlementProof,
     ) -> SettlementResult<bool> {
-        // Verify ZK proof
-        // In production: call ZK verifier contract/circuit
-        Ok(!proof.witness.is_empty())
+        // No ZK verifier: a non-empty witness was treated as a valid proof.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
     fn verify_signature_proof(
         &self,
         _transfer: &CrossChainTransfer,
-        proof: &SettlementProof,
+        _proof: &SettlementProof,
     ) -> SettlementResult<bool> {
-        // Verify threshold signatures
-        // Extract signatures from witness
-        if proof.witness.len() < 65 * self.config.required_signatures as usize {
-            return Ok(false);
-        }
-        Ok(true)
+        // The old body only checked that the witness was at least
+        // `65 × required_signatures` bytes long and then returned `true`: the
+        // signatures were never verified against anything.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
     fn verify_optimistic_proof(
         &self,
         _transfer: &CrossChainTransfer,
-        proof: &SettlementProof,
+        _proof: &SettlementProof,
     ) -> SettlementResult<bool> {
-        // For optimistic proofs, we accept and start challenge period
-        // Actual verification happens if challenged
-        Ok(!proof.receipt_proof.is_empty())
+        // Optimistic settlement needs a challenge window *and* a dispute
+        // resolver; neither exists here, so accepting on a non-empty receipt
+        // would settle unverified transfers.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
     /// Calculate when settlement can be finalized
@@ -398,5 +396,73 @@ mod tests {
         let batch = SettlementBatch::new(transfers.clone());
         assert_eq!(batch.transfers.len(), 3);
         assert_ne!(batch.merkle_root, H256::zero());
+    }
+
+    fn transfer() -> CrossChainTransfer {
+        CrossChainTransfer {
+            id: H256::from([0xAA; 32]),
+            source_chain: 1,
+            dest_chain: 2,
+            source_token: H160::zero(),
+            dest_token: H160::zero(),
+            sender: H160::from([0x01; 20]),
+            recipient: H160::from([0x02; 20]),
+            amount: U256::from(1_000u64),
+            fee: U256::zero(),
+            status: TransferStatus::Pending,
+            source_tx: None,
+            dest_tx: None,
+        }
+    }
+
+    fn proof_with(proof_type: ProofType) -> SettlementProof {
+        SettlementProof {
+            proof_type,
+            source_block: 42,
+            source_block_hash: H256::from([0xBB; 32]),
+            source_tx_hash: H256::from([0xCC; 32]),
+            // Deliberately non-empty: these are exactly the blobs the old
+            // implementations accepted as "verified".
+            merkle_proof: vec![H256::from([0xDD; 32])],
+            receipt_proof: vec![0x01, 0x02, 0x03],
+            witness: vec![0xAB; 65 * 4],
+        }
+    }
+
+    /// Every proof type is refused while no verifier exists.
+    ///
+    /// The old bodies were data-shape checks reported as verification:
+    /// `!receipt_proof.is_empty()` for merkle/optimistic, `!witness.is_empty()`
+    /// for light-client/ZK, and a length check for threshold signatures — all
+    /// answered `Ok(true)`. These proofs carry exactly the shapes that used to
+    /// be accepted, and each one must now be refused, with a distinct error
+    /// (`VerificationUnavailable`) rather than `Ok(false)`, so a caller can tell
+    /// "no verifier ran" from "the proof is invalid".
+    #[test]
+    fn every_proof_type_is_refused_while_unimplemented() {
+        let verifier = SettlementVerifier::new(ChainType::Polygon);
+        let transfer = transfer();
+
+        for proof_type in [
+            ProofType::MerkleTrie,
+            ProofType::LightClient,
+            ProofType::ZkProof,
+            ProofType::Signature,
+            ProofType::Optimistic,
+        ] {
+            let verifier = SettlementVerifier::with_config(SettlementConfig {
+                proof_type: proof_type.clone(),
+                ..SettlementConfig::for_chain(ChainType::Polygon)
+            });
+            let result = verifier.verify_proof(&transfer, &proof_with(proof_type.clone()));
+            assert!(
+                matches!(result, Err(ExternalChainError::VerificationUnavailable)),
+                "{proof_type:?} must be refused, got {result:?}"
+            );
+        }
+
+        // A proof of the wrong type is still "invalid", not "unavailable".
+        let result = verifier.verify_proof(&transfer, &proof_with(ProofType::ZkProof));
+        assert!(matches!(result, Ok(false)), "got {result:?}");
     }
 }
