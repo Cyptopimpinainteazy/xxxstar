@@ -88,6 +88,35 @@ a strict superset, so there is nothing to salvage. This **reverses the
 "salvage the custody commits" recommendation** in both this row and step 4
 of Safe merge order below — don't.
 
+**Update 6 (2026-09-19):** `preserve/20260918/*` (28 branches — safety
+snapshots taken before a consolidation pass, per their naming) checked as a
+batch:
+- **20 of 28** are directly patch-equivalent to master (`git cherry` empty) —
+  fully redundant already.
+- **6 of the remaining 8** (`feat-live-secret-release-firewall-20260911`,
+  `test-cross-domain-refund-recovery-20260911`,
+  `feat-settlement-proofset-gate-20260911`, `codex-x3-economic-safety-kernel`,
+  `finish-x3vm-live-transport`, `finish-x3vm-live-transport-fix`) have
+  nonzero pending commits *against master*, but their **live (non-preserve)
+  counterpart branches** (e.g. `feat/live-secret-release-firewall-20260911`,
+  dropping the `preserve/20260918/` prefix and restoring the `/`) all still
+  exist on origin and are themselves fully patch-equivalent to master. These
+  preserve copies are earlier snapshots taken mid-flight, before their own
+  branch's later commits finished landing — not unique content.
+- **2 remain genuinely unresolved but are not "unlanded work" either**:
+  `cargo/ark-ec-0.6.0` and `cargo/ark-ff-0.6.0` are dependabot bumps
+  generated against an assumed `0.5.0` base (`ark-ec`/`ark-ff` "5.0 → 6.0"),
+  but current master's `Cargo.lock` has them at `0.4.2` — *older* than the
+  bump's own assumed starting point. Applying either branch's diff as-is
+  isn't safe (huge unrelated diff from staleness, plus the version jump it
+  represents no longer matches reality). If arkworks 0.4.x → 0.6.x is wanted,
+  it needs a fresh dependency-bump pass, not a merge of either branch.
+  `ark-std-0.6.0` looked like the same story by name but showed 0 pending —
+  not independently re-verified beyond that.
+
+All 28 can be deleted except the 2 ark branches, which should be closed only
+once whoever owns the arkworks version decision has looked at them.
+
 **Running tally:** 5 of 6 "flagged as real" queue entries checked this
 session were fully superseded (private-mempool, compile-break,
 live-transport-fix, pr-181-check, svm-htlc-custody); 1 was genuine
@@ -142,7 +171,7 @@ revisit.
 | `wip/chatgpt-mainnet-attestation-20260918`, `wip/consolidation-20260917/chatgpt-mainnet` | 1 each | 22 files | snapshot of uncommitted work |
 | `archive/stale-x3lang-trading-wip-20260918` | 3 | 68 files | archival |
 | `ci/path-filter-heavy-gates-20260910` (9), `ci/consolidate-workflows-20260910` (7), `ops/drain-actions-queue-20260911` (1) | 1–9 | workflow files | the CI routing they implement has moved on (`01d2b64e5` and successors) |
-| `preserve/20260918/*` (6 with pending commits) | 2–13 | mixed | preservation copies; their content is either in master or in a live branch |
+| `preserve/20260918/*` (28 branches) | 0–13 | mixed | verified 2026-09-19 as a batch (see Update 6) — 26 fully archival/redundant, 2 (`cargo/ark-ec-0.6.0`, `cargo/ark-ff-0.6.0`) are a stale dependency bump that needs fresh work, not a merge |
 
 ## Dependency heads (21)
 
