@@ -13,4 +13,3 @@ pallet-x3-control
 pallet-x3-governance
 x3-mobile-sdk
 x3-pq
-x3-wallet-cli

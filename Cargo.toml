@@ -265,6 +265,8 @@ members = [
     # Burn-down batch 9 (issue #274).
     "crates/x3-indexer",
     "crates/treasury",
+    # Burn-down batch 11 (issue #274).
+    "crates/x3-wallet-cli",
 ]
 default-members = ["node"]
 resolver = "2"

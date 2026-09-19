@@ -1,5 +1,6 @@
-/// X3 Wallet CLI - Command-line interface for wallet operations
-/// Supports hardware wallets, multisig, recovery, biometric, and DEX swaps
+//! X3 Wallet CLI - Command-line interface for wallet operations.
+//!
+//! Supports hardware wallets, multisig, recovery, biometric, and DEX swaps.
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -296,7 +297,10 @@ struct StatusCmd {
     json: bool,
 }
 
-async fn main() -> Result<(), Box<dyn StdError>> {
+/// `main` used to be `async fn main` with no executor attribute — the compiler
+/// rejects that outright, so the binary had never built. Nothing awaits any
+/// more, so it is a plain `fn`.
+fn main() -> Result<(), Box<dyn StdError>> {
     let args = Args::parse();
 
     if args.verbose {
@@ -304,316 +308,66 @@ async fn main() -> Result<(), Box<dyn StdError>> {
         println!("RPC Endpoint: {}", args.rpc_endpoint.cyan());
     }
 
-    match args.command {
-        Commands::Hardware(cmd) => handle_hardware(cmd, &args.rpc_endpoint).await?,
-        Commands::Multisig(cmd) => handle_multisig(cmd, &args.rpc_endpoint).await?,
-        Commands::Recovery(cmd) => handle_recovery(cmd, &args.rpc_endpoint).await?,
-        Commands::Account(cmd) => handle_account(cmd, &args.rpc_endpoint).await?,
-        Commands::Transaction(cmd) => handle_transaction(cmd, &args.rpc_endpoint).await?,
-        Commands::Swap(cmd) => handle_swap(cmd, &args.rpc_endpoint).await?,
-        Commands::Biometric(cmd) => handle_biometric(cmd, &args.rpc_endpoint).await?,
-        Commands::Status(cmd) => handle_status(cmd, &args.rpc_endpoint).await?,
-    }
+    let command = match args.command {
+        Commands::Hardware(cmd) => format!("hardware {}", action_name(&cmd.action)),
+        Commands::Multisig(cmd) => format!("multisig {}", action_name(&cmd.action)),
+        Commands::Recovery(cmd) => format!("recovery {}", action_name(&cmd.action)),
+        Commands::Account(cmd) => format!("account {}", action_name(&cmd.action)),
+        Commands::Transaction(cmd) => format!("transaction {}", action_name(&cmd.action)),
+        Commands::Swap(cmd) => format!("swap {}", action_name(&cmd.action)),
+        Commands::Biometric(cmd) => format!("biometric {}", action_name(&cmd.action)),
+        Commands::Status(cmd) => format!("status (full: {}, json: {})", cmd.full, cmd.json),
+    };
 
-    Ok(())
+    not_implemented(&command)
 }
 
-async fn handle_hardware(
-    cmd: HardwareCmd,
-    rpc_endpoint: &str,
-) -> Result<(), Box<dyn StdError>> {
-    match cmd.action {
-        HardwareAction::Register {
-            device_type,
-            device_model,
-            public_key,
-        } => {
-            println!(
-                "{}",
-                format!(
-                    "Registering {} device: {}",
-                    device_type, device_model
-                )
-                .green()
-            );
-            println!("Public Key: {}", public_key);
-            println!("Status: {}", "Waiting for hardware confirmation...".yellow());
-            // Implementation: Connect to RPC, register hardware wallet
-        }
-        HardwareAction::List => {
-            println!("{}", "Connected Hardware Wallets:".bold().cyan());
-            println!("  1. Ledger Nano S+ (connected)");
-            println!("  2. Trezor One (connected)");
-            // Implementation: Query RPC for hardware wallets
-        }
-        HardwareAction::Verify { device_id } => {
-            println!("Verifying device: {}", device_id);
-            // Implementation: Verify hardware connection
-        }
-    }
-    Ok(())
+/// Every command in this CLI is a stub.
+///
+/// The handlers used to print what they *would* do — "Creating 3-of-5 multisig
+/// wallet", "Adding hardware guardian: …", with "// Implementation: …" in the
+/// source — and then return `Ok(())`. A user therefore saw a confirmation and a
+/// zero exit status for an operation that never happened, and `rpc_endpoint` was
+/// accepted and never used. Until the RPC plumbing exists, the CLI reports the
+/// truth and exits non-zero.
+fn not_implemented(command: &str) -> Result<(), Box<dyn StdError>> {
+    Err(format!("`{command}` is not implemented: this CLI does not talk to a node yet").into())
 }
 
-async fn handle_multisig(
-    cmd: MultisigCmd,
-    rpc_endpoint: &str,
-) -> Result<(), Box<dyn StdError>> {
-    match cmd.action {
-        MultisigAction::Create {
-            signers,
-            threshold,
-            delay,
-        } => {
-            println!(
-                "{}",
-                format!("Creating {}-of-{} multisig wallet", threshold, signers)
-                    .green()
-                    .bold()
-            );
-            if let Some(d) = delay {
-                println!("Timelock delay: {} blocks", d);
-            }
-            // Implementation: Create multisig wallet
-        }
-        MultisigAction::Info { wallet_id } => {
-            println!("Wallet ID: {}", wallet_id);
-            println!("Status: {}", "3-of-5 multisig".cyan());
-            println!("Signers: 5");
-            println!("Pending approvals: 1");
-            // Implementation: Get multisig info from RPC
-        }
-        MultisigAction::Propose {
-            wallet_id,
-            to,
-            amount,
-        } => {
-            println!("Proposing transaction from {}", wallet_id);
-            println!("Destination: {}", to);
-            println!("Amount: {} tokens", amount);
-            // Implementation: Propose multisig transaction
-        }
-        MultisigAction::Approve { tx_id } => {
-            println!("Approving transaction: {}", tx_id);
-            // Implementation: Sign approval
-        }
-        MultisigAction::Execute { tx_id } => {
-            println!("Executing transaction: {}", tx_id);
-            // Implementation: Execute multisig transaction
-        }
-    }
-    Ok(())
+/// Name of the subcommand variant, for the message above.
+fn action_name<T: std::fmt::Debug>(action: &T) -> String {
+    format!("{action:?}")
+        .split(['(', ' ', '{'])
+        .next()
+        .unwrap_or("unknown")
+        .to_string()
 }
 
-async fn handle_recovery(
-    cmd: RecoveryCmd,
-    _rpc_endpoint: &str,
-) -> Result<(), Box<dyn StdError>> {
-    match cmd.action {
-        RecoveryAction::AddGuardian {
-            guardian_address,
-            guardian_type,
-        } => {
-            println!(
-                "{}",
-                format!("Adding {} guardian: {}", guardian_type, guardian_address)
-                    .green()
-            );
-            // Implementation: Add recovery guardian
-        }
-        RecoveryAction::Initiate { new_owner } => {
-            println!("Initiating recovery for new owner: {}", new_owner);
-            // Implementation: Start recovery process
-        }
-        RecoveryAction::Approve { recovery_id } => {
-            println!("Approving recovery: {}", recovery_id);
-            // Implementation: Guardian approval
-        }
-        RecoveryAction::ListGuardians => {
-            println!("{}", "Recovery Guardians:".bold().cyan());
-            println!("  1. Mom (family) - 5X9n...hQw3");
-            println!("  2. Best Friend (friend) - 3kLp...mBx7");
-            // Implementation: List guardians from RPC
-        }
-    }
-    Ok(())
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-async fn handle_account(
-    cmd: AccountCmd,
-    _rpc_endpoint: &str,
-) -> Result<(), Box<dyn StdError>> {
-    match cmd.action {
-        AccountAction::Balance { account, token_id } => {
-            println!("Account: {} ", account.unwrap_or("default".to_string()));
-            println!("Token: {}", token_id.unwrap_or("X3T".to_string()));
-            println!("Balance: {} X3T", "1,234,567".cyan().bold());
-            // Implementation: Query balance from RPC
-        }
-        AccountAction::AddContact {
-            name,
-            address,
-            network,
-        } => {
-            println!("Adding contact: {} ({})", name, network.unwrap_or("default".to_string()));
-            println!("Address: {}", address);
-            // Implementation: Save contact
-        }
-        AccountAction::ListContacts => {
-            println!("{}", "Saved Contacts:".bold().cyan());
-            println!("  1. Alice (0x1234...5678)");
-            println!("  2. Bob (0x9abc...def0)");
-            // Implementation: List contacts
-        }
-        AccountAction::Import { mnemonic } => {
-            println!("Importing account from mnemonic...");
-            // Implementation: Import account
-        }
-        AccountAction::Export { password } => {
-            println!("Exporting encrypted account backup...");
-            // Implementation: Export account
-        }
-    }
-    Ok(())
-}
-
-async fn handle_transaction(
-    cmd: TransactionCmd,
-    _rpc_endpoint: &str,
-) -> Result<(), Box<dyn StdError>> {
-    match cmd.action {
-        TransactionAction::Sign { tx_data, wallet_id } => {
-            println!("Signing transaction with wallet: {}", wallet_id);
-            println!("Status: {}", "Waiting for hardware confirmation...".yellow());
-            // Implementation: Sign with hardware wallet
-        }
-        TransactionAction::Submit { signed_tx } => {
-            println!("Submitting signed transaction...");
-            println!("TX Hash: {}", "0xabcd...ef01".cyan().bold());
-            // Implementation: Submit TX
-        }
-        TransactionAction::Status { tx_hash } => {
-            println!("Transaction: {}", tx_hash);
-            println!("Status: {}", "Confirmed (2/3 blocks)".green());
-            println!("Block: 12345");
-            // Implementation: Query TX status
-        }
-        TransactionAction::EstimateFee { to, amount } => {
-            println!("Transfer {} tokens to {}", amount, to);
-            println!("Estimated fee: {} tokens", "0.001".yellow());
-            // Implementation: Estimate fee
-        }
-    }
-    Ok(())
-}
-
-async fn handle_swap(
-    cmd: SwapCmd,
-    _rpc_endpoint: &str,
-) -> Result<(), Box<dyn StdError>> {
-    match cmd.action {
-        SwapAction::Estimate {
-            token_in,
-            token_out,
-            amount,
-        } => {
-            println!("Swap estimate: {} {} → {}", amount, token_in, token_out);
-            println!(
-                "You will receive: {} {} ({} impact)",
-                "950".cyan(),
-                token_out,
-                "-5%".red()
-            );
-            println!("Fee: {} tokens", "5".yellow());
-        }
-        SwapAction::Execute {
-            token_in,
-            token_out,
-            amount,
-            min_output,
-            wallet_id,
-        } => {
-            println!(
-                "Execute swap: {} {} → {}",
-                amount, token_in, token_out
-            );
-            println!("Minimum output: {}", min_output);
-            if let Some(wid) = wallet_id {
-                println!("Wallet: {}", wid);
-            }
-            println!("Status: {}", "Waiting for confirmation...".yellow());
-        }
-        SwapAction::Approve { token, amount } => {
-            println!("Approving {} for {} tokens", token, amount);
-            // Implementation: Approve spending
-        }
-        SwapAction::History { limit } => {
-            println!("Swap History (last {})", limit.unwrap_or(10));
-            println!("1. 1000 USDC → 950 USDT (block 12000)");
-            println!("2. 500 ETH → 8500 USDC (block 11999)");
-            // Implementation: Get swap history
-        }
-    }
-    Ok(())
-}
-
-async fn handle_biometric(
-    cmd: BiometricCmd,
-    _rpc_endpoint: &str,
-) -> Result<(), Box<dyn StdError>> {
-    match cmd.action {
-        BiometricAction::Enroll { biometric_type } => {
-            println!("Enrolling {}", biometric_type);
-            println!("Status: {}", "Ready for biometric input...".yellow());
-            // Implementation: Enroll biometric
-        }
-        BiometricAction::Verify { biometric_type } => {
-            println!("Verifying {}", biometric_type);
-            println!("Status: {}", "Ready for biometric input...".yellow());
-            // Implementation: Verify biometric
-        }
-        BiometricAction::RequireForApproval { enabled } => {
-            if enabled {
-                println!("Biometric verification: {}", "REQUIRED for approvals".green());
-            } else {
-                println!("Biometric verification: {}", "OPTIONAL".yellow());
-            }
-        }
-    }
-    Ok(())
-}
-
-async fn handle_status(
-    cmd: StatusCmd,
-    _rpc_endpoint: &str,
-) -> Result<(), Box<dyn StdError>> {
-    println!("{}", "X3 Wallet Status".bold().cyan());
-    println!("─────────────────────────────────────");
-    println!("Account: {}", "1234...abcd".cyan());
-    println!("Balance: {} X3T", "1,234,567.89".green().bold());
-    println!("Wallets Connected: {}", "3".cyan());
-    println!("  - Hardware: Ledger Nano S+");
-    println!("  - Multisig: 3-of-5");
-    println!("  - Social Recovery: 2 guardians");
-    println!("⠀");
-    println!("Recent Transactions:");
-    println!("  1. Swap 1000 USDC → 950 USDT");
-    println!("  2. Transfer 100 X3T to Alice");
-
-    if cmd.full {
-        println!("⠀");
-        println!("Pending Approvals: 1");
-        println!("  - Multisig TX #42");
-        println!("⠀");
-        println!("Recovery Status: Active (2/3 guardians)");
-    }
-
-    if cmd.json {
-        println!("⠀");
-        println!(
-            "{}",
-            r#"{"status":"active","balance":1234567890000,"wallets":3}"#.cyan()
+    /// The CLI must never report success for work it did not do. This is the
+    /// contract the print-only handlers broke.
+    #[test]
+    fn commands_fail_loudly_instead_of_printing_confirmations() {
+        let err = not_implemented("multisig Create").expect_err("stubs must fail");
+        let message = err.to_string();
+        assert!(message.contains("not implemented"), "{message}");
+        assert!(
+            message.contains("multisig Create"),
+            "the message names the command: {message}"
         );
     }
 
-    Ok(())
+    #[test]
+    fn action_names_are_the_variant_names() {
+        assert_eq!(action_name(&HardwareAction::List), "List");
+        assert_eq!(
+            action_name(&MultisigAction::Approve {
+                tx_id: "0x01".to_string()
+            }),
+            "Approve"
+        );
+    }
 }
