@@ -276,7 +276,7 @@ impl RouteOptimizer {
             }
 
             // Explore bridges from current chain
-            let asset_class = self.classify_asset(&asset.asset_type);
+            let asset_class = Self::classify_asset(&asset.asset_type);
 
             for bridge in &self.bridges {
                 if bridge.from != current.chain_id {
@@ -338,14 +338,17 @@ impl RouteOptimizer {
     }
 
     /// Classify asset type for bridge compatibility
-    fn classify_asset(&self, asset_type: &AssetType) -> AssetTypeClass {
+    ///
+    /// Associated function: `self` is only used for the recursive call, which
+    /// clippy flags as `only_used_in_recursion`.
+    fn classify_asset(asset_type: &AssetType) -> AssetTypeClass {
         match asset_type {
             AssetType::Native => AssetTypeClass::Native,
             AssetType::FungibleToken(_) => AssetTypeClass::ERC20,
             AssetType::NonFungible { .. } => AssetTypeClass::ERC721,
             AssetType::SemiFungible { .. } => AssetTypeClass::ERC1155,
             AssetType::Position { .. } => AssetTypeClass::ERC20, // Positions usually resolve to tokens
-            AssetType::Wrapped { asset, .. } => self.classify_asset(asset),
+            AssetType::Wrapped { asset, .. } => Self::classify_asset(asset),
         }
     }
 

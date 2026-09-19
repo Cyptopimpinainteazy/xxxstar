@@ -7,16 +7,12 @@
 # plus its own gate. `scripts/check-workspace-membership.py` fails when a
 # crate appears in neither list, or when a fixed entry stays here.
 
-apotheosis-tx
 confidential-gpu
-dream-mining
 dylint-determinism
 loom-concurrency
 orchestra
 pallet-x3-control
 pallet-x3-governance
-swarm-media
-voice-to-x3
 x3-indexer
 x3-mobile-sdk
 x3-pq

@@ -240,6 +240,11 @@ members = [
     "crates/import-queue-wrapper",
     "crates/x3-chain-onboarding",
     "crates/x3-lsp",
+    # Burn-down batch 8 (issue #274).
+    "crates/apotheosis-tx",
+    "crates/dream-mining",
+    "crates/swarm-media",
+    "crates/voice-to-x3",
 ]
 default-members = ["node"]
 resolver = "2"

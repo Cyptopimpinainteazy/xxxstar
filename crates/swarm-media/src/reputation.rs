@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ReputationFactors {
@@ -74,11 +74,17 @@ impl ReputationRepo for InMemoryRepo {
     }
     async fn get_reputation_events(&self, wallet: &str) -> Result<Vec<ReputationEvent>, String> {
         let g = self.events.lock().expect("events mutex poisoned");
-        Ok(g.iter().filter(|e| e.wallet_address == wallet).cloned().collect())
+        Ok(g.iter()
+            .filter(|e| e.wallet_address == wallet)
+            .cloned()
+            .collect())
     }
     async fn get_slashing_events(&self, wallet: &str) -> Result<Vec<SlashingEvent>, String> {
         let g = self.slashes.lock().expect("slashes mutex poisoned");
-        Ok(g.iter().filter(|e| e.wallet_address == wallet).cloned().collect())
+        Ok(g.iter()
+            .filter(|e| e.wallet_address == wallet)
+            .cloned()
+            .collect())
     }
 }
 
@@ -93,7 +99,11 @@ pub fn compute_node_reputation(mut f: ReputationFactors, incident_penalty: f64) 
     (raw, adj)
 }
 
-pub fn compute_wallet_reputation(node_reps: &[f64], funding_factor: f64, social_factor: f64) -> f64 {
+pub fn compute_wallet_reputation(
+    node_reps: &[f64],
+    funding_factor: f64,
+    social_factor: f64,
+) -> f64 {
     if node_reps.is_empty() {
         return 0.5_f64.clamp(0.0, 1.0);
     }
@@ -107,8 +117,7 @@ pub fn compute_wallet_reputation(node_reps: &[f64], funding_factor: f64, social_
     };
     let f_funding = funding_factor.clamp(0.0, 0.2);
     let f_social = social_factor.clamp(0.0, 0.1);
-    let wallet_rep = (median * (1.0 + f_funding + f_social)).clamp(0.0, 1.0);
-    wallet_rep
+    (median * (1.0 + f_funding + f_social)).clamp(0.0, 1.0)
 }
 
 pub fn compute_slash_amount(bond: f64, severity: f64, repeat_count: i32, base_scale: f64) -> f64 {
@@ -159,9 +168,9 @@ mod pg_impl {
                 .bind(&ev.wallet_address)
                 .bind(node_id)
                 .bind(&ev.event_type)
-                .bind(ev.delta as f64)
-                .bind(ev.prev_reputation as f64)
-                .bind(ev.new_reputation as f64)
+                .bind(ev.delta)
+                .bind(ev.prev_reputation)
+                .bind(ev.new_reputation)
                 .bind(ev.evidence_hash)
                 .bind(ev.occurred_at.naive_utc())
                 .execute(&self.pool)
@@ -176,8 +185,8 @@ mod pg_impl {
             sqlx::query(query)
                 .bind(&ev.wallet_address)
                 .bind(node_id)
-                .bind(ev.severity as f64)
-                .bind(ev.slash_amount as f64)
+                .bind(ev.severity)
+                .bind(ev.slash_amount)
                 .bind(ev.recurrence_count)
                 .bind(ev.evidence_hash)
                 .bind(ev.occurred_at.naive_utc())
@@ -187,44 +196,79 @@ mod pg_impl {
                 .map_err(|e| e.to_string())?;
             Ok(())
         }
-        async fn get_reputation_events(&self, wallet: &str) -> Result<Vec<ReputationEvent>, String> {
+        async fn get_reputation_events(
+            &self,
+            wallet: &str,
+        ) -> Result<Vec<ReputationEvent>, String> {
             let query = r#"SELECT id, wallet_address, node_id, event_type, delta, prev_reputation, new_reputation, evidence_hash, occurred_at FROM reputation_events WHERE wallet_address = $1"#;
-            let rows = sqlx::query_as::<_, (i32, String, Option<String>, String, f64, f64, f64, Option<String>, chrono::DateTime<Utc>)>(query)
-                .bind(wallet)
-                .fetch_all(&self.pool)
-                .await
-                .map_err(|e| e.to_string())?;
-            let evs = rows.into_iter().map(|r| ReputationEvent {
-                id: r.0 as i64,
-                wallet_address: r.1,
-                node_id: r.2.and_then(|s| uuid::Uuid::parse_str(&s).ok()),
-                event_type: r.3,
-                delta: r.4,
-                prev_reputation: r.5,
-                new_reputation: r.6,
-                evidence_hash: r.7,
-                occurred_at: r.8,
-            }).collect();
+            let rows = sqlx::query_as::<
+                _,
+                (
+                    i32,
+                    String,
+                    Option<String>,
+                    String,
+                    f64,
+                    f64,
+                    f64,
+                    Option<String>,
+                    chrono::DateTime<Utc>,
+                ),
+            >(query)
+            .bind(wallet)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+            let evs = rows
+                .into_iter()
+                .map(|r| ReputationEvent {
+                    id: r.0 as i64,
+                    wallet_address: r.1,
+                    node_id: r.2.and_then(|s| uuid::Uuid::parse_str(&s).ok()),
+                    event_type: r.3,
+                    delta: r.4,
+                    prev_reputation: r.5,
+                    new_reputation: r.6,
+                    evidence_hash: r.7,
+                    occurred_at: r.8,
+                })
+                .collect();
             Ok(evs)
         }
         async fn get_slashing_events(&self, wallet: &str) -> Result<Vec<SlashingEvent>, String> {
             let query = r#"SELECT id, wallet_address, node_id, severity, slash_amount, recurrence_count, evidence_hash, occurred_at, appeal_status FROM slashing_events WHERE wallet_address = $1"#;
-            let rows = sqlx::query_as::<_, (i32, String, Option<String>, f64, f64, i32, Option<String>, chrono::DateTime<Utc>, Option<String>)>(query)
-                .bind(wallet)
-                .fetch_all(&self.pool)
-                .await
-                .map_err(|e| e.to_string())?;
-            let evs = rows.into_iter().map(|r| SlashingEvent {
-                id: r.0 as i64,
-                wallet_address: r.1,
-                node_id: r.2.and_then(|s| uuid::Uuid::parse_str(&s).ok()),
-                severity: r.3,
-                slash_amount: r.4,
-                recurrence_count: r.5,
-                evidence_hash: r.6,
-                occurred_at: r.7,
-                appeal_status: r.8.unwrap_or_else(|| "none".to_string()),
-            }).collect();
+            let rows = sqlx::query_as::<
+                _,
+                (
+                    i32,
+                    String,
+                    Option<String>,
+                    f64,
+                    f64,
+                    i32,
+                    Option<String>,
+                    chrono::DateTime<Utc>,
+                    Option<String>,
+                ),
+            >(query)
+            .bind(wallet)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+            let evs = rows
+                .into_iter()
+                .map(|r| SlashingEvent {
+                    id: r.0 as i64,
+                    wallet_address: r.1,
+                    node_id: r.2.and_then(|s| uuid::Uuid::parse_str(&s).ok()),
+                    severity: r.3,
+                    slash_amount: r.4,
+                    recurrence_count: r.5,
+                    evidence_hash: r.6,
+                    occurred_at: r.7,
+                    appeal_status: r.8.unwrap_or_else(|| "none".to_string()),
+                })
+                .collect();
             Ok(evs)
         }
     }
@@ -244,7 +288,9 @@ async fn test_pgrepo_reputation_events_roundtrip() {
     }
 
     let database_url = std::env::var("DATABASE_URL").unwrap();
-    let pool = sqlx::PgPool::connect(&database_url).await.expect("could not connect to postgres for test");
+    let pool = sqlx::PgPool::connect(&database_url)
+        .await
+        .expect("could not connect to postgres for test");
 
     // ensure tables exist
     let create_reputation = r#"
@@ -273,8 +319,14 @@ async fn test_pgrepo_reputation_events_roundtrip() {
             appeal_status TEXT
         );
     "#;
-    sqlx::query(create_reputation).execute(&pool).await.expect("migration failed");
-    sqlx::query(create_slashing).execute(&pool).await.expect("migration failed");
+    sqlx::query(create_reputation)
+        .execute(&pool)
+        .await
+        .expect("migration failed");
+    sqlx::query(create_slashing)
+        .execute(&pool)
+        .await
+        .expect("migration failed");
 
     let repo = pg_impl::PgRepo::new(pool);
 
@@ -290,9 +342,14 @@ async fn test_pgrepo_reputation_events_roundtrip() {
         occurred_at: Utc::now(),
     };
 
-    repo.insert_reputation_event(ev.clone()).await.expect("insert failed");
-    let found = repo.get_reputation_events("0xroundtrip").await.expect("query failed");
-    assert!(found.len() >= 1);
+    repo.insert_reputation_event(ev.clone())
+        .await
+        .expect("insert failed");
+    let found = repo
+        .get_reputation_events("0xroundtrip")
+        .await
+        .expect("query failed");
+    assert!(!found.is_empty());
     assert_eq!(found[0].wallet_address, "0xroundtrip");
 }
 
@@ -303,7 +360,9 @@ async fn test_slashing_appeal_lifecycle_and_recurrence() {
         return;
     }
     let database_url = std::env::var("DATABASE_URL").unwrap();
-    let pool = sqlx::PgPool::connect(&database_url).await.expect("could not connect to postgres for test");
+    let pool = sqlx::PgPool::connect(&database_url)
+        .await
+        .expect("could not connect to postgres for test");
     // Ensure schema
     let create_slashing = r#"
         CREATE TABLE IF NOT EXISTS slashing_events (
@@ -318,12 +377,25 @@ async fn test_slashing_appeal_lifecycle_and_recurrence() {
             appeal_status TEXT
         );
     "#;
-    sqlx::query(create_slashing).execute(&pool).await.expect("migration failed");
+    sqlx::query(create_slashing)
+        .execute(&pool)
+        .await
+        .expect("migration failed");
 
     let repo = pg_impl::PgRepo::new(pool.clone());
     // Insert a pending appeal
     let now = Utc::now();
-    let s = SlashingEvent { id: 0, wallet_address: "0xappeal".to_string(), node_id: None, severity: 0.4, slash_amount: 4.0, recurrence_count: 1, evidence_hash: None, occurred_at: now, appeal_status: "pending".to_string() };
+    let s = SlashingEvent {
+        id: 0,
+        wallet_address: "0xappeal".to_string(),
+        node_id: None,
+        severity: 0.4,
+        slash_amount: 4.0,
+        recurrence_count: 1,
+        evidence_hash: None,
+        occurred_at: now,
+        appeal_status: "pending".to_string(),
+    };
     repo.insert_slashing_event(s).await.expect("insert failed");
 
     // Update appeal status via SQL (simulate appeal resolution)
@@ -334,8 +406,11 @@ async fn test_slashing_appeal_lifecycle_and_recurrence() {
         .await
         .expect("update failed");
 
-    let events = repo.get_slashing_events("0xappeal").await.expect("query failed");
-    assert!(events.len() >= 1);
+    let events = repo
+        .get_slashing_events("0xappeal")
+        .await
+        .expect("query failed");
+    assert!(!events.is_empty());
     assert_eq!(events[0].appeal_status, "accepted");
 
     // Recurrence math: ensure repeat increases slash

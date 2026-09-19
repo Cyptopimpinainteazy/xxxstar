@@ -99,10 +99,8 @@ impl IntentParser {
 
         for pattern in &self.patterns {
             let score = pattern.score(&input_lower);
-            if score > 0.5 {
-                if best_match.is_none() || score > best_match.unwrap().1 {
-                    best_match = Some((pattern.contract_type, score));
-                }
+            if score > MATCH_THRESHOLD && best_match.is_none_or(|(_, best)| score > best) {
+                best_match = Some((pattern.contract_type, score));
             }
         }
 
@@ -113,9 +111,11 @@ impl IntentParser {
         // Extract parameters
         let params = self.extract_params(&input_lower, contract_type);
 
-        // Extract name
+        // Extract the name from the *original* text: `input_lower` has already
+        // destroyed the casing, so "called MyToken" came back as "Mytoken" and
+        // the generated contract no longer contained the name the user wrote.
         let name = self
-            .extract_name(&input_lower)
+            .extract_name(input)
             .unwrap_or_else(|| format!("My{:?}", contract_type));
 
         Ok(Intent {
@@ -222,11 +222,16 @@ impl IntentParser {
 
     /// Extract contract name from input
     fn extract_name(&self, input: &str) -> Option<String> {
-        // Look for patterns like "called X", "named X", "X token"
+        // Look for patterns like "called X", "named X", "X token". Matched
+        // case-insensitively (any casing of "called"/"named"/"name", not
+        // just the two spellings this used to hand-list) so it works
+        // regardless of how the sentence is capitalized; the returned name
+        // keeps the casing from the input, and `to_pascal_case` only fixes
+        // word boundaries.
         let patterns = ["called ", "named ", "name "];
 
         for pattern in patterns {
-            if let Some(pos) = input.find(pattern) {
+            if let Some(pos) = find_ignore_ascii_case(input, pattern) {
                 let after = &input[pos + pattern.len()..];
                 if let Some(name) = after.split_whitespace().next() {
                     return Some(to_pascal_case(name));
@@ -342,20 +347,62 @@ struct IntentPattern {
 
 impl IntentPattern {
     /// Score how well input matches this pattern
+    ///
+    /// The original version divided the number of matched keywords by the
+    /// pattern's *total* keyword list, so a pattern with many synonyms needed
+    /// several of them in one sentence: `Token` lists five keywords, and
+    /// "Create a token called MyToken" scored 1/5 = 0.2 against a 0.5
+    /// threshold — no natural phrasing could ever name a contract type. A
+    /// length-based rewrite of this fixed that but introduced two new bugs:
+    /// short-but-distinctive keywords ("nft", "dex", "dao") could never
+    /// reach the threshold alone (`3 chars / 8 = 0.375 < 0.5`), and a long
+    /// modifier could outrank the actual noun ("governance" at 10 chars
+    /// outscoring "token" at 5, so "governance token" resolved to
+    /// Governance). Any single keyword match is now equally strong evidence
+    /// on its own, regardless of length — confidence instead comes from
+    /// *how many* distinct keywords matched, and ties between equally
+    /// strong patterns are broken by declaration order in
+    /// `default_patterns` (`Token` before `Bridge`/`Governance`/etc.), so
+    /// "governance token" and "bridge token" resolve to `Token`.
     fn score(&self, input: &str) -> f64 {
-        let mut matches = 0;
-        for keyword in &self.keywords {
-            if input.contains(keyword) {
-                matches += 1;
-            }
-        }
-
-        if matches == 0 {
+        let matched: Vec<&str> = self
+            .keywords
+            .iter()
+            .filter(|keyword| input.contains(*keyword))
+            .copied()
+            .collect();
+        if matched.is_empty() {
             return 0.0;
         }
 
-        (matches as f64 / self.keywords.len() as f64) * self.weight
+        let extra = EXTRA_KEYWORD_BONUS * matched.len().saturating_sub(1) as f64;
+        (self.weight * (BASE_MATCH_CONFIDENCE + extra)).min(1.0)
     }
+}
+
+/// Confidence from a single matched keyword, comfortably above
+/// `MATCH_THRESHOLD` so that no archetype's keywords are structurally
+/// unreachable regardless of how short they are.
+const BASE_MATCH_CONFIDENCE: f64 = 0.6;
+/// Each additional distinct keyword beyond the first adds this much confidence.
+const EXTRA_KEYWORD_BONUS: f64 = 0.25;
+/// Minimum confidence for a pattern to name the contract type.
+const MATCH_THRESHOLD: f64 = 0.5;
+
+/// Byte offset of the first case-insensitive (ASCII) occurrence of `needle`
+/// in `haystack`, or `None`. Operates on bytes directly against the
+/// original string rather than searching a separately-lowercased copy, so
+/// the returned offset is always valid for slicing `haystack` — no risk of
+/// the two diverging on non-ASCII input.
+fn find_ignore_ascii_case(haystack: &str, needle: &str) -> Option<usize> {
+    let haystack_bytes = haystack.as_bytes();
+    let needle_bytes = needle.as_bytes();
+    if needle_bytes.is_empty() || needle_bytes.len() > haystack_bytes.len() {
+        return None;
+    }
+    haystack_bytes
+        .windows(needle_bytes.len())
+        .position(|window| window.eq_ignore_ascii_case(needle_bytes))
 }
 
 /// Convert string to PascalCase
@@ -395,5 +442,54 @@ mod tests {
         assert!(result.is_ok());
         let intent = result.unwrap();
         assert_eq!(intent.contract_type, ContractType::NFT);
+    }
+
+    /// A single short keyword ("nft", "dex", "dao", "amm") must be enough to
+    /// name a contract type on its own. Under length-based scoring these
+    /// could never reach MATCH_THRESHOLD (3 chars / 8 = 0.375 < 0.5), so
+    /// phrasings this direct were unparseable.
+    #[test]
+    fn test_short_archetype_keywords_are_reachable_alone() {
+        let parser = IntentParser::new();
+
+        let dex = parser.parse("I want a dex").unwrap();
+        assert_eq!(dex.contract_type, ContractType::DEX);
+
+        let dao = parser.parse("create a dao").unwrap();
+        assert_eq!(dao.contract_type, ContractType::Governance);
+
+        let nft = parser.parse("make an nft").unwrap();
+        assert_eq!(nft.contract_type, ContractType::NFT);
+    }
+
+    /// A long modifier keyword must not outrank the actual noun being
+    /// created just because it happens to be a longer string. Both used to
+    /// resolve to the modifier's contract type ("governance"/"bridge" at 10
+    /// and 6 chars outscoring "token" at 5).
+    #[test]
+    fn test_modifier_keyword_does_not_outrank_the_noun() {
+        let parser = IntentParser::new();
+
+        let governance_token = parser.parse("make a governance token").unwrap();
+        assert_eq!(governance_token.contract_type, ContractType::Token);
+
+        let bridge_token = parser.parse("create a bridge token").unwrap();
+        assert_eq!(bridge_token.contract_type, ContractType::Token);
+    }
+
+    /// Name extraction must be case-insensitive regardless of casing, not
+    /// just the two spellings ("called "/"Called ") that used to be
+    /// hand-listed.
+    #[test]
+    fn test_extract_name_is_case_insensitive() {
+        let parser = IntentParser::new();
+
+        let all_caps = parser
+            .parse("CREATE A TOKEN CALLED MyToken WITH 1000 SUPPLY")
+            .unwrap();
+        assert_eq!(all_caps.name, "MyToken");
+
+        let mixed = parser.parse("create a token nAmEd MyToken").unwrap();
+        assert_eq!(mixed.name, "MyToken");
     }
 }
