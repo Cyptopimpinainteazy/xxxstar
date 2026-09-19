@@ -11,13 +11,18 @@ use crate::error::{ChronosError, ChronosResult};
 use crate::intent::{IntentType, PredictedIntent, PredictionBasis, PredictionType, SwapIntent};
 use crate::types::{Address, Balance, ChainId, Price, Timestamp, Token};
 
+/// The key that identifies a token pair on a specific chain.
+pub type PairKey = (ChainId, Address, Address);
+/// Pair statistics keyed by [`PairKey`].
+pub type PairStatsMap = HashMap<PairKey, PairStats>;
+
 /// AI-powered intent predictor
 pub struct IntentPredictor {
     config: PredictorConfig,
     /// Historical patterns per address
     address_patterns: Arc<RwLock<HashMap<Address, AddressPattern>>>,
     /// Token pair statistics
-    pair_stats: Arc<RwLock<HashMap<(ChainId, Address, Address), PairStats>>>,
+    pair_stats: Arc<RwLock<PairStatsMap>>,
     /// Price movement correlations
     price_correlations: Arc<RwLock<HashMap<Address, PriceCorrelation>>>,
     /// Model state
@@ -323,7 +328,7 @@ impl AddressPattern {
 
         // Update amount statistics
         let old_avg = self.avg_amount;
-        self.avg_amount = (old_avg as u128 * self.trade_count as u128 + intent.amount_in)
+        self.avg_amount = (old_avg * self.trade_count as u128 + intent.amount_in)
             / (self.trade_count as u128 + 1);
 
         // Update pair tracking

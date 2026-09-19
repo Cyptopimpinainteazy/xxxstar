@@ -56,13 +56,31 @@ if ! command -v cargo >/dev/null 2>&1; then
     fi
   done
 fi
-if ! command -v cargo >/dev/null 2>&1; then
+# Put the *real* toolchain directory ahead of the rustup shims. The shims are
+# symlinks to `~/.cargo/bin/rustup`, and this box deletes that binary
+# mid-session: the symlinks then dangle, `cargo`/`rustc` resolve to a path that
+# does not exist, and every cargo gate dies with
+#   `could not execute process rustc ... (never executed) No such file or directory`
+# even though a perfectly good toolchain sits under ~/.rustup. Prefer the
+# pinned toolchain (rust-toolchain.toml), then any complete one, then the shims.
+PINNED_CHANNEL="$(sed -n 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$ROOT/rust-toolchain.toml" 2>/dev/null | head -1)"
+TOOLCHAIN_BIN=""
+for d in "$HOME"/.rustup/toolchains/"$PINNED_CHANNEL"*/bin "$HOME"/.rustup/toolchains/*/bin; do
+  if [ -x "$d/cargo" ] && [ -x "$d/rustc" ] && [ -x "$d/rustfmt" ]; then
+    TOOLCHAIN_BIN="$d"
+    break
+  fi
+done
+if [ -n "$TOOLCHAIN_BIN" ]; then
+  export PATH="$TOOLCHAIN_BIN:$PATH"
+elif ! command -v cargo >/dev/null 2>&1; then
   echo "local-ci: cargo is not on PATH and no toolchain was found under" >&2
   echo "local-ci: ~/.rustup/toolchains/*/bin or ~/.cargo/bin — nothing can be" >&2
   echo "local-ci: verified. Restore the toolchain and re-run." >&2
   exit 2
+else
+  export PATH="${HOME}/.cargo/bin:${PATH}"
 fi
-export PATH="${HOME}/.cargo/bin:${PATH}"
 
 RUN_LIVE=0
 RUN_CROSS=0

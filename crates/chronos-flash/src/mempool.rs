@@ -63,25 +63,23 @@ impl MempoolScanner {
             let mut stats = self.stats.write().await;
             stats.chains_monitored = self.chains.len();
 
-            for result in results {
-                if let Ok((chain_id, pending_txs)) = result {
-                    stats.total_pending += pending_txs.len();
+            for (chain_id, pending_txs) in results.into_iter().flatten() {
+                stats.total_pending += pending_txs.len();
 
-                    // Process each pending transaction
-                    for tx in pending_txs {
-                        if let Some(intent) =
-                            self.intent_detector
-                                .detect(chain_id, &tx.data, tx.sender, tx.gas_price)
-                        {
-                            stats.swap_intents_detected += 1;
+                // Process each pending transaction
+                for tx in pending_txs {
+                    if let Some(intent) =
+                        self.intent_detector
+                            .detect(chain_id, &tx.data, tx.sender, tx.gas_price)
+                    {
+                        stats.swap_intents_detected += 1;
 
-                            // Send intent for processing
-                            if self.intent_tx.send(intent).await.is_err() {
-                                // Channel closed, stop scanning
-                                return Err(ChronosError::MempoolScanFailed(
-                                    "Intent channel closed".to_string(),
-                                ));
-                            }
+                        // Send intent for processing
+                        if self.intent_tx.send(intent).await.is_err() {
+                            // Channel closed, stop scanning
+                            return Err(ChronosError::MempoolScanFailed(
+                                "Intent channel closed".to_string(),
+                            ));
                         }
                     }
                 }
@@ -142,8 +140,9 @@ impl ChainScanner {
         // Filter new transactions
         let mut new_txs = vec![];
         for tx in pending {
-            if !self.pending_txs.contains_key(&tx.hash) {
-                self.pending_txs.insert(tx.hash, tx.clone());
+            if let std::collections::hash_map::Entry::Vacant(slot) = self.pending_txs.entry(tx.hash)
+            {
+                slot.insert(tx.clone());
                 new_txs.push(tx);
             }
         }
@@ -337,8 +336,10 @@ impl MempoolAggregator {
             if let Ok(txs) = stream.get_pending().await {
                 for tx in txs {
                     // Deduplicate
-                    if !self.dedupe_window.contains_key(&tx.hash) {
-                        self.dedupe_window.insert(tx.hash, now);
+                    if let std::collections::hash_map::Entry::Vacant(slot) =
+                        self.dedupe_window.entry(tx.hash)
+                    {
+                        slot.insert(now);
                         all_txs.push(tx);
                     }
                 }

@@ -8,6 +8,63 @@ use std::sync::Arc;
 
 use crate::document::DocumentStore;
 
+/// Function-definition regex, compiled once instead of per line.
+fn fn_def_re() -> &'static regex::Regex {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| regex::Regex::new(r"fn\s+(\w+)").expect("static regex is valid"))
+}
+
+/// Rust/Substrate keywords highlighted in `.rs` files.
+const RUST_KEYWORDS: &[&str] = &[
+    "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "type", "const", "static", "use",
+    "mod", "crate", "self", "super", "where", "for", "loop", "while", "if", "else", "match",
+    "return", "async", "await", "move", "ref", "dyn", "unsafe",
+];
+
+/// X3-specific types highlighted in `.rs` files.
+const X3_TYPES: &[&str] = &[
+    "ComitPayload",
+    "EvmPayload",
+    "SvmPayload",
+    "ExecutionReceipt",
+    "AtlasKernel",
+    "CanonicalLedger",
+    "AuthorizedAccounts",
+];
+
+/// One `\bword\b` regex per entry in `words`, compiled once and cached — not
+/// per line per word, which for `RUST_KEYWORDS` alone was ~30 compiles for
+/// every line in the document.
+fn word_boundary_res(
+    cache: &'static std::sync::OnceLock<Vec<(&'static str, regex::Regex)>>,
+    words: &'static [&'static str],
+) -> &'static [(&'static str, regex::Regex)] {
+    cache.get_or_init(|| {
+        words
+            .iter()
+            .map(|&word| {
+                let pattern = format!(r"\b{word}\b");
+                (
+                    word,
+                    regex::Regex::new(&pattern).expect("static regex is valid"),
+                )
+            })
+            .collect()
+    })
+}
+
+fn keyword_res() -> &'static [(&'static str, regex::Regex)] {
+    static CACHE: std::sync::OnceLock<Vec<(&'static str, regex::Regex)>> =
+        std::sync::OnceLock::new();
+    word_boundary_res(&CACHE, RUST_KEYWORDS)
+}
+
+fn x3_type_res() -> &'static [(&'static str, regex::Regex)] {
+    static CACHE: std::sync::OnceLock<Vec<(&'static str, regex::Regex)>> =
+        std::sync::OnceLock::new();
+    word_boundary_res(&CACHE, X3_TYPES)
+}
+
 /// Semantic token types used by the LSP.
 pub const TOKEN_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::NAMESPACE, // 0 - modules, crates
@@ -275,13 +332,6 @@ impl SemanticTokensProvider {
         let mut prev_line = start.line;
         let mut prev_char = start.character;
 
-        // Rust/Substrate keywords
-        let keywords = [
-            "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "type", "const",
-            "static", "use", "mod", "crate", "self", "super", "where", "for", "loop", "while",
-            "if", "else", "match", "return", "async", "await", "move", "ref", "dyn", "unsafe",
-        ];
-
         // Substrate/FRAME macros
         let macros = [
             "pallet",
@@ -298,41 +348,28 @@ impl SemanticTokensProvider {
             "require_transactional",
         ];
 
-        // X3-specific types
-        let x3_types = [
-            "ComitPayload",
-            "EvmPayload",
-            "SvmPayload",
-            "ExecutionReceipt",
-            "AtlasKernel",
-            "CanonicalLedger",
-            "AuthorizedAccounts",
-        ];
-
         for (line_num, line) in text.lines().enumerate() {
             let line_idx = start.line + line_num as u32;
 
-            // Find keywords
-            for keyword in &keywords {
-                // Match whole word
-                let pattern = format!(r"\b{}\b", keyword);
-                if let Ok(re) = regex::Regex::new(&pattern) {
-                    for mat in re.find_iter(line) {
-                        let col = mat.start() as u32;
-                        tokens.push(SemanticToken {
-                            delta_line: line_idx - prev_line,
-                            delta_start: if line_idx == prev_line {
-                                col.saturating_sub(prev_char)
-                            } else {
-                                col
-                            },
-                            length: keyword.len() as u32,
-                            token_type: 11, // Keyword
-                            token_modifiers_bitset: 0,
-                        });
-                        prev_line = line_idx;
-                        prev_char = col;
-                    }
+            // Find keywords. The regexes are built once (see `keyword_res`):
+            // compiling ~30 of them per line made this expensive for every
+            // line in the document.
+            for (keyword, re) in keyword_res() {
+                for mat in re.find_iter(line) {
+                    let col = mat.start() as u32;
+                    tokens.push(SemanticToken {
+                        delta_line: line_idx - prev_line,
+                        delta_start: if line_idx == prev_line {
+                            col.saturating_sub(prev_char)
+                        } else {
+                            col
+                        },
+                        length: keyword.len() as u32,
+                        token_type: 11, // Keyword
+                        token_modifiers_bitset: 0,
+                    });
+                    prev_line = line_idx;
+                    prev_char = col;
                 }
             }
 
@@ -359,32 +396,33 @@ impl SemanticTokensProvider {
                 }
             }
 
-            // Find X3 types
-            for x3_type in &x3_types {
-                let pattern = format!(r"\b{}\b", x3_type);
-                if let Ok(re) = regex::Regex::new(&pattern) {
-                    for mat in re.find_iter(line) {
-                        let col = mat.start() as u32;
-                        tokens.push(SemanticToken {
-                            delta_line: line_idx - prev_line,
-                            delta_start: if line_idx == prev_line {
-                                col.saturating_sub(prev_char)
-                            } else {
-                                col
-                            },
-                            length: x3_type.len() as u32,
-                            token_type: 1, // Type
-                            token_modifiers_bitset: 0,
-                        });
-                        prev_line = line_idx;
-                        prev_char = col;
-                    }
+            // Find X3 types. Same hoisted-regex treatment as keywords above.
+            for (x3_type, re) in x3_type_res() {
+                for mat in re.find_iter(line) {
+                    let col = mat.start() as u32;
+                    tokens.push(SemanticToken {
+                        delta_line: line_idx - prev_line,
+                        delta_start: if line_idx == prev_line {
+                            col.saturating_sub(prev_char)
+                        } else {
+                            col
+                        },
+                        length: x3_type.len() as u32,
+                        token_type: 1, // Type
+                        token_modifiers_bitset: 0,
+                    });
+                    prev_line = line_idx;
+                    prev_char = col;
                 }
             }
 
-            // Find function definitions
-            if let Ok(re) = regex::Regex::new(r"fn\s+(\w+)") {
-                for caps in re.captures_iter(line) {
+            // Find function definitions. The regex is built once (see
+            // `fn_def_re`) instead of recompiled for every line: rebuilding
+            // it (and the ~30 keyword and 7 x3-type patterns above) per line
+            // was O(lines) with a large constant, not asymptotically
+            // quadratic, but still real, avoidable cost on every document.
+            {
+                for caps in fn_def_re().captures_iter(line) {
                     if let Some(name) = caps.get(1) {
                         let col = name.start() as u32;
                         tokens.push(SemanticToken {

@@ -252,7 +252,7 @@ impl ChronosOracle {
         let mut bundles = vec![];
 
         // Get chains to monitor
-        for (chain_id, _) in &self.config.chains {
+        for chain_id in self.config.chains.keys() {
             // Get predictions for this chain
             let predictions = self.predictor.predict(*chain_id).await?;
 
