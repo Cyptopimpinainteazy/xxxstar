@@ -141,6 +141,17 @@ impl AttestationManager {
     }
 
     /// Verify an attestation report (static — used by verifiers).
+    ///
+    /// KNOWN GAP (tracked in issue #358): this only checks that `report`
+    /// starts with the literal 24-byte header `NVIDIA-CC-ATTESTATION-V1` —
+    /// there is no cryptographic check of a signature, enclave key, or
+    /// timestamp. Any byte string with that prefix returns `valid: true`.
+    /// It is currently only exercised by this module's own tests (no
+    /// production caller); `pallets/private-execution`'s on-chain
+    /// `verify_attestation` does not call it at all and has its own,
+    /// independent, even more permissive check (`!report.is_empty()`). Do
+    /// not wire either into a real trust decision until #358 lands a real
+    /// signature check here.
     pub fn verify_report(report: &[u8]) -> Result<AttestationInfo, ConfidentialGpuError> {
         if report.len() < 24 {
             return Err(ConfidentialGpuError::AttestationFailed(

@@ -10,4 +10,4 @@ name = "x3_validator_attestation"
 path = "src/lib.rs"
 
 [dependencies]
-ed25519-dalek = "2.1"
+ed25519-dalek = { workspace = true }
