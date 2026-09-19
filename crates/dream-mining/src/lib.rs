@@ -19,7 +19,6 @@
 //! - **Configurable Schedule**: User-defined sleep/work hours
 //! - **Resource Limits**: Never exceeds configured GPU/CPU usage
 
-#![allow(dead_code)]
 #![allow(unused_variables)]
 
 pub mod config;
@@ -151,15 +150,20 @@ impl DreamMiner {
 
     /// Check if current time is within configured schedule
     fn is_within_schedule(&self) -> bool {
-        let now = chrono::Local::now();
-        let hour = now.hour();
+        let hour = chrono::Local::now().hour();
+        Self::hour_within_schedule(hour, self.config.schedule_start, self.config.schedule_end)
+    }
 
-        if self.config.schedule_start <= self.config.schedule_end {
-            // Normal range (e.g., 23:00 to 07:00 doesn't cross midnight)
-            hour >= self.config.schedule_start && hour < self.config.schedule_end
+    /// Pure schedule-window check, split out from `is_within_schedule` so
+    /// the cross-midnight branch can be tested against explicit hours
+    /// instead of depending on when the test happens to run.
+    fn hour_within_schedule(hour: u32, start: u32, end: u32) -> bool {
+        if start <= end {
+            // Normal range (e.g., 09:00 to 17:00 doesn't cross midnight)
+            hour >= start && hour < end
         } else {
             // Crosses midnight (e.g., 23:00 to 07:00)
-            hour >= self.config.schedule_start || hour < self.config.schedule_end
+            hour >= start || hour < end
         }
     }
 
@@ -324,11 +328,64 @@ mod tests {
 
     #[test]
     fn test_schedule_check() {
-        let mut config = DreamConfig::default();
-        config.schedule_start = 23;
-        config.schedule_end = 7;
+        // `field_reassign_with_default` wants the struct built in one
+        // expression rather than mutating a `Default::default()`.
+        let config = DreamConfig {
+            schedule_start: 23,
+            schedule_end: 7,
+            ..Default::default()
+        };
 
-        let miner = DreamMiner::with_config(config);
-        // Test would depend on current time
+        // Smoke test: the config wires through to a real miner without
+        // panicking. The actual schedule logic is asserted deterministically
+        // below, since `is_within_schedule` depends on wall-clock time and
+        // this doesn't.
+        let _miner = DreamMiner::with_config(config);
+    }
+
+    /// `is_within_schedule`'s cross-midnight branch (23:00 to 07:00 wraps
+    /// past midnight rather than being an always-false empty range), tested
+    /// against explicit hours via `hour_within_schedule` instead of
+    /// depending on when the test happens to run.
+    #[test]
+    fn test_schedule_crosses_midnight() {
+        let (start, end) = (23, 7);
+
+        assert!(
+            DreamMiner::hour_within_schedule(23, start, end),
+            "23:00 starts the window"
+        );
+        assert!(
+            DreamMiner::hour_within_schedule(0, start, end),
+            "midnight is inside the window"
+        );
+        assert!(
+            DreamMiner::hour_within_schedule(6, start, end),
+            "06:00 is inside the window"
+        );
+        assert!(
+            !DreamMiner::hour_within_schedule(7, start, end),
+            "07:00 ends the window (exclusive)"
+        );
+        assert!(
+            !DreamMiner::hour_within_schedule(12, start, end),
+            "noon is outside the window"
+        );
+        assert!(
+            !DreamMiner::hour_within_schedule(22, start, end),
+            "22:00 is still outside the window"
+        );
+    }
+
+    /// The non-crossing branch (e.g. a 09:00-17:00 workday window), so both
+    /// branches of the start<=end check are covered, not just cross-midnight.
+    #[test]
+    fn test_schedule_does_not_cross_midnight() {
+        let (start, end) = (9, 17);
+
+        assert!(!DreamMiner::hour_within_schedule(8, start, end));
+        assert!(DreamMiner::hour_within_schedule(9, start, end));
+        assert!(DreamMiner::hour_within_schedule(16, start, end));
+        assert!(!DreamMiner::hour_within_schedule(17, start, end));
     }
 }

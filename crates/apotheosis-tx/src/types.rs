@@ -32,7 +32,7 @@ impl ChainId {
     }
 
     pub fn is_cosmos(&self) -> bool {
-        matches!(self.0, 118 | 119 | 120 | 121 | 122)
+        matches!(self.0, 118..=122)
     }
 }
 
