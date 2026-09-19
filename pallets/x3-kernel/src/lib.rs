@@ -2186,16 +2186,16 @@ pub mod pallet {
                     .position(|a| a == &authority)
                     .ok_or(Error::<T>::AuthorityNotFound)?;
 
-                // Check minimum authorities constraint (must keep at least MinAuthorities)
-                ensure!(
-                    authorities.len() > T::MinAuthorities::get() as usize,
-                    Error::<T>::BelowMinimumAuthorities
-                );
-                // Additional safety: never allow single authority in production
-                ensure!(
-                    authorities.len() > 1 || T::MinAuthorities::get() == 0,
-                    Error::<T>::BelowMinimumAuthorities
-                );
+                // The set that would remain must satisfy the same bounds every
+                // other path enforces. This used to carry an extra
+                // "never allow a single authority" rule that
+                // `schedule_authority_change` did not — so it was bypassable by
+                // scheduling a set of one — and that made a one-authority chain
+                // unable to rotate its only key (add a second, then remove the
+                // first, all refused). The bound belongs in `MinAuthorities`,
+                // which is a `#[pallet::constant]`: a chain that must never run
+                // on one authority configures `MinAuthorities >= 2`.
+                Self::check_authority_count(authorities.len() - 1)?;
 
                 authorities.remove(pos);
                 Self::deposit_event(Event::AuthorityRemoved { authority });
@@ -2213,17 +2213,9 @@ pub mod pallet {
         ) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
 
-            // Validate authority count bounds (check empty first for better error messages)
-            ensure!(!new_authorities.is_empty(), Error::<T>::EmptyAuthoritySet);
-            let count = new_authorities.len() as u32;
-            ensure!(
-                count >= T::MinAuthorities::get(),
-                Error::<T>::BelowMinimumAuthorities
-            );
-            ensure!(
-                count <= T::MaxAuthorities::get(),
-                Error::<T>::ExceedsMaximumAuthorities
-            );
+            // Validate authority count bounds (the helper checks empty first,
+            // for the better error message).
+            Self::check_authority_count(new_authorities.len())?;
 
             // Convert to BoundedVec
             let bounded_authorities: BoundedVec<T::AccountId, T::MaxAuthorities> = new_authorities
@@ -2249,6 +2241,10 @@ pub mod pallet {
 
             // Apply the new authority set
             let new_authorities: Vec<T::AccountId> = pending.into_inner();
+            // Re-check at enactment, not only at scheduling: this is the call
+            // that writes `Authorities`, and it is the last place the bound can
+            // be enforced. It used to apply whatever was pending unexamined.
+            Self::check_authority_count(new_authorities.len())?;
             let bounded: BoundedVec<T::AccountId, T::MaxAuthorities> = new_authorities
                 .clone()
                 .try_into()
@@ -2262,6 +2258,33 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
+        /// The bounds every path that changes the authority set must satisfy.
+        ///
+        /// Scheduling checked the count against `MinAuthorities` and
+        /// `MaxAuthorities`, removal checked those *plus* a "never allow a
+        /// single authority" rule, and enactment checked nothing at all. So the
+        /// rule the removal path documented was bypassable by scheduling a set
+        /// of one, and an enactment could write a set neither of the other
+        /// paths would have accepted. One predicate, called by all three.
+        ///
+        /// A chain that must never run on a single authority configures
+        /// `MinAuthorities >= 2`; that value is a `#[pallet::constant]`, not
+        /// governance-mutable state.
+        fn check_authority_count(count: usize) -> DispatchResult {
+            ensure!(count > 0, Error::<T>::EmptyAuthoritySet);
+
+            let count = count as u32;
+            ensure!(
+                count >= T::MinAuthorities::get(),
+                Error::<T>::BelowMinimumAuthorities
+            );
+            ensure!(
+                count <= T::MaxAuthorities::get(),
+                Error::<T>::ExceedsMaximumAuthorities
+            );
+            Ok(())
+        }
+
         fn verify_payloads(
             comit_id: &H256,
             evm_payload: &[u8],

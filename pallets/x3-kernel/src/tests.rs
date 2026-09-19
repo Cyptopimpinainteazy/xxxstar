@@ -3437,3 +3437,123 @@ fn test_defensive_accounting_checks_exist() {
 // Property-based tests module (TICKET-4.5-004 Feature 2 Step 4)
 #[cfg(test)]
 mod property_tests;
+
+// ── Authority-set bounds ────────────────────────────────────────────────────
+//
+// Every path that changes the authority set must enforce the same bounds. The
+// three paths used to disagree: `schedule_authority_change` checked the count
+// against Min/Max, `remove_authority` checked those plus a "never allow a single
+// authority" rule, and `enact_authority_change` checked nothing.
+
+mod authority_bounds {
+    use super::*;
+    use crate::{Authorities, PendingAuthorities};
+    use frame_support::{traits::ConstU32, BoundedVec};
+
+    fn set_authorities(accounts: Vec<u64>) {
+        let bounded: BoundedVec<u64, ConstU32<100>> = accounts.try_into().unwrap();
+        Authorities::<Test>::put(bounded);
+    }
+
+    #[test]
+    fn removing_the_last_authority_is_refused() {
+        new_test_ext().execute_with(|| {
+            set_authorities(vec![ALICE]);
+
+            assert_noop!(
+                crate::Pallet::<Test>::remove_authority(RuntimeOrigin::root(), ALICE),
+                // The set that would remain is empty, and `check_authority_count`
+                // reports that before it compares against `MinAuthorities`.
+                // (`BelowMinimumAuthorities` needs a runtime whose
+                // `MinAuthorities` is at least 2 to be reachable at all.)
+                AtlasError::EmptyAuthoritySet
+            );
+            assert_eq!(Authorities::<Test>::get().len(), 1);
+        });
+    }
+
+    #[test]
+    fn removing_down_to_the_configured_minimum_is_allowed() {
+        new_test_ext().execute_with(|| {
+            set_authorities(vec![ALICE, BOB]);
+
+            assert_ok!(crate::Pallet::<Test>::remove_authority(
+                RuntimeOrigin::root(),
+                BOB
+            ));
+            assert_eq!(Authorities::<Test>::get().to_vec(), vec![ALICE]);
+        });
+    }
+
+    #[test]
+    fn scheduling_an_empty_authority_set_is_refused() {
+        new_test_ext().execute_with(|| {
+            assert_noop!(
+                crate::Pallet::<Test>::schedule_authority_change(RuntimeOrigin::root(), vec![]),
+                AtlasError::EmptyAuthoritySet
+            );
+            assert!(PendingAuthorities::<Test>::get().is_none());
+        });
+    }
+
+    #[test]
+    fn a_scheduled_change_reaches_the_authority_set() {
+        new_test_ext().execute_with(|| {
+            set_authorities(vec![ALICE]);
+
+            assert_ok!(crate::Pallet::<Test>::schedule_authority_change(
+                RuntimeOrigin::root(),
+                vec![BOB, CHARLIE]
+            ));
+            assert_ok!(crate::Pallet::<Test>::enact_authority_change(
+                RuntimeOrigin::root()
+            ));
+
+            assert_eq!(Authorities::<Test>::get().to_vec(), vec![BOB, CHARLIE]);
+            // Enacting takes the pending set: a second call has nothing to apply.
+            assert_noop!(
+                crate::Pallet::<Test>::enact_authority_change(RuntimeOrigin::root()),
+                AtlasError::NoPendingChanges
+            );
+        });
+    }
+
+    /// The enactment is the call that writes `Authorities`, so it re-checks the
+    /// bound rather than trusting whatever was pending. This writes a pending
+    /// set by hand (the extrinsic cannot produce one this small) to prove the
+    /// re-check is real.
+    #[test]
+    fn enactment_refuses_a_pending_set_below_the_minimum() {
+        new_test_ext().execute_with(|| {
+            let below_minimum = sp_std::vec::Vec::<u64>::new();
+            let bounded: BoundedVec<u64, ConstU32<100>> = below_minimum.try_into().unwrap();
+            PendingAuthorities::<Test>::put(Some(bounded));
+
+            assert_noop!(
+                crate::Pallet::<Test>::enact_authority_change(RuntimeOrigin::root()),
+                AtlasError::EmptyAuthoritySet
+            );
+        });
+    }
+
+    #[test]
+    fn the_authority_extrinsics_are_governance_only() {
+        new_test_ext().execute_with(|| {
+            assert_noop!(
+                crate::Pallet::<Test>::schedule_authority_change(
+                    RuntimeOrigin::signed(ALICE),
+                    vec![ALICE, BOB]
+                ),
+                DispatchError::BadOrigin
+            );
+            assert_noop!(
+                crate::Pallet::<Test>::remove_authority(RuntimeOrigin::signed(ALICE), ALICE),
+                DispatchError::BadOrigin
+            );
+            assert_noop!(
+                crate::Pallet::<Test>::enact_authority_change(RuntimeOrigin::signed(ALICE)),
+                DispatchError::BadOrigin
+            );
+        });
+    }
+}
