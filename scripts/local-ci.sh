@@ -11,6 +11,7 @@
 #   scripts/local-ci.sh --cross         # + the X3-native and X3VM<->EVM/SVM cross-domain lifecycles
 #   scripts/local-ci.sh --release       # + the release gate (make mainnet-check)
 #   scripts/local-ci.sh --variants      # + the runtime migration dry-run for all six variants
+#   scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
 #   scripts/local-ci.sh --deep          # + the whole workspace test suite (slow, ~5-15 min)
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
@@ -94,6 +95,7 @@ RUN_CROSS=0
 RUN_RELEASE=0
 RUN_VARIANTS=0
 RUN_DEEP=0
+RUN_LOOM=0
 RUN_PREPUSH=0
 LIST_ONLY=0
 DRY_RUN=0
@@ -113,7 +115,8 @@ while [ "$#" -gt 0 ]; do
     --release) RUN_RELEASE=1 ;;
     --variants) RUN_VARIANTS=1 ;;
     --deep) RUN_DEEP=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1 ;;
+    --loom) RUN_LOOM=1 ;;
     --pre-push) RUN_PREPUSH=1 ;;
     --list) LIST_ONLY=1 ;;
     --dry-run) DRY_RUN=1 ;;
@@ -254,6 +257,14 @@ GATES_RELEASE=(
   "release gate (mainnet-check):make mainnet-check"
 )
 
+# The loom model checks live outside the workspace (`tests/loom-concurrency` is
+# excluded: it is `#![cfg(loom)]` and loom needs a nightly). Opt-in, because it
+# needs a toolchain the default run does not: without it the gate reports
+# BLOCKED, which is the honest answer — nothing was verified.
+GATES_LOOM=(
+  "loom concurrency tests:bash scripts/run-loom-tests.sh"
+)
+
 # The broadest automated signal the repository has: every test target in every
 # workspace member. SLOW (thousands of tests), so it is opt-in rather than part
 # of the default set. No SKIP_WASM_BUILD: x3-chain-node's service tests boot a
@@ -285,6 +296,8 @@ EOF
   printf '  - %s\n' "${GATES_RELEASE[@]%%:*}"
   echo "runtime variants (--variants):"
   printf '  - %s\n' "${GATES_VARIANTS[@]%%:*}"
+  echo "loom gates (--loom, also implied by --all):"
+  printf '  - %s\n' "${GATES_LOOM[@]%%:*}"
   echo "deep gates (--deep, also implied by --all):"
   printf '  - %s\n' "${GATES_DEEP[@]%%:*}"
   echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast"
@@ -346,6 +359,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_CROSS" = 1 ] && for spec in "${GATES_CROSS[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_VARIANTS" = 1 ] && for spec in "${GATES_VARIANTS[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_RELEASE" = 1 ] && for spec in "${GATES_RELEASE[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_LOOM" = 1 ] && for spec in "${GATES_LOOM[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_DEEP" = 1 ] && for spec in "${GATES_DEEP[@]}"; do SELECTED+=("$spec"); done
 
 if [ -n "$ONLY" ]; then
@@ -435,7 +449,7 @@ export CARGO_TERM_COLOR=never
   echo "local-ci $STAMP"
   echo "root=$ROOT"
   echo "branch=$BRANCH head=$HEAD_SHA tree=$DIRTY"
-  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS jobs=$JOBS cargo_jobs=$CARGO_JOBS"
+  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM jobs=$JOBS cargo_jobs=$CARGO_JOBS"
 } >"$LOG"
 
 # run_gate <name> <slug> <command> — one process per gate so the parent keeps the
@@ -451,8 +465,10 @@ run_gate() {
   status=PASS
   if [ "$rc" -ne 0 ]; then
     # Missing network, or a `--offline` gate whose cargo cache went cold (this box
-    # has lost parts of ~/.cargo more than once — see docs/local-ci.md).
-    if grep -qE "Could not resolve host|failed to resolve address|network failure seems to have happened|spurious network error|failed to get .* as a dependency|you're using offline mode" "$gate_log"; then
+    # has lost parts of ~/.cargo more than once — see docs/local-ci.md). A gate
+    # whose toolchain is not installed is the same kind of thing: nothing ran, so
+    # the run cannot call it green.
+    if grep -qE "Could not resolve host|failed to resolve address|network failure seems to have happened|spurious network error|failed to get .* as a dependency|you're using offline mode|toolchain '[^']*' is not installed" "$gate_log"; then
       status=BLOCKED
     else
       status=FAIL
@@ -531,9 +547,10 @@ for i in "${!GATE_NAMES[@]}"; do
 done
 if [ "$BLOCKED_COUNT" -gt 0 ]; then
   echo ""
-  echo "$BLOCKED_COUNT gate(s) reported BLOCKED: the environment could not fetch"
-  echo "dependencies, so those gates did not execute and verified nothing. Re-run"
-  echo "with network access (or pre-fetch the dependency) before treating this as"
+  echo "$BLOCKED_COUNT gate(s) reported BLOCKED: the environment is missing what"
+  echo "the gate needs (network access to fetch dependencies, or a toolchain it"
+  echo "pins), so those gates did not execute and verified nothing. Re-run with"
+  echo "network access (or pre-fetch the dependency) before treating this as"
   echo "coverage. A gate that runs with --offline warms up with:"
   echo "  cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
 fi
