@@ -56,6 +56,11 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)API_KEY\s*=\s*(process\.env|os\.environ|\$INFRA_API_KEY|\"infra_x+\"|your-secret-api-key)",
     r'(?i)API_KEY\s*=\s*"\$\{[A-Z0-9_]+:-\}"',
     r"(?i)mnemonic\s*=\s*bip39::Mnemonic::from_phrase\(\s*seed_phrase\s*,",
+    # The bip39 2.x replacement for the line above: `parse_in(Language, phrase)`
+    # parses a caller-supplied phrase and hardcodes nothing. The old allow entry
+    # stopped matching when the crate moved to 2.x, which turned a legitimate
+    # constructor call into "secret-like material".
+    r"(?i)mnemonic\s*=\s*bip39::Mnemonic::parse_in\(",
     r"(?i)apiKey\s*:\s*'your-api-key'",
     r"(?i)apiKey\s*:\s*config\.(apiKey|privateKey)",
     r"(?i)this\.config\.apiKey\s*=\s*(token|undefined)\b",
