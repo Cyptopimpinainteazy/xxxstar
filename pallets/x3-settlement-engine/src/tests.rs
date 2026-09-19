@@ -3157,3 +3157,27 @@ fn a_btc_proof_whose_stated_height_disagrees_with_its_header_is_refused() {
         );
     });
 }
+
+#[test]
+fn the_refusal_for_an_unbound_external_proof_names_the_reason() {
+    // The chain runtime sets the flag `false`, so this is the message an operator
+    // sees on a rejected EVM/SVM proof: it has to say that the *build* cannot
+    // check the proof, not that the proof is invalid, because the two lead to
+    // different investigations (TICKET-063).
+    assert!(
+        crate::unbound_external_proofs_are_allowed(true).is_ok(),
+        "a runtime that does the binding itself may accept the shape"
+    );
+    let message = format!(
+        "{:?}",
+        crate::unbound_external_proofs_are_allowed(false).expect_err("false must refuse")
+    );
+    assert!(
+        message.contains("nothing binds this receipt to the header"),
+        "the refusal must name what is missing: {message}"
+    );
+    assert!(
+        message.contains("BTC SPV proofs are unaffected"),
+        "and must say which path still works: {message}"
+    );
+}

@@ -310,7 +310,10 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     impl_name: create_runtime_str!("x3-chain"),
     authoring_version: 1,
     // v10: RC4 runtime upgrade rehearsal marker. No storage migration.
-    spec_version: 10,
+    // v11: the settlement engine refuses EVM/SVM external settlement proofs by
+    // default — nothing binds the receipt to the header it is checked against
+    // (TICKET-063). No storage migration.
+    spec_version: 11,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -2486,6 +2489,18 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
     type CrossChainValidator = RuntimeCrossChainValidator;
+    /// `false`: the chain refuses an EVM/SVM settlement proof until something
+    /// binds its receipt to the header it is checked against.
+    ///
+    /// `RuntimeCrossChainValidator` forwards `{height, block_hash, state_root,
+    /// merkle_root}` to the cross-chain-validator pallet, which compares them to
+    /// the *latest* stored header — and the settlement engine reads
+    /// `merkle_proof[0..2]` as those roots rather than walking a path, so nothing
+    /// connects the receipt to the header. Everything a forger needs is public, so
+    /// accepting that shape means accepting a receipt from any transaction
+    /// (TICKET-063). Flip this to `true` only together with a validator that does
+    /// the binding, and then with the tests the ticket names.
+    type AllowUnboundExternalProofs = ConstBool<false>;
     // ── Protocol fee wiring ──────────────────────────────────────────────
     type SettlementFeeBps = SettlementProtocolFeeBps;
     type ProtocolTreasury = TreasuryAccountId;
@@ -4677,6 +4692,61 @@ pub fn runtime_uses_mock_vm_adapters() -> bool {
     let x3 = core::any::type_name::<<Runtime as pallet_x3_kernel::Config>::X3Adapter>();
 
     evm.contains("MockEvmAdapter") || svm.contains("MockSvmAdapter") || x3.contains("MockX3Adapter")
+}
+
+#[cfg(all(test, feature = "std"))]
+mod settlement_proof_posture_tests {
+    use super::*;
+    use pallet_x3_settlement_engine::types::{ExternalChainId, ProofType, SettlementProof};
+
+    /// The chain refuses an EVM/SVM settlement proof until something binds its
+    /// receipt to the header it is checked against (TICKET-063).
+    ///
+    /// The pallet's own tests run with the flag `true`, because there is no
+    /// validator in this workspace that does the binding and the lifecycle they
+    /// exercise would otherwise be unreachable. This is the other half: the chain
+    /// states the safe value, and a proof of the shape the pallet accepts is
+    /// refused with a reason rather than reported as merely invalid.
+    #[test]
+    fn the_chain_refuses_an_unbound_external_settlement_proof() {
+        let allowed: bool = <<Runtime as pallet_x3_settlement_engine::Config>::AllowUnboundExternalProofs
+            as frame_support::traits::Get<bool>>::get();
+        assert!(
+            !allowed,
+            "the chain runtime must state the safe value; setting it true is a claim that the \
+             configured validator binds the receipt to the header, and nothing in this workspace does"
+        );
+
+        // A proof the pallet accepts when the flag allows it: a structurally valid
+        // receipt, both roots, the height stated.
+        let receipt_data = vec![0xc3u8, 0x01, 0x00, 0xc0];
+        let proof = SettlementProof {
+            proof_type: ProofType::MerkleTrie,
+            tx_hash: H256::from(sp_io::hashing::keccak_256(&receipt_data)),
+            block_hash: H256::from_low_u64_be(3),
+            chain_height: Some(18_000_000),
+            confirmations: 12,
+            merkle_proof: vec![H256::from_low_u64_be(4), H256::from_low_u64_be(5)]
+                .try_into()
+                .expect("two roots are within the bound"),
+            receipt_data: receipt_data
+                .try_into()
+                .expect("four bytes are within the bound"),
+        };
+
+        sp_io::TestExternalities::default().execute_with(|| {
+            let error = pallet_x3_settlement_engine::Pallet::<Runtime>::verify_proof(
+                &ExternalChainId::Ethereum,
+                &proof,
+            )
+            .expect_err("the chain must refuse an unbound external proof");
+            let message = format!("{error:?}");
+            assert!(
+                message.contains("nothing binds this receipt to the header"),
+                "the refusal must name what is missing: {message}"
+            );
+        });
+    }
 }
 
 #[cfg(all(test, feature = "std", feature = "frontier"))]

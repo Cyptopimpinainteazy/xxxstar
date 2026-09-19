@@ -160,6 +160,28 @@ pub mod pallet {
         /// Cross-chain validator provider for proof verification
         type CrossChainValidator: bridge_integration::CrossChainValidatorProvider;
 
+        /// Whether an external (EVM/SVM) proof may be settled when nothing binds
+        /// its receipt to the header it is checked against.
+        ///
+        /// It must not be, and this item exists so the answer is a decision the
+        /// runtime states rather than an accident of the code. `verify_evm_receipt_proof`
+        /// checks that `keccak(receipt_data) == tx_hash`, that the proof carries two
+        /// roots, and that `{chain_height, block_hash, state_root, merkle_root}`
+        /// equal the stored header's fields — but the `merkle_proof` entries are
+        /// read as the *roots*, never walked as a path, so nothing connects the
+        /// receipt to that header. Everything a forger needs (the latest header's
+        /// fields and its height) is public, so a proof that copies them passes for
+        /// any structurally valid receipt RLP (TICKET-063, and
+        /// `.ai/reports/settlement-engine-invented-evidence-20260919.md` finding 3).
+        ///
+        /// Set this `true` only where the configured `CrossChainValidator` does the
+        /// binding itself — which today no implementation does, so the test runtime
+        /// is the only place that sets it, and the chain runtime refuses. `false` is
+        /// the safe value, and the diagnostic names the reason rather than reporting
+        /// a generic invalid proof.
+        #[pallet::constant]
+        type AllowUnboundExternalProofs: Get<bool>;
+
         /// Unix time provider for timeout enforcement.
         type UnixTime: UnixTime;
 
@@ -198,6 +220,32 @@ pub mod pallet {
         /// Account that receives collected settlement fees (on-chain treasury).
         #[pallet::constant]
         type ProtocolTreasury: Get<<Self as frame_system::Config>::AccountId>;
+    }
+
+    /// Refuse an EVM/SVM settlement proof when the runtime has not established
+    /// that its receipt is bound to the header it is checked against.
+    ///
+    /// A refusal *with a reason* rather than `Ok(false)`: the caller turns `false`
+    /// into `InvalidProof`, which reads as "this proof is wrong" when the truth is
+    /// "this build cannot check this proof at all". Whoever is looking at a stuck
+    /// settlement needs to be able to tell those apart.
+    pub fn ensure_unbound_external_proofs_allowed<T: Config>() -> Result<(), DispatchError> {
+        unbound_external_proofs_are_allowed(T::AllowUnboundExternalProofs::get())
+    }
+
+    /// The decision itself, so it can be tested for both values without a second
+    /// runtime: `true` means the runtime states that its `CrossChainValidator`
+    /// binds the receipt to the header.
+    pub fn unbound_external_proofs_are_allowed(allowed: bool) -> Result<(), DispatchError> {
+        if allowed {
+            return Ok(());
+        }
+        Err(DispatchError::Other(
+            "external proof verification unavailable: nothing binds this receipt to the header it \
+             is checked against (the merkle path is read as the roots, never walked), so an EVM/SVM \
+             settlement proof cannot be accepted. BTC SPV proofs are unaffected — theirs is \
+             verified. See TICKET-063",
+        ))
     }
 
     // ============================================================================
@@ -2250,6 +2298,8 @@ pub mod pallet {
         /// Verify EVM receipt proof
         /// Bridge Integration: Calls cross-chain-validator to verify against canonical headers
         fn verify_evm_receipt_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
+            ensure_unbound_external_proofs_allowed::<T>()?;
+
             // Stage 1: Basic structural validation
             let proof_type_ok = matches!(
                 proof.proof_type,
@@ -2382,6 +2432,8 @@ pub mod pallet {
         /// - [32 bytes] Recent blockhash
         /// - [remaining] Instructions (each: program_id_index + accounts + data)
         fn verify_svm_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
+            ensure_unbound_external_proofs_allowed::<T>()?;
+
             let tx_bytes: &[u8] = &proof.receipt_data;
 
             // 1. Basic structural validation (signature count, lengths, message format)
