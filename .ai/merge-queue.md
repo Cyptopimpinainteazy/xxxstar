@@ -106,13 +106,26 @@ bulk-delete the unverified remainder on the strength of this pattern alone —
 a 1-in-6 real rate among ~20 branches is still plausibly 2-4 more genuine
 finds sitting in there.
 
+**Update 4 (2026-09-19):** `fix/production-gate-prerequisites` spot-checked
+(not a full commit-by-commit — 163 files is too much to justify for what's
+looking like a 6th archival hit in a row; treat this as a lean, not a
+verified disposition). Signals: branch tip is 8 days stale (2026-09-11,
+based on 2026-09-10 master) against a repo where `.github/workflows/` has
+kept churning (34 workflow files exist on master now vs. the branch's
+older, smaller set); its copy of `production-gate.yml` diffs as 40 lines
+vs. master's current 138, i.e. master's workflow has grown well past what
+this branch proposed rather than the reverse; a sampled fix's distinguishing
+string had no hits anywhere on master. Recommend treating as leaning
+archival and not spending more time on it without a specific reason to
+revisit.
+
 | Branch | pending | conflict files | disposition |
 | --- | --- | --- | --- |
 | `agents/setup-instructions-request` | 1 | — (clean) | landed in batch 6 |
 | `fix/svm-htlc-native-custody-master` | 2 | `.github/workflows/x3vm-svm-live-lifecycle.yml` | landed in batch 6, workflow hunk resolved in master's favour |
 | `test/cross-domain-recovery-matrix-20260911` | 10 | `.github/workflows/mainnet-readiness.yml` | landed in batch 6, workflow hunk resolved in master's favour |
 | `fix/svm-htlc-native-custody` | 33 | 169 files | archival — verified 2026-09-18: of 34 commits, only `854445e75` ("svm: enforce native HTLC custody") is on-topic, the rest is staleness drift; that commit's functions are already on master, which has strictly more (derive_htlc_pda, broadcast_claim_htlc, PDA validation tests). Nothing to salvage, do not merge |
-| `fix/production-gate-prerequisites` | 32 | 163 files | predates the local-CI-of-record work; most of it is superseded — diff the 33 commits against `scripts/local-ci.sh` before merging |
+| `fix/production-gate-prerequisites` | 32 | 163 files | leaning archival — spot-checked 2026-09-19 (see Update 4): 8 days stale, its `production-gate.yml` is a smaller/older copy of what master now has, no hits for a sampled fix's distinguishing string. Not a full per-commit check; revisit with a direct-file-check before actually merging, don't just take this lean as final |
 | `wip/prompts-to-skills-20260918`, `wip/consolidation-20260917/pasted-text-processing`, `agents/pasted-text-processing`, `pr132-work` | 33–34 each | 86–90 files | one work item mirrored on four branches — pick the newest, rebase, land once |
 | `ci/master-lineage-gates-20260908` | 31 | 47 files | superseded by the local CI of record |
 | `docs/grant-readiness-truth-20260908` | 31 | no merge base | archival; lift the document if it is still wanted |
