@@ -53,6 +53,13 @@ pub enum ExternalChainError {
     SerializationError,
     /// Internal error
     InternalError(Vec<u8>),
+    /// No verifier exists for this proof type, so the request is refused.
+    ///
+    /// Distinct from `InvalidProof`: `InvalidProof` means a verifier ran and
+    /// rejected the proof, while this means nothing ran. The settlement
+    /// verifier used to answer `Ok(true)` for any non-empty proof blob, which
+    /// is indistinguishable from a proof that actually verified.
+    VerificationUnavailable,
 }
 
 impl ExternalChainError {
@@ -117,6 +124,10 @@ impl core::fmt::Display for ExternalChainError {
             Self::Timeout => write!(f, "Timeout waiting for confirmation"),
             Self::RateLimitExceeded => write!(f, "Rate limit exceeded"),
             Self::SerializationError => write!(f, "Serialization error"),
+            Self::VerificationUnavailable => write!(
+                f,
+                "no verifier is implemented for this proof type; refusing to verify"
+            ),
             Self::InternalError(msg) => {
                 write!(f, "Internal error: {}", String::from_utf8_lossy(msg))
             }
