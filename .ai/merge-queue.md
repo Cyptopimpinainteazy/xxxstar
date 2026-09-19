@@ -175,13 +175,36 @@ string had no hits anywhere on master. Recommend treating as leaning
 archival and not spending more time on it without a specific reason to
 revisit.
 
+**Update 5 (2026-09-19):** `fix/production-gate-prerequisites` upgraded to
+fully verified archival (this is the safe-merge-order step 5 item). Sampled
+5 non-workflow files spanning unrelated subsystems — chosen because they're
+real code, not Cargo.toml bumps or benchmarking.rs boilerplate:
+`crates/x3-foundry-core/src/security.rs`, `pallets/x3-atomic-kernel/src/{lib,vm_revert}.rs`,
+`crates/x3-atomic-swap/src/evm_live.rs`, `node/src/service.rs` (the largest
+non-workflow diff in the branch, 128 lines). Every hunk in all five was one
+of: (a) pure formatting/import-order noise from a `cargo fmt`/import-sort
+pass the branch predates, (b) a clippy-idiomatic rewrite master has and the
+branch doesn't (`if let Err(_) = x` → `x.is_err()`, `.map_or(false, ..)` →
+`.is_some_and(..)`, an added `impl Default` clippy suggests), or (c) master
+strictly ahead (an added `#[cfg(test)] mod mock;`, a `cfg`-gated import
+split). Zero functional differences found anywhere in the sample — not one
+hunk represents work missing from master. Combined with the `production-gate.yml`
+evidence from Update 4 (branch's copy is a strict, smaller subset of
+master's current one) and the branch being 8-9 days stale in a repo whose
+CI has kept moving, this is now a confirmed archival, not a lean — the 6th
+of 6 "flagged as real" entries in this session to turn out fully superseded
+(only `feat/x3vm-durable-recovery-20260911` / #303 was genuine). Note for
+whoever re-reads Update 4's "34 workflow files" figure: that was already
+stale by the time it was written; current count is 37. Don't treat either
+number as authoritative — re-`ls .github/workflows/*.yml` if it matters.
+
 | Branch | pending | conflict files | disposition |
 | --- | --- | --- | --- |
 | `agents/setup-instructions-request` | 1 | — (clean) | landed in batch 6 |
 | `fix/svm-htlc-native-custody-master` | 2 | `.github/workflows/x3vm-svm-live-lifecycle.yml` | landed in batch 6, workflow hunk resolved in master's favour |
 | `test/cross-domain-recovery-matrix-20260911` | 10 | `.github/workflows/mainnet-readiness.yml` | landed in batch 6, workflow hunk resolved in master's favour |
 | `fix/svm-htlc-native-custody` | 33 | 169 files | archival — verified 2026-09-18: of 34 commits, only `854445e75` ("svm: enforce native HTLC custody") is on-topic, the rest is staleness drift; that commit's functions are already on master, which has strictly more (derive_htlc_pda, broadcast_claim_htlc, PDA validation tests). Nothing to salvage, do not merge |
-| `fix/production-gate-prerequisites` | 32 | 163 files | leaning archival — spot-checked 2026-09-19 (see Update 4): 8 days stale, its `production-gate.yml` is a smaller/older copy of what master now has, no hits for a sampled fix's distinguishing string. Not a full per-commit check; revisit with a direct-file-check before actually merging, don't just take this lean as final |
+| `fix/production-gate-prerequisites` | 32 | 163 files | archival — verified 2026-09-19 (see Update 5): 5 sampled non-workflow files across unrelated subsystems (foundry, pallet, atomic-swap, node service) showed zero functional differences from master — only formatting/clippy-style drift or master being strictly ahead. Combined with its `production-gate.yml` being a strict subset of master's current one (Update 4) and 8-9 days of staleness against a fast-moving CI surface. Do not merge |
 | `wip/prompts-to-skills-20260918`, `wip/consolidation-20260917/pasted-text-processing`, `agents/pasted-text-processing`, `pr132-work` | 33–34 each | 86–90 files | one work item mirrored on four branches — pick the newest, rebase, land once |
 | `ci/master-lineage-gates-20260908` | 31 | 47 files | superseded by the local CI of record |
 | `docs/grant-readiness-truth-20260908` | 31 | no merge base | archival; lift the document if it is still wanted |
@@ -217,17 +240,23 @@ a merge.
    `fix/svm-htlc-native-custody-master`, `test/cross-domain-recovery-matrix-20260911`).
 2. ~~`fix/master-trading-core-compile-break`~~ — verified archival, not real
    unlanded work (see Queue table). Delete rather than merge.
-3. The `pasted-text-processing` family — pick one branch, rebase, land.
+3. ~~The `pasted-text-processing` family~~ — done 2026-09-19: only one
+   commit across all three branches was genuinely on-topic and unlanded
+   (a 4-file `.github/prompts/*.prompt.md` → `.agents/skills/*/SKILL.md`
+   conversion); cherry-picked onto master rather than merging the
+   90-file, 10-day-stale branches wholesale. Landed as #344. The three
+   source branches can be deleted, nothing left to salvage.
 4. ~~`fix/svm-htlc-native-custody`~~ — verified archival; master is already a
    strict superset of its one on-topic commit (see Queue table). Delete
    rather than merge.
-5. `fix/production-gate-prerequisites` — after diffing against the CI of record.
+5. ~~`fix/production-gate-prerequisites`~~ — verified archival 2026-09-19
+   (see Update 5). Delete rather than merge.
 6. Dependency heads, one `cargo update` batch at a time.
 7. Everything else: archival or superseded → delete the branch, do not merge.
-   As of 2026-09-18 this includes `fix/master-trading-core-compile-break`,
+   As of 2026-09-19 this includes `fix/master-trading-core-compile-break`,
    `finish/x3vm-live-transport-fix`, `fix/svm-htlc-native-custody`,
-   `pr-181-check`, `your-task-branch`, and
-   `t5/fix-annotations-20260522-1458` — verified archival this session, see
+   `pr-181-check`, `your-task-branch`, `t5/fix-annotations-20260522-1458`,
+   and `fix/production-gate-prerequisites` — verified archival, see
    the Queue table above for why each one.
 
 ## Post-merge validation
