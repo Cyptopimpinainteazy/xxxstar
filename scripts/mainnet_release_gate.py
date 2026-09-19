@@ -15,6 +15,7 @@ Exit 1 → gate FAILS — do NOT cut a release.
 """
 
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -72,19 +73,51 @@ def check_required_docs() -> None:
 
 # ── 2. Build validation ─────────────────────────────────────────────────────
 
+def target_dir() -> pathlib.Path:
+    """Where cargo writes build artifacts.
+
+    `CARGO_TARGET_DIR` wins when it is set — `scripts/local-ci.sh` sets it for
+    every gate it runs — then `build.target-dir` from `.cargo/config.toml`, then
+    `target/`. Hardcoding `ROOT/target` made this gate report
+
+        ✗ x3-chain-node artifact not found after build at target/release/x3-chain-node
+
+    for a build that had just succeeded into the overridden directory: a
+    release-blocking failure raised by the gate itself, on any machine that
+    redirects the target directory.
+    """
+    env = os.environ.get("CARGO_TARGET_DIR")
+    if env:
+        p = pathlib.Path(env)
+        return p if p.is_absolute() else (ROOT / p)
+    cfg = ROOT / ".cargo" / "config.toml"
+    if cfg.exists():
+        m = re.search(r'(?m)^\s*target-dir\s*=\s*"([^"]+)"', cfg.read_text())
+        if m:
+            p = pathlib.Path(m.group(1))
+            return p if p.is_absolute() else (ROOT / p)
+    return ROOT / "target"
+
+
+TARGET_DIR = target_dir()
+
 BUILD_TARGETS = [
-    ("x3-chain-node", "target/release/x3-chain-node"),
-    ("x3-chain-runtime", "target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.compressed.wasm"),
+    ("x3-chain-node", "release/x3-chain-node"),
+    (
+        "x3-chain-runtime",
+        "release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.compressed.wasm",
+    ),
 ]
 
 
 def check_build() -> None:
     print("\n── 2. Build validation ──")
+    print(f"  cargo target dir: {TARGET_DIR}")
     for pkg, artifact_rel in BUILD_TARGETS:
         # Try to find already-built artifact
-        artifact = ROOT / artifact_rel
+        artifact = TARGET_DIR / artifact_rel
         if artifact.exists():
-            ok(f"{pkg} binary found at {artifact_rel}")
+            ok(f"{pkg} binary found at {artifact}")
             continue
         # Build it
         print(f"  building {pkg}...")
@@ -92,9 +125,9 @@ def check_build() -> None:
         if result.returncode != 0:
             fail(f"{pkg} build failed:\n{result.stderr}")
         elif artifact.exists():
-            ok(f"{pkg} built at {artifact_rel}")
+            ok(f"{pkg} built at {artifact}")
         else:
-            fail(f"{pkg} artifact not found after build at {artifact_rel}")
+            fail(f"{pkg} artifact not found after build at {artifact}")
 
 
 # ── 3. Chain-spec / genesis artifact verification ────────────────────────────
@@ -203,9 +236,10 @@ def check_reproducible_build_prereqs() -> None:
         if fallback.exists():
             ok(f"srtool installed at {fallback} (reproducible WASM builds possible)")
         else:
-            fail("srtool NOT found — install from https://github.com/paritytech/srtool")
-            print("    Without srtool, WASM builds are non-deterministic.")
-            print("    Mainnet genesis artifacts MUST be reproducible.")
+            fail("srtool NOT found — run `make srtool-install` (pinned to the same")
+            print("    revision the release job uses; it needs docker and network).")
+            print("    Without srtool, WASM builds are non-deterministic,")
+            print("    and mainnet genesis artifacts MUST be reproducible.")
 
     # Check docker (required by srtool)
     result = run(["docker", "--version"])
