@@ -1355,11 +1355,11 @@ pub mod pallet {
             // Emit proof verification event for bridge integration tracking
             let current_block: u32 =
                 frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
-            let block_or_slot = u64::from_le_bytes(
-                proof.tx_hash.as_bytes()[0..8]
-                    .try_into()
-                    .unwrap_or_default(),
-            );
+            // The height the event reports is the one the proof stated, for the
+            // same reason the header check uses it: the first eight bytes of
+            // `tx_hash` are a digest, and reporting a digest as a height is how a
+            // reader came to trust a number nobody had claimed (TICKET-061).
+            let block_or_slot = proof.chain_height.ok_or(Error::<T>::InvalidProof)?;
             Self::deposit_event(Event::SettlementProofVerified {
                 intent_id,
                 chain,
@@ -2285,12 +2285,17 @@ pub mod pallet {
             }
 
             // Stage 2: Bridge Integration - Verify against canonical EVM header
-            // Extract block number from proof data (use lower 64 bits of tx_hash as proxy)
-            let block_number = u64::from_le_bytes(
-                proof.tx_hash.as_bytes()[0..8]
-                    .try_into()
-                    .unwrap_or_default(),
-            );
+            //
+            // The block number is the one the proof *states*. It used to be
+            // derived from the first eight bytes of `tx_hash` "as proxy", which
+            // made the value that looks up the canonical header proof data: a
+            // prover could grind a `tx_hash` whose first eight bytes name any
+            // block, and the header check then confirmed a header they had chosen.
+            // A proof that does not state the height is refused rather than
+            // completed (TICKET-061).
+            let Some(block_number) = proof.chain_height else {
+                return Ok(false);
+            };
 
             // Use block_hash directly from proof
             let block_hash = proof.block_hash;
@@ -2451,12 +2456,14 @@ pub mod pallet {
             }
 
             // Stage 2: Bridge Integration - Verify against canonical SVM slot header
-            // Extract slot number from proof data (use lower 64 bits of tx_hash as proxy)
-            let slot = u64::from_le_bytes(
-                proof.tx_hash.as_bytes()[0..8]
-                    .try_into()
-                    .unwrap_or_default(),
-            );
+            //
+            // Stated by the proof, not derived from `tx_hash`; see the EVM site
+            // above. The slot is the height of the chain the proof is about, and
+            // the value that looks up the canonical slot header cannot be proof
+            // data (TICKET-061).
+            let Some(slot) = proof.chain_height else {
+                return Ok(false);
+            };
 
             // Use block_hash directly from proof (already validated above)
             let block_hash = proof.block_hash;
@@ -2918,6 +2925,18 @@ pub mod pallet {
                 Ok(h) => h,
                 Err(_) => return Ok(false),
             };
+
+            // The height the proof states and the height of the header it carries
+            // are two statements about the same block, so they have to agree. The
+            // SPV path does not need the stated height — the header is what its
+            // merkle root is checked against — but a proof that reports one height
+            // and carries a header for another is not about a block at all, and the
+            // event would report the stated one (TICKET-061).
+            if let Some(stated) = proof.chain_height {
+                if stated != header.height {
+                    return Ok(false);
+                }
+            }
 
             // The remaining bytes after the SCALE-encoded header are the raw tx.
             // BtcBlockHeader::encoded_size gives us the SCALE length so we can

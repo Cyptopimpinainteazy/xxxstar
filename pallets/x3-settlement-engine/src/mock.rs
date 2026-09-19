@@ -5,7 +5,7 @@ use frame_support::{
     derive_impl, parameter_types,
     traits::{ConstBool, ConstU32, ConstU64},
 };
-use sp_core::H160;
+use sp_core::{H160, H256};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
@@ -167,8 +167,48 @@ impl pallet_x3_settlement_engine::Config for Test {
     type SettlementTimeoutBlocks = frame_support::traits::ConstU64<28800>; // ~24 hours at 3s blocks
     type SettlementFeeBps = SettlementFeeBps;
     type ProtocolTreasury = ProtocolTreasury;
-    type CrossChainValidator =
-        pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator; // Phase 4: Use no-op for tests
+    type CrossChainValidator = RecordingCrossChainValidator;
+}
+
+thread_local! {
+    /// Every height this test runtime handed the cross-chain validator, in order.
+    ///
+    /// The engine used to derive that height from the first eight bytes of
+    /// `tx_hash`, so the tests could not tell what it passed on: the no-op
+    /// validator accepted anything. Recording it is what makes "the engine checks
+    /// the height the proof states" an assertion rather than a reading of the
+    /// source (TICKET-061). Thread-local because the tests run in parallel and the
+    /// pallet call happens on the test's own thread.
+    pub static VALIDATOR_CALLS: std::cell::RefCell<Vec<(u64, H256)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Records the height it was asked about and accepts the proof.
+///
+/// The no-op's replacement in tests only: it accepts everything (so the fixtures
+/// keep passing through the same path) while making the height observable.
+pub struct RecordingCrossChainValidator;
+
+impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider
+    for RecordingCrossChainValidator
+{
+    fn verify_evm_proof(block_number: u64, block_hash: H256, _: H256, _: H256) -> bool {
+        VALIDATOR_CALLS.with(|calls| calls.borrow_mut().push((block_number, block_hash)));
+        true
+    }
+
+    fn verify_svm_proof(slot: u64, block_hash: H256, _: H256, _: H256) -> bool {
+        VALIDATOR_CALLS.with(|calls| calls.borrow_mut().push((slot, block_hash)));
+        true
+    }
+
+    fn get_latest_evm_header_hash() -> Option<H256> {
+        None
+    }
+
+    fn get_latest_svm_header_hash() -> Option<H256> {
+        None
+    }
 }
 
 // Test accounts

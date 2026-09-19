@@ -9,6 +9,15 @@ use crate::{Bonds, BondsByOwner, Pallet, SettlementIntents};
 use frame_support::{assert_ok, traits::Hooks, BoundedVec};
 use sp_core::{ed25519, Pair, H256};
 
+/// The height every fixture proof states.
+///
+/// It is the EVM block number / SVM slot the proof is about, and it is stated
+/// rather than derived: the value that looks up the canonical header used to be
+/// the first eight bytes of `tx_hash`, which made it proof data (TICKET-061). The
+/// mock validator accepts any height, so this is a fixed number rather than a
+/// chain-accurate one; the tests that care about the value use their own.
+const PROOF_HEIGHT: u64 = 18_000_000;
+
 #[test]
 fn settlement_finalization_marker_decode_requires_exact_payload() {
     let bundle_id = H256::repeat_byte(0x11);
@@ -504,6 +513,7 @@ fn create_evm_receipt_proof() -> SettlementProof {
         tx_hash,
         block_hash: H256::from([2u8; 32]),
         confirmations: 12,
+        chain_height: Some(PROOF_HEIGHT),
         // Two entries, because the module verifies the proof against the
         // first two: a state root and the transaction root. A one-entry proof
         // used to have its second root invented as thirty-two zero bytes; see
@@ -558,6 +568,7 @@ fn create_solana_proof() -> SettlementProof {
         tx_hash: H256::from([4u8; 32]),
         block_hash: H256::from(blockhash_bytes),
         confirmations: 32,
+        chain_height: Some(PROOF_HEIGHT),
         // Two entries: the state root and the validator-set hash, which is
         // what `verify_svm_proof` is handed. See the EVM helper above.
         merkle_proof: (vec![H256::from([6u8; 32]), H256::from([8u8; 32])])
@@ -803,6 +814,7 @@ fn settlement_fails_with_empty_receipt() {
             tx_hash: H256::from([1u8; 32]),
             block_hash: H256::from([2u8; 32]),
             confirmations: 12,
+            chain_height: Some(PROOF_HEIGHT),
             merkle_proof: (vec![H256::from([3u8; 32]), H256::from([7u8; 32])])
                 .try_into()
                 .unwrap(),
@@ -947,6 +959,7 @@ fn settlement_fails_with_invalid_evm_proof() {
             tx_hash: H256::from([1u8; 32]),
             block_hash: H256::from([2u8; 32]),
             confirmations: 12,
+            chain_height: Some(PROOF_HEIGHT),
             merkle_proof: (vec![H256::from([3u8; 32]), H256::from([7u8; 32])])
                 .try_into()
                 .unwrap(),
@@ -1445,6 +1458,7 @@ fn multiple_parallel_settlements_independent() {
                     tx_hash,
                     block_hash: H256::from(sp_io::hashing::keccak_256(intent_id.as_bytes())),
                     confirmations: 12,
+                    chain_height: Some(PROOF_HEIGHT),
                     merkle_proof: (vec![H256::from([3u8; 32]), H256::from([7u8; 32])])
                         .try_into()
                         .unwrap(),
@@ -2218,6 +2232,7 @@ fn btc_settlement_proof_single_tx_passes_verify_proof() {
         tx_hash: txid,
         block_hash,
         confirmations: 6,
+        chain_height: Some(100),
         merkle_proof: BoundedVec::default(), // single-tx → empty path
         receipt_data: BoundedVec::try_from(receipt_data).expect("receipt_data within bound"),
     };
@@ -2260,6 +2275,7 @@ fn btc_settlement_proof_rejects_mismatched_tx_hash() {
         tx_hash: H256::repeat_byte(0xFF), // wrong on purpose
         block_hash: H256::repeat_byte(0xDD),
         confirmations: 6,
+        chain_height: Some(100),
         merkle_proof: BoundedVec::default(),
         receipt_data: BoundedVec::try_from(receipt_data).unwrap(),
     };
@@ -2278,6 +2294,7 @@ fn btc_settlement_proof_rejects_truncated_receipt_data() {
         tx_hash: H256::zero(),
         block_hash: H256::zero(),
         confirmations: 0,
+        chain_height: Some(PROOF_HEIGHT),
         merkle_proof: BoundedVec::default(),
         receipt_data: BoundedVec::try_from(vec![0u8, 1]).unwrap(),
     };
@@ -2324,6 +2341,7 @@ fn btc_settlement_proof_two_tx_block_with_merkle_path() {
         tx_hash: txid1,
         block_hash: H256::repeat_byte(0xAB),
         confirmations: 6,
+        chain_height: Some(200),
         merkle_proof: BoundedVec::try_from(merkle_path).unwrap(),
         receipt_data: BoundedVec::try_from(receipt_data).unwrap(),
     };
@@ -2374,6 +2392,7 @@ fn btc_settlement_proof_two_tx_block_wrong_sibling_fails() {
         tx_hash: txid1,
         block_hash: H256::zero(),
         confirmations: 6,
+        chain_height: Some(200),
         merkle_proof: BoundedVec::try_from(merkle_path).unwrap(),
         receipt_data: BoundedVec::try_from(receipt_data).unwrap(),
     };
@@ -3024,5 +3043,117 @@ fn a_proof_that_does_not_carry_both_roots_is_refused() {
                 );
             }
         }
+    });
+}
+
+// ───── The proof states the height it is about (TICKET-061) ───────────────
+//
+// The engine used to take the EVM block number and the SVM slot from the first
+// eight bytes of `tx_hash` "as proxy", which made the value that looks up the
+// canonical header proof data: a prover could grind a `tx_hash` whose first eight
+// bytes name any block, and the header check then confirmed a header they had
+// chosen. These tests pin the two halves of the fix: a proof that does not state a
+// height is refused, and the height that reaches the validator is the stated one.
+
+#[test]
+fn a_proof_that_does_not_state_its_height_is_refused() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        for (chain, mut proof) in [
+            (ExternalChainId::Ethereum, create_evm_receipt_proof()),
+            (ExternalChainId::Solana, create_solana_proof()),
+        ] {
+            assert!(
+                Pallet::<Test>::verify_proof(&chain, &proof).unwrap(),
+                "the fixture must verify before its height is removed: {chain:?}"
+            );
+            proof.chain_height = None;
+            assert!(
+                !Pallet::<Test>::verify_proof(&chain, &proof).unwrap(),
+                "a proof that does not say which block it is about must be refused for {chain:?}"
+            );
+        }
+    });
+}
+
+#[test]
+fn the_height_the_validator_is_asked_about_is_the_one_the_proof_states() {
+    // Non-vacuous in both directions: the recorded height has to be the stated
+    // one, and it has to *change* when the proof states a different one — a
+    // constant, or a value re-derived from `tx_hash` (which does not change when
+    // the height does), would fail the second assertion.
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        for (chain, stated) in [
+            (ExternalChainId::Ethereum, 18_000_000u64),
+            (ExternalChainId::Ethereum, 18_000_042u64),
+            (ExternalChainId::Solana, 250_000_000u64),
+        ] {
+            let mut proof = if chain == ExternalChainId::Solana {
+                create_solana_proof()
+            } else {
+                create_evm_receipt_proof()
+            };
+            proof.chain_height = Some(stated);
+            crate::mock::VALIDATOR_CALLS.with(|calls| calls.borrow_mut().clear());
+            assert!(
+                Pallet::<Test>::verify_proof(&chain, &proof).unwrap(),
+                "the fixture must verify: {chain:?}"
+            );
+            crate::mock::VALIDATOR_CALLS.with(|calls| {
+                let calls = calls.borrow();
+                assert_eq!(calls.len(), 1, "one header check per proof: {calls:?}");
+                assert_eq!(
+                    calls[0].0, stated,
+                    "the validator must be asked about the height the proof states"
+                );
+                assert_eq!(calls[0].1, proof.block_hash, "and about the block it names");
+            });
+        }
+    });
+}
+
+#[test]
+fn a_btc_proof_whose_stated_height_disagrees_with_its_header_is_refused() {
+    // The SPV path does not need the stated height — the header it carries is what
+    // its merkle root is checked against — but two statements about the same block
+    // have to agree, or the event reports a height no header backs.
+    let tx_bytes = vec![0x01u8, 0x02, 0x03, 0x04];
+    let txid = H256::from(double_sha256(&tx_bytes));
+    let header = BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::repeat_byte(0xEE),
+        merkle_root: txid,
+        timestamp: 1_700_000_000,
+        bits: 0x207fffff,
+        nonce: 0,
+        height: 100,
+    };
+    let mut receipt_data: Vec<u8> = Vec::new();
+    receipt_data.extend_from_slice(&0u32.to_le_bytes());
+    receipt_data.extend_from_slice(&codec::Encode::encode(&header));
+    receipt_data.extend_from_slice(&tx_bytes);
+    let base = SettlementProof {
+        proof_type: ProofType::BitcoinSpv,
+        tx_hash: txid,
+        block_hash: H256::repeat_byte(0xDD),
+        chain_height: Some(100),
+        confirmations: 6,
+        merkle_proof: BoundedVec::default(),
+        receipt_data: BoundedVec::try_from(receipt_data).expect("receipt_data within bound"),
+    };
+
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        assert!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &base).unwrap(),
+            "the fixture must verify with the header's own height"
+        );
+        let mut lying = base.clone();
+        lying.chain_height = Some(101);
+        assert!(
+            !Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &lying).unwrap(),
+            "a proof that reports a height its header does not have is not about a block"
+        );
     });
 }

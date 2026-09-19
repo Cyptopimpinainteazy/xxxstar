@@ -255,6 +255,16 @@ pub struct SettlementProof {
     pub tx_hash: H256,
     /// Block hash containing the transaction
     pub block_hash: H256,
+    /// The height of the external chain this proof's evidence was produced at:
+    /// the EVM block number, or the SVM slot.
+    ///
+    /// Stated rather than derived. It used to be taken from the first eight bytes
+    /// of `tx_hash` "as proxy", which made the value that looks up the canonical
+    /// header proof data: whoever wrote the proof chose the block, and the header
+    /// check then confirmed a header they had picked. A proof that does not state
+    /// it is refused rather than completed, for the same reason a proof that does
+    /// not carry both roots is (TICKET-061).
+    pub chain_height: Option<u64>,
     /// Number of confirmations
     pub confirmations: u32,
     /// Merkle proof (for MPT or SPV)
