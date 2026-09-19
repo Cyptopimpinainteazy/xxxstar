@@ -38,9 +38,12 @@ mod tests {
             severity: 9,
             message: "runtime issue".into(),
         };
-        matches!(
-            propose_evolution_action(signal),
-            EvolutionDecision::RequireApproval(_)
+        // `matches!` returns a bool; without an assert this test passed no
+        // matter what the function did.
+        let decision = propose_evolution_action(signal);
+        assert!(
+            matches!(decision, EvolutionDecision::RequireApproval(_)),
+            "a severity-9 signal must require approval, got {decision:?}"
         );
     }
 }
