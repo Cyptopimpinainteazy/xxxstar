@@ -247,6 +247,9 @@ members = [
     "crates/dream-mining",
     "crates/swarm-media",
     "crates/voice-to-x3",
+    # Burn-down batch 9 (issue #274).
+    "crates/x3-indexer",
+    "crates/treasury",
 ]
 default-members = ["node"]
 resolver = "2"
