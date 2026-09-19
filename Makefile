@@ -2,7 +2,7 @@
  test-node-build test-atomic-kernel test-atomic-router test-axe test-x3-forge test-x3-sentinel\
  test-x3-wallet test-atomic-gateway test-x3-readiness test-x3-lang-vm\
  test-runtime-upgrade test-all-pallets fmt lint\
-local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-list\
+local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-loom local-ci-list\
  local-ci-all local-ci-prepush local-ci-dry-run\
  local-ci-deep srtool-install\
  batch-runner\
@@ -28,6 +28,9 @@ local-ci-release:
 
 local-ci-variants:
 	@bash scripts/local-ci.sh --variants
+
+local-ci-loom:
+	@bash scripts/local-ci.sh --loom
 
 local-ci-list:
 	@bash scripts/local-ci.sh --list
