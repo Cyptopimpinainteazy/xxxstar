@@ -5,7 +5,7 @@
 //! Provides the low-level interface to NVIDIA Confidential Computing enclaves.
 //! Manages:
 //! - Enclave initialization and attestation
-//! - Threshold key share management (Pedersen DKG)
+//! - Threshold key share management (Feldman-verifiable DKG)
 //! - Secure execution of transactions inside GPU TEEs
 //! - Attestation refresh and key rotation
 //!
@@ -163,6 +163,20 @@ impl ConfidentialGpuRuntime {
         }
 
         Ok(share)
+    }
+
+    /// Accept and verify a private DKG share addressed to this validator.
+    /// The runtime becomes active only after the complete committee share set
+    /// has passed Feldman verification.
+    pub fn accept_dkg_share(
+        &mut self,
+        share: threshold::DkgShare,
+    ) -> Result<(), ConfidentialGpuError> {
+        self.dkg.accept_share(share)?;
+        if self.dkg.is_complete() {
+            self.status = RuntimeStatus::Active;
+        }
+        Ok(())
     }
 
     /// Execute a transaction inside the enclave.

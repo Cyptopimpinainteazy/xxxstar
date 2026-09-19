@@ -234,6 +234,8 @@ members = [
     # Burn-down batch 5 (issue #274).
     "crates/x3-dns-server",
     "crates/x3-marketplace",
+    # Burn-down batch 6 (issue #274): real confidential threshold DKG.
+    "crates/confidential-gpu",
     # Burn-down batch 7 (issue #274).
     "crates/gpu-sig-verifier",
     "crates/chronos-flash",
