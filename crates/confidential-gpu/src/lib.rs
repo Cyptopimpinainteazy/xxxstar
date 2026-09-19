@@ -141,13 +141,22 @@ impl ConfidentialGpuRuntime {
     pub fn initialize(&mut self) -> Result<(), ConfidentialGpuError> {
         self.status = RuntimeStatus::Initializing;
 
+        if let Err(err) = self.try_initialize() {
+            self.status = RuntimeStatus::Error;
+            return Err(err);
+        }
+
+        self.status = RuntimeStatus::WaitingForDkg;
+        Ok(())
+    }
+
+    fn try_initialize(&mut self) -> Result<(), ConfidentialGpuError> {
         // Initialize GPU enclave
         self.enclave.initialize()?;
 
         // Generate attestation report
         self.attestation.generate_report(&self.enclave)?;
 
-        self.status = RuntimeStatus::WaitingForDkg;
         Ok(())
     }
 
@@ -327,7 +336,14 @@ mod tests {
     #[cfg(not(feature = "simulated-attestation"))]
     fn runtime_initialize_fails_closed_without_attestation_backend() {
         let mut runtime = ConfidentialGpuRuntime::new(ConfidentialGpuConfig::default());
-        assert!(runtime.initialize().is_err());
+        let err = runtime
+            .initialize()
+            .expect_err("no attestation backend is configured");
+        assert!(
+            matches!(&err, ConfidentialGpuError::AttestationFailed(msg) if msg.contains("attestation")),
+            "expected an attestation-stage failure, got: {err:?}"
+        );
+        assert_eq!(runtime.status(), RuntimeStatus::Error);
     }
 
     #[test]

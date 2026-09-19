@@ -1210,8 +1210,11 @@ mod tests {
     /// the vector, so one validator's signature repeated N times satisfied an
     /// N-of-M requirement. Identity is now the validator public key, and the
     /// repeated signer is rejected before it can be counted. Uses a genuinely
-    /// signed attestation (not fake bytes) because `add_attestation` now
-    /// verifies the signature before the duplicate check would otherwise fire.
+    /// signed attestation (not fake bytes): the *first* copy must pass
+    /// `add_attestation`'s Ed25519 check to reach the store at all — with fake
+    /// bytes it would fail closed there with `SignatureVerificationFailed`,
+    /// and the test would never reach the `DuplicateValidator` case it's
+    /// actually regression-testing.
     #[test]
     fn safety_pipeline_rejects_repeated_svm_signer() {
         let config = test_config();

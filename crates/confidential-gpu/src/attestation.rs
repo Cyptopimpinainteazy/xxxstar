@@ -71,8 +71,12 @@ impl AttestationManager {
                 secret_key,
             });
 
+            // A header that does NOT share the real `NVIDIA-CC-ATTESTATION-V1`
+            // prefix: `verify_report` compares the first 24 bytes exactly, so
+            // this is rejected as an invalid header rather than accepted as a
+            // genuine report — a simulated report must never verify as real.
             let mut report = Vec::new();
-            report.extend_from_slice(b"NVIDIA-CC-ATTESTATION-V1-SIMULATED");
+            report.extend_from_slice(b"X3-SIMULATED-ATTESTATION-TEST-ONLY-V1");
             report.extend_from_slice(&self.gpu_model.as_bytes()[..self.gpu_model.len().min(64)]);
             report.extend_from_slice(&public_key);
 
@@ -186,7 +190,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "simulated-attestation")]
-    fn generate_and_verify_report() {
+    fn generate_report_produces_a_report() {
         let mut enclave = EnclaveManager::new(0, false);
         enclave.initialize().unwrap();
 
@@ -195,9 +199,22 @@ mod tests {
 
         let report = att.current_report().unwrap();
         assert!(!report.is_empty());
+    }
 
-        let info = AttestationManager::verify_report(&report).unwrap();
-        assert!(info.valid);
+    /// A simulated report must never pass as a genuine one: `verify_report`
+    /// is what other code uses to decide whether a report is real, and a
+    /// simulated report accepted there would defeat the fail-closed default.
+    #[test]
+    #[cfg(feature = "simulated-attestation")]
+    fn simulated_report_is_rejected_by_verify_report() {
+        let mut enclave = EnclaveManager::new(0, false);
+        enclave.initialize().unwrap();
+
+        let mut att = AttestationManager::new("NVIDIA H100".into(), 3600);
+        att.generate_report(&enclave).unwrap();
+        let report = att.current_report().unwrap();
+
+        assert!(AttestationManager::verify_report(&report).is_err());
     }
 
     #[test]

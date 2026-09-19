@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 
 /// Length of an Ed25519 public key, in bytes.
 pub const PUBLIC_KEY_LEN: usize = 32;
@@ -96,8 +96,14 @@ impl AttestationSet {
             }
         })?;
 
+        // `verify_strict`, not `verify`: this signature may be checked
+        // independently by other validators counting toward the same quorum,
+        // and non-strict verification accepts some non-canonical signatures
+        // (small-order components, non-canonical S) that strict verification
+        // rejects — different verifiers could then disagree about whether the
+        // same bytes are a valid signature.
         verifying_key
-            .verify(&attestation.statement_hash, &signature)
+            .verify_strict(&attestation.statement_hash, &signature)
             .map_err(|_| AttestationError::SignatureVerificationFailed)?;
 
         self.total_weight = self.total_weight.saturating_add(attestation.weight);
