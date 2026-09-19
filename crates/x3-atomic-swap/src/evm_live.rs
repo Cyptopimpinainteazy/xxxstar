@@ -80,11 +80,85 @@ fn parse_hex_u64(value: &serde_json::Value, field: &str) -> Result<u64, SwapErro
         .map_err(|_| SwapError::RpcError(format!("receipt {} is invalid", field)))
 }
 
+/// The `AtlasHTLC` event a receipt must carry for the operation that produced it.
+///
+/// A successful status is not proof that *this* operation happened: a receipt
+/// for a transaction against the same contract that reverted a `claim` and
+/// succeeded on some unrelated call would pass a status-only check. The event
+/// topic plus a non-zero id in `topics[1]` is the on-chain statement that the
+/// swap actually moved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RequiredEvent {
+    /// Callers that only need the block metadata (no swap transition).
+    None,
+    Created,
+    Claimed,
+    Refunded,
+}
+
+impl RequiredEvent {
+    /// Canonical signatures, copied from
+    /// `X3-contracts/evm/contracts/AtlasHTLC.sol` (the same source the
+    /// selector constants are checked against in `selectors_match_keccak_of_canonical_signature`).
+    fn signature(self) -> Option<&'static [u8]> {
+        match self {
+            RequiredEvent::None => None,
+            RequiredEvent::Created => {
+                Some(b"HTLCCreated(bytes32,address,address,address,uint256,bytes32,uint256)")
+            }
+            RequiredEvent::Claimed => Some(b"HTLCClaimed(bytes32,address,bytes32)"),
+            RequiredEvent::Refunded => Some(b"HTLCRefunded(bytes32,address)"),
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            RequiredEvent::None => "none",
+            RequiredEvent::Created => "HTLCCreated",
+            RequiredEvent::Claimed => "HTLCClaimed",
+            RequiredEvent::Refunded => "HTLCRefunded",
+        }
+    }
+
+    fn topic(self) -> Option<String> {
+        self.signature()
+            .map(|sig| to_0x_hex(&Keccak256::digest(sig)))
+    }
+
+    /// The event implied by the four-byte selector a call starts with.
+    fn for_calldata(data: &str) -> RequiredEvent {
+        if data.starts_with(&to_0x_hex(&selector::CLAIM)) {
+            RequiredEvent::Claimed
+        } else if data.starts_with(&to_0x_hex(&selector::REFUND)) {
+            RequiredEvent::Refunded
+        } else if data.starts_with(&to_0x_hex(&selector::CREATE)) {
+            RequiredEvent::Created
+        } else {
+            RequiredEvent::None
+        }
+    }
+}
+
+/// `topics[1]` of an `AtlasHTLC` event is the indexed `bytes32 id`. A zero id
+/// would make the receipt useless as a proof (it identifies no swap), so it is
+/// rejected along with anything that is not a 32-byte hex value. `0X`/`0x` and
+/// hex case are both accepted: RPC providers differ in what they emit, and the
+/// earlier exact string comparison rejected valid receipts from clients that use
+/// the other spelling.
+fn valid_swap_id_topic(value: &str) -> bool {
+    let body = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"));
+    body.is_some_and(|body| {
+        body.len() == 64 && !body.bytes().all(|b| b == b'0') && hex::decode(body).is_ok()
+    })
+}
+
 fn parse_receipt(
     receipt: serde_json::Value,
     tx_hash: &str,
     contract: &str,
-    require_created_event: bool,
+    required_event: RequiredEvent,
 ) -> Result<ReceiptData, SwapError> {
     let status = parse_hex_u64(&receipt["status"], "status")?;
     if status != 1 {
@@ -112,31 +186,29 @@ fn parse_receipt(
         .ok_or_else(|| SwapError::RpcError("receipt blockHash is missing".into()))?
         .to_string();
     let block_number = parse_hex_u64(&receipt["blockNumber"], "blockNumber")?;
-    if require_created_event {
-        let topic = to_0x_hex(&Keccak256::digest(
-            b"HTLCCreated(bytes32,address,address,address,uint256,bytes32,uint256)",
-        ));
+    if let Some(topic) = required_event.topic() {
         let found = receipt["logs"].as_array().is_some_and(|logs| {
             logs.iter().any(|log| {
                 log["address"]
                     .as_str()
                     .is_some_and(|address| address.eq_ignore_ascii_case(contract))
                     && log["topics"].as_array().is_some_and(|topics| {
-                        topics.first().and_then(|v| v.as_str()) == Some(topic.as_str())
-                            && topics.get(1).and_then(|v| v.as_str()).is_some_and(|id| {
-                                id.strip_prefix("0x").is_some_and(|id| {
-                                    id.len() == 64
-                                        && id != "0".repeat(64)
-                                        && hex::decode(id).is_ok()
-                                })
-                            })
+                        topics
+                            .first()
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|t| t.eq_ignore_ascii_case(&topic))
+                            && topics
+                                .get(1)
+                                .and_then(|v| v.as_str())
+                                .is_some_and(valid_swap_id_topic)
                     })
             })
         });
         if !found {
-            return Err(SwapError::RpcError(
-                "receipt lacks a valid HTLCCreated event".into(),
-            ));
+            return Err(SwapError::RpcError(format!(
+                "receipt lacks a valid {} event",
+                required_event.name()
+            )));
         }
     }
     Ok(ReceiptData {
@@ -212,7 +284,7 @@ impl LiveEvmExecutor {
         &mut self,
         tx_hash: &str,
         timeout_ms: u64,
-        require_created_event: bool,
+        required_event: RequiredEvent,
     ) -> Result<ReceiptData, SwapError> {
         let deadline = std::time::Instant::now()
             .checked_add(std::time::Duration::from_millis(timeout_ms))
@@ -223,12 +295,7 @@ impl LiveEvmExecutor {
                 .get_transaction_receipt(tx_hash)
                 .map_err(|e| SwapError::RpcError(e.to_string()))?
             {
-                return parse_receipt(
-                    receipt,
-                    tx_hash,
-                    &to_0x_hex(&self.contract),
-                    require_created_event,
-                );
+                return parse_receipt(receipt, tx_hash, &to_0x_hex(&self.contract), required_event);
             }
             if std::time::Instant::now() >= deadline {
                 return Err(SwapError::TxNotFound {
@@ -247,8 +314,8 @@ impl LiveEvmExecutor {
     ) -> Result<(String, ReceiptData), SwapError> {
         let signed = tx.sign(&self.signer_private_key)?;
         let tx_hash = self.rpc.send_raw_transaction(&signed)?;
-        let require_created_event = tx.data.starts_with(&to_0x_hex(&selector::CREATE));
-        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, require_created_event)?;
+        let required_event = RequiredEvent::for_calldata(&tx.data);
+        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, required_event)?;
         Ok((tx_hash, receipt))
     }
 
@@ -456,7 +523,7 @@ impl LiveEvmExecutor {
         timeout_ms: u64,
     ) -> Result<LockProof, SwapError> {
         let tx_hash = self.create_lock(receiver, hashlock, timelock, asset, amount, timeout_ms)?;
-        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, true)?;
+        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, RequiredEvent::Created)?;
         // AtlasHTLC has no refund param: the sender is the only party able to
         // refund after the timelock, so we surface the signer as refund address.
         Ok(self.lock_proof_from_tx(
@@ -505,7 +572,7 @@ impl LiveEvmExecutor {
         timeout_ms: u64,
     ) -> Result<ClaimProof, SwapError> {
         let tx_hash = self.claim(id, secret, timeout_ms)?;
-        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, false)?;
+        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, RequiredEvent::Claimed)?;
         Ok(self.claim_proof_from_tx(
             chain_label,
             intent_id,
@@ -525,7 +592,7 @@ impl LiveEvmExecutor {
         timeout_ms: u64,
     ) -> Result<RefundProof, SwapError> {
         let tx_hash = self.refund(id, timeout_ms)?;
-        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, false)?;
+        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, RequiredEvent::Refunded)?;
         Ok(RefundProof {
             tx_id: tx_hash.clone(),
             intent_id,
@@ -614,7 +681,8 @@ mod tests {
             "blockNumber": "0x2a",
             "blockHash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         });
-        let parsed = parse_receipt(receipt, tx, contract, false).expect("valid receipt");
+        let parsed =
+            parse_receipt(receipt, tx, contract, RequiredEvent::None).expect("valid receipt");
         assert_eq!(parsed.block_number, 42);
         assert_eq!(
             parsed.block_hash,
@@ -637,7 +705,7 @@ mod tests {
             });
             invalid[field] = value;
             assert!(
-                parse_receipt(invalid, tx, contract, false).is_err(),
+                parse_receipt(invalid, tx, contract, RequiredEvent::None).is_err(),
                 "{field}"
             );
         }
@@ -647,9 +715,7 @@ mod tests {
     fn receipt_validation_requires_created_event_id() {
         let tx = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let contract = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-        let topic = to_0x_hex(&Keccak256::digest(
-            b"HTLCCreated(bytes32,address,address,address,uint256,bytes32,uint256)",
-        ));
+        let topic = RequiredEvent::Created.topic().expect("created topic");
         let receipt = serde_json::json!({
             "status": "0x1",
             "transactionHash": tx,
@@ -661,7 +727,133 @@ mod tests {
                 "topics": [topic, format!("0x{}", "11".repeat(32))]
             }]
         });
-        assert!(parse_receipt(receipt, tx, contract, true).is_ok());
+        assert!(parse_receipt(receipt, tx, contract, RequiredEvent::Created).is_ok());
+    }
+
+    /// A successful receipt that never emitted the event is not proof of the
+    /// swap transition. `execute_claim`/`execute_refund` used to pass `false`
+    /// here, so *any* successful receipt against the contract was accepted.
+    #[test]
+    fn claim_and_refund_receipts_require_their_own_event() {
+        let tx = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let contract = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let bare = serde_json::json!({
+            "status": "0x1",
+            "transactionHash": tx,
+            "to": contract,
+            "blockNumber": "0x2a",
+            "blockHash": "0xcccc",
+        });
+        assert!(
+            parse_receipt(bare.clone(), tx, contract, RequiredEvent::Claimed).is_err(),
+            "a receipt without the HTLCClaimed event must be rejected"
+        );
+        assert!(
+            parse_receipt(bare, tx, contract, RequiredEvent::Refunded).is_err(),
+            "a receipt without the HTLCRefunded event must be rejected"
+        );
+
+        // The claim event with topic and id in the other hex case: JSON-RPC
+        // clients differ here, and the exact match this replaced rejected them.
+        let receipt = serde_json::json!({
+            "status": "0x1",
+            "transactionHash": tx,
+            "to": contract,
+            "blockNumber": "0x2a",
+            "blockHash": "0xcccc",
+            "logs": [{
+                "address": contract,
+                "topics": [
+                    RequiredEvent::Claimed.topic().unwrap().to_uppercase(),
+                    format!("0X{}", "AB".repeat(32)),
+                ]
+            }]
+        });
+        assert!(parse_receipt(receipt.clone(), tx, contract, RequiredEvent::Claimed).is_ok());
+        assert!(
+            parse_receipt(receipt, tx, contract, RequiredEvent::Refunded).is_err(),
+            "a claim event must not satisfy a refund"
+        );
+    }
+
+    /// A zero id, a log from another contract, or a topic that is not 32 bytes
+    /// proves nothing about this swap.
+    #[test]
+    fn required_event_rejects_zero_id_and_foreign_logs() {
+        let tx = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let contract = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let topic = RequiredEvent::Refunded.topic().expect("refund topic");
+        let with_log = |address: &str, id: String| {
+            serde_json::json!({
+                "status": "0x1",
+                "transactionHash": tx,
+                "to": contract,
+                "blockNumber": "0x2a",
+                "blockHash": "0xcccc",
+                "logs": [{ "address": address, "topics": [topic, id] }]
+            })
+        };
+
+        assert!(
+            parse_receipt(
+                with_log(contract, format!("0x{}", "00".repeat(32))),
+                tx,
+                contract,
+                RequiredEvent::Refunded
+            )
+            .is_err(),
+            "a zero swap id proves nothing"
+        );
+        assert!(
+            parse_receipt(
+                with_log(
+                    "0xdddddddddddddddddddddddddddddddddddddddd",
+                    format!("0x{}", "11".repeat(32))
+                ),
+                tx,
+                contract,
+                RequiredEvent::Refunded
+            )
+            .is_err(),
+            "a log from another contract must not count"
+        );
+        assert!(
+            parse_receipt(
+                with_log(contract, "0x11".to_string()),
+                tx,
+                contract,
+                RequiredEvent::Refunded
+            )
+            .is_err(),
+            "an id that is not 32 bytes must not count"
+        );
+        assert!(parse_receipt(
+            with_log(contract, format!("0x{}", "11".repeat(32))),
+            tx,
+            contract,
+            RequiredEvent::Refunded
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn required_event_follows_the_callee_selector() {
+        assert_eq!(
+            RequiredEvent::for_calldata(&to_0x_hex(&selector::CREATE)),
+            RequiredEvent::Created
+        );
+        assert_eq!(
+            RequiredEvent::for_calldata(&to_0x_hex(&selector::CLAIM)),
+            RequiredEvent::Claimed
+        );
+        assert_eq!(
+            RequiredEvent::for_calldata(&to_0x_hex(&selector::REFUND)),
+            RequiredEvent::Refunded
+        );
+        assert_eq!(
+            RequiredEvent::for_calldata("0xdeadbeef"),
+            RequiredEvent::None
+        );
     }
 
     #[test]
