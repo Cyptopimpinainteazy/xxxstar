@@ -210,7 +210,22 @@ mod tests {
 
     #[test]
     fn test_gas_analyzer_creation() {
-        let rules = SafetyRules::default();
-        let _analyzer = GasAnalyzer::new(rules);
+        // The previous body built an analyzer and asserted nothing. Analyzing a
+        // function with no blocks pins the trivial case: no instructions, no gas.
+        use x3_mir::{MirBlockId, SymbolId};
+
+        let analyzer = GasAnalyzer::new(SafetyRules::default());
+        let function = MirFunction {
+            symbol: SymbolId(0),
+            params: Vec::new(),
+            entry: MirBlockId(0),
+            blocks: Vec::new(),
+            span: x3_common::Span::default(),
+        };
+
+        let gas = analyzer.analyze_function(&function);
+        assert_eq!(gas.instruction_count, 0);
+        assert_eq!(gas.min_gas, 0);
+        assert_eq!(gas.max_gas, 0, "a function with no blocks costs no gas");
     }
 }

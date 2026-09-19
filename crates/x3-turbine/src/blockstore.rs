@@ -257,17 +257,9 @@ impl Blockstore {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_blockstore_insert() {
-        let config = BlockstoreConfig::default();
-        let metrics = Arc::new(TurbineMetrics::new());
-        let _store = Blockstore::new(config, metrics);
-
-        // This would require creating a proper Shred which depends on ErasureCode
-        // Skipping full test for brevity
-    }
-}
+// `test_blockstore_insert` used to live here: it constructed a store and
+// asserted nothing ("would require creating a proper Shred … Skipping full test
+// for brevity"). A test that cannot assert anything is not coverage, so it is
+// gone rather than left to make this file look tested. Exercising the blockstore
+// needs a real `Shred` — the type the old comment refers to does not exist in
+// this crate — which is blockstore work, not a placeholder.
