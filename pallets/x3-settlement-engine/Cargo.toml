@@ -72,6 +72,10 @@ std = [
     "pallet-atomic-trade-engine/std",
     "x3-crosschain-intent/std",
     "x3-atomic-swap/std",
+    # The pallet depends on the router with `default-features = false` so the
+    # wasm build gets its `no_std` path; the host build has to turn `std` back on
+    # explicitly.
+    "x3-verification-router/std",
 ]
 runtime-benchmarks = [
     "frame-support/runtime-benchmarks",
