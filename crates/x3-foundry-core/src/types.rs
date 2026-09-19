@@ -77,6 +77,18 @@ impl FeeMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RevenueConfig {
     pub platform_fee_bps: u16,
+    /// The creator's share, in basis points. This is the remainder after
+    /// `platform_fee_bps` and any active optional legs (`ai_agent_fee_bps`,
+    /// `maintenance_fee_bps`, `referral_fee_bps`) — see
+    /// [`derive_creator_fee_bps`]. It is a ceiling, not a guarantee: it only
+    /// equals `10000 - platform_fee_bps` when none of the optional legs are
+    /// set. Stored (rather than computed on read) so it round-trips through
+    /// serialization, but any code constructing or mutating the other legs
+    /// must keep it in sync via `derive_creator_fee_bps` or the four fields
+    /// will silently stop summing to 10000 (see `check_fee_sanity` in
+    /// `security.rs`, and `RevenueTracker::record_revenue` in `revenue.rs`,
+    /// which computes the creator's actual payout as the runtime remainder
+    /// independently of this field).
     pub creator_fee_bps: u16,
     pub ai_agent_fee_bps: Option<u16>,
     pub maintenance_fee_bps: Option<u16>,
@@ -90,14 +102,44 @@ pub struct RevenueConfig {
     pub fee_mode: FeeMode,
 }
 
+/// Computes the creator's share, in basis points, as the remainder after the
+/// platform fee and any active optional legs. Saturates at 0 if the other
+/// legs already consume the full 10000 bps.
+///
+/// The creator absorbs the optional legs rather than them being carved out
+/// of the platform's cut: a "97% creator" default is a ceiling that only
+/// holds when no optional fees are active, not a fixed guarantee (issue
+/// #110 item 7 follow-up).
+pub fn derive_creator_fee_bps(
+    platform_fee_bps: u16,
+    ai_agent_fee_bps: Option<u16>,
+    maintenance_fee_bps: Option<u16>,
+    referral_fee_bps: Option<u16>,
+) -> u16 {
+    let others = platform_fee_bps as u32
+        + ai_agent_fee_bps.unwrap_or(0) as u32
+        + maintenance_fee_bps.unwrap_or(0) as u32
+        + referral_fee_bps.unwrap_or(0) as u32;
+    10_000u32.saturating_sub(others) as u16
+}
+
 impl Default for RevenueConfig {
     fn default() -> Self {
+        let platform_fee_bps = 200;
+        let ai_agent_fee_bps = Some(50);
+        let maintenance_fee_bps = Some(50);
+        let referral_fee_bps = Some(50);
         Self {
-            platform_fee_bps: 200,
-            creator_fee_bps: 9700,
-            ai_agent_fee_bps: Some(50),
-            maintenance_fee_bps: Some(50),
-            referral_fee_bps: Some(50),
+            platform_fee_bps,
+            creator_fee_bps: derive_creator_fee_bps(
+                platform_fee_bps,
+                ai_agent_fee_bps,
+                maintenance_fee_bps,
+                referral_fee_bps,
+            ),
+            ai_agent_fee_bps,
+            maintenance_fee_bps,
+            referral_fee_bps,
             treasury_wallet: "0x0000000000000000000000000000000000000000".to_string(),
             creator_wallet: String::new(),
             maintenance_wallet: "0x0000000000000000000000000000000000000001".to_string(),
@@ -475,7 +517,33 @@ mod tests {
     fn test_revenue_config_default() {
         let config = RevenueConfig::default();
         assert_eq!(config.platform_fee_bps, 200);
-        assert_eq!(config.creator_fee_bps, 9700);
+        // The default config has all three optional legs active (0.5% each,
+        // 150 bps total), so the creator's remainder is 9650 (96.5%), not
+        // the 9700 (97%) ceiling that only holds with zero optional legs
+        // active (issue #110 item 7 follow-up).
+        assert_eq!(config.creator_fee_bps, 9650);
+
+        let total = config.platform_fee_bps as u32
+            + config.creator_fee_bps as u32
+            + config.ai_agent_fee_bps.unwrap_or(0) as u32
+            + config.maintenance_fee_bps.unwrap_or(0) as u32
+            + config.referral_fee_bps.unwrap_or(0) as u32;
+        assert_eq!(total, 10_000);
+    }
+
+    #[test]
+    fn test_derive_creator_fee_bps_matches_default() {
+        assert_eq!(
+            derive_creator_fee_bps(200, Some(50), Some(50), Some(50)),
+            9_650
+        );
+        // No optional legs active: creator gets the full ceiling.
+        assert_eq!(derive_creator_fee_bps(200, None, None, None), 9_800);
+        // Saturates rather than underflowing if legs would exceed 10000.
+        assert_eq!(
+            derive_creator_fee_bps(9_999, Some(50), Some(50), Some(50)),
+            0
+        );
     }
 
     #[test]
