@@ -14,6 +14,14 @@ pub const MAX_MERKLE_PROOF_DEPTH: u32 = 32;
 /// Maximum receipt data size
 pub const MAX_RECEIPT_DATA_SIZE: u32 = 1024;
 
+/// Largest Merkle-Patricia receipt proof the settlement path accepts, in bytes.
+///
+/// The proof is an RLP list of node byte strings, root first (the shape
+/// `x3-verification-router`'s `verify_merkle_patricia_proof` walks). A receipts-trie
+/// path for a real block is a few hundred bytes to about a kilobyte; two kilobytes
+/// leaves room for a deep trie without inviting an unbounded extrinsic argument.
+pub const MAX_TRIE_PROOF_SIZE: u32 = 2048;
+
 // ============================================================================
 // Intent Types
 // ============================================================================
@@ -271,6 +279,21 @@ pub struct SettlementProof {
     pub merkle_proof: BoundedVec<H256, ConstU32<MAX_MERKLE_PROOF_DEPTH>>,
     /// Receipt/witness data (chain-specific)
     pub receipt_data: BoundedVec<u8, ConstU32<MAX_RECEIPT_DATA_SIZE>>,
+    /// The receipt's index in its block.
+    ///
+    /// The receipts trie's key is `rlp(index)`, so a proof that does not state the
+    /// index cannot be walked: this is what makes the inclusion check possible at
+    /// all, rather than comparing two roots the proof supplies (TICKET-063).
+    pub receipt_index: Option<u32>,
+    /// The Merkle-Patricia inclusion proof for `receipt_data`: an RLP list of trie
+    /// node byte strings, from the root to the leaf.
+    ///
+    /// `merkle_proof` above carries the *roots* the header is matched against; this
+    /// carries the *path* between them. Without it the receipt is bound to nothing:
+    /// every value a forger needs (the header's roots and its height) is public, so
+    /// a proof that copied them passed for any structurally valid receipt
+    /// (TICKET-063).
+    pub trie_proof: Option<BoundedVec<u8, ConstU32<MAX_TRIE_PROOF_SIZE>>>,
 }
 
 /// Proof type used for verification

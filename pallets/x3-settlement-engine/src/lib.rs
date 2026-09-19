@@ -161,26 +161,25 @@ pub mod pallet {
         type CrossChainValidator: bridge_integration::CrossChainValidatorProvider;
 
         /// Whether an external (EVM/SVM) proof may be settled when nothing binds
-        /// its receipt to the header it is checked against.
+        /// its evidence to the header it is checked against.
         ///
         /// It must not be, and this item exists so the answer is a decision the
-        /// runtime states rather than an accident of the code. `verify_evm_receipt_proof`
-        /// checks that `keccak(receipt_data) == tx_hash`, that the proof carries two
-        /// roots, and that `{chain_height, block_hash, state_root, merkle_root}`
-        /// equal the stored header's fields — but the `merkle_proof` entries are
-        /// read as the *roots*, never walked as a path, so nothing connects the
-        /// receipt to that header. Everything a forger needs (the latest header's
-        /// fields and its height) is public, so a proof that copies them passes for
-        /// any structurally valid receipt RLP (TICKET-063, and
+        /// runtime states rather than an accident of the code (TICKET-063, and
         /// `.ai/reports/settlement-engine-invented-evidence-20260919.md` finding 3).
         ///
-        /// Set this `true` only where the configured `CrossChainValidator` does the
-        /// binding itself — which today no implementation does, so the test runtime
-        /// is the only place that sets it, and the chain runtime refuses. `false` is
-        /// the safe value, and the diagnostic names the reason rather than reporting
-        /// a generic invalid proof.
+        /// **The EVM path no longer reads this.** It walks the receipt's
+        /// Merkle-Patricia path to the declared receipts root
+        /// (`x3-verification-router`'s one implementation of that check, shared with
+        /// the relayer) and refuses a proof that does not carry one, so an EVM
+        /// settlement now stands on an inclusion proof rather than on a copy of the
+        /// header. What is left is the SVM path: it verifies the transaction's
+        /// signature and that the transaction names the attested blockhash, but
+        /// nothing proves the transaction is *in* that slot, so a caller can craft a
+        /// transaction referencing a stored blockhash and have it settled.
+        /// `true` is therefore "the configured validator binds the SVM evidence
+        /// itself", the test runtime's stand-in, and the chain runtime sets `false`.
         #[pallet::constant]
-        type AllowUnboundExternalProofs: Get<bool>;
+        type AllowUnboundSvmProofs: Get<bool>;
 
         /// Unix time provider for timeout enforcement.
         type UnixTime: UnixTime;
@@ -229,22 +228,23 @@ pub mod pallet {
     /// into `InvalidProof`, which reads as "this proof is wrong" when the truth is
     /// "this build cannot check this proof at all". Whoever is looking at a stuck
     /// settlement needs to be able to tell those apart.
-    pub fn ensure_unbound_external_proofs_allowed<T: Config>() -> Result<(), DispatchError> {
-        unbound_external_proofs_are_allowed(T::AllowUnboundExternalProofs::get())
+    pub fn ensure_unbound_svm_proofs_allowed<T: Config>() -> Result<(), DispatchError> {
+        unbound_svm_proofs_are_allowed(T::AllowUnboundSvmProofs::get())
     }
 
     /// The decision itself, so it can be tested for both values without a second
     /// runtime: `true` means the runtime states that its `CrossChainValidator`
-    /// binds the receipt to the header.
-    pub fn unbound_external_proofs_are_allowed(allowed: bool) -> Result<(), DispatchError> {
+    /// binds the SVM evidence to the header. The EVM path does not consult it — it
+    /// walks the receipt's inclusion proof (`verify_evm_receipt_proof`).
+    pub fn unbound_svm_proofs_are_allowed(allowed: bool) -> Result<(), DispatchError> {
         if allowed {
             return Ok(());
         }
         Err(DispatchError::Other(
-            "external proof verification unavailable: nothing binds this receipt to the header it \
-             is checked against (the merkle path is read as the roots, never walked), so an EVM/SVM \
-             settlement proof cannot be accepted. BTC SPV proofs are unaffected — theirs is \
-             verified. See TICKET-063",
+            "SVM proof verification unavailable: nothing binds this transaction to the slot header \
+             it is checked against (the validator set and bank state are not proven), so an SVM \
+             settlement proof cannot be accepted. EVM receipts are bound by their trie proof and \
+             BTC SPV proofs by their header and merkle path — both are accepted. See TICKET-063",
         ))
     }
 
@@ -2298,8 +2298,6 @@ pub mod pallet {
         /// Verify EVM receipt proof
         /// Bridge Integration: Calls cross-chain-validator to verify against canonical headers
         fn verify_evm_receipt_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
-            ensure_unbound_external_proofs_allowed::<T>()?;
-
             // Stage 1: Basic structural validation
             let proof_type_ok = matches!(
                 proof.proof_type,
@@ -2362,7 +2360,41 @@ pub mod pallet {
                 merkle_root,
             );
 
-            Ok(valid)
+            if !valid {
+                return Ok(false);
+            }
+
+            // The receipt has to be *in* the trie whose root the header carries.
+            //
+            // Everything above this line establishes that the proof's fields match a
+            // stored header — and every one of those fields is public, so on its own
+            // it establishes nothing about the receipt: a forger copied the latest
+            // header's roots, paired them with any structurally valid receipt RLP,
+            // and the settlement was accepted (TICKET-063). The walk below is the
+            // step that makes the receipt evidence: the key is `rlp(index)` and the
+            // value is the receipt's own bytes, both checked against
+            // `merkle_root`, which the docs require to be the header's *receipts*
+            // root. One implementation of that walk exists in this repository
+            // (`x3-verification-router`), shared with the relayer (TICKET-064).
+            let Some(index) = proof.receipt_index else {
+                return Ok(false);
+            };
+            let Some(trie_proof) = proof.trie_proof.as_ref() else {
+                return Ok(false);
+            };
+            let key = x3_verification_router::evm_receipt::rlp_index_key(&index.to_be_bytes());
+            if x3_verification_router::evm_receipt::verify_merkle_patricia_proof(
+                &merkle_root.0,
+                &key,
+                Some(proof.receipt_data.as_slice()),
+                trie_proof.as_slice(),
+            )
+            .is_err()
+            {
+                return Ok(false);
+            }
+
+            Ok(true)
         }
 
         /// Validate RLP-encoded receipt structure
@@ -2432,7 +2464,7 @@ pub mod pallet {
         /// - [32 bytes] Recent blockhash
         /// - [remaining] Instructions (each: program_id_index + accounts + data)
         fn verify_svm_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
-            ensure_unbound_external_proofs_allowed::<T>()?;
+            ensure_unbound_svm_proofs_allowed::<T>()?;
 
             let tx_bytes: &[u8] = &proof.receipt_data;
 

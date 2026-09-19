@@ -32,9 +32,18 @@ pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
 pallet-x3-atomic-kernel = { path = "../x3-atomic-kernel", default-features = false }
 pallet-atomic-trade-engine = { path = "../atomic-trade-engine", default-features = false }
 x3-crosschain-intent = { path = "../../crates/x3-crosschain-intent", default-features = false }
+# The one Merkle-Patricia receipt-proof verifier in this repository
+# (`no_std`/`alloc`), shared with the relayer. The settlement path used to
+# compare two roots it read out of the proof and never walked a path, so a
+# receipt from any transaction could ride on the latest header (TICKET-063).
+x3-verification-router = { path = "../../crates/x3-verification-router", default-features = false }
 x3-atomic-swap = { path = "../../crates/x3-atomic-swap", default-features = false }
 
 [dev-dependencies]
+# The test fixtures build a real receipts-trie proof (a leaf node and its RLP
+# envelope); the pallet itself walks them with `x3-verification-router`.
+rlp = "0.5"
+
 pallet-timestamp = { workspace = true }
 pallet-balances = { workspace = true }
 proptest = "1.4"

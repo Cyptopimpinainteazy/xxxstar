@@ -12881,6 +12881,7 @@ dependencies = [
  "proptest",
  "rand 0.8.8",
  "ripemd",
+ "rlp 0.5.2",
  "scale-info",
  "secp256k1 0.28.2",
  "serde",
@@ -12892,6 +12893,7 @@ dependencies = [
  "x3-asset-kernel-types",
  "x3-atomic-swap",
  "x3-crosschain-intent",
+ "x3-verification-router",
 ]
 
 [[package]]

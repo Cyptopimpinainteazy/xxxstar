@@ -2495,18 +2495,20 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
     type CrossChainValidator = RuntimeCrossChainValidator;
-    /// `false`: the chain refuses an EVM/SVM settlement proof until something
-    /// binds its receipt to the header it is checked against.
+    /// `false`: the chain refuses an SVM settlement proof, because nothing binds
+    /// its transaction to the slot header it is checked against.
     ///
-    /// `RuntimeCrossChainValidator` forwards `{height, block_hash, state_root,
-    /// merkle_root}` to the cross-chain-validator pallet, which compares them to
-    /// the *latest* stored header — and the settlement engine reads
-    /// `merkle_proof[0..2]` as those roots rather than walking a path, so nothing
-    /// connects the receipt to the header. Everything a forger needs is public, so
-    /// accepting that shape means accepting a receipt from any transaction
-    /// (TICKET-063). Flip this to `true` only together with a validator that does
-    /// the binding, and then with the tests the ticket names.
-    type AllowUnboundExternalProofs = ConstBool<false>;
+    /// The EVM path no longer needs this. It walks the receipt's Merkle-Patricia
+    /// path to the header's receipts root — the one implementation of that check in
+    /// the workspace, in `x3-verification-router`, shared with the relayer — and
+    /// refuses a proof that does not carry one, so an EVM settlement stands on an
+    /// inclusion proof rather than on a copy of the header's public fields
+    /// (TICKET-063). The SVM path verifies the transaction's signature and that it
+    /// names the attested blockhash, but nothing proves the transaction is *in* that
+    /// slot, so `RuntimeCrossChainValidator` cannot bind it and the chain says so
+    /// rather than settling it. Flip this to `true` only together with a validator
+    /// that binds the SVM evidence itself.
+    type AllowUnboundSvmProofs = ConstBool<false>;
     // ── Protocol fee wiring ──────────────────────────────────────────────
     type SettlementFeeBps = SettlementProtocolFeeBps;
     type ProtocolTreasury = TreasuryAccountId;
@@ -4823,28 +4825,45 @@ mod settlement_proof_posture_tests {
     use super::*;
     use pallet_x3_settlement_engine::types::{ExternalChainId, ProofType, SettlementProof};
 
-    /// The chain refuses an EVM/SVM settlement proof until something binds its
-    /// receipt to the header it is checked against (TICKET-063).
+    /// What the chain does with an external settlement proof, per path.
     ///
-    /// The pallet's own tests run with the flag `true`, because there is no
-    /// validator in this workspace that does the binding and the lifecycle they
-    /// exercise would otherwise be unreachable. This is the other half: the chain
-    /// states the safe value, and a proof of the shape the pallet accepts is
-    /// refused with a reason rather than reported as merely invalid.
+    /// The EVM path binds the receipt itself now: it walks the receipt's
+    /// Merkle-Patricia path to the header's receipts root (TICKET-063), so a proof
+    /// without that path is refused as `Ok(false)` — a proof that is not evidence.
+    /// The SVM path has no such binding yet, so the runtime states that it cannot
+    /// verify one at all and the refusal says why; that is the flag's remaining
+    /// scope, and this test is the runtime's half of it.
     #[test]
-    fn the_chain_refuses_an_unbound_external_settlement_proof() {
-        let allowed: bool = <<Runtime as pallet_x3_settlement_engine::Config>::AllowUnboundExternalProofs
+    fn the_chain_refuses_external_settlement_proofs_until_they_are_bound() {
+        let svm_allowed: bool = <<Runtime as pallet_x3_settlement_engine::Config>::AllowUnboundSvmProofs
             as frame_support::traits::Get<bool>>::get();
         assert!(
-            !allowed,
-            "the chain runtime must state the safe value; setting it true is a claim that the \
-             configured validator binds the receipt to the header, and nothing in this workspace does"
+            !svm_allowed,
+            "the chain runtime must state the safe value: setting it true is a claim that the \
+             configured validator binds the SVM evidence itself, and nothing in this workspace does"
         );
 
-        // A proof the pallet accepts when the flag allows it: a structurally valid
-        // receipt, both roots, the height stated.
+        // The SVM refusal happens before the proof is inspected, so a minimal
+        // well-typed proof reaches it rather than a structural error.
+        let svm_proof = SettlementProof {
+            proof_type: ProofType::SolanaProof,
+            tx_hash: H256::zero(),
+            block_hash: H256::zero(),
+            chain_height: Some(250_000_000),
+            confirmations: 32,
+            merkle_proof: vec![H256::zero(), H256::zero()]
+                .try_into()
+                .expect("two roots are within the bound"),
+            receipt_data: vec![0u8; 64]
+                .try_into()
+                .expect("64 bytes are within the bound"),
+            receipt_index: None,
+            trie_proof: None,
+        };
+
+        // An EVM proof with everything except the receipt's inclusion path.
         let receipt_data = vec![0xc3u8, 0x01, 0x00, 0xc0];
-        let proof = SettlementProof {
+        let evm_proof = SettlementProof {
             proof_type: ProofType::MerkleTrie,
             tx_hash: H256::from(sp_io::hashing::keccak_256(&receipt_data)),
             block_hash: H256::from_low_u64_be(3),
@@ -4856,18 +4875,30 @@ mod settlement_proof_posture_tests {
             receipt_data: receipt_data
                 .try_into()
                 .expect("four bytes are within the bound"),
+            receipt_index: None,
+            trie_proof: None,
         };
 
         sp_io::TestExternalities::default().execute_with(|| {
             let error = pallet_x3_settlement_engine::Pallet::<Runtime>::verify_proof(
-                &ExternalChainId::Ethereum,
-                &proof,
+                &ExternalChainId::Solana,
+                &svm_proof,
             )
-            .expect_err("the chain must refuse an unbound external proof");
+            .expect_err("the chain must refuse an SVM proof it cannot bind");
             let message = format!("{error:?}");
             assert!(
-                message.contains("nothing binds this receipt to the header"),
+                message.contains("nothing binds this transaction to the slot header"),
                 "the refusal must name what is missing: {message}"
+            );
+
+            assert_eq!(
+                pallet_x3_settlement_engine::Pallet::<Runtime>::verify_proof(
+                    &ExternalChainId::Ethereum,
+                    &evm_proof,
+                ),
+                Ok(false),
+                "an EVM proof that does not carry the receipt's trie path is not evidence, and the \
+                 chain says so the same way it says any other proof is invalid"
             );
         });
     }

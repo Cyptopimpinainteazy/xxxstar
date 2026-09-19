@@ -173,7 +173,7 @@ impl pallet_x3_settlement_engine::Config for Test {
     // (TICKET-063). `RecordingCrossChainValidator` is a no-op that accepts
     // everything, so this test runtime states that it stands in for a validator
     // that would do the binding.
-    type AllowUnboundExternalProofs = frame_support::traits::ConstBool<true>;
+    type AllowUnboundSvmProofs = frame_support::traits::ConstBool<true>;
 }
 
 thread_local! {
