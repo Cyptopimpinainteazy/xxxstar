@@ -28301,6 +28301,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-wallet-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "colored",
+]
+
+[[package]]
 name = "x3-x3-integration"
 version = "0.1.0"
 dependencies = [
