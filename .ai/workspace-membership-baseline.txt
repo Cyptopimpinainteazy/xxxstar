@@ -8,17 +8,11 @@
 # crate appears in neither list, or when a fixed entry stays here.
 
 confidential-gpu
-dylint-determinism
 loom-concurrency
 orchestra
 pallet-x3-control
 pallet-x3-governance
 x3-mobile-sdk
 x3-pq
-x3-sidecar
-x3-solvency-sidecar
 x3-swap-router
-x3-swarm-api
-x3-swarm-core
-x3-swarm-worker-standalone
 x3-wallet-cli

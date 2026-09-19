@@ -38,4 +38,6 @@ pub use report::SwarmReport;
 pub use scheduler::SwarmScheduler;
 pub use scoreboard::SwarmScoreboard;
 pub use spawn::{max_spawn_depth, SpawnError, SpawnGuard, DEFAULT_MAX_DIRECT_SPAWNS};
-pub use task::{AgentResult, AgentTask, TaskStatus};
+// `RiskLevel` is a public field of `AgentTask` (`pub risk: RiskLevel`), so it
+// has to be nameable by callers; without this they cannot construct a task.
+pub use task::{AgentResult, AgentTask, RiskLevel, TaskStatus};

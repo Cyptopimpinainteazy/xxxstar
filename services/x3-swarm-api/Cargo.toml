@@ -3,6 +3,13 @@ name = "x3-swarm-api"
 version = "0.1.0"
 edition = "2021"
 
+# Own workspace: this service cannot be a member of the root workspace because
+# it path-depends on `crates/x3-swarm-core`, which declares its own
+# `[workspace]` — cargo refuses the combination ("multiple workspace roots
+# found in the same workspace"). Declaring the empty table makes the service
+# buildable on its own, which is what the `nested-workspaces` gate does.
+[workspace]
+
 [dependencies]
 axum = "0.7"
 tokio = { version = "1.0", features = ["full"] }

@@ -14,6 +14,20 @@ exclude = [
     "programs/svm/*",
     # Cross-VM coordinator is intentionally a standalone crate.
     "crates/cross-vm-coordinator",
+    # Each of these declares its own `[workspace]` (or path-depends on one that
+    # does), so cargo refuses to have them as members: "multiple workspace roots
+    # found in the same workspace". They are built by the `nested workspaces`
+    # gate in scripts/local-ci.sh instead, which is what keeps them from rotting
+    # unseen — that is how x3-solvency-sidecar stopped compiling against
+    # tungstenite 0.29 without anyone noticing.
+    "crates/x3-sidecar",
+    "crates/x3-swarm-core",
+    "services/x3-solvency-sidecar",
+    "services/x3-swarm-api",
+    "services/x3-swarm-worker",
+    # dylint libraries need a nightly toolchain (`#![feature(rustc_private)]`);
+    # it is excluded until a nightly is available for its own gate.
+    "crates/dylint-determinism",
 ]
 members = [
     "pallets/x3-kernel",

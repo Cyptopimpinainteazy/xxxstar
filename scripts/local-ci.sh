@@ -184,6 +184,28 @@ GATES_FAST=(
   # disappeared mid-session). Offline, the fetch fails and the test still runs
   # against whatever cache exists - cold cache surfaces as BLOCKED, never green.
   "test cross-vm-coordinator:cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml || echo 'local-ci: coordinator dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
+  # The crates below are `exclude`d from the root workspace: each declares its
+  # own `[workspace]` (or path-depends on one that does), and cargo refuses to
+  # have them as members ("multiple workspace roots found in the same
+  # workspace"). `cargo check --workspace` therefore never sees them, and
+  # nothing else did either: that is how `x3-solvency-sidecar` stopped
+  # compiling against tungstenite 0.29, and how `services/x3-swarm-api` rotted
+  # against `x3-swarm-core`'s API (a removed re-export and a `String` field that
+  # had become an enum) without a single red gate. `--locked` keeps their
+  # committed lockfiles honest.
+  # `crates/dylint-determinism` is excluded too but needs a nightly toolchain
+  # (`#![feature(rustc_private)]`), so it is not part of this gate yet.
+  # Each crate gets its own target dir: they resolve different versions of the
+  # same dependencies (x3-sidecar still pins reqwest 0.11, the root workspace is
+  # on 0.12), and sharing the harness target dir with the main build produced
+  # `could not parse/generate dep info ... No such file or directory`.
+  #
+  # `crates/x3-sidecar` is checked without `--all-targets`: its test targets do
+  # not compile (78 errors — tests reference `wiremock`, `uuid`, a `x3_rpc`
+  # crate and `axum::Server`, none of which the manifest declares or which
+  # axum 0.7 still has). The library and binary are covered; its tests are a
+  # recorded follow-up rather than something this gate pretends to check.
+  "nested workspaces:for d in crates/x3-swarm-core services/x3-swarm-api services/x3-swarm-worker services/x3-solvency-sidecar; do echo \"== \$d\"; CARGO_TARGET_DIR=\"/tmp/x3-nested-\$(basename \"\$d\")\" cargo check --locked --all-targets --manifest-path \"\$d/Cargo.toml\" || exit 1; done; echo '== crates/x3-sidecar (lib+bin only; its tests are a follow-up)'; CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo check --locked --manifest-path crates/x3-sidecar/Cargo.toml || exit 1"
   # Two configurations of the proof-verification router, because the `--deep`
   # workspace build unifies `test-verifier` through the gateway pallet's
   # dev-dependency and would therefore never exercise the fail-closed posture.

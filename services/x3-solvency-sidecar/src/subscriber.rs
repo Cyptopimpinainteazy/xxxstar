@@ -110,7 +110,10 @@ async fn run_session(
         "method": "chain_subscribeNewHeads",
         "params": []
     });
-    sink.send(Message::Text(sub_req.to_string()))
+    // tungstenite 0.29 changed `Message::Text` to carry `Utf8Bytes` instead of
+    // `String`, so the payload has to be converted (the tokio-tungstenite 0.29
+    // upgrade landed without this crate being compiled).
+    sink.send(Message::Text(sub_req.to_string().into()))
         .await
         .map_err(|e| anyhow::anyhow!("Subscribe send failed: {e}"))?;
 
@@ -273,7 +276,10 @@ async fn handle_text_message(
             "method": "system_health",
             "params": []
         });
-        if let Err(e) = sink.send(Message::Text(health_req.to_string())).await {
+        if let Err(e) = sink
+            .send(Message::Text(health_req.to_string().into()))
+            .await
+        {
             tracing::error!("Failed to send system_health RPC call: {e}");
         }
 
