@@ -158,6 +158,11 @@ GATES_FAST=(
   "script syntax:bash scripts/check-script-syntax.sh"
   "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
   "workspace membership:python3 scripts/check-workspace-membership.py"
+  # Every id in `tests/invariants/registry.toml` must be referenced by a test.
+  # This check lived in `tests_core/invariant_registry_check.rs`, which no crate,
+  # script or Makefile ever compiled — so an invariant could be registered with
+  # nothing checking it and the tree stayed green.
+  "invariant registry:python3 scripts/check-invariant-registry.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
   "workspace check:env SKIP_WASM_BUILD=1 cargo check --workspace"
