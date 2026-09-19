@@ -37,20 +37,6 @@ exclude = [
     # than green. This was the last entry in
     # `.ai/workspace-membership-baseline.txt`.
     "tests/loom-concurrency",
-    # `pallets/x3-governance` is a superseded duplicate of the two governance
-    # pallets the runtime actually runs — `pallets/governance`
-    # (`pallet-governance`, wired in `construct_runtime!`) and
-    # `pallets/treasury` (`pallet-treasury`, multi-signer spending tracks with
-    # per-track thresholds) — so it is excluded rather than made a member:
-    # nothing should build a second governance system. It is not a burn-down
-    # candidate either — three of its four source files (`proposal_manager.rs`,
-    # `treasury.rs`, `voting_engine.rs`) are not declared as modules in its
-    # `lib.rs` and therefore compile nowhere even after its manifest is
-    # repaired, that manifest pins abandoned crates.io Substrate versions
-    # (`sp-core 29`, `sp-runtime 33`) against the workspace's polkadot-sdk
-    # `stable2512`, and its `[[test]] governance_integration` points at a
-    # `tests/integration_tests.rs` that does not exist. See issue #332.
-    "pallets/x3-governance",
 ]
 members = [
     "pallets/x3-kernel",
