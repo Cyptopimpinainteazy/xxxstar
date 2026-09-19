@@ -16,3 +16,4 @@ thiserror = "1"
 sha2 = "0.10"
 hex = "0.4"
 regex = "1"
+tempfile = { workspace = true }

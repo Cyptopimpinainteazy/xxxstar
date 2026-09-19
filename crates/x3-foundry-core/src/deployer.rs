@@ -4,7 +4,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use tracing::info;
+use tracing::{info, warn};
+use x3_foundry_auditor::FoundryAuditor;
 
 /// Deployment manifest containing all deployment metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +72,8 @@ impl Deployer {
                 ))
             })?;
 
+            self.gate_on_audit(contract_name, source)?;
+
             // Simulate deployment
             let address = self.simulate_deploy(contract_name, source, chain);
             let tx_hash = self.compute_tx_hash(contract_name, chain);
@@ -95,6 +98,40 @@ impl Deployer {
         }
 
         Ok(deployed)
+    }
+
+    /// Runs the real security audit (compiler diagnostics, reentrancy,
+    /// ownership, fee-transparency, license, and scam-pattern checks) against
+    /// a contract's source and refuses to deploy it if the audit finds any
+    /// Critical-severity issue — including "the compiler couldn't verify
+    /// this even compiles". A deployment path that silently proceeds despite
+    /// a failed audit is exactly the "no-op adapter" this crate must not
+    /// have, so this is a hard error, not a logged warning.
+    fn gate_on_audit(&self, contract_name: &str, source: &str) -> Result<(), FoundryError> {
+        let mut auditor = FoundryAuditor::new(contract_name, source);
+        let report = auditor.audit_project();
+        if report.summary.critical > 0 {
+            let critical: Vec<String> = report
+                .findings
+                .iter()
+                .filter(|f| f.severity == x3_foundry_auditor::Severity::Critical)
+                .map(|f| format!("{} ({})", f.title, f.description))
+                .collect();
+            return Err(FoundryError::SecurityAuditFailed(format!(
+                "{} failed the pre-deployment security audit with {} critical finding(s): {}",
+                contract_name,
+                report.summary.critical,
+                critical.join("; ")
+            )));
+        }
+        if !report.passed {
+            warn!(
+                "{} passed the critical-findings gate but the audit is not fully clean \
+                 (risk_score={}, high={}) — deploying anyway, but review the report",
+                contract_name, report.risk_score, report.summary.high
+            );
+        }
+        Ok(())
     }
 
     /// Deploys the frontend application.
@@ -382,6 +419,37 @@ mod tests {
         let deployed = result.unwrap();
         assert_eq!(deployed.len(), 1);
         assert!(deployed[0].address.starts_with("0x"));
+    }
+
+    /// `forge` is a first-class repo toolchain requirement (X3-contracts/evm
+    /// tests already depend on it); skip rather than hard-fail on a dev
+    /// machine that genuinely doesn't have it, instead of pretending the
+    /// gate ran.
+    fn forge_available() -> bool {
+        std::process::Command::new("forge")
+            .arg("--version")
+            .output()
+            .is_ok()
+    }
+
+    #[test]
+    fn test_deploy_contracts_refuses_a_contract_that_does_not_compile() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
+        let deployer = Deployer::new("test-key".into(), "x3-testnet".into());
+        let mut contracts = HashMap::new();
+        contracts.insert(
+            "BrokenToken".into(),
+            "pragma solidity ^0.8.20;\ncontract BrokenToken {\n    function nope( {\n}".into(),
+        );
+        let order = vec!["BrokenToken".into()];
+        let result = deployer.deploy_contracts(&contracts, &order, "x3-testnet");
+        assert!(
+            matches!(result, Err(FoundryError::SecurityAuditFailed(_))),
+            "expected deployment to be refused for a contract that fails to compile, got {result:?}"
+        );
     }
 
     #[test]

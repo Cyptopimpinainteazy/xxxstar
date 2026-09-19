@@ -124,6 +124,31 @@ pub struct SourceLocation {
     pub snippet: Option<String>,
 }
 
+/// The subset of `forge build --json`'s (solc standard-JSON) output this
+/// auditor cares about.
+#[derive(Debug, Clone, Deserialize)]
+struct SolcBuildOutput {
+    #[serde(default)]
+    errors: Vec<SolcDiagnostic>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct SolcDiagnostic {
+    severity: String,
+    message: String,
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(rename = "errorCode", default)]
+    error_code: Option<String>,
+    #[serde(rename = "sourceLocation", default)]
+    source_location: Option<SolcSourceLocation>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct SolcSourceLocation {
+    file: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditReport {
     pub report_id: String,
@@ -654,6 +679,7 @@ impl FoundryAuditor {
 
     pub fn audit_project(&mut self) -> AuditReport {
         info!("Starting audit for project: {}", self.project_name);
+        self.check_compiler_diagnostics();
         self.check_static_analysis();
         self.check_reentrancy_patterns();
         self.check_ownership_patterns();
@@ -674,6 +700,104 @@ impl FoundryAuditor {
             report.project_name, report.risk_score, report.risk_level
         );
         report
+    }
+
+    /// Runs the real Solidity compiler (`forge build --json`) against the
+    /// audited source, turning actual compiler diagnostics into findings.
+    /// Unlike the pattern-matching checks below, this executes a real tool
+    /// rather than scanning text: a contract that fails to compile becomes a
+    /// Critical finding (blocks deployment via `AuditReport::passed`), and
+    /// compiler warnings become Low findings (recorded, but not blocking).
+    /// If the compiler can't be run at all, that itself is a Critical
+    /// finding — an audit that silently skips its own verification step is
+    /// worse than no audit, so this fails closed rather than passing by
+    /// default.
+    pub fn check_compiler_diagnostics(&mut self) {
+        info!("Running solc compiler diagnostics via `forge build`...");
+        match Self::run_forge_build(&self.source_code) {
+            Ok(diagnostics) => {
+                for diag in diagnostics {
+                    let is_error = diag.severity.eq_ignore_ascii_case("error");
+                    let (severity, score) = if is_error {
+                        (Severity::Critical, 95)
+                    } else {
+                        (Severity::Low, 15)
+                    };
+                    self.findings.push(Finding {
+                        id: format!("SOLC-{:04}", self.findings.len() + 1),
+                        title: format!(
+                            "solc {}: {}",
+                            diag.severity,
+                            diag.error_code.as_deref().unwrap_or(&diag.kind)
+                        ),
+                        description: diag.message,
+                        severity,
+                        category: FindingCategory::StaticAnalysis,
+                        location: diag.source_location.map(|loc| SourceLocation {
+                            file: loc.file,
+                            line: 0,
+                            column: None,
+                            snippet: None,
+                        }),
+                        remediation: Some(
+                            "Fix the reported solc diagnostic before deploying".into(),
+                        ),
+                        score,
+                        raw_snippet: None,
+                    });
+                }
+            }
+            Err(e) => {
+                self.findings.push(Finding {
+                    id: format!("SOLC-{:04}", self.findings.len() + 1),
+                    title: "Compiler verification unavailable".into(),
+                    description: format!(
+                        "Could not run `forge build` to verify the contract actually \
+                         compiles: {e}. Refusing to treat unverified source as safe to deploy."
+                    ),
+                    severity: Severity::Critical,
+                    category: FindingCategory::StaticAnalysis,
+                    location: None,
+                    remediation: Some(
+                        "Ensure `forge` (Foundry) is installed and on PATH in this environment"
+                            .into(),
+                    ),
+                    score: 95,
+                    raw_snippet: None,
+                });
+            }
+        }
+    }
+
+    /// Compiles `source_code` in a scratch Foundry project via `forge build
+    /// --json` and returns solc's own diagnostics (errors and warnings).
+    fn run_forge_build(source_code: &str) -> Result<Vec<SolcDiagnostic>, String> {
+        let dir = tempfile::tempdir().map_err(|e| format!("failed to create temp dir: {e}"))?;
+        let src_dir = dir.path().join("src");
+        std::fs::create_dir_all(&src_dir)
+            .map_err(|e| format!("failed to create scratch src/ dir: {e}"))?;
+        std::fs::write(
+            dir.path().join("foundry.toml"),
+            "[profile.default]\nsrc = \"src\"\nout = \"out\"\ncache = false\n",
+        )
+        .map_err(|e| format!("failed to write scratch foundry.toml: {e}"))?;
+        std::fs::write(src_dir.join("AuditedContract.sol"), source_code)
+            .map_err(|e| format!("failed to write scratch contract source: {e}"))?;
+
+        let output = std::process::Command::new("forge")
+            .args(["build", "--json"])
+            .current_dir(dir.path())
+            .output()
+            .map_err(|e| format!("failed to spawn `forge build`: {e}"))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let parsed: SolcBuildOutput = serde_json::from_str(stdout.trim()).map_err(|e| {
+            format!(
+                "failed to parse `forge build --json` output: {e} (stdout: {})",
+                stdout.trim()
+            )
+        })?;
+        Ok(parsed.errors)
     }
 
     pub fn check_static_analysis(&mut self) {
@@ -1140,5 +1264,68 @@ mod tests {
         let source = "addr.call{value: amount}();";
         let findings = PatternDetector::detect_unchecked_external_calls(source);
         assert!(!findings.is_empty());
+    }
+
+    /// `forge` is a first-class repo toolchain requirement (used throughout
+    /// X3-contracts/evm testing already), but skip rather than hard-fail on a
+    /// dev machine that genuinely doesn't have it, instead of pretending the
+    /// check passed.
+    fn forge_available() -> bool {
+        std::process::Command::new("forge")
+            .arg("--version")
+            .output()
+            .is_ok()
+    }
+
+    #[test]
+    fn test_check_compiler_diagnostics_valid_contract_has_no_critical() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
+        let source = "pragma solidity ^0.8.20;\ncontract Valid {}";
+        let mut auditor = FoundryAuditor::new("valid-contract", source);
+        auditor.check_compiler_diagnostics();
+        assert!(
+            auditor
+                .findings
+                .iter()
+                .all(|f| f.severity != Severity::Critical),
+            "a contract that compiles cleanly must not produce a Critical compiler finding: {:?}",
+            auditor.findings
+        );
+    }
+
+    #[test]
+    fn test_check_compiler_diagnostics_broken_contract_is_critical() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
+        let source = "pragma solidity ^0.8.20;\ncontract Broken {\n    function nope( {\n}";
+        let mut auditor = FoundryAuditor::new("broken-contract", source);
+        auditor.check_compiler_diagnostics();
+        assert!(
+            auditor
+                .findings
+                .iter()
+                .any(|f| f.severity == Severity::Critical
+                    && f.category == FindingCategory::StaticAnalysis),
+            "a contract that fails to compile must produce a Critical static-analysis finding: {:?}",
+            auditor.findings
+        );
+    }
+
+    #[test]
+    fn test_audit_project_refuses_to_pass_a_contract_that_does_not_compile() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
+        let source = "pragma solidity ^0.8.20;\ncontract Broken {\n    function nope( {\n}";
+        let mut auditor = FoundryAuditor::new("broken-contract", source);
+        let report = auditor.audit_project();
+        assert!(!report.passed, "audit report: {report:?}");
+        assert!(report.summary.critical > 0, "audit report: {report:?}");
     }
 }
