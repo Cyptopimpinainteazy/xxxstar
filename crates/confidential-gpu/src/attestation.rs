@@ -34,11 +34,14 @@ impl AttestationManager {
 
     /// Generate an attestation report.
     ///
-    /// In production this would:
-    /// 1. Call NVIDIA CC attestation API
-    /// 2. Generate an enclave-bound keypair
-    /// 3. Include the public key in the attestation report
-    /// 4. Get the report signed by NVIDIA's attestation service
+    /// A real deployment must call the NVIDIA CC / AMD SEV-SNP attestation
+    /// service, bind an enclave keypair to it, and have the report signed by
+    /// the vendor. Until that backend exists this function FAILS CLOSED: it
+    /// never fabricates a report that downstream code could mistake for a
+    /// genuine attestation.
+    ///
+    /// The deterministic report below is only produced when the crate is
+    /// built with the explicit, non-default `simulated-attestation` feature.
     pub fn generate_report(
         &mut self,
         enclave: &super::enclave::EnclaveManager,
@@ -49,30 +52,45 @@ impl AttestationManager {
             ));
         }
 
-        // Generate enclave keypair
-        let public_key = [0x42; 32]; // Deterministic for testing
-        let secret_key = [0x84; 32];
-        self.enclave_keypair = Some(EnclaveKeypair {
-            public_key,
-            secret_key,
-        });
+        #[cfg(not(feature = "simulated-attestation"))]
+        {
+            Err(ConfidentialGpuError::AttestationFailed(
+                "no TEE attestation backend configured: build with a real NVIDIA CC / SEV-SNP \
+                 backend, or enable the test-only 'simulated-attestation' feature"
+                    .into(),
+            ))
+        }
 
-        // Build attestation report
-        let mut report = Vec::new();
-        report.extend_from_slice(b"NVIDIA-CC-ATTESTATION-V1");
-        report.extend_from_slice(&self.gpu_model.as_bytes()[..self.gpu_model.len().min(64)]);
-        report.extend_from_slice(&public_key);
+        #[cfg(feature = "simulated-attestation")]
+        {
+            // Deterministic, non-cryptographic keypair — test/simulation only.
+            let public_key = [0x42; 32];
+            let secret_key = [0x84; 32];
+            self.enclave_keypair = Some(EnclaveKeypair {
+                public_key,
+                secret_key,
+            });
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        report.extend_from_slice(&now.to_le_bytes());
+            // A header that does NOT share the real `NVIDIA-CC-ATTESTATION-V1`
+            // prefix: `verify_report` compares the first 24 bytes exactly, so
+            // this is rejected as an invalid header rather than accepted as a
+            // genuine report — a simulated report must never verify as real.
+            let mut report = Vec::new();
+            report.extend_from_slice(b"X3-SIMULATED-ATTESTATION-TEST-ONLY-V1");
+            report.extend_from_slice(&self.gpu_model.as_bytes()[..self.gpu_model.len().min(64)]);
+            report.extend_from_slice(&public_key);
 
-        self.report = Some(report);
-        self.last_refresh = now;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            report.extend_from_slice(&now.to_le_bytes());
 
-        Ok(())
+            self.report = Some(report);
+            self.last_refresh = now;
+
+            Ok(())
+        }
     }
 
     /// Get the current attestation report.
@@ -123,6 +141,17 @@ impl AttestationManager {
     }
 
     /// Verify an attestation report (static — used by verifiers).
+    ///
+    /// KNOWN GAP (tracked in issue #358): this only checks that `report`
+    /// starts with the literal 24-byte header `NVIDIA-CC-ATTESTATION-V1` —
+    /// there is no cryptographic check of a signature, enclave key, or
+    /// timestamp. Any byte string with that prefix returns `valid: true`.
+    /// It is currently only exercised by this module's own tests (no
+    /// production caller); `pallets/private-execution`'s on-chain
+    /// `verify_attestation` does not call it at all and has its own,
+    /// independent, even more permissive check (`!report.is_empty()`). Do
+    /// not wire either into a real trust decision until #358 lands a real
+    /// signature check here.
     pub fn verify_report(report: &[u8]) -> Result<AttestationInfo, ConfidentialGpuError> {
         if report.len() < 24 {
             return Err(ConfidentialGpuError::AttestationFailed(
@@ -171,7 +200,8 @@ mod tests {
     use crate::enclave::EnclaveManager;
 
     #[test]
-    fn generate_and_verify_report() {
+    #[cfg(feature = "simulated-attestation")]
+    fn generate_report_produces_a_report() {
         let mut enclave = EnclaveManager::new(0, false);
         enclave.initialize().unwrap();
 
@@ -180,12 +210,26 @@ mod tests {
 
         let report = att.current_report().unwrap();
         assert!(!report.is_empty());
+    }
 
-        let info = AttestationManager::verify_report(&report).unwrap();
-        assert!(info.valid);
+    /// A simulated report must never pass as a genuine one: `verify_report`
+    /// is what other code uses to decide whether a report is real, and a
+    /// simulated report accepted there would defeat the fail-closed default.
+    #[test]
+    #[cfg(feature = "simulated-attestation")]
+    fn simulated_report_is_rejected_by_verify_report() {
+        let mut enclave = EnclaveManager::new(0, false);
+        enclave.initialize().unwrap();
+
+        let mut att = AttestationManager::new("NVIDIA H100".into(), 3600);
+        att.generate_report(&enclave).unwrap();
+        let report = att.current_report().unwrap();
+
+        assert!(AttestationManager::verify_report(&report).is_err());
     }
 
     #[test]
+    #[cfg(feature = "simulated-attestation")]
     fn sign_data() {
         let mut enclave = EnclaveManager::new(0, false);
         enclave.initialize().unwrap();
@@ -196,5 +240,18 @@ mod tests {
         let data = b"test data to sign";
         let sig = att.sign_with_enclave_key(data).unwrap();
         assert_ne!(sig, [0u8; 64]);
+    }
+
+    /// Without a real attestation backend the manager must refuse to produce
+    /// a report rather than fabricating one.
+    #[test]
+    #[cfg(not(feature = "simulated-attestation"))]
+    fn generate_report_fails_closed_without_backend() {
+        let mut enclave = EnclaveManager::new(0, false);
+        enclave.initialize().unwrap();
+
+        let mut att = AttestationManager::new("NVIDIA H100".into(), 3600);
+        assert!(att.generate_report(&enclave).is_err());
+        assert!(att.sign_with_enclave_key(b"payload").is_err());
     }
 }

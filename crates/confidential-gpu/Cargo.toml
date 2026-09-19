@@ -11,6 +11,10 @@ repository = "https://github.com/x3-chain/x3-chain"
 default = ["cuda"]
 cuda = []
 sev-snp = []
+# Test/simulation-only deterministic attestation report generation. Without
+# it, `AttestationManager::generate_report` fails closed rather than
+# fabricating a report no real NVIDIA CC / AMD SEV-SNP backend produced.
+simulated-attestation = []
 
 [dependencies]
 # Async runtime

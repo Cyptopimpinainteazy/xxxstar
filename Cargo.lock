@@ -28306,6 +28306,9 @@ dependencies = [
 [[package]]
 name = "x3-validator-attestation"
 version = "0.1.0"
+dependencies = [
+ "ed25519-dalek 2.2.0",
+]
 
 [[package]]
 name = "x3-verification-router"

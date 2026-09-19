@@ -711,20 +711,28 @@ impl RelayerSafetyPipeline {
             return self.raise_dispute(proof_id, proof.slot, reason);
         }
 
-        let mut attestations = AttestationSet::new(proof_id);
+        // `AttestationSet::add_attestation` now verifies each signature against
+        // its `statement_hash`, so this must be the exact message validators
+        // sign — `BLAKE2b-256(slot_le || blockhash)`, not the bare blockhash
+        // (`proof_id`) used for dispute bookkeeping below.
+        let signed_message =
+            x3_verification_router::solana_attestation_message(proof.slot, &proof.blockhash);
+        // KNOWN GAP (tracked in issue #351, same root cause: no governance/
+        // config-sourced SVM validator set is wired into this pipeline yet):
+        // `AttestationSet::new` performs no authorization check, so a
+        // self-generated keypair signs just as validly as a real validator's.
+        // Use `AttestationSet::with_authorized_validators` here once such a
+        // set exists for this relayer.
+        let mut attestations = AttestationSet::new(signed_message);
         for signature in proof.validator_signatures.iter() {
             let attestation = Attestation {
                 // Identity is the validator's public key, not its position in the
                 // vector: keying on the index let a proof repeat one validator's
                 // signature N times and still satisfy an N-of-M quorum.
                 validator: ValidatorId(hex::encode(signature.validator_pubkey)),
-                statement_hash: proof_id,
-                signature: {
-                    let mut combined = Vec::with_capacity(96);
-                    combined.extend_from_slice(&signature.validator_pubkey);
-                    combined.extend_from_slice(&signature.signature);
-                    combined
-                },
+                statement_hash: signed_message,
+                public_key: signature.validator_pubkey,
+                signature: signature.signature.to_vec(),
                 weight: 1,
             };
             if let Err(err) = attestations.add_attestation(attestation) {
@@ -1207,19 +1215,24 @@ mod tests {
     /// Regression: the quorum used to key each attestation on its *position* in
     /// the vector, so one validator's signature repeated N times satisfied an
     /// N-of-M requirement. Identity is now the validator public key, and the
-    /// repeated signer is rejected before it can be counted.
+    /// repeated signer is rejected before it can be counted. Uses a genuinely
+    /// signed attestation (not fake bytes): the *first* copy must pass
+    /// `add_attestation`'s Ed25519 check to reach the store at all — with fake
+    /// bytes it would fail closed there with `SignatureVerificationFailed`,
+    /// and the test would never reach the `DuplicateValidator` case it's
+    /// actually regression-testing.
     #[test]
     fn safety_pipeline_rejects_repeated_svm_signer() {
         let config = test_config();
         let pipeline = RelayerSafetyPipeline::new(&config);
-        let signer = ValidatorSignature {
-            validator_pubkey: [7u8; 32],
-            signature: [8u8; 64],
-        };
+        let key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let slot = 42u64;
+        let blockhash = [8u8; 32];
+        let signer = signed_validator(&key, slot, &blockhash);
         let proof = SvmProof {
             source_domain: 200,
-            slot: 42,
-            blockhash: [8u8; 32],
+            slot,
+            blockhash,
             validator_signatures: vec![signer.clone(), signer],
             required_signatures: 2,
         };
