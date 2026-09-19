@@ -356,7 +356,12 @@ impl FlashFinalityGadget {
         let proposal = match self.build_proposal(&round) {
             Some(proposal) => proposal,
             None => {
-                warn!(
+                // The keystore is currently always unprovisioned (see
+                // `build_proposal`/`sign_with_keystore`), so this fires
+                // every round on every node until it's wired — `debug!`,
+                // not `warn!`, or it floods the log at whatever multiple of
+                // one-per-block this runs at.
+                debug!(
                     "[FlashFinality] round {} has no keystore-backed signature: no proposal emitted \
                      (an unsigned proposal would be dropped by every peer)",
                     round.round
@@ -422,6 +427,22 @@ impl FlashFinalityGadget {
                 return None;
             }
         };
+
+        // `on_new_block` sets `round.block_hash` before it knows whether it
+        // can produce a signed proposal (see `build_proposal`), so a set
+        // `block_hash` alone is not evidence a proposal was ever verified
+        // for this round — only `round.proposal` is. Without this check, a
+        // peer could push enough votes to reach quorum and produce a
+        // finality certificate for a round this node never actually
+        // proposed or accepted a proposal for.
+        if round.proposal.is_none() {
+            warn!(
+                "[FlashFinality] Vote received for round {} with no verified proposal yet; \
+                 rejecting rather than counting it toward quorum",
+                vote.round
+            );
+            return None;
+        }
 
         if vote.block_hash != block_hash {
             warn!(
@@ -746,16 +767,69 @@ mod tests {
         }
     }
 
+    /// A validly-signed `Proposal`, same construction as `make_vote` but for
+    /// the leader side. Tests need this now that `on_vote` requires
+    /// `round.proposal` to be set (see `on_vote`'s check just above the
+    /// `block_hash` mismatch check) — a round without one is a round no
+    /// certificate can be produced for, matching production behaviour where
+    /// votes only exist in response to a proposal peers actually accepted.
+    fn make_proposal(
+        block_hash: BlockHash,
+        block_number: BlockNumber,
+        round: RoundNumber,
+        leader: u8,
+    ) -> Proposal {
+        let mini_secret =
+            schnorrkel::MiniSecretKey::from_bytes(&[leader; 32]).expect("valid test seed");
+        let keypair = mini_secret.expand_to_keypair(schnorrkel::ExpansionMode::Ed25519);
+        let leader_id = keypair.public.to_bytes();
+        let msg_hash = {
+            let mut h = Sha256::new();
+            h.update(block_hash);
+            h.update(round.to_le_bytes());
+            h.update(leader_id);
+            h.finalize()
+        };
+        let sig_array = keypair
+            .sign(schnorrkel::signing_context(b"substrate").bytes(&msg_hash))
+            .to_bytes();
+        Proposal {
+            block_hash,
+            block_number,
+            round,
+            leader_id,
+            leader_sig: sig_array,
+        }
+    }
+
+    /// Advance to a new round via `on_new_block` (which, with no keystore
+    /// wired in tests, never emits its own proposal — see
+    /// `on_new_block_without_a_keystore_emits_no_proposal`) and then
+    /// establish a verified proposal for it via `on_proposal`, the same way
+    /// a real node accepts one from the network. Returns the round number.
+    async fn start_round_with_proposal(
+        gadget: &FlashFinalityGadget,
+        block_hash: BlockHash,
+        block_number: BlockNumber,
+        round: RoundNumber,
+    ) {
+        gadget.on_new_block(block_hash, block_number).await;
+        gadget
+            .on_proposal(make_proposal(block_hash, block_number, round, 0xF0))
+            .await;
+    }
+
     #[tokio::test]
     async fn test_certificate_produced_at_quorum() {
         let gadget = make_gadget(3, 4);
         let block_hash = make_hash(0x01);
 
         // Start round 1. No keystore is wired, so the gadget emits no proposal
-        // (`on_new_block` returns `None`); the round still advances, which is
-        // all this test needs to drive votes to quorum.
-        assert!(gadget.on_new_block(block_hash, 1).await.is_none());
+        // of its own (`on_new_block` returns `None`); establish one the way
+        // a real node would after receiving it from the network, which is
+        // what `on_vote` now requires before it will count anything.
         let round = 1;
+        start_round_with_proposal(&gadget, block_hash, 1, round).await;
 
         // Submit 2 votes — no quorum yet
         let cert1 = gadget.on_vote(make_vote(block_hash, round, 0xB1)).await;
@@ -827,7 +901,7 @@ mod tests {
         let gadget = make_gadget(2, 3);
         let block_hash = make_hash(0xCC);
 
-        gadget.on_new_block(block_hash, 1).await;
+        start_round_with_proposal(&gadget, block_hash, 1, 1).await;
 
         // Same voter votes twice — should only count once
         let v = make_vote(block_hash, 1, 0xB1);
@@ -858,6 +932,31 @@ mod tests {
         assert!(cert.is_none());
     }
 
+    /// A peer pushing enough votes to reach quorum must not produce a
+    /// certificate for a round this node never accepted a verified proposal
+    /// for. `on_new_block` sets `round.block_hash` before it knows whether a
+    /// proposal can be built, so `block_hash.is_some()` alone used to be
+    /// treated as enough context to count votes — closing that gap is what
+    /// `on_vote`'s `round.proposal.is_none()` check is for.
+    #[tokio::test]
+    async fn test_votes_without_a_proposal_never_reach_quorum() {
+        let gadget = make_gadget(2, 3);
+        let block_hash = make_hash(0x77);
+
+        // Round advances, but no proposal is ever established for it — no
+        // `on_proposal` call, unlike every other quorum test.
+        gadget.on_new_block(block_hash, 1).await;
+
+        let cert1 = gadget.on_vote(make_vote(block_hash, 1, 0xB1)).await;
+        let cert2 = gadget.on_vote(make_vote(block_hash, 1, 0xB2)).await;
+
+        assert!(cert1.is_none(), "no proposal: first vote must be rejected");
+        assert!(
+            cert2.is_none(),
+            "no proposal: quorum-reaching vote must still be rejected"
+        );
+    }
+
     #[tokio::test]
     async fn test_shadow_validation_threshold() {
         let gadget = Arc::new(FlashFinalityGadget::new(
@@ -885,7 +984,7 @@ mod tests {
         let gadget = make_gadget(1, 1); // quorum=1 for easy test
         let block_hash = make_hash(0xEE);
 
-        gadget.on_new_block(block_hash, 42).await;
+        start_round_with_proposal(&gadget, block_hash, 42, 1).await;
         gadget.on_vote(make_vote(block_hash, 1, 0xB1)).await;
 
         let cert = gadget.get_certificate(block_hash).await;
@@ -906,13 +1005,10 @@ mod tests {
         let block_number = 100;
 
         // All validators start the same round. The gadget cannot sign (no
-        // keystore), so it emits no proposal — the round still advances and the
-        // votes below are what this test is about.
-        assert!(gadget
-            .on_new_block(block_hash, block_number)
-            .await
-            .is_none());
+        // keystore), so it emits no proposal of its own — establish one the
+        // way every validator would after receiving it from the network.
         let round = 1;
+        start_round_with_proposal(&gadget, block_hash, block_number, round).await;
 
         // 3 of 4 validators vote (quorum threshold)
         let vote1 = gadget.on_vote(make_vote(block_hash, round, 0x11)).await;
@@ -935,7 +1031,7 @@ mod tests {
         let gadget = make_gadget(3, 4);
         let block_hash = make_hash(0x66);
 
-        gadget.on_new_block(block_hash, 101).await;
+        start_round_with_proposal(&gadget, block_hash, 101, 1).await;
 
         // First 3 votes reach quorum
         gadget.on_vote(make_vote(block_hash, 1, 0x11)).await;
@@ -968,7 +1064,7 @@ mod tests {
             let hash = make_hash(i as u8);
             hashes.push(hash);
 
-            gadget.on_new_block(hash, i).await;
+            start_round_with_proposal(&gadget, hash, i, i).await;
 
             // Get 2 votes to reach quorum
             gadget.on_vote(make_vote(hash, i, 0x11)).await;
