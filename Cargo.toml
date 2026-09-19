@@ -285,6 +285,8 @@ members = [
     "crates/orchestra",
     # Burn-down batch 13 (issue #274).
     "pallets/pallet-x3-control",
+    # Burn-down batch 14 (issue #274).
+    "crates/x3-pq",
 ]
 default-members = ["node"]
 resolver = "2"

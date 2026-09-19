@@ -27914,6 +27914,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-pq"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 39.0.0",
+ "sp-io 44.0.0",
+ "sp-std 14.0.0",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "x3-proof"
 version = "0.1.0"
 dependencies = [
