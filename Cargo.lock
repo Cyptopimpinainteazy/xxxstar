@@ -27585,6 +27585,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-swap-router"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "serde",
+ "sp-core 39.0.0",
+ "sp-std",
+ "tokio",
+]
+
+[[package]]
 name = "x3-turbine"
 version = "0.1.0"
 dependencies = [

@@ -436,7 +436,7 @@ mod tests {
     #[test]
     fn test_random_delay_calculation() {
         let delay = MEVProtector::calculate_random_delay(100, 1000);
-        assert!(delay >= 100 && delay <= 1000);
+        assert!((100..=1000).contains(&delay));
     }
 
     #[test]

@@ -120,6 +120,7 @@ members = [
     "crates/x3-revenue-sharing",
     "crates/x3-rpc",
     "crates/x3-slash",
+    "crates/x3-swap-router",
     "crates/x3-svm",
     "crates/x3-vrf",
     "crates/x3-wallet",

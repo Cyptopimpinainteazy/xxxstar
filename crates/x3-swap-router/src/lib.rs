@@ -1,200 +1,89 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-
 //! # X3 Swap Router
 //!
-//! DEX swap routing with AI-powered optimization using oracle price data.
+//! Cross-VM DEX swap routing: quoting, route optimization, slippage protection,
+//! MEV protection, gas estimation, fee calculation, and atomic execution across
+//! X3VM, EVM, and SVM legs.
 
-use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
-use scale_info::TypeInfo;
-use sp_core::U256;
-use sp_std::vec::Vec;
-// Note: Would integrate with oracle pallet for price data
-
-/// Swap route segment
-#[derive(
-    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-)]
-pub struct RouteSegment {
-    /// Input asset ID
-    pub from_asset: u32,
-    /// Output asset ID
-    pub to_asset: u32,
-    /// Pool ID for the swap
-    pub pool_id: u32,
-    /// Expected output amount
-    pub expected_output: U256,
-}
-
-/// Complete swap route
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
-pub struct SwapRoute {
-    /// Route segments
-    pub segments: Vec<RouteSegment>,
-    /// Total expected output
-    pub total_output: U256,
-    /// Total price impact
-    pub price_impact: U256,
-    /// Route confidence score (0-10000, representing 0.00%-100.00%)
-    pub confidence_score: u16,
-}
-
-/// Swap router interface
-pub trait SwapRouter {
-    /// Find optimal route for a swap
-    fn find_route(
-        from_asset: u32,
-        to_asset: u32,
-        amount_in: U256,
-        max_hops: u8,
-    ) -> Result<SwapRoute, RouterError>;
-
-    /// Execute a swap route
-    fn execute_route(route: &SwapRoute, min_output: U256) -> Result<U256, RouterError>;
-}
-
-/// Router errors
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
-pub enum RouterError {
-    /// No route found
-    NoRouteFound,
-    /// Insufficient liquidity
-    InsufficientLiquidity,
-    /// Price impact too high
-    PriceImpactTooHigh,
-    /// Route execution failed
-    ExecutionFailed,
-    /// Invalid route parameters
-    InvalidParameters,
-}
-
-/// AI-powered route optimizer
-pub struct AiRouteOptimizer;
-
-impl AiRouteOptimizer {
-    /// Optimize route using oracle price data
-    pub fn optimize_route(
-        from_asset: u32,
-        to_asset: u32,
-        amount_in: U256,
-        available_routes: Vec<SwapRoute>,
-    ) -> Result<SwapRoute, RouterError> {
-        if available_routes.is_empty() {
-            return Err(RouterError::NoRouteFound);
-        }
-
-        // Get oracle prices for assets
-        let from_price = Self::get_oracle_price(from_asset);
-        let to_price = Self::get_oracle_price(to_asset);
-
-        // Score routes based on:
-        // 1. Price impact
-        // 2. Oracle price alignment
-        // 3. Route confidence
-        let mut best_route = &available_routes[0];
-        let mut best_score = 0u64;
-
-        for route in &available_routes {
-            let mut score = 0u64;
-
-            // Lower price impact is better
-            let impact_penalty = route.price_impact.low_u64().min(10000);
-            score += 10000 - impact_penalty;
-
-            // Higher confidence is better
-            score += route.confidence_score as u64;
-
-            // Oracle price alignment (simplified)
-            if let (Some(fp), Some(tp)) = (from_price, to_price) {
-                let expected_output = amount_in
-                    .low_u128()
-                    .saturating_mul(tp as u128)
-                    .saturating_div(fp as u128);
-                let actual_output = route.total_output.low_u128();
-
-                if actual_output >= expected_output {
-                    score += 1000; // Bonus for better than oracle price
-                }
-            }
-
-            if score > best_score {
-                best_score = score;
-                best_route = route;
-            }
-        }
-
-        Ok(best_route.clone())
-    }
-
-    fn get_oracle_price(_asset_id: u32) -> Option<u64> {
-        None
-    }
-}
-
-/// Basic swap router implementation
-pub struct BasicSwapRouter;
-
-impl SwapRouter for BasicSwapRouter {
-    fn find_route(
-        from_asset: u32,
-        to_asset: u32,
-        amount_in: U256,
-        _max_hops: u8,
-    ) -> Result<SwapRoute, RouterError> {
-        // Simplified direct route
-        let segment = RouteSegment {
-            from_asset,
-            to_asset,
-            pool_id: 1,
-            expected_output: amount_in, // 1:1 for demo
-        };
-
-        let route = SwapRoute {
-            segments: vec![segment],
-            total_output: amount_in,
-            price_impact: U256::zero(),
-            confidence_score: 9500, // 95.00%
-        };
-
-        Ok(route)
-    }
-
-    fn execute_route(_route: &SwapRoute, _min_output: U256) -> Result<U256, RouterError> {
-        // Simplified execution - would interact with DEX pallets
-        Ok(U256::from(1000))
-    }
-}
+mod atomic_execution;
+mod fee_calculator;
+mod gas_optimization;
+mod mev_protection;
+mod optimization;
+mod quote_engine;
+mod routing;
+mod slippage_control;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests;
 
-    #[test]
-    fn test_basic_router() {
-        let router = BasicSwapRouter;
-        let route = BasicSwapRouter::find_route(0, 1, U256::from(1000), 2).unwrap();
-        let _ = router;
-        assert_eq!(route.segments.len(), 1);
-        assert_eq!(route.total_output, U256::from(1000));
-    }
+pub use atomic_execution::{AtomicSwapExecutor, ExecutionResult, ExecutionStatus, SwapBundle};
+pub use fee_calculator::{FeeCalculator, FeeStructure, ProtocolFees};
+pub use gas_optimization::{ChainGasParams, GasEstimate, GasOptimizer};
+pub use mev_protection::{
+    Hop, MEVProtectionConfig, MEVProtectionError, MEVProtector, ProtectedRoute, ProtectionMetrics,
+    ProtectionStrategy, SandwichAttack, SandwichProtection,
+};
+pub use optimization::{OptimizationParams, RouteOptimizer, RouteScore};
+pub use quote_engine::{PriceOracle, PriceSource, QuoteEngine, QuoteResult};
+pub use routing::{HopInfo, RouteConstraints, RouteFinder, SwapRoute};
+pub use slippage_control::{
+    ProtectionLevel, SlippageConfig, SlippageController, SlippageProtectedParams,
+};
 
-    #[test]
-    fn test_ai_optimizer() {
-        let routes = vec![
-            SwapRoute {
-                segments: vec![],
-                total_output: U256::from(950),
-                price_impact: U256::from(50),
-                confidence_score: 9000,
-            },
-            SwapRoute {
-                segments: vec![],
-                total_output: U256::from(980),
-                price_impact: U256::from(20),
-                confidence_score: 9500,
-            },
-        ];
+use sp_core::{H160, U256};
 
-        let optimized = AiRouteOptimizer::optimize_route(0, 1, U256::from(1000), routes).unwrap();
-        assert_eq!(optimized.total_output, U256::from(980)); // Should pick the better route
+/// Which virtual machine a chain in a swap leg belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum VmType {
+    /// VM not identified from the chain ID.
+    Unknown,
+    /// X3 native VM.
+    X3Vm,
+    /// EVM-compatible chain.
+    Evm,
+    /// SVM-compatible chain.
+    Svm,
+}
+
+/// Parameters describing a requested swap, possibly crossing VMs and chains.
+#[derive(Debug, Clone)]
+pub struct SwapParams {
+    pub token_in: H160,
+    pub token_out: H160,
+    pub amount_in: U256,
+    pub min_amount_out: U256,
+    pub chain_in: u64,
+    pub chain_out: u64,
+    pub deadline: u64,
+    pub recipient: H160,
+    pub slippage_tolerance_bps: u16,
+    pub gas_price_limit: Option<U256>,
+    pub source_vm: VmType,
+    pub destination_vm: VmType,
+}
+
+/// Errors produced by the swap router pipeline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SwapRouterError {
+    /// No route satisfied the requested parameters.
+    RouteNotFound,
+    /// Slippage tolerance was zero or otherwise unacceptable.
+    HighSlippage,
+    /// Route or params failed validation.
+    InvalidParameters,
+    /// Route execution failed.
+    ExecutionFailed,
+}
+
+impl core::fmt::Display for SwapRouterError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            SwapRouterError::RouteNotFound => write!(f, "no route found"),
+            SwapRouterError::HighSlippage => write!(f, "slippage tolerance too high or unset"),
+            SwapRouterError::InvalidParameters => write!(f, "invalid swap parameters"),
+            SwapRouterError::ExecutionFailed => write!(f, "route execution failed"),
+        }
     }
 }
+
+impl std::error::Error for SwapRouterError {}
