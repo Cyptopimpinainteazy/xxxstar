@@ -7,7 +7,7 @@ description = "X3 Cross-Chain Intent System — user-facing intent language, com
 
 [features]
 default = ["std"]
-std = ["serde/std", "hex/alloc", "sha2/std"]
+std = ["serde/std", "hex/alloc", "sha2/std", "x3-verification-router/std"]
 
 [dependencies]
 serde = { version = "1.0", default-features = false, features = ["derive"] }
@@ -21,7 +21,14 @@ ed25519-dalek = { version = "2.1", default-features = false, features = ["alloc"
 # own bytes and called the result a trie root — a proof of nothing, checked against
 # nothing (TICKET-065). One verifier, in `x3-verification-router`, is the one the
 # relayer is already wired to; this crate delegates rather than re-derives it.
-x3-verification-router = { path = "../x3-verification-router" }
+# `default-features = false` is load-bearing: this crate is in the runtime's
+# wasm dependency graph (via `pallet-x3-settlement-engine`), and taking the
+# router's default `std` feature there made the embedded runtime unbuildable:
+#
+#   error[E0463]: can't find crate for `std`
+#     = note: `std` is required by `x3_verification_router` because it does not
+#             declare `#![no_std]`
+x3-verification-router = { path = "../x3-verification-router", default-features = false }
 
 [dev-dependencies]
 serde_json = "1.0"
