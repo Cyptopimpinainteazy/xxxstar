@@ -4,6 +4,7 @@
 //! Chain ID: 56
 
 use crate::adapter::*;
+use crate::error::ExternalChainError;
 use crate::ChainType;
 use sp_core::{H160, H256, U256};
 use sp_std::vec::Vec;
@@ -104,8 +105,13 @@ impl BnbAdapter {
     /// Get validator set from system contract
     #[allow(dead_code)]
     async fn get_validators(&self) -> AdapterResult<Vec<H160>> {
-        // BNB uses PoSA with 21 validators
-        Ok(vec![])
+        // Refused: this returned an empty validator set, which reads as "BSC
+        // has no validators". The real set is stored in the system contract at
+        // 0x...1000 and needs that contract's storage layout.
+        Err(ExternalChainError::adapter_unimplemented(
+            "bnb: the PoSA validator set lives in the system contract; this adapter cannot read \
+             it and refuses rather than reporting an empty set",
+        ))
     }
 }
 
@@ -120,73 +126,86 @@ impl ChainAdapter for BnbAdapter {
     }
 
     async fn is_connected(&self) -> bool {
-        true
+        // Real `eth_chainId` probe: the endpoint must answer *as this chain*.
+        matches!(
+            crate::evm_rpc::chain_id(&crate::evm_rpc::url(&self.config)).await,
+            Ok(id) if id == self.config.chain_type
+        )
     }
 
     async fn get_block_number(&self) -> AdapterResult<u64> {
-        Ok(45_000_000) // BSC block number
+        crate::evm_rpc::block_number(&crate::evm_rpc::url(&self.config)).await
     }
 
-    async fn get_balance(&self, _address: H160) -> AdapterResult<U256> {
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_balance(&self, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::balance(&crate::evm_rpc::url(&self.config), address).await
     }
 
-    async fn get_token_balance(&self, _token: H160, _address: H160) -> AdapterResult<U256> {
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_token_balance(&self, token: H160, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::token_balance(&crate::evm_rpc::url(&self.config), token, address).await
     }
 
-    async fn send_message(&self, message: ChainMessage) -> AdapterResult<H256> {
-        // Uses CrossChain contract for inter-chain messaging
-        Ok(message.hash())
+    async fn send_message(&self, _message: ChainMessage) -> AdapterResult<H256> {
+        // Refused, not invented: this returned `message.hash()` for a message
+        // that was never broadcast through the CrossChain contract.
+        Err(ExternalChainError::adapter_unimplemented(
+            "bnb: send_message needs a signed CrossChain contract transaction and this adapter \
+             has no signer",
+        ))
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        // Query CrossChainPackage events
-        Ok(vec![])
+        // Refused: an empty list reads as "no CrossChainPackage events".
+        Err(ExternalChainError::adapter_unimplemented(
+            "bnb: receive_messages cannot decode CrossChainPackage events yet",
+        ))
     }
 
-    async fn initiate_transfer(&self, transfer: CrossChainTransfer) -> AdapterResult<H256> {
-        // Use TokenHub for BEP2<->BEP20 transfers
-        Ok(transfer.id)
+    async fn initiate_transfer(&self, _transfer: CrossChainTransfer) -> AdapterResult<H256> {
+        // Refused: this returned `transfer.id` for a transfer never sent.
+        Err(ExternalChainError::adapter_unimplemented(
+            "bnb: initiate_transfer needs a signed TokenHub transaction and this adapter has no \
+             signer",
+        ))
     }
 
     async fn check_transfer_status(&self, _transfer_id: H256) -> AdapterResult<TransferStatus> {
-        // BSC has 3-second blocks, ~15 confirmations for safety
-        Ok(TransferStatus::Completed)
+        // Refused: this answered `Completed` for every transfer id.
+        Err(ExternalChainError::adapter_unimplemented(
+            "bnb: check_transfer_status needs the destination CrossChain state; nothing here can \
+             tell a relayed message from an unrelayed one",
+        ))
     }
 
     async fn verify_message_proof(
         &self,
         _message: &ChainMessage,
-        proof: &[u8],
+        _proof: &[u8],
     ) -> AdapterResult<bool> {
-        // BSC uses validator signatures for cross-chain proofs
-        Ok(!proof.is_empty())
+        // Refused, not shape-checked: a BSC cross-chain proof is a validator
+        // signature set, and `!proof.is_empty()` accepts any byte string.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
-    async fn finalize_transfer(&self, transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
-        // Handled by relayer infrastructure
-        Ok(transfer_id)
+    async fn finalize_transfer(&self, _transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
+        // Refused: "handled by relayer infrastructure" was not this adapter
+        // doing anything, yet it returned the id as though it had.
+        Err(ExternalChainError::adapter_unimplemented(
+            "bnb: finalize_transfer needs a signed destination transaction and a proof this \
+             adapter cannot verify",
+        ))
     }
 
     async fn estimate_gas_price(&self) -> AdapterResult<U256> {
-        // BSC has low gas prices
-        Ok(U256::from(3_000_000_000u64)) // 3 gwei
+        crate::evm_rpc::gas_price(&crate::evm_rpc::url(&self.config)).await
     }
 
     async fn get_transaction_receipt(
         &self,
         tx_hash: H256,
     ) -> AdapterResult<Option<TransactionReceipt>> {
-        Ok(Some(TransactionReceipt {
-            tx_hash,
-            block_number: 45_000_000,
-            block_hash: H256::zero(),
-            tx_index: 0,
-            success: true,
-            gas_used: 21_000,
-            logs: vec![],
-        }))
+        // Refused: this reported `success: true` for every transaction hash.
+        crate::evm_rpc::receipt(&crate::evm_rpc::url(&self.config), tx_hash).await
     }
 }
 

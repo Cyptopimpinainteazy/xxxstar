@@ -119,65 +119,10 @@ impl ArbitrumAdapter {
             hex::encode(call_data)
         );
 
-        let response = self.rpc_call("eth_call", &params).await?;
-        let result = Self::extract_result(&response)?;
-        Self::parse_hex_u64(&result)
-    }
-
-    fn rpc_url(&self) -> String {
-        String::from_utf8_lossy(&self.config.rpc_url).to_string()
-    }
-
-    fn build_rpc_request(method: &str, params: &str) -> Vec<u8> {
-        format!(
-            r#"{{"jsonrpc":"2.0","method":"{}","params":{},"id":1}}"#,
-            method, params
-        )
-        .into_bytes()
-    }
-
-    async fn rpc_call(&self, method: &str, params: &str) -> AdapterResult<Vec<u8>> {
-        let url = self.rpc_url();
-        let body = Self::build_rpc_request(method, params);
-        crate::rpc_http::post_json(&url, &body)
-            .await
-            .map_err(|e| ExternalChainError::rpc_error(&format!("HTTP error: {}", e)))
-    }
-
-    fn extract_result(response: &[u8]) -> AdapterResult<String> {
-        let text = String::from_utf8_lossy(response);
-
-        if text.contains("\"error\"") {
-            return Err(ExternalChainError::rpc_error(&format!(
-                "RPC error: {}",
-                text
-            )));
-        }
-
-        if let Some(idx) = text.find("\"result\"") {
-            let after = &text[idx + 9..];
-            let after = after.trim_start();
-
-            if after.starts_with("null") {
-                return Ok("null".to_string());
-            }
-
-            if after.starts_with('"') {
-                let end = after[1..].find('"').unwrap_or(after.len() - 1);
-                return Ok(after[1..=end].to_string());
-            }
-        }
-
-        Err(ExternalChainError::parse_error(
-            "Could not extract result from RPC response",
-        ))
-    }
-
-    fn parse_hex_u64(hex_str: &str) -> AdapterResult<u64> {
-        let trimmed = hex_str.trim().trim_matches('"');
-        let without_prefix = trimmed.strip_prefix("0x").unwrap_or(trimmed);
-        u64::from_str_radix(without_prefix, 16)
-            .map_err(|e| ExternalChainError::parse_error(&format!("hex parse: {}", e)))
+        let response =
+            crate::evm_rpc::call(&crate::evm_rpc::url(&self.config), "eth_call", &params).await?;
+        let result = crate::evm_rpc::extract_result(&response)?;
+        crate::evm_rpc::parse_hex_u64(&result)
     }
 }
 
@@ -192,73 +137,93 @@ impl ChainAdapter for ArbitrumAdapter {
     }
 
     async fn is_connected(&self) -> bool {
-        true
+        // Real `eth_chainId` probe: the endpoint must answer *as Arbitrum*.
+        matches!(
+            crate::evm_rpc::chain_id(&crate::evm_rpc::url(&self.config)).await,
+            Ok(id) if id == self.config.chain_type
+        )
     }
 
     async fn get_block_number(&self) -> AdapterResult<u64> {
-        Ok(250_000_000) // Arbitrum has high block numbers
+        crate::evm_rpc::block_number(&crate::evm_rpc::url(&self.config)).await
     }
 
-    async fn get_balance(&self, _address: H160) -> AdapterResult<U256> {
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_balance(&self, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::balance(&crate::evm_rpc::url(&self.config), address).await
     }
 
-    async fn get_token_balance(&self, _token: H160, _address: H160) -> AdapterResult<U256> {
-        Ok(U256::from(1_000_000_000_000_000_000u64))
+    async fn get_token_balance(&self, token: H160, address: H160) -> AdapterResult<U256> {
+        crate::evm_rpc::token_balance(&crate::evm_rpc::url(&self.config), token, address).await
     }
 
-    async fn send_message(&self, message: ChainMessage) -> AdapterResult<H256> {
-        // Uses ArbSys.sendTxToL1 for L2->L1 messages
-        Ok(message.hash())
+    async fn send_message(&self, _message: ChainMessage) -> AdapterResult<H256> {
+        // Refused, not invented. This returned `message.hash()` for a message
+        // that was never broadcast over ArbSys.sendTxToL1.
+        Err(ExternalChainError::adapter_unimplemented(
+            "arbitrum: send_message needs a signed ArbSys.sendTxToL1 transaction and this \
+             adapter has no signer",
+        ))
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        // Query L2ToL1Tx events from ArbSys
-        Ok(vec![])
+        // Refused, not answered with an empty list: an empty list reads as
+        // "no pending L2ToL1Tx events" no matter what the chain said.
+        Err(ExternalChainError::adapter_unimplemented(
+            "arbitrum: receive_messages cannot decode L2ToL1Tx events yet; refusing rather than \
+             reporting an empty message queue",
+        ))
     }
 
-    async fn initiate_transfer(&self, transfer: CrossChainTransfer) -> AdapterResult<H256> {
-        // Use Gateway Router for token transfers
-        Ok(transfer.id)
+    async fn initiate_transfer(&self, _transfer: CrossChainTransfer) -> AdapterResult<H256> {
+        // Refused: this returned `transfer.id` for a Gateway Router transfer
+        // that was never sent.
+        Err(ExternalChainError::adapter_unimplemented(
+            "arbitrum: initiate_transfer needs a signed Gateway Router transaction and this \
+             adapter has no signer",
+        ))
     }
 
     async fn check_transfer_status(&self, _transfer_id: H256) -> AdapterResult<TransferStatus> {
-        Ok(TransferStatus::Completed)
+        // Refused: this answered `Completed` for every transfer id, including
+        // ids that do not exist. A relayer acting on that releases funds for a
+        // message that never arrived.
+        Err(ExternalChainError::adapter_unimplemented(
+            "arbitrum: check_transfer_status needs the destination Outbox state; nothing here \
+             can tell a relayed message from an unrelayed one",
+        ))
     }
 
     async fn verify_message_proof(
         &self,
         _message: &ChainMessage,
-        proof: &[u8],
+        _proof: &[u8],
     ) -> AdapterResult<bool> {
-        // Arbitrum uses Nitro's state commitment for proofs
-        // 7 day challenge period for fraud proofs
-        Ok(!proof.is_empty())
+        // Refused, not shape-checked. Arbitrum proofs walk to Nitro's state
+        // commitment through a 7-day challenge period; `!proof.is_empty()` is
+        // not that, and returning `true` for it made any byte string a proof.
+        Err(ExternalChainError::VerificationUnavailable)
     }
 
-    async fn finalize_transfer(&self, transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
-        // After challenge period, execute on L1 Outbox
-        Ok(transfer_id)
+    async fn finalize_transfer(&self, _transfer_id: H256, _proof: Vec<u8>) -> AdapterResult<H256> {
+        // Refused: this returned the transfer id as though the message had been
+        // executed on the L1 Outbox.
+        Err(ExternalChainError::adapter_unimplemented(
+            "arbitrum: finalize_transfer needs a signed L1 Outbox execution and a proof this \
+             adapter cannot verify",
+        ))
     }
 
     async fn estimate_gas_price(&self) -> AdapterResult<U256> {
-        // Arbitrum gas is measured in ArbGas
-        Ok(U256::from(100_000_000)) // 0.1 gwei
+        crate::evm_rpc::gas_price(&crate::evm_rpc::url(&self.config)).await
     }
 
     async fn get_transaction_receipt(
         &self,
         tx_hash: H256,
     ) -> AdapterResult<Option<TransactionReceipt>> {
-        Ok(Some(TransactionReceipt {
-            tx_hash,
-            block_number: 250_000_000,
-            block_hash: H256::zero(),
-            tx_index: 0,
-            success: true,
-            gas_used: 21_000,
-            logs: vec![],
-        }))
+        // Refused: this reported `success: true` for *every* transaction hash,
+        // including hashes that were never mined.
+        crate::evm_rpc::receipt(&crate::evm_rpc::url(&self.config), tx_hash).await
     }
 }
 

@@ -31,6 +31,7 @@ pub mod assets;
 pub mod chains;
 pub mod env_config;
 pub mod error;
+pub(crate) mod evm_rpc;
 pub mod router;
 pub mod rpc;
 pub mod rpc_http;
