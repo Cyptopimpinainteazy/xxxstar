@@ -26,9 +26,22 @@ pub struct SpendProposal {
     pub amount: u128,
     pub reason: String,
     pub status: SpendStatus,
-    pub approvals: u32,
+    /// Which approvers have approved, by identity.
+    ///
+    /// This was a bare counter (`approvals: u32`), and `approve_spend` simply
+    /// incremented it — so **one** authorized approver could call it
+    /// `required_approvals` times and release a spend on their own. The list
+    /// makes a repeat approval impossible and the count derivable.
+    pub approved_by: Vec<String>,
     pub created_block: u64,
     pub executed_block: Option<u64>,
+}
+
+impl SpendProposal {
+    /// Number of distinct approvals recorded.
+    pub fn approval_count(&self) -> u32 {
+        self.approved_by.len() as u32
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,7 +116,7 @@ impl Treasury {
             amount,
             reason,
             status: SpendStatus::Proposed,
-            approvals: 0,
+            approved_by: Vec::new(),
             created_block,
             executed_block: None,
         };
@@ -112,17 +125,31 @@ impl Treasury {
         Ok(spend_id)
     }
 
-    /// Approve a spend (M-of-N consensus)
+    /// Approve a spend (M-of-N consensus).
+    ///
+    /// One approver counts once: an approval from an identity that already
+    /// approved is refused rather than counted again.
     pub fn approve_spend(&mut self, spend_id: u32, approver: String) -> Result<bool, String> {
         if !self.approvers.contains(&approver) {
             return Err("Not an authorized approver".to_string());
         }
 
         if let Some(spend) = self.spends.get_mut(&spend_id) {
-            spend.approvals += 1;
+            if spend.status != SpendStatus::Proposed {
+                return Err(format!(
+                    "Spend {} is {:?} and is no longer open for approval",
+                    spend.id, spend.status
+                ));
+            }
+
+            if spend.approved_by.contains(&approver) {
+                return Err(format!("{approver} has already approved this spend"));
+            }
+
+            spend.approved_by.push(approver);
 
             // Check if threshold reached
-            if spend.approvals >= self.required_approvals {
+            if spend.approval_count() >= self.required_approvals {
                 spend.status = SpendStatus::Approved;
                 return Ok(true);
             }
@@ -134,12 +161,17 @@ impl Treasury {
 
     /// Execute an approved spend
     pub fn execute_spend(&mut self, spend_id: u32, current_block: u64) -> Result<u128, String> {
+        // Read the balance before taking the mutable borrow of `self.spends`:
+        // calling `self.available_balance()` inside the `if let` borrows `self`
+        // twice, which does not compile (this module had never been built).
+        let available = self.available_balance();
+
         if let Some(spend) = self.spends.get_mut(&spend_id) {
             if spend.status != SpendStatus::Approved {
                 return Err("Spend must be approved before execution".to_string());
             }
 
-            if spend.amount > self.available_balance() {
+            if spend.amount > available {
                 return Err("Insufficient funds".to_string());
             }
 
@@ -224,7 +256,7 @@ impl Treasury {
     pub fn get_spending_history(&self, status: Option<SpendStatus>) -> Vec<&SpendProposal> {
         self.spends
             .values()
-            .filter(|s| status.is_none() || s.status == status.unwrap())
+            .filter(|s| status.as_ref().is_none_or(|wanted| &s.status == wanted))
             .collect()
     }
 
@@ -316,9 +348,15 @@ mod tests {
             .propose_spend("alice".to_string(), 1_000, "test".to_string(), 100)
             .unwrap();
 
-        let approved1 = treasury.approve_spend(spend_id, "approver1".to_string()).unwrap();
-        let approved2 = treasury.approve_spend(spend_id, "approver2".to_string()).unwrap();
-        let approved3 = treasury.approve_spend(spend_id, "approver3".to_string()).unwrap();
+        let approved1 = treasury
+            .approve_spend(spend_id, "approver1".to_string())
+            .unwrap();
+        let approved2 = treasury
+            .approve_spend(spend_id, "approver2".to_string())
+            .unwrap();
+        let approved3 = treasury
+            .approve_spend(spend_id, "approver3".to_string())
+            .unwrap();
 
         assert!(!approved1);
         assert!(!approved2);
@@ -329,19 +367,59 @@ mod tests {
     fn test_execute_spend() {
         let mut treasury = Treasury::new(10_000, 2_000, 3);
         treasury.add_approver("approver1".to_string());
+        treasury.add_approver("approver2".to_string());
+        treasury.add_approver("approver3".to_string());
 
         let spend_id = treasury
             .propose_spend("alice".to_string(), 1_000, "test".to_string(), 100)
             .unwrap();
 
-        treasury.approve_spend(spend_id, "approver1".to_string()).ok();
-
-        let spend = treasury.spends.get_mut(&spend_id).unwrap();
-        spend.approvals = 3; // Manually set to approved
+        // Real flow instead of writing the counter directly (the old test set
+        // `spend.approvals = 3`, which is exactly the shape the bug relied on).
+        assert!(!treasury
+            .approve_spend(spend_id, "approver1".to_string())
+            .unwrap());
+        assert!(!treasury
+            .approve_spend(spend_id, "approver2".to_string())
+            .unwrap());
+        assert!(treasury
+            .approve_spend(spend_id, "approver3".to_string())
+            .unwrap());
 
         let executed = treasury.execute_spend(spend_id, 200).unwrap();
         assert_eq!(executed, 1_000);
         assert_eq!(treasury.get_balance(), 9_000);
+    }
+
+    /// One approver must not be able to satisfy an M-of-N threshold alone.
+    #[test]
+    fn one_approver_cannot_reach_the_threshold_alone() {
+        let mut treasury = Treasury::new(10_000, 2_000, 3);
+        treasury.add_approver("solo".to_string());
+
+        let spend_id = treasury
+            .propose_spend("mallory".to_string(), 5_000, "drain".to_string(), 100)
+            .unwrap();
+
+        assert!(!treasury
+            .approve_spend(spend_id, "solo".to_string())
+            .unwrap());
+
+        // Repeating the approval is refused, and the spend stays unapproved.
+        for _ in 0..5 {
+            assert!(treasury
+                .approve_spend(spend_id, "solo".to_string())
+                .is_err());
+        }
+
+        let spend = treasury.spends.get(&spend_id).unwrap();
+        assert_eq!(spend.approval_count(), 1);
+        assert_eq!(spend.status, SpendStatus::Proposed);
+        assert!(
+            treasury.execute_spend(spend_id, 200).is_err(),
+            "an under-approved spend must not execute"
+        );
+        assert_eq!(treasury.get_balance(), 10_000);
     }
 
     #[test]

@@ -171,6 +171,23 @@ pub mod pallet {
     pub type CouncilMembers<T: Config> =
         StorageValue<_, BoundedVec<T::AccountId, ConstU32<50>>, ValueQuery>;
 
+    /// Treasury approvals recorded per spend, per approver.
+    ///
+    /// `TreasurySpend::approvals` is a bare counter, so without this the same
+    /// councillor could call `approve_treasury_spend` repeatedly until the
+    /// majority threshold was met and release the transfer single-handedly
+    /// (mirrors `Votes`, which is what stops double voting on proposals).
+    #[pallet::storage]
+    pub type TreasuryApprovals<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        u32, // Spend ID
+        Blake2_128Concat,
+        T::AccountId, // Approver
+        bool,
+        ValueQuery,
+    >;
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
@@ -246,6 +263,9 @@ pub mod pallet {
 
         /// Councillor not found
         CouncillorNotFound,
+
+        /// This councillor has already approved that treasury spend
+        AlreadyApproved,
 
         /// Invalid metadata length
         InvalidMetadata,
@@ -448,6 +468,16 @@ pub mod pallet {
             ensure!(council.contains(&approver), Error::<T>::CouncillorNotFound);
 
             if let Some(mut spend) = TreasurySpendsque::<T>::get(spend_id) {
+                // One councillor, one approval: the counter used to be
+                // incremented unconditionally, so a single council member could
+                // reach the majority threshold by calling this repeatedly and
+                // trigger the transfer alone.
+                ensure!(
+                    !TreasuryApprovals::<T>::contains_key(spend_id, &approver),
+                    Error::<T>::AlreadyApproved
+                );
+                TreasuryApprovals::<T>::insert(spend_id, &approver, true);
+
                 spend.approvals += 1;
 
                 // M-of-N threshold: need majority (>50% of council)
