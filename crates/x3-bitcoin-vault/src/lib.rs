@@ -392,52 +392,111 @@ impl BtcVault {
     }
 
     pub fn process_deposit(&mut self, index: usize) -> Result<(), BtcVaultError> {
+        // Only the final credit lives here. This function used to walk the whole
+        // state machine on its own: `confirmations += 1` per call (six calls both
+        // mined and confirmed a transaction nobody broadcast), a non-empty
+        // `spv_proof` blob counted as SPV verification, and `approvals + 1` per
+        // call meant three calls stood in for three signer signatures. A caller
+        // could therefore mint a spendable UTXO — and `total_deposited` — for an
+        // arbitrary txid/vout/amount. Each step now has an API that verifies
+        // something real: `record_confirmations`, `verify_deposit_spv`,
+        // `add_signer_approval`.
+        let (txid, vout, amount) = {
+            let deposit = self
+                .pending_deposits
+                .get_mut(index)
+                .ok_or(BtcVaultError::DepositNotFound)?;
+            if deposit.status != BtcDepositStatus::Approved {
+                return Err(BtcVaultError::InvalidStateTransition);
+            }
+            deposit.status = BtcDepositStatus::Completed;
+            (deposit.txid, deposit.vout, deposit.amount)
+        };
+
+        self.total_deposited = self.total_deposited.saturating_add(amount);
+        self.utxos.add(BtcUtxoEntry {
+            txid,
+            vout,
+            amount,
+            script_pubkey: self.config.vault_address_p2wsh.clone(),
+            spendable: true,
+        });
+        Ok(())
+    }
+
+    /// Record the confirmations observed for a pending deposit.
+    ///
+    /// Confirmations are a property of the chain, so the caller states what it
+    /// observed and the count may only move forward. `process_deposit` used to
+    /// increment a counter once per call: any caller could produce the six
+    /// confirmations this vault requires without a transaction existing.
+    pub fn record_confirmations(
+        &mut self,
+        index: usize,
+        observed: u64,
+    ) -> Result<(), BtcVaultError> {
+        let min_confirmations = self.config.min_confirmations;
         let deposit = self
             .pending_deposits
             .get_mut(index)
             .ok_or(BtcVaultError::DepositNotFound)?;
 
-        match &deposit.status {
-            BtcDepositStatus::PendingConfirmations => {
-                deposit.confirmations += 1;
-                if deposit.confirmations >= self.config.min_confirmations {
-                    deposit.status = BtcDepositStatus::PendingSpvVerification;
-                }
-            }
-            BtcDepositStatus::PendingSpvVerification => {
-                if !deposit.spv_proof.is_empty() {
-                    deposit.status = BtcDepositStatus::PendingSignerApproval {
-                        approvals: 0,
-                        threshold: self.config.threshold,
-                    };
-                }
-            }
-            BtcDepositStatus::PendingSignerApproval {
-                approvals,
-                threshold,
-            } => {
-                if approvals + 1 >= *threshold {
-                    deposit.status = BtcDepositStatus::Approved;
-                } else {
-                    deposit.status = BtcDepositStatus::PendingSignerApproval {
-                        approvals: approvals + 1,
-                        threshold: *threshold,
-                    };
-                }
-            }
-            BtcDepositStatus::Approved => {
-                self.total_deposited = self.total_deposited.saturating_add(deposit.amount);
-                self.utxos.add(BtcUtxoEntry {
-                    txid: deposit.txid,
-                    vout: deposit.vout,
-                    amount: deposit.amount,
-                    script_pubkey: self.config.vault_address_p2wsh.clone(),
-                    spendable: true,
-                });
-                deposit.status = BtcDepositStatus::Completed;
-            }
-            _ => return Err(BtcVaultError::InvalidStateTransition),
+        if deposit.status != BtcDepositStatus::PendingConfirmations {
+            return Err(BtcVaultError::InvalidStateTransition);
         }
+        if observed < deposit.confirmations {
+            return Err(BtcVaultError::ConfirmationCountRegression);
+        }
+
+        deposit.confirmations = observed;
+        if observed >= min_confirmations {
+            deposit.status = BtcDepositStatus::PendingSpvVerification;
+        }
+        Ok(())
+    }
+
+    /// Verify that the deposit's transaction is in a proof-of-work chain.
+    ///
+    /// `headers` are the 80-byte block headers ending with the block that
+    /// contains the transaction; the chain is checked for valid proof of work
+    /// and correct linkage (`verify_block_header_chain`) and the deposit's txid
+    /// is checked against that block's merkle root (`verify_merkle_proof`). Only
+    /// then does the deposit move on to signer approval — the previous code
+    /// advanced on `!spv_proof.is_empty()`.
+    pub fn verify_deposit_spv(
+        &mut self,
+        index: usize,
+        headers: &[&[u8]],
+        merkle_proof: &[u8],
+    ) -> Result<(), BtcVaultError> {
+        let txid = {
+            let deposit = self
+                .pending_deposits
+                .get(index)
+                .ok_or(BtcVaultError::DepositNotFound)?;
+            if deposit.status != BtcDepositStatus::PendingSpvVerification {
+                return Err(BtcVaultError::InvalidStateTransition);
+            }
+            deposit.txid
+        };
+
+        verify_block_header_chain(headers).map_err(|_| BtcVaultError::SpvVerificationFailed)?;
+        let tip_raw = *headers.last().ok_or(BtcVaultError::SpvVerificationFailed)?;
+        let tip =
+            BitcoinBlockHeader::parse(tip_raw).map_err(|_| BtcVaultError::SpvVerificationFailed)?;
+        if !verify_merkle_proof(&txid, &tip.merkle_root, merkle_proof) {
+            return Err(BtcVaultError::SpvVerificationFailed);
+        }
+
+        let threshold = self.config.threshold;
+        let deposit = self
+            .pending_deposits
+            .get_mut(index)
+            .ok_or(BtcVaultError::DepositNotFound)?;
+        deposit.status = BtcDepositStatus::PendingSignerApproval {
+            approvals: 0,
+            threshold,
+        };
         Ok(())
     }
 
@@ -600,6 +659,8 @@ pub enum BtcVaultError {
     InvalidSigner,
     DuplicateSignature,
     InvalidApprovalSignature,
+    /// A confirmation count below the one already recorded was reported
+    ConfirmationCountRegression,
 }
 
 impl Display for BtcVaultError {
@@ -623,6 +684,9 @@ impl Display for BtcVaultError {
             BtcVaultError::DuplicateSignature => write!(f, "duplicate signature"),
             BtcVaultError::InvalidApprovalSignature => {
                 write!(f, "signature does not verify for this deposit and signer")
+            }
+            BtcVaultError::ConfirmationCountRegression => {
+                write!(f, "confirmation count went backwards")
             }
         }
     }
@@ -891,7 +955,7 @@ mod tests {
 
     #[test]
     fn test_deposit_flow() {
-        let mut vault = default_vault();
+        let (mut vault, keys) = default_vault_with_keys();
         vault
             .submit_deposit(
                 [1u8; 32],
@@ -904,12 +968,46 @@ mod tests {
             .unwrap();
         assert_eq!(vault.pending_deposits.len(), 1);
 
-        for _ in 0..6 {
-            vault.process_deposit(0).unwrap();
-        }
-        vault.process_deposit(0).unwrap();
-        for _ in 0..3 {
-            vault.process_deposit(0).unwrap();
+        // Confirmations are observed, not invented by calling a function: the
+        // old flow reached "six confirmations" by calling `process_deposit`
+        // six times, which is how a transaction nobody mined became a spendable
+        // UTXO. `process_deposit` can no longer advance a deposit at all.
+        assert_eq!(
+            vault.process_deposit(0),
+            Err(BtcVaultError::InvalidStateTransition)
+        );
+        vault.record_confirmations(0, 3).unwrap();
+        assert_eq!(
+            vault.pending_deposits[0].status,
+            BtcDepositStatus::PendingConfirmations
+        );
+        assert_eq!(
+            vault.record_confirmations(0, 2),
+            Err(BtcVaultError::ConfirmationCountRegression),
+            "a confirmation count may not go backwards"
+        );
+        vault.record_confirmations(0, 6).unwrap();
+        assert_eq!(
+            vault.pending_deposits[0].status,
+            BtcDepositStatus::PendingSpvVerification
+        );
+
+        // SPV needs a real proof-of-work block, not a non-empty blob.
+        assert_eq!(
+            vault.verify_deposit_spv(0, &[[0u8; 80].as_slice()], &[]),
+            Err(BtcVaultError::SpvVerificationFailed)
+        );
+
+        let header = header_containing(vault.pending_deposits[0].txid);
+        vault
+            .verify_deposit_spv(0, &[header.as_slice()], &[])
+            .unwrap();
+        let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
+        let deposit = vault.pending_deposits[0].clone();
+        for (i, key) in keys.iter().take(3).enumerate() {
+            vault
+                .add_signer_approval(0, signer_ids[i], sign_deposit_approval(key, &deposit))
+                .unwrap();
         }
         assert_eq!(vault.pending_deposits[0].status, BtcDepositStatus::Approved);
 
@@ -941,7 +1039,7 @@ mod tests {
 
     #[test]
     fn test_withdrawal_flow() {
-        let mut vault = default_vault();
+        let (mut vault, keys) = default_vault_with_keys();
         vault
             .submit_deposit(
                 [1u8; 32],
@@ -952,10 +1050,8 @@ mod tests {
                 vec![1, 2, 3, 4],
             )
             .unwrap();
-        // 6 confirmations + 1 SPV + 3 approvals + 1 complete = 11
-        for _ in 0..11 {
-            vault.process_deposit(0).unwrap();
-        }
+        drive_deposit_to_approved(&mut vault, &keys);
+        vault.process_deposit(0).unwrap();
         assert_eq!(
             vault.pending_deposits[0].status,
             BtcDepositStatus::Completed
@@ -979,7 +1075,7 @@ mod tests {
 
     #[test]
     fn test_build_psbt() {
-        let mut vault = default_vault();
+        let (mut vault, keys) = default_vault_with_keys();
         vault
             .submit_deposit(
                 [1u8; 32],
@@ -990,9 +1086,10 @@ mod tests {
                 vec![1, 2, 3],
             )
             .unwrap();
-        for _ in 0..11 {
-            vault.process_deposit(0).unwrap();
-        }
+        // Real path: observed confirmations, mined SPV header, signer
+        // signatures, then the credit.
+        drive_deposit_to_approved(&mut vault, &keys);
+        vault.process_deposit(0).unwrap();
 
         let mut recipient = vec![0xAAu8; 22];
         recipient[0] = 0x00;
@@ -1009,6 +1106,57 @@ mod tests {
         raw[72..76].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0x1E]);
         raw[76..80].copy_from_slice(&2561u32.to_le_bytes());
         raw
+    }
+
+    /// A proof-of-work block header whose merkle root is `txid`, so an empty
+    /// merkle proof witnesses that the transaction is in the block. The header
+    /// is *mined* here (the fixture difficulty is low enough that this takes a
+    /// few hundred hashes), because changing the merkle root changes the block
+    /// hash and therefore the proof of work.
+    fn header_containing(txid: [u8; 32]) -> [u8; 80] {
+        for nonce in 0..1_000_000u32 {
+            let mut raw = [0u8; 80];
+            raw[36..68].copy_from_slice(&txid);
+            raw[72..76].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0x1E]);
+            raw[76..80].copy_from_slice(&nonce.to_le_bytes());
+            let ok = BitcoinBlockHeader::parse(&raw)
+                .map(|header| header.verify_pow().is_ok())
+                .unwrap_or(false);
+            if ok {
+                return raw;
+            }
+        }
+        panic!("no proof-of-work header found for this merkle root");
+    }
+
+    /// Take a submitted deposit through the real path: observed confirmations,
+    /// SPV inclusion in a proof-of-work block, and the configured number of
+    /// signer signatures. Leaves it `Approved`.
+    /// Take a submitted deposit to `PendingSignerApproval` using observed
+    /// confirmations and a mined SPV header. No signatures are added.
+    fn drive_deposit_to_signer_approval(vault: &mut BtcVault) {
+        let txid = vault.pending_deposits[0].txid;
+        let header = header_containing(txid);
+        let min_confirmations = vault.config.min_confirmations;
+        vault
+            .record_confirmations(0, min_confirmations)
+            .expect("observed confirmations are accepted");
+        vault
+            .verify_deposit_spv(0, &[header.as_slice()], &[])
+            .expect("mined header + inclusion proof verifies");
+    }
+
+    /// Take a submitted deposit all the way to `Approved`.
+    fn drive_deposit_to_approved(vault: &mut BtcVault, keys: &[k256::ecdsa::SigningKey]) {
+        drive_deposit_to_signer_approval(vault);
+        let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
+        let threshold = vault.config.threshold as usize;
+        for (i, key) in keys.iter().take(threshold).enumerate() {
+            let deposit = vault.pending_deposits[0].clone();
+            vault
+                .add_signer_approval(0, signer_ids[i], sign_deposit_approval(key, &deposit))
+                .expect("signer approval verifies");
+        }
     }
 
     #[test]
@@ -1072,9 +1220,7 @@ mod tests {
                 vec![1, 2, 3],
             )
             .unwrap();
-        for _ in 0..7 {
-            vault.process_deposit(0).unwrap();
-        }
+        drive_deposit_to_signer_approval(&mut vault);
 
         assert_eq!(
             vault.pending_deposits[0].status,
@@ -1120,9 +1266,7 @@ mod tests {
                 vec![1, 2, 3],
             )
             .unwrap();
-        for _ in 0..7 {
-            vault.process_deposit(0).unwrap();
-        }
+        drive_deposit_to_signer_approval(&mut vault);
 
         let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
         let mut wrong_deposit = vault.pending_deposits[0].clone();
@@ -1150,9 +1294,7 @@ mod tests {
                 vec![1, 2, 3],
             )
             .unwrap();
-        for _ in 0..7 {
-            vault.process_deposit(0).unwrap();
-        }
+        drive_deposit_to_signer_approval(&mut vault);
 
         let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
         let deposit = vault.pending_deposits[0].clone();
@@ -1180,9 +1322,7 @@ mod tests {
                 vec![1, 2, 3],
             )
             .unwrap();
-        for _ in 0..7 {
-            vault.process_deposit(0).unwrap();
-        }
+        drive_deposit_to_signer_approval(&mut vault);
 
         let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
         let deposit = vault.pending_deposits[0].clone();
@@ -1214,9 +1354,7 @@ mod tests {
                 vec![1, 2, 3],
             )
             .unwrap();
-        for _ in 0..7 {
-            vault.process_deposit(0).unwrap();
-        }
+        drive_deposit_to_signer_approval(&mut vault);
 
         let mut outsider_scalar = [0u8; 32];
         outsider_scalar[31] = 99;
@@ -1265,32 +1403,29 @@ mod tests {
         assert_eq!(vault.pending_deposits.len(), 1);
         assert_eq!(vault.utxos.total_spendable(), 0);
 
-        // 2. Drive confirmations past the minimum (MIN_BITCOIN_CONFIRMATIONS=6).
-        // Each process_deposit() increments confirmations, so the
-        // transition to PendingSpvVerification happens on the Nth call
-        // when confirmations reaches min_confirmations (i.e. on the 6th).
+        // 2. Confirmations are observed from the chain. One short of the
+        //    minimum leaves the deposit where it is; reaching the minimum
+        //    (MIN_BITCOIN_CONFIRMATIONS=6) moves it to SPV verification.
         let min_conf = MIN_BITCOIN_CONFIRMATIONS;
-        for i in 0..min_conf {
-            vault.process_deposit(0).unwrap();
-            if (i + 1) < min_conf {
-                assert_eq!(
-                    vault.pending_deposits[0].status,
-                    BtcDepositStatus::PendingConfirmations,
-                    "still pending confirmation at step {}",
-                    i + 1
-                );
-            }
-        }
-        // After the loop, status has just transitioned to PendingSpvVerification.
+        vault.record_confirmations(0, min_conf - 1).unwrap();
+        assert_eq!(
+            vault.pending_deposits[0].status,
+            BtcDepositStatus::PendingConfirmations,
+            "one confirmation short is still pending"
+        );
+        vault.record_confirmations(0, min_conf).unwrap();
         assert_eq!(
             vault.pending_deposits[0].status,
             BtcDepositStatus::PendingSpvVerification
         );
 
-        // 3. SPV proof is already attached (non-empty payload submitted
-        //    with the deposit above); next process_deposit moves it into
-        //    the signer-approval state.
-        vault.process_deposit(0).unwrap();
+        // 3. SPV: a mined proof-of-work header carrying this txid's merkle root
+        //    plus an inclusion proof. The old flow treated the non-empty
+        //    `spv_proof` blob submitted above as verification.
+        let header = header_containing(deposit_txid);
+        vault
+            .verify_deposit_spv(0, &[header.as_slice()], &[])
+            .unwrap();
         assert_eq!(
             vault.pending_deposits[0].status,
             BtcDepositStatus::PendingSignerApproval {
@@ -1360,10 +1495,10 @@ mod tests {
     }
 
     /// Test that an off-by-one in the threshold count would actually be
-    /// caught. With threshold=3 we need exactly 3 approvals (not 2, not 4).
-    /// If `process_deposit` ever changes its `approvals + 1 >= threshold`
-    /// check to `< threshold`, this test fails on step 4 (the 2-approval
-    /// state would prematurely become Approved).
+    /// caught. With threshold=3 we need exactly 3 approvals (not 2, not 4):
+    /// two approvals must leave the deposit pending. (It also pins that
+    /// `process_deposit` can no longer add a phantom approval of its own —
+    /// calling it on a pending deposit is now an invalid transition.)
     #[test]
     fn test_threshold_quorum_is_exact_not_off_by_one() {
         let (mut vault, keys) = default_vault_with_keys();
@@ -1377,15 +1512,9 @@ mod tests {
                 vec![1, 2, 3],
             )
             .unwrap();
-        // Drive to PendingSignerApproval. 6 calls → PendingSpvVerification
-        // (call N), 1 more call → PendingSignerApproval {0, 3} (call N+1).
-        // Do NOT call process_deposit again: the PendingSignerApproval
-        // arm auto-increments approvals, which would silently add a
-        // phantom approval and defeat the off-by-one test.
-        for _ in 0..MIN_BITCOIN_CONFIRMATIONS {
-            vault.process_deposit(0).unwrap();
-        }
-        vault.process_deposit(0).unwrap(); // → SignerApproval {0, 3}
+        // Drive to PendingSignerApproval with observed confirmations and a
+        // mined SPV header.
+        drive_deposit_to_signer_approval(&mut vault);
 
         // Two approvals must NOT be enough.
         let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
