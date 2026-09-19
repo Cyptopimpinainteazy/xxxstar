@@ -351,8 +351,19 @@ impl FlashFinalityGadget {
             hex::encode(block_hash)
         );
 
-        // Build proposal (leader = self for now — real impl uses VRF leader election)
-        let proposal = self.build_proposal(&round);
+        // Build proposal (leader = self for now — real impl uses VRF leader election).
+        // Nothing is emitted when this node cannot sign: see `build_proposal`.
+        let proposal = match self.build_proposal(&round) {
+            Some(proposal) => proposal,
+            None => {
+                warn!(
+                    "[FlashFinality] round {} has no keystore-backed signature: no proposal emitted \
+                     (an unsigned proposal would be dropped by every peer)",
+                    round.round
+                );
+                return None;
+            }
+        };
         round.proposal = Some(proposal.clone());
 
         Some(proposal)
@@ -583,7 +594,14 @@ impl FlashFinalityGadget {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    fn build_proposal(&self, round: &RoundState) -> Proposal {
+    /// Build and sign this round's proposal.
+    ///
+    /// Returns `None` when the node cannot sign. The previous version fell back
+    /// to `leader_sig = [0u8; 64]` (`sign_with_keystore(..).unwrap_or([0u8; 64])`),
+    /// a signature-shaped value that nothing — including this crate's own
+    /// `Proposal::verify` — can accept: peers dropped the proposal while this
+    /// node believed it had proposed, and the round advanced on nothing.
+    fn build_proposal(&self, round: &RoundState) -> Option<Proposal> {
         let block_hash = round.block_hash.unwrap_or([0u8; 32]);
         let message = {
             let mut h = Sha256::new();
@@ -595,28 +613,24 @@ impl FlashFinalityGadget {
 
         let message_array: [u8; 32] = message.into();
 
-        let leader_sig = if let Some(_keystore) = &self.keystore {
-            // Try to sign with the keystore if available
-            self.sign_with_keystore(&message_array).unwrap_or([0u8; 64])
-        } else {
-            // Fallback to empty signature if no keystore
-            [0u8; 64]
-        };
+        let leader_sig = self.sign_with_keystore(&message_array)?;
 
-        Proposal {
+        Some(Proposal {
             block_hash,
             block_number: round.block_number,
             round: round.round,
             leader_id: self.my_id,
             leader_sig,
-        }
+        })
     }
 
-    /// Attempt to sign a message using the keystore if available
+    /// Attempt to sign a message using the keystore.
+    ///
+    /// **Not implemented**: the keystore is type-erased (`Box<dyn Any>`) and
+    /// this returns `None` unconditionally, so every caller fails closed. Wiring
+    /// `sp_keystore` in is the remaining work; until then this gadget can
+    /// observe rounds but cannot produce a valid proposal.
     fn sign_with_keystore(&self, _message: &[u8; 32]) -> Option<[u8; 64]> {
-        // This is a placeholder implementation that would integrate with sp_keystore
-        // In production, this would properly extract the keystore and sign the message
-        // For now, we return None to indicate signing is not available
         None
     }
 
@@ -737,18 +751,20 @@ mod tests {
         let gadget = make_gadget(3, 4);
         let block_hash = make_hash(0x01);
 
-        // Start round 1
-        let proposal = gadget.on_new_block(block_hash, 1).await.unwrap();
-        assert_eq!(proposal.round, 1);
+        // Start round 1. No keystore is wired, so the gadget emits no proposal
+        // (`on_new_block` returns `None`); the round still advances, which is
+        // all this test needs to drive votes to quorum.
+        assert!(gadget.on_new_block(block_hash, 1).await.is_none());
+        let round = 1;
 
         // Submit 2 votes — no quorum yet
-        let cert1 = gadget.on_vote(make_vote(block_hash, 1, 0xB1)).await;
-        let cert2 = gadget.on_vote(make_vote(block_hash, 1, 0xB2)).await;
+        let cert1 = gadget.on_vote(make_vote(block_hash, round, 0xB1)).await;
+        let cert2 = gadget.on_vote(make_vote(block_hash, round, 0xB2)).await;
         assert!(cert1.is_none());
         assert!(cert2.is_none());
 
         // Submit 3rd vote — quorum reached
-        let cert3 = gadget.on_vote(make_vote(block_hash, 1, 0xB3)).await;
+        let cert3 = gadget.on_vote(make_vote(block_hash, round, 0xB3)).await;
         assert!(cert3.is_some());
 
         let cert = cert3.unwrap();
@@ -889,21 +905,19 @@ mod tests {
         let block_hash = make_hash(0x55);
         let block_number = 100;
 
-        // All validators start the same round
-        let proposal = gadget.on_new_block(block_hash, block_number).await.unwrap();
-        assert_eq!(proposal.block_hash, block_hash);
-        assert_eq!(proposal.block_number, block_number);
+        // All validators start the same round. The gadget cannot sign (no
+        // keystore), so it emits no proposal — the round still advances and the
+        // votes below are what this test is about.
+        assert!(gadget
+            .on_new_block(block_hash, block_number)
+            .await
+            .is_none());
+        let round = 1;
 
         // 3 of 4 validators vote (quorum threshold)
-        let vote1 = gadget
-            .on_vote(make_vote(block_hash, proposal.round, 0x11))
-            .await;
-        let vote2 = gadget
-            .on_vote(make_vote(block_hash, proposal.round, 0x22))
-            .await;
-        let vote3 = gadget
-            .on_vote(make_vote(block_hash, proposal.round, 0x33))
-            .await;
+        let vote1 = gadget.on_vote(make_vote(block_hash, round, 0x11)).await;
+        let vote2 = gadget.on_vote(make_vote(block_hash, round, 0x22)).await;
+        let vote3 = gadget.on_vote(make_vote(block_hash, round, 0x33)).await;
 
         assert!(vote1.is_none(), "1st vote: no quorum yet");
         assert!(vote2.is_none(), "2nd vote: no quorum yet");
@@ -986,6 +1000,27 @@ mod tests {
         assert!(gadget.config.shadow_mode, "Gadget should be in shadow mode");
         let metrics = gadget.metrics().await;
         assert_eq!(metrics.rounds_completed, 0);
+    }
+
+    /// A node that cannot sign must not put a proposal on the wire. The gadget
+    /// used to emit one with `leader_sig = [0u8; 64]`, which `Proposal::verify`
+    /// rejects — so peers dropped it while this node advanced its round.
+    #[tokio::test]
+    async fn on_new_block_without_a_keystore_emits_no_proposal() {
+        let gadget = FlashFinalityGadget::new(
+            FlashFinalityConfig {
+                shadow_mode: true,
+                ..Default::default()
+            },
+            make_id(0xCC),
+            None,
+        );
+
+        let proposal = gadget.on_new_block(make_hash(9), 9).await;
+        assert!(
+            proposal.is_none(),
+            "no signature means no proposal (was: a zero-signature one)"
+        );
     }
 
     /// Test metrics collection across a realistic voting scenario.

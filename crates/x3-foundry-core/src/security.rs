@@ -68,11 +68,15 @@ impl SecurityAuditor {
         // LOC analyzed
         report.loc_analyzed = contracts.values().map(|s| s.lines().count() as u64).sum();
 
-        // Fuzz score (simulated based on code complexity)
-        report.fuzz_score = self.calculate_fuzz_score(contracts);
-
-        // Test coverage estimate
-        report.test_coverage_pct = self.estimate_coverage(contracts);
+        // Fuzzing and coverage are left unmeasured (`None`). They used to be
+        // fabricated: `run_fuzz_tests` always reported `contracts × 100`
+        // iterations with exactly two failures, `calculate_fuzz_score` derived a
+        // score from the line count, and `estimate_coverage` returned the share
+        // of lines starting with `//` — comment density, reported as coverage.
+        // A report that invents those numbers tells a dApp author their contract
+        // was fuzzed when nothing was executed.
+        report.fuzz_score = None;
+        report.test_coverage_pct = None;
 
         // Generate auditor signature
         let sig_input = format!(
@@ -186,20 +190,6 @@ impl SecurityAuditor {
         };
 
         (score, warnings, critical)
-    }
-
-    /// Runs unit tests (simulated).
-    pub fn run_unit_tests(&self, contracts: &HashMap<String, String>) -> (u32, u32) {
-        let total = contracts.len() as u32 * 5; // 5 tests per contract
-        let passed = if total > 0 { total - 1 } else { 0 }; // Simulate 1 failure
-        (passed, total)
-    }
-
-    /// Runs fuzz tests (simulated).
-    pub fn run_fuzz_tests(&self, contracts: &HashMap<String, String>) -> (u32, u32) {
-        let total = contracts.len() as u32 * 100; // 100 fuzz iterations per contract
-        let passed = if total > 0 { total - 2 } else { 0 }; // Simulate 2 failures
-        (passed, total)
     }
 
     /// Checks fee configuration for sanity.
@@ -404,33 +394,6 @@ impl SecurityAuditor {
         score.min(100)
     }
 
-    /// Calculates fuzz test score based on code complexity.
-    fn calculate_fuzz_score(&self, contracts: &HashMap<String, String>) -> u8 {
-        let total_lines: usize = contracts.values().map(|s| s.lines().count()).sum();
-        if total_lines > 500 {
-            70
-        } else if total_lines > 200 {
-            85
-        } else {
-            95
-        }
-    }
-
-    /// Estimates test coverage.
-    fn estimate_coverage(&self, contracts: &HashMap<String, String>) -> f64 {
-        let total_lines: usize = contracts.values().map(|s| s.lines().count()).sum();
-        if total_lines == 0 {
-            return 0.0;
-        }
-        // Simulate coverage based on code structure
-        let commented: usize = contracts
-            .values()
-            .map(|s| s.lines().filter(|l| l.trim().starts_with("//")).count())
-            .sum();
-        let coverage = (commented as f64 / total_lines as f64) * 100.0;
-        coverage.clamp(10.0, 100.0)
-    }
-
     /// Validates fee configuration and returns warnings.
     pub fn validate_fee_config(&self, config: &RevenueConfig) -> Vec<String> {
         let (warnings, _) = self.check_fee_sanity(config);
@@ -471,5 +434,32 @@ mod tests {
         };
         let (_, findings) = auditor.check_fee_sanity(&config);
         assert!(!findings.is_empty());
+    }
+
+    /// The report must not carry fabricated metrics: no fuzz campaign and no
+    /// coverage measurement runs here, so both fields stay `None` (they used to
+    /// be invented from line count and comment density, and the empty default
+    /// report claimed a perfect fuzz score of 100).
+    #[test]
+    fn report_does_not_invent_fuzz_or_coverage_numbers() {
+        let auditor = SecurityAuditor::new("test".into());
+        let mut contracts = HashMap::new();
+        contracts.insert(
+            "Token.sol".to_string(),
+            "// a comment\ncontract Token {}\n".to_string(),
+        );
+
+        let report = auditor.audit_project(
+            &DAppType::TokenLaunchpad,
+            &contracts,
+            &RevenueConfig::default(),
+            "launch a token",
+        );
+        assert_eq!(report.fuzz_score, None);
+        assert_eq!(report.test_coverage_pct, None);
+
+        let empty = SecurityReport::new("test".into());
+        assert_eq!(empty.fuzz_score, None, "an empty report claims no fuzzing");
+        assert_eq!(empty.test_coverage_pct, None);
     }
 }
