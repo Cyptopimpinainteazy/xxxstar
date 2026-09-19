@@ -26,8 +26,18 @@ REPORT_DIR="$REPO_ROOT/.srtool-reports"
 REPORT_FILE="$REPORT_DIR/srtool-$(date +%Y%m%d-%H%M%S).json"
 LATEST_REPORT="$REPORT_DIR/latest.json"
 
-# srtool Docker image — pin to the Rust toolchain you target
-SRTOOL_IMAGE="${SRTOOL_IMAGE:-paritytech/srtool:1.75.0}"
+# srtool Docker image — pin to the Rust toolchain you target.
+#
+# The image's toolchain builds the runtime, so it must be able to build *this*
+# workspace's dependency graph: `1.75.0` and `1.88.0` both refuse with
+# "rustc 1.88.0 is not supported by the following packages:
+# enum-ordinalize@4.4.2 requires rustc 1.89". 1.93.0 is the published image that
+# matches the srtool CLI this repository installs (`make srtool-install`,
+# srtool 0.18.4) and it reproduces the hashes recorded in
+# docs/reports/runtime-wasm-reproducibility.md. `1.93.0` and `1.93.0-0.18.4`
+# are the same image (digest sha256:8638a668…); the rounded tag is what the
+# hosted production-gate workflow pins.
+SRTOOL_IMAGE="${SRTOOL_IMAGE:-paritytech/srtool:1.93.0-0.18.4}"
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()    { echo -e "${CYAN}[srtool]${NC} $*"; }
@@ -92,12 +102,32 @@ print_report_summary() {
   echo "   srtool BUILD REPORT"
   echo "  ═══════════════════════════════════════════════════════════════"
 
-  # Parse key fields from JSON
+  # Parse key fields from the JSON payload, if the run produced one.
+  #
+  # srtool interleaves progress with its output, and the raw Docker path writes
+  # no JSON at all, so this must not assume the file *is* JSON: it used to do
+  # `json.load` and die with `Expecting value: line 1 column 1` on a build that
+  # had succeeded. Take the last line that parses as an object; if there is
+  # none, print the report — it already contains every hash.
   if command -v python3 &>/dev/null; then
     python3 - "$report" <<'PY'
 import json, sys
-with open(sys.argv[1]) as f:
-    d = json.load(f)
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+
+d = None
+for line in reversed(text.splitlines()):
+    line = line.strip()
+    if not line.startswith("{"):
+        continue
+    try:
+        d = json.loads(line)
+        break
+    except json.JSONDecodeError:
+        continue
+
+if d is None:
+    print(text)
+    raise SystemExit(0)
 
 # srtool JSON schema has top-level keys: runtimes, context, etc.
 runtimes = d.get("runtimes", {})
@@ -128,6 +158,21 @@ cmd_build() {
   check_docker
   mkdir -p "$REPORT_DIR"
 
+  cd "$REPO_ROOT"
+
+  # The image builds as `uid=1001(builder)` while the checkout is owned by the
+  # invoking user, so cargo cannot create its target directory inside the
+  # mount:
+  #
+  #   error: failed to create directory `/build/runtime/target`
+  #   Caused by: Permission denied (os error 13)
+  #
+  # Create it and open it to the container's user. Nothing else in the checkout
+  # needs to be writable, and the artifacts srtool leaves there are disposable
+  # (the hashes are in the report written below).
+  mkdir -p "$RUNTIME_DIR/target"
+  chmod o+rwx "$RUNTIME_DIR/target"
+
   local mode
   mode=$(check_srtool)
 
@@ -138,10 +183,10 @@ cmd_build() {
     info "(first run: Docker pull ~2 GB; subsequent runs use cache)"
     echo ""
 
-    cd "$REPO_ROOT"
     srtool build \
       --app \
       --json \
+      --image "$SRTOOL_IMAGE" \
       -p "$PACKAGE" \
       --runtime-dir "$RUNTIME_DIR" \
       2>&1 | tee "$REPORT_FILE"
@@ -152,7 +197,6 @@ cmd_build() {
     info "Image: $SRTOOL_IMAGE"
     echo ""
 
-    cd "$REPO_ROOT"
     docker run \
       --rm \
       -e PACKAGE="$PACKAGE" \

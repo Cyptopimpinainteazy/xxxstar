@@ -251,7 +251,7 @@ run_test "srtool: Docker daemon running" \
     "docker info"
 
 run_test "srtool: Docker image pulled or pullable" \
-    "docker image inspect paritytech/srtool:1.75.0 2>/dev/null || docker manifest inspect paritytech/srtool:1.75.0 2>/dev/null"
+    "docker image inspect paritytech/srtool:1.93.0-0.18.4 2>/dev/null || docker manifest inspect paritytech/srtool:1.93.0-0.18.4 2>/dev/null"
 
 run_test "Benchmarking: benchmarking.rs exists for all 4 pallets" \
     "test -f pallets/x3-atomic-kernel/src/benchmarking.rs && \
