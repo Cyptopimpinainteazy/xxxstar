@@ -74,31 +74,55 @@ reschedule, runtime-signer intent-id resolution, the blst patch removal, the
 CI workflow) already exists on master via convergent implementation; master
 just organized the transport export differently
 (`x3vm_native::NativeX3NodeTransport` vs. this branch's `x3vm_node` exports).
-Real count is now 26. Running tally this session: 3 of 4 "flagged as real"
-entries checked turned out superseded (private-mempool, compile-break, this
-one) against 1 genuine find (`feat/x3vm-durable-recovery-20260911`, landed as
-#303) — the census's automated signals (git cherry, conflict-file counts)
-are proving to be a weak prior for this repo specifically, probably because
-so much of this queue is itself the product of many parallel agents
-independently reimplementing the same fixes. Direct-file-check before
-merging, not just before trusting "real," is the load-bearing step.
+Real count is now 26.
+
+**Update 3:** `pr-181-check`, `fix/svm-htlc-native-custody`,
+`your-task-branch`, and `t5/fix-annotations-20260522-1458` all checked and
+confirmed superseded/archival too (see their rows). Notably
+`fix/svm-htlc-native-custody`'s 34 commits looked substantial, but only one
+(`854445e75`, "svm: enforce native HTLC custody") was actually about custody
+— the rest was unrelated staleness drift — and even that one commit's
+functions are already on master, which has *more* than this branch does
+(`derive_htlc_pda`, `broadcast_claim_htlc`, PDA validation tests): master is
+a strict superset, so there is nothing to salvage. This **reverses the
+"salvage the custody commits" recommendation** in both this row and step 4
+of Safe merge order below — don't.
+
+**Running tally:** 5 of 6 "flagged as real" queue entries checked this
+session were fully superseded (private-mempool, compile-break,
+live-transport-fix, pr-181-check, svm-htlc-custody); 1 was genuine
+(`feat/x3vm-durable-recovery-20260911`, landed as #303). The census's
+automated signals (git cherry, conflict-file counts) are a weak prior for
+this repo specifically — most of this queue is the product of many parallel
+agent sessions independently reimplementing the same fixes over the past
+week, so a branch "looking unlanded" by patch/conflict signals mostly means
+*nobody rebased it*, not that its content is missing from master. Given the
+1-in-6 hit rate, grinding through the remaining ~20 entries one-by-one has
+real diminishing returns — recommend checking the rest **opportunistically**
+(when someone's already looking at that area of the code) rather than as a
+dedicated pass, and continuing to require a direct-file-check (not just
+trusting this doc's "real" label) before merging any of them. Do **not**
+bulk-delete the unverified remainder on the strength of this pattern alone —
+a 1-in-6 real rate among ~20 branches is still plausibly 2-4 more genuine
+finds sitting in there.
 
 | Branch | pending | conflict files | disposition |
 | --- | --- | --- | --- |
 | `agents/setup-instructions-request` | 1 | — (clean) | landed in batch 6 |
 | `fix/svm-htlc-native-custody-master` | 2 | `.github/workflows/x3vm-svm-live-lifecycle.yml` | landed in batch 6, workflow hunk resolved in master's favour |
 | `test/cross-domain-recovery-matrix-20260911` | 10 | `.github/workflows/mainnet-readiness.yml` | landed in batch 6, workflow hunk resolved in master's favour |
-| `fix/svm-htlc-native-custody` | 33 | 169 files | same work as the `-master` branch plus a much older base; salvage the SVM custody commits onto master rather than merging |
+| `fix/svm-htlc-native-custody` | 33 | 169 files | archival — verified 2026-09-18: of 34 commits, only `854445e75` ("svm: enforce native HTLC custody") is on-topic, the rest is staleness drift; that commit's functions are already on master, which has strictly more (derive_htlc_pda, broadcast_claim_htlc, PDA validation tests). Nothing to salvage, do not merge |
 | `fix/production-gate-prerequisites` | 32 | 163 files | predates the local-CI-of-record work; most of it is superseded — diff the 33 commits against `scripts/local-ci.sh` before merging |
 | `wip/prompts-to-skills-20260918`, `wip/consolidation-20260917/pasted-text-processing`, `agents/pasted-text-processing`, `pr132-work` | 33–34 each | 86–90 files | one work item mirrored on four branches — pick the newest, rebase, land once |
 | `ci/master-lineage-gates-20260908` | 31 | 47 files | superseded by the local CI of record |
 | `docs/grant-readiness-truth-20260908` | 31 | no merge base | archival; lift the document if it is still wanted |
 | `wip/consolidation-20260917/recovered-usb-clone` | 149 | no merge base | salvage review only |
 | `archive/pr126-pre-master-rewrite-20260909` | 66 | no merge base | archival |
-| `your-task-branch` (14), `t5/fix-annotations-20260522-1458` (13), `pr-181-check` (12) | 12–14 | real | May/September snapshots; triage individually |
+| `your-task-branch` (14), `t5/fix-annotations-20260522-1458` (13) | 13–14 | real | verified 2026-09-18: genuinely unrelated history (confirmed not a shallow-clone false negative first) — matches the archival bucket despite `git cherry` reporting pending commits; archival, do not merge |
+| `pr-181-check` (12) | 12 | real | verified 2026-09-18: its CI concurrency/cancel-stale-runs fix is already on master, and the receipt files it deletes are already absent from master's tree — archival, do not merge |
 | `fix/master-trading-core-compile-break` | 4 | 20 files | archival — verified 2026-09-18: every function/struct/test this branch adds (including exact test names) already exists on master verbatim, landed independently via #133/#212/#216/#223. The `git cherry`/`conflict-files` signals alone made this look like real unlanded work; a direct file check (not a triple-dot diff against the branch's own stale base) showed 100% overlap. Same pattern as `fix/private-mempool-real-shamir-threshold` (PR #288) above — do not merge, it would revert to an older tree shape |
 | `finish/x3vm-live-transport-fix` | 4 | 16 files | archival — verified 2026-09-18: finality range-scan fix, settlement-engine auto-refund reschedule, runtime-signer intent-id resolution, blst patch removal, and the CI workflow all already on master via convergent implementation; master just organized the transport export differently. Do not merge |
-| `feat/x3vm-durable-recovery-20260911` | 4 | 2 files | newer versions of the same files landed — verify before merging |
+| `feat/x3vm-durable-recovery-20260911` | 4 | 2 files | landed as #303 (salvaged, not merged — master's `from_recovery_snapshot` had gained an `expected_simulation` parameter since this branch's base, so the two new functions were manually ported rather than merged) |
 | `feat/secret-release-firewall-20260911` | 3 | `crates/x3-atomic-swap/src/secret_release.rs` | superseded by `feat/live-secret-release-firewall-20260911` (in master) |
 | `feat/canonical-cross-domain-proof-bundle-20260911-pre-rebase-20260917` | 3 | `crates/x3-atomic-swap/{lib,proof_bundle}.rs` | pre-rebase copy; the rebased branch is in master |
 | `feat/idempotent-cross-domain-coordinator-20260911-pre-rebase-20260917` | 1 | 2 files | same |
@@ -125,11 +149,17 @@ a merge.
 2. ~~`fix/master-trading-core-compile-break`~~ — verified archival, not real
    unlanded work (see Queue table). Delete rather than merge.
 3. The `pasted-text-processing` family — pick one branch, rebase, land.
-4. `fix/svm-htlc-native-custody` — salvage the custody commits (its `-master`
-   sibling already carries the same work with a newer base).
+4. ~~`fix/svm-htlc-native-custody`~~ — verified archival; master is already a
+   strict superset of its one on-topic commit (see Queue table). Delete
+   rather than merge.
 5. `fix/production-gate-prerequisites` — after diffing against the CI of record.
 6. Dependency heads, one `cargo update` batch at a time.
 7. Everything else: archival or superseded → delete the branch, do not merge.
+   As of 2026-09-18 this includes `fix/master-trading-core-compile-break`,
+   `finish/x3vm-live-transport-fix`, `fix/svm-htlc-native-custody`,
+   `pr-181-check`, `your-task-branch`, and
+   `t5/fix-annotations-20260522-1458` — verified archival this session, see
+   the Queue table above for why each one.
 
 ## Post-merge validation
 
