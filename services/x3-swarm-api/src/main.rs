@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use x3_swarm_core::{
-    append_memory_entry_file, AgentKind, AgentTask, ApprovalRequirement, SwarmMemoryEntry, TaskStatus,
+    AgentKind, AgentTask, ApprovalRequirement, RiskLevel, SwarmMemoryEntry, TaskStatus,
 };
 
 const MAX_MEMORY: usize = 1_000;
@@ -123,7 +123,7 @@ fn default_tasks() -> Vec<AgentTask> {
             required_commands: vec![],
             approval_required: ApprovalRequirement::HumanReview,
             status: TaskStatus::Pending,
-            risk: "high".to_string(),
+            risk: RiskLevel::High,
         },
         AgentTask {
             id: "x3-task-0002".to_string(),
@@ -136,7 +136,7 @@ fn default_tasks() -> Vec<AgentTask> {
             required_commands: vec![],
             approval_required: ApprovalRequirement::HumanReview,
             status: TaskStatus::Pending,
-            risk: "medium".to_string(),
+            risk: RiskLevel::Medium,
         },
     ]
 }
@@ -204,14 +204,52 @@ struct NewTaskRequest {
     risk: String,
 }
 
+/// `AgentTask::risk` is a `RiskLevel`, and an unknown value is a client error
+/// rather than something to guess at.
+fn parse_risk(raw: &str) -> Result<RiskLevel, (StatusCode, String)> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "low" => Ok(RiskLevel::Low),
+        "medium" => Ok(RiskLevel::Medium),
+        "high" => Ok(RiskLevel::High),
+        "critical" => Ok(RiskLevel::Critical),
+        other => Err((
+            StatusCode::BAD_REQUEST,
+            format!("unknown risk level {other:?}; expected low|medium|high|critical"),
+        )),
+    }
+}
+
+/// Append one JSON line to an agent-memory file.
+///
+/// `x3_swarm_core` used to export `append_memory_entry_file`; it no longer does
+/// (the crate keeps only the in-memory helpers), so this service writes the
+/// line itself: append-only, one JSON object per line, creating the directory on
+/// first write.
+fn append_memory_entry_file(path: &str, entry: &SwarmMemoryEntry) -> std::io::Result<()> {
+    use std::io::Write;
+
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let line = serde_json::to_string(entry)
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?;
+    writeln!(file, "{line}")
+}
+
 async fn create_task(
     State(state): State<SharedState>,
     Json(req): Json<NewTaskRequest>,
-) -> (StatusCode, Json<AgentTask>) {
+) -> Result<(StatusCode, Json<AgentTask>), (StatusCode, String)> {
     let mut state = state.lock().await;
     let task_id = format!("x3-task-{:04}", state.task_seq);
     state.task_seq += 1;
 
+    // Reject an unknown risk before any state is touched.
+    let risk = parse_risk(&req.risk)?;
     let task = AgentTask {
         id: task_id,
         title: req.title,
@@ -223,12 +261,12 @@ async fn create_task(
         required_commands: req.required_commands,
         approval_required: req.approval_required,
         status: TaskStatus::Pending,
-        risk: req.risk,
+        risk,
     };
 
     emit_event(&mut state, "task_created", format!("{} created", task.id));
     state.tasks.insert(task.id.clone(), task.clone());
-    (StatusCode::CREATED, Json(task))
+    Ok((StatusCode::CREATED, Json(task)))
 }
 
 async fn get_task(
@@ -378,14 +416,17 @@ async fn kill_switch(
 ) -> Json<serde_json::Value> {
     let mut state = state.lock().await;
     state.kill_switch = req.enabled;
+    // Build the message before taking the mutable borrow for `emit_event`:
+    // reading `state.kill_switch` inside the call is what made this a
+    // borrow-check error.
+    let enabled = state.kill_switch;
+    let reason = req
+        .reason
+        .unwrap_or_else(|| "no reason provided".to_string());
     emit_event(
         &mut state,
         "kill_switch",
-        format!(
-            "kill switch set to {} ({})",
-            state.kill_switch,
-            req.reason.unwrap_or_else(|| "no reason provided".to_string())
-        ),
+        format!("kill switch set to {enabled} ({reason})"),
     );
     Json(json!({ "kill_switch": state.kill_switch }))
 }
