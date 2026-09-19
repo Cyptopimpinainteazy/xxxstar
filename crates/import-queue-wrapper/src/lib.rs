@@ -93,7 +93,13 @@ pub struct ImportQueueWrapper {
     config: QueueConfig,
     queue: Arc<Mutex<VecDeque<QueueEntry>>>,
     priority_queue: Arc<Mutex<HashMap<u8, VecDeque<QueueEntry>>>>,
-    verification_service: Arc<Mutex<GPUSignatureVerifier>>,
+    // No outer Mutex: GPUSignatureVerifier's methods all take `&self` and the
+    // type is already internally synchronized (its own Arc<Mutex<..>>
+    // fields), so wrapping it in another Mutex here only serialized workers
+    // against each other for no correctness benefit — every worker held this
+    // lock for the full `verify_signature(..).await`, so `parallel_workers`
+    // could never actually verify in parallel.
+    verification_service: Arc<GPUSignatureVerifier>,
     stats: Arc<Mutex<QueueStats>>,
     worker_handles: Vec<tokio::task::JoinHandle<()>>,
 }
@@ -105,7 +111,7 @@ impl ImportQueueWrapper {
             config,
             queue: Arc::new(Mutex::new(VecDeque::new())),
             priority_queue: Arc::new(Mutex::new(HashMap::new())),
-            verification_service: Arc::new(Mutex::new(verifier)),
+            verification_service: Arc::new(verifier),
             stats: Arc::new(Mutex::new(QueueStats::new())),
             worker_handles: Vec::new(),
         }
@@ -237,8 +243,16 @@ impl ImportQueueWrapper {
 
     /// Update queue statistics
     async fn update_stats(&self) {
+        // Acquire queue/priority_queue (inside get_queue_size) *before*
+        // stats, matching cleanup_queues' order (queue -> priority_queue ->
+        // stats). Locking stats first here would invert that order: with
+        // cleanup_queues now actually running (see `start`), a
+        // submit_transaction racing a cleanup pass could deadlock, one task
+        // holding stats and waiting on queue while the other holds
+        // queue/priority_queue and waits on stats.
+        let queue_size = self.get_queue_size().await;
         let mut stats = self.stats.lock().await;
-        stats.current_queue_size = self.get_queue_size().await as usize;
+        stats.current_queue_size = queue_size;
     }
 }
 
@@ -247,7 +261,7 @@ async fn worker_main(
     worker_id: usize,
     queue: Arc<Mutex<VecDeque<QueueEntry>>>,
     priority_queue: Arc<Mutex<HashMap<u8, VecDeque<QueueEntry>>>>,
-    verifier: Arc<Mutex<GPUSignatureVerifier>>,
+    verifier: Arc<GPUSignatureVerifier>,
     config: QueueConfig,
     stats: Arc<Mutex<QueueStats>>,
 ) {
@@ -320,7 +334,7 @@ async fn get_next_entry(
 /// Process queue entry
 async fn process_entry(
     mut entry: QueueEntry,
-    verifier: Arc<Mutex<GPUSignatureVerifier>>,
+    verifier: Arc<GPUSignatureVerifier>,
     _config: QueueConfig,
 ) -> Result<()> {
     // Stage 1: Contention check
@@ -344,8 +358,6 @@ async fn process_entry(
     // Stage 2: Signature verification
     entry.processing_stage = ProcessingStage::SignatureVerification;
     let verification_result = verifier
-        .lock()
-        .await
         .verify_signature(
             &entry.transaction.signature,
             entry.transaction_hash().as_bytes(),
@@ -356,8 +368,13 @@ async fn process_entry(
         entry.verification_status = VerificationStatus::Verified;
         entry.processing_stage = ProcessingStage::ReadyForInclusion;
     } else {
+        // `entry` is owned by this function and dropped on return — nothing
+        // re-queues it, so this is a terminal failure, not a "return to
+        // queue for retry" (the previous comment/state here claimed a retry
+        // that never happened). Retrying a forged/invalid signature forever
+        // would also be its own hazard, so terminal failure is the right
+        // outcome, not just the honest one.
         entry.verification_status = VerificationStatus::Failed;
-        entry.processing_stage = ProcessingStage::Queued; // Return to queue for retry
         return Err(anyhow!("Signature verification failed"));
     }
 
@@ -568,10 +585,23 @@ mod tests {
             .await
             .unwrap();
 
-        // Let a worker pick the entry up; workers poll every 100 ms.
-        tokio::time::sleep(Duration::from_millis(600)).await;
-
-        let stats = queue.get_stats().await;
+        // Wait for a worker to actually record the outcome (workers poll
+        // every 100 ms) instead of sleeping a fixed guess: on a slow or
+        // loaded runner a fixed sleep can elapse before any worker has run,
+        // which would make this assertion spuriously fail, not pass, since
+        // it can only be wrong in the direction of "not processed yet."
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        let stats = loop {
+            let stats = queue.get_stats().await;
+            if stats.failed_entries + stats.verified_entries >= 1 {
+                break stats;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "no worker recorded an outcome within the deadline: {stats:?}"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        };
         assert_eq!(
             stats.verified_entries, 0,
             "a 65-character string must never verify: {stats:?}"

@@ -123,16 +123,20 @@ impl GPUSignatureVerifier {
     async fn process_request(&self, request: VerificationRequest) -> Result<VerificationResult> {
         let mut attempts = 0;
         let mut result = None;
+        // Cumulative across every attempt, not just the last one: a request
+        // that exhausted `max_retries` retries did all of that work, and a
+        // caller reading `verification_time_ms`/the stats average should see
+        // the full cost, not just the final attempt's slice of it.
+        let request_start = Instant::now();
 
         while attempts <= self.config.max_retries {
-            let start_time = Instant::now();
             let verification = self
                 .gpu_context
                 .lock()
                 .map_err(|e| anyhow!("gpu context mutex poisoned: {e}"))?
                 .verify(&request);
 
-            let elapsed_time = start_time.elapsed().as_millis() as f64;
+            let elapsed_time = request_start.elapsed().as_millis() as f64;
 
             if verification.is_ok() {
                 // Count each *request* once, not each retry attempt: the
@@ -225,7 +229,14 @@ impl GPUSignatureVerifier {
         let total_time = start_time.elapsed().as_millis() as f64;
         let throughput = (requests.len() as f64 / (total_time / 1000.0)).max(1.0);
 
-        // Update global stats
+        // Record per-request outcomes in the same global counters
+        // `process_request` (the single-signature path) updates — otherwise
+        // `get_stats()` stays at zero for every batch verification, while
+        // `get_batch_stats()` alone shows real numbers.
+        for result in &results {
+            self.update_stats(result.verified, result.verification_time_ms);
+        }
+
         self.update_batch_stats(
             batch_id,
             requests.len(),
@@ -453,5 +464,25 @@ mod tests {
         assert_eq!(stats.total_verifications, 3);
         assert_eq!(stats.successful_verifications, 0);
         assert_eq!(stats.failed_verifications, 3);
+    }
+
+    #[tokio::test]
+    async fn batch_verification_updates_global_stats_too() {
+        let verifier = GPUSignatureVerifier::new(VerifierConfig::default());
+        let payload: &[u8] = b"payload";
+        let signatures: Vec<(&str, &[u8])> =
+            vec![("sig1", payload), ("sig2", payload), ("sig3", payload)];
+
+        verifier.verify_signatures(signatures).await.unwrap();
+
+        // Before this fix, process_batch only recorded batch_stats and left
+        // the global counters get_stats() reports at zero.
+        let stats = verifier.get_stats().await;
+        assert_eq!(stats.total_verifications, 3);
+        assert_eq!(stats.failed_verifications, 3);
+
+        let batch_stats = verifier.get_batch_stats().await;
+        assert_eq!(batch_stats.len(), 1);
+        assert_eq!(batch_stats[0].total_signatures, 3);
     }
 }
