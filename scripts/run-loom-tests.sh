@@ -36,5 +36,16 @@ if command -v rustup >/dev/null 2>&1; then
   fi
 fi
 
+# `cargo +toolchain` only works when `cargo` on PATH is the rustup shim. The
+# local CI puts the *toolchain* directory first (scripts/local-ci.sh does this
+# on purpose, so a dangling shim cannot break every gate), which makes
+# `cargo +nightly-...` fail with "no such command: `+nightly-...`". `rustup run`
+# works either way.
+if command -v rustup >/dev/null 2>&1; then
+  CARGO=(rustup run "$TOOLCHAIN" cargo)
+else
+  CARGO=(cargo "+$TOOLCHAIN")
+fi
+
 cd "$CRATE_DIR"
-RUSTFLAGS="${RUSTFLAGS:-} --cfg loom" cargo "+${TOOLCHAIN}" test --release "$@"
+RUSTFLAGS="${RUSTFLAGS:-} --cfg loom" "${CARGO[@]}" test --release "$@"

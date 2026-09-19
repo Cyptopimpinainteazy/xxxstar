@@ -185,6 +185,7 @@ fn reservation_lock_acquire_release_cycle() {
 
 // ─── Mempool Queue ────────────────────────────────────────────────────────
 
+#[derive(Clone)]
 struct MempoolQueue {
     items: Arc<RwLock<Vec<(u64, Vec<u8>)>>>,
     next_id: Arc<AtomicU64>,
@@ -254,6 +255,7 @@ fn mempool_queue_empty_dequeue_returns_none() {
 
 // ─── RPC Rotator ──────────────────────────────────────────────────────────
 
+#[derive(Clone)]
 struct RpcRotator {
     endpoints: Arc<RwLock<Vec<String>>>,
     current: Arc<AtomicUsize>,
