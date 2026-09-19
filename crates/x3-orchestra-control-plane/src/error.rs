@@ -16,6 +16,8 @@ pub enum ControlPlaneError {
     VoteWindowNotOpen,
     #[error("vote window cannot close before its deadline")]
     VoteWindowStillOpen,
+    #[error("vote window has closed")]
+    VoteWindowClosed,
     #[error("voter is not eligible for this vote window")]
     IneligibleVoter,
     #[error("vote already recorded for this voter")]

@@ -235,6 +235,7 @@ fn map_error(error: ControlPlaneError) -> (StatusCode, String) {
         | ControlPlaneError::IntentNotDispatchable
         | ControlPlaneError::VoteWindowNotOpen
         | ControlPlaneError::VoteWindowStillOpen
+        | ControlPlaneError::VoteWindowClosed
         | ControlPlaneError::IneligibleVoter
         | ControlPlaneError::DuplicateVote => StatusCode::BAD_REQUEST,
         ControlPlaneError::Crm(_) => StatusCode::BAD_GATEWAY,
