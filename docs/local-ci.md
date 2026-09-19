@@ -185,6 +185,74 @@ X3_LOCAL_CI_SKIP=test-node,test-cross-vm-coordinator git push
 the run and the summary prints `SKIPPED BY REQUEST: <slug>`. Do not reach for
 `X3_LOCAL_CI_SKIP_ALL=1` instead - that runs nothing at all and says so.
 
+## The box loses rustc / target-dir files mid-build (#330)
+
+This machine periodically rewrites `~/.rustup` / `~/.cargo` — every symlink in
+`~/.cargo/bin` (`cargo`, `rustc`, `clippy-driver`, `rustfmt`, ...) points at
+one shared `rustup` proxy binary, and that binary (or a file already written
+under a running build's target dir) can vanish out from under an in-flight
+process, then exist again moments later. It is not this repo's code failing;
+it is the toolchain or target dir disappearing mid-build, most often when
+multiple builds (interactive sessions, self-hosted CI runners) are racing on
+this box at once.
+
+Every real occurrence so far has matched one of three shapes, none of which
+is a compiler diagnostic about our code:
+
+```
+error: could not compile `sha2` (lib)
+  Caused by:
+    could not execute process `.../rustc ...` (never executed)
+  Caused by:
+    No such file or directory (os error 2)
+```
+
+```
+error: could not parse/generate dep info at: .../deps/sp_runtime-....d
+  Caused by: No such file or directory (os error 2)
+```
+
+```
+error: failed to run custom build command for `ring v0.16.20`
+  could not execute process `.../build-script-build` (never executed)
+  Caused by: No such file or directory (os error 2)
+```
+
+`scripts/local-ci.sh` classifies a gate log matching this pairing (one of
+`could not execute process` / `could not parse/generate dep info` / `failed
+to run custom build command`, together with `No such file or directory (os
+error 2)`) as `BLOCKED`, not `FAIL`, with a reason distinguishing it from the
+older network-BLOCKED case in both the terminal summary and the machine-
+readable `summary.json`'s `"reason"` field. `BLOCKED` still fails the overall
+run — a gate that did not really execute has verified nothing — but a reader
+(or an automated merge decision) can tell "the box lost rustc" from "your
+code stopped compiling" without re-deriving it by hand. Just re-run the gate;
+do not read a `BLOCKED (environment)` gate as evidence the change under test
+is broken, and do not merge or revert based on it.
+
+### The quieter failure mode: a shared `CARGO_TARGET_DIR` across revisions
+
+Passing an external `CARGO_TARGET_DIR` (rather than each worktree's own
+default) and reusing it across a checkout that has since moved to a
+different revision — a real pattern, e.g. verifying several worktrees against
+one scratch target dir for speed — can fool cargo's mtime-based freshness
+check: it may skip recompiling a crate whose source actually changed, or
+replay a stale build's cached warnings/panics. This is dangerous in *both*
+directions (false green, or a red that describes code that no longer exists
+in the tree). One confirmed case: a `x3-verification-router` test panic was
+reported for a test that did not exist in the source at either revision
+involved — cargo had replayed a stale binary.
+
+When `local-ci.sh` is run with an explicit, non-default `CARGO_TARGET_DIR`,
+it stamps that directory with the worktree path + revision it was built for.
+On the next run, if that stamp does not match, it prints a loud warning and
+touches every tracked file before the gates run, forcing cargo to re-examine
+freshness instead of trusting a cache that may describe a different
+revision. This costs a full rebuild the first time a mismatch is detected —
+a real but bounded cost, worth paying over silently trusting stale results.
+The default case (no `CARGO_TARGET_DIR` override; each worktree gets its own
+`target/`) is unaffected and pays no extra cost.
+
 ## Workflow wiring reality
 
 GitHub Actions is now deliberately a **manual orchestration layer**. Automatic
