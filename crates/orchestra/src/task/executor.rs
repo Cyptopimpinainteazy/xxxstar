@@ -1,10 +1,8 @@
 //! Task executor — approval gating, Score enforcement, execution dispatch.
 
-use crate::agent::identity::AgentId;
 use crate::agent::on_chain::OnChainAgent;
 use crate::audit::{AuditEntry, AuditLog};
 use crate::score::{ActionContext, ScoreEnforcer, TaskClassification};
-use crate::task::queue::{TaskQueue, TaskStatus};
 use crate::task::spec::TaskSpec;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -32,13 +30,46 @@ pub struct TaskExecutor {
     pub base_reward: u64,
     /// penalty per failed task execution (alignment score decrease).
     pub failure_penalty: i32,
+    /// The backend that actually runs a task payload.
+    dispatcher: Box<dyn TaskDispatcher>,
+}
+
+/// What a dispatcher produced for one task.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DispatchOutcome {
+    /// The backend's output (or the reason it refused the task).
+    pub output: String,
+    /// Compute units the backend reports having consumed.
+    pub compute_units: u64,
+}
+
+/// The backend a task payload is handed to.
+///
+/// The Orchestra deliberately does not contain a compute backend: the EL/CL
+/// execution paths, the GPU swarm and the simulation sandbox live outside this
+/// crate. An executor that invented a success for every task would make
+/// [`TaskExecutor::process_task`] a no-op execution path, so the backend is a
+/// required constructor argument instead.
+pub trait TaskDispatcher {
+    /// Run one task payload for `agent`.
+    ///
+    /// Returning `Err` means the task did not run. A dispatcher that ran but
+    /// failed the task returns `Ok(DispatchOutcome)` and the executor records
+    /// the outcome as a task failure.
+    fn dispatch(&self, task: &TaskSpec, agent: &OnChainAgent) -> Result<DispatchOutcome, String>;
 }
 
 impl TaskExecutor {
-    pub fn new(base_reward: u64, failure_penalty: i32) -> Self {
+    /// Build an executor around a task dispatcher.
+    pub fn new(
+        base_reward: u64,
+        failure_penalty: i32,
+        dispatcher: Box<dyn TaskDispatcher>,
+    ) -> Self {
         Self {
             base_reward,
             failure_penalty,
+            dispatcher,
         }
     }
 
@@ -67,10 +98,7 @@ impl TaskExecutor {
             is_protocol_bound: true,
             claims_sovereignty: false,
             is_loggable: true,
-            writes_to_chain: !matches!(
-                task.metadata.task_type,
-                crate::task::TaskType::Simulation
-            ),
+            writes_to_chain: !matches!(task.metadata.task_type, crate::task::TaskType::Simulation),
         };
 
         if let Err(violation) = ScoreEnforcer::validate_on_chain_action(agent.identity.id, &ctx) {
@@ -109,8 +137,26 @@ impl TaskExecutor {
             ),
         ));
 
-        // Simulate execution — in production this dispatches to the actual compute backend
-        let result = self.execute_task_payload(task, agent);
+        // Step 3: hand the payload to the dispatcher. A dispatcher that refuses
+        // the task is recorded as a task failure — never as a success.
+        let result = match self.dispatcher.dispatch(task, agent) {
+            Ok(outcome) => ExecutionResult {
+                task_id: task.metadata.id.clone(),
+                success: true,
+                output: outcome.output,
+                compute_units: outcome.compute_units,
+                reward: self.base_reward,
+                completed_at: Utc::now(),
+            },
+            Err(reason) => ExecutionResult {
+                task_id: task.metadata.id.clone(),
+                success: false,
+                output: reason,
+                compute_units: 0,
+                reward: 0,
+                completed_at: Utc::now(),
+            },
+        };
 
         // Step 4: Record result
         if result.success {
@@ -136,31 +182,6 @@ impl TaskExecutor {
 
         Ok(result)
     }
-
-    /// Execute the actual task payload. In production, this dispatches to:
-    /// - GPU swarm for compute tasks
-    /// - EVM/SVM/X3VM for contract tasks
-    /// - Simulation sandbox for simulation tasks
-    fn execute_task_payload(&self, task: &TaskSpec, agent: &OnChainAgent) -> ExecutionResult {
-        let compute_units = match task.metadata.priority {
-            crate::task::spec::TaskPriority::High => 1000,
-            crate::task::spec::TaskPriority::Medium => 500,
-            crate::task::spec::TaskPriority::Low => 100,
-        };
-
-        // For now, all tasks succeed (real implementation dispatches to VM backends)
-        ExecutionResult {
-            task_id: task.metadata.id.clone(),
-            success: true,
-            output: format!(
-                "Task executed by agent {} in section {}",
-                agent.identity.id, agent.identity.section
-            ),
-            compute_units,
-            reward: self.base_reward,
-            completed_at: Utc::now(),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -172,6 +193,49 @@ mod tests {
 
     fn make_agent() -> OnChainAgent {
         OnChainAgent::new(1, "executor-1".into(), OrchestraSection::Strings)
+    }
+
+    /// Test-only dispatcher: the Orchestra ships no backend, so the tests
+    /// supply one and can make it refuse on demand.
+    struct TestDispatcher {
+        refuse_with: Option<String>,
+        compute_units: u64,
+    }
+
+    impl TestDispatcher {
+        fn accepting() -> Self {
+            Self {
+                refuse_with: None,
+                compute_units: 7,
+            }
+        }
+
+        fn refusing(reason: &str) -> Self {
+            Self {
+                refuse_with: Some(reason.to_string()),
+                compute_units: 0,
+            }
+        }
+    }
+
+    impl TaskDispatcher for TestDispatcher {
+        fn dispatch(
+            &self,
+            _task: &TaskSpec,
+            agent: &OnChainAgent,
+        ) -> Result<DispatchOutcome, String> {
+            match &self.refuse_with {
+                Some(reason) => Err(reason.clone()),
+                None => Ok(DispatchOutcome {
+                    output: format!("ran for agent {}", agent.identity.id),
+                    compute_units: self.compute_units,
+                }),
+            }
+        }
+    }
+
+    fn executor_with(dispatcher: TestDispatcher) -> TaskExecutor {
+        TaskExecutor::new(100, 10, Box::new(dispatcher))
     }
 
     fn make_task(task_type: TaskType, approved: bool) -> TaskSpec {
@@ -194,7 +258,7 @@ mod tests {
 
     #[test]
     fn minor_task_executes_without_jury() {
-        let executor = TaskExecutor::new(100, 10);
+        let executor = executor_with(TestDispatcher::accepting());
         let mut agent = make_agent();
         let mut log = AuditLog::new(1000);
         let task = make_task(TaskType::Execution, false);
@@ -202,12 +266,17 @@ mod tests {
         let result = executor.process_task(&task, &mut agent, &mut log).unwrap();
         assert!(result.success);
         assert_eq!(result.reward, 100);
+        assert_eq!(result.compute_units, 7);
         assert_eq!(agent.identity.tasks_completed, 1);
+        assert_eq!(
+            log.iter().last().and_then(|e| e.task_event_name()),
+            Some("execution_completed")
+        );
     }
 
     #[test]
     fn major_task_blocked_without_approval() {
-        let executor = TaskExecutor::new(100, 10);
+        let executor = executor_with(TestDispatcher::accepting());
         let mut agent = make_agent();
         let mut log = AuditLog::new(1000);
         let task = make_task(TaskType::Law, false); // not approved
@@ -215,16 +284,40 @@ mod tests {
         let result = executor.process_task(&task, &mut agent, &mut log);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("jury approval"));
+        assert_eq!(agent.identity.tasks_completed, 0, "nothing may have run");
     }
 
     #[test]
     fn approved_major_task_executes() {
-        let executor = TaskExecutor::new(100, 10);
+        let executor = executor_with(TestDispatcher::accepting());
         let mut agent = make_agent();
         let mut log = AuditLog::new(1000);
         let task = make_task(TaskType::Law, true); // approved by jury
 
         let result = executor.process_task(&task, &mut agent, &mut log).unwrap();
         assert!(result.success);
+    }
+
+    #[test]
+    fn a_dispatcher_that_refuses_is_a_failed_task_not_a_success() {
+        let executor = executor_with(TestDispatcher::refusing("no backend for task type"));
+        let mut agent = make_agent();
+        let mut log = AuditLog::new(1000);
+        let task = make_task(TaskType::Execution, true);
+
+        let result = executor.process_task(&task, &mut agent, &mut log).unwrap();
+
+        assert!(
+            !result.success,
+            "a refusal must never be reported as success"
+        );
+        assert_eq!(result.reward, 0);
+        assert_eq!(result.compute_units, 0);
+        assert!(result.output.contains("no backend"));
+        assert_eq!(agent.identity.tasks_completed, 0);
+        assert_eq!(
+            log.iter().last().and_then(|e| e.task_event_name()),
+            Some("execution_failed")
+        );
     }
 }

@@ -88,11 +88,7 @@ impl ScrapYard {
     }
 
     /// Force retirement (immediate), regardless of alignment.
-    pub fn force_retire(
-        &mut self,
-        agent: &mut OnChainAgent,
-        reason: &str,
-    ) -> ScrapAction {
+    pub fn force_retire(&mut self, agent: &mut OnChainAgent, reason: &str) -> ScrapAction {
         agent.status = OnChainStatus::Retired;
         agent.identity.domain = crate::agent::identity::AgentDomain::Retired;
 
@@ -136,7 +132,7 @@ impl ScrapYard {
     }
 
     /// Get all retired records.
-    pub fn retired_records(&self) -> &[ScrapRecord] {
+    pub fn retired_records(&self) -> &VecDeque<ScrapRecord> {
         &self.retired
     }
 
@@ -188,7 +184,7 @@ mod tests {
         let action = yard.recycle(3);
         assert!(action.is_some());
 
-        let record = yard.retired_records().first().unwrap();
+        let record = yard.retired_records().front().unwrap();
         assert!(record.data_harvested);
     }
 }

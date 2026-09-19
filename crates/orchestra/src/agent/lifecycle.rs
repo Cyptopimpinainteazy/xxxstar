@@ -3,7 +3,6 @@
 use super::identity::{AgentId, AlignmentScore, OrchestraSection};
 use super::off_chain::{OffChainAgent, OffChainRole};
 use super::on_chain::OnChainAgent;
-use crate::audit::AuditEntry;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -152,8 +151,12 @@ impl AgentLifecycle {
             }
             SpawnDomain::OffChain => {
                 let role = params.off_chain_role.unwrap_or(OffChainRole::JuryMember);
-                let mut agent =
-                    self.spawn_off_chain(params.display_name, params.section, role, params.session_id);
+                let mut agent = self.spawn_off_chain(
+                    params.display_name,
+                    params.section,
+                    role,
+                    params.session_id,
+                );
                 if let Some(alignment) = params.initial_alignment {
                     agent.identity.alignment = alignment;
                 }

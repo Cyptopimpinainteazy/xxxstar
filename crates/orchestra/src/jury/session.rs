@@ -27,7 +27,7 @@ impl Default for SessionConfig {
             min_jury_size: 5,
             max_jury_size: 15,
             max_section_proportion: OrchestraSection::MAX_JURY_PROPORTION, // 0.4
-            voting_duration_secs: 300, // 5 minutes
+            voting_duration_secs: 300,                                     // 5 minutes
             require_confidence: false,
         }
     }
@@ -119,14 +119,14 @@ impl JurySession {
             return Err(JuryError::SessionFull);
         }
 
-        // Check section proportion
-        let section_count = self
-            .members
-            .iter()
-            .filter(|m| m.section == section)
-            .count() as f64;
-        let new_total = self.members.len() as f64 + 1.0;
-        if section_count + 1.0 > new_total * self.config.max_section_proportion {
+        // Section quota: no section may hold more than its share of the jury,
+        // but every section is guaranteed one seat. Rounding the quota down to
+        // zero would reject the first member of every section — which is how
+        // this check used to make every jury unassemblable.
+        let section_count = self.members.iter().filter(|m| m.section == section).count() as u32;
+        let jury_size_after = self.members.len() as u32 + 1;
+        let quota = (self.config.max_section_proportion * jury_size_after as f64).floor() as u32;
+        if section_count + 1 > quota.max(1) {
             return Err(JuryError::SectionProportionExceeded(section));
         }
 
@@ -157,7 +157,10 @@ impl JurySession {
     /// Start the voting period (transition from Assembling → Active).
     pub fn start_voting(&mut self) -> Result<(), JuryError> {
         if self.status != SessionStatus::Assembling {
-            return Err(JuryError::InvalidTransition(self.status, SessionStatus::Active));
+            return Err(JuryError::InvalidTransition(
+                self.status,
+                SessionStatus::Active,
+            ));
         }
 
         if (self.members.len() as u32) < self.config.min_jury_size {
@@ -179,8 +182,7 @@ impl JurySession {
     /// Check if the voting period has expired.
     pub fn is_expired(&self) -> bool {
         if let Some(started) = self.voting_started_at {
-            let deadline =
-                started + Duration::seconds(self.config.voting_duration_secs as i64);
+            let deadline = started + Duration::seconds(self.config.voting_duration_secs as i64);
             Utc::now() > deadline
         } else {
             false
@@ -304,9 +306,15 @@ mod tests {
     #[test]
     fn assemble_jury() {
         let mut session = default_session();
-        session.add_member(1, OrchestraSection::Strings, false).unwrap();
-        session.add_member(2, OrchestraSection::Brass, true).unwrap();
-        session.add_member(3, OrchestraSection::Percussion, false).unwrap();
+        session
+            .add_member(1, OrchestraSection::Strings, false)
+            .unwrap();
+        session
+            .add_member(2, OrchestraSection::Brass, true)
+            .unwrap();
+        session
+            .add_member(3, OrchestraSection::Percussion, false)
+            .unwrap();
 
         assert_eq!(session.members.len(), 3);
     }
@@ -323,7 +331,9 @@ mod tests {
             },
         );
 
-        session.add_member(1, OrchestraSection::Strings, false).unwrap();
+        session
+            .add_member(1, OrchestraSection::Strings, false)
+            .unwrap();
         // Second Strings would be 2/2 = 100% > 40%
         let result = session.add_member(2, OrchestraSection::Strings, false);
         assert!(result.is_err());
@@ -332,9 +342,15 @@ mod tests {
     #[test]
     fn full_session_lifecycle() {
         let mut session = default_session();
-        session.add_member(1, OrchestraSection::Strings, false).unwrap();
-        session.add_member(2, OrchestraSection::Brass, true).unwrap();
-        session.add_member(3, OrchestraSection::Percussion, false).unwrap();
+        session
+            .add_member(1, OrchestraSection::Strings, false)
+            .unwrap();
+        session
+            .add_member(2, OrchestraSection::Brass, true)
+            .unwrap();
+        session
+            .add_member(3, OrchestraSection::Percussion, false)
+            .unwrap();
 
         session.add_task("task-001".into());
         session.start_voting().unwrap();
@@ -359,7 +375,9 @@ mod tests {
     #[test]
     fn cannot_start_without_quorum() {
         let mut session = default_session();
-        session.add_member(1, OrchestraSection::Strings, false).unwrap();
+        session
+            .add_member(1, OrchestraSection::Strings, false)
+            .unwrap();
         session.add_task("task-001".into());
 
         let result = session.start_voting();

@@ -36,8 +36,8 @@ impl TaskType {
     /// Classify a task type for Score enforcement.
     pub fn classification(&self) -> TaskClassification {
         match self {
-            TaskType::Law => TaskClassification::Major,       // Laws always need jury
-            TaskType::Execution => TaskClassification::Minor,  // Default; caller may override
+            TaskType::Law => TaskClassification::Major, // Laws always need jury
+            TaskType::Execution => TaskClassification::Minor, // Default; caller may override
             TaskType::Simulation => TaskClassification::Minor, // Sims are always minor
         }
     }
@@ -181,7 +181,10 @@ impl TaskSpec {
                     .map(|ndt| ndt.and_utc())
             })
             .map_err(|e| {
-                TaskParseError::InvalidField("timestamp".into(), format!("Invalid timestamp: {}", e))
+                TaskParseError::InvalidField(
+                    "timestamp".into(),
+                    format!("Invalid timestamp: {}", e),
+                )
             })?;
 
         let classification = task_type.classification();

@@ -27785,6 +27785,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-orchestra"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "chrono",
+ "glob",
+ "hex",
+ "rand 0.8.8",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
 name = "x3-orchestra-control-plane"
 version = "0.1.0"
 dependencies = [

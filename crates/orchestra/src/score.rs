@@ -52,9 +52,7 @@ impl Commandment {
     pub fn description(&self) -> &'static str {
         match self {
             Self::NoActionOutsideScore => "No agent shall act outside the bounds of the Score",
-            Self::NoJuryInfluence => {
-                "No agent shall influence another jury member during rotation"
-            }
+            Self::NoJuryInfluence => "No agent shall influence another jury member during rotation",
             Self::ImmutableLogging => "Every action must be logged to the blockchain immutably",
             Self::OffChainReadOnly => {
                 "Off-chain agents have read-only access to on-chain state snapshots"
@@ -79,12 +77,7 @@ impl Commandment {
 
 impl fmt::Display for Commandment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Commandment {}: {}",
-            *self as u8 + 1,
-            self.description()
-        )
+        write!(f, "Commandment {}: {}", *self as u8 + 1, self.description())
     }
 }
 
@@ -303,7 +296,11 @@ mod tests {
 
     #[test]
     fn major_tasks_require_jury() {
-        assert!(ScoreEnforcer::requires_jury_approval(&TaskClassification::Major));
-        assert!(!ScoreEnforcer::requires_jury_approval(&TaskClassification::Minor));
+        assert!(ScoreEnforcer::requires_jury_approval(
+            &TaskClassification::Major
+        ));
+        assert!(!ScoreEnforcer::requires_jury_approval(
+            &TaskClassification::Minor
+        ));
     }
 }

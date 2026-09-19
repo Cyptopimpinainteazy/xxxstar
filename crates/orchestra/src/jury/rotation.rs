@@ -77,9 +77,16 @@ impl JuryRotation {
 
         let total_eligible = eligible.len();
 
-        // Determine how many to select
-        let max_from_fraction = (eligible.len() as f64 * self.config.rotation_fraction).ceil() as usize;
-        let desired = (target_size as usize).min(max_from_fraction).min(eligible.len());
+        // An explicit target size is the authority: a jury that comes back a
+        // juror short cannot reach quorum, and that failure would otherwise be
+        // silent. `rotation_fraction` sizes the jury only when the caller does
+        // not ask for a specific size (target_size == 0).
+        let desired = if target_size == 0 {
+            (eligible.len() as f64 * self.config.rotation_fraction).ceil() as usize
+        } else {
+            target_size as usize
+        }
+        .min(eligible.len());
 
         if desired == 0 {
             return RotationResult {
@@ -107,10 +114,17 @@ impl JuryRotation {
 
             let section = agent.identity.section;
             let current_count = *section_counts.get(&section).unwrap_or(&0);
-            let new_total = selected.len() as f64 + 1.0;
 
-            // Check if adding this agent would exceed section proportion
-            if (current_count as f64 + 1.0) / new_total > self.config.max_section_proportion {
+            // Section quota: a section may hold at most `max_section_proportion`
+            // of the jury as it currently stands, but never fewer than one
+            // seat — a quota rounded down to zero would reject the first
+            // candidate of every section and return an empty jury.
+            let jury_size_after = selected.len() as f64 + 1.0;
+            let quota = (self.config.max_section_proportion * jury_size_after)
+                .floor()
+                .max(1.0) as u32;
+
+            if current_count + 1 > quota {
                 continue; // skip, try next
             }
 
@@ -155,11 +169,8 @@ mod tests {
 
         (0..count)
             .map(|i| {
-                let mut agent = OnChainAgent::new(
-                    i as u32,
-                    format!("agent-{}", i),
-                    sections[i % 4],
-                );
+                let mut agent =
+                    OnChainAgent::new(i as u32, format!("agent-{}", i), sections[i % 4]);
                 agent.identity.alignment = AlignmentScore::new(150); // eligible
                 agent
             })
@@ -213,16 +224,26 @@ mod tests {
         let seed = [1u8; 32];
         let result = rotation.select(&agents, 5, &seed);
 
-        // With all agents from Strings and max 40% proportion,
-        // we can only select 1 agent (1/1 = 100% initially, then 1/2 = 50%... etc)
-        // Actually first agent always passes (1/1 = 100% but we check AFTER add)
-        // The proportion check: (current+1)/(selected+1) > 0.4
-        // For first: (0+1)/(0+1) = 1.0 > 0.4 → skip? No, let me re-read...
-        // The check is: if (current_count + 1) / new_total > max_section_proportion → skip
-        // First agent: (0+1)/(0+1) = 1.0 > 0.4 → skip!
-        // This means if ALL agents are same section, we get 0.
-        // That's actually correct — you can't have a jury of all one section.
-        assert!(result.selected.len() <= 2);
+        // Every eligible agent is from Strings, so the first seat is the only
+        // one the 40% section quota can grant: a second Strings juror would be
+        // 2/2 = 100% of the jury. A pool that cannot fill a balanced jury
+        // yields a short jury, not an unbalanced one.
+        assert_eq!(result.selected.len(), 1);
+        assert_eq!(result.total_eligible, 10);
+    }
+
+    #[test]
+    fn a_zero_target_size_sizes_the_jury_from_the_rotation_fraction() {
+        let rotation = JuryRotation::new(RotationConfig {
+            rotation_fraction: 0.5,
+            ..Default::default()
+        });
+
+        let agents = make_eligible_agents(20);
+        let result = rotation.select(&agents, 0, &[7u8; 32]);
+
+        // 50% of the 20 eligible agents, spread over four sections.
+        assert_eq!(result.selected.len(), 10);
     }
 
     #[test]
