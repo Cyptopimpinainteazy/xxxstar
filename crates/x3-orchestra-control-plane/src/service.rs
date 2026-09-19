@@ -221,8 +221,16 @@ impl OrchestraControlPlane {
             if window.status != VoteWindowStatus::Open {
                 return Err(ControlPlaneError::VoteWindowNotOpen);
             }
+            // Voting cannot start before the window opens. Only the close time
+            // was checked, so a receipt timestamped *before* `opens_at_unix` —
+            // and, because `VoteWindowStillOpen` was reused here, a late vote was
+            // reported with the error that means "you cannot close this window
+            // yet", which told the caller the opposite of what happened.
+            if input.cast_at_unix < window.opens_at_unix {
+                return Err(ControlPlaneError::VoteWindowNotOpen);
+            }
             if input.cast_at_unix > window.closes_at_unix {
-                return Err(ControlPlaneError::VoteWindowStillOpen);
+                return Err(ControlPlaneError::VoteWindowClosed);
             }
             if !window
                 .electorate
@@ -691,6 +699,41 @@ mod tests {
             premature,
             Err(ControlPlaneError::VoteWindowStillOpen)
         ));
+
+        // A receipt timestamped before the window opens is refused, and a late
+        // one says the window closed rather than reusing the
+        // "cannot close yet" error.
+        let early = service
+            .record_vote(
+                &window.window_id,
+                NewVoteReceipt {
+                    voter_id: "carol".to_string(),
+                    vote_choice: VoteChoice::Approve,
+                    rationale: None,
+                    cast_at_unix: 101,
+                },
+            )
+            .await;
+        assert!(
+            matches!(early, Err(ControlPlaneError::VoteWindowNotOpen)),
+            "a vote cast before the window opens must be refused: {early:?}"
+        );
+
+        let late = service
+            .record_vote(
+                &window.window_id,
+                NewVoteReceipt {
+                    voter_id: "carol".to_string(),
+                    vote_choice: VoteChoice::Approve,
+                    rationale: None,
+                    cast_at_unix: 111,
+                },
+            )
+            .await;
+        assert!(
+            matches!(late, Err(ControlPlaneError::VoteWindowClosed)),
+            "a vote cast after the window closes must say so: {late:?}"
+        );
 
         service
             .record_vote(
