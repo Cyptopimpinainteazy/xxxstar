@@ -11579,24 +11579,6 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "orchestra"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "chrono",
- "glob",
- "hex",
- "rand 0.8.8",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.10.9",
- "tempfile",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "orchestra"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19051f0b0512402f5d52d6776999f55996f01887396278aeeccbbdfbc83eef2d"
@@ -13704,7 +13686,7 @@ dependencies = [
  "derive_more 0.99.20",
  "fatality",
  "futures 0.3.34",
- "orchestra 0.4.1",
+ "orchestra",
  "polkadot-node-network-protocol",
  "polkadot-node-primitives",
  "polkadot-primitives",
@@ -13731,7 +13713,7 @@ dependencies = [
  "async-trait",
  "futures 0.3.34",
  "futures-timer",
- "orchestra 0.4.1",
+ "orchestra",
  "polkadot-node-metrics",
  "polkadot-node-network-protocol",
  "polkadot-node-primitives",
@@ -27800,6 +27782,24 @@ dependencies = [
  "x3-hir",
  "x3-mir",
  "x3-vm",
+]
+
+[[package]]
+name = "x3-orchestra"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "chrono",
+ "glob",
+ "hex",
+ "rand 0.8.8",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]

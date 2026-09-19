@@ -1,5 +1,9 @@
 [package]
-name = "orchestra"
+# `orchestra` is already taken in this workspace's dependency graph: the
+# polkadot node crates pull `orchestra 0.4.1` from crates.io. A member with the
+# same name makes every `-p orchestra` ambiguous, so the crate is `x3-orchestra`
+# (the directory keeps its historical name).
+name = "x3-orchestra"
 version = "0.1.0"
 edition = "2021"
 description = "Multi-layered orchestral agent system for X3 Chain — on-chain execution, off-chain jury, rotation, and scrap yard alignment"
