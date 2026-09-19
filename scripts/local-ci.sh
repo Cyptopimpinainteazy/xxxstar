@@ -32,9 +32,12 @@
 # 2 on a usage error, 3 when the whole run was skipped by X3_LOCAL_CI_SKIP_ALL=1.
 #
 # A gate that could not even start because the environment lacks something
-# (crates.io / github.com unreachable while cargo resolves dependencies) is
-# reported as BLOCKED, not FAIL — and BLOCKED still fails the run, because a
-# gate that did not execute has verified nothing.
+# (crates.io / github.com unreachable while cargo resolves dependencies, or
+# this box rewriting ~/.rustup / ~/.cargo / a target-dir file out from under a
+# running build — see #330) is reported as BLOCKED, not FAIL — and BLOCKED
+# still fails the run, because a gate that did not execute has verified
+# nothing. It is also not a code diagnostic: do not read a BLOCKED gate as
+# "the change under test broke something."
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -145,7 +148,7 @@ LOG="$LOG_DIR/local-ci-$STAMP.log"
 PROGRESS="$LOG_DIR/local-ci-$STAMP-progress.log"
 : >"$PROGRESS"
 
-declare -a GATE_NAMES=() GATE_STATUS=() GATE_SECS=() GATE_LOGS=()
+declare -a GATE_NAMES=() GATE_STATUS=() GATE_SECS=() GATE_LOGS=() GATE_REASONS=()
 FAILED=0
 
 declare -A SEEN_SLUG=()
@@ -407,6 +410,34 @@ HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 DIRTY="clean"
 [ -n "$(git status --porcelain 2>/dev/null | head -n 1)" ] && DIRTY="dirty"
 
+# An externally-shared CARGO_TARGET_DIR (the default is this worktree's own
+# $ROOT/target, which is always safe) is a known trap: cargo's mtime-based
+# freshness check can be fooled when the same target dir is reused across
+# worktrees at different revisions (#330) — it can skip recompiling a crate
+# whose source actually changed, or replay a stale build's cached
+# warnings/panics, in either direction (false green or false red). Stamp the
+# target dir with the worktree + revision it was last built for, and force a
+# freshness re-check on mismatch instead of trusting the cache.
+if [ -n "${CARGO_TARGET_DIR:-}" ] && [ "$CARGO_TARGET_DIR" != "$ROOT/target" ]; then
+  mkdir -p "$CARGO_TARGET_DIR"
+  TARGET_DIR_MARKER="$CARGO_TARGET_DIR/.local-ci-last-revision"
+  TARGET_DIR_STAMP="$ROOT@$HEAD_SHA"
+  if [ -f "$TARGET_DIR_MARKER" ] && [ "$(cat "$TARGET_DIR_MARKER" 2>/dev/null)" != "$TARGET_DIR_STAMP" ]; then
+    echo "local-ci: WARNING: CARGO_TARGET_DIR=$CARGO_TARGET_DIR was last built for"
+    echo "local-ci:          $(cat "$TARGET_DIR_MARKER"), this run is $TARGET_DIR_STAMP."
+    echo "local-ci:          Reusing a target dir across worktrees/revisions can make"
+    echo "local-ci:          cargo trust a stale dep-info cache instead of rebuilding"
+    echo "local-ci:          (#330) — touching every tracked file so cargo re-checks"
+    echo "local-ci:          freshness instead of trusting it."
+    # Some tracked paths (submodule placeholders, toolchain download stubs)
+    # are not materialized in every checkout — a failed touch on those is
+    # harmless (nothing to mark fresh), so stderr is discarded rather than
+    # letting a wall of "No such file or directory" bury the real warning.
+    git ls-files -z 2>/dev/null | xargs -0 -r touch 2>/dev/null
+  fi
+  printf '%s' "$TARGET_DIR_STAMP" >"$TARGET_DIR_MARKER"
+fi
+
 echo "local-ci $STAMP — root=$ROOT"
 echo "local-ci: ${#SELECTED[@]} gate(s), jobs=$JOBS, cargo-jobs=$CARGO_JOBS, $BRANCH@$HEAD_SHA ($DIRTY)"
 for note in "${NOTES[@]:-}"; do [ -n "$note" ] && echo "local-ci: note: $note"; done
@@ -443,7 +474,7 @@ export CARGO_TERM_COLOR=never
 run_gate() {
   local name="$1" slug="$2" cmd="$3"
   local gate_log="$LOG_DIR/local-ci-$STAMP-$slug.log"
-  local start end rc status
+  local start end rc status reason=""
   start=$(date +%s)
   env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "$cmd" >"$gate_log" 2>&1
   rc=$?
@@ -454,15 +485,31 @@ run_gate() {
     # has lost parts of ~/.cargo more than once — see docs/local-ci.md).
     if grep -qE "Could not resolve host|failed to resolve address|network failure seems to have happened|spurious network error|failed to get .* as a dependency|you're using offline mode" "$gate_log"; then
       status=BLOCKED
+      reason=network
+    # This box periodically rewrites ~/.rustup / ~/.cargo and loses files under
+    # the shared target dir mid-build (see #330 and the header of this script).
+    # The named path exists again moments later — this is not a diagnostic
+    # about our code, it is the toolchain or target dir vanishing out from
+    # under a running process. Every real occurrence pairs one of cargo's
+    # "could not execute process / could not parse dep info / failed to run
+    # custom build command" framings with the raw OS error for a missing file.
+    elif grep -qE "could not execute process|could not parse/generate dep info|failed to run custom build command" "$gate_log" \
+      && grep -qE "No such file or directory \(os error 2\)" "$gate_log"; then
+      status=BLOCKED
+      reason=environment
     else
       status=FAIL
     fi
   fi
   printf '%s' "$status" >"$LOG_DIR/local-ci-$STAMP-$slug.status"
   printf '%s' "$((end - start))" >"$LOG_DIR/local-ci-$STAMP-$slug.secs"
+  printf '%s' "$reason" >"$LOG_DIR/local-ci-$STAMP-$slug.reason"
   # One short line per gate: atomic appends, so parallel gates cannot interleave.
   if [ "$status" = "PASS" ]; then
     printf 'PASS %-34s %ss\n' "$name" "$((end - start))" | tee -a "$LOG"
+  elif [ "$status" = "BLOCKED" ] && [ "$reason" = "environment" ]; then
+    printf 'BLOCKED %-31s %ss — this box lost rustc/cargo or a target-dir file mid-build; not a code diagnostic (%s)\n' \
+      "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
   elif [ "$status" = "BLOCKED" ]; then
     printf 'BLOCKED %-31s %ss — environment could not fetch dependencies; nothing verified (%s)\n' \
       "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
@@ -513,14 +560,20 @@ for spec in "${SELECTED[@]}"; do
   name="${spec%%:*}"; slug="$(slugify "$name")"
   status="$(cat "$LOG_DIR/local-ci-$STAMP-$slug.status" 2>/dev/null || echo FAIL)"
   secs="$(cat "$LOG_DIR/local-ci-$STAMP-$slug.secs" 2>/dev/null || echo 0)"
+  reason="$(cat "$LOG_DIR/local-ci-$STAMP-$slug.reason" 2>/dev/null || echo "")"
   GATE_NAMES+=("$name"); GATE_STATUS+=("$status"); GATE_SECS+=("$secs")
+  GATE_REASONS+=("$reason")
   GATE_LOGS+=("$LOG_DIR/local-ci-$STAMP-$slug.log")
   [ "$status" = "PASS" ] || FAILED=1
 done
 
 BLOCKED_COUNT=0
-for status in "${GATE_STATUS[@]}"; do
-  [ "$status" = "BLOCKED" ] && BLOCKED_COUNT=$((BLOCKED_COUNT + 1))
+BLOCKED_ENV_COUNT=0
+for i in "${!GATE_STATUS[@]}"; do
+  if [ "${GATE_STATUS[$i]}" = "BLOCKED" ]; then
+    BLOCKED_COUNT=$((BLOCKED_COUNT + 1))
+    [ "${GATE_REASONS[$i]}" = "environment" ] && BLOCKED_ENV_COUNT=$((BLOCKED_ENV_COUNT + 1))
+  fi
 done
 
 echo ""
@@ -529,13 +582,23 @@ printf '%-34s %-6s %s\n' "GATE" "RESULT" "SECONDS"
 for i in "${!GATE_NAMES[@]}"; do
   printf '%-34s %-6s %s\n' "${GATE_NAMES[$i]}" "${GATE_STATUS[$i]}" "${GATE_SECS[$i]}"
 done
-if [ "$BLOCKED_COUNT" -gt 0 ]; then
+if [ "$((BLOCKED_COUNT - BLOCKED_ENV_COUNT))" -gt 0 ]; then
   echo ""
-  echo "$BLOCKED_COUNT gate(s) reported BLOCKED: the environment could not fetch"
-  echo "dependencies, so those gates did not execute and verified nothing. Re-run"
+  echo "$((BLOCKED_COUNT - BLOCKED_ENV_COUNT)) gate(s) reported BLOCKED (network): the environment could not"
+  echo "fetch dependencies, so those gates did not execute and verified nothing. Re-run"
   echo "with network access (or pre-fetch the dependency) before treating this as"
   echo "coverage. A gate that runs with --offline warms up with:"
   echo "  cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
+fi
+if [ "$BLOCKED_ENV_COUNT" -gt 0 ]; then
+  echo ""
+  echo "$BLOCKED_ENV_COUNT gate(s) reported BLOCKED (environment): this box rewrote"
+  echo "~/.rustup, ~/.cargo, or a shared target dir out from under a running build"
+  echo "(see issue #330 and docs/local-ci.md). The failing log has a 'could not"
+  echo "execute process' / 'could not parse dep info' / 'failed to run custom build"
+  echo "command' framing paired with a raw 'No such file or directory (os error 2)'"
+  echo "— that pairing is never a diagnostic about this repo's code. Just re-run the"
+  echo "gate; do not read it as a real failure and do not merge/revert based on it."
 fi
 
 {
@@ -565,8 +628,8 @@ fi
   for i in "${!GATE_NAMES[@]}"; do
     comma=","
     [ "$i" -eq "$((${#GATE_NAMES[@]} - 1))" ] && comma=""
-    printf '    {"name": "%s", "result": "%s", "seconds": %s, "log": "%s"}%s\n' \
-      "${GATE_NAMES[$i]}" "${GATE_STATUS[$i]}" "${GATE_SECS[$i]}" \
+    printf '    {"name": "%s", "result": "%s", "seconds": %s, "reason": "%s", "log": "%s"}%s\n' \
+      "${GATE_NAMES[$i]}" "${GATE_STATUS[$i]}" "${GATE_SECS[$i]}" "${GATE_REASONS[$i]}" \
       "$(basename "${GATE_LOGS[$i]}")" "$comma"
   done
   printf '  ]\n}\n'
