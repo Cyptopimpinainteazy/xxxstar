@@ -10,6 +10,17 @@ pub enum ViolationType {
     MaxTasksPerBlockExceeded,
     CollusionAttempted,
     RateLimitExceeded,
+    /// The policy needs a reputation score and none is available.
+    ///
+    /// Distinct from `ReputationBelowMinimum`: nothing was measured. The
+    /// context used to carry a hardcoded `100`, so a `ReputationMinimum` rule
+    /// could never fire.
+    ReputationUnknown,
+    /// The policy needs the agent's known peers and none are available.
+    ///
+    /// `NoCollusionWith` was evaluated against an always-empty list, so it could
+    /// never fire either.
+    CollusionCheckUnavailable,
 }
 
 /// Enforcement actions

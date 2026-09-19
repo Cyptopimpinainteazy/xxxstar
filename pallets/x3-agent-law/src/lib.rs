@@ -62,6 +62,24 @@ pub mod signed_extension;
 pub mod types;
 pub mod weights;
 
+/// Violations after which an agent is blacklisted automatically.
+///
+/// The helper this replaced compared the violation count against
+/// `T::ReputationThreshold` — the *reputation* level at which capabilities are
+/// revoked (100 by default) — while the extrinsic used a literal `3`, and both
+/// counted the same violation. This is the threshold the pallet's own tests
+/// document ("3rd violation → blacklist").
+pub const BLACKLIST_VIOLATION_THRESHOLD: u32 = 3;
+
+// `src/tests.rs` and `src/mock.rs` existed but were never declared, so none of
+// the pallet's integration tests had ever been compiled or run.
+#[cfg(test)]
+#[path = "tests.rs"]
+mod integration_tests;
+#[cfg(test)]
+#[path = "mock.rs"]
+mod mock;
+
 pub use emergency::{EmergencyAction, EmergencyEvent};
 pub use law_engine::*;
 pub use signed_extension::*;
@@ -285,23 +303,24 @@ pub mod pallet {
 
             let penalty = Self::calculate_penalty(&reason);
 
-            // Apply slash
-            Self::internal_slash(&agent, penalty, &reason)?;
-
-            // Track violation count
-            ViolationCount::<T>::mutate(&agent, |count| *count = count.saturating_add(1));
-
-            // Auto-enforcement at threshold (3rd violation → blacklist)
-            let violation_count = ViolationCount::<T>::get(&agent);
-            if violation_count >= 3 {
-                Self::blacklist_agent(&agent, BlockNumberFor::<T>::from(100u32))?;
-            }
-
+            // One violation, one event. `internal_slash` used to do this and
+            // `slash_agent` then did it again, so a single governance slash
+            // counted as two violations and emitted `AgentSlashed` twice —
+            // reaching the blacklist threshold of 3 after two slashes.
+            let violation_count = ViolationCount::<T>::mutate(&agent, |count| {
+                *count = count.saturating_add(1);
+                *count
+            });
             Self::deposit_event(Event::<T>::AgentSlashed {
                 agent: agent.clone(),
                 reason,
                 penalty,
             });
+
+            // Auto-enforcement at the threshold (3rd violation → blacklist)
+            if violation_count >= BLACKLIST_VIOLATION_THRESHOLD {
+                Self::blacklist_agent(&agent, BlockNumberFor::<T>::from(100u32))?;
+            }
 
             Ok(())
         }
@@ -339,37 +358,15 @@ pub mod pallet {
     // ========================================================================
 
     impl<T: Config> Pallet<T> {
-        /// Slash agent reputation
-        fn internal_slash(
-            agent: &T::AccountId,
-            penalty: u64,
-            reason: &SlashingReason,
-        ) -> DispatchResult {
-            let current_violations = ViolationCount::<T>::get(agent);
-            let new_violations = current_violations.saturating_add(1);
-            ViolationCount::<T>::insert(agent, new_violations);
-
-            Self::deposit_event(Event::AgentSlashed {
-                agent: agent.clone(),
-                reason: reason.clone(),
-                penalty,
-            });
-
-            if new_violations as u64 >= T::ReputationThreshold::get() {
-                let duration = T::CheckpointGracePeriod::get();
-                let expires_at = frame_system::Pallet::<T>::block_number() + duration;
-                Blacklist::<T>::insert(agent, expires_at);
-                Self::deposit_event(Event::AgentBlacklisted {
-                    agent: agent.clone(),
-                    expires_at,
-                });
-            }
-
-            Ok(())
-        }
-
         /// Temporarily blacklist agent
-        fn blacklist_agent(agent: &T::AccountId, duration: BlockNumberFor<T>) -> DispatchResult {
+        ///
+        /// Pallet-internal (not an extrinsic): blacklisting is driven by
+        /// governance slashing and the automatic violation threshold. Public so
+        /// the pallet's integration tests can exercise the stored expiry.
+        pub fn blacklist_agent(
+            agent: &T::AccountId,
+            duration: BlockNumberFor<T>,
+        ) -> DispatchResult {
             let current_block = frame_system::Pallet::<T>::block_number();
             let expires_at = current_block + duration;
             Blacklist::<T>::insert(agent, expires_at);

@@ -94,11 +94,19 @@ where
             return Ok((ValidTransaction::default(), (), origin));
         }
 
-        // 3. Build policy context
-        let reputation_score = 100u64;
+        // 3. Build policy context.
+        //
+        // `reputation_score` was hardcoded to `100`, so a `ReputationMinimum`
+        // policy could never fail, and `related_agents` was always empty, so
+        // `NoCollusionWith` could never fail either. Both are now reported as
+        // *unknown*, and the engine fails such a policy instead of passing it:
+        // wiring the real sources (the agent registry's reputation, a relation
+        // set) is the feature that turns these back on.
+        let reputation_score = None;
         let tasks_this_block = TasksThisBlock::<T>::get((current_block, who.clone()));
         let extrinsics_this_epoch = Self::get_extrinsic_count_this_epoch(who, current_block);
         let related_agents: Vec<T::AccountId> = Vec::new();
+        let relations_known = false;
 
         let context = PolicyContext {
             reputation_score,
@@ -106,6 +114,7 @@ where
             extrinsics_this_epoch,
             requested_capability: Self::extract_requested_capability(_call),
             related_agents,
+            relations_known,
             current_block,
             last_activity_block: current_block,
         };
