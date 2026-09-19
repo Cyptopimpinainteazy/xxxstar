@@ -221,7 +221,23 @@ fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
         // waves cannot check it. Encoded as a payload frame like every other
         // record here: a payload is consumed as `align4(pc + 3 + len)`, the
         // expression the writer pads by, so it is correct at any offset.
-        Operation::ParallelPlan { waves, edges } => {
+        // `[FEATURE_ALLOW][0][u16 code]` — a three-byte frame, like every other
+        // fixed instruction here. A four-byte one would desync the reader when it
+        // lands at an offset congruent to 1 mod 4, which is where the first
+        // instruction of a stream sits.
+        Operation::FeatureAllow { feature, .. } => {
+            // `[FEATURE_ALLOW][flags = 0][code]`. Three bytes of content, then
+            // the per-instruction padding — the shape every fixed-frame
+            // instruction here uses, and the only shape the reader can follow at
+            // any offset.
+            bytecode.write_all(&[FEATURE_ALLOW, 0, *feature])?;
+        }
+        Operation::ParallelPlan {
+            waves,
+            edges,
+            domains,
+            settlement,
+        } => {
             let leg_count: usize = waves.iter().map(|wave| wave.len()).sum();
             let wave_text = waves.iter().map(|wave| wave.join(",")).collect::<Vec<_>>().join("|");
             let edge_text = edges
@@ -229,7 +245,50 @@ fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
                 .map(|(from, to)| format!("{from}->{to}"))
                 .collect::<Vec<_>>()
                 .join(",");
-            let payload = format!("legs={leg_count};waves={wave_text};edges={edge_text}");
+            // Domains are carried per leg because "is this plan multi-VM" is a
+            // question about the legs, and a reader who cannot see which VM
+            // each leg runs on cannot answer it.
+            let domain_text = domains
+                .iter()
+                .map(|(leg, domains)| format!("{leg}:{}", domains.iter().cloned().collect::<Vec<_>>().join("+")))
+                .collect::<Vec<_>>()
+                .join(",");
+            // The settlement section is what a coordinator acts on, so it is in
+            // the artifact rather than left to be re-derived: `wave:domains:
+            // proofs:recoverable`, with `-` for an empty set.
+            let settlement_text = settlement
+                .iter()
+                .map(|wave| {
+                    let domains = if wave.domains.is_empty() {
+                        "-".to_string()
+                    } else {
+                        wave.domains.iter().cloned().collect::<Vec<_>>().join("+")
+                    };
+                    let proofs = if wave.outstanding_proofs.is_empty() {
+                        "-".to_string()
+                    } else {
+                        wave.outstanding_proofs.iter().cloned().collect::<Vec<_>>().join("+")
+                    };
+                    format!(
+                        "{}:{}:{}:{}",
+                        wave.wave,
+                        domains,
+                        proofs,
+                        if wave.locally_recoverable {
+                            "local"
+                        } else {
+                            "coordinated"
+                        }
+                    )
+                })
+                .collect::<Vec<_>>()
+                // `|` between records: `,` already separates the domains and
+                // proofs within one, and a separator that appears inside the
+                // thing it separates cannot be parsed back.
+                .join("|");
+            let payload = format!(
+                "legs={leg_count};waves={wave_text};edges={edge_text};domains={domain_text};settle={settlement_text}"
+            );
             if payload.len() > u16::MAX as usize {
                 return Err(X3Error::CodegenError {
                     message: format!("parallel plan payload too large: {} bytes", payload.len()),
@@ -592,6 +651,7 @@ fn operation_to_asset_payload(op: &Operation) -> Result<AssetOpPayload, X3Error>
         Operation::Swap {
             from_chain,
             from_asset,
+            to_chain,
             to_asset,
             input_amount,
             min_output,
@@ -599,6 +659,7 @@ fn operation_to_asset_payload(op: &Operation) -> Result<AssetOpPayload, X3Error>
         } => AssetOpPayload::Swap {
             from_chain: from_chain.clone(),
             from_asset: from_asset.clone(),
+            to_chain: to_chain.clone(),
             to_asset: to_asset.clone(),
             input_amount: *input_amount,
             min_output: *min_output,

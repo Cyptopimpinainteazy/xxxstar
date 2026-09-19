@@ -176,6 +176,26 @@ pub fn lower_program_with_mode(
                             leg.name.as_str()
                         )));
                     }
+                    // Replay protection is a property of the program, and a leg
+                    // is the only place a nonce guard can be written — so a leg
+                    // that declares one declares it for the program. Two legs
+                    // disagreeing about it is ambiguous rather than ordered:
+                    // there is one artifact, and it cannot carry two nonces.
+                    if let Some(nonce) = body.metadata.nonce.clone() {
+                        match &ir.metadata.nonce {
+                            None => ir.metadata.nonce = Some(nonce),
+                            Some(existing) if *existing == nonce => {}
+                            Some(existing) => {
+                                return Err(semantic(&format!(
+                                    "parallel '{}' leg '{}' declares nonce '{nonce}' but the program \
+                                     already carries '{existing}'; one artifact cannot carry two \
+                                     replay-protection nonces",
+                                    parallel.name.as_str(),
+                                    leg.name.as_str()
+                                )))
+                            }
+                        }
+                    }
                     lowered.push((leg.name.as_str().to_string(), body.operations));
                 }
 
@@ -183,29 +203,44 @@ pub fn lower_program_with_mode(
                 // the program resolves, so the plan is refused rather than
                 // ordered arbitrarily. A dependency the program *does* express —
                 // one leg consuming what another produces — becomes an edge.
+                // Which VM family each chain runs on, from the program's own
+                // declarations. Two declarations disagreeing about one chain
+                // would make the plan's answer to "which VM runs this leg"
+                // ambiguous, so that is refused rather than picked between.
+                let mut chain_domains: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+                for item in &program.items {
+                    let (chain, domain) = match &item.node {
+                        Item::VmDecl(vm) => (vm.chain.as_str().to_string(), vm.adapter.as_str().to_string()),
+                        Item::VenueDecl(venue) => (venue.chain.as_str().to_string(), venue.domain.as_str().to_string()),
+                        _ => continue,
+                    };
+                    if let Some(existing) = chain_domains.get(&chain) {
+                        if existing != &domain {
+                            return Err(semantic(&format!(
+                                "chain '{chain}' is declared on two domains ('{existing}' and '{domain}'); \
+                                 the plan could not say which VM executes a leg on it"
+                            )));
+                        }
+                    }
+                    chain_domains.insert(chain, domain);
+                }
+
                 let legs: Vec<crate::dag::Leg> = lowered
                     .iter()
                     .map(|(name, operations)| crate::dag::leg_from_operations(name, operations))
-                    .collect();
-                let plan = crate::dag::plan(&legs).map_err(|race| {
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|error| {
+                        semantic(&format!(
+                            "parallel '{}': {}",
+                            parallel.name.as_str(),
+                            describe_race(&error)
+                        ))
+                    })?;
+                let plan = crate::dag::plan(&legs, &chain_domains).map_err(|race| {
                     semantic(&format!(
-                        "parallel '{}': {description}",
+                        "parallel '{}': {}",
                         parallel.name.as_str(),
-                        description = match &race {
-                            crate::dag::RaceError::WriteWrite { asset, first, second } => format!(
-                                "legs '{first}' and '{second}' both produce {asset}, so the program \
-                                 does not say which write wins"
-                            ),
-                            crate::dag::RaceError::Cycle { legs } => format!(
-                                "the dependencies form a cycle ({}), so there is no execution order",
-                                legs.join(" -> ")
-                            ),
-                            crate::dag::RaceError::TooFewLegs { legs } =>
-                                format!("{legs} leg(s) declared; a parallel block needs at least two"),
-                            crate::dag::RaceError::TooManyLegs { legs, bound } =>
-                                format!("{legs} legs declared, above the {bound}-leg production bound"),
-                            crate::dag::RaceError::DuplicateLeg { name } => format!("leg '{name}' is declared twice"),
-                        }
+                        describe_race(&race)
                     ))
                 })?;
 
@@ -213,6 +248,8 @@ pub fn lower_program_with_mode(
                 ir.push(Operation::ParallelPlan {
                     waves: plan.waves.clone(),
                     edges: plan.edges.clone(),
+                    domains: plan.domains.clone(),
+                    settlement: plan.settlement.clone(),
                 });
                 for name in order {
                     let (_, operations) = lowered
@@ -737,6 +774,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             ir.push(Operation::Swap {
                 from_chain: chain_to_string(&from.chain),
                 from_asset: from.name.as_str().to_string(),
+                to_chain: chain_to_string(&to.chain),
                 to_asset: to.name.as_str().to_string(),
                 input_amount: route.as_ref().and_then(expression_to_u128_opt).unwrap_or(0),
                 min_output: min_output.as_ref().and_then(expression_to_u128_opt).unwrap_or(0),
@@ -797,6 +835,26 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                     .iter()
                     .map(|replacement| replacement.venue.as_str().to_string())
                     .collect(),
+            });
+        }
+        Statement::Allow { feature } => {
+            // The consent is the point, so it goes in the artifact. An opt-in
+            // the bytecode does not carry is a permission only the source knows
+            // about, and a runtime deciding whether it may net this intent
+            // against another has nothing to check it against.
+            let code = match feature.as_str() {
+                "intent_fusion" => crate::spec::opcodes::FEATURE_INTENT_FUSION,
+                _ => {
+                    return Err(semantic(&format!(
+                        "unknown feature '{}' in `allow`; the set is closed so a misspelling cannot be \
+                         read as consent",
+                        feature.as_str()
+                    )))
+                }
+            };
+            ir.push(Operation::FeatureAllow {
+                feature: code,
+                name: feature.as_str().to_string(),
             });
         }
         Statement::OnFail(action) => {
@@ -1267,6 +1325,35 @@ fn select_choice_path(choice: &x3_lang_ast::ast::AtomicChoiceDecl) -> Option<usi
         }
     }
     best.map(|(index, _)| index)
+}
+
+/// One sentence for why a `parallel` block has no plan. The messages live here
+/// rather than inline so the two call sites — the per-leg check and the
+/// whole-plan check — cannot describe the same failure differently.
+fn describe_race(race: &crate::dag::RaceError) -> String {
+    match race {
+        crate::dag::RaceError::WriteWrite { asset, first, second } => format!(
+            "legs '{first}' and '{second}' both produce {asset}, so the program does not say which \
+             write wins"
+        ),
+        crate::dag::RaceError::Cycle { legs } => format!(
+            "the dependencies form a cycle ({}), so there is no execution order",
+            legs.join(" -> ")
+        ),
+        crate::dag::RaceError::TooFewLegs { legs } => {
+            format!("{legs} leg(s) declared; a parallel block needs at least two")
+        }
+        crate::dag::RaceError::TooManyLegs { legs, bound } => {
+            format!("{legs} legs declared, above the {bound}-leg production bound")
+        }
+        crate::dag::RaceError::DuplicateLeg { name } => format!("leg '{name}' is declared twice"),
+        crate::dag::RaceError::ImplicitCrossChain { leg, chains, bridges } => format!(
+            "leg '{leg}' touches {} chains ({}) but contains {bridges} cross-chain step(s); moving \
+             value between chains takes a step that says so",
+            chains.len(),
+            chains.join(", ")
+        ),
+    }
 }
 
 /// The statement bodies a top-level item may hold, for passes that need to see

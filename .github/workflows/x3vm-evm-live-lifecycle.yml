@@ -31,6 +31,14 @@ env:
 jobs:
   live-lifecycle:
     name: EVM HTLC live anvil lifecycle
+    # Both jobs below start anvil on the same fixed port (18545) and write the
+    # same pid file, and both self-hosted runners are on this host, so they must
+    # not overlap. A job-level group (not workflow-level: see the note above the
+    # `jobs:` key) serialises them without touching the reusable-workflow call
+    # path that `production-gate.yml` depends on.
+    concurrency:
+      group: x3vm-evm-live-anvil
+      cancel-in-progress: false
     # Persistent cargo target dir (outside the checkout) so runs reuse compiled
     # artefacts instead of rebuilding the workspace from scratch each time.
     env:
@@ -75,8 +83,21 @@ jobs:
           workspaces: .
           shared-key: evm-live-lifecycle
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      # Not `foundry-rs/foundry-toolchain@v1`: that action runs `foundryup`,
+      # which aborts with "Error: 'anvil' is currently running. Please stop the
+      # process and try again." Both self-hosted runners (x3star1 *and* x3star2)
+      # live on this one host, and the sibling job in this same workflow starts
+      # anvil, so the installer step failed before a single test ran and the
+      # whole production gate went red for a reason unrelated to the diff
+      # (run 35393252659, job 105756194600). Install only when missing.
+      - name: Install Foundry (skipped when already installed)
+        run: |
+          if command -v anvil >/dev/null 2>&1 && command -v forge >/dev/null 2>&1; then
+            echo "foundry already installed: $(forge --version)"
+          else
+            curl -sSfL https://foundry.paradigm.xyz | bash
+            "$HOME/.foundry/bin/foundryup"
+          fi
 
       - name: Install forge dependencies (pinned via foundry.lock)
         working-directory: X3-contracts/evm
@@ -112,6 +133,9 @@ jobs:
 
   live-x3vm-evm:
     name: real X3VM to Anvil lock claim lifecycle
+    concurrency:
+      group: x3vm-evm-live-anvil
+      cancel-in-progress: false
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
       CARGO_BUILD_JOBS: "12"
@@ -144,8 +168,16 @@ jobs:
         with:
           targets: wasm32v1-none, wasm32-unknown-unknown
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      # See the note on the job above: `foundryup` refuses to run while anvil is
+      # alive, and both jobs share one host.
+      - name: Install Foundry (skipped when already installed)
+        run: |
+          if command -v anvil >/dev/null 2>&1 && command -v forge >/dev/null 2>&1; then
+            echo "foundry already installed: $(forge --version)"
+          else
+            curl -sSfL https://foundry.paradigm.xyz | bash
+            "$HOME/.foundry/bin/foundryup"
+          fi
 
       - name: Install forge dependencies (pinned via foundry.lock)
         working-directory: X3-contracts/evm

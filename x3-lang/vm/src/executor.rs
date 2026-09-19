@@ -25,7 +25,8 @@
 //! Gas is never refunded and never goes negative. The VM checks
 //! `state.gas >= cost` before deducting.
 
-use crate::x3_lang_vm::{AtomicChoiceRecord, ParallelPlanRecord, SubExecInfo, VmSnapshot, VM};
+use crate::x3_lang_vm::{AtomicChoiceRecord, ParallelPlanRecord, SubExecInfo, VmSnapshot, WaveSettlementRecord, VM};
+use std::collections::BTreeMap;
 use x3_lang_compiler::emitter::decode_trading_operation;
 // Import shared opcode constants
 use crate::spec::opcodes::*;
@@ -649,6 +650,20 @@ pub(crate) fn execute(vm: &mut VM) -> ExecResult<()> {
                 vm.state.pc = align4(vm.state.pc + 3 + payload.len());
                 continue;
             }
+            FEATURE_ALLOW => {
+                // The program consented to an execution mode. Recording it is
+                // the whole effect: a runtime deciding whether it may net this
+                // intent against another has to be able to see the consent.
+                if _flags != 0 || operand != u16::from(FEATURE_INTENT_FUSION) {
+                    if try_dispatch_handler(vm) {
+                        continue;
+                    }
+                    return Err(ExecError::Panic(format!(
+                        "X3_FEATURE_ALLOW_INVALID: feature code {operand} is not one the language defines"
+                    )));
+                }
+                vm.state.allowed_features.insert(FEATURE_INTENT_FUSION);
+            }
             PARALLEL_PLAN => {
                 // `legs=<n>;waves=a,b|c;edges=a->c`.
                 //
@@ -714,7 +729,62 @@ pub(crate) fn execute(vm: &mut VM) -> ExecResult<()> {
                             .collect()
                     })
                     .unwrap_or_default();
-                if legs < 2 || declared.len() != legs {
+                // Which VM each leg runs on. Absent here is a refusal, not an
+                // empty set: a plan that does not say is not a multi-VM plan.
+                let domains: BTreeMap<String, Vec<String>> = field("domains")
+                    .map(|domains| {
+                        domains
+                            .split(',')
+                            .filter(|entry| !entry.is_empty())
+                            .filter_map(|entry| entry.split_once(':'))
+                            .map(|(leg, leg_domains)| {
+                                (
+                                    leg.to_string(),
+                                    leg_domains.split('+').map(|domain| domain.to_string()).collect(),
+                                )
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let settlement: Vec<WaveSettlementRecord> = field("settle")
+                    .map(|settle| {
+                        settle
+                            .split('|')
+                            .filter_map(|record| {
+                                let parts: Vec<&str> = record.split(':').collect();
+                                if parts.len() != 4 {
+                                    return None;
+                                }
+                                Some(WaveSettlementRecord {
+                                    wave: parts[0].parse().ok()?,
+                                    domains: if parts[1] == "-" {
+                                        Vec::new()
+                                    } else {
+                                        parts[1].split('+').map(|domain| domain.to_string()).collect()
+                                    },
+                                    outstanding_proofs: if parts[2] == "-" {
+                                        Vec::new()
+                                    } else {
+                                        parts[2].split('+').map(|proof| proof.to_string()).collect()
+                                    },
+                                    locally_recoverable: parts[3] == "local",
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                if settlement.len() != waves.len() {
+                    if try_dispatch_handler(vm) {
+                        continue;
+                    }
+                    return Err(ExecError::Panic(format!(
+                        "X3_PARALLEL_PLAN_INVALID: plan has {} wave(s) and {} settlement record(s); a \
+                         coordinator cannot be told what a wave owes if the plan does not say",
+                        waves.len(),
+                        settlement.len()
+                    )));
+                }
+                if legs < 2 || declared.len() != legs || domains.len() != legs {
                     if try_dispatch_handler(vm) {
                         continue;
                     }
@@ -723,7 +793,13 @@ pub(crate) fn execute(vm: &mut VM) -> ExecResult<()> {
                         declared.len()
                     )));
                 }
-                vm.state.parallel_plans.push(ParallelPlanRecord { legs, waves, edges });
+                vm.state.parallel_plans.push(ParallelPlanRecord {
+                    legs,
+                    waves,
+                    edges,
+                    domains,
+                    settlement,
+                });
                 vm.state.pc = align4(vm.state.pc + 3 + payload.len());
                 continue;
             }

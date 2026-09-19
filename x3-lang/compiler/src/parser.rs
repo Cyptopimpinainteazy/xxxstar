@@ -1611,6 +1611,14 @@ impl<'a> Parser<'a> {
                 Ok(Statement::Require(g))
             }
             Tok::Ident(ref s) if s == "timeout" => self.parse_intent_timeout(),
+            Tok::Ident(ref s) if s == "allow" => {
+                self.advance();
+                let feature = self.expect_ident("allowed feature")?;
+                self.opt_semi();
+                Ok(Statement::Allow {
+                    feature: Symbol::new(&feature),
+                })
+            }
             Tok::Ident(ref s) if s == "on_fail" => self.parse_intent_onfail(),
             Tok::KwOnFail => self.parse_intent_onfail(),
             Tok::Ident(ref s) if s == "use" => self.parse_intent_use(),
@@ -1828,6 +1836,15 @@ impl<'a> Parser<'a> {
                             {
                                 body.push(self.parse_route_step()?)
                             }
+                            // A leg that bridges must be able to declare its
+                            // expiry. Without this the verdict on a bridging leg
+                            // is "no refund path" — correct, and impossible for
+                            // the program to answer, because a leg had no way to
+                            // state a timeout. The intent clause parser is what
+                            // knows the `timeout <duration> refund <asset> to
+                            // <who>` form, so a leg borrows it rather than
+                            // growing a second spelling of the same statement.
+                            Tok::Ident(ref s) if s == "timeout" => body.push(self.parse_intent_timeout()?),
                             _ => body.push(self.parse_statement()?),
                         }
                     }

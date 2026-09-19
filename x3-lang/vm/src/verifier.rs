@@ -65,6 +65,15 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
                     return Err(VerifyError::JumpToNonBoundary(pc, target as usize));
                 }
             }
+            FEATURE_ALLOW => {
+                // A fixed three-byte frame whose operand is the feature code.
+                // The set is closed: consent to an unknown mode is not consent,
+                // and a byte that happens to decode as a feature must still name
+                // one the language defines.
+                if operand != u16::from(FEATURE_INTENT_FUSION) {
+                    return Err(VerifyError::InvalidOperand(pc));
+                }
+            }
             CALL => {
                 let target = operand as usize;
                 if target >= bytes.len() {
@@ -186,11 +195,17 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
             AssetOpPayload::Swap {
                 from_chain,
                 from_asset,
+                to_chain,
                 to_asset,
                 input_amount,
                 ..
             } => {
-                if from_chain.is_empty() || from_asset.is_empty() || to_asset.is_empty() || input_amount == 0 {
+                if from_chain.is_empty()
+                    || from_asset.is_empty()
+                    || to_chain.is_empty()
+                    || to_asset.is_empty()
+                    || input_amount == 0
+                {
                     return Err(VerifyError::InvalidOperand(pc));
                 }
             }
@@ -260,6 +275,45 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
                 if from == to || !declared.contains(&from) || !declared.contains(&to) {
                     return Err(VerifyError::InvalidOperand(pc));
                 }
+            }
+        }
+        // Every leg must name the domain it executes on: a plan that does not
+        // say which VM runs a leg is not a multi-VM plan, it is a list of legs
+        // with a multi-VM claim attached.
+        let domains = field("domains").ok_or(VerifyError::InvalidOperand(pc))?;
+        let mut with_domain = 0usize;
+        for entry in domains.split(',').filter(|entry| !entry.is_empty()) {
+            let Some((leg, leg_domains)) = entry.split_once(':') else {
+                return Err(VerifyError::InvalidOperand(pc));
+            };
+            if !declared.contains(&leg) || leg_domains.is_empty() {
+                return Err(VerifyError::InvalidOperand(pc));
+            }
+            with_domain += 1;
+        }
+        if with_domain != legs {
+            return Err(VerifyError::InvalidOperand(pc));
+        }
+        // The settlement section is what a coordinator acts on, so a plan
+        // without one, or with a record that does not line up with the waves,
+        // is refused rather than accepted as "no obligations".
+        let settle = field("settle").ok_or(VerifyError::InvalidOperand(pc))?;
+        let records: Vec<&str> = settle.split('|').collect();
+        if records.len() != waves.len() {
+            return Err(VerifyError::InvalidOperand(pc));
+        }
+        for (index, record) in records.iter().enumerate() {
+            let parts: Vec<&str> = record.split(':').collect();
+            if parts.len() != 4 || parts[0].parse::<usize>().ok() != Some(index) {
+                return Err(VerifyError::InvalidOperand(pc));
+            }
+            if parts[1].is_empty() || !matches!(parts[3], "local" | "coordinated") {
+                return Err(VerifyError::InvalidOperand(pc));
+            }
+            // The rule the compiler enforces, checked again where it is read: a
+            // wave over more than one domain is not locally recoverable.
+            if parts[1] != "-" && parts[1].contains('+') && parts[3] == "local" {
+                return Err(VerifyError::InvalidOperand(pc));
             }
         }
         return Ok(());

@@ -82,7 +82,23 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
                 }
                 let _ = criterion;
             }
-            Operation::ParallelPlan { waves, edges } => {
+            Operation::FeatureAllow { feature, name } => {
+                // The set of features is closed, and this is where the closure
+                // is enforced on the IR side: an unknown code means the artifact
+                // claims consent to something the language does not define.
+                if *feature != crate::spec::opcodes::FEATURE_INTENT_FUSION {
+                    push_unsafe(
+                        diagnostics,
+                        format!("{op_context}: unknown allowed feature code {feature} ({name})"),
+                    );
+                }
+            }
+            Operation::ParallelPlan {
+                waves,
+                edges,
+                domains,
+                settlement,
+            } => {
                 // The compiler built this plan, so what the IR verifier owes is
                 // a check that it is a plan: legs that appear exactly once, no
                 // empty wave, and no edge naming a leg that is not in it. A
@@ -111,6 +127,22 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
                     }
                     seen.push(leg.as_str());
                 }
+                for leg in &seen {
+                    match domains.get(*leg) {
+                        None => push_unsafe(
+                            diagnostics,
+                            format!("{op_context}: leg '{leg}' has no execution domain"),
+                        ),
+                        Some(leg_domains) => {
+                            if leg_domains.is_empty() {
+                                push_unsafe(
+                                    diagnostics,
+                                    format!("{op_context}: leg '{leg}' has an empty domain set"),
+                                );
+                            }
+                        }
+                    }
+                }
                 for (from, to) in edges {
                     if from == to || !seen.contains(&from.as_str()) || !seen.contains(&to.as_str()) {
                         push_unsafe(
@@ -118,6 +150,45 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
                             format!(
                                 "{op_context}: dependency {from}->{to} does not join two distinct legs \
                                  of this plan"
+                            ),
+                        );
+                    }
+                }
+                // Every wave owes a statement about its settlement. A wave with
+                // no entry is a wave whose recoverability nobody decided.
+                if settlement.len() != waves.len() {
+                    push_unsafe(
+                        diagnostics,
+                        format!(
+                            "{op_context}: {} wave(s) but {} settlement record(s)",
+                            waves.len(),
+                            settlement.len()
+                        ),
+                    );
+                }
+                for (index, record) in settlement.iter().enumerate() {
+                    if record.wave != index {
+                        push_unsafe(
+                            diagnostics,
+                            format!("{op_context}: settlement record {index} names wave {}", record.wave),
+                        );
+                    }
+                    if record.domains.is_empty() {
+                        push_unsafe(
+                            diagnostics,
+                            format!("{op_context}: wave {index} settles over no domain"),
+                        );
+                    }
+                    // A wave spanning more than one domain cannot be undone by
+                    // this VM alone; claiming otherwise would tell a coordinator
+                    // it has a rollback it does not have.
+                    if record.domains.len() > 1 && record.locally_recoverable {
+                        push_unsafe(
+                            diagnostics,
+                            format!(
+                                "{op_context}: wave {index} spans {} domains but is marked locally \
+                                 recoverable",
+                                record.domains.len()
                             ),
                         );
                     }
@@ -217,6 +288,7 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
             Operation::Swap {
                 from_chain,
                 from_asset,
+                to_chain,
                 to_asset,
                 input_amount,
                 min_output,
@@ -224,6 +296,7 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
             } => {
                 require_non_empty(diagnostics, &op_context, "from_chain", from_chain);
                 require_non_empty(diagnostics, &op_context, "from_asset", from_asset);
+                require_non_empty(diagnostics, &op_context, "to_chain", to_chain);
                 require_non_empty(diagnostics, &op_context, "to_asset", to_asset);
                 if let Some(dex) = dex {
                     require_non_empty(diagnostics, &op_context, "dex", dex);
