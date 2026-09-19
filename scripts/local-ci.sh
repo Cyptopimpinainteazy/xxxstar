@@ -73,6 +73,13 @@ for d in "$HOME"/.rustup/toolchains/"$PINNED_CHANNEL"*/bin "$HOME"/.rustup/toolc
 done
 if [ -n "$TOOLCHAIN_BIN" ]; then
   export PATH="$TOOLCHAIN_BIN:$PATH"
+  # Pin the compiler by absolute path as well: cargo looks `rustc` up on PATH
+  # for every crate it compiles, and a PATH lookup that lands on a shim the box
+  # is in the middle of replacing reports
+  #   `could not execute process rustc --crate-name ... (never executed)`
+  # with no path at all. RUSTC removes that lookup.
+  export RUSTC="$TOOLCHAIN_BIN/rustc"
+  export CARGO="$TOOLCHAIN_BIN/cargo"
 elif ! command -v cargo >/dev/null 2>&1; then
   echo "local-ci: cargo is not on PATH and no toolchain was found under" >&2
   echo "local-ci: ~/.rustup/toolchains/*/bin or ~/.cargo/bin — nothing can be" >&2
