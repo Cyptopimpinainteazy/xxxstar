@@ -31,7 +31,10 @@ anyhow = "1.0"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
+# `src/main.rs` installs a `tracing_subscriber::registry()` with
+# `tracing_subscriber::fmt::layer()`, so the `fmt` feature is required; without
+# it the binary does not compile ("could not find `fmt` in `tracing_subscriber`").
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 
 # Parsing
 tree-sitter = "0.20"

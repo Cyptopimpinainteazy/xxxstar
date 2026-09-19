@@ -8,6 +8,12 @@ use std::sync::Arc;
 
 use crate::document::DocumentStore;
 
+/// Function-definition regex, compiled once instead of per line.
+fn fn_def_re() -> &'static regex::Regex {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| regex::Regex::new(r"fn\s+(\w+)").expect("static regex is valid"))
+}
+
 /// Semantic token types used by the LSP.
 pub const TOKEN_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::NAMESPACE, // 0 - modules, crates
@@ -382,9 +388,10 @@ impl SemanticTokensProvider {
                 }
             }
 
-            // Find function definitions
-            if let Ok(re) = regex::Regex::new(r"fn\s+(\w+)") {
-                for caps in re.captures_iter(line) {
+            // Find function definitions. The regex is built once (see
+            // `fn_def_re`): compiling it per line made this quadratic.
+            {
+                for caps in fn_def_re().captures_iter(line) {
                     if let Some(name) = caps.get(1) {
                         let col = name.start() as u32;
                         tokens.push(SemanticToken {

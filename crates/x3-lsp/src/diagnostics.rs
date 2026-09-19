@@ -3,7 +3,27 @@
 use crate::document::DocumentStore;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range, Url};
 use regex::Regex;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+/// The per-line regexes are compiled once. Building a `Regex` inside the loop
+/// made diagnostics quadratic in document length (and clippy's
+/// `regex_creation_in_loops` flagged it).
+fn gas_limit_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"gas_limit:\s*(\d+)").expect("static regex is valid"))
+}
+
+fn compute_units_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"compute_units:\s*(\d+)").expect("static regex is valid"))
+}
+
+fn contract_address_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r#"contract:\s*"(0x[a-fA-F0-9]*)""#).expect("static regex is valid")
+    })
+}
 
 /// Provides diagnostics for X3 files.
 pub struct DiagnosticsProvider {
@@ -92,7 +112,7 @@ impl DiagnosticsProvider {
         // Check for EVM/SVM blocks in comits
         for (line_num, line) in content.lines().enumerate() {
             // Check for invalid gas limits
-            if let Some(caps) = Regex::new(r"gas_limit:\s*(\d+)").unwrap().captures(line) {
+            if let Some(caps) = gas_limit_re().captures(line) {
                 if let Ok(gas) = caps[1].parse::<u64>() {
                     if gas > 30_000_000 {
                         diagnostics.push(Diagnostic {
@@ -117,10 +137,7 @@ impl DiagnosticsProvider {
             }
 
             // Check for invalid compute units
-            if let Some(caps) = Regex::new(r"compute_units:\s*(\d+)")
-                .unwrap()
-                .captures(line)
-            {
+            if let Some(caps) = compute_units_re().captures(line) {
                 if let Ok(cu) = caps[1].parse::<u64>() {
                     if cu > 1_400_000 {
                         diagnostics.push(Diagnostic {
@@ -148,8 +165,7 @@ impl DiagnosticsProvider {
             }
 
             // Check for invalid addresses
-            let addr_re = Regex::new(r#"contract:\s*"(0x[a-fA-F0-9]*)""#).unwrap();
-            if let Some(caps) = addr_re.captures(line) {
+            if let Some(caps) = contract_address_re().captures(line) {
                 let addr = &caps[1];
                 if addr.len() != 42 {
                     diagnostics.push(Diagnostic {

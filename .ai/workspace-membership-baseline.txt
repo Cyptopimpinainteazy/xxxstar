@@ -8,21 +8,16 @@
 # crate appears in neither list, or when a fixed entry stays here.
 
 apotheosis-tx
-chronos-flash
 confidential-gpu
 dream-mining
 dylint-determinism
-gpu-sig-verifier
-import-queue-wrapper
 loom-concurrency
 orchestra
 pallet-x3-control
 pallet-x3-governance
 swarm-media
 voice-to-x3
-x3-chain-onboarding
 x3-indexer
-x3-lsp
 x3-mobile-sdk
 x3-pq
 x3-sidecar

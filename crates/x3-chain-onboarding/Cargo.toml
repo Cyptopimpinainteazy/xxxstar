@@ -15,6 +15,11 @@ scale-info = { workspace = true, default-features = false, features = ["derive"]
 sp-std = { workspace = true, default-features = false }
 serde = { workspace = true, optional = true, features = ["derive"] }
 
+# `src/tests.rs` is compiled under `#[cfg(test)]` and serialises records with
+# serde_json, which was never declared — the module could not compile.
+[dev-dependencies]
+serde_json = { workspace = true }
+
 [features]
 default = ["std"]
 std = [

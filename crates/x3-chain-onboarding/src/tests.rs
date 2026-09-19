@@ -1,16 +1,16 @@
 //! Unit tests for `x3-chain-onboarding`.
 //!
 //! Coverage (10 tests):
-//!  1. compute_composite — all-perfect scores yield 100.
-//!  2. compute_composite — all-zero scores yield 0.
-//!  3. compute_composite — known mixed scores match manual calculation.
-//!  4. compute_composite — only technical weight (30 %) applied correctly.
-//!  5. meets_approval_threshold — exact boundary values return true.
-//!  6. meets_approval_threshold — composite one below threshold returns false.
-//!  7. meets_approval_threshold — compliance one below threshold returns false.
-//!  8. meets_approval_threshold — technical one below threshold returns false.
-//!  9. SCALE codec roundtrip for ChainOnboardingRecord.
-//! 10. SCALE codec roundtrip for WeeklyProvingCycleSummary.
+//!  1. `compute_composite` — all-perfect scores yield 100.
+//!  2. `compute_composite` — all-zero scores yield 0.
+//!  3. `compute_composite` — known mixed scores match manual calculation.
+//!  4. `compute_composite` — only technical weight (30 %) applied correctly.
+//!  5. `meets_approval_threshold` — exact boundary values return true.
+//!  6. `meets_approval_threshold` — composite one below threshold returns false.
+//!  7. `meets_approval_threshold` — compliance one below threshold returns false.
+//!  8. `meets_approval_threshold` — technical one below threshold returns false.
+//!  9. SCALE codec roundtrip for `ChainOnboardingRecord`.
+//! 10. SCALE codec roundtrip for `WeeklyProvingCycleSummary`.
 
 use super::*;
 use codec::{Decode, Encode};

@@ -157,7 +157,7 @@ impl IntentDetector {
         // Match against known swap selectors
         for swap_sel in &self.swap_selectors {
             if selector == swap_sel.selector {
-                return self.parse_swap_intent(chain_id, tx_data, sender, gas_price, &swap_sel);
+                return self.parse_swap_intent(chain_id, tx_data, sender, gas_price, swap_sel);
             }
         }
 
@@ -206,17 +206,23 @@ impl IntentDetector {
     }
 
     fn decode_exact_input_single(&self, _data: &[u8]) -> Option<(Token, Token, Balance, Balance)> {
-        tracing::warn!("ChronosFlash: UniswapV3 exactInputSingle param decoding not yet implemented");
+        tracing::warn!(
+            "ChronosFlash: UniswapV3 exactInputSingle param decoding not yet implemented"
+        );
         None
     }
 
     fn decode_exact_input(&self, _data: &[u8]) -> Option<(Token, Token, Balance, Balance)> {
-        tracing::warn!("ChronosFlash: UniswapV3 exactInput (multi-hop) param decoding not yet implemented");
+        tracing::warn!(
+            "ChronosFlash: UniswapV3 exactInput (multi-hop) param decoding not yet implemented"
+        );
         None
     }
 
     fn decode_swap_exact_tokens(&self, _data: &[u8]) -> Option<(Token, Token, Balance, Balance)> {
-        tracing::warn!("ChronosFlash: UniswapV2 swapExactTokensForTokens param decoding not yet implemented");
+        tracing::warn!(
+            "ChronosFlash: UniswapV2 swapExactTokensForTokens param decoding not yet implemented"
+        );
         None
     }
 
@@ -226,16 +232,16 @@ impl IntentDetector {
                 name: "Uniswap V3".to_string(),
                 chain_id: 1,
                 address: [
-                    0xE5, 0x92, 0x42, 0x7A, 0x0A, 0xce, 0xc9, 0x2D, 0xe3, 0xEd, 0xee, 0x1F, 0x18,
-                    0xE0, 0x15, 0x7C, 0x05, 0x86, 0x15, 0x64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0xe5, 0x92, 0x42, 0x7a, 0x0a, 0xce, 0xc9, 0x2d, 0xe3, 0xed, 0xee, 0x1f, 0x18,
+                    0xe0, 0x15, 0x7c, 0x05, 0x86, 0x15, 0x64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
             },
             KnownRouter {
                 name: "Uniswap V2".to_string(),
                 chain_id: 1,
                 address: [
-                    0x7a, 0x25, 0x0d, 0x56, 0x30, 0xB4, 0xcF, 0x53, 0x97, 0x39, 0xdF, 0x2C, 0x5d,
-                    0xAc, 0xb4, 0xc6, 0x59, 0xF2, 0x48, 0x8D, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0x7a, 0x25, 0x0d, 0x56, 0x30, 0xb4, 0xcf, 0x53, 0x97, 0x39, 0xdf, 0x2c, 0x5d,
+                    0xac, 0xb4, 0xc6, 0x59, 0xf2, 0x48, 0x8d, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ],
             },
         ]

@@ -234,6 +234,12 @@ members = [
     # Burn-down batch 5 (issue #274).
     "crates/x3-dns-server",
     "crates/x3-marketplace",
+    # Burn-down batch 7 (issue #274).
+    "crates/gpu-sig-verifier",
+    "crates/chronos-flash",
+    "crates/import-queue-wrapper",
+    "crates/x3-chain-onboarding",
+    "crates/x3-lsp",
 ]
 default-members = ["node"]
 resolver = "2"

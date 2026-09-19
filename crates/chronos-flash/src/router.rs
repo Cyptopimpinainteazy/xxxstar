@@ -186,7 +186,9 @@ impl QuantumRouter {
         let mut visited = std::collections::HashSet::new();
         visited.insert(start);
 
-        self.dfs_paths(
+        // `dfs_paths` never reads `self` (clippy: "parameter is only used in
+        // recursion"), so it is an associated function.
+        Self::dfs_paths(
             graph,
             end,
             &mut current_path,
@@ -199,7 +201,6 @@ impl QuantumRouter {
     }
 
     fn dfs_paths(
-        &self,
         graph: &LiquidityGraph,
         end: Address,
         current: &mut Vec<Address>,
@@ -223,7 +224,7 @@ impl QuantumRouter {
                 if !visited.contains(next_token) {
                     visited.insert(*next_token);
                     current.push(*next_token);
-                    self.dfs_paths(graph, end, current, visited, paths, max_hops);
+                    Self::dfs_paths(graph, end, current, visited, paths, max_hops);
                     current.pop();
                     visited.remove(next_token);
                 }
@@ -382,10 +383,8 @@ impl QuantumRouter {
         // Uses Evolution Core for genetic algorithm optimization
         // Explores route permutations and hop reordering
 
-        let mut population: Vec<RouteIndividual> = routes
-            .into_iter()
-            .map(|r| RouteIndividual::new(r))
-            .collect();
+        let mut population: Vec<RouteIndividual> =
+            routes.into_iter().map(RouteIndividual::new).collect();
 
         // Run evolution
         for _ in 0..self.config.evolution_iterations {

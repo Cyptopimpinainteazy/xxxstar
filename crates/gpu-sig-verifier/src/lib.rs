@@ -2,16 +2,19 @@
 //!
 //! Implements high-performance signature verification using GPU acceleration
 //! for parallel processing of cryptographic signatures.
+//!
+//! **Status: no verification exists yet.** The previous implementation answered
+//! `Ok` whenever the signature string was longer than 64 characters and the
+//! payload was non-empty, so any 65-character string passed — and
+//! `import-queue-wrapper` used that answer to decide whether a transaction was
+//! `Verified`. Every verification now **fails closed** until a real verifier
+//! (GPU or otherwise) is wired in. Do not treat this crate as a security
+//! boundary.
 
-use std::collections::HashMap;
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tracing::{debug, info, warn};
-use tokio::sync::mpsc;
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
-use blake3::Hasher;
-use once_cell::sync::Lazy;
 
 /// Signature verification configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,34 +64,40 @@ pub struct GPUSignatureVerifier {
     config: VerifierConfig,
     gpu_context: Arc<Mutex<GPUContext>>,
     stats: Arc<Mutex<VerificationStats>>,
-    retry_queue: Arc<Mutex<Vec<VerificationRequest>>>,
 }
 
 impl GPUSignatureVerifier {
     /// Create a new GPU signature verifier
     pub fn new(config: VerifierConfig) -> Self {
+        // `config` is moved into the struct, so read the device id first.
+        let device_id = config.gpu_device_id;
         Self {
             config,
-            gpu_context: Arc::new(Mutex::new(GPUContext::new(config.gpu_device_id))),
+            gpu_context: Arc::new(Mutex::new(GPUContext::new(device_id))),
             stats: Arc::new(Mutex::new(VerificationStats::new())),
-            retry_queue: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
     /// Verify a single signature
-    pub async fn verify_signature(&self, signature: &str, data: &[u8]) -> Result<VerificationResult> {
+    pub async fn verify_signature(
+        &self,
+        signature: &str,
+        data: &[u8],
+    ) -> Result<VerificationResult> {
         let request = VerificationRequest {
             id: generate_signature_id(),
             signature: signature.to_string(),
             data: data.to_vec(),
-            attempts: 0,
         };
 
         self.process_request(request).await
     }
 
     /// Verify multiple signatures in parallel
-    pub async fn verify_signatures(&self, signatures: Vec<(&str, &[u8])>) -> Result<Vec<VerificationResult>> {
+    pub async fn verify_signatures(
+        &self,
+        signatures: Vec<(&str, &[u8])>,
+    ) -> Result<Vec<VerificationResult>> {
         let mut results = Vec::with_capacity(signatures.len());
         let mut requests = Vec::with_capacity(signatures.len());
 
@@ -97,7 +106,6 @@ impl GPUSignatureVerifier {
                 id: generate_signature_id(),
                 signature: signature.to_string(),
                 data: data.to_vec(),
-                attempts: 0,
             };
             requests.push(request);
         }
@@ -118,15 +126,20 @@ impl GPUSignatureVerifier {
 
         while attempts <= self.config.max_retries {
             let start_time = Instant::now();
-            let verification = self.gpu_context.lock().await.verify(&request).await;
+            let verification = self
+                .gpu_context
+                .lock()
+                .map_err(|e| anyhow!("gpu context mutex poisoned: {e}"))?
+                .verify(&request);
 
             let elapsed_time = start_time.elapsed().as_millis() as f64;
-            let verified = verification.is_ok();
-
-            // Update stats
-            self.update_stats(verified, elapsed_time).await;
 
             if verification.is_ok() {
+                // Count each *request* once, not each retry attempt: the
+                // counters used to be updated inside the retry loop, so a
+                // request that failed `max_retries + 1` times was counted that
+                // many times.
+                self.update_stats(true, elapsed_time);
                 result = Some(VerificationResult {
                     signature_id: request.id.clone(),
                     verified: true,
@@ -138,11 +151,17 @@ impl GPUSignatureVerifier {
             } else {
                 attempts += 1;
                 if attempts > self.config.max_retries {
+                    self.update_stats(false, elapsed_time);
                     result = Some(VerificationResult {
                         signature_id: request.id.clone(),
                         verified: false,
                         verification_time_ms: elapsed_time,
-                        error_message: Some(verification.err().unwrap_or("Unknown error".to_string())),
+                        error_message: Some(
+                            verification
+                                .err()
+                                .map(|e| e.to_string())
+                                .unwrap_or_else(|| "Unknown error".to_string()),
+                        ),
                         batch_id: 0,
                     });
                 }
@@ -153,8 +172,15 @@ impl GPUSignatureVerifier {
     }
 
     /// Process batch of verification requests
-    async fn process_batch(&self, requests: &[VerificationRequest]) -> Result<Vec<VerificationResult>> {
-        let batch_id = self.stats.lock().await.next_batch_id;
+    async fn process_batch(
+        &self,
+        requests: &[VerificationRequest],
+    ) -> Result<Vec<VerificationResult>> {
+        let batch_id = self
+            .stats
+            .lock()
+            .map_err(|e| anyhow!("stats mutex poisoned: {e}"))?
+            .next_batch_id;
         let start_time = Instant::now();
 
         let mut results = Vec::with_capacity(requests.len());
@@ -162,7 +188,11 @@ impl GPUSignatureVerifier {
         let mut failed = 0;
 
         for request in requests {
-            let verification = self.gpu_context.lock().await.verify(request).await;
+            let verification = self
+                .gpu_context
+                .lock()
+                .map_err(|e| anyhow!("gpu context mutex poisoned: {e}"))?
+                .verify(request);
             let elapsed_time = start_time.elapsed().as_millis() as f64;
 
             if verification.is_ok() {
@@ -180,7 +210,12 @@ impl GPUSignatureVerifier {
                     signature_id: request.id.clone(),
                     verified: false,
                     verification_time_ms: elapsed_time,
-                    error_message: Some(verification.err().unwrap_or("Unknown error".to_string())),
+                    error_message: Some(
+                        verification
+                            .err()
+                            .map(|e| e.to_string())
+                            .unwrap_or_else(|| "Unknown error".to_string()),
+                    ),
                     batch_id,
                 });
             }
@@ -191,14 +226,26 @@ impl GPUSignatureVerifier {
         let throughput = (requests.len() as f64 / (total_time / 1000.0)).max(1.0);
 
         // Update global stats
-        self.update_batch_stats(batch_id, requests.len(), successful, failed, total_time / requests.len() as f64, throughput).await;
+        self.update_batch_stats(
+            batch_id,
+            requests.len(),
+            successful,
+            failed,
+            total_time / requests.len() as f64,
+            throughput,
+        );
 
         Ok(results)
     }
 
     /// Update verification statistics
-    async fn update_stats(&self, verified: bool, time_ms: f64) {
-        let mut stats = self.stats.lock().await;
+    fn update_stats(&self, verified: bool, time_ms: f64) {
+        let mut stats = match self.stats.lock() {
+            Ok(stats) => stats,
+            // A poisoned stats mutex must not stop verification from failing
+            // closed; the counters are diagnostics, not the verdict.
+            Err(poisoned) => poisoned.into_inner(),
+        };
         stats.total_verifications += 1;
         stats.total_time_ms += time_ms;
 
@@ -212,8 +259,19 @@ impl GPUSignatureVerifier {
     }
 
     /// Update batch statistics
-    async fn update_batch_stats(&self, batch_id: u32, total: usize, successful: usize, failed: usize, avg_time: f64, throughput: f64) {
-        let mut stats = self.stats.lock().await;
+    fn update_batch_stats(
+        &self,
+        batch_id: u32,
+        total: usize,
+        successful: usize,
+        failed: usize,
+        avg_time: f64,
+        throughput: f64,
+    ) {
+        let mut stats = match self.stats.lock() {
+            Ok(stats) => stats,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         stats.batch_stats.push(BatchStats {
             batch_id,
             total_signatures: total,
@@ -227,18 +285,26 @@ impl GPUSignatureVerifier {
 
     /// Get verification statistics
     pub async fn get_stats(&self) -> VerificationStats {
-        self.stats.lock().await.clone()
+        match self.stats.lock() {
+            Ok(stats) => stats.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
     }
 
     /// Get batch statistics
     pub async fn get_batch_stats(&self) -> Vec<BatchStats> {
-        self.stats.lock().await.batch_stats.clone()
+        match self.stats.lock() {
+            Ok(stats) => stats.batch_stats.clone(),
+            Err(poisoned) => poisoned.into_inner().batch_stats.clone(),
+        }
     }
 
     /// Clear statistics
     pub async fn clear_stats(&self) {
-        let mut stats = self.stats.lock().await;
-        stats.clear();
+        match self.stats.lock() {
+            Ok(mut stats) => stats.clear(),
+            Err(poisoned) => poisoned.into_inner().clear(),
+        }
     }
 }
 
@@ -253,18 +319,22 @@ impl GPUContext {
         Self { device_id }
     }
 
-    async fn verify(&mut self, request: &VerificationRequest) -> Result<()> {
-        // Simulate GPU verification
-        if Self::simulate_verification(&request.signature, &request.data) {
-            Ok(())
-        } else {
-            Err(anyhow!("Verification failed"))
-        }
-    }
-
-    fn simulate_verification(signature: &str, data: &[u8]) -> bool {
-        // Simple validation - in real implementation this would use GPU acceleration
-        !signature.is_empty() && signature.len() > 64 && data.len() > 0
+    /// Refuse every request.
+    ///
+    /// There is no GPU (or CPU) verifier behind this type yet. The previous
+    /// body returned `Ok(())` for `signature.len() > 64 && !data.is_empty()`,
+    /// which accepts `signature = "x".repeat(65)` as valid for any payload;
+    /// `import-queue-wrapper` then marked the transaction `Verified` and moved
+    /// it to `ReadyForInclusion`. "Not verified" is the only honest verdict
+    /// until a real implementation exists.
+    fn verify(&self, _request: &VerificationRequest) -> Result<()> {
+        Err(anyhow!(
+            "GPU signature verification is not implemented (requested device {}); refusing to verify {} ({} signature byte(s) over {} payload byte(s))",
+            self.device_id,
+            _request.id,
+            _request.signature.len(),
+            _request.data.len()
+        ))
     }
 }
 
@@ -274,7 +344,6 @@ struct VerificationRequest {
     id: String,
     signature: String,
     data: Vec<u8>,
-    attempts: u8,
 }
 
 /// Global verification statistics
@@ -323,44 +392,66 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_gpu_verifier_basic_flow() {
+    async fn verifier_fails_closed_for_every_signature() {
         let config = VerifierConfig::default();
         let verifier = GPUSignatureVerifier::new(config);
 
-        // Test valid signature
-        let result = verifier.verify_signature("valid_sig_123", b"test_data").await.unwrap();
-        assert!(result.verified);
+        // The exploit this crate used to accept: any string longer than 64
+        // characters was reported as a verified signature for any payload.
+        let forged = "x".repeat(65);
+        let result = verifier
+            .verify_signature(&forged, b"test_data")
+            .await
+            .unwrap();
+        assert!(
+            !result.verified,
+            "a 65-character string must not verify as a signature"
+        );
+        assert!(
+            result
+                .error_message
+                .as_deref()
+                .is_some_and(|m| m.contains("not implemented")),
+            "the failure must say why: {:?}",
+            result.error_message
+        );
 
-        // Test invalid signature
         let result = verifier.verify_signature("", b"").await.unwrap();
         assert!(!result.verified);
-
-        // Test batch verification
-        let signatures = vec![
-            ("valid_sig_1", b"data1"),
-            ("valid_sig_2", b"data2"),
-            ("", b"data3"),
-        ];
-        let results = verifier.verify_signatures(signatures).await.unwrap();
-        assert_eq!(results.len(), 3);
-        assert_eq!(results.iter().filter(|r| r.verified).count(), 2);
     }
 
     #[tokio::test]
-    async fn test_verification_stats() {
+    async fn batch_verification_reports_no_successes() {
+        let verifier = GPUSignatureVerifier::new(VerifierConfig::default());
+        let long_a = "a".repeat(128);
+        let long_b = "b".repeat(128);
+        let payload: &[u8] = b"payload";
+        let signatures: Vec<(&str, &[u8])> = vec![
+            (long_a.as_str(), payload),
+            (long_b.as_str(), payload),
+            ("", payload),
+        ];
+        let results = verifier.verify_signatures(signatures).await.unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(
+            results.iter().filter(|r| r.verified).count(),
+            0,
+            "nothing may be reported verified while no verifier exists"
+        );
+    }
+
+    #[tokio::test]
+    async fn stats_count_failures_not_successes() {
         let config = VerifierConfig::default();
         let verifier = GPUSignatureVerifier::new(config);
 
-        // Perform some verifications
         verifier.verify_signature("sig1", b"data1").await.unwrap();
         verifier.verify_signature("sig2", b"data2").await.unwrap();
         verifier.verify_signature("invalid", b"").await.unwrap();
 
-        // Get stats
         let stats = verifier.get_stats().await;
         assert_eq!(stats.total_verifications, 3);
-        assert_eq!(stats.successful_verifications, 2);
-        assert_eq!(stats.failed_verifications, 1);
-        assert!(stats.average_time_ms > 0.0);
+        assert_eq!(stats.successful_verifications, 0);
+        assert_eq!(stats.failed_verifications, 3);
     }
 }

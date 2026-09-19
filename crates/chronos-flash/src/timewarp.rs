@@ -137,7 +137,7 @@ impl TimeWarpEngine {
         // Calculate time advantage
         // Negative means we executed BEFORE the user's original transaction
         let latency_ms = start_time.elapsed().as_millis() as u64;
-        let time_advantage = self.calculate_time_advantage(&bundle).await;
+        let time_advantage = self.calculate_time_advantage(bundle).await;
 
         let result = ExecutionResult {
             route_id: bundle.route.id,

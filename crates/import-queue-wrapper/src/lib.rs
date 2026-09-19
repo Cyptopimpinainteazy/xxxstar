@@ -4,14 +4,22 @@
 //! parallel processing capabilities and GPU-accelerated signature verification.
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::{debug, info, warn};
-use tokio::sync::{mpsc, RwLock};
+// Every one of the queue's mutexes is locked with `.lock().await` inside async
+// functions that are `tokio::spawn`ed, so they must be `tokio::sync::Mutex`:
+// the crate used `std::sync::Mutex` and awaited its guards, which does not
+// compile (and would not be `Send` across an await point even if it did).
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 use tokio::time::interval;
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
+// The crate referenced `TransactionMeta`, `GPUSignatureVerifier` and
+// `VerifierConfig` without ever importing them, so it had never compiled.
+use gpu_sig_verifier::GPUSignatureVerifier;
+use parallel_proposer::TransactionMeta;
 
 /// Import queue configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,7 +113,10 @@ impl ImportQueueWrapper {
 
     /// Start the import queue processing
     pub async fn start(&mut self) -> Result<()> {
-        info!("Starting import queue with {} workers", self.config.parallel_workers);
+        info!(
+            "Starting import queue with {} workers",
+            self.config.parallel_workers
+        );
 
         // Start worker pool
         for worker_id in 0..self.config.parallel_workers {
@@ -116,14 +127,25 @@ impl ImportQueueWrapper {
             let stats_clone = self.stats.clone();
 
             let handle = tokio::spawn(async move {
-                worker_main(worker_id, queue_clone, priority_queue_clone, verifier_clone, config_clone, stats_clone).await;
+                worker_main(
+                    worker_id,
+                    queue_clone,
+                    priority_queue_clone,
+                    verifier_clone,
+                    config_clone,
+                    stats_clone,
+                )
+                .await;
             });
 
             self.worker_handles.push(handle);
         }
 
         // Start cleanup task
-        let cleanup_handle = self.start_cleanup_task();
+        // `start_cleanup_task` is `async`, so it has to be awaited: pushing the
+        // future itself into a `Vec<JoinHandle<()>>` does not typecheck (and the
+        // task would never have started).
+        let cleanup_handle = self.start_cleanup_task().await;
         self.worker_handles.push(cleanup_handle);
 
         Ok(())
@@ -151,6 +173,9 @@ impl ImportQueueWrapper {
             verification_status: VerificationStatus::Pending,
             processing_stage: ProcessingStage::Queued,
         };
+        // The entry is moved into one of the queues below, so keep the id for
+        // the return value (this used to be a borrow-after-move).
+        let entry_id = entry.id.clone();
 
         // Add to appropriate queue
         if self.config.enable_priority {
@@ -167,7 +192,7 @@ impl ImportQueueWrapper {
         // Update stats
         self.update_stats().await;
 
-        Ok(entry.id.clone())
+        Ok(entry_id)
     }
 
     /// Get queue statistics
@@ -200,7 +225,12 @@ impl ImportQueueWrapper {
 
             loop {
                 interval.tick().await;
-                cleanup_queues(queue_clone.clone(), priority_queue_clone.clone(), stats_clone.clone()).await;
+                cleanup_queues(
+                    queue_clone.clone(),
+                    priority_queue_clone.clone(),
+                    stats_clone.clone(),
+                )
+                .await;
             }
         })
     }
@@ -225,7 +255,13 @@ async fn worker_main(
 
     loop {
         // Get next transaction from queue
-        let entry = match get_next_entry(queue.clone(), priority_queue.clone(), config.enable_priority).await {
+        let entry = match get_next_entry(
+            queue.clone(),
+            priority_queue.clone(),
+            config.enable_priority,
+        )
+        .await
+        {
             Some(entry) => entry,
             None => {
                 tokio::time::sleep(Duration::from_millis(100)).await;
@@ -234,13 +270,21 @@ async fn worker_main(
         };
 
         // Process transaction
-        if let Err(e) = process_entry(entry, verifier.clone(), config.clone()).await {
+        let outcome = process_entry(entry, verifier.clone(), config.clone()).await;
+        if let Err(e) = &outcome {
             warn!("Worker {} error processing entry: {}", worker_id, e);
         }
 
-        // Update stats
+        // Update stats. `verified_entries`/`failed_entries` were declared but
+        // never written, so a queue that rejected every transaction still
+        // reported zero failures — the counters are the only way to observe
+        // from outside whether anything got past verification.
         let mut stats_lock = stats.lock().await;
         stats_lock.total_entries += 1;
+        match outcome {
+            Ok(()) => stats_lock.verified_entries += 1,
+            Err(_) => stats_lock.failed_entries += 1,
+        }
     }
 }
 
@@ -258,7 +302,10 @@ async fn get_next_entry(
         priorities.reverse();
 
         for priority in priorities {
-            if let Some(entry) = priority_queue_lock.get_mut(&priority).and_then(|q| q.pop_front()) {
+            if let Some(entry) = priority_queue_lock
+                .get_mut(&priority)
+                .and_then(|q| q.pop_front())
+            {
                 return Some(entry);
             }
         }
@@ -274,23 +321,21 @@ async fn get_next_entry(
 async fn process_entry(
     mut entry: QueueEntry,
     verifier: Arc<Mutex<GPUSignatureVerifier>>,
-    config: QueueConfig,
+    _config: QueueConfig,
 ) -> Result<()> {
     // Stage 1: Contention check
     entry.processing_stage = ProcessingStage::ContentionCheck;
-    
+
     // Check for potential contention using the transaction features
     // High-value or high-gas transactions are flagged for contention analysis
     let has_high_value = entry.transaction.value > 1_000_000_000;
     let has_high_gas = entry.transaction.gas_price > 50_000_000;
-    
+
     if has_high_value || has_high_gas {
         // Log potential contention for monitoring
         debug!(
             "Transaction {} flagged for contention check (value: {}, gas_price: {})",
-            entry.id,
-            entry.transaction.value,
-            entry.transaction.gas_price
+            entry.id, entry.transaction.value, entry.transaction.gas_price
         );
         // In production, this would query the contention predictor
         // For now, we proceed but track the potential for parallel execution
@@ -301,7 +346,10 @@ async fn process_entry(
     let verification_result = verifier
         .lock()
         .await
-        .verify_signature(&entry.transaction.signature, &entry.transaction_hash().as_bytes())
+        .verify_signature(
+            &entry.transaction.signature,
+            entry.transaction_hash().as_bytes(),
+        )
         .await?;
 
     if verification_result.verified {
@@ -398,6 +446,7 @@ impl QueueStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpu_sig_verifier::VerifierConfig;
 
     #[tokio::test]
     async fn test_import_queue_basic_flow() {
@@ -482,6 +531,56 @@ mod tests {
         assert_eq!(size, 2);
 
         // Stop queue
+        queue.stop().await.unwrap();
+    }
+
+    fn tx_with_signature(signature: String) -> TransactionMeta {
+        TransactionMeta {
+            tx_hash: "forged_tx".to_string(),
+            sender: "0x1234".to_string(),
+            receiver: "0x5678".to_string(),
+            value: 1_000_000_000,
+            gas_limit: 21_000,
+            gas_price: 20_000_000,
+            nonce: 7,
+            signature,
+            contract_address: None,
+            timestamp: 1234567890,
+        }
+    }
+
+    /// End-to-end proof that the forged-signature hole is closed.
+    ///
+    /// The verifier used to answer "verified" for any signature longer than 64
+    /// characters, and `process_entry` marked such a transaction
+    /// `ReadyForInclusion`. A 65-character string must now never be counted as
+    /// verified by the queue.
+    #[tokio::test]
+    async fn forged_signature_is_never_verified() {
+        let mut queue = ImportQueueWrapper::new(
+            QueueConfig::default(),
+            GPUSignatureVerifier::new(VerifierConfig::default()),
+        );
+        queue.start().await.unwrap();
+
+        queue
+            .submit_transaction(tx_with_signature("x".repeat(65)), 1)
+            .await
+            .unwrap();
+
+        // Let a worker pick the entry up; workers poll every 100 ms.
+        tokio::time::sleep(Duration::from_millis(600)).await;
+
+        let stats = queue.get_stats().await;
+        assert_eq!(
+            stats.verified_entries, 0,
+            "a 65-character string must never verify: {stats:?}"
+        );
+        assert!(
+            stats.failed_entries >= 1,
+            "the entry must be recorded as failed: {stats:?}"
+        );
+
         queue.stop().await.unwrap();
     }
 }
