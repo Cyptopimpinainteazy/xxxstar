@@ -1,6 +1,6 @@
 .PHONY: guard test audit mainnet-check fresh-machine-check check-make-gates\
  test-node-build test-atomic-kernel test-atomic-router test-axe test-x3-forge test-x3-sentinel\
- test-x3-wallet test-atomic-gateway test-x3-readiness test-x3-lang-vm\
+ test-x3-wallet test-atomic-gateway test-x3-readiness test-x3-lang-vm test-foundry\
  test-runtime-upgrade test-all-pallets fmt lint\
 local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-loom local-ci-list\
  local-ci-all local-ci-prepush local-ci-dry-run\
@@ -104,6 +104,8 @@ test-x3-readiness:
 	@cargo test -p x3-readiness --tests
 test-x3-lang-vm:
 	@cargo test --manifest-path x3-lang/Cargo.toml --tests
+test-foundry:
+	@log=$$(mktemp); cargo test -p x3-foundry-core -p x3-foundry-auditor -p x3-foundry-revenue -p x3-foundry-indexer > "$$log" 2>&1; rc=$$?; tail -n 5 "$$log"; rm -f "$$log"; exit $$rc
 test-runtime-upgrade:
 	@echo "=== Runtime upgrade rehearsal (migration dry-run per variant) ==="
 	@bash scripts/check-runtime-variants.sh
