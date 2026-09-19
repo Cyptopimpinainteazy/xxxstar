@@ -33,7 +33,12 @@ IGNORE_PREFIXES = (
     "tests/phase_core/security/lib/forge-std/",
 )
 SECRET_PATTERNS = [
-    r"(?i)\b(private[_-]?key|mnemonic|api[_-]?key|rpc[_-]?key)\b\s*[:=]\s*['\"]?[^'\"\s]{8,}",
+    # `(?::(?!:)|=)` rather than `[:=]`: a bare `:` still matches (YAML/JSON-
+    # style `mnemonic: "..."`), but the first `:` of Rust's `::` path
+    # separator does not, so a comment or code merely *naming* a type like
+    # `Mnemonic::parse_in` or `PrivateKey::from_bytes` cannot be misread as an
+    # assignment of a secret value to a variable called mnemonic/private_key/etc.
+    r"(?i)\b(private[_-]?key|mnemonic|api[_-]?key|rpc[_-]?key)\b\s*(?::(?!:)|=)\s*['\"]?[^'\"\s]{8,}",
     r"AKIA[0-9A-Z]{16}",
     r"-----BEGIN (EC|RSA|OPENSSH) PRIVATE KEY-----",
 ]
@@ -56,6 +61,12 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)API_KEY\s*=\s*(process\.env|os\.environ|\$INFRA_API_KEY|\"infra_x+\"|your-secret-api-key)",
     r'(?i)API_KEY\s*=\s*"\$\{[A-Z0-9_]+:-\}"',
     r"(?i)mnemonic\s*=\s*bip39::Mnemonic::from_phrase\(\s*seed_phrase\s*,",
+    # bip39 2.x replaced `Mnemonic::from_phrase` with `Mnemonic::parse_in`
+    # (crates/x3-mobile-sdk/src/mobile_wallet_core.rs) — same benign pattern
+    # (a local `mnemonic` binding from a real bip39 parse call, not a secret
+    # value), just the new API's name. The from_phrase entries above stay for
+    # any code that hasn't migrated yet.
+    r"(?i)\bmnemonic\s*=\s*bip39::Mnemonic::parse_in\(",
     r"(?i)apiKey\s*:\s*'your-api-key'",
     r"(?i)apiKey\s*:\s*config\.(apiKey|privateKey)",
     r"(?i)this\.config\.apiKey\s*=\s*(token|undefined)\b",
