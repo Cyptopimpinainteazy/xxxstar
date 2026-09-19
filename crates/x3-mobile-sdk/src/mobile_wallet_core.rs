@@ -1,33 +1,31 @@
 //! Core mobile wallet engine
-//! 
+//!
 //! Manages wallet lifecycle, balance tracking, and state synchronization
 //! with the X3 blockchain via JSON-RPC.
 
 use crate::SdkError;
 use serde::{Deserialize, Serialize};
-use sp_runtime::MultiAddress;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
-use zeroize::Zeroize;
 
 /// Mobile wallet configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MobileWalletConfig {
     /// RPC endpoint URL (http://localhost:9944, https://testnet.x3.io, etc.)
     pub rpc_endpoint: String,
-    
+
     /// Default network (testnet, mainnet, local)
     pub network: String,
-    
+
     /// Minimum balance for transactions
     pub min_balance: u128,
-    
+
     /// Transaction timeout in seconds (300 = 5 min)
     pub tx_timeout: u64,
-    
+
     /// Enable offline mode (prepare txs without broadcasting)
     pub offline_mode: bool,
-    
+
     /// Cache block height for optimization
     pub cache_block_height: bool,
 }
@@ -108,7 +106,7 @@ impl MobileWallet {
             "Initializing MobileWallet with RPC: {}",
             config.rpc_endpoint
         );
-        
+
         Ok(Self {
             config,
             addresses: RwLock::new(Vec::new()),
@@ -135,13 +133,18 @@ impl MobileWallet {
             return Err(SdkError::InvalidAddress);
         }
 
-        // BIP-39 mnemonic -> seed -> BIP-32 derived keypair
-        let mnemonic = bip39::Mnemonic::from_phrase(seed_phrase, bip39::Language::English)
+        // BIP-39 mnemonic -> seed -> BIP-32 derived keypair.
+        //
+        // `Mnemonic::from_phrase` and `Seed::new` no longer exist in bip39 2.x;
+        // they were replaced by `Mnemonic::parse_in` and `Mnemonic::to_seed`.
+        let mnemonic = bip39::Mnemonic::parse_in(bip39::Language::English, seed_phrase)
             .map_err(|_| SdkError::InvalidAddress)?;
-        let seed = bip39::Seed::new(&mnemonic, "");
+        let seed = mnemonic.to_seed("");
         let xpriv = bip32::XPrv::derive_from_path(
-            seed.as_bytes(),
-            &derivation_path.parse().map_err(|_| SdkError::InvalidAddress)?,
+            seed,
+            &derivation_path
+                .parse()
+                .map_err(|_| SdkError::InvalidAddress)?,
         )
         .map_err(|_| SdkError::InvalidAddress)?;
         let public_key = xpriv.public_key().to_bytes();
@@ -151,13 +154,13 @@ impl MobileWallet {
 
         let wallet_address = WalletAddress {
             address: address.clone(),
-            public_key,
+            public_key: public_key.to_vec(),
             label: None,
             created_at: now,
         };
 
         self.addresses.write().await.push(wallet_address.clone());
-        
+
         tracing::info!("Imported wallet address: {}", address);
         Ok(wallet_address)
     }
@@ -168,13 +171,9 @@ impl MobileWallet {
     }
 
     /// Set label for an address
-    pub async fn set_address_label(
-        &self,
-        address: &str,
-        label: String,
-    ) -> Result<(), SdkError> {
+    pub async fn set_address_label(&self, address: &str, label: String) -> Result<(), SdkError> {
         let mut addrs = self.addresses.write().await;
-        
+
         if let Some(wallet_addr) = addrs.iter_mut().find(|a| a.address == address) {
             wallet_addr.label = Some(label);
             tracing::info!("Updated label for {}", address);
@@ -184,26 +183,40 @@ impl MobileWallet {
         }
     }
 
-    /// Fetch balance from chain via RPC (batched query)
+    /// Configure the RPC endpoint this wallet would talk to.
+    ///
+    /// Storing an endpoint does not connect to one — nothing in this SDK speaks
+    /// JSON-RPC yet, which is why `fetch_balance` refuses.
+    pub async fn set_rpc_endpoint(&self, endpoint: &str) {
+        *self.rpc_client.lock().await = Some(endpoint.to_string());
+    }
+
+    /// The configured RPC endpoint, if one was set.
+    pub async fn rpc_endpoint(&self) -> Option<String> {
+        self.rpc_client.lock().await.clone()
+    }
+
+    /// The error for a call that needs the chain client.
+    async fn chain_client_unavailable(&self) -> SdkError {
+        SdkError::RpcNotImplemented(match self.rpc_client.lock().await.as_deref() {
+            Some(endpoint) => format!(
+                "refusing to answer from a chain this SDK cannot read; endpoint {endpoint} is \
+                 configured but unused"
+            ),
+            None => "refusing to answer from a chain this SDK cannot read; no endpoint is \
+                     configured"
+                .to_string(),
+        })
+    }
+
+    /// Fetch balance from chain via RPC (batched query).
+    ///
+    /// Refused, not invented. This used to cache and return a balance of
+    /// exactly 10 X3 at block 1000 for every address, so a wallet would show a
+    /// user funds it never asked the chain about.
     pub async fn fetch_balance(&self, address: &str) -> Result<WalletBalance, SdkError> {
-        tracing::info!("Fetching balance for {}", address);
-        
-        // In production: Call system.account RPC method
-        // For now, return default balance
-        let balance = WalletBalance {
-            free: 10_000_000_000,
-            reserved: 0,
-            frozen: 0,
-            block_number: 1000,
-            last_updated: chrono::Utc::now().timestamp(),
-        };
-
-        self.balances
-            .write()
-            .await
-            .insert(address.to_string(), balance.clone());
-
-        Ok(balance)
+        tracing::info!("Balance requested for {}", address);
+        Err(self.chain_client_unavailable().await)
     }
 
     /// Get cached balance
@@ -229,13 +242,16 @@ impl MobileWallet {
         };
 
         self.recent_txs.write().await.push(tx.clone());
-        
+
         tracing::info!("Tracked transaction: {}", tx_hash);
         Ok(tx)
     }
 
     /// Get recent transactions (last N)
-    pub async fn get_recent_transactions(&self, limit: usize) -> Result<Vec<RecentTransaction>, SdkError> {
+    pub async fn get_recent_transactions(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<RecentTransaction>, SdkError> {
         let txs = self.recent_txs.read().await;
         Ok(txs.iter().rev().take(limit).cloned().collect())
     }
@@ -247,28 +263,24 @@ impl MobileWallet {
         state: TransactionState,
     ) -> Result<(), SdkError> {
         let mut txs = self.recent_txs.write().await;
-        
+
         if let Some(tx) = txs.iter_mut().find(|t| t.tx_hash == tx_hash) {
-            tx.state = state;
             tracing::info!("Updated tx {} state to {:?}", tx_hash, state);
+            tx.state = state;
             Ok(())
         } else {
             Err(SdkError::InvalidAddress)
         }
     }
 
-    /// Get network status
+    /// Get network status.
+    ///
+    /// Refused, not invented: this used to report `is_connected: true`, block
+    /// 1000, finalized 998 and a node version for any configuration, without a
+    /// request. "Connected" has to mean something the SDK checked.
     pub async fn get_network_status(&self) -> Result<NetworkStatus, SdkError> {
-        tracing::info!("Checking network status for {}", self.config.rpc_endpoint);
-        
-        // In production: Query chain.getFinalizedHead, system.chainType, etc.
-        Ok(NetworkStatus {
-            is_connected: true,
-            block_height: 1000,
-            finalized_block: 998,
-            node_version: "1.0.0".to_string(),
-            network: self.config.network.clone(),
-        })
+        tracing::info!("Network status requested for {}", self.config.rpc_endpoint);
+        Err(self.chain_client_unavailable().await)
     }
 
     /// Check if balance is sufficient
@@ -282,18 +294,23 @@ impl MobileWallet {
             Some(balance) => {
                 let available = balance.available();
                 let total_required = amount.saturating_add(fee_estimate);
-                let can_afford = available >= total_required && available >= self.config.min_balance;
-                
+                let can_afford =
+                    available >= total_required && available >= self.config.min_balance;
+
                 tracing::info!(
                     "Balance check: available={}, required={}, ok={}",
                     available,
                     total_required,
                     can_afford
                 );
-                
+
                 Ok(can_afford)
             }
-            None => Err(SdkError::WalletNotInitialized),
+            // No cached balance is not "the wallet is not initialized": it
+            // means the answer has to come from the chain, and this SDK has no
+            // chain client. `WalletNotInitialized` here made an unanswerable
+            // question look like a lifecycle mistake.
+            None => Err(self.chain_client_unavailable().await),
         }
     }
 
@@ -302,7 +319,7 @@ impl MobileWallet {
         self.addresses.write().await.clear();
         self.balances.write().await.clear();
         self.recent_txs.write().await.clear();
-        
+
         tracing::warn!("Wallet reset - all local data cleared");
         Ok(())
     }
@@ -354,10 +371,10 @@ mod tests {
     async fn test_import_seed_phrase() {
         let config = MobileWalletConfig::default();
         let wallet = MobileWallet::new(config).await.unwrap();
-        
+
         let seed = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         let path = "m/44'/60'/0'/0/0";
-        
+
         let addr = wallet.import_from_seed(seed, path).await.unwrap();
         assert!(addr.address.starts_with("x3:"));
     }
@@ -366,10 +383,10 @@ mod tests {
     async fn test_invalid_seed_phrase() {
         let config = MobileWalletConfig::default();
         let wallet = MobileWallet::new(config).await.unwrap();
-        
+
         let seed = "abandon abandon abandon"; // Only 3 words
         let path = "m/44'/60'/0'/0/0";
-        
+
         let result = wallet.import_from_seed(seed, path).await;
         assert!(result.is_err());
     }
@@ -378,7 +395,7 @@ mod tests {
     async fn test_track_transaction() {
         let config = MobileWalletConfig::default();
         let wallet = MobileWallet::new(config).await.unwrap();
-        
+
         let tx = wallet
             .track_transaction(
                 "0x123abc".to_string(),
@@ -388,7 +405,7 @@ mod tests {
             )
             .await
             .unwrap();
-        
+
         assert_eq!(tx.state, TransactionState::Submitted);
         assert_eq!(tx.amount, 1000);
     }
@@ -397,37 +414,48 @@ mod tests {
     async fn test_get_network_status() {
         let config = MobileWalletConfig::default();
         let wallet = MobileWallet::new(config).await.unwrap();
-        
-        let status = wallet.get_network_status().await.unwrap();
-        assert!(status.is_connected);
-        assert_eq!(status.network, "testnet");
+
+        // This test used to read `is_connected == true` off a struct that the
+        // SDK filled in without a request. "Connected" now requires a chain
+        // client, so with none configured the call refuses.
+        assert!(matches!(
+            wallet.get_network_status().await,
+            Err(SdkError::RpcNotImplemented(_))
+        ));
     }
 
     #[tokio::test]
     async fn test_can_afford_transaction() {
         let config = MobileWalletConfig::default();
         let wallet = MobileWallet::new(config).await.unwrap();
-        
-        // Fetch balance first (caches it)
-        let _ = wallet.fetch_balance("x3:test").await;
-        
-        let can_afford = wallet.can_afford_transaction("x3:test", 1000, 100).await.unwrap();
-        assert!(can_afford);
+
+        // With no balance cached and no way to fetch one, the honest answer is
+        // a refusal. This used to be `assert!(can_afford)`: the test fetched a
+        // balance (which the SDK invented) and then confirmed the wallet could
+        // afford a payment out of it.
+        assert!(matches!(
+            wallet.fetch_balance("x3:test").await,
+            Err(SdkError::RpcNotImplemented(_))
+        ));
+        assert!(matches!(
+            wallet.can_afford_transaction("x3:test", 1000, 100).await,
+            Err(SdkError::RpcNotImplemented(_))
+        ));
     }
 
     #[tokio::test]
     async fn test_wallet_reset() {
         let config = MobileWalletConfig::default();
         let wallet = MobileWallet::new(config).await.unwrap();
-        
+
         let seed = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         let _ = wallet.import_from_seed(seed, "m/44'/60'/0'/0/0").await;
-        
+
         let addresses_before = wallet.get_addresses().await.unwrap();
         assert!(!addresses_before.is_empty());
-        
+
         wallet.reset().await.unwrap();
-        
+
         let addresses_after = wallet.get_addresses().await.unwrap();
         assert!(addresses_after.is_empty());
     }
@@ -436,15 +464,18 @@ mod tests {
     async fn test_set_address_label() {
         let config = MobileWalletConfig::default();
         let wallet = MobileWallet::new(config).await.unwrap();
-        
+
         let seed = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-        let addr = wallet.import_from_seed(seed, "m/44'/60'/0'/0/0").await.unwrap();
-        
+        let addr = wallet
+            .import_from_seed(seed, "m/44'/60'/0'/0/0")
+            .await
+            .unwrap();
+
         wallet
             .set_address_label(&addr.address, "My Account".to_string())
             .await
             .unwrap();
-        
+
         let addresses = wallet.get_addresses().await.unwrap();
         assert_eq!(addresses[0].label, Some("My Account".to_string()));
     }
@@ -453,17 +484,17 @@ mod tests {
     async fn test_update_transaction_state() {
         let config = MobileWalletConfig::default();
         let wallet = MobileWallet::new(config).await.unwrap();
-        
+
         let tx = wallet
             .track_transaction("0x123".to_string(), "x3:to".to_string(), 100, 10)
             .await
             .unwrap();
-        
+
         wallet
             .update_transaction_state(&tx.tx_hash, TransactionState::Finalized)
             .await
             .unwrap();
-        
+
         let txs = wallet.get_recent_transactions(10).await.unwrap();
         assert_eq!(txs[0].state, TransactionState::Finalized);
     }

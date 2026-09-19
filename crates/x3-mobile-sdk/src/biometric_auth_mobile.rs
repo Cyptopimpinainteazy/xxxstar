@@ -1,12 +1,11 @@
 //! Biometric authentication for mobile wallets
-//! 
+//!
 //! Supports Face ID, fingerprint, iris, and PIN fallback.
 //! Uses secure enclave storage on iOS and Android KeyStore on Android.
 
 use crate::SdkError;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
-use zeroize::Zeroize;
 
 /// Biometric authentication types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,16 +74,16 @@ struct BiometricTemplate {
 pub struct BiometricAuth {
     // Secure storage of biometric templates (in production: Keystore/Secure Enclave)
     templates: std::sync::Mutex<Vec<BiometricTemplate>>,
-    
+
     // Active sessions
     sessions: tokio::sync::RwLock<Vec<BiometricSession>>,
-    
+
     // Failed attempt tracking
     failed_attempts: std::sync::Mutex<u32>,
-    
+
     // Session timeout in seconds (300 = 5 minutes)
     session_timeout: i64,
-    
+
     // Max failed attempts before lockout (5)
     max_failures: u32,
 }
@@ -109,9 +108,7 @@ impl BiometricAuth {
     ) -> Result<(), SdkError> {
         // Validate minimum biometric size
         if biometric_data.is_empty() {
-            return Err(SdkError::BiometricError(
-                "Empty biometric data".to_string(),
-            ));
+            return Err(SdkError::BiometricError("Empty biometric data".to_string()));
         }
 
         // Generate random salt
@@ -132,60 +129,81 @@ impl BiometricAuth {
             enrollment_date: chrono::Utc::now().timestamp(),
         };
 
+        let enrolled_at = template.enrollment_date;
         let mut templates = self.templates.lock().expect("templates mutex poisoned");
         templates.push(template);
 
-        tracing::info!("Enrolled {} credential", biometric_type);
+        // The timestamp is recorded so an operator can see how old a stored
+        // template is; no expiry policy reads it yet.
+        tracing::info!("Enrolled {} credential at {}", biometric_type, enrolled_at);
         Ok(())
     }
 
     /// Verify biometric and create authenticated session
     pub async fn verify(&self, biometric_data: &[u8]) -> Result<AuthResult, SdkError> {
         // Check if locked out
-        let failed = *self.failed_attempts.lock().expect("failed_attempts mutex poisoned");
+        let failed = *self
+            .failed_attempts
+            .lock()
+            .expect("failed_attempts mutex poisoned");
         if failed >= self.max_failures {
             return Ok(AuthResult::Retry);
         }
 
-        let templates = self.templates.lock().expect("templates mutex poisoned");
-        if templates.is_empty() {
-            return Err(SdkError::BiometricError(
-                "No biometric enrolled".to_string(),
-            ));
-        }
-
-        // Try to match against enrolled templates
-        for template in templates.iter() {
-            let mut hasher = sha2::Sha256::new();
-            hasher.update(biometric_data);
-            hasher.update(&template.salt);
-            let test_hash = hasher.finalize().to_vec();
-
-            // Constant-time comparison to prevent timing attacks
-            if constant_time_compare(&test_hash, &template.template_hash) {
-                // Match found - create session
-                let session_token = generate_session_token();
-                let now = chrono::Utc::now().timestamp();
-                
-                let session = BiometricSession {
-                    session_token: session_token.clone(),
-                    auth_method: template.biometric_type,
-                    created_at: now,
-                    expires_at: now + self.session_timeout,
-                };
-
-                self.sessions.write().await.push(session);
-                
-                // Reset failure count
-                *self.failed_attempts.lock().expect("failed_attempts mutex poisoned") = 0;
-
-                tracing::info!("Biometric authentication successful");
-                return Ok(AuthResult::Success(session_token));
+        // The lock is scoped to this block so it cannot be held across the
+        // `.await` below: a `std::sync::MutexGuard` held across an await point
+        // can deadlock the task that wants the same guard (and makes the
+        // returned future non-`Send`). This used to hold it across
+        // `sessions.write().await`.
+        let matched = {
+            let templates = self.templates.lock().expect("templates mutex poisoned");
+            if templates.is_empty() {
+                return Err(SdkError::BiometricError(
+                    "No biometric enrolled".to_string(),
+                ));
             }
+
+            templates.iter().find_map(|template| {
+                let mut hasher = sha2::Sha256::new();
+                hasher.update(biometric_data);
+                hasher.update(&template.salt);
+                let test_hash = hasher.finalize().to_vec();
+
+                // Constant-time comparison to prevent timing attacks
+                constant_time_compare(&test_hash, &template.template_hash)
+                    .then_some(template.biometric_type)
+            })
+        };
+
+        if let Some(biometric_type) = matched {
+            // Match found - create session
+            let session_token = generate_session_token();
+            let now = chrono::Utc::now().timestamp();
+
+            let session = BiometricSession {
+                session_token: session_token.clone(),
+                auth_method: biometric_type,
+                created_at: now,
+                expires_at: now + self.session_timeout,
+            };
+
+            self.sessions.write().await.push(session);
+
+            // Reset failure count
+            *self
+                .failed_attempts
+                .lock()
+                .expect("failed_attempts mutex poisoned") = 0;
+
+            tracing::info!("Biometric authentication successful");
+            return Ok(AuthResult::Success(session_token));
         }
 
         // No match - increment failures
-        let mut failed = self.failed_attempts.lock().expect("failed_attempts mutex poisoned");
+        let mut failed = self
+            .failed_attempts
+            .lock()
+            .expect("failed_attempts mutex poisoned");
         *failed += 1;
         let remaining = self.max_failures - *failed;
 
@@ -228,14 +246,16 @@ impl BiometricAuth {
             }
         }
 
-        Err(SdkError::BiometricError("Invalid or expired session".to_string()))
+        Err(SdkError::BiometricError(
+            "Invalid or expired session".to_string(),
+        ))
     }
 
     /// Invalidate session (logout)
     pub async fn logout(&self, session_token: &str) -> Result<(), SdkError> {
         let mut sessions = self.sessions.write().await;
         sessions.retain(|s| s.session_token != session_token);
-        
+
         tracing::info!("Session invalidated");
         Ok(())
     }
@@ -254,7 +274,10 @@ impl BiometricAuth {
 
     /// Reset lockout (admin function - requires authentication)
     pub async fn reset_lockout(&self) -> Result<(), SdkError> {
-        *self.failed_attempts.lock().expect("failed_attempts mutex poisoned") = 0;
+        *self
+            .failed_attempts
+            .lock()
+            .expect("failed_attempts mutex poisoned") = 0;
         tracing::warn!("Lockout reset");
         Ok(())
     }
@@ -287,13 +310,6 @@ fn generate_session_token() -> String {
     let mut rng = rand::thread_rng();
     let token: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
     hex::encode(token)
-}
-
-/// Hash PIN with salt
-fn hash_pin(pin: &str) -> String {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(pin.as_bytes());
-    format!("{:x}", hasher.finalize())
 }
 
 #[cfg(test)]
@@ -349,7 +365,10 @@ mod tests {
             .unwrap();
 
         let result = auth.verify(biometric_data).await.unwrap();
-        assert_eq!(result, AuthResult::Success(_));
+        // `AuthResult::Success` carries a session token, so this is a shape
+        // assertion, not an equality one — `AuthResult::Success(_)` is a
+        // pattern and is not valid in expression position.
+        assert!(matches!(result, AuthResult::Success(_)));
     }
 
     #[tokio::test]
@@ -400,9 +419,11 @@ mod tests {
     #[tokio::test]
     async fn test_enrolled_methods() {
         let auth = BiometricAuth::new(300);
-        
+
         auth.enroll(b"face", BiometricType::FaceID).await.unwrap();
-        auth.enroll(b"finger", BiometricType::Fingerprint).await.unwrap();
+        auth.enroll(b"finger", BiometricType::Fingerprint)
+            .await
+            .unwrap();
 
         let methods = auth.get_enrolled_methods().await.unwrap();
         assert_eq!(methods.len(), 2);
@@ -411,7 +432,7 @@ mod tests {
     #[tokio::test]
     async fn test_is_enrolled() {
         let auth = BiometricAuth::new(300);
-        
+
         auth.enroll(b"face", BiometricType::FaceID).await.unwrap();
 
         assert!(auth.is_enrolled(BiometricType::FaceID).await.unwrap());
@@ -446,8 +467,15 @@ mod tests {
     #[tokio::test]
     async fn test_reset_lockout() {
         let auth = BiometricAuth::new(300);
-        
-        // Simulate lockout
+
+        // Enroll first: without an enrolment `verify` returns
+        // `BiometricError("No biometric enrolled")` and never reaches the
+        // lockout counter, so this test used to panic on the reset below.
+        auth.enroll(b"biometric", BiometricType::FaceID)
+            .await
+            .unwrap();
+
+        // Reach the lockout threshold.
         for _ in 0..5 {
             let _ = auth.verify(b"wrong").await;
         }
@@ -456,8 +484,12 @@ mod tests {
 
         let result = auth.verify(b"wrong").await.unwrap();
         match result {
-            AuthResult::Failure(_) => {}, // Now allows one more attempt
+            AuthResult::Failure(_) => {} // The reset allows attempts again
             _ => panic!("Expected failure"),
         }
+
+        // ... and the right biometric still succeeds afterwards.
+        let result = auth.verify(b"biometric").await.unwrap();
+        assert!(matches!(result, AuthResult::Success(_)));
     }
 }

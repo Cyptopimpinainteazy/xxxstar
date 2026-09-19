@@ -1,5 +1,5 @@
 //! Deep link handling for wallet integration
-//! 
+//!
 //! Handles: x3:// URL scheme, app-to-app communication, universal links
 
 use crate::SdkError;
@@ -29,7 +29,8 @@ pub struct DeeplinkRequest {
 impl DeeplinkRequest {
     /// Parse x3:// URL scheme
     pub fn from_url(url_str: &str) -> Result<Self, SdkError> {
-        let url = Url::parse(url_str).map_err(|_| SdkError::DeeplinkError("Invalid URL".to_string()))?;
+        let url =
+            Url::parse(url_str).map_err(|_| SdkError::DeeplinkError("Invalid URL".to_string()))?;
 
         let request_type = match url.host_str().unwrap_or("send") {
             "send" | "tx" => DeeplinkRequestType::SendTransaction,
@@ -77,7 +78,7 @@ impl DeeplinkRequest {
 pub struct DeeplinkHandler {
     // Registered app schemes
     allowed_schemes: std::sync::Mutex<Vec<String>>,
-    
+
     // Deep link history
     history: tokio::sync::RwLock<Vec<DeeplinkRequest>>,
 }
@@ -98,9 +99,16 @@ impl DeeplinkHandler {
     pub async fn handle(&self, url: &str) -> Result<DeeplinkRequest, SdkError> {
         let request = DeeplinkRequest::from_url(url)?;
 
-        // Validate scheme
-        let allowed = self.allowed_schemes.lock().expect("allowed_schemes mutex poisoned");
-        let is_allowed = allowed.iter().any(|scheme| url.starts_with(scheme));
+        // Validate scheme. The guard is scoped so it is not held across the
+        // `history.write().await` below: a `std::sync::MutexGuard` across an
+        // await point can deadlock the task waiting for the same guard.
+        let is_allowed = {
+            let allowed = self
+                .allowed_schemes
+                .lock()
+                .expect("allowed_schemes mutex poisoned");
+            allowed.iter().any(|scheme| url.starts_with(scheme))
+        };
 
         if !is_allowed {
             return Err(SdkError::DeeplinkError("Scheme not allowed".to_string()));
@@ -121,7 +129,10 @@ impl DeeplinkHandler {
             ));
         }
 
-        let mut allowed = self.allowed_schemes.lock().expect("allowed_schemes mutex poisoned");
+        let mut allowed = self
+            .allowed_schemes
+            .lock()
+            .expect("allowed_schemes mutex poisoned");
         if !allowed.contains(&scheme) {
             allowed.push(scheme);
         }
@@ -131,9 +142,12 @@ impl DeeplinkHandler {
 
     /// Revoke app scheme
     pub async fn revoke_scheme(&self, scheme: &str) -> Result<(), SdkError> {
-        let mut allowed = self.allowed_schemes.lock().expect("allowed_schemes mutex poisoned");
+        let mut allowed = self
+            .allowed_schemes
+            .lock()
+            .expect("allowed_schemes mutex poisoned");
         allowed.retain(|s| s != scheme);
-        
+
         tracing::info!("Revoked scheme: {}", scheme);
         Ok(())
     }
@@ -201,7 +215,7 @@ mod tests {
     fn test_send_deeplink() {
         let url = "x3://send?to=x3:recipient&amount=1000";
         let request = DeeplinkRequest::from_url(url).unwrap();
-        
+
         assert_eq!(request.request_type, DeeplinkRequestType::SendTransaction);
         assert_eq!(request.get_param("to"), Some("x3:recipient"));
         assert_eq!(request.get_param("amount"), Some("1000"));
@@ -211,17 +225,20 @@ mod tests {
     fn test_sign_deeplink() {
         let url = "x3://sign?message=hello&callback=https://example.com";
         let request = DeeplinkRequest::from_url(url).unwrap();
-        
+
         assert_eq!(request.request_type, DeeplinkRequestType::SignMessage);
         assert_eq!(request.get_param("message"), Some("hello"));
-        assert_eq!(request.callback_url, Some("https://example.com".to_string()));
+        assert_eq!(
+            request.callback_url,
+            Some("https://example.com".to_string())
+        );
     }
 
     #[test]
     fn test_connect_deeplink() {
         let url = "x3://connect?app=MyDApp&callback=https://mydapp.com";
         let request = DeeplinkRequest::from_url(url).unwrap();
-        
+
         assert_eq!(request.request_type, DeeplinkRequestType::ConnectDApp);
     }
 
@@ -235,19 +252,22 @@ mod tests {
     #[tokio::test]
     async fn test_handle_deeplink() {
         let handler = DeeplinkHandler::new();
-        
+
         let url = "x3://send?to=x3:recipient&amount=500";
         let request = handler.handle(url).await.unwrap();
-        
+
         assert_eq!(request.request_type, DeeplinkRequestType::SendTransaction);
     }
 
     #[tokio::test]
     async fn test_register_scheme() {
         let handler = DeeplinkHandler::new();
-        
-        handler.register_scheme("myapp://".to_string()).await.unwrap();
-        
+
+        handler
+            .register_scheme("myapp://".to_string())
+            .await
+            .unwrap();
+
         // Try to handle with new scheme
         let url = "myapp://send?to=x3:recipient";
         let result = handler.handle(url).await;
@@ -257,9 +277,9 @@ mod tests {
     #[tokio::test]
     async fn test_revoke_scheme() {
         let handler = DeeplinkHandler::new();
-        
+
         handler.revoke_scheme("ethereum://").await.unwrap();
-        
+
         // Try to handle with revoked scheme
         let url = "ethereum://send?to=x3:recipient";
         let result = handler.handle(url).await;
@@ -269,10 +289,10 @@ mod tests {
     #[tokio::test]
     async fn test_deeplink_history() {
         let handler = DeeplinkHandler::new();
-        
+
         let url1 = "x3://send?to=x3:recipient1";
         let url2 = "x3://send?to=x3:recipient2";
-        
+
         handler.handle(url1).await.unwrap();
         handler.handle(url2).await.unwrap();
 
@@ -283,12 +303,12 @@ mod tests {
     #[tokio::test]
     async fn test_clear_history() {
         let handler = DeeplinkHandler::new();
-        
+
         let url = "x3://send?to=x3:recipient";
         handler.handle(url).await.unwrap();
-        
+
         handler.clear_history().await.unwrap();
-        
+
         let history = handler.get_history(10).await.unwrap();
         assert!(history.is_empty());
     }
@@ -300,19 +320,24 @@ mod tests {
             Some(1000),
             Some("https://callback.com"),
         );
-        
+
         assert!(deeplink.contains("x3://send"));
-        assert!(deeplink.contains("to=x3:recipient"));
+        // Query values are percent-encoded: a raw `x3:recipient` in a query
+        // string is not a valid URL value. The test used to expect the raw
+        // form, which this code cannot produce.
+        assert!(deeplink.contains("to=x3%3Arecipient"));
+        assert_eq!(
+            urlencoding::decode("x3%3Arecipient").unwrap().as_ref(),
+            "x3:recipient"
+        );
         assert!(deeplink.contains("amount=1000"));
     }
 
     #[test]
     fn test_generate_sign_deeplink() {
-        let deeplink = DeeplinkHandler::generate_sign_deeplink(
-            "hello world",
-            Some("https://callback.com"),
-        );
-        
+        let deeplink =
+            DeeplinkHandler::generate_sign_deeplink("hello world", Some("https://callback.com"));
+
         assert!(deeplink.contains("x3://sign"));
         assert!(deeplink.contains("message=hello"));
     }
@@ -325,7 +350,13 @@ mod tests {
 
     #[test]
     fn test_request_type_enum() {
-        assert_eq!(DeeplinkRequestType::SendTransaction, DeeplinkRequestType::SendTransaction);
-        assert_ne!(DeeplinkRequestType::SendTransaction, DeeplinkRequestType::SignMessage);
+        assert_eq!(
+            DeeplinkRequestType::SendTransaction,
+            DeeplinkRequestType::SendTransaction
+        );
+        assert_ne!(
+            DeeplinkRequestType::SendTransaction,
+            DeeplinkRequestType::SignMessage
+        );
     }
 }

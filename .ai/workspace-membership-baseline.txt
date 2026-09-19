@@ -8,4 +8,3 @@
 # crate appears in neither list, or when a fixed entry stays here.
 
 loom-concurrency
-x3-mobile-sdk
