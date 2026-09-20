@@ -171,6 +171,13 @@ GATES_FAST=(
   "invariant registry:python3 scripts/check-invariant-registry.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
+  # `make mainnet-check` stage 6b rebuilds the runtime and fails when it no
+  # longer matches `docs/reports/runtime-wasm-hashes.json`. That is ten minutes
+  # into a release, and runtime changes have landed without the record three
+  # times in a day, so this is the cheap early warning: if the outgoing diff
+  # touches any package in the runtime's dependency graph, the record has to
+  # move in the same change (`./scripts/update-runtime-hashes.sh`).
+  "runtime hash freshness:python3 scripts/check-runtime-hash-freshness.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "workspace check:env SKIP_WASM_BUILD=1 cargo check --workspace"
   "clippy workspace:cargo clippy --workspace --all-targets -- -D warnings"
   "clippy runtime rc1:cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings"
