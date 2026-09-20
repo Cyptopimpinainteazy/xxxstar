@@ -100,12 +100,32 @@ revision = subprocess.run(
 
 record = json.loads(record_path.read_text())
 previous = record.get("recorded_revision")
+previous_runtimes = record.get("runtimes", {})
 record["recorded_revision"] = revision
 record["runtimes"] = {k: {f: first[k][f] for f in fields} for k in sorted(first)}
 
 print(f"[runtime-hashes] two builds of {revision} agree ({previous} -> {revision})")
 for runtime in sorted(first):
     print(f"  {runtime:<10} {first[runtime]['size']} bytes  {first[runtime]['blake2_256']}")
+
+# The report quotes the same values in prose. Print the pairs so updating it is a
+# copy-paste rather than a diff hunt.
+doc_pairs = [
+    (previous_runtimes.get(runtime, {}).get(field), first[runtime][field])
+    for runtime in sorted(first)
+    for field in fields
+    if previous_runtimes.get(runtime, {}).get(field)
+    and previous_runtimes[runtime][field] != first[runtime][field]
+]
+if doc_pairs and previous:
+    print(
+        "[runtime-hashes] docs/reports/runtime-wasm-reproducibility.md quotes the "
+        "previous values; replace:"
+    )
+    for old, new in doc_pairs:
+        print(f"  {old} -> {new}")
+    if previous:
+        print(f"  {previous} -> {revision}")
 
 if os.environ["CHECK_ONLY"] == "1":
     print("[runtime-hashes] --check: nothing written")
