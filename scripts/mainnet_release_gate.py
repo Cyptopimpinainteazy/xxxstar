@@ -361,6 +361,37 @@ def check_test_suites() -> None:
 
 # ── 5. Runtime upgrade rehearsal ────────────────────────────────────────────
 
+def check_panic_ratchet() -> None:
+    """No new panics in consensus-critical code.
+
+    A panic in `on_initialize`/`on_finalize`/`offchain_worker` stops block
+    production. The old audit classified by file path, so in-file `#[cfg(test)]`
+    modules were counted as production (~5,170 findings, nearly all test
+    assertions) and the script always exited 0 while its own report said
+    "gate: FAIL" — the `|| exit 1` guard in `mainnet_rc_gate.sh` could never fire.
+    The audit now classifies by enclosing function, excludes test items, and
+    compares against a committed baseline.
+    """
+    print("\n── 4b. Panic ratchet (block hooks and production paths) ──")
+    script = ROOT / "scripts" / "mainnet" / "panic_unwrap_audit.sh"
+    if not script.exists():
+        fail("scripts/mainnet/panic_unwrap_audit.sh is missing — nothing checks for new panics")
+        return
+
+    result = run(["bash", str(script)])
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("new panic/unwrap in consensus-critical code")
+        for line in output.splitlines()[-12:]:
+            print(f"    {line}")
+        return
+
+    counts_line = next(
+        (line.strip() for line in output.splitlines() if "runtime-hook=" in line), ""
+    )
+    ok(counts_line or "panic ratchet holds")
+
+
 def check_runtime_upgrade_rehearsal() -> None:
     print("\n── 5. Runtime upgrade rehearsal (migration dry-run per variant) ──")
     script = ROOT / "scripts" / "check-runtime-variants.sh"
@@ -594,6 +625,7 @@ def main() -> int:
     check_chain_spec_artifacts()
     check_production_genesis()
     check_test_suites()
+    check_panic_ratchet()
     check_runtime_upgrade_rehearsal()
     check_reproducible_build_prereqs()
     check_reproducible_build()
