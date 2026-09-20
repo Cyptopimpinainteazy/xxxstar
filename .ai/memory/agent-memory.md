@@ -5271,3 +5271,20 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - Probe lesson (again): a scripted replacement anchored on a *string* matched a comment that quoted
   the same clause, and the probe measured an unmodified program. Anchor on the clause's own
   indentation, then `grep -c` to confirm the edit landed before trusting the measurement.
+
+**2026-09-20 — TICKET-006 closed: the branch adjudication is a tree property, not a diff review**
+
+- The decisive test for "is this branch's content already on master?" is **tree reachability**: a
+  branch's `x3-lang` tree hash either appears in `git rev-list --objects origin/master` (so that
+  exact state is one master has held) or it does not. 530 of 562 branches pass; the test costs one
+  `rev-list --objects` run and a `grep -F`.
+- For the branches that fail, the per-file test is: is the path on master now, and
+  `git rev-list --count origin/master -- <path>` — a count of zero means master's current lineage
+  never had that file, which is the only residue worth reading.
+- Numbers: 562 branches with an x3-lang tree; 530 reachable; 32 refs / 15 distinct trees adjudicated;
+  only **3 files** anywhere are neither on master nor non-language artifacts —
+  `compiler/src/arbitrage.rs` (master's `arb.rs`, renamed and grown) and its test, plus the
+  `prototypes/x3-lang-20260621/` tree.
+- Trap: `git rev-parse '<branch>:x3-lang'` echoes its argument on failure, so a scan that strips
+  stderr sees a "tree hash" that is really a branch name. Check `git cat-file -e '<ref>:x3-lang'`
+  first.

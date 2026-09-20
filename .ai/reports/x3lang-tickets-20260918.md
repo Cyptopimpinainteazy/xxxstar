@@ -610,9 +610,28 @@ produces a warning surfaces it.
 Validation: `cargo test -p x3-lang-compiler -p x3-tools`.
 Note: coordinate with TICKET-003, which also touches this file.
 
-## TICKET-006 — Adjudicate residual `x3-lang` content on stale agent branches
-Type: DEFERRED · Subsystem: repo/reconciliation
-Reason: six branches carry `x3-lang` content `origin/master` lacks (~180-320
+## TICKET-006 — Adjudicate residual `x3-lang` content on stale agent branches — CLOSED
+Type: CLOSED in `816de4708`'s round (2026-09-20) · Subsystem: repo/reconciliation
+**Closed: 530 of 562 branches are superseded by a property of their tree, and the remaining 15 trees
+are adjudicated file by file.** The method is in
+`.ai/reports/x3lang-ticket-006-branch-adjudication-20260920.md`; the numbers:
+```
+branches with an x3-lang tree: 562
+  tree reachable from master: 530      -> an earlier state master has held
+  NOT reachable:               32      -> 15 distinct trees
+```
+Of the 15: ten have **zero** files master never had (every file is on master, renamed there, or
+removed there — that last being `regalloc.rs` and the `examples/legacy/*` moves); the economic-safety
+branch's two unapplied commits are on master (`vm/src/economic.rs` exists, `SubmissionProfile` is in
+`compiler/src/ir.rs`); `recovered-usb-clone`'s eight novel files are a pytest cache, an agent
+transcript and its driver, and a dashboard page; `preserve-packets-and-arbitrage`'s two are
+`arb.rs`'s **older generation** (699 lines against 921, 44 of 87 named items present, branch-only
+names are the pre-rename spellings); and one ref is a separate `prototypes/x3-lang-20260621/` tree
+master never had, superseded by the implementation. Two refs have no `x3-lang/` at all.
+Nothing was landed, deliberately: landing `arbitrage.rs` would delete the newer `arb.rs`, and landing
+the prototype would add a second, smaller implementation. Both are the failure the merge-queue doc's
+`git cherry` rule exists to prevent.
+Original Reason: six branches carry `x3-lang` content `origin/master` lacks (~180-320
 lines each), all on pre-trading-core bases. Mostly superseded, but not proven
 so line by line.
 Acceptance criteria: for each branch, either the residual content is shown to
