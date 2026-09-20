@@ -87,6 +87,28 @@ The `--live`, `--cross`, `--release`, `--variants` and `--loom` groups add the
 gates that need a real chain, a full release build, six runtime compilations, or
 a pinned nightly toolchain.
 
+### What `--cross` covers
+
+`--cross` runs the three lifecycles that settle one atomic intent across two
+domains. Each one boots its own chain; none of them mocks chain state:
+
+| gate | boots | proves |
+| --- | --- | --- |
+| `X3-native lifecycles` | `x3-chain-node --dev` | escrow → claim and escrow → timeout → finalized refund entirely on X3, through the node's own RPC |
+| `cross-domain EVM` (`scripts/cross-domain-evm-gate.sh`) | `anvil` + a deployed `AtlasHTLC` + `x3-chain-node` | `real_x3vm_evm_lock_claim_atomic_lifecycle` and `real_x3vm_evm_timeout_refund_atomic_lifecycle` from `node/tests/x3vm_evm_live.rs` |
+| `cross-domain SVM` (`scripts/cross-domain-svm-gate.sh`) | `solana-test-validator` + the SBF program built here + `x3-chain-node` | `real_x3vm_svm_lock_claim_atomic_lifecycle` and `real_x3vm_svm_timeout_refund_atomic_lifecycle` from `node/tests/x3vm_svm_live.rs` |
+
+The two cross-domain scripts exist because those four tests are `#[ignore]`d in
+the source: the ignore attribute means "needs a chain", not "unfinished". The
+scripts supply anvil + the pinned AtlasHTLC deploy and solana-test-validator +
+`cargo build-sbf` respectively, so the tests run in the gate set instead of only
+in a past CI run. Before this, `--cross` listed the two cross-domain lifecycles
+as a note in `--list` and ran neither, so a reader could not reproduce the
+claim with any command.
+
+Both scripts need foundry (`anvil`, `forge`, `cast`) and the Solana toolchain;
+without them they exit non-zero rather than reporting a pass.
+
 ## Results
 
 ### Preconditions

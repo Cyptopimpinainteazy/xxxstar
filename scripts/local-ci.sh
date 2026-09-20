@@ -304,8 +304,18 @@ GATES_DEEP=(
   "test workspace:env -u SKIP_WASM_BUILD cargo test --workspace"
 )
 
+# The cross-domain gates were listed in `describe_all` for a long time without
+# being runnable: the three lifecycles below boot a chain each, and the two
+# X3VM<->EVM / X3VM<->SVM tests are `#[ignore]`d in the source because they need
+# one. Their pass evidence lived only in `.ai/runlogs` (which is gitignored) and
+# in CI history, so "the cross-domain leg is proven" was a claim about a past
+# run, not something a reader could reproduce with one command. The two scripts
+# now supply anvil + AtlasHTLC and solana-test-validator + the SBF program, so
+# they are gates like any other.
 GATES_CROSS=(
   "X3-native lifecycles:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
+  "cross-domain EVM:bash scripts/cross-domain-evm-gate.sh"
+  "cross-domain SVM:bash scripts/cross-domain-svm-gate.sh"
 )
 
 # Slugs are the `--only`/`--skip` keys, so keep them lowercase: gate names carry
@@ -319,10 +329,6 @@ describe_all() {
   printf '  - %s\n' "${GATES_LIVE[@]%%:*}"
   echo "cross-domain gates (--cross):"
   printf '  - %s\n' "${GATES_CROSS[@]%%:*}"
-  cat <<'EOF'
-  - X3VM<->EVM cross-domain lifecycles (needs anvil + deployed AtlasHTLC; see .ai/runlogs for the runner recipe)
-  - X3VM<->SVM cross-domain lifecycles (needs solana-test-validator + SBF program)
-EOF
   echo "release gate (--release):"
   printf '  - %s\n' "${GATES_RELEASE[@]%%:*}"
   echo "runtime variants (--variants):"
