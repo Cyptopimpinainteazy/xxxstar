@@ -133,6 +133,35 @@ def check_build() -> None:
 
 # ── 3. Chain-spec / genesis artifact verification ────────────────────────────
 
+def check_chain_runs() -> None:
+    """Boot the node on a dev chain and prove it authors and finalizes blocks.
+
+    Every other stage checks code — that it builds, that its tests pass, that
+    the runtime upgrades, that the WASM is reproducible. None of them starts a
+    chain. This does, and asks the operator CLI for the authority set and an
+    asset through the node's own RPC on the way.
+    """
+    print("\n── 2b. The chain runs ──")
+    script = ROOT / "scripts" / "local-node-smoke.sh"
+    if not script.exists():
+        fail("scripts/local-node-smoke.sh is missing — nothing boots a chain")
+        return
+
+    result = run(["bash", str(script)])
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("the chain did not run (scripts/local-node-smoke.sh failed)")
+        for line in output.splitlines()[-15:]:
+            print(f"    {line}")
+        return
+
+    summary = next(
+        (line.split("PASS — ", 1)[1] for line in output.splitlines() if "PASS — " in line),
+        "the node booted, authored, finalized, and answered its CLI",
+    )
+    ok(summary)
+
+
 ARTIFACT_CHECKS = [
     "chain-specs/x3-local3-current-plain.json",
     "chain-specs/x3-local3-current-raw.json",
@@ -430,6 +459,7 @@ def main() -> int:
 
     check_required_docs()
     check_build()
+    check_chain_runs()
     check_chain_spec_artifacts()
     check_test_suites()
     check_runtime_upgrade_rehearsal()
