@@ -91,6 +91,18 @@ pub struct OpcodeCost {
     pub dynamic_cost: fn(u64) -> u64, // Function that calculates additional cost
 }
 
+/// The limit a transaction is given, from the gas it is estimated to use: **25% more, rounded up**.
+///
+/// It was `(total_gas as f64 * 1.25) as u64`, and `1.25` is exact in binary but the *product* is not:
+/// a quarter of most gas figures is fractional, and the cast truncated it. For a small figure the
+/// whole margin went — `total_gas = 3` gave a limit of **3**, which is no ceiling above what the
+/// transaction needs — and a limit one unit under is a transaction that runs out of gas rather than
+/// one that is provisioned for 25% more. A *limit* rounds up, which is the rule a fee ceiling and a
+/// compensation share in this repository already follow (TICKET-094).
+fn gas_limit_with_margin(total_gas: u64) -> u64 {
+    total_gas.saturating_add(total_gas.div_ceil(4))
+}
+
 impl GasEstimator {
     pub fn new() -> Self {
         let mut opcodes = HashMap::new();
@@ -127,7 +139,7 @@ impl GasEstimator {
         let (execution_gas, status, revert_reason) = self.execute_in_fork(tx);
 
         let total_gas = intrinsic_gas + execution_gas;
-        let gas_limit = (total_gas as f64 * 1.25) as u64; // 25% safety margin
+        let gas_limit = gas_limit_with_margin(total_gas);
 
         GasEstimation {
             gas_used: total_gas,
@@ -422,6 +434,25 @@ mod tests {
     }
 
     #[test]
+    fn a_gas_limit_rounds_its_margin_up() {
+        // The defect this replaced, measured: `(3 as f64 * 1.25) as u64` is **3** — no ceiling above
+        // what the transaction needs, because a quarter of 3 is fractional and the cast truncated it.
+        assert_eq!(
+            gas_limit_with_margin(3),
+            4,
+            "a limit must not lose its margin to a truncation"
+        );
+        assert_eq!(gas_limit_with_margin(4), 5);
+        assert_eq!(gas_limit_with_margin(5), 7, "5 + ceil(1.25)");
+        assert_eq!(gas_limit_with_margin(21_000), 26_250);
+        assert_eq!(gas_limit_with_margin(0), 0);
+        // Past `f64`'s 53 bits the float form was wrong by more than the margin; the integer form has
+        // no such edge.
+        let big = (1u64 << 60) + 3;
+        assert_eq!(gas_limit_with_margin(big), big + big.div_ceil(4));
+    }
+
+    #[test]
     fn test_gas_limit_safety_margin() {
         let estimator = GasEstimator::new();
         let tx = RPCTransaction {
@@ -434,9 +465,11 @@ mod tests {
         };
 
         let est = estimator.estimate_gas(&tx);
-        // Gas limit should be ~25% higher than used
-        let expected_margin = (est.gas_used as f64 * 0.25) as u64;
-        assert!(est.gas_limit >= est.gas_used + expected_margin - 1);
+        // A quarter of the estimate, rounded up — the rule the estimator uses, so the test cannot pass
+        // by matching the same float it used to.
+        let expected_margin = est.gas_used.div_ceil(4);
+        assert_eq!(est.gas_limit, est.gas_used + expected_margin);
+        assert!(est.gas_limit > est.gas_used);
     }
 
     #[test]
