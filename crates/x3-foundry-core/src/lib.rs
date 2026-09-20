@@ -6,6 +6,7 @@
 
 pub mod deployer;
 pub mod error;
+pub mod evm_deploy;
 pub mod generator;
 pub mod revenue;
 pub mod security;
@@ -373,15 +374,67 @@ mod tests {
 
     #[test]
     fn test_full_pipeline() {
-        let engine = FoundryEngine::new("deployer-key".into(), "auditor-key".into());
+        // Deployment is real now (x3-foundry-core/src/evm_deploy.rs), so a
+        // full successful pipeline run needs a real chain to deploy to.
+        // Point the "x3-mainnet"/"x3-testnet" chain names -- whichever the
+        // generated plan picks as its first target_chain -- at a local
+        // anvil node via the same X3_NODE_RPC override
+        // evm_deploy::resolve_rpc_url reads in production. This is the only
+        // test in the crate that both resolves a named chain (rather than a
+        // literal http(s):// URL) and needs the deployment to actually
+        // succeed with a valid key, so mutating this process-wide env var
+        // for its duration doesn't race any other test: every other test
+        // that touches deploy_contracts either uses a literal anvil URL
+        // directly (unaffected by this var) or an intentionally invalid key
+        // that fails during key parsing, before any RPC call is made (so it
+        // fails the same way regardless of which URL X3_NODE_RPC points at).
+        if !forge_available() || !anvil_available() {
+            eprintln!("skipping: forge/anvil not on PATH in this environment");
+            return;
+        }
+        const ANVIL_DEV_KEY_0: &str =
+            "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+        let anvil = ethers::utils::Anvil::new().spawn();
+        // SAFETY: no other test reads/depends on X3_NODE_RPC concurrently
+        // resolving to a *different* value than this one sets it to; see
+        // the comment above for why that's true for every current test.
+        unsafe {
+            std::env::set_var("X3_NODE_RPC", anvil.endpoint());
+        }
+
+        let engine = FoundryEngine::new(ANVIL_DEV_KEY_0.into(), "auditor-key".into());
         let result = engine.run(
             "Create a token launchpad called MyToken for DeFi",
             "0xCreatorWallet",
         );
-        assert!(result.is_ok());
-        let pipeline = result.unwrap();
+
+        unsafe {
+            std::env::remove_var("X3_NODE_RPC");
+        }
+
+        let pipeline = result.expect("full pipeline against a real local anvil node must succeed");
         assert!(pipeline.receipt.signature.len() == 64);
         assert!(!pipeline.receipt.contract_addresses.is_empty());
+        for address in pipeline.receipt.contract_addresses.values() {
+            assert!(
+                address.starts_with("0x") && address.len() == 42,
+                "{address}"
+            );
+        }
+    }
+
+    fn forge_available() -> bool {
+        std::process::Command::new("forge")
+            .arg("--version")
+            .output()
+            .is_ok()
+    }
+
+    fn anvil_available() -> bool {
+        std::process::Command::new("anvil")
+            .arg("--version")
+            .output()
+            .is_ok()
     }
 
     #[test]

@@ -27451,6 +27451,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "ethers",
  "frame-support",
  "frame-system",
  "hex",

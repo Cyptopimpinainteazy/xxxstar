@@ -124,12 +124,134 @@ pub struct SourceLocation {
     pub snippet: Option<String>,
 }
 
-/// The subset of `forge build --json`'s (solc standard-JSON) output this
-/// auditor cares about.
-#[derive(Debug, Clone, Deserialize)]
-struct SolcBuildOutput {
-    #[serde(default)]
-    errors: Vec<SolcDiagnostic>,
+/// One contract's compiled creation (deployment) bytecode, as produced by
+/// `forge build --json`. Shared between this crate's own compiler-diagnostics
+/// check and x3-foundry-core's real deployment path -- there is exactly one
+/// place in the codebase that knows how to invoke the compiler.
+#[derive(Debug, Clone)]
+pub struct CompiledContract {
+    pub name: String,
+    /// Raw creation bytecode, ready to send as an EVM contract-creation
+    /// transaction's `data`. Never includes a leading `0x`.
+    pub bytecode: Vec<u8>,
+}
+
+struct RawBuildOutput {
+    diagnostics: Vec<SolcDiagnostic>,
+    contracts: Vec<CompiledContract>,
+}
+
+/// Compiles `source_code` (a single Solidity file) via `forge build --json`
+/// in a scratch Foundry project and returns the named contract's creation
+/// bytecode. Fails if the contract doesn't compile, isn't found in solc's
+/// output (e.g. the source's `contract Foo` name doesn't match
+/// `contract_name`), or compiles to empty bytecode (an abstract
+/// contract/interface, which can't be deployed).
+pub fn compile_contract_bytecode(
+    contract_name: &str,
+    source_code: &str,
+) -> Result<CompiledContract, String> {
+    let raw = run_forge_build_raw(source_code)?;
+    let errors: Vec<&str> = raw
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity.eq_ignore_ascii_case("error"))
+        .map(|d| d.message.as_str())
+        .collect();
+    if !errors.is_empty() {
+        return Err(format!(
+            "{contract_name} failed to compile: {}",
+            errors.join("; ")
+        ));
+    }
+
+    let entry = raw
+        .contracts
+        .into_iter()
+        .find(|c| c.name == contract_name)
+        .ok_or_else(|| {
+            format!(
+                "solc produced no output for contract `{contract_name}` -- does the contract \
+                 declaration inside the source actually match this name?"
+            )
+        })?;
+    if entry.bytecode.is_empty() {
+        return Err(format!(
+            "`{contract_name}` compiled to empty bytecode (likely an abstract contract or \
+             interface -- those cannot be deployed)"
+        ));
+    }
+    Ok(entry)
+}
+
+/// Compiles `source_code` in a scratch Foundry project via `forge build
+/// --json` and returns both solc's diagnostics and every contract's
+/// compiled bytecode.
+fn run_forge_build_raw(source_code: &str) -> Result<RawBuildOutput, String> {
+    let dir = tempfile::tempdir().map_err(|e| format!("failed to create temp dir: {e}"))?;
+    let src_dir = dir.path().join("src");
+    std::fs::create_dir_all(&src_dir)
+        .map_err(|e| format!("failed to create scratch src/ dir: {e}"))?;
+    std::fs::write(
+        dir.path().join("foundry.toml"),
+        "[profile.default]\nsrc = \"src\"\nout = \"out\"\ncache = false\n",
+    )
+    .map_err(|e| format!("failed to write scratch foundry.toml: {e}"))?;
+    std::fs::write(src_dir.join("AuditedContract.sol"), source_code)
+        .map_err(|e| format!("failed to write scratch contract source: {e}"))?;
+
+    let output = std::process::Command::new("forge")
+        .args(["build", "--json"])
+        .current_dir(dir.path())
+        .output()
+        .map_err(|e| format!("failed to spawn `forge build`: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let value: serde_json::Value = serde_json::from_str(stdout.trim()).map_err(|e| {
+        format!(
+            "failed to parse `forge build --json` output: {e} (stdout: {})",
+            stdout.trim()
+        )
+    })?;
+
+    let diagnostics: Vec<SolcDiagnostic> = value
+        .get("errors")
+        .cloned()
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|e| format!("failed to parse solc diagnostics: {e}"))?
+        .unwrap_or_default();
+
+    let mut contracts = Vec::new();
+    if let Some(files) = value.get("contracts").and_then(|c| c.as_object()) {
+        for per_file in files.values() {
+            let Some(per_contract) = per_file.as_object() else {
+                continue;
+            };
+            for (contract_name, entries) in per_contract {
+                let bytecode_hex = entries
+                    .as_array()
+                    .and_then(|arr| arr.first())
+                    .and_then(|e| e.get("contract"))
+                    .and_then(|c| c.get("evm"))
+                    .and_then(|e| e.get("bytecode"))
+                    .and_then(|b| b.get("object"))
+                    .and_then(|o| o.as_str())
+                    .unwrap_or("");
+                if let Ok(bytecode) = hex::decode(bytecode_hex) {
+                    contracts.push(CompiledContract {
+                        name: contract_name.clone(),
+                        bytecode,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(RawBuildOutput {
+        diagnostics,
+        contracts,
+    })
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -714,9 +836,9 @@ impl FoundryAuditor {
     /// default.
     pub fn check_compiler_diagnostics(&mut self) {
         info!("Running solc compiler diagnostics via `forge build`...");
-        match Self::run_forge_build(&self.source_code) {
-            Ok(diagnostics) => {
-                for diag in diagnostics {
+        match run_forge_build_raw(&self.source_code) {
+            Ok(raw) => {
+                for diag in raw.diagnostics {
                     let is_error = diag.severity.eq_ignore_ascii_case("error");
                     let (severity, score) = if is_error {
                         (Severity::Critical, 95)
@@ -767,37 +889,6 @@ impl FoundryAuditor {
                 });
             }
         }
-    }
-
-    /// Compiles `source_code` in a scratch Foundry project via `forge build
-    /// --json` and returns solc's own diagnostics (errors and warnings).
-    fn run_forge_build(source_code: &str) -> Result<Vec<SolcDiagnostic>, String> {
-        let dir = tempfile::tempdir().map_err(|e| format!("failed to create temp dir: {e}"))?;
-        let src_dir = dir.path().join("src");
-        std::fs::create_dir_all(&src_dir)
-            .map_err(|e| format!("failed to create scratch src/ dir: {e}"))?;
-        std::fs::write(
-            dir.path().join("foundry.toml"),
-            "[profile.default]\nsrc = \"src\"\nout = \"out\"\ncache = false\n",
-        )
-        .map_err(|e| format!("failed to write scratch foundry.toml: {e}"))?;
-        std::fs::write(src_dir.join("AuditedContract.sol"), source_code)
-            .map_err(|e| format!("failed to write scratch contract source: {e}"))?;
-
-        let output = std::process::Command::new("forge")
-            .args(["build", "--json"])
-            .current_dir(dir.path())
-            .output()
-            .map_err(|e| format!("failed to spawn `forge build`: {e}"))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let parsed: SolcBuildOutput = serde_json::from_str(stdout.trim()).map_err(|e| {
-            format!(
-                "failed to parse `forge build --json` output: {e} (stdout: {})",
-                stdout.trim()
-            )
-        })?;
-        Ok(parsed.errors)
     }
 
     pub fn check_static_analysis(&mut self) {
@@ -1327,5 +1418,48 @@ mod tests {
         let report = auditor.audit_project();
         assert!(!report.passed, "audit report: {report:?}");
         assert!(report.summary.critical > 0, "audit report: {report:?}");
+    }
+
+    #[test]
+    fn test_compile_contract_bytecode_returns_real_nonempty_bytecode() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
+        let source =
+            "pragma solidity ^0.8.20;\ncontract SimpleToken {\n    uint256 public totalSupply;\n}";
+        let compiled = compile_contract_bytecode("SimpleToken", source)
+            .expect("a contract that compiles cleanly must produce bytecode");
+        assert_eq!(compiled.name, "SimpleToken");
+        assert!(
+            !compiled.bytecode.is_empty(),
+            "a concrete (non-abstract) contract must compile to nonempty creation bytecode"
+        );
+    }
+
+    #[test]
+    fn test_compile_contract_bytecode_rejects_name_mismatch() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
+        let source = "pragma solidity ^0.8.20;\ncontract ActualName {}";
+        let result = compile_contract_bytecode("WrongName", source);
+        assert!(
+            result.is_err(),
+            "compiling for a contract name that doesn't exist in the source must fail, not \
+             silently return some other contract's bytecode"
+        );
+    }
+
+    #[test]
+    fn test_compile_contract_bytecode_rejects_broken_source() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
+        let source = "pragma solidity ^0.8.20;\ncontract Broken {\n    function nope( {\n}";
+        let result = compile_contract_bytecode("Broken", source);
+        assert!(result.is_err());
     }
 }

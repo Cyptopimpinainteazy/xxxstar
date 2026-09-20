@@ -20,6 +20,7 @@ hex = "0.4"
 tracing = "0.1"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+ethers = { version = "2.0", features = ["rustls"] }
 x3-foundry-auditor = { path = "../x3-foundry-auditor" }
 codec = { workspace = true }
 scale-info = { workspace = true }
