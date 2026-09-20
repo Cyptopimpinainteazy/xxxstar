@@ -4952,3 +4952,59 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - TICKET-096 (three crates with no consumer), 008/009 (need approval), and the deferred 016/018/022.
 - An example for the `subscription` item form; a measured branch over *plans*; the full `local-ci`.
 - Needle: x3-lang **1218/0**; clippy + fmt clean; sweep 19/19/19/18; `x3c replay` on a receipt pair ok.
+
+## 2026-09-20 — push/merge state audit (root agent)
+
+**Facts discovered**
+
+- GitHub `refs/heads/master` was `2419bc2fe`; the user's canonical checkout at
+  `/home/lojak/Desktop/xxxstar-main` was `920a44775`, **144 commits behind**, on
+  branch `master`, with one uncommitted tracked file (`.ai/merge-queue.md`,
+  the round-72 section).
+- The canonical checkout's `origin/master` remote-tracking ref was stale at
+  `93d762b5c`. **Never answer "is it pushed?" from `origin/master` — use
+  `git ls-remote origin refs/heads/master`.**
+- `.ai/reports` (93 files), `.ai/memory` (1), `.ai/runlogs` (1),
+  `.ai/wip-backups` (7) were untracked **and not gitignored** — 102 evidence
+  files that only existed on one disk.
+- 14 branches had tips ahead of their GitHub copies; only 2 could push as a
+  fast-forward. The rest had diverged (`origin/<b>` held commits the local copy
+  lacked, e.g. `finish/x3vm-live-transport-fix`: 20 remote commits not in master).
+- Three `/tmp` worktrees had uncommitted tracked work: `/tmp/x3-ext`,
+  `/tmp/x3-gov`, `/tmp/x3-kernel`. `git stash create` **fails (exit 1)** in all
+  three; use `git diff HEAD --binary` instead.
+- 51 patches across 8 branches are genuinely unapplied vs master
+  (`git cherry -v origin/master <b>` → `+`), but all 8 are 2026-09-11/12
+  lineages and their headline features are already on master in later form
+  (proof_bundle.rs, secret_release.rs, `NativeX3NodeTransport` exports in
+  `crates/x3-atomic-swap/src/lib.rs:106,112`, `x3-lang/vm/src/economic.rs`).
+
+**Decisions made**
+
+- Fast-forwarded the user's checkout after stashing their `merge-queue` edit;
+  `stash pop` applied cleanly. Zero collisions were pre-checked by intersecting
+  incoming added paths with `git ls-files --others`.
+- Pushed the 14 diverged branch tips to `archive/local-20260920/<branch>`
+  rather than force-pushing. Force was rejected as a category: it destroys
+  remote commits to save refs that master already contains.
+- Committed the 102-file evidence pile and the 3 WIP patches to master.
+- Scanned everything for credentials before pushing to a remote.
+
+**Canonical paths / commands**
+
+- GitHub truth: `git ls-remote origin refs/heads/master`
+- Collision pre-check before a long ff:
+  `comm -12 <(git diff --name-only --diff-filter=A A B | sort) <(git ls-files --others --exclude-standard | sort)`
+- Divergence: `git rev-list --left-right --count origin/<b>...<b>`
+- Unapplied work: `git cherry -v origin/master <b> | grep '^+'`
+
+**Next task seed**
+
+- 4 of the 8 backlog branches are still unverified (only their headline features
+  were checked): `feat/canonical-cross-domain-proof-bundle-20260911`,
+  `feat/idempotent-cross-domain-coordinator-20260911`,
+  `finish/x3vm-live-transport-fix`, `test/cross-domain-refund-recovery-20260911`.
+  Verify each of their unapplied patches against master by content before
+  declaring them archival.
+- Dashboard `dist/assets` (~hundreds of untracked build outputs) should get a
+  `.gitignore` entry rather than being committed.
