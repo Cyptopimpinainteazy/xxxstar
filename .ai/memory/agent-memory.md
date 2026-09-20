@@ -5419,3 +5419,15 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - `70%` and `0.5%` lex differently but read the same everywhere (artifact threshold 7000 vs 70bps; the
   policy check refuses 7000 against a 100bps ceiling) — measured on both paths, so TICKET-041 is closed
   as a shape curiosity rather than a defect.
+
+**2026-09-20 — `x3c refund` fabricated a transaction (TICKET-123); the CLI audit is filed (TICKET-124)**
+
+- The command printed "Refund submitted — transaction pending confirmation" with no chain connection at
+  all. Run-the-command audits find this class; reading the code does not (the line looks like a report).
+  Both branches now name what the command did and what would submit (the timeout/refund engine).
+- `45s` is a `LiteralExpr::Duration`, not `Int`: a reader matching only `Int` reports 0. The lowering
+  has always used `blocks_from_duration`; the CLI reader was the one shape short.
+- `formatter::refund_target` is **public** now: a report needs the clause's two parts, and one splitter
+  stops a second reader inventing a second reading (`Literal(String(Symbol("…")))` was the compiler's
+  Debug output reaching a person).
+- 33 CLI commands; `test`/`fuzz`/`chaos` verified real in the same pass; the rest are TICKET-124.

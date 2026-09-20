@@ -5010,3 +5010,32 @@ Acceptance criteria: either `atomic swap` accepts `min_output <expr>` and the ar
 bounded by it (with a test that an under-delivery is refused), or the declaration's shape is recorded as
 deliberately unprotected and the spec's phase says why.
 Validation: an atomic swap with a floor, and one whose counterparty delivers less, refused.
+
+## TICKET-123 — `x3c refund` announced a transaction it never sent — CLOSED
+Type: CLOSED in `2c983e2fa` (2026-09-20), filed and fixed in the same pass · Subsystem: crates/x3-tools/src/bin/x3c.rs
+Found by running every command instead of reading it (the CLI surface is 33 commands; a stub or a
+fabrication here is the class AGENTS.md forbids outright). Three defects in one command:
+- **A fabricated confirmation.** `Triggering refund for intent...` / `Refund submitted — transaction
+  pending confirmation` — with no chain connection, no key and no submission of any kind. Both
+  branches now say what the command did (it read the source and found the path) and what would submit
+  a refund.
+- **"Timeout duration: 0s" for `timeout 45s`.** The reader matched only `LiteralExpr::Int`, and `45s`
+  is a `LiteralExpr::Duration` — a shape the lowering has always handled. Measured: `x3c refund` on
+  `examples/timeout_refund_minimal.x3` printed 0s before, 45s after.
+- **The target printed as the compiler's `Debug` output** (`Literal(String(Symbol("Ethereum.USDC:sender")))`).
+  It uses `formatter::refund_target` — made public for this reader — so the report reads
+  `Ethereum.USDC to sender`.
+One test asserts all three. The coverage gap that let it ship: no CLI test had run `refund` on a
+program with a refund path, so the fabricated line was never compared against anything.
+
+## TICKET-124 — the CLI surface has not been audited command by command — OPEN
+Type: OPEN, audit · Subsystem: crates/x3-tools/src/bin/x3c.rs
+Reason: the defect above was found by running one command; the surface has 33. `x3c test`, `fuzz` and
+`chaos` were checked in the same pass and generate real artifacts (test files that parse/compile/check,
+an `Arbitrary` input struct, scenarios) — not stubs. `deploy`/`plan` report the artifact's own figures.
+What has not been done is the same check for `prove`, `run-intent`, `intent`, `inspect`, `verify`,
+`audit`, `score`, `receipt`, `packet`, `new`, `simulate --state` and the rest, each on an input that
+*should* exercise its claim.
+Acceptance criteria: for each command, either its output is shown to follow from the input (a figure
+the program states, an artifact's bytes, a refusal with a reason), or a defect is filed.
+Validation: one measured run per command, recorded in a report.
