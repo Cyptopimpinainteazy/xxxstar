@@ -376,13 +376,16 @@ def check_reproducible_build() -> None:
                 "    a hash changed. Two possibilities: the runtime source changed since"
             )
             print(
-                "    docs/reports/runtime-wasm-hashes.json was recorded (rebuild again to"
+                "    docs/reports/runtime-wasm-hashes.json was recorded — run"
             )
             print(
-                "    confirm two builds of *this* revision agree, then update the record),"
+                "    ./scripts/update-runtime-hashes.sh, which rebuilds twice, refuses to"
             )
             print(
-                "    or the build is not reproducible (stop the release and investigate)."
+                "    write unless they agree, and re-records it — or the build is not"
+            )
+            print(
+                "    reproducible, in which case that script fails and the release stops."
             )
             for line in mismatched:
                 fail(f"{runtime}: {line}")
