@@ -5,23 +5,23 @@
   "srtool": "0.18.4",
   "rustc": "1.93.0",
   "recorded_at": "2026-09-19",
-  "recorded_revision": "f7007ee4d",
+  "recorded_revision": "603398a38",
   "runtime_version": "x3-chain-11 (x3-chain-1.tx1.au1)",
   "metadata": "V14",
   "runtimes": {
     "compact": {
-      "size": 8420214,
-      "set_code": "0xf0e1e6e72542170aa22567a0791b346c5eba80579e0af07af3ff2b6e209fc86c",
-      "authorize_upgrade": "0x877de18ba73356356b59c203d53453f6eb6df5f31aab4623b042ff21ff751b48",
-      "ipfs": "QmdtaKNfMc58FG1tSwnVZ6deR2su3Zw1DgdAMEtaujtCeL",
-      "blake2_256": "0xa90fa39255a0dbf9a6aeab96c595aea25ffd32ff94258b01798b85d9e4e5082e"
+      "size": "8420316",
+      "set_code": "0x0cb9f78d9b341a907c734325bbc89240373708ca9f4ae4b58c6f238bfe2f733a",
+      "authorize_upgrade": "0x53e1c26e245f54bca21394d229ad67b7674d1d272204a7990f6a52b669c4427d",
+      "ipfs": "QmTxDrKtbLY7YKfuycyo7VjfzrNWxKHqR6te3skkUCXBH7",
+      "blake2_256": "0x69f795b7892e77114a8d46e2214db1f5ff1134db4ac40dfe380338b334448ddc"
     },
     "compressed": {
-      "size": 1442110,
-      "set_code": "0x8e83291590bb93227fb6b5ecdf0823d7d9e6369de0dfd341730205c1ac733770",
-      "authorize_upgrade": "0x333052240df6b5d53eadf7fd11076ab09b0fbaa409663ad464c0c595c14c7d29",
-      "ipfs": "Qmcto7SvzXqWVJEJqbT8QsyQJJG2xMiiMrCZhNwV9o2U7X",
-      "blake2_256": "0x124b5b9389459b3960ff972ce46176f8f45ee1b3853e541e33e2616cbfc1a22e"
+      "size": "1441551",
+      "set_code": "0x80643f696980b87b0334642bfd0243f9ab8df8657e59de085f6fe890be996971",
+      "authorize_upgrade": "0xa6d12eef17baeab1ce49c6aa71a626ff9a09d3da1ddb1218b4b2042fa8ccc869",
+      "ipfs": "QmNWM9HPudAQpEkLZfmYb5CSky6fMySSJ7YvDJbgNSyh2W",
+      "blake2_256": "0x3140bf85bcdf482e07fd6c7f235dd246ef4bb16742a50fa90904e49b3de8c77d"
     }
   }
 }
