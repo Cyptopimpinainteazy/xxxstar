@@ -1,0 +1,2504 @@
+with x3lang will you be able to make trades no one else can make speed and arbitrage style or how ever unless they use this lang
+
+Yes — but only if the advantage is built below the language layer too.
+
+X3Lang by itself cannot magically create arbitrage that other languages are physically incapable of expressing. A Rust, Solidity, or C++ developer could reproduce many strategies. The real opportunity is to make X3Lang + X3VM + X3 Chain execution primitives capable of transactions other environments cannot execute as a single native operation.
+
+The architecture you have been building is already pointed in that direction.
+What could actually become X3-exclusive
+
+Imagine an X3Lang instruction like:
+
+atomic_trade {
+    borrow 8_000_000 USDC;
+
+    swap ETH -> USDC on Ethereum;
+    swap USDC -> SOL on Solana;
+    swap SOL -> BTC on X3;
+
+    require profit >= 18_000 USDC;
+    require slippage <= 8 bps;
+    require total_fees <= 4_000 USDC;
+
+    repay;
+
+    commit only_if_all_succeed;
+}
+
+The important part isn't the syntax.
+
+The important part would be X3's runtime understanding that entire operation as one economic transaction.
+
+That opens several interesting possibilities.
+X3 capability	Advantage
+Atomic EVM + SVM + X3VM execution	Cross-VM arbitrage without manually coordinating separate bots
+Native flash liquidity	Borrow → trade → repay inside one execution
+Compile-time route/risk constraints	Less runtime decision overhead and fewer unsafe states
+Private transaction submission	Reduced exposure to copy-trading/front-running
+Parallel execution	Independent legs execute concurrently
+Precompiled trading instructions	Lower interpretation/serialization overhead
+Deterministic rollback	Failed arb returns to original state rather than leaving half a trade
+Native profit guards	Transaction simply refuses settlement below target profit
+Native fee/slippage guards	Economic constraints enforced by the VM
+Cross-chain position manager	Positions become first-class runtime objects
+GPU-assisted route/search pipeline	Search enormous route spaces before execution
+
+And there is a bigger idea.
+Create trades that don't exist elsewhere
+
+Don't merely make:
+
+    Solidity, but faster.
+
+Make X3Lang capable of expressing a new transaction primitive.
+
+For example:
+
+hyperarb {
+    capital = flash(25_000_000 USDC);
+
+    parallel {
+        route_a = ETH.USDC -> ARB.USDC;
+        route_b = SOL.USDC -> JUP.SOL;
+        route_c = BTC.USDC -> X3.BTC;
+    }
+
+    choose optimal(route_a, route_b, route_c);
+
+    hedge volatility;
+    settle_across_domains;
+
+    assert net_profit > 0.0035;
+}
+
+The compiler could turn that into an execution graph:
+
+                  FLASH CAPITAL
+                       │
+             ┌─────────┼─────────┐
+             ▼         ▼         ▼
+            EVM       SVM       X3VM
+             │         │         │
+             └─────────┼─────────┘
+                       ▼
+                 PROFIT CHECK
+                       │
+              ┌────────┴────────┐
+              │                 │
+            PROFIT            FAIL
+              │                 │
+              ▼                 ▼
+           SETTLE           ROLLBACK
+
+Now you're no longer competing primarily on:
+
+bot latency
+
+You're competing on:
+
+transaction expressiveness
++
+execution topology
++
+settlement guarantees
++
+latency
+
+The key distinction
+
+There are three levels of advantage:
+
+LEVEL 1
+X3Lang syntax
+        ↓
+Easy to copy
+
+LEVEL 2
+X3Lang compiler optimizations
+        ↓
+Harder to copy
+
+LEVEL 3
+X3Lang + X3VM + X3 sequencer
++ atomic coordinator
++ private orderflow
++ native liquidity
++ cross-VM settlement
+        ↓
+VERY hard to copy
+
+Level 3 is where the moat is.
+
+Someone might understand exactly what an X3Lang trader is doing but still be unable to reproduce it from Ethereum because Ethereum doesn't possess the same execution primitive.
+
+That would be analogous to them seeing:
+
+X3 transaction:
+Ethereum leg
+     +
+Solana leg
+     +
+X3 leg
+     +
+flash capital
+     +
+profit guard
+     +
+atomic settlement
+
+but having no equivalent instruction available on their chain.
+One especially powerful feature I'd add
+
+Give X3Lang a native Arbitrage IR rather than treating arbitrage as ordinary contract code.
+
+Something approximately like:
+
+arb {
+
+    discover {
+        chains: [x3, ethereum, solana, base, arbitrum];
+        max_hops: 8;
+        liquidity_min: 500_000;
+    }
+
+    capital {
+        flash: enabled;
+        max: 50_000_000;
+    }
+
+    execution {
+        atomic: true;
+        parallel: true;
+        private: true;
+    }
+
+    risk {
+        min_profit: 0.20%;
+        max_slippage: 0.08%;
+        max_fee: 0.05%;
+        deadline: 220ms;
+    }
+
+}
+
+The compiler could lower that into an optimized trading graph automatically.
+
+Then an X3 trader isn't writing:
+
+RPC calls
+→ quote calls
+→ calldata
+→ approvals
+→ swaps
+→ bridges
+→ monitoring
+→ settlement
+
+They're declaring:
+
+    Find and atomically execute profitable economic state transitions.
+
+That is a radically different abstraction.
+And speed can become part of the language
+
+X3Lang could expose latency constraints:
+
+deadline 175ms;
+parallelize independent;
+prefer finalized_liquidity;
+private_submit;
+abort_if route_age > 30ms;
+
+The compiler/runtime could optimize the execution plan around those constraints.
+
+That means speed isn't merely the bot being written well.
+
+Speed becomes part of the transaction specification.
+Where this gets really interesting
+
+Eventually X3 could support things like:
+
+Atomic Cross-DEX Arbitrage
+Atomic Cross-VM Arbitrage
+Atomic Cross-Chain Arbitrage
+Atomic Liquidation + Hedge
+Atomic Flashloan + Arb
+Atomic CEX/DEX settlement intents
+Atomic Options Hedge
+Atomic Perp/Futures Hedge
+Atomic Stablecoin Depeg Arbitrage
+Atomic NFT/Token composability
+Atomic Treasury Rebalancing
+Atomic Yield Migration
+
+and possibly:
+
+BTC
+ │
+EVM
+ │
+SVM
+ │
+X3VM
+ │
+other connected execution domains
+
+all represented by one X3 execution graph.
+
+The strongest version of X3Lang therefore isn't:
+
+    "a programming language for blockchain."
+
+It's closer to:
+
+    a compiler for programmable financial transactions spanning multiple execution environments.
+
+If that architecture is completed correctly, then yes: X3Lang users could have access to trading structures unavailable as one atomic transaction elsewhere. Other developers could imitate the strategy logic, but without X3's underlying execution and settlement machinery they couldn't necessarily reproduce the trade itself.
+
+lets brainstorm more
+
+Absolutely. The biggest opportunity is to make X3Lang capable of expressing financial operations that are awkward, slow, fragmented, or impossible to coordinate atomically today.
+The next wave of X3Lang trading primitives
+Idea	What it does	Why it matters
+Atomic Opportunity Graph	Treats chains, DEXs, lending markets, perps, bridges, and pools as one graph	Compiler can search across everything instead of one venue
+Profit-Only Transactions	Transaction is invalid unless realized profit exceeds a threshold	Removes “executed correctly but lost money” outcomes
+Atomic Hedge	Spot trade + perp hedge + borrow/repay settle together	Removes temporary directional exposure
+Atomic Liquidation	Liquidate → swap collateral → repay loan → hedge → collect profit	Liquidation becomes one economic operation
+Atomic Rebalance	Move an entire portfolio to a target allocation simultaneously	Avoids intermediate exposure
+Temporal Transactions	Execution conditions tied to block/time/state windows	Useful for time-sensitive opportunities
+State-Locked Quotes	Quote tied to a specific verified state root	Prevents trading against stale state
+Route Freshness Rules	Reject routes older than N milliseconds/blocks	Especially useful for fast arbitrage
+Economic Assertions	assert pnl > fees + risk_buffer	Economics become consensus-enforced logic
+Multi-Asset Flash Capital	Borrow several assets inside one transaction graph	Much richer arbitrage structures
+Flash Collateral	Temporary collateral exists only for the atomic execution	Could enable unusual capital-efficient trades
+Cross-Domain Netting	Debts/profits across several markets net before settlement	Less capital movement and fewer swaps
+Automatic Failure Compensation	Compiler inserts rollback/compensation actions	Safer complex workflows
+Position Objects	Positions become native typed objects	Compiler understands debt, leverage, collateral, PnL
+Liquidity Objects	Pools/orderbooks treated as native resources	Better optimization than arbitrary contract calls
+
+The really interesting stuff starts when X3Lang stops thinking in terms of transactions and starts thinking in terms of economic objectives.
+
+Instead of this:
+
+swap(...);
+borrow(...);
+swap(...);
+repay(...);
+
+you could eventually write:
+
+objective {
+    maximize net_profit;
+
+    using {
+        capital <= 10_000_000 USDC;
+        chains = [ethereum, solana, x3, base];
+        max_hops = 12;
+    }
+
+    constraints {
+        atomic;
+        private;
+        slippage < 6bps;
+        execution_time < 250ms;
+        loss_probability < policy.max;
+    }
+}
+
+Then the compiler/runtime figures out the execution graph.
+
+That is a much bigger idea than a smart-contract language.
+X3 could have a native Trading IR
+
+You're already working toward stateful Trading IR verification. I'd push that much further.
+
+The IR could understand concepts like:
+
+CAPITAL
+DEBT
+COLLATERAL
+POSITION
+QUOTE
+ROUTE
+HEDGE
+PROFIT
+FEE
+SLIPPAGE
+DEADLINE
+FINALITY
+SETTLEMENT
+
+Instead of representing everything as generic bytecode.
+
+That lets the compiler prove things such as:
+
+Debt opened before borrowed funds are used
+Debt closes exactly once
+Collateral cannot disappear
+Every route has a verified output asset
+Fees are bounded
+Slippage is bounded
+Profit is measured after fees
+No settlement occurs before all required legs succeed
+
+That's powerful because X3Lang could reject economically broken programs before they ever hit the chain.
+One idea I especially like: Atomic Branching Trades
+
+Normally a bot has to decide its route before submitting.
+
+X3 could allow:
+
+atomic_choice {
+
+    path A {
+        ETH -> USDC -> SOL
+    }
+
+    path B {
+        ETH -> BTC -> SOL
+    }
+
+    path C {
+        ETH -> X3 -> SOL
+    }
+
+    choose highest_net_output;
+}
+
+The runtime evaluates valid branches against current state and executes only the best valid branch.
+
+Now imagine:
+
+100 candidate routes
+        ↓
+parallel evaluation
+        ↓
+7 profitable
+        ↓
+best net route selected
+        ↓
+atomic settlement
+
+That's significantly different from ordinary precomputed calldata.
+Even crazier: Route Mutation
+
+Instead of killing an entire transaction when one venue changes:
+
+route ETH -> USDC -> BTC
+fallback {
+    replace failing leg;
+    preserve profit >= 0.25%;
+}
+
+The execution engine could substitute another approved liquidity source while preserving compiler-enforced constraints.
+
+The important word is approved.
+
+You don't want arbitrary runtime mutation.
+
+The compiler could produce a bounded execution tree:
+
+              ETH
+               │
+      ┌────────┼────────┐
+      │        │        │
+    Uniswap  Curve   Balancer
+      │        │        │
+      └────────┼────────┘
+               ▼
+              USDC
+
+The runtime chooses among paths the compiler has already proven safe.
+Native Economic Types
+
+This could become one of X3Lang's signature features.
+
+Instead of:
+
+u128
+
+you could have:
+
+Amount<USDC>
+Price<ETH, USDC>
+Debt<USDC>
+Collateral<ETH>
+Position<ETH, Long>
+Slippage<BPS>
+Profit<USD>
+BlockDeadline
+FinalizedState
+
+Then this becomes a compile error:
+
+ETH + USDC
+
+or:
+
+repay(debt, wrong_asset);
+
+or:
+
+settle(unfinalized_position);
+
+That sounds simple, but it could eliminate an enormous class of financial bugs.
+Economic Effect System
+
+Rust has ownership.
+
+X3Lang could have something conceptually similar for financial effects.
+
+Example:
+
+fn trade()
+    effects [
+        borrow,
+        swap,
+        repay
+    ]
+    guarantees [
+        debt_closed,
+        principal_preserved,
+        min_profit
+    ]
+
+The compiler could refuse to compile if an economic effect isn't resolved.
+
+Example:
+
+ERROR X3E-4021
+
+Borrowed:
+    1,000,000 USDC
+
+Repaid:
+    998,400 USDC
+
+Unresolved debt:
+    1,600 USDC
+
+Transaction cannot compile.
+
+That's killer tooling.
+Profit Ownership
+
+Here's another interesting concept.
+
+Make profit itself a first-class value.
+
+profit p = execute(strategy);
+
+require p.net > 15_000 USDC;
+
+split p {
+    70% -> trader;
+    20% -> liquidity_provider;
+    5%  -> X3_validator_pool;
+    5%  -> strategy_author;
+}
+
+That opens a marketplace for strategies.
+
+A developer could publish an X3Lang strategy without giving users complete control over the strategy's economics.
+
+Think:
+
+X3 Strategy Marketplace
+
+Developers publish compiled trading modules.
+
+Users supply capital.
+
+X3 automatically handles:
+
+execution
+profit accounting
+royalties
+risk policy
+settlement
+
+That's potentially a whole business itself.
+Compiled Strategy Licensing
+
+This may fit your earlier monetization ideas extremely well.
+
+X3Lang could support:
+
+license {
+    executions: 10_000;
+    fee: 2bps;
+    expires: block 88_000_000;
+}
+
+or:
+
+royalty {
+    creator: x3:0xABC...;
+    profit_share: 3%;
+}
+
+The compiler/runtime enforces the license.
+
+Not SaaS billing.
+
+Protocol-level software licensing.
+
+That is unusual.
+Strategy Secrecy
+
+Another potential moat:
+
+private_strategy {
+    reveal: never;
+    expose: execution_receipt_only;
+}
+
+The network verifies that execution followed an approved artifact without exposing the strategy's full source.
+
+Eventually this could combine:
+
+compiled commitments
++
+attested execution
++
+zero-knowledge proofs
+
+so traders can prove:
+
+    “This execution obeyed policy X.”
+
+without revealing:
+
+    “Here is my strategy.”
+
+That is extremely interesting for institutional trading.
+X3 Opportunity Packets
+
+Instead of sending ordinary transactions, bots could submit:
+
+Opportunity Packet
+
+containing:
+
+state root
+route graph
+capital requirement
+expected PnL
+maximum fees
+maximum slippage
+expiration
+execution proof
+strategy commitment
+
+Validators/sequencers could treat those differently from normal transactions.
+
+You could eventually have:
+
+normal transaction lane
+trading lane
+liquidation lane
+atomic cross-domain lane
+
+with different scheduling policies.
+Execution Auctions without exposing the strategy
+
+Someone detects an opportunity.
+
+They submit:
+
+I have a transaction producing ≥ $18,000 surplus.
+
+Builders compete to execute it.
+
+They don't necessarily receive the underlying strategy.
+
+That could create an X3 execution market around strategy commitments.
+Intent Fusion
+
+This might be huge.
+
+Suppose three users want:
+
+Alice: ETH → SOL
+Bob: SOL → USDC
+Charlie: USDC → ETH
+
+Instead of three DEX trades:
+
+Alice ───────► Bob
+Bob   ───────► Charlie
+Charlie──────► Alice
+
+X3 could internally net much of the trade.
+
+Only the imbalance hits external liquidity.
+
+That means:
+
+less slippage
+less gas
+less external liquidity consumption
+
+You could call it:
+X3 Intent Fusion
+
+And X3Lang programs could opt into it:
+
+allow intent_fusion;
+
+Atomic Portfolio Transactions
+
+Another class almost nobody treats naturally:
+
+rebalance portfolio {
+    BTC = 40%;
+    ETH = 25%;
+    SOL = 15%;
+    X3  = 10%;
+    USDC = 10%;
+
+    minimize {
+        fees;
+        slippage;
+        taxable_events;
+    }
+
+    atomic;
+}
+
+Now X3Lang starts behaving like a financial optimizer.
+Native Risk Engine
+
+Programs could declare:
+
+risk {
+    max_drawdown = 0.5%;
+    max_leverage = 2.5x;
+    max_price_age = 100ms;
+    max_oracle_divergence = 15bps;
+    max_route_concentration = 40%;
+}
+
+X3VM enforces it.
+
+That is much stronger than having a bot promise to respect a config file.
+And here's the really ambitious direction
+
+Eventually:
+
+X3Lang source
+      ↓
+Economic IR
+      ↓
+Opportunity graph
+      ↓
+Constraint solver
+      ↓
+Parallel execution plan
+      ↓
+EVM ─┐
+SVM ─┼─► Atomic Coordinator
+BTC ─┤
+X3VM─┘
+      ↓
+Profit / risk verification
+      ↓
+Final settlement
+      ↓
+Signed economic receipt
+
+At that point X3Lang isn't really competing with Solidity.
+
+It starts competing with a combination of:
+
+Solidity
++
+Rust
++
+Hummingbot
++
+MEV infrastructure
++
+routing engines
++
+risk engines
++
+settlement infrastructure
+
+under one compiler.
+
+And that is where X3Lang could become genuinely difficult to reproduce without using the X3 execution environment.
+
+give me the super prompt for this
+
+Use this as the master implementation prompt for Codex/Claude/GPT coding agents working on X3Lang.
+X3Lang Economic Execution Super Prompt
+X3LANG GODMODE — ECONOMIC EXECUTION ENGINE
+
+You are working on X3Lang, the native programming language and economic execution language for the X3 ecosystem.
+
+Your mission is not to build another Solidity-like smart-contract language.
+
+Your mission is to turn X3Lang into a compiler for programmable financial transactions, strategies, and atomic economic state transitions spanning multiple execution environments.
+
+The long-term architecture is:
+
+X3Lang Source
+      ↓
+Parser / AST
+      ↓
+Typed Economic HIR
+      ↓
+Trading / Economic MIR
+      ↓
+Stateful Economic Verifier
+      ↓
+Opportunity Graph
+      ↓
+Constraint Solver
+      ↓
+Execution Planner
+      ↓
+Parallel Scheduler
+      ↓
+EVM ──────┐
+SVM ──────┤
+X3VM ─────┼──► X3 Atomic Coordinator
+BTC ──────┤
+External ─┘
+      ↓
+Risk + Economic Verification
+      ↓
+Atomic Settlement / Rollback
+      ↓
+Signed Economic Receipt
+
+The goal is to create financial operations that are difficult or impossible to express, coordinate, or execute atomically using conventional blockchain languages.
+NON-NEGOTIABLE PRINCIPLE
+
+Do not add syntax merely because it looks impressive.
+
+Every language feature must eventually lower into:
+
+    deterministic typed IR,
+
+    verifiable economic semantics,
+
+    bounded execution behavior,
+
+    measurable gas/resource cost,
+
+    fail-closed runtime behavior,
+
+    auditable receipts,
+
+    explicit settlement guarantees.
+
+If behavior cannot be reasoned about, it is a bug.
+
+No mocks may be accepted as proof of production readiness.
+CORE DIFFERENTIATOR
+
+The moat is NOT X3Lang syntax.
+
+The moat is:
+
+X3Lang
++
+X3 compiler
++
+X3VM
++
+atomic coordinator
++
+cross-VM adapters
++
+private execution
++
+parallel execution
++
+native financial primitives
++
+economic verification
++
+signed execution receipts
+
+Other developers may understand the strategy.
+
+They should still need X3 infrastructure to reproduce the same execution semantics.
+PRIMARY OBJECTIVE
+
+Build X3Lang around economic intent rather than low-level transaction choreography.
+
+Traditional code:
+
+RPC
+→ quote
+→ approve
+→ borrow
+→ swap
+→ bridge
+→ wait
+→ swap
+→ repay
+→ check profit
+
+X3Lang target:
+
+objective {
+    maximize net_profit;
+
+    using {
+        capital <= 10_000_000 USDC;
+        chains = [ethereum, solana, x3, base];
+        max_hops = 12;
+    }
+
+    constraints {
+        atomic;
+        private;
+        slippage <= 6bps;
+        total_fees <= 4_000 USDC;
+        execution_time <= 250ms;
+        min_profit >= 15_000 USDC;
+    }
+}
+
+The compiler/runtime should determine how the valid economic objective is executed.
+PHASE 1 — ECONOMIC TYPE SYSTEM
+
+Add first-class economic types.
+
+Examples:
+
+Amount<USDC>
+Amount<ETH>
+
+Price<ETH, USDC>
+
+Debt<USDC>
+Collateral<ETH>
+
+Position<ETH, Long>
+Position<BTC, Short>
+
+Profit<USDC>
+Loss<USDC>
+
+Slippage<BPS>
+Fee<USDC>
+
+Liquidity<ETH, USDC>
+
+Quote<ETH, USDC>
+
+FinalizedState<X3>
+StateRoot<Ethereum>
+
+Deadline<Block>
+Deadline<Time>
+
+The compiler must reject invalid operations such as:
+
+Amount<ETH> + Amount<USDC>
+
+without an explicit conversion.
+
+Reject:
+
+repay(usdc_debt, eth_amount);
+
+Reject:
+
+settle(unfinalized_position);
+
+Reject dimensional errors.
+
+Reject asset mismatches.
+
+Reject chain mismatches.
+
+Reject VM mismatches.
+
+Reject invalid ownership of financial resources.
+PHASE 2 — FINANCIAL OWNERSHIP MODEL
+
+Borrow ideas from Rust's ownership system but apply them to economic resources.
+
+Example:
+
+let capital = borrow<USDC>(1_000_000);
+
+capital now represents an obligation.
+
+That obligation MUST eventually resolve through:
+
+repay(capital);
+
+or a provably valid compensation/failure path.
+
+The compiler/verifier must understand:
+
+borrow
+→ debt opens
+→ capital becomes usable
+→ capital may flow through operations
+→ repayment must occur
+→ debt closes exactly once
+
+Prevent:
+
+    use-before-borrow,
+
+    double repay,
+
+    missing repay,
+
+    asset mismatch,
+
+    repay with unrelated funds where policy forbids it,
+
+    debt reuse after closure,
+
+    phantom collateral,
+
+    duplicated position ownership.
+
+PHASE 3 — ECONOMIC EFFECT SYSTEM
+
+Introduce economic effects.
+
+Example:
+
+fn execute_arb()
+    effects [
+        borrow,
+        swap,
+        hedge,
+        repay
+    ]
+    guarantees [
+        debt_closed,
+        min_profit,
+        bounded_slippage
+    ]
+
+The compiler must verify that declared effects are resolved.
+
+Example compiler diagnostic:
+
+X3E-4021 UNRESOLVED_DEBT
+
+Borrowed:
+    1,000,000 USDC
+
+Required repayment:
+    1,001,700 USDC
+
+Provable repayment:
+    999,600 USDC
+
+Shortfall:
+    2,100 USDC
+
+Compilation rejected.
+
+PHASE 4 — STATEFUL TRADING IR
+
+Build a dedicated Trading/Economic IR.
+
+It must understand operations such as:
+
+BEGIN
+BORROW
+LOCK
+BIND
+QUOTE
+SWAP
+ROUTE
+POSITION_OPEN
+POSITION_CLOSE
+HEDGE
+LIQUIDATE
+COLLATERALIZE
+REPAY
+FEE_CHECK
+SLIPPAGE_CHECK
+PROFIT_CHECK
+FINALITY_CHECK
+COMMIT
+ROLLBACK
+END
+
+The verifier must reason across the WHOLE instruction sequence.
+
+Examples of required invariants:
+
+BEGIN occurs exactly once
+
+Debt must open before borrowed capital is used
+
+Binding must exist before reference
+
+Binding must carry exact asset and chain type
+
+Every swap input must exist
+
+Every output asset must be tracked
+
+Every debt closes exactly once
+
+Every position either closes or becomes an explicitly returned output
+
+Profit checks must occur after all required costs are known
+
+No COMMIT may occur before all required finality proofs exist
+
+ROLLBACK paths must preserve declared invariants
+
+END occurs exactly once
+
+PHASE 5 — PROFIT AS A FIRST-CLASS VALUE
+
+Profit must not be represented as an arbitrary integer.
+
+Example:
+
+profit p = execute(strategy);
+
+require p.net >= 15_000 USDC;
+
+Profit calculations must understand:
+
+gross proceeds
+-
+principal
+-
+gas
+-
+DEX fees
+-
+flash-loan fees
+-
+protocol fees
+-
+settlement costs
+-
+hedging costs
+-
+declared safety buffer
+=
+NET PROFIT
+
+Never allow "profit" to mean pre-fee revenue.
+
+Introduce:
+
+p.gross
+p.cost
+p.net
+p.margin
+p.realized
+p.unrealized
+
+where semantically valid.
+PHASE 6 — PROFIT-ONLY TRANSACTIONS
+
+Add a primitive allowing transactions to refuse economic settlement unless minimum economics are satisfied.
+
+Example:
+
+atomic_trade {
+    ...
+
+    require net_profit >= 18_000 USDC;
+
+    commit;
+}
+
+If profit falls below threshold:
+
+DO NOT SETTLE
+
+Prefer rollback/failure according to domain capabilities.
+
+This condition must be enforced by execution semantics, not merely client-side logic.
+PHASE 7 — NATIVE RISK POLICY
+
+Add a first-class risk declaration.
+
+Example:
+
+risk {
+    max_slippage = 8bps;
+    max_fee = 0.05%;
+    max_leverage = 2.5x;
+    max_price_age = 100ms;
+    max_route_age = 50ms;
+    max_oracle_divergence = 15bps;
+    max_position_size = 2_000_000 USDC;
+    min_liquidity = 500_000 USDC;
+    deadline = 250ms;
+}
+
+Risk policy must compile into the artifact.
+
+Runtime callers MUST NOT be able to silently override compiled safety settings.
+
+Bind:
+
+chain
+artifact version
+private/public submission policy
+gas bounds
+slippage limits
+flash fee limits
+deadline
+route freshness
+oracle policy
+allowed venues
+allowed assets
+allowed domains
+
+into the compiled artifact.
+PHASE 8 — ATOMIC CROSS-VM TRANSACTIONS
+
+Support declarations such as:
+
+atomic {
+    x3 {
+        lock USDC;
+    }
+
+    evm {
+        swap USDC -> ETH;
+    }
+
+    svm {
+        swap ETH-equivalent -> SOL;
+    }
+
+    x3 {
+        settle;
+    }
+}
+
+Atomic coordinator semantics must explicitly define:
+
+PREPARE
+LOCK
+VERIFY
+EXECUTE
+FINALIZE
+COMMIT
+
+and failure behavior:
+
+ABORT
+REFUND
+COMPENSATE
+
+No false claims of atomicity.
+
+Distinguish:
+
+    same-runtime atomicity,
+
+    coordinated cross-domain atomicity,
+
+    cryptographically locked conditional execution,
+
+    compensating transaction semantics.
+
+Use precise names in compiler/runtime documentation.
+PHASE 9 — ATOMIC HEDGE
+
+Introduce a hedge primitive.
+
+Example:
+
+atomic_hedge {
+    buy 1_000 ETH spot;
+    short equivalent ETH perp;
+
+    require delta <= 0.01%;
+}
+
+Both legs should be represented within one economic plan.
+
+The verifier must reason about directional exposure.
+
+Potential types:
+
+Exposure<ETH>
+Delta<ETH>
+HedgeRatio
+
+PHASE 10 — ATOMIC LIQUIDATION
+
+Create a liquidation primitive.
+
+Example:
+
+atomic_liquidation {
+    liquidate borrower.position;
+
+    receive collateral;
+
+    swap collateral -> USDC;
+
+    repay liquidation capital;
+
+    require net_profit >= 2_500 USDC;
+}
+
+Possible extension:
+
+hedge collateral immediately;
+
+Verifier must ensure repayment and valid final position.
+PHASE 11 — ATOMIC PORTFOLIO REBALANCING
+
+Support:
+
+rebalance portfolio {
+    BTC = 40%;
+    ETH = 25%;
+    SOL = 15%;
+    X3  = 10%;
+    USDC = 10%;
+
+    minimize {
+        fees;
+        slippage;
+        external_liquidity_usage;
+    }
+
+    atomic;
+}
+
+Compiler should eventually be able to generate the transaction graph automatically.
+PHASE 12 — ATOMIC BRANCHING TRADES
+
+Implement bounded branch execution.
+
+Example:
+
+atomic_choice {
+
+    path A {
+        ETH -> USDC -> SOL
+    }
+
+    path B {
+        ETH -> BTC -> SOL
+    }
+
+    path C {
+        ETH -> X3 -> SOL
+    }
+
+    choose highest_net_output;
+}
+
+Compiler must:
+
+    enumerate permitted branches,
+
+    type-check every branch,
+
+    ensure equivalent required output type,
+
+    prove branch safety,
+
+    emit bounded execution graph,
+
+    prohibit arbitrary runtime code mutation.
+
+PHASE 13 — BOUNDED ROUTE MUTATION
+
+Support approved runtime substitution.
+
+Example:
+
+route ETH -> USDC -> BTC {
+
+    fallback {
+        replace failing_leg;
+
+        require profit >= 0.25%;
+        require slippage <= 7bps;
+    }
+}
+
+The runtime may choose only among compiler-approved routes.
+
+Example:
+
+ETH
+ │
+ ├─ Uniswap
+ ├─ Curve
+ └─ Balancer
+      ↓
+     USDC
+
+No arbitrary dynamic contract substitution.
+
+Every fallback must be statically bounded.
+PHASE 14 — OPPORTUNITY GRAPH
+
+Build a graph model representing:
+
+asset
+venue
+pool
+orderbook
+chain
+VM
+bridge/domain adapter
+lending market
+perp market
+collateral relation
+flash liquidity source
+settlement path
+
+Edges contain:
+
+expected output
+fees
+liquidity
+slippage function
+latency
+finality characteristics
+risk
+domain
+proof requirement
+
+The planner should be able to search this graph for valid opportunities.
+PHASE 15 — OBJECTIVE-DRIVEN PROGRAMS
+
+Support declarative objectives.
+
+Example:
+
+objective {
+    maximize net_profit;
+
+    constraints {
+        capital <= 25_000_000 USDC;
+        hops <= 10;
+        chains <= 4;
+        risk <= strategy.policy;
+        execution_time <= 200ms;
+        private;
+        atomic;
+    }
+}
+
+Potential future objectives:
+
+maximize profit
+maximize output
+minimize fees
+minimize slippage
+minimize execution time
+minimize external liquidity
+minimize risk
+maximize capital efficiency
+
+Multi-objective optimization must be deterministic.
+
+Do not allow non-deterministic solver output to affect consensus.
+PHASE 16 — PARALLEL FINANCIAL EXECUTION
+
+Allow independent branches to execute concurrently.
+
+Example:
+
+parallel {
+
+    route_a = evaluate(...);
+
+    route_b = evaluate(...);
+
+    route_c = evaluate(...);
+
+}
+
+Compiler must build dependency DAG.
+
+Example:
+
+             START
+               │
+        ┌──────┼──────┐
+        │      │      │
+        A      B      C
+        │      │      │
+        └──────┼──────┘
+               │
+             MERGE
+               │
+           PROFIT CHECK
+
+Parallelism must be deterministic.
+
+Race conditions must be rejected or resolved by explicit semantics.
+PHASE 17 — ROUTE FRESHNESS
+
+Add freshness constraints.
+
+Examples:
+
+require quote.age <= 25ms;
+require state.age <= 1 block;
+require oracle.age <= 100ms;
+
+Introduce typed values:
+
+QuoteAge
+StateAge
+OracleAge
+RouteAge
+
+Stale information should cause a fail-closed rejection.
+PHASE 18 — STATE-LOCKED EXECUTION
+
+Allow a trade to bind to verified state.
+
+Example:
+
+execute_against {
+    ethereum.state_root = 0x...;
+    x3.finalized_block = 12345678;
+}
+
+If expected state no longer matches:
+
+INVALIDATE EXECUTION PLAN
+
+This prevents plans from silently executing against materially different state.
+PHASE 19 — MULTI-ASSET FLASH CAPITAL
+
+Support:
+
+flash {
+    5_000_000 USDC;
+    1_000 ETH;
+    200 BTC;
+}
+
+Each obligation becomes independently tracked.
+
+Repayment must be proven for every asset.
+PHASE 20 — FLASH COLLATERAL
+
+Research a bounded primitive for temporary collateral available only inside one protected execution plan.
+
+Example conceptual syntax:
+
+flash_collateral {
+    pledge 5_000 ETH;
+
+    execute strategy;
+
+    release collateral only if obligations_resolved;
+}
+
+Do NOT ship until the economic model is formally proven safe.
+PHASE 21 — INTENT FUSION
+
+Implement user-intent netting.
+
+Example:
+
+Alice wants:
+ETH → SOL
+
+Bob wants:
+SOL → USDC
+
+Charlie wants:
+USDC → ETH
+
+Instead of performing three full external trades, internalize compatible flows.
+
+Example:
+
+Alice ───────► Bob
+Bob ─────────► Charlie
+Charlie ─────► Alice
+
+Only residual imbalance should require external liquidity.
+
+Syntax:
+
+allow intent_fusion;
+
+Execution must preserve:
+
+minimum output
+deadline
+asset correctness
+user authorization
+fairness policy
+
+PHASE 22 — CROSS-DOMAIN NETTING
+
+Extend netting across economic obligations.
+
+Example:
+
+Chain A owes X
+Chain B receives X
+Chain C owes Y
+Chain A receives Y
+
+Net obligations before settlement where cryptographically valid.
+
+Target benefits:
+
+less capital movement
+fewer transactions
+lower fees
+lower liquidity demand
+lower settlement risk
+
+PHASE 23 — STRATEGY MODULES
+
+Allow reusable economic modules.
+
+Example:
+
+strategy TriDexArb {
+
+    input Capital<USDC>;
+
+    guarantee {
+        debt_closed;
+        min_profit = 20bps;
+    }
+
+    execute {
+        ...
+    }
+}
+
+Modules must declare:
+
+inputs
+outputs
+effects
+guarantees
+permissions
+required domains
+risk profile
+gas/resource bounds
+
+PHASE 24 — STRATEGY LICENSING
+
+Add optional protocol-level licensing.
+
+Example:
+
+license {
+    executions = 10_000;
+    expires = block 88_000_000;
+}
+
+Or:
+
+royalty {
+    creator = x3:0xABC...;
+    profit_share = 3%;
+}
+
+Possible payment models:
+
+per execution
+basis-point fee
+profit share
+subscription entitlement
+execution count
+time-limited license
+
+Licensing must never compromise deterministic execution.
+PHASE 25 — PROFIT SPLITTING
+
+Profit should be distributable directly.
+
+Example:
+
+split profit {
+    70% -> trader;
+    20% -> liquidity_provider;
+    5%  -> validator_pool;
+    5%  -> strategy_author;
+}
+
+Distribution should occur only after final net profit is known.
+PHASE 26 — STRATEGY MARKETPLACE FOUNDATION
+
+Design artifacts to support a future strategy marketplace.
+
+A compiled strategy should expose metadata without necessarily exposing source.
+
+Example:
+
+strategy ID
+artifact hash
+compiler version
+risk class
+supported chains
+capital requirements
+minimum capital
+maximum capital
+required permissions
+historical receipt references
+license terms
+author
+artifact signature
+
+Do not build marketing/UI before execution semantics are trustworthy.
+PHASE 27 — PRIVATE STRATEGIES
+
+Support private artifact execution.
+
+Conceptual syntax:
+
+private_strategy {
+    expose = receipt_only;
+}
+
+Long-term architecture may include:
+
+artifact commitment
+encrypted strategy payload
+trusted execution
+zero-knowledge proof
+signed receipt
+
+Do not invent cryptographic guarantees that are not implemented.
+
+Clearly label each privacy level.
+PHASE 28 — PRIVATE SUBMISSION
+
+Support compiler-bound private submission policy.
+
+Example:
+
+submission {
+    private = required;
+}
+
+Runtime should reject accidental public submission if compiled policy requires privacy.
+
+This is valuable for:
+
+arbitrage
+liquidations
+institutional strategies
+large rebalance operations
+sensitive route logic
+
+PHASE 29 — OPPORTUNITY PACKETS
+
+Create a portable execution package.
+
+Example structure:
+
+OpportunityPacket {
+    strategy_id
+    artifact_hash
+    state_roots
+    route_graph
+    required_capital
+    max_capital
+    expected_output
+    minimum_profit
+    maximum_fee
+    maximum_slippage
+    deadline
+    proof_requirements
+    execution_commitment
+}
+
+Packets should be:
+
+signed
+versioned
+hashable
+deterministic
+replay-protected
+
+PHASE 30 — DEDICATED EXECUTION LANES
+
+Design runtime classes such as:
+
+standard transaction lane
+trading lane
+atomic cross-domain lane
+liquidation lane
+settlement lane
+
+Do NOT implement unfair ordering mechanisms.
+
+Scheduling policy should be deterministic, documented, and auditable.
+PHASE 31 — ECONOMIC RECEIPTS
+
+Every economic execution should produce a receipt containing enough information for independent replay and verification.
+
+Example:
+
+strategy hash
+artifact hash
+compiler version
+execution ID
+input assets
+output assets
+principal
+gross proceeds
+fees
+net profit
+slippage
+domains touched
+transaction IDs
+state roots
+finality evidence
+execution operations
+risk checks
+profit checks
+settlement outcome
+receipt hash
+signature
+attestation
+
+Receipts MUST NOT merely self-hash.
+
+Continue hardening toward:
+
+Ed25519 signature
+trusted attestation
+economic replay verification
+operation-level replay
+source → bytecode → host → receipt provenance
+
+PHASE 32 — ECONOMIC REPLAY
+
+Build a verifier capable of replaying an economic receipt.
+
+Given:
+
+compiled artifact
+inputs
+operation sequence
+state evidence
+receipt
+
+it should independently verify:
+
+correct operations
+correct assets
+correct balances
+correct fees
+correct debt lifecycle
+correct profit calculation
+correct risk checks
+correct finality references
+correct settlement outcome
+
+PHASE 33 — PROGRAMMABLE FINALITY
+
+Allow code to express required settlement strength.
+
+Examples:
+
+require finality >= GRANDPA;
+
+or:
+
+finality {
+    x3 = finalized;
+    ethereum = confirmed(12);
+    solana = finalized;
+}
+
+Do not blur probabilistic confirmation and deterministic finality.
+PHASE 34 — EXECUTION DEADLINES
+
+Add native execution constraints.
+
+Example:
+
+deadline 175ms;
+
+or:
+
+deadline 2 blocks;
+
+The planner must understand whether the requirement is feasible.
+
+Runtime must reject expired plans.
+PHASE 35 — COMPILER COST MODEL
+
+The compiler should estimate:
+
+gas
+compute
+network calls
+cross-domain latency
+proof cost
+verification cost
+expected fees
+
+Example:
+
+Estimated execution:
+
+Compute:        18.3M units
+EVM gas:        812,000
+SVM compute:    423,000 CU
+X3 weight:      ...
+Proof bytes:    ...
+Estimated cost: 2,491 USDC
+
+Economic assertions must include these costs when appropriate.
+PHASE 36 — STATIC ROUTE PROFITABILITY ANALYSIS
+
+Where feasible, the compiler should detect obviously impossible economics.
+
+Example:
+
+Expected route profit:
+    1,400 USDC
+
+Minimum unavoidable cost:
+    1,925 USDC
+
+Compilation warning/error:
+    route cannot satisfy declared minimum profit
+
+Do not pretend static estimates guarantee runtime profitability.
+PHASE 37 — X3 ARBITRAGE IR
+
+Create dedicated arbitrage representation.
+
+Example:
+
+arb {
+
+    discover {
+        chains = [x3, ethereum, solana, base, arbitrum];
+        max_hops = 8;
+        liquidity_min = 500_000 USDC;
+    }
+
+    capital {
+        flash = enabled;
+        max = 50_000_000 USDC;
+    }
+
+    execution {
+        atomic = true;
+        parallel = true;
+        private = true;
+    }
+
+    risk {
+        min_profit = 20bps;
+        max_slippage = 8bps;
+        max_total_fee = 6bps;
+        deadline = 220ms;
+    }
+}
+
+Compiler lowering should eventually produce:
+
+Opportunity Graph
+→ Candidate Routes
+→ Filter
+→ Dependency DAG
+→ Risk Verification
+→ Execution Plan
+→ Atomic Settlement
+
+PHASE 38 — HYPERARB
+
+Create a high-level primitive for complex multi-domain arbitrage.
+
+Example:
+
+hyperarb {
+
+    capital = flash(25_000_000 USDC);
+
+    parallel {
+        route_a = evaluate(EVM_PATH);
+        route_b = evaluate(SVM_PATH);
+        route_c = evaluate(X3_PATH);
+    }
+
+    choose highest_net_output;
+
+    hedge volatility;
+
+    settle_across_domains;
+
+    require net_profit >= 35bps;
+}
+
+Every part must eventually map to explicit deterministic operations.
+PHASE 39 — ATOMIC CEX/DEX INTENTS
+
+Design the abstraction so future trusted/off-chain connectors may participate.
+
+Example:
+
+DEX position
++
+CEX hedge
++
+X3 settlement
+
+Do not claim atomic CEX execution unless the external venue exposes enforceable settlement semantics.
+
+Model CEX interaction honestly as:
+
+trusted adapter
+escrow
+pre-funded account
+attested execution
+or compensating action
+
+PHASE 40 — PERMISSION AND CAPABILITY SYSTEM
+
+Compiled strategies should declare permissions.
+
+Example:
+
+capabilities {
+    may_borrow USDC;
+    may_trade [ETH, SOL, BTC];
+    may_access [Uniswap, Curve, Jupiter];
+    may_use_flash_liquidity;
+    may_execute_on [x3, ethereum, solana];
+}
+
+Any operation outside declared capabilities must fail.
+PHASE 41 — RESOURCE CAPS
+
+Every strategy should support:
+
+resources {
+    max_compute = ...;
+    max_memory = ...;
+    max_network_calls = ...;
+    max_routes = ...;
+    max_branches = ...;
+}
+
+Prevent pathological execution graphs.
+PHASE 42 — DETERMINISM
+
+This is critical.
+
+Consensus-affecting decisions must never depend on:
+
+unordered maps
+wall clock jitter
+randomness
+thread scheduling
+floating-point ambiguity
+non-deterministic optimizer output
+external mutable state without explicit proof
+
+Use deterministic:
+
+fixed-point arithmetic
+stable ordering
+canonical serialization
+bounded search
+canonical tie-breaking
+
+PHASE 43 — FIXED-POINT FINANCIAL MATH
+
+Do not use native floating-point values for consensus-sensitive financial calculations.
+
+Implement safe fixed-point types.
+
+Example:
+
+Decimal<18>
+Bps
+Rate
+Price
+Ratio
+
+Audit:
+
+overflow
+underflow
+rounding direction
+precision loss
+division by zero
+conversion bounds
+asset decimal conversion
+
+PHASE 44 — FAIL-CLOSED SEMANTICS
+
+If the runtime cannot prove a required condition:
+
+DO NOT EXECUTE
+
+Examples:
+
+missing oracle
+stale quote
+unknown finality
+proof mismatch
+asset mismatch
+signature failure
+receipt mismatch
+unavailable route
+unexpected contract
+unsupported chain version
+state root mismatch
+
+Never silently degrade an atomic strategy into a weaker mode.
+PHASE 45 — VERSION BINDING
+
+Every artifact must bind to:
+
+language version
+compiler version
+IR version
+VM version
+runtime compatibility
+chain/domain configuration
+policy version
+
+Reject incompatible artifacts.
+PHASE 46 — ARTIFACT HASHING
+
+Every compiled strategy should produce a stable artifact hash.
+
+Example:
+
+source
+ ↓
+canonical AST
+ ↓
+typed HIR
+ ↓
+MIR
+ ↓
+bytecode
+ ↓
+artifact hash
+
+Receipt must identify exact artifact executed.
+PHASE 47 — SOURCE PROVENANCE
+
+Support optional provenance:
+
+source hash
+repository commit
+build environment
+compiler binary hash
+dependency lock hash
+artifact hash
+
+The system should eventually answer:
+
+    Which exact source produced this exact strategy artifact?
+
+PHASE 48 — ADVERSARIAL TEST MATRIX
+
+Every economic feature must include hostile tests.
+
+Examples:
+
+wrong asset
+wrong chain
+wrong VM
+wrong signer
+wrong preimage
+duplicate operation
+double repay
+double claim
+claim after refund
+refund before timeout
+stale state
+stale route
+stale oracle
+fake finality
+wrong state root
+wrong receipt hash
+invalid artifact signature
+cost above maximum
+profit below minimum
+slippage above maximum
+deadline exceeded
+partial domain outage
+dropped transaction
+duplicate transaction
+nonce conflict
+reorg simulation
+ledger corruption
+restart during execution
+process kill
+RPC outage
+
+PHASE 49 — FUZZING AND PROPERTY TESTS
+
+Add property tests for invariants such as:
+
+Assets cannot appear from nowhere
+
+Debt cannot disappear without valid repayment
+
+Profit cannot exceed mathematically possible balance delta
+
+Net profit = outputs - inputs - all declared costs
+
+Closed debt cannot reopen without explicit borrow
+
+Atomic plan cannot commit with unresolved required leg
+
+Invalid proof cannot produce FinalizedState
+
+No execution can escape declared capabilities
+
+PHASE 50 — PERFORMANCE TARGETS
+
+Build benchmarks for:
+
+parsing
+type checking
+economic verification
+IR lowering
+graph construction
+route scoring
+constraint solving
+dependency scheduling
+receipt verification
+economic replay
+
+Track:
+
+p50
+p95
+p99
+
+Do not optimize blindly.
+
+Profile first.
+PHASE 51 — GPU ACCELERATION
+
+Identify computations suitable for GPU acceleration:
+
+route candidate scoring
+signature verification
+hash batches
+graph scoring
+simulation batches
+opportunity filtering
+
+Do NOT move consensus-critical behavior to GPU unless determinism is guaranteed.
+
+CPU and GPU results must match bit-for-bit where consensus matters.
+PHASE 52 — COMPILER DIAGNOSTICS
+
+X3Lang should produce world-class diagnostics.
+
+Bad:
+
+type mismatch
+
+Good:
+
+X3E-2107 ASSET_TYPE_MISMATCH
+
+Attempted operation:
+
+    repay(debt, funds)
+
+Debt requires:
+    Amount<USDC>
+
+Provided:
+    Amount<ETH>
+
+Debt created at:
+    strategy.x3:28:13
+
+Funds created at:
+    strategy.x3:44:9
+
+Suggested fix:
+    convert ETH to USDC before repayment,
+    or repay using an existing USDC balance.
+
+Economic code requires economic diagnostics.
+PHASE 53 — X3LANG TOOLING
+
+Eventually support:
+
+x3c build
+x3c verify
+x3c simulate
+x3c explain
+x3c graph
+x3c audit
+x3c receipt verify
+x3c replay
+
+Example:
+
+x3c graph strategy.x3
+
+should visualize the economic execution DAG.
+PHASE 54 — SIMULATION
+
+Support deterministic strategy simulation.
+
+Example:
+
+x3c simulate arb.x3 \
+    --state snapshot.json \
+    --explain
+
+Output:
+
+Route selected:
+Ethereum → Base → X3
+
+Capital:
+2,000,000 USDC
+
+Gross:
+2,019,842 USDC
+
+Fees:
+8,119 USDC
+
+Net:
+11,723 USDC
+
+Minimum required:
+10,000 USDC
+
+Result:
+PASS
+
+PHASE 55 — EXPLAINABILITY
+
+Add:
+
+x3c explain strategy.x3
+
+It should describe:
+
+what assets move
+what debt is created
+what risk is accepted
+what profit condition exists
+what chains are touched
+what permissions are used
+what happens on failure
+
+No opaque financial bytecode.
+PHASE 56 — BUILD ORDER
+
+DO NOT attempt all features simultaneously.
+
+Implement in dependency order:
+
+1. Economic primitive types
+2. Fixed-point math
+3. Financial ownership model
+4. Economic effect system
+5. Stateful Trading IR verifier
+6. Compiled risk-policy binding
+7. Capability enforcement
+8. Economic receipt hardening
+9. Economic replay verification
+10. Profit as first-class value
+11. Profit-only transactions
+12. Quote/state freshness
+13. State-root binding
+14. Atomic branch representation
+15. Bounded route fallback
+16. Opportunity graph
+17. Deterministic route optimizer
+18. Parallel dependency DAG
+19. Multi-VM execution planning
+20. Atomic coordinator integration
+21. Intent fusion
+22. Strategy modules
+23. Licensing / royalties
+24. Private strategy commitments
+25. Marketplace metadata
+
+Finish foundational correctness before adding flashy syntax.
+CURRENT HARDENING PRIORITY
+
+The immediate critical path should remain:
+
+exact-head compile/test repair
+→ checked numeric conversion audit
+→ stateful Trading IR verifier
+→ compiled risk-policy binding
+→ capability enforcement
+→ stronger receipt operation replay
+→ Ed25519 / trusted attestation
+→ signed source→bytecode→host→receipt E2E
+→ all CI green
+
+Do not weaken existing gates.
+REQUIRED IMPLEMENTATION LOOP
+
+For every task:
+
+1. Inspect existing implementation
+2. Identify current invariant
+3. Add failing test first when practical
+4. Implement smallest correct change
+5. Run focused tests
+6. Run package tests
+7. Run workspace/exact-head gates
+8. Inspect warnings
+9. Review unsafe conversions
+10. Review panic paths
+11. Review error propagation
+12. Document behavior
+13. Commit only proven behavior
+
+REQUIRED REPORT FORMAT
+
+After each implementation task, report:
+Implemented
+
+Exact files modified.
+Semantics
+
+What behavior now exists.
+Invariants
+
+What is guaranteed.
+Tests
+
+Exact commands executed.
+Results
+
+PASS/FAIL counts.
+Remaining Risk
+
+Anything not yet proven.
+Next Dependency
+
+The next implementation step required by architecture.
+DEFINITION OF DONE
+
+A feature is NOT done because:
+
+syntax parses
+a unit test passes
+a mock works
+a demo compiles
+
+A production-grade feature requires as applicable:
+
+parser support
+AST representation
+type checking
+HIR lowering
+MIR lowering
+semantic verification
+runtime execution
+gas/resource accounting
+failure semantics
+receipts
+replay support
+adversarial tests
+documentation
+CI coverage
+
+THE END STATE
+
+X3Lang should eventually let a developer express:
+
+strategy GlobalArbitrage {
+
+    capital {
+        flash <= 25_000_000 USDC;
+    }
+
+    discover {
+        chains = [
+            x3,
+            ethereum,
+            solana,
+            base,
+            arbitrum
+        ];
+
+        max_hops = 10;
+    }
+
+    risk {
+        max_slippage = 6bps;
+        max_total_fee = 8bps;
+        min_profit = 25bps;
+        quote_age <= 25ms;
+        deadline <= 200ms;
+    }
+
+    execution {
+        atomic;
+        parallel;
+        private;
+        allow intent_fusion;
+    }
+
+    objective {
+        maximize net_profit;
+    }
+
+    guarantees {
+        debt_closed;
+        principal_preserved;
+        min_profit;
+    }
+
+    split profit {
+        92% -> trader;
+        5%  -> liquidity_provider;
+        3%  -> strategy_author;
+    }
+}
+
+and have the X3 compiler/runtime transform that into a bounded, typed, verifiable, optimized economic execution graph.
+
+The ultimate goal is:
+
+NOT:
+
+"Write blockchain transactions."
+
+BUT:
+
+"Declare the desired economic outcome,
+the acceptable risk,
+and the settlement guarantees."
+
+X3 determines the safe execution plan.
+
+That is the X3Lang direction.
+
+Build the language around that principle.
+
+I can also turn this into a repo-execution version that tells the coding agent exactly which x3-parser, x3-typeck, x3-hir, x3-mir, x3-backend, x3-opt, and runtime files to inspect and implement first.
+
+
