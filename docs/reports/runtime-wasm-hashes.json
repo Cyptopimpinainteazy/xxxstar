@@ -1,27 +1,27 @@
 {
-  "_comment": "Recorded output of a reproducible build of the X3 runtime at recorded_revision. scripts/mainnet_release_gate.py rebuilds the runtime inside the same image and fails if any value here differs (or if this file is missing). The values describe one revision: any runtime-affecting change produces a new hash, so a release updates this file with a build taken from the revision it is releasing — after confirming two builds of that revision agree.",
+  "_comment": "Recorded output of a reproducible build of the X3 runtime at recorded_revision. scripts/mainnet_release_gate.py rebuilds the runtime inside the same image and fails if any value here differs (or if this file is missing). The values describe one revision: any runtime-affecting change produces a new hash, so a release updates this file with a build taken from the revision it is releasing \u2014 after confirming two builds of that revision agree.",
   "image": "paritytech/srtool:1.93.0-0.18.4",
   "image_digest": "sha256:8638a668bd6d29111dc01953fbead6eb08c062e1cc62d3047a245a52b6edb3bf",
   "srtool": "0.18.4",
   "rustc": "1.93.0",
   "recorded_at": "2026-09-19",
-  "recorded_revision": "922fbde16",
+  "recorded_revision": "f7007ee4d",
   "runtime_version": "x3-chain-11 (x3-chain-1.tx1.au1)",
   "metadata": "V14",
   "runtimes": {
     "compact": {
-      "size": 8420312,
-      "set_code": "0xb1777a0973e0adfee402364c18815598487fe3e50a05da4f3034b795a4982328",
-      "authorize_upgrade": "0xde33dad4f51852fe7aa4d8974e937b12e762ae1efee6cee48a10d26a85412aca",
-      "ipfs": "QmUNb2XxXXEfEjb9UHu7uC1FPwGTqFTL82vMURNT4vwHNz",
-      "blake2_256": "0xcce41a9e4b504522c569e9778d6253385451b31238ef01e4777e77f2b84ef561"
+      "size": 8420214,
+      "set_code": "0xf0e1e6e72542170aa22567a0791b346c5eba80579e0af07af3ff2b6e209fc86c",
+      "authorize_upgrade": "0x877de18ba73356356b59c203d53453f6eb6df5f31aab4623b042ff21ff751b48",
+      "ipfs": "QmdtaKNfMc58FG1tSwnVZ6deR2su3Zw1DgdAMEtaujtCeL",
+      "blake2_256": "0xa90fa39255a0dbf9a6aeab96c595aea25ffd32ff94258b01798b85d9e4e5082e"
     },
     "compressed": {
-      "size": 1443216,
-      "set_code": "0x5488df118b09819b34cfeb7dd9dfc1802dd03979627d12905ca7f2b3a0fa9095",
-      "authorize_upgrade": "0xf684208d29a61e88dc9caad20f9764e6d437ea14f762370f1be90ebc86875dcc",
-      "ipfs": "QmefFnaknozLQJKx5i8ZefRgo5L6fmFeMQnVCCnv4VGSxR",
-      "blake2_256": "0x851d985d843e3f64ef855073c5fbe3b6a20e66bf9b53357b4b5e6a51a676e1f4"
+      "size": 1442110,
+      "set_code": "0x8e83291590bb93227fb6b5ecdf0823d7d9e6369de0dfd341730205c1ac733770",
+      "authorize_upgrade": "0x333052240df6b5d53eadf7fd11076ab09b0fbaa409663ad464c0c595c14c7d29",
+      "ipfs": "Qmcto7SvzXqWVJEJqbT8QsyQJJG2xMiiMrCZhNwV9o2U7X",
+      "blake2_256": "0x124b5b9389459b3960ff972ce46176f8f45ee1b3853e541e33e2616cbfc1a22e"
     }
   }
 }
