@@ -1436,6 +1436,36 @@ where
         },
     )?;
 
+    // ── x3_getAssetMetadata ─────────────────────────────
+    //
+    // The runtime exposes `get_asset_metadata` and `x3-chain-node inspect asset`
+    // asks for it, but no method served it: the CLI called
+    // `atlasKernel_getAssetMetadata`, a name from before the kernel rename, and
+    // got "Method not found" from every node.
+    let asset_meta_client = client.clone();
+    module.register_method(
+        "x3_getAssetMetadata",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let (asset_id,): (AssetId,) = params
+                .parse()
+                .map_err(|e| custom_error(format!("Invalid asset id: {e}")))?;
+            let block_hash = asset_meta_client.info().best_hash;
+            let metadata = asset_meta_client
+                .runtime_api()
+                .get_asset_metadata(block_hash, asset_id)
+                .map_err(|e| custom_error(format!("Runtime asset metadata query failed: {e}")))?;
+
+            Ok(match metadata {
+                Some((symbol, decimals)) => serde_json::json!({
+                    "asset_id": asset_id,
+                    "symbol": String::from_utf8_lossy(&symbol).to_string(),
+                    "decimals": decimals,
+                }),
+                None => serde_json::json!(null),
+            })
+        },
+    )?;
+
     let kernel_state_client = client.clone();
     module.register_method(
         "x3_getKernelBridgeState",

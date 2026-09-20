@@ -14,6 +14,30 @@ use x3_chain_runtime::opaque::Block;
 
 use crate::logging;
 
+/// The account argument `x3_getCanonicalBalance` takes: 32 bytes of hex.
+///
+/// The CLI documents `--account` as "SS58 or hex format", and every call site
+/// passed whatever the user typed straight through — including the SS58 literal
+/// in the Comit query — so a correctly formed request was impossible: the node
+/// decodes the parameter as hex and rejected all of them.
+fn account_to_hex32(account: &str) -> Result<String, String> {
+    if let Some(hex_part) = account
+        .strip_prefix("0x")
+        .or_else(|| account.strip_prefix("0X"))
+    {
+        let bytes = hex::decode(hex_part).map_err(|e| format!("invalid hex account: {e}"))?;
+        if bytes.len() != 32 {
+            return Err(format!("account hex must be 32 bytes, got {}", bytes.len()));
+        }
+        return Ok(format!("0x{}", hex::encode(bytes)));
+    }
+
+    use sp_core::crypto::Ss58Codec;
+    let public = sp_runtime::AccountId32::from_ss58check(account)
+        .map_err(|e| format!("invalid SS58 address: {e}"))?;
+    Ok(format!("0x{}", hex::encode(public.as_ref() as &[u8])))
+}
+
 /// Entry point that runs the CLI and dispatches the requested command.
 pub fn run() -> CliResult<()> {
     // Initialize colorful logger with emojis
@@ -448,27 +472,17 @@ pub fn run() -> CliResult<()> {
                     println!("RPC URL:   {}", rpc_url);
                     println!();
 
-                    // Make RPC call to atlasKernel_getCanonicalBalance as a proxy query
-                    // In production, this would query a dedicated Comit status endpoint
-                    match make_rpc_call(
-                        rpc_url,
-                        "atlasKernel_getCanonicalBalance",
-                        serde_json::json!(["5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY", 0]),
-                    ) {
-                        Ok(result) => {
-                            println!("--- Comit Status ---");
-                            println!("Note: Full Comit query endpoint not yet implemented.");
-                            println!("Showing canonical balance query as example:");
-                            println!("Balance: {}", result);
-                        }
-                        Err(e) => {
-                            warn!("RPC call failed: {}", e);
-                            println!("--- Comit Query Failed ---");
-                            println!("Error: {}", e);
-                            println!();
-                            println!("Note: Ensure a node is running on {}", rpc_url);
-                        }
-                    }
+                    // There is no Comit status endpoint to query: the node
+                    // registers none, and this used to send Alice's balance
+                    // query under the old `atlasKernel_` name and print whatever
+                    // came back as "Comit Status". Say what is true instead.
+                    println!("--- Comit Status ---");
+                    println!("This node exposes no Comit status query over RPC.");
+                    println!("  Comit id: 0x{}", hex::encode(comit_id.as_bytes()));
+                    println!("  RPC URL:  {}", rpc_url);
+                    println!();
+                    println!("Use the runtime's own view of the operation:");
+                    println!("  x3-chain-node inspect account --account <the comit account>");
 
                     Ok(())
                 }
@@ -488,11 +502,20 @@ pub fn run() -> CliResult<()> {
                     println!("RPC URL:   {}", rpc_url);
                     println!();
 
-                    // Make RPC call to atlasKernel_getCanonicalBalance
+                    // `x3_getCanonicalBalance` is the registered method, and it
+                    // takes the account as 32 bytes of hex.
+                    let account_hex = match account_to_hex32(account) {
+                        Ok(hex) => hex,
+                        Err(e) => {
+                            println!("--- Canonical Balance Query Failed ---");
+                            println!("Error: {e}");
+                            return Ok(());
+                        }
+                    };
                     match make_rpc_call(
                         rpc_url,
-                        "atlasKernel_getCanonicalBalance",
-                        serde_json::json!([account, asset_id]),
+                        "x3_getCanonicalBalance",
+                        serde_json::json!([account_hex, asset_id]),
                     ) {
                         Ok(result) => {
                             println!("--- Balance ---");
@@ -517,15 +540,14 @@ pub fn run() -> CliResult<()> {
                     println!("RPC URL:  {}", rpc_url);
                     println!();
 
-                    // Make RPC call to atlasKernel_getAuthorizedAccounts
-                    match make_rpc_call(
-                        rpc_url,
-                        "atlasKernel_getAuthorizedAccounts",
-                        serde_json::json!([]),
-                    ) {
+                    // The same registered method as `inspect authorities`; the
+                    // authorized set is the second field it returns.
+                    match make_rpc_call(rpc_url, "x3_getKernelBridgeState", serde_json::json!([])) {
                         Ok(result) => {
                             println!("--- Authorized Accounts ---");
-                            if let Some(arr) = result.as_array() {
+                            if let Some(arr) =
+                                result.get("authorized_accounts").and_then(|v| v.as_array())
+                            {
                                 if arr.is_empty() {
                                     println!("No authorized accounts found.");
                                 } else {
@@ -667,15 +689,29 @@ pub fn run() -> CliResult<()> {
                     println!("Output:    {}", output);
                     println!();
 
-                    // Make RPC call to atlasKernel_getCanonicalBalance for native asset
+                    // The registered method, with the account the node can
+                    // decode: `--account` documents "SS58 or hex", and this used
+                    // to pass the user's string through as if it were hex.
+                    let account_hex = match account_to_hex32(account) {
+                        Ok(hex) => hex,
+                        Err(e) => {
+                            println!("--- Account Inspection Failed ---");
+                            println!("Error: {e}");
+                            return Ok(());
+                        }
+                    };
                     match make_rpc_call(
                         rpc_url,
-                        "atlasKernel_getCanonicalBalance",
-                        serde_json::json!([account, 0]),
+                        "x3_getCanonicalBalance",
+                        serde_json::json!([account_hex, 0]),
                     ) {
                         Ok(result) => {
                             println!("--- Account Balances ---");
-                            println!("Native X3 (Asset 0): {}", result);
+                            let balance = result
+                                .get("balance")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("<no balance field>");
+                            println!("Native X3 (Asset 0): {}", balance);
 
                             // In a full implementation, this would iterate through all assets
                             println!();
@@ -702,10 +738,12 @@ pub fn run() -> CliResult<()> {
                     println!("RPC URL:   {}", rpc_url);
                     println!();
 
-                    // Make RPC call to atlasKernel_getAssetMetadata
+                    // Registered by the node for this command; the runtime's
+                    // `get_asset_metadata` answers it. The CLI used to ask for
+                    // `atlasKernel_getAssetMetadata`, which no node serves.
                     match make_rpc_call(
                         rpc_url,
-                        "atlasKernel_getAssetMetadata",
+                        "x3_getAssetMetadata",
                         serde_json::json!([asset_id]),
                     ) {
                         Ok(result) => {
@@ -763,15 +801,16 @@ pub fn run() -> CliResult<()> {
                     println!("RPC URL:  {}", rpc_url);
                     println!();
 
-                    // Make RPC call to atlasKernel_getAuthorities
-                    match make_rpc_call(
-                        rpc_url,
-                        "atlasKernel_getAuthorities",
-                        serde_json::json!([]),
-                    ) {
+                    // `x3_getKernelBridgeState` is the method the node
+                    // registers; it carries the authority set and the authorized
+                    // accounts. This used to call `atlasKernel_getAuthorities`,
+                    // a name from before the kernel rename, so every node
+                    // answered "Method not found".
+                    match make_rpc_call(rpc_url, "x3_getKernelBridgeState", serde_json::json!([])) {
                         Ok(result) => {
                             println!("--- Current Authorities ---");
-                            if let Some(arr) = result.as_array() {
+                            if let Some(arr) = result.get("authorities").and_then(|v| v.as_array())
+                            {
                                 if arr.is_empty() {
                                     println!("No authorities found.");
                                 } else {
