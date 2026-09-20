@@ -112,12 +112,8 @@ impl AMMPool {
             // First liquidity: use geometric mean of deposits
             Self::sqrt(amount_a.saturating_mul(amount_b))
         } else {
-            // LP tokens = min(amount_a * total_supply / reserve_a, amount_b * total_supply / reserve_b)
-            let lp_from_a =
-                (amount_a as f64) * (pool.total_lp_supply as f64) / (pool.reserve_a as f64);
-            let lp_from_b =
-                (amount_b as f64) * (pool.total_lp_supply as f64) / (pool.reserve_b as f64);
-            let lp = lp_from_a.min(lp_from_b) as u128;
+            let lp =
+                Self::lp_for_deposit(pool, amount_a, amount_b).ok_or("LP calculation overflow")?;
 
             if lp == 0 {
                 return Err("LP amount too small");
@@ -141,9 +137,10 @@ impl AMMPool {
             return Err("Invalid LP amount");
         }
 
-        let share = (lp_amount as f64) / (pool.total_lp_supply as f64);
-        let amount_a = ((pool.reserve_a as f64) * share) as u128;
-        let amount_b = ((pool.reserve_b as f64) * share) as u128;
+        let amount_a = Self::mul_div(pool.reserve_a, lp_amount, pool.total_lp_supply)
+            .ok_or("Withdrawal calculation overflow")?;
+        let amount_b = Self::mul_div(pool.reserve_b, lp_amount, pool.total_lp_supply)
+            .ok_or("Withdrawal calculation overflow")?;
 
         if amount_a == 0 || amount_b == 0 {
             return Err("Withdrawal too small");
@@ -170,13 +167,8 @@ impl AMMPool {
             return Err("Pool has no liquidity");
         }
 
-        // Apply fee
-        let fee = (amount_in as f64) * (pool.fee_basis_points as f64) / 10000.0;
-        let amount_in_after_fee = (amount_in as f64) - fee;
-
-        // Constant product: amount_out = (amount_in * reserve_out) / (reserve_in + amount_in)
-        let amount_out = ((amount_in_after_fee * (pool.reserve_b as f64))
-            / ((pool.reserve_a as f64) + amount_in_after_fee)) as u128;
+        let (reserve_in, reserve_out) = (pool.reserve_a, pool.reserve_b);
+        let amount_out = Self::swap_out(amount_in, reserve_in, reserve_out, pool.fee_basis_points)?;
 
         if amount_out < min_out {
             return Err("Slippage exceeds limit");
@@ -196,11 +188,7 @@ impl AMMPool {
         if pool.total_lp_supply == 0 {
             Self::sqrt(amount_a.saturating_mul(amount_b))
         } else {
-            let lp_from_a =
-                (amount_a as f64) * (pool.total_lp_supply as f64) / (pool.reserve_a as f64);
-            let lp_from_b =
-                (amount_b as f64) * (pool.total_lp_supply as f64) / (pool.reserve_b as f64);
-            lp_from_a.min(lp_from_b) as u128
+            Self::lp_for_deposit(pool, amount_a, amount_b).unwrap_or(0)
         }
     }
 
@@ -221,16 +209,19 @@ impl AMMPool {
             return Ok((amount_a_desired, amount_b_desired, lp_tokens));
         }
 
-        // Calculate optimal amounts based on current ratio
-        let amount_b_optimal =
-            (amount_a_desired as f64) * (pool.reserve_b as f64) / (pool.reserve_a as f64);
-        let amount_a_optimal =
-            (amount_b_desired as f64) * (pool.reserve_a as f64) / (pool.reserve_b as f64);
-
-        let (amount_a, amount_b) = if amount_b_optimal <= amount_b_desired as f64 {
-            (amount_a_desired, amount_b_optimal as u128)
+        // Which leg is limiting, without dividing: `amount_a_desired * reserve_b` against
+        // `amount_b_desired * reserve_a`, in the wide intermediate. The float form divided
+        // both and compared the rounded quotients (TICKET-094).
+        let lhs = sp_core::U256::from(amount_a_desired) * sp_core::U256::from(pool.reserve_b);
+        let rhs = sp_core::U256::from(amount_b_desired) * sp_core::U256::from(pool.reserve_a);
+        let (amount_a, amount_b) = if lhs <= rhs {
+            let b = Self::mul_div(amount_a_desired, pool.reserve_b, pool.reserve_a)
+                .ok_or("Liquidity calculation overflow")?;
+            (amount_a_desired, b)
         } else {
-            (amount_a_optimal as u128, amount_b_desired)
+            let a = Self::mul_div(amount_b_desired, pool.reserve_a, pool.reserve_b)
+                .ok_or("Liquidity calculation overflow")?;
+            (a, amount_b_desired)
         };
 
         // Check minimums
@@ -239,15 +230,8 @@ impl AMMPool {
         }
 
         // Calculate LP tokens
-        let lp_tokens = if pool.total_lp_supply == 0 {
-            Self::sqrt(amount_a.saturating_mul(amount_b))
-        } else {
-            let lp_from_a =
-                (amount_a as f64) * (pool.total_lp_supply as f64) / (pool.reserve_a as f64);
-            let lp_from_b =
-                (amount_b as f64) * (pool.total_lp_supply as f64) / (pool.reserve_b as f64);
-            lp_from_a.min(lp_from_b) as u128
-        };
+        let lp_tokens =
+            Self::lp_for_deposit(pool, amount_a, amount_b).ok_or("LP calculation overflow")?;
 
         Ok((amount_a, amount_b, lp_tokens))
     }
@@ -266,14 +250,16 @@ impl AMMPool {
             return Err("Insufficient LP balance");
         }
 
-        let amount_a = (lp_amount as f64) * (pool.reserve_a as f64) / (pool.total_lp_supply as f64);
-        let amount_b = (lp_amount as f64) * (pool.reserve_b as f64) / (pool.total_lp_supply as f64);
+        let amount_a = Self::mul_div(lp_amount, pool.reserve_a, pool.total_lp_supply)
+            .ok_or("Withdrawal calculation overflow")?;
+        let amount_b = Self::mul_div(lp_amount, pool.reserve_b, pool.total_lp_supply)
+            .ok_or("Withdrawal calculation overflow")?;
 
-        if (amount_a as u128) < amount_a_min || (amount_b as u128) < amount_b_min {
+        if amount_a < amount_a_min || amount_b < amount_b_min {
             return Err("Output amounts below minimums");
         }
 
-        Ok((amount_a as u128, amount_b as u128))
+        Ok((amount_a, amount_b))
     }
 
     /// Calculate swap output amount
@@ -299,13 +285,7 @@ impl AMMPool {
             return Err("Token not in pool");
         };
 
-        // Apply fee
-        let fee = (amount_in as f64) * (pool.fee_basis_points as f64) / 10000.0;
-        let amount_in_after_fee = (amount_in as f64) - fee;
-
-        // Constant product formula
-        let amount_out = ((amount_in_after_fee * (reserve_out as f64))
-            / ((reserve_in as f64) + amount_in_after_fee)) as u128;
+        let amount_out = Self::swap_out(amount_in, reserve_in, reserve_out, pool.fee_basis_points)?;
 
         if amount_out < min_out {
             return Err("Slippage exceeds limit");
@@ -328,18 +308,87 @@ impl AMMPool {
     }
 
     /// Calculate output amount for given input (without executing swap)
+    ///
+    /// The same formula `swap` uses, through the same helper, so a preview and an execution
+    /// cannot disagree. This was the *ninth* function in this file computing a swap in `f64`
+    /// and the enumeration missed it by eye; `preview_swap_agrees_with_swap` pins the two
+    /// together, which is the property a caller relies on when they quote a preview
+    /// (TICKET-094).
     pub fn preview_swap(pool: &LiquidityPool, amount_in: u128) -> u128 {
         if pool.reserve_a == 0 || pool.reserve_b == 0 {
             return 0;
         }
-
-        let fee = (amount_in as f64) * (pool.fee_basis_points as f64) / 10000.0;
-        let amount_in_after_fee = (amount_in as f64) - fee;
-        ((amount_in_after_fee * (pool.reserve_b as f64))
-            / ((pool.reserve_a as f64) + amount_in_after_fee)) as u128
+        Self::swap_out(
+            amount_in,
+            pool.reserve_a,
+            pool.reserve_b,
+            pool.fee_basis_points,
+        )
+        .unwrap_or(0)
     }
 
     /// Simple integer square root
+    /// `a * b / d`, floored, in a 256-bit intermediate. `None` on a zero divisor or a result
+    /// that does not fit a `u128`.
+    ///
+    /// The intermediate *has* to be wider than `u128`, and this is why: a reserve and an
+    /// amount are both token quantities and their product is the constant-product formula
+    /// itself. `u128` holds about 3.4e38; two quantities of 1e24 multiply to 1e48. The `f64`
+    /// this replaces did not overflow — it did something worse, rounding both operands to 53
+    /// bits of mantissa *before* the product, so the result was approximate at every size and
+    /// the pool's reserves were then updated from it (TICKET-094, PHASE 43).
+    ///
+    /// Flooring is the AMM's convention: the pool keeps the remainder, so a swap can never
+    /// take more out than the formula allows.
+    fn mul_div(a: u128, b: u128, d: u128) -> Option<u128> {
+        if d == 0 {
+            return None;
+        }
+        let product = sp_core::U256::from(a).checked_mul(sp_core::U256::from(b))?;
+        let quotient = product / sp_core::U256::from(d);
+        if quotient > sp_core::U256::from(u128::MAX) {
+            return None;
+        }
+        Some(quotient.low_u128())
+    }
+
+    /// The input a swap actually prices, after the venue's fee.
+    fn net_of_fee(amount_in: u128, fee_basis_points: u32) -> u128 {
+        let fee =
+            Self::mul_div(amount_in, u128::from(fee_basis_points), 10_000).unwrap_or(amount_in);
+        // A fee above the whole input cannot be a fee; `saturating_sub` leaves nothing to
+        // price rather than wrapping, which is what the float form did too (`as u128` on a
+        // negative float is 0).
+        amount_in.saturating_sub(fee)
+    }
+
+    /// The output of a constant-product swap: `in_after_fee * reserve_out / (reserve_in +
+    /// in_after_fee)`, all integers.
+    fn swap_out(
+        amount_in: u128,
+        reserve_in: u128,
+        reserve_out: u128,
+        fee_basis_points: u32,
+    ) -> Result<u128, &'static str> {
+        let net = Self::net_of_fee(amount_in, fee_basis_points);
+        let denominator = reserve_in
+            .checked_add(net)
+            .ok_or("Pool accounting overflow")?;
+        Self::mul_div(net, reserve_out, denominator).ok_or("Swap calculation overflow")
+    }
+
+    /// LP tokens minted for a deposit, by the pool's own ratio: the **smaller** of the two
+    /// legs, so a deposit cannot move the price. The first deposit has no ratio to hold to,
+    /// so it mints the geometric mean of the two amounts.
+    fn lp_for_deposit(pool: &LiquidityPool, amount_a: u128, amount_b: u128) -> Option<u128> {
+        if pool.total_lp_supply == 0 {
+            return Some(Self::sqrt(amount_a.saturating_mul(amount_b)));
+        }
+        let from_a = Self::mul_div(amount_a, pool.total_lp_supply, pool.reserve_a)?;
+        let from_b = Self::mul_div(amount_b, pool.total_lp_supply, pool.reserve_b)?;
+        Some(from_a.min(from_b))
+    }
+
     fn sqrt(n: u128) -> u128 {
         if n == 0 {
             return 0;
@@ -459,6 +508,118 @@ mod tests {
 
         assert_eq!(lp1, lp2); // Equal deposits should yield equal LP
         assert_eq!(pool.total_lp_supply, lp1 * 2);
+    }
+
+    /// A swap at a realistic size is **exact**, where the float form was not (TICKET-094).
+    ///
+    /// `10^24` is not representable as a `f64` — it becomes `999999999999999983222784`, off by
+    /// `16_777_216` — and the old code converted every reserve and every amount to `f64`,
+    /// multiplied them, and cast the quotient back. For a pool of `10^24` on each side taking
+    /// a `10^18` swap at 30bps, the exact constant-product answer is
+    /// `996_999_005_991_991_025` and the float form produced `996_999_005_991_991_040`:
+    /// **fifteen units more than the formula allows**, because the operand was already wrong
+    /// before the division. The pool paid the difference, every swap.
+    ///
+    /// That is not a rounding detail. It is a pool that can be drained fifteen units at a
+    /// time, and it is the concrete form of PHASE 43's prohibition.
+    #[test]
+    fn a_swap_at_a_realistic_size_is_exact() {
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 2,
+        };
+        let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+        pool.reserve_a = 1_000_000_000_000_000_000_000_000; // 10^24
+        pool.reserve_b = 1_000_000_000_000_000_000_000_000; // 10^24
+                                                            // The first deposit sets the supply; the second is the swap's counterparty.
+        pool.total_lp_supply = 1_000_000_000_000_000_000_000_000;
+
+        let out = AMMPool::swap(&mut pool, 1_000_000_000_000_000_000, 1).unwrap();
+
+        assert_eq!(
+            out, 996_999_005_991_991_025,
+            "the constant-product answer, exactly — the float form gave ...040, fifteen units \
+             more than the formula allows"
+        );
+    }
+
+    /// A swap never decreases `k`, which is the invariant the pool's solvency rests on.
+    ///
+    /// The fee is what makes it increase; an integer implementation that rounded the input up
+    /// or the output down the wrong way would decrease it, and the float form's fifteen extra
+    /// units did exactly that.
+    #[test]
+    fn a_swap_never_decreases_the_product() {
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 2,
+        };
+
+        for (reserve, amount_in) in [
+            (1_000_000u128, 1_000u128),
+            (1_000_000_000_000_000_000, 1_000_000_000),
+            (10u128.pow(24), 10u128.pow(18)),
+        ] {
+            let mut pool = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30).unwrap();
+            pool.reserve_a = reserve;
+            pool.reserve_b = reserve;
+            pool.total_lp_supply = reserve;
+
+            let before = sp_core::U256::from(pool.reserve_a) * sp_core::U256::from(pool.reserve_b);
+            AMMPool::swap(&mut pool, amount_in, 1).expect("a funded pool can swap");
+            let after = sp_core::U256::from(pool.reserve_a) * sp_core::U256::from(pool.reserve_b);
+
+            assert!(
+                after >= before,
+                "k must not fall: reserves {reserve}, amount {amount_in}, before {before}, after {after}"
+            );
+        }
+    }
+
+    /// A preview and an execution are the same formula, so they must not disagree.
+    ///
+    /// They were two separate `f64` computations of the constant-product rule before
+    /// TICKET-094 — and `preview_swap` was the one that got missed when the others were
+    /// converted, which is exactly the drift this test would have caught.
+    #[test]
+    fn preview_swap_agrees_with_swap() {
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 2,
+        };
+
+        for (reserve, amount_in) in [
+            (1_000_000u128, 1_000u128),
+            (10u128.pow(24), 10u128.pow(18)),
+            (999_999_999_999_999_999_999u128, 1u128),
+        ] {
+            let mut pool = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30).unwrap();
+            pool.reserve_a = reserve;
+            pool.reserve_b = reserve;
+            pool.total_lp_supply = reserve;
+
+            let preview = AMMPool::preview_swap(&pool, amount_in);
+            // `min_out: 0` because this asks what the pool pays, not whether it clears a
+            // bound — a one-unit swap into a 10^21 pool floors to zero, which the guard would
+            // refuse and which is itself correct behaviour.
+            let executed = AMMPool::swap(&mut pool, amount_in, 0).expect("a funded pool can swap");
+            assert_eq!(
+                preview, executed,
+                "a preview must be the number the swap pays: reserves {reserve}, amount {amount_in}"
+            );
+        }
     }
 
     #[test]
