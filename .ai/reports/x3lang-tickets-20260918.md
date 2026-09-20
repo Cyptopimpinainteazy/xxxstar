@@ -1639,6 +1639,82 @@ refusal with it.
 Validation: a module whose body requires flash liquidity is refused without the permission and
 accepted with it; or the set has three members and the corpus is unchanged.
 
+## TICKET-036 — the first instruction of a stream must be ≤3 bytes — CLOSED
+Type: CLOSED by the versions record (measured 2026-09-20) · Subsystem: x3-lang/compiler + vm
+Closed: measured on a program whose first operation is a four-byte frame and that carries no other
+metadata (`fn f() { require slippage <= 50 }`): the artifact is `[version][META_VERSIONS 11 bytes]`
+and the guard lands at offset 12, so a four-byte frame is **never** the first instruction — the header
+fixes the stride TICKET-036 was about. `x3c explain` walks it (`0001 0x40 REQUIRE measured slippage
+50`) and the executor runs it. The constraint was accidental when it was written (before the version
+binding existed) and the binding is what removed it.
+Original text: a four-byte fixed frame at offset 1 desyncs the reader, because the version byte puts
+the first instruction there and the reader's stride assumes alignment.
+
+## TICKET-037 — a stray option line in a leg is silently ignored — CLOSED
+Type: CLOSED in `35c15fa09` (2026-09-20) · Subsystem: x3-lang/compiler (lowering)
+Closed: an expression statement that calls nothing is refused by name, so `transfer_proof eth_receipt`
+on its own line is a diagnostic rather than two inert statements. Measured before: the program parsed,
+checked `ok`, and built to 12 bytes with two statements that lower to nothing.
+The same refusal catches the residue of a half-written clause (`to sender`) and a bare literal — the
+shapes that made the refund arm's missing half invisible until `4e337de7b`'s neighbour fixed it.
+Four tests in `compiler/tests/test_inert_statements.rs`.
+Original text: `transfer_proof eth_receipt` written on its own line after a bridge parses as an
+expression statement and does nothing.
+
+## TICKET-038 — a bridge-only intent has no way to state what it delivers — OPEN
+Type: OPEN, language gap · Subsystem: x3-lang/compiler + spec
+Reason: the fusion minimum-output check is unverifiable for any intent that bridges without a swap on
+the far side, because the language has no `min_receive`. Measured 2026-09-20: `min_receive` appears
+**0 times** in `compiler/src`, `crates/x3-ast/src` — and 0 times in the spec, so adding the clause would
+be inventing surface rather than implementing one. The analysis reports the limit honestly
+(`profitability.rs` returns *NotAnalysed* with the reason), which is why this is a gap to decide rather
+than a defect to fix.
+Acceptance criteria: either a clause states what a bridge-only intent must deliver and the fusion check
+reads it, or the phase's report says in its own words that the check cannot apply to that shape.
+Validation: a bridge-only intent with the clause is analysed; without it, the report names the reason.
+Original text: the fusion minimum-output check is unverifiable for any intent that bridges without a
+swap on the far side, because the language has no `min_receive`.
+
+## TICKET-041 — whole and fractional percentages lex differently — CLOSED
+Type: CLOSED in measurement (2026-09-20) · Subsystem: x3-lang/crates/x3-lexer (shape) + compiler (readers)
+Closed: the token shapes differ and **every reader gives them the same value**, which is the part that
+mattered. Measured on `require slippage <= 70%` versus `<= 70`: the artifact carries `REQUIRE measured
+slippage 7000` against `70` (so the `%` is read), and the policy check refuses the first against
+`max_slippage 100` with "permits a slippage of 7000 while the risk policy accepts at most 100" — while
+`<= 0.7%` (the fractional shape) is accepted at 70bps. Two shapes, one meaning, on both paths.
+The shape itself is left as it is: unifying it is a lexer change with no consumer affected, and the
+measurement above is what would have caught a reader that read one and not the other.
+Original text: `70%` is `Int` + `Percent`; `0.5%` is a `Percentage` literal whose value carries a `%`.
+One construct, two token shapes, nothing a reader would predict.
+
+## TICKET-066 — the VM keeps its own MPT verifier — OPEN
+Type: OPEN, decision · Subsystem: x3-lang/vm/src/bridge.rs + crates/x3-verification-router
+Reason: the workspace has one MPT implementation (`x3-verification-router`'s), used by the relayer and
+by the settlement path; `x3-lang/vm/src/bridge.rs` keeps its own copy because it is a separate
+workspace. Whether the VM should use the router's verifier instead is a dependency decision (the VM
+would take a `no_std` dependency on a root crate, which the workspace split exists to avoid).
+Acceptance criteria: either the VM depends on the router's verifier and its own copy is deleted, or the
+duplication is recorded with the reason it stays.
+Validation: `rg "verify_evm_receipt_proof"` has one implementation, or the entry names two and why.
+
+## TICKET-088 — a route swap that states no `amount` lowered to zero — CLOSED
+Type: CLOSED in `47e944662` (2026-09-19) · Subsystem: x3-lang/compiler (lowering)
+Closed: the round-60 report records it as fixed in that commit, together with TICKET-084 (the failing
+stage is named). Materialized here because the number was cited in three reports and the ledger had no
+entry for it.
+Original report: `.ai/reports/x3lang-round60-20260919.md`.
+
+## TICKET-096 — `crates/x3-oracle` is not a workspace member — OPEN
+Type: OPEN, decision · Subsystem: repo/workspace + crate design
+Reason: `crates/x3-oracle` is not a workspace member and nothing calls its float paths, so it is code
+with no consumer and no evidence contract; `x3-foundry-core` and `x3-foundry-revenue` are members with
+no dependents either. The decision is member-plus-consumer or delete — recorded here because it was
+discussed in three rounds and filed nowhere.
+Acceptance criteria: each of the three crates is either a workspace member with a caller and a test, or
+deleted with its reason.
+Validation: `cargo metadata` lists it and `rg` finds a caller, or the crate is gone and the corpus is
+unchanged.
+
 ## TICKET-042 — `x3c graph` does not say that a declared objective is being ignored — CLOSED
 Type: CLOSED in `52f79a4b9` (2026-09-19) · Subsystem: x3-lang/crates/x3-tools
 Closed by the second of the ticket's two acceptable answers: `graph` still lists what the
@@ -4918,3 +4994,19 @@ Five tests. Note for the audit's next step: the scan skipped nested structs whos
 `StrategyRisk`, `SubmissionPolicy`, `ProfitSplit`, `StrategyLicense`, `ContextBlock`, `ObjectiveConstraints`,
 `ParallelLeg`, `ChoicePath` and `ObligationDecl` were checked by name-presence only and are worth the
 same treatment.
+
+## TICKET-122 — an `atomic swap` cannot state a minimum output — OPEN
+Type: OPEN, language gap · Subsystem: x3-lang/crates/x3-ast + compiler
+Reason: `AtomicSwapDecl` has no `min_output` field, its body's clause loop has no arm for the word, and
+the declaration lowers to `Lock` + `Release` rather than a `Swap` — so `atomic swap eth.USDC -> sol.SOL
+{ amount 500  receiver R  min_output 400 }` parsed `min_output` and `400` as two statements that lower
+to nothing, and the declaration has **no price protection at all**. Found by the fixture that places a
+valueless guard before and after every clause line (TICKET-037's fix made it loud); it had passed
+because the line contributed nothing either way.
+Not fixed here: the spec's PHASE 8 example does not state a minimum output for its swaps
+(`atomic { x3 { lock USDC } evm { swap USDC -> ETH } … }`), and the route-step `swap` and the trading
+dialect both have floors — so this is a gap to decide rather than surface to invent.
+Acceptance criteria: either `atomic swap` accepts `min_output <expr>` and the artifact's release is
+bounded by it (with a test that an under-delivery is refused), or the declaration's shape is recorded as
+deliberately unprotected and the spec's phase says why.
+Validation: an atomic swap with a floor, and one whose counterparty delivers less, refused.

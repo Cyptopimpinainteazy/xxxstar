@@ -5402,3 +5402,20 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   clause ("Note what is absent"), so a regex substitution on it silently changed nothing and the probe
   reported the untouched example. Assert the substitution landed (`assert "…" in open(name).read()`)
   before trusting any measurement.
+
+**2026-09-20 — inert statements refused (TICKET-037), and the dangling-ticket sweep**
+
+- An expression statement that calls nothing is refused now (`lower_statement`): a stray clause option
+  (`transfer_proof x`), a clause's residue (`to sender`), a bare literal. Four tests in
+  `compiler/tests/test_inert_statements.rs`. The corpus is unaffected (sweep 20/20).
+- **That refusal surfaced TICKET-122**: `min_output` is not a clause of an `atomic swap` declaration
+  (`AtomicSwapDecl` has no field; the body loop has no arm; the declaration lowers to Lock+Release), so
+  the guard-lookahead fixture's `min_output 400` line had been two inert statements all along.
+- **Dangling-ticket sweep**: seven numbers were cited (in code comments, rounds and memory) with no
+  ledger entry — 036, 037, 038, 041, 066, 088, 096. Method:
+  `git grep -rhoE 'TICKET-[0-9]{3}' -- x3-lang .ai` then diff against `^## TICKET-(\d+)` in the ledger.
+  All seven are materialized with a measured disposition (036 and 041 closed by measurement, 037 closed
+  by the fix above, 088 closed in `47e944662`, 038/066/096 open with their decisions).
+- `70%` and `0.5%` lex differently but read the same everywhere (artifact threshold 7000 vs 70bps; the
+  policy check refuses 7000 against a 100bps ceiling) — measured on both paths, so TICKET-041 is closed
+  as a shape curiosity rather than a defect.
