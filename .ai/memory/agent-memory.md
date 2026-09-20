@@ -5008,3 +5008,59 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   declaring them archival.
 - Dashboard `dist/assets` (~hundreds of untracked build outputs) should get a
   `.gitignore` entry rather than being committed.
+
+## 2026-09-20 — `EMIT`/`CALL_HOST` records, and `x3c fmt` deleting annotations
+
+**Facts discovered**
+
+- `EMIT` (0x60) and `CALL_HOST` (0x61) were written by hand in
+  `x3-lang/compiler/src/emitter.rs` as `format!("{name}:{args:?}")`, and
+  `decode_capability_payload` (`x3-lang/crates/x3-common/src/capability.rs`,
+  the file is under `x3-lang/`, not `crates/`) had no arm for either. The
+  verifier's fallback at `validate_payload_opcode` decodes every unclaimed
+  payload opcode through that function, so `emit` and every host call built and
+  then failed with `X3_VERIFY_FAILED: InvalidOperand`. Before/after: 96 bytes
+  and refused → 40 bytes and runs.
+- Five producers reach `Operation::Call`: `@subscribe`, `@sponsor`, the
+  `subscription` item, `diff(a, b)`, and the unclaimed-call fallback in
+  `lowering.rs`. `@subscription` is **not** one of them — the parser refuses it.
+- `Annotation::Subscription` is dead: no constructor anywhere, and the parser
+  cannot produce it (TICKET-111). Deleted.
+- `X3Formatter` had **zero** references to annotations: `x3c fmt` deleted every
+  `@…` from a program, which changed its compiled artifact (172 → 108 bytes on
+  the new example, dropping two `CALL_HOST` records). The corpus round-trip test
+  never caught it because no corpus file carried an annotation.
+- `format_subscription` dropped the period, and `Item::SubscriptionDecl`'s
+  lowering dropped `period_blocks` too — declared cadence reached nothing.
+- `x3-lang/tests/test_surface_drift.py` requires **every** `examples/*.x3` to be
+  classified in `READS` or `REFUSES`; adding an example without a row fails the
+  suite. An example with no `intent` is `REFUSES` with `X3_PARSE_NO_INTENT`.
+- The root `crates/x3-{ast,common,compiler,lexer}` are separate chain-integration
+  copies, not path-deps on `x3-lang/*`. A change in `x3-lang` does not reach the
+  root workspace.
+
+**Decisions made**
+
+- Payload records over special-casing: both opcodes go through
+  `emit_payload_op` and the one codec. The verifier refuses a record that names
+  nothing; the executor's `dispatch_host_opcode` refuses both variants by name
+  because the execution loop owns them.
+- The formatter uses `annotations::spelling` (already the inverse of the parser's
+  name map) rather than a second table.
+- `@gas_adaptive`-style "annotation with no artifact form" stays as TICKET-111
+  left it; only the unreachable variant was removed.
+
+**Dead ends to avoid**
+
+- `git stash create` fails (exit 1) in the `/tmp/x3-*` worktrees.
+- The sandbox denies loopback: `bind("127.0.0.1", 0)` → EPERM and
+  `connect 127.0.0.1` → EPERM. Four `scripts/local-ci.sh` gates are red for that
+  reason alone (`nested workspaces`, `test node`, `js sdk tests`) plus
+  `clippy runtime rc1`, which is a rustc 1.90/1.98 mixed `target/` cache.
+
+**Next task seed**
+
+- `x3c fmt` still has no spelling for anything it cannot place (comments move to
+  declaration boundaries and it warns); annotations are now covered.
+- A typed record per host operation (instead of `HostCall`'s positional strings)
+  needs a new opcode and therefore a bytecode version bump (TICKET-097's gate).
