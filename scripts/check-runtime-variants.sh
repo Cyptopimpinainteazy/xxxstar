@@ -47,7 +47,12 @@ FAILED=0
 run_variant() {
   local name="$1" feats="$2"
   local log="$LOG_DIR/runtime-variant-$STAMP-$name.log"
-  local feature_list="std,tuples-96"
+  # `tuples-96` used to be a feature of `x3-chain-runtime`. TICKET-093 moved it
+  # onto the runtime's `frame-support` dependency — the runtime cannot be built
+  # without it, and a feature that has to be on for the build to succeed is not
+  # a feature. Passing it here made all six variants fail with
+  # "the package 'x3-chain-runtime' does not contain this feature: tuples-96".
+  local feature_list="std"
   [ -n "$feats" ] && feature_list="$feature_list,$feats"
 
   echo ""
