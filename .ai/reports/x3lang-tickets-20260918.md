@@ -4880,3 +4880,24 @@ the phase text. A `#[serde(default)]`-safe field split would let both travel.
 Acceptance criteria: a program stating two different actions is either refused with both named, or
 both reach the artifact; the same action stated twice stays accepted (the formatter writes that).
 Validation: the measured program above, plus a round trip of the accepted case.
+
+## TICKET-121 — an agent is three blocks, and two of them were read by nothing — CLOSED
+Type: CLOSED in `897552791` (2026-09-20), filed and fixed in the same pass · Subsystem: x3-lang/compiler (formatter + semantic)
+Found by the nested-field audit (for each declaration struct, does the writer reference its fields?)
+which had already found the annotations, the `resources` block and the bridge clauses. Three defects in
+one construct:
+- **`x3c fmt` produced text the parser refuses.** The grammar reads three blocks after an agent's name
+  — context, state, body — and the first `{` is always the context; the writer put the methods there, so
+  `agent Trader { } { } { fn step() { … } }` came back as `agent Trader { fn step() { … } }`, which fails
+  to re-parse with `context key: expected identifier`. Measured: the formatted text does not parse. No
+  corpus file declares an agent, so the corpus round-trip test could not see it.
+- **A context's entries and a state's fields are read by nothing** — no pass, no artifact, no command.
+  Refused by name when they have content (TICKET-117's rule one level in); an **empty** block stays
+  accepted, because the parser reads the first brace as the context and refusing an empty one would make
+  an agent unwritable.
+- **Every method came out at column zero**: the function writer's caller writes the indent, and inside a
+  block nobody did.
+Five tests. Note for the audit's next step: the scan skipped nested structs whose writer is inlined, so
+`StrategyRisk`, `SubmissionPolicy`, `ProfitSplit`, `StrategyLicense`, `ContextBlock`, `ObjectiveConstraints`,
+`ParallelLeg`, `ChoicePath` and `ObligationDecl` were checked by name-presence only and are worth the
+same treatment.

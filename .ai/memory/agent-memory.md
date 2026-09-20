@@ -5372,3 +5372,19 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - Careful with multi-clause ASTs: `on_timeout` fills `on_fail` when it is unset, so the formatter
   writes the action in both lines (the parser requires one on `on_timeout`) — round-trip exact, and the
   silent-discard case is TICKET-120.
+
+**2026-09-20 — an agent's three blocks (formatter output that did not parse, and two inert blocks)**
+
+- The grammar after `agent NAME` is three blocks in order: context (`{ }` or `key: value,`), state
+  (`{ field: type, }`), body (`{ fn … strategy … }`) — the first `{` is *always* the context, so an
+  agent must write both empty blocks to have a body at all.
+- `format_agent` wrote one block → the output did not re-parse (`context key: expected identifier`).
+  It writes three now, empty ones included. **A formatter test over a corpus only covers constructs the
+  corpus contains** — agents appear in none, so this survived every round trip.
+- An agent's context entries and state fields are read by nothing (grep confirms) → refused by name when
+  non-empty, accepted when empty (the braces are syntax, not a claim).
+- The function writer assumes its caller wrote the indent; anything calling `format_function` from
+  inside a block must `write_indent()` first.
+- Audit status: the nested-struct list (StrategyRisk, SubmissionPolicy, ProfitSplit, StrategyLicense,
+  ContextBlock, ObjectiveConstraints, ParallelLeg, ChoicePath, ObligationDecl) has only had the
+  name-presence check, not the behavioural one.
