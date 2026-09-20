@@ -1,15 +1,12 @@
 {
-  "generated_at": "2026-09-20T10:28:18Z",
-  "commit": "c2a6bb301",
+  "generated_at": "2026-09-20T11:46:02Z",
+  "commit": "5775b1587",
   "counts": {
-    "runtime-hook": 2,
+    "runtime-hook": 0,
     "pallet-call": 0,
     "production": 2269
   },
   "files_scanned": 1298,
-  "runtime_hooks_allowed": [
-    "pallets/pallet-x3-agent-registry/src/lib.rs:608",
-    "pallets/x3-slash/src/lib.rs:576"
-  ],
+  "runtime_hooks_allowed": [],
   "note": "Panic/unwrap ratchet. `counts` may only go down; runtime_hooks_allowed is an explicit allowlist of KNOWN block-hook panics that are scheduled to be removed \u2014 it is not a target state, and it should trend to empty. Refresh with scripts/mainnet/panic_unwrap_audit.sh --update-baseline, and say why in the commit message if a count increases."
 }
