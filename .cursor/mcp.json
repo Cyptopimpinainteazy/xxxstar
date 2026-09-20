@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "todo-mcp": {
+      "command": "node",
+      "args": [
+        "/home/lojak/.vscode/extensions/hurtis.todo-mcp-2.0.0/bin/todo-mcp.js",
+        "--workspace",
+        "/home/lojak/Desktop/xxxstar-main"
+      ]
+    }
+  }
+}
