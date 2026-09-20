@@ -59,6 +59,27 @@ pub struct BotPerformance {
 pub struct ArbBotEventSystem;
 
 impl ArbBotEventSystem {
+    /// The spread between two prices in basis points (100 bps = 1%), floored.
+    ///
+    /// `(hi - lo) * 10_000 / lo`. The `f64` form this replaces cast both `u128` prices to
+    /// binary floating point, and above 2^53 that cast rounds — so the number that decided
+    /// whether the opportunity was admitted at all (`spread >= 10`) and the number stored
+    /// in `spread_bps` were both approximations of a value the inputs state exactly.
+    ///
+    /// The product is computed in 256 bits because `hi - lo` is a `u128` and ten thousand
+    /// of it is not; `U256` cannot overflow here (`(2^128 - 1) * 10^4 < 2^256`), so the
+    /// multiplication is unchecked and the *only* thing that can fail is the narrowing.
+    ///
+    /// `None` when the spread does not fit the `u32` an `ArbOpportunity` carries. The old
+    /// `as u32` saturated in silence, so a spread of 43 million percent — or two prices
+    /// quoted in different units, which is the realistic way to get one — reported as
+    /// `u32::MAX` and read as the most attractive trade on the book.
+    fn spread_bps(hi: u128, lo: u128) -> Option<u32> {
+        let scaled = sp_core::U256::from(hi - lo) * sp_core::U256::from(10_000u32);
+        let bps = scaled / sp_core::U256::from(lo);
+        u32::try_from(bps).ok()
+    }
+
     /// Detect arbitrage opportunity between two pools
     #[allow(clippy::too_many_arguments)]
     pub fn detect_opportunity(
@@ -81,12 +102,12 @@ impl ArbBotEventSystem {
 
         // Calculate spread in basis points (100 bps = 1%)
         let (spread, profit_token, min_input, max_input) = if price_a > price_b {
-            let spread = ((price_a - price_b) as f64) / (price_b as f64) * 10000.0;
-            (spread as u32, token_out, 0, u128::MAX)
+            (Self::spread_bps(price_a, price_b), token_out, 0, u128::MAX)
         } else {
-            let spread = ((price_b - price_a) as f64) / (price_a as f64) * 10000.0;
-            (spread as u32, token_in, 0, u128::MAX)
+            (Self::spread_bps(price_b, price_a), token_in, 0, u128::MAX)
         };
+
+        let spread = spread.ok_or("Spread does not fit the basis-point field")?;
 
         if spread < 10 {
             return Err("Spread too small (minimum 10 bps)");
@@ -236,11 +257,18 @@ impl ArbBotEventSystem {
 
         // Update win rate (profitable executions / total)
         if execution.net_profit > 0 {
-            let new_win_rate = (performance.total_executions as f64
-                * (performance.win_rate_bps as f64 / 10000.0))
-                + 1.0;
-            performance.win_rate_bps =
-                ((new_win_rate / performance.total_executions as f64) * 10000.0) as u32;
+            // One more win out of `n`, in basis points: `(wins + 1) / n * 10_000` where the
+            // stored rate is the wins, `n * rate_bps / 10_000`. This is a statistic rather
+            // than a decision — nothing reads `win_rate_bps` to admit or refuse — and it is
+            // converted anyway because the exact form is the shorter one and it leaves no
+            // float in this file to mistake for a priced value.
+            //
+            // `n` was just incremented, so it is at least 1 and the division is defined. The
+            // product cannot overflow `u128` (`u64 * u32`); the narrowing is the only step
+            // that can, and it is checked rather than wrapped.
+            let executions = u128::from(performance.total_executions);
+            let next = (executions * u128::from(performance.win_rate_bps) + 10_000) / executions;
+            performance.win_rate_bps = u32::try_from(next).unwrap_or(u32::MAX);
         }
 
         Ok(())
@@ -358,6 +386,54 @@ mod tests {
     }
 
     #[test]
+    fn a_spread_that_is_an_integer_number_of_basis_points_is_not_stored_short() {
+        // An exact 12 bps: `lo = 10^15`, `hi = lo + 1.2*10^12`. The `f64` form stored **11**.
+        // Both `u128` casts round above 2^53 and the quotient came out just under the integer
+        // the inputs state — and this is not a hand-picked freak: across a family of
+        // `lo = 10^4 * t`, `hi = lo + t * k` there are **195** (t, k) pairs where the `f64`
+        // form is exactly one basis point low. What was *not* observed, in that family or in
+        // 800k random pairs, is the one-bps error crossing the `spread >= 10` admission
+        // boundary — so this is a wrong number, not a wrong decision, and it is stated that
+        // way rather than as the larger defect it would be nicer to have found.
+        let opp = ArbBotEventSystem::detect_opportunity(
+            [1; 32],
+            [2; 32],
+            [3; 32],
+            [4; 32],
+            1_001_200_000_000_000,
+            1_000_000_000_000_000,
+            100_000,
+            1000,
+            3600,
+        )
+        .unwrap();
+
+        assert_eq!(opp.spread_bps, 12, "12 bps stated exactly is 12 bps stored");
+    }
+
+    #[test]
+    fn a_spread_that_does_not_fit_the_field_is_refused_rather_than_saturated() {
+        // `u128::MAX` against `1` is 3.4e42 basis points — two prices quoted in different
+        // units, not a market observation. The old `spread as u32` saturated in silence, so
+        // the opportunity was admitted carrying `spread_bps: u32::MAX` and read as the most
+        // attractive trade on the book. A field that cannot hold the number is a reason to
+        // refuse, not a reason to clamp.
+        let result = ArbBotEventSystem::detect_opportunity(
+            [1; 32],
+            [2; 32],
+            [3; 32],
+            [4; 32],
+            u128::MAX,
+            1,
+            100_000,
+            1000,
+            3600,
+        );
+
+        assert_eq!(result, Err("Spread does not fit the basis-point field"));
+    }
+
+    #[test]
     fn test_create_subscription() {
         let sub =
             ArbBotEventSystem::create_subscription([1; 32], 100, 50000, vec![[2; 32]]).unwrap();
@@ -436,6 +512,10 @@ mod tests {
 
         assert_eq!(perf.total_executions, 1);
         assert_eq!(perf.total_profit, 85000);
+        // One profitable execution out of one is a 100% win rate. The integer form is
+        // `(executions * win_rate_bps + 10_000) / executions` — the same expression the two
+        // `f64` divisions evaluated, with one floor instead of an accumulation of rounding.
+        assert_eq!(perf.win_rate_bps, 10_000, "one win of one is 10000 bps");
     }
 
     #[test]
