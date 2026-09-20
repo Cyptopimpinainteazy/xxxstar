@@ -4785,3 +4785,22 @@ compiles, and the artifact's trace shows `REQUIRE static fees <n>`.
 Why not done here: it is a new guard kind (parser + `REQUIRE_KIND_NAMES` + the check + a test), and
 PHASE 7's requirement — the policy compiling into the artifact — is met without it. Adding a language
 feature in the same change as the record it would use makes both harder to review.
+
+## TICKET-117 — declarations the compiler accepted and nothing read — CLOSED
+Type: CLOSED in `9878f8c19` (2026-09-20), filed and fixed in the same pass · Subsystem: x3-lang/compiler (semantic + lowering)
+Reason: `struct`, `enum`, `use`, `mod`, `import`, `const` and `error` parse, lower to nothing, and were
+read by **nothing** outside the parser and the formatter. Three lowering comments claimed a consumer
+that does not exist ("the compiler reads it", "a constant is evaluated where it is used", "raising it
+is a `Statement`"), which is how the absence survived: a comment asserting a reader is indistinguishable
+from a reader, until something measures. Measured: the only `Item::` mentions of any of the seven in
+the crate are the lowering arm itself and the formatter's printer.
+Three fixtures declared `error SlippageExceeded` (`examples/mainnet_safe_swap.x3`,
+`examples/flagship_b52.x3`, `crates/x3-tools/tests/cli.rs`'s audit fixture) — and removing the line
+changed both examples' artifacts by nothing (672 and 872 bytes, before and after), which is the
+measurement that the declaration was inert.
+Closed: `verify_declarations_have_a_reader` refuses each of the seven by name with its reason, so
+`import foo;` is a diagnostic rather than a line that imports nothing. The parser still reads them
+(`test_parser_coverage.rs` asserts the grammar accepts a `struct`), because a grammar's coverage is a
+separate claim. Five tests, including a control that the corpus's own shape meets no such rule.
+This is the same shape as TICKET-111 (`@subscription`, `audit_gate`) and the `finality_explicit` find:
+a construct the artifact cannot carry and no pass reads is refused, not dropped.

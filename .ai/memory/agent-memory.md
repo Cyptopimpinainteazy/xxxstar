@@ -5301,3 +5301,17 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   impact / MEV leakage, and (2) **the guard quantity code is full** (8 of 8: none/profit, delta,
   slippage, amount, score, count, blocks, fees) — a third measured quantity needs a wider field,
   which is a format decision.
+
+**2026-09-20 — seven declarations nothing read, and the comments that hid it (TICKET-117)**
+
+- `struct`/`enum`/`use`/`mod`/`import`/`const`/`error` parse, lower to nothing, and were read by
+  nothing but the formatter. `verify_declarations_have_a_reader` (semantic.rs, registered in
+  `lib.rs::ast_level_errors`) refuses each by name with its reason.
+- **The tell is a comment claiming a consumer.** Three lowering comments asserted readers that do not
+  exist ("the compiler reads it", "a constant is evaluated where it is used", "raising it is a
+  Statement" — no such statement exists). When auditing for inert surface, read the comments next to
+  the no-op arms and check each claim with a grep for the type name outside the parser/formatter.
+- Three fixtures carried a dead `error SlippageExceeded`; removing it changed the artifacts by
+  *nothing* (672/872 bytes before and after) — the cheap proof that a declaration was inert.
+- `Item::Const` and `Item::Struct` etc. still need their match arms (exhaustiveness, TICKET-078); the
+  refusal is a semantic pass, so the *parser* keeps accepting them.
