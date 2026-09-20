@@ -339,39 +339,56 @@ def check_validator_install() -> None:
     )
 
 
-def check_production_genesis() -> None:
-    """The mainnet genesis has to be built *and* it has to boot.
+def run_genesis_gate(chain: str, label: str) -> None:
+    """Build a built-in Live genesis from fixture keys and boot a network on it.
 
     `check_chain_spec_artifacts` parses the local3 specs and greps
-    `chain_spec.rs` for the literal string "production_config". It never calls
-    that function, so a `production_config` that cannot produce a genesis — or a
-    spec that parses but cannot start a chain — passed the release gate. This
-    stage runs the whole path with fixture keys: derive authorities, build the
+    `chain_spec.rs` for the literal strings "production_config"/"testnet_config".
+    It never calls either function, so a builder that cannot produce a genesis —
+    or a spec that parses but cannot start a chain — passed the release gate.
+    This runs the whole path with fixture keys: derive authorities, build the
     Live spec, assert the artifact, boot three validators on it, and require
     finalized agreement.
     """
-    print("\n── 3b. Production genesis builds and boots ──")
+    print(f"\n── {label} ──")
     script = ROOT / "scripts" / "mainnet" / "production_genesis_gate.sh"
     if not script.exists():
         fail(
             "scripts/mainnet/production_genesis_gate.sh is missing — nothing "
-            "builds or boots the mainnet genesis"
+            f"builds or boots the {chain} genesis"
         )
         return
 
-    result = run(["bash", str(script)], env=node_binary_env())
+    result = run(
+        ["bash", str(script)],
+        env={**node_binary_env(), "X3_GENESIS_CHAIN": chain},
+    )
     output = result.stdout + result.stderr
     if result.returncode != 0:
-        fail("the production genesis did not build, boot and finalize")
+        fail(f"the {chain} genesis did not build, boot and finalize")
         for line in output.splitlines()[-15:]:
             print(f"    {line}")
         return
 
     summary = next(
         (line.split("PASS — ", 1)[1] for line in output.splitlines() if "PASS — " in line),
-        "production genesis builds, boots and finalizes",
+        f"{chain} genesis builds, boots and finalizes",
     )
     ok(summary)
+
+
+def check_production_genesis() -> None:
+    run_genesis_gate("production", "3b. Production (mainnet) genesis builds and boots")
+
+
+def check_testnet_genesis() -> None:
+    """Same path for the chain a public testnet runs: `testnet_config()`.
+
+    It is a different builder with a different env prefix (X3_TESTNET_*) and a
+    different gateway default, and it is what a testnet launch actually uses, so
+    it needs its own proof rather than riding on production's.
+    """
+    run_genesis_gate("testnet", "3d. Testnet genesis builds and boots")
 
 
 # ── 4. Critical runtime & pallet test suites ─────────────────────────────────
@@ -676,6 +693,7 @@ def main() -> int:
     check_chain_spec_artifacts()
     check_shipped_genesis_boots()
     check_production_genesis()
+    check_testnet_genesis()
     check_test_suites()
     check_panic_ratchet()
     check_runtime_upgrade_rehearsal()

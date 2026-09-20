@@ -59,7 +59,7 @@ INSTALLER="$ROOT/scripts/install-validator.sh"
 
 # ── inputs: a real Live genesis and a real dev genesis ───────────────────────
 info "building a fixture Live genesis"
-X3_NODE_BIN="$NODE_BIN" bash "$ROOT/scripts/mainnet/make-fixture-mainnet-spec.sh" "$WORK/spec" \
+X3_NODE_BIN="$NODE_BIN" bash "$ROOT/scripts/mainnet/make-fixture-live-spec.sh" "$WORK/spec" \
   >"$WORK/fixture.log" 2>&1 \
   || { tail -20 "$WORK/fixture.log" >&2; fail "could not build the fixture Live genesis"; }
 LIVE_SPEC="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['spec'])" "$WORK/spec/fixture.json")"
