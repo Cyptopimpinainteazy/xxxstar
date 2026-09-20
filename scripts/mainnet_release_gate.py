@@ -162,6 +162,34 @@ def check_chain_runs() -> None:
     ok(summary)
 
 
+def check_validators_agree() -> None:
+    """Three validators on the built-in `local3` chain have to agree.
+
+    One node authoring blocks proves the node runs. This proves the part a
+    blockchain actually needs: independent validators find each other, finalize,
+    and return the same canonical hash for the same finalized height.
+    """
+    print("\n── 2c. Validators agree ──")
+    script = ROOT / "scripts" / "local-network-smoke.sh"
+    if not script.exists():
+        fail("scripts/local-network-smoke.sh is missing — nothing runs a validator set")
+        return
+
+    result = run(["bash", str(script)])
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("the three-validator local chain did not converge")
+        for line in output.splitlines()[-15:]:
+            print(f"    {line}")
+        return
+
+    summary = next(
+        (line.split("PASS — ", 1)[1] for line in output.splitlines() if "PASS — " in line),
+        "three validators finalized and agreed on the canonical hash",
+    )
+    ok(summary)
+
+
 ARTIFACT_CHECKS = [
     "chain-specs/x3-local3-current-plain.json",
     "chain-specs/x3-local3-current-raw.json",
@@ -460,6 +488,7 @@ def main() -> int:
     check_required_docs()
     check_build()
     check_chain_runs()
+    check_validators_agree()
     check_chain_spec_artifacts()
     check_test_suites()
     check_runtime_upgrade_rehearsal()

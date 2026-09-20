@@ -264,6 +264,9 @@ GATES_LIVE=(
   # Boots a dev chain and checks that it authors, finalizes, and answers its own
   # operator CLI over RPC. Self-contained: no anvil, no solana, no network.
   "local node smoke:bash scripts/local-node-smoke.sh"
+  # Three validators on the built-in `local3` chain: they have to find each
+  # other, finalize, and agree on the canonical hash at a finalized height.
+  "local network smoke:bash scripts/local-network-smoke.sh"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
   "SVM contract lifecycle:programs/svm/x3_atomic_swap/test-live-lifecycle.sh"
 )
