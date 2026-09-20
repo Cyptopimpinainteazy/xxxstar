@@ -164,6 +164,15 @@ GATES_FAST=(
   "script syntax:bash scripts/check-script-syntax.sh"
   "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
   "workspace membership:python3 scripts/check-workspace-membership.py"
+  # A `Cargo.lock` resolved by hand during a merge has to be re-checked by cargo. It
+  # was not: the x3-swap-router merge kept the branch's package entry verbatim, where
+  # its sole `sp-std` is the 14.0.0 one while the merged graph has two, so the bare
+  # name was ambiguous and cargo rewrote it — `cargo metadata --locked` exited 101
+  # ("the lock file needs to be updated but --locked was passed") on master, which is
+  # what every `--locked` gate in CI would have reported (TICKET-062). Measured both
+  # ways: exit 0 on a consistent lock, and exit 101 after adding a dependency to one
+  # member's manifest without touching the lock.
+  "cargo lockfile locked:cargo metadata --locked --format-version 1"
   # Every id in `tests/invariants/registry.toml` must be referenced by a test.
   # This check lived in `tests_core/invariant_registry_check.rs`, which no crate,
   # script or Makefile ever compiled — so an invariant could be registered with
