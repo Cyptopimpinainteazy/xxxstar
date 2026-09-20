@@ -11,6 +11,102 @@
 use crate::{make_json_rpc_call, BridgeAdapter, BridgeError};
 use sha2::{Digest, Sha256};
 
+/// A bitcoin amount, stated by a node's reply, as satoshi.
+///
+/// The reply states bitcoins as a JSON number and this used to read it as `f64` and multiply by `1e8`:
+/// `0.29` is not representable in binary, so `0.29 * 1e8` is `28999999.999999996` and the cast
+/// truncated it to **28999999** — one satoshi short of the UTXO, in a bridge adapter, for every amount
+/// whose decimal form binary cannot hold. The reply's own *text* is parsed exactly instead, and a
+/// fraction finer than a satoshi is refused rather than rounded: this is an amount of money, and a
+/// value the unit cannot carry is not one to guess at (TICKET-094).
+///
+/// A missing or unparseable amount is refused as well. It used to be `unwrap_or(0.0)` on money, which
+/// turns a malformed reply into a UTXO worth nothing — or, for a fee rate, into a fee of zero — with
+/// nothing said about it.
+fn btc_to_satoshi(value: Option<&serde_json::Value>, field: &str) -> Result<u64, BridgeError> {
+    let stated = value
+        .ok_or_else(|| BridgeError::Serialization(format!("{field}: the reply states no amount")))?
+        .as_number()
+        .ok_or_else(|| BridgeError::Serialization(format!("{field}: the amount is not a number")))?
+        .to_string();
+    let stated = stated.trim();
+    if stated.starts_with('-') || stated.starts_with('+') {
+        return Err(BridgeError::Serialization(format!(
+            "{field}: '{stated}' is not a positive amount"
+        )));
+    }
+    // A JSON number may be written with an exponent — `1e-8` is one satoshi, and that is how a
+    // shortest-round-trip formatter writes it, so refusing the form would refuse a legitimate amount.
+    let (mantissa, exponent) = match stated.split_once(['e', 'E']) {
+        Some((mantissa, exponent)) => (
+            mantissa,
+            exponent.parse::<i32>().map_err(|_| {
+                BridgeError::Serialization(format!(
+                    "{field}: '{stated}' has an exponent this reader cannot read"
+                ))
+            })?,
+        ),
+        None => (stated, 0),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    if whole.is_empty()
+        || !whole.chars().all(|digit| digit.is_ascii_digit())
+        || !fraction.chars().all(|digit| digit.is_ascii_digit())
+    {
+        return Err(BridgeError::Serialization(format!(
+            "{field}: '{stated}' is not a plain decimal amount"
+        )));
+    }
+    // The value as a digit string and the position of its decimal point, then shifted so that eight
+    // digits stand below it: satoshi = value * 10^8, which is `digits * 10^(8 - fractional_digits +
+    // exponent)`. A negative shift means the amount is *finer* than a satoshi, and the digits it would
+    // drop have to be zeros — a value this unit cannot state is refused rather than rounded, the same
+    // rule the compiler's guard bounds use for a fraction of a basis point.
+    let digits: String = format!("{whole}{fraction}");
+    let shift = 8 - fraction.len() as i32 + exponent;
+    let (digits, drop) = if shift >= 0 {
+        (digits, shift as usize)
+    } else {
+        let drop = (-shift) as usize;
+        if drop > digits.len() {
+            // Every stated digit is below the satoshi: only an amount of zero is statable here.
+            if digits.chars().any(|digit| digit != '0') {
+                return Err(BridgeError::Serialization(format!(
+                    "{field}: '{stated}' is finer than a satoshi, which is the smallest unit this \
+                     amount can be stated in"
+                )));
+            }
+            return Ok(0);
+        }
+        let (kept, dropped) = digits.split_at(digits.len() - drop);
+        if dropped.chars().any(|digit| digit != '0') {
+            return Err(BridgeError::Serialization(format!(
+                "{field}: '{stated}' is finer than a satoshi, which is the smallest unit this amount \
+                 can be stated in"
+            )));
+        }
+        (kept.to_string(), 0)
+    };
+    let digits = digits.trim_start_matches('0').to_string();
+    if digits.is_empty() {
+        return Ok(0);
+    }
+    // Seventeen digits bound a `u64`'s satoshi value (21M BTC is 2.1e15 satoshi), so a digit count that
+    // would not fit is larger than the supply, and saying so is better than parsing a wrapped number.
+    if digits.len() + drop > 20 {
+        return Err(BridgeError::Serialization(format!(
+            "{field}: '{stated}' is larger than the whole bitcoin supply can state in satoshi"
+        )));
+    }
+    format!("{digits}{}", "0".repeat(drop))
+        .parse::<u64>()
+        .map_err(|_| {
+            BridgeError::Serialization(format!(
+                "{field}: '{stated}' is larger than the whole bitcoin supply can state in satoshi"
+            ))
+        })
+}
+
 /// Error code returned when the BTC adapter is disabled.
 pub const BTC_ADAPTER_DISABLED_CODE: &str = "X3_BTC_ADAPTER_DISABLED";
 
@@ -224,7 +320,7 @@ impl ProductionBitcoinAdapter {
             entries.push(BtcUtxo {
                 txid,
                 vout: item.get("vout").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                amount: (item.get("amount").and_then(|v| v.as_f64()).unwrap_or(0.0) * 1e8) as u64,
+                amount: btc_to_satoshi(item.get("amount"), "listunspent.amount")?,
                 script_pubkey: item
                     .get("scriptPubKey")
                     .and_then(|s| s.as_str())
@@ -266,11 +362,9 @@ impl ProductionBitcoinAdapter {
             "estimatesmartfee",
             serde_json::json!([blocks]),
         )?;
-        Ok((result
-            .get("feerate")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0)
-            * 1e8) as u64)
+        // Satoshi per kilobyte, from the reply's own text: see `btc_to_satoshi` for why this is not a
+        // float multiply, and for why a missing rate is a refusal rather than a fee of zero.
+        btc_to_satoshi(result.get("feerate"), "estimatesmartfee.feerate")
     }
 
     pub fn send_raw_transaction(&self, tx_hex: &str) -> Result<String, BridgeError> {
@@ -487,6 +581,71 @@ mod tests {
         let adapter = BitcoinBridgeAdapter::new(0, "http://localhost:8332".to_string());
         let result = adapter.validate_header(b"btc-header-v1:abcdef123456");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn an_amount_binary_cannot_hold_is_not_a_satoshi_short() {
+        let satoshi = |value: serde_json::Value| btc_to_satoshi(Some(&value), "test.amount");
+        // `0.29` is not representable in binary: `0.29 * 1e8` is `28999999.999999996`, which the old
+        // expression cast to **28999999** — one satoshi short of the amount the node stated. The
+        // before/after is the assertion: the exact reading is 29_000_000.
+        assert_eq!(
+            satoshi(serde_json::json!(0.29)).expect("0.29 reads exactly"),
+            29_000_000,
+            "the reply's own text is the amount; the float was one satoshi under it"
+        );
+        for (stated, expected) in [
+            (0.1_f64, 10_000_000_u64),
+            (0.29, 29_000_000),
+            (1.0, 100_000_000),
+            (21_000_000.0, 2_100_000_000_000_000),
+            (0.00000001, 1),
+            (1234.56789012, 123_456_789_012),
+        ] {
+            assert_eq!(
+                satoshi(serde_json::json!(stated))
+                    .unwrap_or_else(|error| panic!("{stated}: {error}")),
+                expected,
+                "{stated} must read as {expected} satoshi"
+            );
+        }
+    }
+
+    #[test]
+    fn a_fraction_of_a_satoshi_is_refused_rather_than_rounded() {
+        // The rule the compiler's guard bounds use for a fraction of a basis point, on money: a value
+        // this unit cannot state is refused, because rounding it picks a direction nobody wrote.
+        let error = btc_to_satoshi(Some(&serde_json::json!(0.000000001)), "test.amount")
+            .expect_err("a billionth of a bitcoin is not a satoshi amount");
+        assert!(
+            error.to_string().contains("finer than a satoshi"),
+            "the refusal must say why: {error}"
+        );
+        // And trailing zeros are not a fraction: `0.290000000` states the same amount as `0.29`.
+        assert_eq!(
+            btc_to_satoshi(Some(&serde_json::json!(0.29)), "test.amount").expect("reads exactly"),
+            29_000_000
+        );
+    }
+
+    #[test]
+    fn an_amount_nothing_stated_is_refused_rather_than_zero() {
+        // `unwrap_or(0.0)` on money turns a malformed reply into a UTXO worth nothing, or a fee of
+        // zero, and says nothing about it. A missing amount is a refusal that names the field.
+        for absent in [
+            None,
+            Some(serde_json::json!("0.29")),
+            Some(serde_json::json!(null)),
+        ] {
+            let error = btc_to_satoshi(absent.as_ref(), "listunspent.amount")
+                .expect_err("an absent or non-numeric amount must be refused");
+            assert!(
+                error.to_string().contains("listunspent.amount"),
+                "the refusal must name the field it is about: {error}"
+            );
+        }
+        // A negative amount is a reply a bridge must not act on.
+        assert!(btc_to_satoshi(Some(&serde_json::json!(-1)), "test.amount").is_err());
     }
 
     #[cfg(feature = "bitcoin-adapter")]

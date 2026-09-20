@@ -164,6 +164,14 @@ GATES_FAST=(
   "script syntax:bash scripts/check-script-syntax.sh"
   "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
   "workspace membership:python3 scripts/check-workspace-membership.py"
+  # PHASE 43 is a prohibition, not a feature: a value that becomes a balance, a reward, a slash or a
+  # settlement amount must be computed exactly. `x3-lang` has had this check for its own two crates for
+  # a while (`compiler/tests/test_computation_discipline.rs`); the *root* workspace's consensus surface
+  # was never scanned, which is how "no native float in a consensus-sensitive path" came to be a claim
+  # about one directory (TICKET-094). Measured when the gate was added: `pallets/*/src` and
+  # `runtime/src` contain zero `f64`/`f32`, so this is a line held, not a line drawn — the scan refuses
+  # the next one, and a legitimate float states `// float-exemption: <reason>` on its own line.
+  "no float in consensus:python3 scripts/check-no-float-in-consensus.py"
   # A `Cargo.lock` resolved by hand during a merge has to be re-checked by cargo. It
   # was not: the x3-swap-router merge kept the branch's package entry verbatim, where
   # its sole `sp-std` is the 14.0.0 one while the merged graph has two, so the bare
