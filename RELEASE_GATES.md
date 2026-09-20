@@ -2,7 +2,7 @@
 
 **Canonical source: `FEATURE_REGISTRY.toml`** — all readiness scores and blockers derive from it. Run `scripts/check-readiness-consistency.sh` to validate.
 
-**Overall readiness: ~36%** (average across 23 features). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
+**Overall readiness: ~54%** (53.74% arithmetic mean across the 19 currently scored entries in `FEATURE_REGISTRY.toml`, recalculated 2026-09-20). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
 
 ## Gate commands
 
@@ -24,4 +24,4 @@ Enforced in `.github/workflows/mainnet-readiness.yml` on every push/PR to main.
 
 ## Mainnet-ready claims
 
-Forbidden unless all gates pass AND `FEATURE_REGISTRY.toml` scores ≥95% for every feature. Currently: ~36%.
+Forbidden unless all gates pass AND `FEATURE_REGISTRY.toml` scores ≥95% for every feature. Currently: ~54% registry-scored readiness; this is **not** a mainnet-ready score.

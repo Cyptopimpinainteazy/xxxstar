@@ -1,6 +1,6 @@
 # X3 Atomic Star — Mainnet Status
 
-**Updated: 2026-09-05 — Honest ~54% average readiness (15/15 registry entries point at real code). Build compiles clean. Fictional registry rows purged.**
+**Updated: 2026-09-20 — ~54% registry-scored readiness (53.74% across 19 current entries, recalculated from `FEATURE_REGISTRY.toml`). The registry paths and cited test names resolve to real code; this is not a mainnet-ready claim.**
 
 > `FEATURE_REGISTRY.toml` is the single canonical source. All percentages derive from it.
 > Run `scripts/check-readiness-consistency.sh` to validate (now also fails on fictional registry paths).
@@ -25,7 +25,7 @@ Repo Scanner Agent (scripts/swarm)                 ██░░░░░░░�
 Tauri OS (apps/tauri-os)                           █░░░░░░░░░  15%  GUARDED_TESTNET — Dead buttons report, Tauri wiring pending
 ```
 
-**Average readiness: ~51%** — 15 features tracked (8 aspirational/fictional rows purged 2026-09-05; atomic_kernel corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 — its required_tests were fictional), core consensus features ready for guarded testnet deployment.
+**Average readiness: ~54%** — 19 features are currently tracked. Eight aspirational/fictional rows were purged on 2026-09-05; `atomic_kernel` was corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 because its required tests were fictional. Core consensus features are at guarded-testnet, not mainnet, maturity.
 
 ### 2026-09-07 Atomic lifecycle live evidence
 
@@ -74,7 +74,7 @@ Tauri OS (apps/tauri-os)                           █░░░░░░░░�
   - Launchpad graduate() calls TokenFactory via `TokenFactoryCreate` trait + `LaunchpadTokenFactoryBridge` ✅
   - Cross-VM Router enforces `daily_limit`, `per_wallet_daily_limit`, `pending_limit` in `initiate_transfer` ✅
   - `pallet-x3-lp-locker` exists with full lib (331 lines), mock, and tests ✅
-- **Project completion updated to ~60%** (up from ~54%) — the gap report's product integration gaps were stale.
+- **Historical session estimate withdrawn as a canonical score** — the gap report's product integration gaps were stale. The current canonical aggregate is the ~54% registry-scored readiness above; it does not measure the entire aspirational project surface.
 - **Blockers remaining**: GRANDPA finality cert wiring (`H256::zero()` in atomic-swap-orchestrator), x3-lang BridgeAdapter 26/27 stub methods (separate workspace), relayer multi-validator quorum.
 
 ## Validation
