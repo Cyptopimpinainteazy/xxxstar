@@ -5388,3 +5388,17 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - Audit status: the nested-struct list (StrategyRisk, SubmissionPolicy, ProfitSplit, StrategyLicense,
   ContextBlock, ObjectiveConstraints, ParallelLeg, ChoicePath, ObligationDecl) has only had the
   name-presence check, not the behavioural one.
+
+**2026-09-20 — permissions nothing tests refused, and a ticket that did not exist**
+
+- Of the four strategy permissions, `private_submission` and `flash_capital` have no reader anywhere
+  (measured by grep across compiler/vm/tooling). Both are refused now: the first points at
+  `submission { private = … }`, which lowers to a mode check the VM enforces; the second cites
+  TICKET-040. `cross_domain` and `intent_fusion` are required by the body's shape and stay accepted.
+- **A code comment can cite a ticket the ledger does not have.** `strategy.rs` cited TICKET-040 and
+  the round-26 report wrote its text, but the ledger jumps 039 → 042. When a comment names a ticket,
+  grep for its entry; if it is missing, materialize it — otherwise the follow-up exists only in prose.
+- Probe-anchoring trap, again: `examples/strategy_module.x3` deliberately declares **no** `permissions`
+  clause ("Note what is absent"), so a regex substitution on it silently changed nothing and the probe
+  reported the untouched example. Assert the substitution landed (`assert "…" in open(name).read()`)
+  before trusting any measurement.

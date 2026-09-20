@@ -1622,6 +1622,23 @@ agree on; a round-trip test covers the body form.
 Validation: `invariant a { assert x <= 5 }` formats, re-parses, and compiles to
 the same bytecode.
 
+## TICKET-040 — `flash_capital` cannot be tested — OPEN
+Type: OPEN, decision needed · Subsystem: x3-lang/compiler (strategy modules)
+Reason: nothing in a module body *requires* flash liquidity, so the permission is declarable and
+unverifiable. The strategy module's own doc cites this ticket ("recorded in TICKET-040 rather than
+papered over with a check that always passes"), and the round-26 report wrote the text — but the
+ledger jumped from 039 to 042, so the follow-up lived only in a report until now. Materialized here
+after `4e337de7b` made the permission a refusal, which is what makes the citation load-bearing: the
+diagnostic names this ticket.
+The choice is unchanged: either a module body needs a borrow statement — which would also discharge
+the `borrow`/`repay` effects and `debt_closed` — or the permission leaves the set. PHASE 19
+(multi-asset flash capital) is partial for the same reason: multi-asset flash is not modelled.
+Acceptance criteria: `permissions [flash_capital]` is accepted because a body can require the
+capability and the check reads it, or the permission is removed from `StrategyPermission::ALL` and the
+refusal with it.
+Validation: a module whose body requires flash liquidity is refused without the permission and
+accepted with it; or the set has three members and the corpus is unchanged.
+
 ## TICKET-042 — `x3c graph` does not say that a declared objective is being ignored — CLOSED
 Type: CLOSED in `52f79a4b9` (2026-09-19) · Subsystem: x3-lang/crates/x3-tools
 Closed by the second of the ticket's two acceptable answers: `graph` still lists what the
