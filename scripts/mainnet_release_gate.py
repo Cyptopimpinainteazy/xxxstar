@@ -223,7 +223,43 @@ def check_chain_spec_artifacts() -> None:
         fail("node/src/chain_spec.rs not found")
 
 
+def check_production_genesis() -> None:
+    """The mainnet genesis has to be built *and* it has to boot.
+
+    `check_chain_spec_artifacts` parses the local3 specs and greps
+    `chain_spec.rs` for the literal string "production_config". It never calls
+    that function, so a `production_config` that cannot produce a genesis — or a
+    spec that parses but cannot start a chain — passed the release gate. This
+    stage runs the whole path with fixture keys: derive authorities, build the
+    Live spec, assert the artifact, boot three validators on it, and require
+    finalized agreement.
+    """
+    print("\n── 3b. Production genesis builds and boots ──")
+    script = ROOT / "scripts" / "mainnet" / "production_genesis_gate.sh"
+    if not script.exists():
+        fail(
+            "scripts/mainnet/production_genesis_gate.sh is missing — nothing "
+            "builds or boots the mainnet genesis"
+        )
+        return
+
+    result = run(["bash", str(script)])
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("the production genesis did not build, boot and finalize")
+        for line in output.splitlines()[-15:]:
+            print(f"    {line}")
+        return
+
+    summary = next(
+        (line.split("PASS — ", 1)[1] for line in output.splitlines() if "PASS — " in line),
+        "production genesis builds, boots and finalizes",
+    )
+    ok(summary)
+
+
 # ── 4. Critical runtime & pallet test suites ─────────────────────────────────
+
 
 TEST_PACKAGES = [
     # Each entry: (cargo-flag, pkg-name, features-list)
@@ -490,6 +526,7 @@ def main() -> int:
     check_chain_runs()
     check_validators_agree()
     check_chain_spec_artifacts()
+    check_production_genesis()
     check_test_suites()
     check_runtime_upgrade_rehearsal()
     check_reproducible_build_prereqs()

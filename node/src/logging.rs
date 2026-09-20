@@ -15,13 +15,21 @@ pub fn init() {
     // Defer logging setup entirely to the CLI/runner. The runner initializes
     // logging and tracing subscribers in the correct order to avoid conflicts.
 
-    // Colorful startup banner with ASCII art (ANSI color) — visible even if logger is overridden
-    println!("\n\x1b[1;35m");
-    println!("       ________          __                ");
-    println!("___  __\\_____  \\  ______/  |______ _______ ");
-    println!("\\  \\/  / _(__  < /  ___|   __\\__  \\\\_  __ \\");
-    println!(r" >    < /       \\\___ \ |  |  / __ \|  | \/");
-    println!("/__/\\_Y______  /____  >|__| (____  /__|   ");
-    println!("     \\/      \\/     \\/           \\/       ");
-    println!("\x1b[0m\x1b[36m\n🚀  X3 Chain Node — syncing the mesh ⚡️\x1b[0m\n");
+    // Colorful startup banner with ASCII art (ANSI color) — visible even if
+    // logger is overridden.
+    //
+    // On **stderr**: stdout is the data channel for the subcommands whose output
+    // is meant to be piped — `build-spec > spec.json`, `export-state`,
+    // `export-blocks`, `keys`. Printing the banner to stdout put the ASCII art
+    // in front of every generated chain spec, so the file started
+    // `{\n\n<esc>[1;35m` and no JSON parser would take it. Every spec in
+    // `chain-specs/` was produced by this command.
+    eprintln!("\n\x1b[1;35m");
+    eprintln!("       ________          __                ");
+    eprintln!("___  __\\_____  \\  ______/  |______ _______ ");
+    eprintln!("\\  \\/  / _(__  < /  ___|   __\\__  \\\\_  __ \\");
+    eprintln!(r" >    < /       \\\___ \ |  |  / __ \|  | \/");
+    eprintln!("/__/\\_Y______  /____  >|__| (____  /__|   ");
+    eprintln!("     \\/      \\/     \\/           \\/       ");
+    eprintln!("\x1b[0m\x1b[36m\n🚀  X3 Chain Node — syncing the mesh ⚡️\x1b[0m\n");
 }

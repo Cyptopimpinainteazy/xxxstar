@@ -38,6 +38,140 @@ fn account_to_hex32(account: &str) -> Result<String, String> {
     Ok(format!("0x{}", hex::encode(public.as_ref() as &[u8])))
 }
 
+// ── Key management ──────────────────────────────────────────────────────────
+//
+// `keys generate|verify|insert|list` used to print "In a full implementation,
+// this would use sp_core crypto / For now, show a placeholder" and exit 0. That
+// is worse than an error on the mainnet path it exists for: `install-validator.sh`
+// and `scripts/mainnet/genesis_ceremony.sh` both tell an operator to run these
+// commands to produce the Aura/GRANDPA authorities that go into
+// `X3_PRODUCTION_AUTHORITIES`, and `production_config()` refuses to build a
+// genesis without those keys. A command that prints advice and succeeds leaves
+// the operator with no key and an empty `--seed` file.
+
+/// The block-authoring/finality key types this CLI understands.
+///
+/// `aura` and `imonline` are sr25519; `grandpa` is ed25519. The four-character
+/// forms (`aura`, `gran`, `imon`) are what `KeyTypeId` stores in the keystore,
+/// so both spellings are accepted and the long ones are not silently truncated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeyScheme {
+    Sr25519,
+    Ed25519,
+}
+
+struct KeyTypeSpec {
+    /// The 4-byte keystore key type (`aura`, `gran`, `imon`).
+    key_type: sp_core::crypto::KeyTypeId,
+    scheme: KeyScheme,
+}
+
+fn resolve_key_type(name: &str) -> Result<KeyTypeSpec, String> {
+    use sp_core::crypto::KeyTypeId;
+    let (id, scheme) = match name.to_ascii_lowercase().as_str() {
+        "aura" => (KeyTypeId(*b"aura"), KeyScheme::Sr25519),
+        "grandpa" | "gran" => (KeyTypeId(*b"gran"), KeyScheme::Ed25519),
+        "imonline" | "imon" => (KeyTypeId(*b"imon"), KeyScheme::Sr25519),
+        other => {
+            return Err(format!(
+                "unknown key type '{other}': expected aura, grandpa or imonline \
+                 (or the 4-character keystore ids aura, gran, imon)"
+            ))
+        }
+    };
+    Ok(KeyTypeSpec {
+        key_type: id,
+        scheme,
+    })
+}
+
+/// Derive a public key from a secret URI, in the scheme that key type uses.
+fn public_from_suri(scheme: KeyScheme, suri: &str) -> Result<Vec<u8>, String> {
+    use sp_core::{crypto::SecretStringError, Pair};
+    match scheme {
+        KeyScheme::Sr25519 => sp_core::sr25519::Pair::from_string(suri, None)
+            .map(|p| p.public().0.to_vec())
+            .map_err(|e: SecretStringError| format!("invalid sr25519 secret URI: {e:?}")),
+        KeyScheme::Ed25519 => sp_core::ed25519::Pair::from_string(suri, None)
+            .map(|p| p.public().0.to_vec())
+            .map_err(|e: SecretStringError| format!("invalid ed25519 secret URI: {e:?}")),
+    }
+}
+
+/// Generate a fresh keypair and return `(public, secret_seed_hex)`.
+///
+/// The secret is returned because a generated key that the operator cannot save
+/// is a key the operator cannot use: `keys generate` without `--seed` has to
+/// disclose the seed or it has done nothing.
+fn generate_keypair(scheme: KeyScheme) -> (Vec<u8>, String) {
+    use sp_core::Pair;
+    match scheme {
+        KeyScheme::Sr25519 => {
+            let (pair, seed) = sp_core::sr25519::Pair::generate();
+            (pair.public().0.to_vec(), format!("0x{}", hex::encode(seed)))
+        }
+        KeyScheme::Ed25519 => {
+            let (pair, seed) = sp_core::ed25519::Pair::generate();
+            (pair.public().0.to_vec(), format!("0x{}", hex::encode(seed)))
+        }
+    }
+}
+
+/// Render a 32-byte public key as SS58 (prefix 42, the default the SDK's
+/// `from_ss58check` reads and the one `X3_PRODUCTION_AUTHORITIES` expects).
+fn public_to_ss58(public: &[u8]) -> Result<String, String> {
+    if public.len() != 32 {
+        return Err(format!("public key must be 32 bytes, got {}", public.len()));
+    }
+    use sp_core::crypto::Ss58Codec;
+    let mut raw = [0u8; 32];
+    raw.copy_from_slice(public);
+    Ok(sp_runtime::AccountId32::from(raw).to_ss58check())
+}
+
+/// Parse `--public` the way the other commands accept accounts: SS58 or hex.
+fn parse_public_key(value: &str) -> Result<Vec<u8>, String> {
+    if let Some(hex_part) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        let bytes = hex::decode(hex_part).map_err(|e| format!("invalid hex public key: {e}"))?;
+        if bytes.len() != 32 {
+            return Err(format!(
+                "hex public key must be 32 bytes, got {}",
+                bytes.len()
+            ));
+        }
+        return Ok(bytes);
+    }
+    use sp_core::crypto::Ss58Codec;
+    let account = sp_runtime::AccountId32::from_ss58check(value)
+        .map_err(|e| format!("invalid SS58 public key: {e}"))?;
+    Ok((account.as_ref() as &[u8]).to_vec())
+}
+
+/// Where a `keys insert`/`keys list` writes when `--keystore-path` is absent.
+///
+/// This is the path a running node uses for the same `--base-path`/`--chain`:
+/// `<base-path>/chains/<chain-id>/keystore` (see `BasePath::config_dir`). The
+/// base path defaults to the same project directory the node itself defaults to,
+/// so the operator does not have to reproduce it by hand.
+fn default_keystore_path(
+    base_path: &Option<std::path::PathBuf>,
+    chain: &Option<String>,
+) -> Result<std::path::PathBuf, String> {
+    use sc_service::config::BasePath;
+    // Same default the node itself computes: a `BasePath` built from the
+    // executable name, then `chains/<chain-id>` inside it.
+    let base = match base_path {
+        Some(p) => BasePath::new(p.clone()),
+        None => BasePath::from_project("", "", "x3-chain-node"),
+    };
+    let chain_id = chain.clone().unwrap_or_else(|| "dev".to_string());
+    let spec = crate::chain_spec::load_spec(&chain_id)?;
+    Ok(base.config_dir(spec.id()).join("keystore"))
+}
+
 /// Entry point that runs the CLI and dispatches the requested command.
 pub fn run() -> CliResult<()> {
     // Initialize colorful logger with emojis
@@ -576,97 +710,151 @@ pub fn run() -> CliResult<()> {
             match &cmd.command {
                 KeysSubcommand::Generate {
                     key_type,
-                    seed: _,
+                    seed,
                     output,
                 } => {
-                    info!("Generating keypair...");
-                    info!("  Key Type: {}", key_type);
-                    info!("  Output:   {}", output);
+                    let spec = resolve_key_type(key_type)?;
 
-                    println!("\n=== Key Generation ===");
-                    println!("Key Type:  {}", key_type);
-                    println!("Output:    {}", output);
-                    println!();
+                    // With `--seed` the operator already holds the secret, so the
+                    // output is the public key only. Without it a fresh keypair is
+                    // generated here and the secret is printed, because a key the
+                    // operator cannot save is a key the operator cannot use.
+                    let (public, generated_secret) = match seed {
+                        Some(suri) => (public_from_suri(spec.scheme, suri)?, None),
+                        None => {
+                            let (public, secret) = generate_keypair(spec.scheme);
+                            (public, Some(secret))
+                        }
+                    };
+                    let ss58 = public_to_ss58(&public)?;
 
-                    // In a full implementation, this would use sp_core crypto
-                    // For now, show a placeholder
-                    println!("--- Generated Keypair ---");
-                    println!("Note: Full key generation requires sp_core integration.");
-                    println!("Use `subkey` tool for production key generation:");
-                    println!("  subkey generate --scheme sr25519");
-                    println!();
-                    println!("Key type mapping:");
-                    println!("  aura    -> sr25519 (block authoring)");
-                    println!("  grandpa -> ed25519 (finality)");
-                    println!("  imonline -> sr25519 (heartbeat)");
+                    match output.to_ascii_lowercase().as_str() {
+                        "ss58" => {
+                            println!("{ss58}");
+                        }
+                        "hex" => {
+                            println!("0x{}", hex::encode(&public));
+                        }
+                        "json" => {
+                            let scheme = match spec.scheme {
+                                KeyScheme::Sr25519 => "sr25519",
+                                KeyScheme::Ed25519 => "ed25519",
+                            };
+                            let mut obj = serde_json::json!({
+                                "keyType": key_type,
+                                "scheme": scheme,
+                                "publicKey": format!("0x{}", hex::encode(&public)),
+                                "ss58Address": ss58,
+                            });
+                            if let Some(secret) = &generated_secret {
+                                obj["secretSeed"] = serde_json::Value::String(secret.clone());
+                            }
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&obj)
+                                    .map_err(|e| format!("could not render JSON: {e}"))?
+                            );
+                        }
+                        other => {
+                            return Err(format!(
+                                "unknown --output '{other}': expected ss58, hex or json"
+                            )
+                            .into())
+                        }
+                    }
 
+                    if let Some(secret) = generated_secret {
+                        // stderr, so `--output json` stays machine-readable on stdout.
+                        eprintln!();
+                        eprintln!("SAVE THIS SECRET — it is not recoverable and is not stored:");
+                        eprintln!("  {secret}");
+                    }
+                    eprintln!();
+                    eprintln!("SS58 address (use this in X3_PRODUCTION_AUTHORITIES): {ss58}");
                     Ok(())
                 }
                 KeysSubcommand::Insert {
                     key_type,
-                    seed: _,
+                    seed,
                     keystore_path,
                 } => {
-                    info!("Inserting key into keystore...");
-                    info!("  Key Type: {}", key_type);
-                    if let Some(path) = keystore_path {
-                        info!("  Keystore: {:?}", path);
-                    }
-
-                    println!("\n=== Key Insertion ===");
-                    println!("Key Type:  {}", key_type);
-                    if let Some(path) = keystore_path {
-                        println!("Keystore:  {:?}", path);
-                    } else {
-                        println!("Keystore:  (default)");
-                    }
-                    println!();
-
-                    // In a full implementation, this would insert into the keystore
-                    println!("--- Key Insertion ---");
-                    println!("Note: Full keystore insertion requires node integration.");
-                    println!("Use the node's keystore directly or `subkey` for testing.");
-
+                    let spec = resolve_key_type(key_type)?;
+                    let path = match keystore_path {
+                        Some(p) => p.clone(),
+                        None => default_keystore_path(
+                            &cli.run.shared_params.base_path,
+                            &cli.run.shared_params.chain,
+                        )?,
+                    };
+                    let public = public_from_suri(spec.scheme, seed)?;
+                    let keystore = sc_keystore::LocalKeystore::open(path.clone(), None)
+                        .map_err(|e| format!("could not open keystore {path:?}: {e}"))?;
+                    use sp_keystore::Keystore as _;
+                    keystore.insert(spec.key_type, seed, &public).map_err(|_| {
+                        format!(
+                            "the keystore refused this {key_type} key: the secret URI is \
+                                 not valid for the {} scheme (use `keys verify` to check it)",
+                            match spec.scheme {
+                                KeyScheme::Sr25519 => "sr25519",
+                                KeyScheme::Ed25519 => "ed25519",
+                            }
+                        )
+                    })?;
+                    println!("{}", public_to_ss58(&public)?);
+                    eprintln!("inserted {} key into {}", key_type, path.display());
                     Ok(())
                 }
                 KeysSubcommand::List { keystore_path } => {
-                    info!("Listing keystore contents...");
-                    if let Some(path) = keystore_path {
-                        info!("  Keystore: {:?}", path);
+                    let path = match keystore_path {
+                        Some(p) => p.clone(),
+                        None => default_keystore_path(
+                            &cli.run.shared_params.base_path,
+                            &cli.run.shared_params.chain,
+                        )?,
+                    };
+                    let keystore = sc_keystore::LocalKeystore::open(path.clone(), None)
+                        .map_err(|e| format!("could not open keystore {path:?}: {e}"))?;
+                    use sp_keystore::Keystore as _;
+                    println!("keystore: {}", path.display());
+                    let mut total = 0usize;
+                    for name in ["aura", "grandpa", "imonline"] {
+                        let spec = resolve_key_type(name)?;
+                        let keys = keystore
+                            .keys(spec.key_type)
+                            .map_err(|e| format!("could not read {name} keys: {e}"))?;
+                        for key in &keys {
+                            println!("{name}: {}", public_to_ss58(key)?);
+                        }
+                        total += keys.len();
                     }
-
-                    println!("\n=== Keystore Contents ===");
-                    if let Some(path) = keystore_path {
-                        println!("Keystore:  {:?}", path);
-                    } else {
-                        println!("Keystore:  (default)");
+                    if total == 0 {
+                        println!("(no keys in this keystore)");
                     }
-                    println!();
-
-                    // In a full implementation, this would list keys from the keystore
-                    println!("--- Keys ---");
-                    println!("Note: Full keystore listing requires node integration.");
-
                     Ok(())
                 }
                 KeysSubcommand::Verify {
                     key_type,
                     public,
-                    seed: _,
+                    seed,
                 } => {
-                    info!("Verifying keypair...");
-                    info!("  Key Type: {}", key_type);
-                    info!("  Public:   {}", public);
-
-                    println!("\n=== Keypair Verification ===");
-                    println!("Key Type:  {}", key_type);
-                    println!("Public:    {}", public);
-                    println!();
-
-                    // In a full implementation, this would verify the keypair
-                    println!("--- Verification ---");
-                    println!("Note: Full key verification requires sp_core integration.");
-
+                    let spec = resolve_key_type(key_type)?;
+                    let derived = public_from_suri(spec.scheme, seed)?;
+                    let claimed = parse_public_key(public)?;
+                    if derived == claimed {
+                        println!("MATCH {key_type} {}", public_to_ss58(&derived)?);
+                    } else {
+                        // A mismatch is the answer this command exists to give, so it
+                        // exits non-zero: a shell `keys verify || die` must fail.
+                        eprintln!(
+                            "MISMATCH\n  --public: {}\n  derived:  {}",
+                            public_to_ss58(&claimed)?,
+                            public_to_ss58(&derived)?
+                        );
+                        return Err(format!(
+                            "the secret does not derive the supplied {key_type} public key"
+                        )
+                        .into());
+                    }
                     Ok(())
                 }
             }
@@ -1010,4 +1198,96 @@ fn make_rpc_call(
         .get("result")
         .cloned()
         .ok_or_else(|| "No result in response".to_string())
+}
+
+#[cfg(test)]
+mod key_command_tests {
+    use super::*;
+
+    /// `//Alice`'s canonical keys. These are the values every Substrate tool
+    /// prints for the dev phrase, so they pin the derivation to the SDK's
+    /// rather than to "something 32 bytes long".
+    const ALICE_AURA_PUBLIC_HEX: &str =
+        "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d";
+    const ALICE_GRANDPA_PUBLIC_HEX: &str =
+        "88dc3417d5058ec4b4503e0c12ea1a0a89be200fe98922423d4334014fa6b0ee";
+    const ALICE_AURA_SS58: &str = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
+    const ALICE_GRANDPA_SS58: &str = "5FA9nQDVg267DEd8m1ZypXLBnvN7SFxYwV7ndqSYGiN9TTpu";
+
+    #[test]
+    fn key_type_aliases_resolve_to_the_keystore_ids() {
+        for (name, expected_id, expected_scheme) in [
+            ("aura", *b"aura", KeyScheme::Sr25519),
+            ("AURA", *b"aura", KeyScheme::Sr25519),
+            ("grandpa", *b"gran", KeyScheme::Ed25519),
+            ("gran", *b"gran", KeyScheme::Ed25519),
+            ("imonline", *b"imon", KeyScheme::Sr25519),
+            ("imon", *b"imon", KeyScheme::Sr25519),
+        ] {
+            let spec = resolve_key_type(name).expect("alias should resolve");
+            assert_eq!(spec.key_type.0, expected_id, "{name} key type id");
+            assert_eq!(spec.scheme, expected_scheme, "{name} scheme");
+        }
+
+        // A typo must not silently become a key: the old code accepted any
+        // string and printed advice.
+        for bad in ["", "sudos", "grnd", "aura2"] {
+            assert!(
+                resolve_key_type(bad).is_err(),
+                "{bad:?} must not resolve to a key type"
+            );
+        }
+    }
+
+    #[test]
+    fn dev_phrase_derives_the_canonical_authority_keys() {
+        let aura = public_from_suri(KeyScheme::Sr25519, "//Alice").expect("aura key");
+        assert_eq!(hex::encode(&aura), ALICE_AURA_PUBLIC_HEX);
+        assert_eq!(public_to_ss58(&aura).unwrap(), ALICE_AURA_SS58);
+
+        let grandpa = public_from_suri(KeyScheme::Ed25519, "//Alice").expect("grandpa key");
+        assert_eq!(hex::encode(&grandpa), ALICE_GRANDPA_PUBLIC_HEX);
+        assert_eq!(public_to_ss58(&grandpa).unwrap(), ALICE_GRANDPA_SS58);
+    }
+
+    #[test]
+    fn ss58_and_hex_forms_of_the_same_key_agree() {
+        let from_ss58 = parse_public_key(ALICE_AURA_SS58).expect("ss58 form");
+        let from_hex = parse_public_key(&format!("0x{ALICE_AURA_PUBLIC_HEX}")).expect("hex form");
+        assert_eq!(from_ss58, from_hex);
+        assert_eq!(hex::encode(&from_ss58), ALICE_AURA_PUBLIC_HEX);
+
+        // Wrong length and wrong alphabet are rejected, not truncated.
+        assert!(parse_public_key("0xdead").is_err());
+        assert!(parse_public_key("not-an-address").is_err());
+        assert!(public_to_ss58(&[0u8; 31]).is_err());
+    }
+
+    #[test]
+    fn a_generated_key_is_reproducible_from_the_secret_it_prints() {
+        // `keys generate` without `--seed` must hand back a secret that derives
+        // the same public key, or the operator cannot re-insert the key later.
+        let (public, secret) = generate_keypair(KeyScheme::Sr25519);
+        assert_eq!(public.len(), 32);
+        let rederived = public_from_suri(KeyScheme::Sr25519, &secret).expect("secret re-derives");
+        assert_eq!(rederived, public);
+
+        let (public, secret) = generate_keypair(KeyScheme::Ed25519);
+        let rederived = public_from_suri(KeyScheme::Ed25519, &secret).expect("secret re-derives");
+        assert_eq!(rederived, public);
+    }
+
+    #[test]
+    fn default_keystore_path_matches_the_layout_a_running_node_uses() {
+        let base = Some(std::path::PathBuf::from("/tmp/x3-keys-default-test"));
+        let path = default_keystore_path(&base, &Some("dev".to_string())).expect("dev keystore");
+        assert_eq!(
+            path,
+            std::path::PathBuf::from("/tmp/x3-keys-default-test/chains/x3_chain_dev/keystore")
+        );
+
+        // An unknown chain id is a path, and a path that does not exist must
+        // surface as an error rather than as a keystore in a made-up directory.
+        assert!(default_keystore_path(&base, &Some("/nonexistent/spec.json".into())).is_err());
+    }
 }

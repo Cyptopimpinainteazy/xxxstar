@@ -70,6 +70,7 @@ sc-basic-authorship = { workspace = true }
 sc-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sc-cli = { workspace = true }
 sc-client-api = { workspace = true }
+sc-keystore = { workspace = true }
 sc-consensus = { workspace = true }
 sc-consensus-aura = { workspace = true }
 sc-consensus-grandpa = { workspace = true }
