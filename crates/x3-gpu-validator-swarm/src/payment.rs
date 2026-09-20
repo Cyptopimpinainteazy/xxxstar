@@ -37,10 +37,10 @@ pub struct RewardRate {
 impl Default for RewardRate {
     fn default() -> Self {
         Self {
-            base_rate: 1000, // 0.001 X3
+            base_rate: 1000,                     // 0.001 X3
             verification_bonus_per_mille: 1_500, // 1.5×
             divergence_penalty_per_mille: 500,   // 0.5×
-            min_stake: 1000000, // 1 X3
+            min_stake: 1000000,                  // 1 X3
         }
     }
 }
@@ -722,7 +722,9 @@ mod tests {
 
         // 1000 * 1001 / 1000 == 1001. Under the float form this was 1000.
         assert_eq!(
-            payment.calculate_reward(&record).expect("no overflow at this size"),
+            payment
+                .calculate_reward(&record)
+                .expect("no overflow at this size"),
             1001,
             "a 1.001x bonus must be 1.001x, not 1.000x"
         );
