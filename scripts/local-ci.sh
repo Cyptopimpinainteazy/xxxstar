@@ -223,7 +223,13 @@ GATES_FAST=(
   # crate and `axum::Server`, none of which the manifest declares or which
   # axum 0.7 still has). The library and binary are covered; its tests are a
   # recorded follow-up rather than something this gate pretends to check.
-  "nested workspaces:for d in crates/x3-swarm-core services/x3-swarm-api services/x3-swarm-worker services/x3-solvency-sidecar; do echo \"== \$d\"; CARGO_TARGET_DIR=\"/tmp/x3-nested-\$(basename \"\$d\")\" cargo check --locked --all-targets --manifest-path \"\$d/Cargo.toml\" || exit 1; done; echo '== crates/x3-sidecar (lib+bin only; its tests are a follow-up)'; CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo check --locked --manifest-path crates/x3-sidecar/Cargo.toml || exit 1"
+  # `crates/x3-sidecar` runs its tests too. Until this change its manifest
+  # declared no `[lib]` target at all, so the eleven-module library (and the e2e
+  # test that links it) was never compiled; now that it is, the gate checks and
+  # runs every target. `SKIP_WASM_BUILD=1` because the library pulls `x3-rpc` for
+  # its types, which pulls the runtime — this check needs the types, not the
+  # embedded blob, and the blob is built by the root workspace gates anyway.
+  "nested workspaces:for d in crates/x3-swarm-core services/x3-swarm-api services/x3-swarm-worker services/x3-solvency-sidecar; do echo \"== \$d\"; CARGO_TARGET_DIR=\"/tmp/x3-nested-\$(basename \"\$d\")\" cargo check --locked --all-targets --manifest-path \"\$d/Cargo.toml\" || exit 1; done; echo '== crates/x3-sidecar (all targets; runtime wasm skipped)'; SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml || exit 1"
   # `AGENTS.md` asks for `pnpm test`, `pnpm build` and `npm test` before any
   # task is called complete. Nothing in this harness ran any of them, and
   # nothing else did either: **412 tests across twelve JS projects** had never
