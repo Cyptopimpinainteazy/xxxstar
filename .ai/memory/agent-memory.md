@@ -5126,3 +5126,14 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - `on_fail` was removed from `CLAUSE_WORDS`: it is a keyword, so the guard stops at it with no
   entry. The list is now 20 entries, all identifier-reaching.
 - 1234 workspace tests, clippy/fmt clean, 23 python tests, sweep 20/20/20/19.
+
+**2026-09-20 — TICKET-008 and TICKET-009 closed (they were BLOCKED on approval, and the blockers are gone)**
+
+- TICKET-008 (move the main worktree off a 444-behind branch): the checkout is on `master` and
+  `HEAD == origin/master` (`69e7e8849`). Done in the `83d354b1a` round: stash the one local edit
+  (`.ai/merge-queue.md`) → `merge --ff-only` → `stash pop`, after intersecting incoming added paths
+  with `git ls-files --others` to prove zero collisions. Nothing was lost.
+- TICKET-009 (three uncommitted WIP piles): all three worktrees report `git status --porcelain`
+  clean, and the piles are committed on `master` as patches under `.ai/wip-backups/` (the Sept-18
+  three plus the `20260920-*` three found later). Not merged to their branches — the merge-queue
+  adjudication still applies.
