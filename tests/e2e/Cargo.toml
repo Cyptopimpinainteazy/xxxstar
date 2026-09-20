@@ -16,6 +16,15 @@ bench = false
 [[test]]
 name = "cross_vm_real_chain_test"
 path = "cross_vm_real_chain_test.rs"
+# **Deliberate, not automatic.** This suite boots an ephemeral node and drives a real chain, so
+# it needs a built `x3-chain-node` — a prerequisite `cargo test --workspace` cannot supply, and
+# which made that command abort with six panics rather than report a missing prerequisite
+# (TICKET-103). Gated on a feature so the workspace run neither builds it nor *silently skips*
+# it: a test that quietly does nothing is the thing this repository treats as a claim. Run it
+# on purpose, with a node built or `X3_NODE_BIN` set:
+#
+#   cargo test -p e2e_tests --features real-chain --test cross_vm_real_chain_test -- --nocapture
+required-features = ["real-chain"]
 
 [[test]]
 name = "gateway_integration_test"
@@ -29,7 +38,15 @@ required-features = []
 [[test]]
 name = "live_internal_mainnet_e2e"
 path = "live_internal_mainnet_e2e.rs"
-required-features = []
+# Same prerequisite as the real-chain suite, and the same no-op gate it had: `required-features
+# = []` requires nothing, so `cargo test --workspace` ran this and it panicked four times for a
+# missing node binary (TICKET-103). The *suite* stays mandatory — it refuses rather than skips
+# when it runs without a node, which is the right behaviour for a live-chain suite — but it is
+# asked for rather than assumed:
+#
+#   cargo build -p x3-chain-node
+#   cargo test -p e2e_tests --features real-chain --test live_internal_mainnet_e2e -- --nocapture
+required-features = ["real-chain"]
 
 [[test]]
 name = "internal_mainnet_happy_path"
@@ -45,6 +62,8 @@ required-features = []
 [features]
 default = []
 full_e2e = []
+# The real-chain suite's prerequisite, as a feature so it is asked for rather than assumed.
+real-chain = []
 
 [dependencies]
 tokio = { version = "1.0", features = ["full", "net", "time"] }
