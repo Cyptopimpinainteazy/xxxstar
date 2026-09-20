@@ -230,7 +230,21 @@ def check_chain_spec_artifacts() -> None:
                 if not isinstance(data, dict) or "genesis" not in data:
                     fail(f"{rel} is valid JSON but missing 'genesis' key")
                 else:
-                    ok(f"{rel} valid genesis spec")
+                    # Parsing is not loading. `genesis.runtime` is the pre-`runtimeGenesis`
+                    # format and the node rejects it outright:
+                    #   unknown variant `runtime`, expected one of `raw`, `stateRootHash`, `runtimeGenesis`
+                    # That is how a shipped plain spec sat in this repository unable
+                    # to start a chain.
+                    genesis = data["genesis"]
+                    expected = "raw" if rel.endswith("-raw.json") else "runtimeGenesis"
+                    if expected not in genesis:
+                        fail(
+                            f"{rel} is in a format this node does not load: genesis has "
+                            f"{sorted(genesis)} but the node expects '{expected}'. "
+                            "Regenerate with `x3-chain-node build-spec --chain local3`."
+                        )
+                    else:
+                        ok(f"{rel} valid genesis spec (genesis.{expected})")
             except (json.JSONDecodeError, ValueError):
                 fail(f"{rel} is not valid JSON")
 
@@ -244,6 +258,43 @@ def check_chain_spec_artifacts() -> None:
             fail("production_config() not found in node/src/chain_spec.rs")
     else:
         fail("node/src/chain_spec.rs not found")
+
+
+def check_shipped_genesis_boots() -> None:
+    """The genesis this repository ships has to start a network.
+
+    `check_chain_spec_artifacts` parses the files; a spec can parse and still be
+    rejected by the node (that is exactly what the old `genesis.runtime` format
+    did). And one node cannot decide it either: with three GRANDPA authorities a
+    solo node holds 1/3 of the set, below the 2/3 needed to finalize, so it looks
+    like a broken spec when it is not. This stage boots **three** validators on
+    the shipped file and requires a finalized, agreed height.
+    """
+    print("\n── 3c. The shipped genesis boots a network ──")
+    script = ROOT / "scripts" / "local-network-smoke.sh"
+    spec = ROOT / "chain-specs" / "x3-local3-current-plain.json"
+    if not script.exists():
+        fail("scripts/local-network-smoke.sh is missing — nothing boots the shipped genesis")
+        return
+    if not spec.exists():
+        fail(f"{spec.relative_to(ROOT)} is missing — nothing to boot")
+        return
+
+    result = run(
+        ["bash", str(script)],
+        env={**node_binary_env(), "X3_NETWORK_SMOKE_CHAIN_SPEC": str(spec)},
+    )
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("the genesis this repository ships did not start a three-validator network")
+        for line in output.splitlines()[-15:]:
+            print(f"    {line}")
+        return
+    summary = next(
+        (line.split("PASS — ", 1)[1] for line in output.splitlines() if "PASS — " in line),
+        "three validators finalized and agreed on the shipped genesis",
+    )
+    ok(f"shipped genesis: {summary}")
 
 
 def check_validator_install() -> None:
@@ -623,6 +674,7 @@ def main() -> int:
     check_validators_agree()
     check_validator_install()
     check_chain_spec_artifacts()
+    check_shipped_genesis_boots()
     check_production_genesis()
     check_test_suites()
     check_panic_ratchet()
