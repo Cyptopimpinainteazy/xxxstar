@@ -175,10 +175,19 @@ pub fn verify_svm_validator_quorum(
             .map(|(_, s)| *s)
             .ok_or(SvmProofError::UnknownSigner { pubkey: *pubkey })?;
 
-        // Verify Ed25519 signature
-        // Note: In production, use ed25519-dalek. Here we use the
-        // ed25519 crate for no_std compatibility.
-        #[cfg(any(test, feature = "std"))]
+        // Verify the Ed25519 signature.
+        //
+        // This used to be `#[cfg(any(test, feature = "std"))]` with no `else`, so in a
+        // build without `std` and not under `test` — which is the **runtime's wasm build** —
+        // the gate removed the verification and the loop went straight on to
+        // `signed_stake += stake`. A quorum was then reached on stakes whose signatures had
+        // never been checked, and the `signature` binding was unused, which is the warning
+        // that pointed here. `ed25519-dalek` is `no_std` with `alloc` — the feature set this
+        // crate already declares for it — so the gate was never needed, and a validator
+        // quorum that counts an unverified signature is a forgeable one.
+        //
+        // It was invisible until the `no_std` build compiled at all: with 244 errors from
+        // the feature gating (TICKET-082) nobody could reach this path.
         {
             use ed25519_dalek::{Signature as DalekSig, Verifier, VerifyingKey};
             let vk = VerifyingKey::from_bytes(pubkey)
@@ -227,6 +236,7 @@ pub fn verify_svm_validator_quorum(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
 
     fn test_validator_set() -> Vec<ValidatorEntry> {
         vec![
@@ -260,10 +270,17 @@ mod tests {
         ];
 
         let result = verify_svm_validator_quorum(&msg, &set, &signatures, 1, 3);
-        // Should fail because the signature is fake
-        assert!(
-            result.is_err() || result.is_ok(),
-            "signature verification should be attempted"
+        // The signature is fake, so this must be refused — and *which* refusal is the point.
+        //
+        // This assertion used to be `result.is_err() || result.is_ok()`, which is true for
+        // every value, under a message saying "signature verification should be attempted".
+        // It was the one test whose subject is a fake signature and it could not fail, which
+        // is what let the `no_std` build count an unverified signature's stake toward the
+        // quorum (TICKET-092).
+        assert_eq!(
+            result,
+            Err(SvmProofError::InvalidSignature { pubkey: [0x01u8; 32] }),
+            "a fake signature must be refused, and refused as an invalid signature"
         );
     }
 
@@ -348,6 +365,45 @@ mod tests {
         assert!(
             result.is_err(),
             "empty signatures should fail on insufficient stake"
+        );
+    }
+
+    /// A signature that is well formed and does **not** verify is refused, even when the
+    /// signer's stake alone would clear the threshold.
+    ///
+    /// This is the forgery the removal of the `no_std` gate opened.
+    /// `verify_svm_validator_quorum` used to carry `#[cfg(any(test, feature = "std"))]`
+    /// around the Ed25519 check with no `else`, so a build without `std` and not under
+    /// `test` — the runtime's wasm build — skipped it and went straight to
+    /// `signed_stake += stake`. A proof naming any validator and carrying any 64 bytes
+    /// reached the quorum (TICKET-092).
+    ///
+    /// The fixture matters: the signer is a real validator of the set, the signature is made
+    /// by a real key, and only the *message* is wrong. Nothing but the verification can
+    /// refuse this, so a future `cfg` gate or a deleted check fails here rather than in a
+    /// runtime. The final assertion is the other half — the same signer over the right
+    /// message does reach the threshold — so the test cannot pass by the fixture being
+    /// unusable.
+    #[test]
+    fn a_signature_that_does_not_verify_is_refused_even_when_the_stake_would_reach_quorum() {
+        let key = SigningKey::from_bytes(&[0x07u8; 32]);
+        let pubkey = key.verifying_key().to_bytes();
+        let mut set = test_validator_set();
+        set[0].pubkey = pubkey;
+
+        let msg = [0xabu8; 32];
+        let wrong = key.sign(b"not the message this proof is about");
+        assert_eq!(
+            verify_svm_validator_quorum(&msg, &set, &[(pubkey, wrong.to_bytes())], 1, 3),
+            Err(SvmProofError::InvalidSignature { pubkey }),
+            "a quorum must not be reached on a signature that does not verify"
+        );
+
+        let right = key.sign(&msg);
+        assert!(
+            verify_svm_validator_quorum(&msg, &set, &[(pubkey, right.to_bytes())], 1, 3).is_ok(),
+            "the same signer over the right message must reach the threshold, or this test is \
+             refusing the fixture rather than the forgery"
         );
     }
 }

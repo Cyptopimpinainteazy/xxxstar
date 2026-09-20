@@ -7,14 +7,28 @@ description = "X3 Cross-Chain Intent System — user-facing intent language, com
 
 [features]
 default = ["std"]
-std = ["serde/std", "hex/alloc", "sha2/std", "x3-verification-router/std"]
+# The `std` feature is what the graph switches on; the two features below are **not** here
+# because the code cannot do without them. TICKET-082 measured what happened when they were:
+# `cargo check -p x3-crosschain-intent --no-default-features` failed with **244 errors** —
+# 230 `the trait bound String: serde::Deserialize is not satisfied` and 13
+# `cannot find function hex::encode` — because this crate's only `std`-gated items were the
+# very dependency features every path needs. The crate is `#![cfg_attr(not(feature = "std"),
+# no_std)]` and is in the runtime's wasm graph through `pallet-x3-settlement-engine`, which
+# depends on it with `default-features = false`, so "off" is a configuration that has to
+# build.
+std = ["serde/std", "sha2/std", "x3-verification-router/std"]
 
 [dependencies]
-serde = { version = "1.0", default-features = false, features = ["derive"] }
+# `alloc` is not optional: `serde`'s `String`/`Vec` impls live behind it, and this crate
+# deserializes both on every path. See the note on the `std` feature.
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 thiserror = { version = "2.0", default-features = false }
 sha2 = { version = "0.10", default-features = false }
 sha3 = { version = "0.10", default-features = false }
-hex = { version = "0.4", default-features = false }
+# `hex::encode` is an `alloc` API and this crate calls it unconditionally, so the feature
+# is declared here rather than hung off `std` — which is what made it unreachable in the
+# configuration the wasm graph builds (TICKET-082).
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ed25519-dalek = { version = "2.1", default-features = false, features = ["alloc"] }
 # The canonical Merkle Patricia Trie receipt verifier. This crate used to carry its
 # own "verification" for EVM receipts, which decoded a receipt, hashed the caller's
