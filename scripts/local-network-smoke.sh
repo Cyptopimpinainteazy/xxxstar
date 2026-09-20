@@ -10,10 +10,20 @@
 #
 #   ./scripts/local-network-smoke.sh
 #   X3_NODE_BIN=/path/to/x3-chain-node ./scripts/local-network-smoke.sh
+#   X3_NETWORK_SMOKE_CHAIN_SPEC=chain-specs/x3-local3-current-raw.json \
+#     ./scripts/local-network-smoke.sh
+#
+# By default this uses the *built-in* `local3` chain, which proves consensus
+# works. Setting `X3_NETWORK_SMOKE_CHAIN_SPEC` boots that genesis **file**
+# instead, which is the different question a release has to answer: can the spec
+# this repository ships actually start a three-validator network? (One node
+# cannot answer it — with three GRANDPA authorities a solo node is 1/3 of the set,
+# below the 2/3 needed to finalize, which looks like a broken spec and is not.)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+CHAIN_SPEC="${X3_NETWORK_SMOKE_CHAIN_SPEC:-}"
 BASE_DIR="$(mktemp -d)"
 LOG_DIR="$(mktemp -d)"
 BASE_PORT="${X3_SMOKE_NETWORK_BASE_PORT:-$(( 21000 + RANDOM % 8000 ))}"
@@ -72,7 +82,7 @@ start_node() {  # start_node <name> <key-seed> <rpc-port> <p2p-port> <prom-port>
   # `--alice`/`--bob`/`--charlie` shortcuts add *session* keys only — without an
   # explicit `--node-key` the node fails with
   # `NetworkKeyNotFound(.../network/secret_ed25519)`.
-  "$NODE_BIN" --chain local3 --base-path "$BASE_DIR/$name" \
+  "$NODE_BIN" --chain "${CHAIN_SPEC:-local3}" --base-path "$BASE_DIR/$name" \
     --rpc-port "$rpc_port" --port "$p2p_port" --prometheus-port "$prom_port" \
     --no-mdns --node-key "$(node_key_for "$key_seed")" "$@" >"$LOG_DIR/$name.log" 2>&1 &
   NODE_PIDS+=("$!")
