@@ -1,0 +1,37 @@
+diff --git a/.ai/workspace-membership-baseline.txt b/.ai/workspace-membership-baseline.txt
+index fae813479..d67487e43 100644
+--- a/.ai/workspace-membership-baseline.txt
++++ b/.ai/workspace-membership-baseline.txt
+@@ -9,6 +9,5 @@
+ 
+ loom-concurrency
+ pallet-x3-control
+-pallet-x3-governance
+ x3-mobile-sdk
+ x3-pq
+diff --git a/Cargo.toml b/Cargo.toml
+index f445247af..a56d0c726 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -28,6 +28,21 @@ exclude = [
+     # dylint libraries need a nightly toolchain (`#![feature(rustc_private)]`);
+     # it is excluded until a nightly is available for its own gate.
+     "crates/dylint-determinism",
++    # `pallets/x3-governance` is a superseded duplicate of the two governance
++    # pallets the runtime actually runs — `pallets/governance`
++    # (`pallet-governance`, wired in `construct_runtime!`) and
++    # `pallets/treasury` (`pallet-treasury`, multi-signer spending tracks with
++    # per-track thresholds) — kept as an artifact rather than deleted, and
++    # excluded rather than made a member so nothing builds a second governance
++    # system. It is not a candidate for the membership burn-down: three of its
++    # four source files (`proposal_manager.rs`, `treasury.rs`,
++    # `voting_engine.rs`) are not declared as modules in its `lib.rs`, so they
++    # compile nowhere even after its manifest is repaired, and that manifest
++    # pins abandoned crates.io Substrate versions (`sp-core 29`, `sp-runtime 33`)
++    # against the workspace's polkadot-sdk `stable2512`. Its `[[test]]
++    # governance_integration` points at a `tests/integration_tests.rs` that does
++    # not exist. See issue #332.
++    "pallets/x3-governance",
+ ]
+ members = [
+     "pallets/x3-kernel",
