@@ -5112,3 +5112,17 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - TICKET-113: delete the seven dead duplicate arms (method in the ticket). Cheapest is to add a
   source-scanning test that fails for any `Tok::Ident(ref s) if s == w` where `w` is a lexer keyword
   with a `Tok::Kw*` mapping — that makes the class impossible to reintroduce.
+
+**2026-09-20 — TICKET-113 closed (same pass)**
+
+- The seven dead arms are deleted; `no_arm_matches_an_identifier_for_a_lexer_keyword`
+  (`compiler/tests/test_keyword_clauses.rs`) now fails for any such arm. It reads the lexer's
+  keyword table **and** `keyword_to_tok`: the dead words are the *intersection*, because `timeout`
+  is a lexer keyword with no `Tok::Kw*` arm and therefore arrives as an identifier (my first test
+  version wrongly flagged four `timeout` arms).
+- The scanner reads the first quoted word after `Tok::Ident(ref`, so a dead half hidden behind a
+  live one — `requirement || require` — is invisible to it. Found by reading; the test is a floor,
+  not a proof of absence.
+- `on_fail` was removed from `CLAUSE_WORDS`: it is a keyword, so the guard stops at it with no
+  entry. The list is now 20 entries, all identifier-reaching.
+- 1234 workspace tests, clippy/fmt clean, 23 python tests, sweep 20/20/20/19.

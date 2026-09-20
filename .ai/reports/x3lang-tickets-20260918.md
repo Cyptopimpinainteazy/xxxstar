@@ -4421,9 +4421,37 @@ Measured after: `receipt execute examples/arb_scope.x3` refuses honestly
 program) and a trading program's receipt still verifies. Validation: x3-lang `cargo test --workspace`
 **1218 passed / 0 failed** (1216 before); clippy `-D warnings` and fmt clean; sweep 19/19/19/18.
 
-## TICKET-113 — seven more arms match an identifier for a word the lexer reserves — OPEN
-Type: OPEN, cleanup · Subsystem: x3-lang/compiler/parser
-Reason: TICKET-046 closed three clauses whose arms could never run because they tested
+## TICKET-113 — seven more arms match an identifier for a word the lexer reserves — CLOSED
+Type: CLOSED in `16aa716b4` (2026-09-20), filed and fixed in the same pass · Subsystem:
+x3-lang/compiler/parser
+**Closed: the seven arms are deleted, and the shape is now a test failure rather than a note.**
+`no_arm_matches_an_identifier_for_a_lexer_keyword` reads the lexer's keyword table and
+`keyword_to_tok` out of their own sources — the words that reach the parser as keyword tokens are
+the intersection, not the lexer's list alone, which is what makes it precise: `timeout` is a lexer
+keyword with **no** `Tok::Kw*` arm, so it falls back to `Tok::Ident` and its arms are live and must
+stay. The first version of the test got that wrong and reported four `timeout` arms; the fix is
+recorded here because the same trap is waiting for anyone who reads only the lexer.
+
+Deleted: `bridge` in `parse_trade_stmt`; `swap`/`bridge`/`lock`/`mint`/`burn`/`release` in both the
+choice-path step loop and `parse_route_step`; `on_fail` in `parse_intent_clause`; `require` in
+`parse_rpc_quorum_item`; and the dead `require` half of `requirement || require` in
+`parse_finality_policy_item` (the scanner could not see that one — it reads the first quoted word
+after `Tok::Ident(ref` — so it was found by looking rather than by the test).
+`fallback` stays and is now the only bare identifier in that dispatcher, which is correct: it is the
+one route operation the lexer does not reserve.
+
+The test's second assertion found one more thing while it was being written: **`on_fail` was in
+`CLAUSE_WORDS`, which is redundant.** It is `Tok::KwOnFail`, a keyword cannot begin an expression,
+and a valueless guard therefore stops at it with no entry — which is the rule the const's own doc
+states. Removed, so the list now contains only words that reach the parser as identifiers (measured:
+21 entries, exactly one redundant).
+
+Proof: 1234 workspace tests (was 1233), clippy `-D warnings`, fmt clean, 23 python tests, sweep
+`20/20/20/19`.
+
+Original entry below, kept because the measurement method is what a future scan should start from.
+
+Original Reason: TICKET-046 closed three clauses whose arms could never run because they tested
 `Tok::Ident(ref s) if s == "<word>"` for a word the lexer sends as a keyword token. The same shape
 survives in seven places where a `Tok::Kw*` arm in the same match does the work, so nothing is
 broken — but an unreachable arm is what let the three broken ones look correct for as long as they

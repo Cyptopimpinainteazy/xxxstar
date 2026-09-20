@@ -133,3 +133,28 @@ ledger entry for TICKET-046 carry the intended text. Not corrected by
 force-pushing: rewriting a pushed `master` while other agents are working on it
 is the hazard `git cherry` exists to avoid, and a commit message is not worth
 that.
+
+## TICKET-113 closed in the same pass — the class is now a test
+
+The seven duplicate arms are deleted, and the shape they belong to is now impossible to
+reintroduce: `no_arm_matches_an_identifier_for_a_lexer_keyword` reads the lexer's keyword
+table and `keyword_to_tok` from their own sources and fails for any
+`Tok::Ident(ref s) if s == <word>` where the word arrives as a keyword token.
+
+Two things it caught while being written, both worth recording:
+
+- **The intersection, not the lexer's list.** The first version reported four `timeout` arms as
+  dead. `timeout` *is* a lexer keyword (`token.rs:594`) but has **no** `Tok::Kw*` arm, so
+  `keyword_to_tok` falls back to `Tok::Ident` and those arms are live — which is what the
+  ticket ledger said in the first place ("`timeout` was assumed to be a keyword; the parser's
+  own clause arm is `Tok::Ident(\"timeout\")`"). Reading only the lexer gives the wrong answer;
+  the rule is the intersection of the two tables.
+- **`on_fail` was in `CLAUSE_WORDS` and did not need to be.** It is `Tok::KwOnFail`, a keyword
+  cannot begin an expression, and the guard stops at it with no entry — the const's own doc
+  says exactly that. Removed: the list is now 20 entries, all of which reach the parser as
+  identifiers.
+
+A third site was invisible to the scanner and was found by reading:
+`requirement || require` in `parse_finality_policy_item`. The scanner reports the first quoted
+word after `Tok::Ident(ref`, so the dead half hid behind the live one. That is the limit of a
+textual scan, and it is why the test is a floor rather than a proof of absence.
