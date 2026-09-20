@@ -254,6 +254,15 @@ GATES_LIVE=(
 
 GATES_VARIANTS=(
   "runtime variant dry-runs:bash scripts/check-runtime-variants.sh"
+  # `cargo check --workspace` builds every crate *with* its default features, so a crate
+  # whose own declaration says it can be `no_std` and cannot be stays invisible. TICKET-082
+  # measured one of those at 244 errors, and behind it TICKET-092: a
+  # `#[cfg(any(test, feature = "std"))]` around an Ed25519 check with no `else`, so the
+  # runtime's wasm configuration counted a validator's stake without verifying anything.
+  # The gate derives its list from the `no_std` posture itself and checks each crate
+  # **alone**, because cargo unifies features across a graph — a single invocation with
+  # every crate passed to it passed with TICKET-082 deliberately reintroduced.
+  "no-default-features crates:bash scripts/check-no-default-features.sh"
 )
 
 GATES_RELEASE=(
