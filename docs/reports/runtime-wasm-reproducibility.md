@@ -78,6 +78,21 @@ one whose `setCode`/`BLAKE2_256` a release would attest to.
 * **Does not:** prove the hash is the one an *audited* release commits to.
   Updating the record is part of cutting a release, and an audit is a separate
   step.
+
+## Re-attesting
+
+Any change that alters the runtime's bytes invalidates the record, and the
+release gate will say so. Re-recording it is one command:
+
+```bash
+./scripts/update-runtime-hashes.sh          # build twice, then rewrite the record
+./scripts/update-runtime-hashes.sh --check  # build twice, write nothing
+```
+
+It clears srtool's target directory between the two builds, compares every
+field, and refuses to write anything if they disagree — a disagreement is a
+reproducibility failure, not a stale record. Run it in the same change that
+alters the runtime, so the record and the code land together.
 * Toolchain note: the image must be able to build this dependency graph. Both
   `1.75.0` (the previous pin) and `1.88.0` refuse with
   `enum-ordinalize@4.4.2 requires rustc 1.89`.
