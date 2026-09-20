@@ -3,7 +3,11 @@
 //! Classifies tasks by their execution determinism guarantees:
 //! - **FullyDeterministic**: Identical output on all validators (deterministic algorithms)
 //! - **BlockStateDeterministic**: Output depends on block state (valid for blockchain)
-//! - **ProbabilisticBounded**: Output varies but within bounded variance (ML models)
+//! - **ProbabilisticBounded**: Output varies but within bounded variance (ML
+//!   models). [`verify_deterministic_output`] **refuses** this tier: a
+//!   byte-level comparison cannot establish a numeric variance bound, and the
+//!   check that used to stand in for one accepted arbitrary outputs (see the
+//!   comment on that arm)
 //! - **NonDeterministic**: No execution guarantees (external services, randomness)
 //!
 //! Used to validate proof outputs against execution commitments.
@@ -66,32 +70,25 @@ pub fn verify_deterministic_output<T: Encode>(
             }
         }
         DeterminismTier::ProbabilisticBounded => {
-            // Output variance is acceptable within bounds
-            // This is a simplified check: in production, compare numerical variance
-            let actual_bytes = actual_output.encode();
-            let actual_hash = blake2_256(&actual_bytes);
-
-            if let Some(variance_percent) = spec.variance_bound_percent {
-                // Simplified: if variance <= variance_percent, accept
-                // Real implementation would compute statistical distance
-                // For now: accept if hash is close (within Hamming distance threshold)
-                let expected_bytes = spec.canonical_output_bytes.as_slice();
-                let expected_hash = blake2_256(expected_bytes);
-
-                // Compute Hamming distance between hashes
-                let hamming_distance = actual_hash
-                    .iter()
-                    .zip(expected_hash.iter())
-                    .filter(|(a, b)| a != b)
-                    .count();
-
-                // Accept if Hamming distance is within variance threshold
-                // (32 bytes * 8 bits = 256 bits; variance_percent as fraction)
-                let threshold = ((256 * variance_percent as usize) / 100).max(1);
-                hamming_distance <= threshold
-            } else {
-                false // Must have variance bound
-            }
+            // Refused, not guessed.
+            //
+            // This used to accept an output when the Hamming distance between
+            // `blake2_256(actual)` and `blake2_256(canonical)` was within
+            // `variance_bound_percent` of 256 bits. A hash is an avalanche
+            // function: two nearly identical numbers differ in about half of
+            // their bits, and two unrelated outputs land anywhere. The check
+            // therefore measured nothing about the output — at
+            // `variance_bound_percent = 50` it accepted roughly half of all
+            // byte strings — while reading like a numeric tolerance test.
+            //
+            // A bounded *numeric* variance needs the numeric contract (which
+            // field of the output, in what units, with what tolerance). This
+            // pallet has no such contract: it is generic over `T: Encode`. Use
+            // `DeterminismTier::FullyDeterministic` with `output_hash` when a
+            // byte-exact comparison is what is meant; until a typed comparator
+            // exists, this tier refuses every output rather than accepting the
+            // ones that happen to hash "close".
+            false
         }
         DeterminismTier::NonDeterministic => {
             // Accept any output (no determinism constraints)
@@ -145,6 +142,71 @@ mod tests {
 
         assert!(verify_deterministic_output(&spec, &42u64));
         assert!(verify_deterministic_output(&spec, &0u64));
+    }
+
+    /// The probabilistic tier refuses, including when the output is exactly the
+    /// expected one.
+    ///
+    /// The check it replaces compared the Hamming distance between
+    /// `blake2_256(actual)` and `blake2_256(canonical)` with a threshold, which
+    /// has nothing to do with numeric variance: at
+    /// `variance_bound_percent = 50` the threshold was half of 256 bits, and two
+    /// unrelated outputs land within it about half the time.
+    #[test]
+    fn probabilistic_tier_refuses_rather_than_measuring_hashes() {
+        let expected = 1_000_000i64;
+        let spec = TaskDeterminismSpec {
+            tier: DeterminismTier::ProbabilisticBounded,
+            output_hash: None,
+            variance_bound_percent: Some(50),
+            canonical_output_bytes: expected.encode(),
+        };
+
+        // The exact expected value, a value 1% away, and a wildly different one
+        // are all refused: there is no comparator that could tell them apart.
+        assert!(!verify_deterministic_output(&spec, &expected));
+        assert!(!verify_deterministic_output(&spec, &(expected + 10_000)));
+        assert!(!verify_deterministic_output(&spec, &i64::MIN));
+    }
+
+    /// A tier with no variance bound was already refused; keep that pinned.
+    #[test]
+    fn probabilistic_tier_without_a_bound_is_refused() {
+        let spec = TaskDeterminismSpec {
+            tier: DeterminismTier::ProbabilisticBounded,
+            output_hash: None,
+            variance_bound_percent: None,
+            canonical_output_bytes: 42u64.encode(),
+        };
+
+        assert!(!verify_deterministic_output(&spec, &42u64));
+    }
+
+    /// The two byte-exact tiers keep working.
+    #[test]
+    fn byte_exact_tiers_still_decide_on_the_hash() {
+        let output = 7u64;
+
+        for tier in [
+            DeterminismTier::FullyDeterministic,
+            DeterminismTier::BlockStateDeterministic,
+        ] {
+            let matching = TaskDeterminismSpec {
+                tier,
+                output_hash: Some(blake2_256(&output.encode())),
+                variance_bound_percent: None,
+                canonical_output_bytes: output.encode(),
+            };
+            assert!(verify_deterministic_output(&matching, &output));
+
+            let mut wrong = matching.clone();
+            wrong.output_hash = Some(blake2_256(&8u64.encode()));
+            assert!(!verify_deterministic_output(&wrong, &output));
+
+            let mut missing = matching.clone();
+            missing.output_hash = None;
+            assert!(!verify_deterministic_output(&missing, &output));
+        }
     }
 
     #[test]
