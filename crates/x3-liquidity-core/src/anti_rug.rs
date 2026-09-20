@@ -240,7 +240,8 @@ impl LpLockRegistry {
         // property that matters.
         const THIRTY_DAYS_SECONDS: u64 = 30 * 24 * 3600;
         let duration_score = if lock_duration > 0 {
-            let ratio = (u128::from(lock_duration).ilog2() * 20) / u128::from(THIRTY_DAYS_SECONDS).ilog2();
+            let ratio =
+                (u128::from(lock_duration).ilog2() * 20) / u128::from(THIRTY_DAYS_SECONDS).ilog2();
             ratio.min(20)
         } else {
             0
@@ -312,8 +313,16 @@ mod tests {
     fn the_duration_term_is_integer_arithmetic_with_a_reachable_maximum() {
         // 30 days is the documented ceiling, and it has to be reachable — a maximum the
         // heuristic can never award is a bug in the heuristic.
-        assert_eq!(fully_locked_for(30 * 86_400), 100, "a 30-day lock is the maximum");
-        assert_eq!(fully_locked_for(1), 80, "a one-second lock contributes nothing");
+        assert_eq!(
+            fully_locked_for(30 * 86_400),
+            100,
+            "a 30-day lock is the maximum"
+        );
+        assert_eq!(
+            fully_locked_for(1),
+            80,
+            "a one-second lock contributes nothing"
+        );
         // And it is monotonic in the duration: more lock is never worse.
         let scores: Vec<u8> = [1u64, 3_600, 86_400, 604_800, 2_592_000]
             .iter()
@@ -353,7 +362,9 @@ mod tests {
         // And a supply whose scaling overflows is scored at the ceiling rather than wrapped:
         // an unrepresentable share is not a small one.
         let mut registry = LpLockRegistry::new();
-        registry.lock([1u8; 32], 7, u128::MAX / 2, 30 * 86_400).expect("lock");
+        registry
+            .lock([1u8; 32], 7, u128::MAX / 2, 30 * 86_400)
+            .expect("lock");
         let result = registry
             .compute_rug_score(7, u128::MAX, 0, 0, 0, 31 * 86_400)
             .expect("the pool is scoreable");

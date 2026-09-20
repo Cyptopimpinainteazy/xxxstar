@@ -279,7 +279,9 @@ mod tests {
         // quorum (TICKET-092).
         assert_eq!(
             result,
-            Err(SvmProofError::InvalidSignature { pubkey: [0x01u8; 32] }),
+            Err(SvmProofError::InvalidSignature {
+                pubkey: [0x01u8; 32]
+            }),
             "a fake signature must be refused, and refused as an invalid signature"
         );
     }
