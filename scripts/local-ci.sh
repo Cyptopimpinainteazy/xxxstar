@@ -268,7 +268,11 @@ GATES_LIVE=(
   # other, finalize, and agree on the canonical hash at a finalized height.
   "local network smoke:bash scripts/local-network-smoke.sh"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
-  "SVM contract lifecycle:programs/svm/x3_atomic_swap/test-live-lifecycle.sh"
+  # `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54 …` internally, and
+  # `+toolchain` only works through the rustup shim — which this script puts
+  # behind the pinned toolchain directory on purpose. Put the shim back in front
+  # for this gate, or the build dies with "no such command: `+…`".
+  "SVM contract lifecycle:env PATH=\"$HOME/.cargo/bin:$PATH\" programs/svm/x3_atomic_swap/test-live-lifecycle.sh"
 )
 
 GATES_VARIANTS=(
