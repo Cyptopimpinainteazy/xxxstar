@@ -4847,3 +4847,36 @@ Acceptance criteria: a module whose artifact weight for its own operations excee
 refused with both figures; one at the cap is accepted; the count is per module.
 Validation: the measurement above, turned around — `max_gas 1` refused by name — plus a
 two-module control that is not refused.
+
+## TICKET-119 — the bridge formatter deleted its clauses, and the parser dropped a refund's receiver — CLOSED
+Type: CLOSED in `a4fcd2a10` (2026-09-20), filed and fixed in the same pass · Subsystem: x3-lang/compiler (formatter + parser)
+Found by auditing every declaration field against the formatter that writes it (`format_*`), which is
+the audit that produced the annotations and the `resources` block. Two defects, one clause apart:
+- **`format_bridge` wrote only the statement body.** A bridge with a replay-protection nonce guard and
+  a refund path came back with neither: 36 bytes (9 ops) before formatting, 20 bytes (5 ops) after, no
+  `REQUIRE` records. `format_atomic_swap` carries a comment about this exact fix one declaration over
+  ("Emitting only the statement body turned a swap with an amount, a hashlock and two deadlines into a
+  swap with none of them"); the bridge writer never got it.
+- **`parse_failure_action`'s refund arm read `refund <expr>` and stopped**, so
+  `refund ethereum.USDC to sender` left `to sender` as two expression statements that lower to nothing.
+  The receiver never reached the action and the formatter wrote the residue back:
+  `on_fail refund ethereum.USDC;` + `to;` + `sender;`. It reads the whole clause now and folds it the
+  way the intent path folds it (`chain.ASSET:receiver`), which is the one shape `refund_target` splits.
+Three tests, including the corpus's own statement spelling and an artifact-equality assertion across
+the round trip.
+
+## TICKET-120 — a program may state two failure actions and the parser keeps one silently — OPEN
+Type: OPEN, design decision · Subsystem: x3-lang/compiler (parser)
+Reason: a declaration may state `on_timeout <dur> <action>` and `on_fail <action>` together, and the
+AST holds **one** action for both clauses: `parse_bridge_item`/`parse_atomic_swap_item` do
+`if on_fail.is_none() { on_fail = Some(action) }`, so the first action stated wins and a second,
+different one is discarded without a word. Measured: `bridge b ethereum.USDC to solana.USDC { on_fail
+halt on_timeout 30s refund solana.USDC to bob }` builds, and the refund the program wrote reaches no
+field. The formatter is affected too: it must write an action in the `on_timeout` clause (the parser
+requires one) and writes the same one it writes for `on_fail`, which round-trips but reads oddly.
+The decision is what two stated actions mean — refuse the pair (the shape the language uses for every
+other contradiction), keep the last, or give the timeout its own field — and it is not guessable from
+the phase text. A `#[serde(default)]`-safe field split would let both travel.
+Acceptance criteria: a program stating two different actions is either refused with both named, or
+both reach the artifact; the same action stated twice stays accepted (the formatter writes that).
+Validation: the measured program above, plus a round trip of the accepted case.

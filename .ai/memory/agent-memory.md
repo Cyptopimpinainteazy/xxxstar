@@ -5358,3 +5358,17 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   refuse after a format round trip, which catches the drop even when a non-binding cap would hide it.
 - `StrategyResources` carries `#[serde(default)]` on the strategy field, so an AST stored before it
   existed still loads (TICKET-067's rule).
+
+**2026-09-20 — the formatter/parser clause audit: a bridge lost its guards, a refund lost its receiver**
+
+- The audit that works: for every declaration struct field, check whether the formatter's `format_*`
+  references it. It found the annotations, the `resources` block, and now `format_bridge` — which wrote
+  only the statement body, deleting a bridge's `requires`/`on_timeout`/`on_fail` (36 → 20 bytes).
+  `format_atomic_swap` had the fix and the comment; the sibling did not.
+- **A clause's parser must consume the whole clause.** `parse_failure_action`'s refund arm read
+  `refund <expr>`, leaving `to <receiver>` as two no-op statements — the receiver never reached the
+  action and `x3c fmt` wrote `to;`/`sender;`. It folds `chain.ASSET:receiver` now, the shape
+  `formatter::refund_target` splits and the intent path already produced.
+- Careful with multi-clause ASTs: `on_timeout` fills `on_fail` when it is unset, so the formatter
+  writes the action in both lines (the parser requires one on `on_timeout`) — round-trip exact, and the
+  silent-discard case is TICKET-120.
