@@ -1,0 +1,1561 @@
+{
+  "baseline": "6822fd373b8ea1851fdf528744de5d3c5eb6fe70",
+  "note": "Ancestry inventory only; requires_review does not prove unique changes or conflicts. This candidate combines five branch tips. Rust verification blocked because cargo is unavailable.",
+  "branches": [
+    {
+      "branch": "add-slippage",
+      "sha": "6cffd44d9629991a4a97d21d67ab74de7a82ae7d",
+      "status": "requires_review"
+    },
+    {
+      "branch": "agents/pasted-text-processing",
+      "sha": "09a6221de1e32575ba92090323510ab6c59bddf6",
+      "status": "requires_review"
+    },
+    {
+      "branch": "agents/setup-instructions-request",
+      "sha": "e36db2320052f49e4d20581b2929b5fde12944ce",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/codex/x3-economic-safety-kernel",
+      "sha": "0c75dab0656bdb4028a4689e161b79173b8d0236",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/codex/x3-trading-core-v1-hardening",
+      "sha": "5df7d70b9b465ef81564e4b49e93d94acbce13f3",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/docs/merge-queue-production-gate-lean",
+      "sha": "69d66ac9131b4e6d63f13a6216f4e99623a2dcd7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "archive/local-20260920/feat/canonical-cross-domain-proof-bundle-20260911",
+      "sha": "a44b13fb5037753c64cab957f18f0309aa33516c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/feat/idempotent-cross-domain-coordinator-20260911",
+      "sha": "d126a41652665d6fcabece015373b2269f550193",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/feat/live-feature-matrix-20260912",
+      "sha": "e6c6b09e8dd3d905131edcb7220bc7ceb6033efb",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/feat/live-secret-release-firewall-20260911",
+      "sha": "a10ac597cdd284fa2b5247fab645c9141ccde73c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/feat/settlement-proofset-gate-20260911",
+      "sha": "c1d8ba790bcae071bbe2e30cbd86d900959995cc",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/feat/x3-lang-crosschain-integration-20260909",
+      "sha": "ef83d056619dafa76e1f5bdda758672d050b0379",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/finish/x3vm-live-transport",
+      "sha": "921f81d64e1f2d2f628e47c69b1384b9bed6d10a",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/finish/x3vm-live-transport-fix",
+      "sha": "42f9a2d77a960d091c109d47c0823de1a259bb9f",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/local-20260920/fix/x3lang-frame-classification",
+      "sha": "ea0294fb82851bd92f901f3e4f1c6940253bc1b7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "archive/local-20260920/fix/x3lang-proof-vocabulary",
+      "sha": "c5a7ab1e08544b363066f9d9ee7682fcda53fd59",
+      "status": "already_merged"
+    },
+    {
+      "branch": "archive/local-20260920/test/cross-domain-refund-recovery-20260911",
+      "sha": "29a3dcaff7201f65376b4d4f112a297e6fdd38f3",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/pr126-pre-master-rewrite-20260909",
+      "sha": "326158250ddafc2659cccb7457ea77eafadeaee2",
+      "status": "requires_review"
+    },
+    {
+      "branch": "archive/stale-x3lang-trading-wip-20260918",
+      "sha": "5862ce19341e883601000558a17b44c86e8a2324",
+      "status": "requires_review"
+    },
+    {
+      "branch": "batch/20260918T175104Z",
+      "sha": "841cdeb603f2544dc4d0fce2a165e69cd69b7902",
+      "status": "already_merged"
+    },
+    {
+      "branch": "batch/20260918T2015Z",
+      "sha": "ee83dd0be836e371c08b94fd3ae735e3d8e86659",
+      "status": "requires_review"
+    },
+    {
+      "branch": "build/atomic-swap-no-std-port",
+      "sha": "4557cc0c0d46d4aaa6fa92904f1677aea05d8eae",
+      "status": "already_merged"
+    },
+    {
+      "branch": "build/make-runtime-upgrade-real",
+      "sha": "177d62960b7a0b5d07146c6daa4a6215a74798b2",
+      "status": "already_merged"
+    },
+    {
+      "branch": "build/re-attest-603398a38",
+      "sha": "d70b6761f70ca149815637f37e4310032115b200",
+      "status": "already_merged"
+    },
+    {
+      "branch": "build/re-attest-runtime-hash",
+      "sha": "9e5897b341472f6eb90a2f5ba11baa5c6b30c27a",
+      "status": "already_merged"
+    },
+    {
+      "branch": "build/srtool-reproducible-wasm",
+      "sha": "9d40ba9e82217b4af2751b0e6eb7afce67ad96d0",
+      "status": "already_merged"
+    },
+    {
+      "branch": "build/verify-reproducible-hash",
+      "sha": "5288b50865488348b4f9282fccbae1be7a351e00",
+      "status": "already_merged"
+    },
+    {
+      "branch": "chore/exclude-superseded-governance",
+      "sha": "1e7919e912c0be6bb26a265555b5f21cb491fda6",
+      "status": "already_merged"
+    },
+    {
+      "branch": "chore/reqwest-0.12-rust-highs",
+      "sha": "87ec241f6158c300fc9d2236f2fcb2102df19663",
+      "status": "already_merged"
+    },
+    {
+      "branch": "chore/wire-orphan-runtime-tests",
+      "sha": "be7303fee6658bc450021b2735be3eac4fea92ed",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/cap-cargo-parallelism",
+      "sha": "4b897996a95154e2bd3ae4e20e9bda7196551d94",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/consolidate-workflows-20260910",
+      "sha": "4b1ed18b509dd2782773fbdec083c6cfe28255c6",
+      "status": "requires_review"
+    },
+    {
+      "branch": "ci/cross-domain-gates",
+      "sha": "c4990a72e1504275b64066fe8ada41dc26f3f949",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/dedupe-live-triggers",
+      "sha": "6fcd2db07558e81c73f3ebc9a581966645dd043e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/foundry-crate-test-gate-110",
+      "sha": "43589bd53798aba27641f5d7cd24d05d789ddcba",
+      "status": "requires_review"
+    },
+    {
+      "branch": "ci/harden-self-hosted-jobs",
+      "sha": "2043f6d16635250d7be9a8ac847bd9d4ddc88435",
+      "status": "requires_review"
+    },
+    {
+      "branch": "ci/local-ci-improvements",
+      "sha": "64110babe6dc49593a961f704dce18c18ddf6887",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/local-ci-known-red",
+      "sha": "d3004afe802e1981c08a5f3eb82b44ed2fcee68e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/local-ci-make-targets",
+      "sha": "401d27756dbbe5b8f00aa1ae48ee2a881c6cd0c9",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/local-ci-of-record",
+      "sha": "50cc169b36412bc37589d7083133106adb5bed62",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/local-ci-pytest-gate",
+      "sha": "f0c0618ec0c257b9ff87d6d190d855a49c90b2b7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/local-ci-release-gate",
+      "sha": "eff1291cccba020d101901dcc70fca7a3c9a6188",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/local-ci-runtime-variants",
+      "sha": "a85bd2a31e635a13bf7fc6037d19530cb1236f32",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/local-ci-slug-case",
+      "sha": "1eac9b005a36280878ac0c6b27704a102afd8733",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/local-network-smoke",
+      "sha": "c5468aa18775b7ac5c65ebea92a5b2c5473b841e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/master-lineage-gates-20260908",
+      "sha": "7b84e002f1471723d2af9f486a95166f9744cf80",
+      "status": "requires_review"
+    },
+    {
+      "branch": "ci/path-filter-heavy-gates-20260910",
+      "sha": "1e9446c37229df59fa11fa053e3245872437a25a",
+      "status": "requires_review"
+    },
+    {
+      "branch": "ci/production-gate-dispatch",
+      "sha": "0f997972ddb698046b5d7833effebf60490a5944",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/route-live-gates-to-local-runner",
+      "sha": "e207ebfb6c9782a5be477f91bdbb3110c76d96b5",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/route-more-workflows-self-hosted",
+      "sha": "fb9a640dad153a99b7692725ec2387ce1798ab79",
+      "status": "requires_review"
+    },
+    {
+      "branch": "ci/runtime-hash-freshness",
+      "sha": "5fae6e1f0e5b5811718dc17e927e1eadb5a4ef2d",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/shared-cargo-target",
+      "sha": "71ad3a49fe9fc01d8d630b5ac77fdf3acf4a9cb1",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/stop-hosted-dead-triggers",
+      "sha": "0001200965823a0f36414d91e5ba349757cf02c8",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/svm-gate-rustup-shim",
+      "sha": "81bea1277602e566fc492f6bdfd7d102f6a96d12",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/workflow-audit",
+      "sha": "bef24d15f6415e90d752bbf9a24543732ae966b1",
+      "status": "already_merged"
+    },
+    {
+      "branch": "ci/x3-local-runner-smoke",
+      "sha": "b24d0d05c7f0195130c6ceff8e72ccb919d5c198",
+      "status": "requires_review"
+    },
+    {
+      "branch": "codex/chatgpt-mainnet-work",
+      "sha": "83bc5254fefefd645df48b1d519508b5212ed095",
+      "status": "already_merged"
+    },
+    {
+      "branch": "codex/x3-economic-safety-kernel",
+      "sha": "4aa67b8cc307adbb66cdbede1de7d93842ff8a41",
+      "status": "already_merged"
+    },
+    {
+      "branch": "codex/x3-trading-core-v1",
+      "sha": "03dc439412ced7cc060bd8fca04236b7d4d82dba",
+      "status": "already_merged"
+    },
+    {
+      "branch": "codex/x3-trading-core-v1-hardening",
+      "sha": "f46b1cbf3ff03a1d9b6588e37d7a07b363447d38",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/ark-ec-0.6.0",
+      "sha": "2cb3b22d916d1aecfbf0ec92f37383d78063542c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/ark-ff-0.6.0",
+      "sha": "9ece03653ad2724d05ec5375332b59cc61eb344a",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/ark-std-0.6.0",
+      "sha": "8c2c9d98ba86869860c6a7021715824df9043324",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/frame-benchmarking-cli-54f11b1",
+      "sha": "bcefcd21cbb664b1772387a7989a7f3eab533ef8",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/frame-support-54f11b1",
+      "sha": "35f5e44b731a682234bc1510e63473eec2f23af0",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/hex-literal-1.1.0",
+      "sha": "3950a6104b209ea562d20efb7ef8872b80f66403",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/libloading-0.9.0",
+      "sha": "a84b69d9e133854b38a03568bf60fd5dd76c9a8d",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/minicbor-2.3.0",
+      "sha": "b092c771c76541779d4def60429416b0a986201d",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/pallet-scheduler-54f11b1",
+      "sha": "4416fee9937fdadc055265d74e98860b8aa65fca",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/pallet-staking-54f11b1",
+      "sha": "d0a4786be37da115037f4cf83cc7749bbbbef48f",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/pallet-sudo-54f11b1",
+      "sha": "9c2ebb0691c73218acec34ec007d61141a57bf6f",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/redis-1.7.0",
+      "sha": "630141bc3cb87bf03bded92a36df7f963c60e259",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/sc-basic-authorship-54f11b1",
+      "sha": "6d58f6f73ee1dc4f2257b1c50f0770665c387051",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/sc-cli-54f11b1",
+      "sha": "a9bb9327e3ed53c09887d8bb281ec44570d9e417",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/sc-consensus-aura-54f11b1",
+      "sha": "65d9baac255a10bc048e7aa85d187f267b029802",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/sc-rpc-54f11b1",
+      "sha": "5551b1c90b224fd46c2affcca74db3341d9e81c5",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/sc-rpc-api-54f11b1",
+      "sha": "13de37ce7e1b36b75f45998bf7f973d2ce0c08b7",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/sp-keystore-54f11b1",
+      "sha": "131b04d5afea58aff3758894d41a5fd27decd555",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/cargo/sp-version-54f11b1",
+      "sha": "8731eab698f5496330e0a94a9e3f0b3fd53192cc",
+      "status": "requires_review"
+    },
+    {
+      "branch": "dependabot/pip/psycopg2-binary-gte-2.9.13",
+      "sha": "14b46f300cd6af77f4f2d6ff19102e04dc5c1d03",
+      "status": "requires_review"
+    },
+    {
+      "branch": "deps-batch-test",
+      "sha": "7c5b42acdab186a0edce8a8c556e688ff2004efd",
+      "status": "requires_review"
+    },
+    {
+      "branch": "deps-mod-test",
+      "sha": "56df3613e12e66c8c0777db78dcf2e263c6bda64",
+      "status": "requires_review"
+    },
+    {
+      "branch": "deps-mod-test-v2",
+      "sha": "3328f1c83e15cfd66daa356f9a9515577386580c",
+      "status": "already_merged"
+    },
+    {
+      "branch": "deps/batch-low-risk",
+      "sha": "7c5b42acdab186a0edce8a8c556e688ff2004efd",
+      "status": "requires_review"
+    },
+    {
+      "branch": "design/x3lang-root-compiler-bridge",
+      "sha": "61b5152c4f4a89ca9e27966598ea9e707e16a360",
+      "status": "requires_review"
+    },
+    {
+      "branch": "docs/grant-readiness-truth-20260908",
+      "sha": "f975eb54b3d49b72c104ffb3baeb07dc8fbc5102",
+      "status": "requires_review"
+    },
+    {
+      "branch": "docs/local-branch-triage",
+      "sha": "0ba161d16c3c85d591f0c5da7cf6c90d26ddc562",
+      "status": "already_merged"
+    },
+    {
+      "branch": "docs/local-ci-verification-discipline",
+      "sha": "1f8037c7b945ea43d141433113243bf0efb41364",
+      "status": "already_merged"
+    },
+    {
+      "branch": "docs/merge-queue-production-gate-lean",
+      "sha": "1a3cf115df4afee7a2248091dcb950fa843dceb7",
+      "status": "requires_review"
+    },
+    {
+      "branch": "docs/merge-queue-production-gate-prereq-verified",
+      "sha": "133855e57f84bd20036276a7e25362de015171c7",
+      "status": "requires_review"
+    },
+    {
+      "branch": "docs/readiness-score-reconciliation",
+      "sha": "90366faabd8f6b0465417641062571929cdf1978",
+      "status": "requires_review"
+    },
+    {
+      "branch": "docs/runtime-rehearsal-fidelity-note",
+      "sha": "b4e171ab9682c0fd07e7c3ec9ad0396c8063daf5",
+      "status": "already_merged"
+    },
+    {
+      "branch": "econsafety-kernel",
+      "sha": "4aa67b8cc307adbb66cdbede1de7d93842ff8a41",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/canonical-cross-domain-proof-bundle-20260911",
+      "sha": "c5994eed32e1f22a4504653c1308ef581497aeee",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/canonical-cross-domain-proof-bundle-20260911-pre-rebase-20260917",
+      "sha": "a44b13fb5037753c64cab957f18f0309aa33516c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "feat/concurrent-coordinator-serialization-20260911",
+      "sha": "86bc16c4a05ef51deed87446284fcdbeae62ab95",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/coordinator-attempt-ledger-20260911",
+      "sha": "715b181ff80a90d29185258ec9628b4932d377c7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/coordinator-proof-vault-20260911",
+      "sha": "7a744d0ddd89953a1ddf8bcde6ab721308601903",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/deterministic-recovery-reconciler-20260911",
+      "sha": "b4d3a0dcc952091921a16b9e856de84b241a1cc4",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/distributed-durable-fencing-20260911",
+      "sha": "75f67e921a90540f08b2aaea4678e374b5fbe65e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/idempotent-cross-domain-coordinator-20260911",
+      "sha": "dc3e75fd2bdda262a9825f40a7f058aae6c2e990",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/idempotent-cross-domain-coordinator-20260911-pre-rebase-20260917",
+      "sha": "d126a41652665d6fcabece015373b2269f550193",
+      "status": "requires_review"
+    },
+    {
+      "branch": "feat/live-feature-matrix-20260912",
+      "sha": "e7ed95cdb043c1a1385236564d482024284c7eaf",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/live-secret-release-firewall-20260911",
+      "sha": "42a7915df8a8eab580635080af78a836fc0d6b77",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/proof-bound-coordinator-settlement-20260911",
+      "sha": "4c57e2f0f97958b8f01a10fdcd758c3589421433",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/release-gate-runtime-rehearsal",
+      "sha": "bf257f4da9c5d8d257821f397af3722398e2c1df",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/secret-release-firewall-20260911",
+      "sha": "9ee04fd02632f0526c38efa5a017518d44c08505",
+      "status": "requires_review"
+    },
+    {
+      "branch": "feat/session-runtime-intent-binding-20260911",
+      "sha": "3b0f1a67e2a5dc744b593667534f5482fa17fee5",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/session-sharded-leases-20260911",
+      "sha": "7a574760dcbc02cfc60209408848a9111827141e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/settlement-chain-reconciliation-20260911",
+      "sha": "d9689cf873a755f4180ec559f98466321e80b993",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/settlement-proofset-gate-20260911",
+      "sha": "0121f43f7fd9f94391f20466879f462439870c2e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/settlement-submission-envelope-20260911",
+      "sha": "6f93010bcf5d70cf74aecebcdbcd33351973eb6c",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/settlement-submission-outbox-20260911",
+      "sha": "46788a09e6d17a77d5cdfb8c9d83820b3d9195e7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/solana-attestation-verifier",
+      "sha": "f42d2597e2703ad30b1e288a36b0ba05a0de0c69",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/svm-validator-set-wiring",
+      "sha": "eb9fa14c60d72a563304aac3521e1fdf90edf5be",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/trading-core-bridge-integration",
+      "sha": "fcc0d8f7874a38c18f71919bce21e5844cd286f8",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/trading-core-v1-hardening-part2",
+      "sha": "c706d4107146b973a98d392e4a00ef7549b377f7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/trading-core-v1-registry",
+      "sha": "6d11749cd7cec3aa5c8eab0126bbfc16025d7a7b",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/valkey-redis-fencing-backend-20260911",
+      "sha": "5f64dd0754ed8ad9d53fca5da2677b1c048e0a5d",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/x3-lang-crosschain-integration-20260909",
+      "sha": "1cf1570a714b2ed8162f216bea6e2d00efca51c0",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/x3-settlement-reconciliation-rpc-20260911",
+      "sha": "3e20b4249359955404ea472977533b582b288cdf",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/x3lang-effects-guarantees",
+      "sha": "d3eaa476394a7434ef56bde8164eb2e371577dc0",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/x3lang-guards-and-build-verification",
+      "sha": "aeddee6cf72d5ebc9bd828ead7d3a9f9d595e0e4",
+      "status": "already_merged"
+    },
+    {
+      "branch": "feat/x3vm-durable-recovery-20260911",
+      "sha": "824f8d96bc208030fa7bed12008431b9f9419509",
+      "status": "requires_review"
+    },
+    {
+      "branch": "finish/x3vm-live-transport",
+      "sha": "a2d6a78842a11c84ffae83fb5a62d4591999ddc1",
+      "status": "already_merged"
+    },
+    {
+      "branch": "finish/x3vm-live-transport-fix",
+      "sha": "440b963323066f2e1f59d0048922c8caeebd01d5",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix-x3lang-python",
+      "sha": "3d78fcf7b42861390673851f543ed84ecb8554b9",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/agent-guard-bip39-allow",
+      "sha": "48084d5622cf8c9594ccfd9ad6ee5cc0df13dee0",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/agent-law-real-policy-and-live-tests",
+      "sha": "3cd6d49e46c89d3bc342793ac30ea20ab0f9a5db",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/atomic-kernel-bond-accounting",
+      "sha": "e06b3ec9d7d09927c806873bfdbbbcf25a38087e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/bitcoin-spv-policy-claim",
+      "sha": "17a2821b4a97e51279f4838cf3f0021cd4b56f7d",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/bridge-evm-transfer-content-verification",
+      "sha": "5a6af9e3e34fb02fd78f0a2e457d8e01b5d79d56",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/btc-vault-honest-deposit-path",
+      "sha": "1e1d814178cd69506de87044ac9d400e49470da6",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/build-rs-ptr-arg",
+      "sha": "82737a4d54e8863d206af101c4c4fa0c9cbedd50",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/chronos-mempool-connections-refuse",
+      "sha": "f321e41d7e6f95d61d1a613c3d22f95bc47987ff",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/control-plane-vote-window-validation",
+      "sha": "ba733fd31bff39a754c0c69356163e17b72fb934",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/coordinator-durable-authority-shared-store",
+      "sha": "210ff0eaf2ddddb004ada65912191b883248f5ab",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/coordinator-gate-offline",
+      "sha": "a3dcc660b14556179fb2bc9dceb74cbb0f2b14d2",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/coordinator-settlement-outbox-partial-move",
+      "sha": "0c930d67cc5de071eed566528f5ddf7e13e447b1",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/custody-authorization-required",
+      "sha": "dccda7f8ca47d6b6037d98830482adbd7ef2226c",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/dev-variant-runtime-tests",
+      "sha": "73e45292f78586b828ab3e9fbdc8cbd1c7aa7783",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/do-not-cancel-master-gates",
+      "sha": "8f40d348a1eb0d9ebb5ab173a40a214661a14105",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/embedded-runtime-variant-guard",
+      "sha": "f5555eaea0ace6d68c0e5569923f9164f5394fa6",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/evm-lifecycle-honour-target-dir",
+      "sha": "b63aef570212c5d14b6645fbdb84bddb2efc921d",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/evm-live-foundry-anvil-collision",
+      "sha": "6dd47e7f3e994ae04d96309261c7a185de14906e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/external-chains-honest-adapters",
+      "sha": "f2ff298415e97b5d474743f6ab5ecbfc26520db1",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/fake-metrics-honesty",
+      "sha": "1e8f9eee27934751c332bf8418f8f320a80aa52b",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/forge-deps-idempotent",
+      "sha": "e866197598a2c362e573f24b4a070b0da65469fd",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/foundry-core-creator-fee-remainder",
+      "sha": "150b3babae56742e6004971955ac304d8b24ab3a",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/foundry-real-evm-deploy",
+      "sha": "ca2d833fc064221f1f97a27fbfd1c2bdb4dec4a8",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/governance-approval-tracking",
+      "sha": "b559970d0cf5c96fbc329ebcb34c7c2b868697b1",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/invariant-registry-gate",
+      "sha": "97f25c9c708d9811a93388f75ae75622403e9999",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/js-sdk-test-gate",
+      "sha": "aea553d01c0d22c2838cfafaf4d43f8228319dc0",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/kernel-authority-bounds",
+      "sha": "af6710c7e8f1d7d5558a6f06c0711ff3d61e35cf",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/live-x3vm-lifecycle-gate",
+      "sha": "8dd7f36ab83828706fda53af7615932de07035ca",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/loom-concurrency-gate",
+      "sha": "1476e109d4a2e77308e195e61492f55fc12bb364",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/loom-runner-rustup",
+      "sha": "9d40ba9e82217b4af2751b0e6eb7afce67ad96d0",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/master-trading-core-compile-break",
+      "sha": "f577f1cd43857b17fece879f5b1fa3429cf2a83c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/mock-adapter-gating-and-workspace-membership",
+      "sha": "fd6a73f724763baa0a2f1572fd3fa3fe6a69fba5",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/node-inspect-and-chain-smoke",
+      "sha": "05efe4dd569f540b7238544f8eb6c3f4ce81c619",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/orchestra-crate-root",
+      "sha": "b334a9cedc0cfdedd6e404d014d0a06e81fd3a39",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/pallet-x3-control-member",
+      "sha": "05cfd85f729eac083a6a6723492cc4bb72134871",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/private-mempool-real-shamir-threshold",
+      "sha": "e35760c8ee14752a2ef8ee65b49f0da9788ee2bb",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/private-mempool-share-validation-hardening",
+      "sha": "e7220518896aa4af4036f1432302df5ccd9fc1cd",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/private-mempool-threshold-crypto",
+      "sha": "213f2e71aee328153875bb34f87ee57ef8eb6602",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/production-gate-prerequisites",
+      "sha": "fb526d8d39c9e061c126c8f76ffdf7ae764c5fca",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/relayer-real-solana-verifier-351",
+      "sha": "14bab7c75558c3a756c396a9a626c679d81120c5",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/release-gate-target-dir",
+      "sha": "b5855c851bc99e408e2966976f3963fcb0c1c936",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/reqwest-0.12-migration",
+      "sha": "3809e28874131cd8eebae9ac74570cd3e41d8105",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/reusable-call-concurrency",
+      "sha": "e49909269f57764d42fd2c28db66e449cb2df191",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/risk-scorer-trading-core-v1",
+      "sha": "824b7fdf9ce67b7609772bf1ba464bad8d5de01f",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/runtime-evm-envelope-validation",
+      "sha": "79ca97ae998cef3a3b3924121fd65f5d7d0475f7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/runtime-hash-helper",
+      "sha": "37bf1ce21d69116d7cbd9b8dea9d6efb327737ff",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/runtime-orphan-placeholder-tests",
+      "sha": "14afec5344babceaf53645a5fdfdea265a0c1620",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/runtime-variants-tuples-96",
+      "sha": "37bf1ce21d69116d7cbd9b8dea9d6efb327737ff",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/self-hosted-apt-step",
+      "sha": "2eefb67e8ef0137889864d2bec4bf908e6fac82c",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/settlement-proof-set-gate",
+      "sha": "af64a076971e3967ecdbf5020699b295c12daa02",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/settlement-proofs-fail-closed",
+      "sha": "f68769cc9e24156648d0f8d90f1fb5aa7df8daa2",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/shipped-genesis-boots",
+      "sha": "9e10a7f7d9a66c2653b2eb5faffad7ce87378170",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/stress-harness-rate-limit",
+      "sha": "a00995a4436bde1c9678bef1078bc76f077029fd",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/svm-htlc-native-custody",
+      "sha": "854445e75453f0822cb5876579eb36810e7f3e04",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/svm-htlc-native-custody-master",
+      "sha": "8d1d2fbde85548237743de2576ff4c1e970a4701",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/svm-lifecycle-ignore-ambient-target-dir",
+      "sha": "594203616161d845e8db6dd206c0ac14543b02bb",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/swarm-determinism-fail-closed",
+      "sha": "3e2f48e6f048bda16dab554b9134433fa744b1bd",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/testnet-spec-builder",
+      "sha": "09a80cd8a7fd7cbdf26eb439cda87b7459781438",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/trading-core-v1-mainnet-and-audit-blindness",
+      "sha": "0b379c4b4381d3f6b37ce76e1c5729ef1107c117",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/vacuous-tests-assert-something",
+      "sha": "4de5dcbf9ef7508f7cbc5b1bc3644e511aa651ad",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/verifier-fail-closed",
+      "sha": "241b328b15c6cac8ce8074f2ad667dd29469606f",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/wallet-cli-honest-and-member",
+      "sha": "98919c1d0db54955e88c0f25a97b80a511e0b33d",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/wasm-std-feature-leak",
+      "sha": "5cf49f32956ff58532e29d05b741446e85bc6137",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/workspace-membership-batch-1",
+      "sha": "e57d30d28af6e177981820ad4b7428230ec05888",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/workspace-membership-batch-10",
+      "sha": "e75186878c34afa3110296a72f24de3fbc547dd3",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/workspace-membership-batch-2",
+      "sha": "2a8d7dac00c7a89feb006af9d2427c440c37c246",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/workspace-membership-batch-3",
+      "sha": "a7d2574055bcce3711df28f2119d5d92dd642c50",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/workspace-membership-batch-4",
+      "sha": "4c9cdd84c55ccae0b69a7d06e8d101273b2fc1b0",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/workspace-membership-batch-5",
+      "sha": "94864ea037416cf50d89adbecbfc7e03161cb780",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/x3-evolution-fail-closed-contract",
+      "sha": "320ca6ea580789175768d8a3bcfb2aa72b3b966e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3-mobile-sdk-member",
+      "sha": "a52662a6a070937b08c515cec646de3597dbf079",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3-pq-member",
+      "sha": "431a2f89f4fa0ff274bc4c731b5c094b71049705",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3-sidecar-lib-target",
+      "sha": "3e2f48e6f048bda16dab554b9134433fa744b1bd",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3-swap-router-two-generations",
+      "sha": "fd195b7bdcab4353aaf6736b9de07563fd684fbf",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3lang-frame-classification",
+      "sha": "3387f7a0a128c43d9c7afb646b736b84b5a8bc8e",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/x3lang-guard-evaluation",
+      "sha": "c1306b9291aa41839db9027110c36c333fcddcc4",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3lang-policy-honesty",
+      "sha": "771955972d48648ca711d8ef7e75f74f36922742",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3lang-proof-required",
+      "sha": "5ff7c9ecf5572ee38a0d5358aa65f0510416e09b",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3lang-proof-vocabulary",
+      "sha": "e86f9c08da7a9317cb7c9f1b5cbe9140c34cf72a",
+      "status": "requires_review"
+    },
+    {
+      "branch": "fix/x3lang-sound-invariants",
+      "sha": "126b606fe0c12d197f98de0d4a72577133c6f8e0",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3lang-surface-warnings",
+      "sha": "841cdeb603f2544dc4d0fce2a165e69cd69b7902",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3vm-evm-live-gate",
+      "sha": "807a8521374a9163ddca9a326913085fab9d43fa",
+      "status": "already_merged"
+    },
+    {
+      "branch": "fix/x3vm-svm-live-gate",
+      "sha": "c3c2494ff1af389a2b1e0c5aca0c584ddc19008c",
+      "status": "already_merged"
+    },
+    {
+      "branch": "land-durable-recovery",
+      "sha": "6fe3b098bcdd831f577f5b7a40746ba70870569c",
+      "status": "already_merged"
+    },
+    {
+      "branch": "land-durable-recovery-v2",
+      "sha": "e90e28f032a206bf2933deb6191d7689c9485a6f",
+      "status": "requires_review"
+    },
+    {
+      "branch": "lint/atomic-swap-std-cfg",
+      "sha": "bea11ac4c8740e788157ac8937140764409037b6",
+      "status": "already_merged"
+    },
+    {
+      "branch": "mainnet/block-hook-panics",
+      "sha": "f3bc2f2b409e312e3309b0b757b611268ed7fd33",
+      "status": "already_merged"
+    },
+    {
+      "branch": "mainnet/inspect-real-assets",
+      "sha": "4bd35d1eb4209c8cd8dba0ddd5a1a23730a0e167",
+      "status": "already_merged"
+    },
+    {
+      "branch": "mainnet/panic-ratchet",
+      "sha": "29faa1ca571d533be87b2310686bb98578a767b6",
+      "status": "already_merged"
+    },
+    {
+      "branch": "mainnet/production-genesis-path",
+      "sha": "6102bd6aa7cc85166acf1c77fdc7470917c2765b",
+      "status": "already_merged"
+    },
+    {
+      "branch": "mainnet/release-gate-integrity",
+      "sha": "2de2fc27d6189bdaadc44385d08a1046df181709",
+      "status": "already_merged"
+    },
+    {
+      "branch": "mainnet/runbook-reality",
+      "sha": "c2a6bb3011b23c0ad3273f6b98f44adf766559ec",
+      "status": "already_merged"
+    },
+    {
+      "branch": "mainnet/testnet-genesis-gate",
+      "sha": "5775b158785dc2c684d81633fb1d8a23a8589ea8",
+      "status": "already_merged"
+    },
+    {
+      "branch": "mainnet/validator-install-path",
+      "sha": "918fa552e806a58cc1510d8a96a544e7c6e58e8b",
+      "status": "already_merged"
+    },
+    {
+      "branch": "merge-into-master",
+      "sha": "3809e28874131cd8eebae9ac74570cd3e41d8105",
+      "status": "already_merged"
+    },
+    {
+      "branch": "merge/all-work-c3095b883",
+      "sha": "8214d32fc90609d30026b901355c06fe2b231b02",
+      "status": "requires_review"
+    },
+    {
+      "branch": "ops/drain-actions-queue-20260911",
+      "sha": "8222b96c5492cc207a955ea0a6b85a3e22a301fc",
+      "status": "requires_review"
+    },
+    {
+      "branch": "pr-166-refresh",
+      "sha": "e9747cb6181e41d1c705aa6fea38538e75e61a1b",
+      "status": "already_merged"
+    },
+    {
+      "branch": "pr-181-check",
+      "sha": "c5b5fa134bc0f1dcd89318dba2586b604ca917b5",
+      "status": "requires_review"
+    },
+    {
+      "branch": "pr132-work",
+      "sha": "09a6221de1e32575ba92090323510ab6c59bddf6",
+      "status": "requires_review"
+    },
+    {
+      "branch": "pr193-merge-master",
+      "sha": "87ec241f6158c300fc9d2236f2fcb2102df19663",
+      "status": "already_merged"
+    },
+    {
+      "branch": "preserve/20260918/cargo/ark-ec-0.6.0",
+      "sha": "2cb3b22d916d1aecfbf0ec92f37383d78063542c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/ark-ff-0.6.0",
+      "sha": "9ece03653ad2724d05ec5375332b59cc61eb344a",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/ark-std-0.6.0",
+      "sha": "8c2c9d98ba86869860c6a7021715824df9043324",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/frame-benchmarking-cli-54f11b1",
+      "sha": "bcefcd21cbb664b1772387a7989a7f3eab533ef8",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/frame-support-54f11b1",
+      "sha": "35f5e44b731a682234bc1510e63473eec2f23af0",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/hex-literal-1.1.0",
+      "sha": "3950a6104b209ea562d20efb7ef8872b80f66403",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/libloading-0.9.0",
+      "sha": "a84b69d9e133854b38a03568bf60fd5dd76c9a8d",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/minicbor-2.3.0",
+      "sha": "b092c771c76541779d4def60429416b0a986201d",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/pallet-scheduler-54f11b1",
+      "sha": "4416fee9937fdadc055265d74e98860b8aa65fca",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/pallet-staking-54f11b1",
+      "sha": "d0a4786be37da115037f4cf83cc7749bbbbef48f",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/pallet-sudo-54f11b1",
+      "sha": "9c2ebb0691c73218acec34ec007d61141a57bf6f",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/redis-1.7.0",
+      "sha": "630141bc3cb87bf03bded92a36df7f963c60e259",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/sc-basic-authorship-54f11b1",
+      "sha": "6d58f6f73ee1dc4f2257b1c50f0770665c387051",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/sc-cli-54f11b1",
+      "sha": "a9bb9327e3ed53c09887d8bb281ec44570d9e417",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/sc-consensus-aura-54f11b1",
+      "sha": "65d9baac255a10bc048e7aa85d187f267b029802",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/sc-rpc-54f11b1",
+      "sha": "5551b1c90b224fd46c2affcca74db3341d9e81c5",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/sc-rpc-api-54f11b1",
+      "sha": "13de37ce7e1b36b75f45998bf7f973d2ce0c08b7",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/sp-keystore-54f11b1",
+      "sha": "131b04d5afea58aff3758894d41a5fd27decd555",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/cargo/sp-version-54f11b1",
+      "sha": "8731eab698f5496330e0a94a9e3f0b3fd53192cc",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/codex-x3-economic-safety-kernel",
+      "sha": "0c75dab0656bdb4028a4689e161b79173b8d0236",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/codex-x3-trading-core-v1-hardening",
+      "sha": "5df7d70b9b465ef81564e4b49e93d94acbce13f3",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/feat-live-feature-matrix-20260912",
+      "sha": "e6c6b09e8dd3d905131edcb7220bc7ceb6033efb",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/feat-live-secret-release-firewall-20260911",
+      "sha": "a10ac597cdd284fa2b5247fab645c9141ccde73c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/feat-settlement-proofset-gate-20260911",
+      "sha": "c1d8ba790bcae071bbe2e30cbd86d900959995cc",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/feat-x3-lang-crosschain-integration-20260909",
+      "sha": "ef83d056619dafa76e1f5bdda758672d050b0379",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/finish-x3vm-live-transport",
+      "sha": "921f81d64e1f2d2f628e47c69b1384b9bed6d10a",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/finish-x3vm-live-transport-fix",
+      "sha": "42f9a2d77a960d091c109d47c0823de1a259bb9f",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/merge-into-master",
+      "sha": "a64721d04d9eeee5220fae6d8ca058ef74d13731",
+      "status": "already_merged"
+    },
+    {
+      "branch": "preserve/20260918/pip/psycopg2-binary-gte-2.9.13",
+      "sha": "14b46f300cd6af77f4f2d6ff19102e04dc5c1d03",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260918/test-cross-domain-refund-recovery-20260911",
+      "sha": "29a3dcaff7201f65376b4d4f112a297e6fdd38f3",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/canonical-cross-domain-proof-bundle-20260911",
+      "sha": "a44b13fb5037753c64cab957f18f0309aa33516c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/cross-domain-refund-recovery-20260911",
+      "sha": "29a3dcaff7201f65376b4d4f112a297e6fdd38f3",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/idempotent-cross-domain-coordinator-20260911",
+      "sha": "d126a41652665d6fcabece015373b2269f550193",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/live-feature-matrix-20260912",
+      "sha": "e6c6b09e8dd3d905131edcb7220bc7ceb6033efb",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/live-secret-release-firewall-20260911",
+      "sha": "a10ac597cdd284fa2b5247fab645c9141ccde73c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/merge-queue-production-gate-lean",
+      "sha": "69d66ac9131b4e6d63f13a6216f4e99623a2dcd7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "preserve/20260919/settlement-proofset-gate-20260911",
+      "sha": "c1d8ba790bcae071bbe2e30cbd86d900959995cc",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/x3-economic-safety-kernel",
+      "sha": "0c75dab0656bdb4028a4689e161b79173b8d0236",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/x3-lang-crosschain-integration-20260909",
+      "sha": "ef83d056619dafa76e1f5bdda758672d050b0379",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/x3-trading-core-v1-hardening",
+      "sha": "5df7d70b9b465ef81564e4b49e93d94acbce13f3",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/x3lang-frame-classification",
+      "sha": "ea0294fb82851bd92f901f3e4f1c6940253bc1b7",
+      "status": "already_merged"
+    },
+    {
+      "branch": "preserve/20260919/x3lang-proof-vocabulary",
+      "sha": "c5a7ab1e08544b363066f9d9ee7682fcda53fd59",
+      "status": "already_merged"
+    },
+    {
+      "branch": "preserve/20260919/x3vm-live-transport",
+      "sha": "921f81d64e1f2d2f628e47c69b1384b9bed6d10a",
+      "status": "requires_review"
+    },
+    {
+      "branch": "preserve/20260919/x3vm-live-transport-fix",
+      "sha": "42f9a2d77a960d091c109d47c0823de1a259bb9f",
+      "status": "requires_review"
+    },
+    {
+      "branch": "reapply-features",
+      "sha": "f46b1cbf3ff03a1d9b6588e37d7a07b363447d38",
+      "status": "requires_review"
+    },
+    {
+      "branch": "rebase-310",
+      "sha": "62d94504325d7a4ba215be39a2748ba5b93176d8",
+      "status": "requires_review"
+    },
+    {
+      "branch": "retarget-batch8",
+      "sha": "f58896a9384f2775c6004b4619c2870572cbdafb",
+      "status": "requires_review"
+    },
+    {
+      "branch": "salvage/evm-receipt-verify",
+      "sha": "ec65b6f12703981edd827c1102c68cc774cd9645",
+      "status": "already_merged"
+    },
+    {
+      "branch": "salvage/pr128-supervisor-tests",
+      "sha": "f9568723ca8168cfea876ea1b27f1eb1444ec883",
+      "status": "already_merged"
+    },
+    {
+      "branch": "salvage/trading-core-20260918",
+      "sha": "ec65b6f12703981edd827c1102c68cc774cd9645",
+      "status": "already_merged"
+    },
+    {
+      "branch": "salvage/x3lang-intent-bridge",
+      "sha": "fbc095420429ec28ce2b0f26f4e2bd2484a7d376",
+      "status": "requires_review"
+    },
+    {
+      "branch": "sec/remove-dead-libp2p-deps",
+      "sha": "85e69694af38103e7bc50d72a73a713faab96959",
+      "status": "already_merged"
+    },
+    {
+      "branch": "t5/fix-annotations-20260522-1458",
+      "sha": "ebce3fa6cc5cee61355c52eb10c7d480af7a1a69",
+      "status": "requires_review"
+    },
+    {
+      "branch": "test/atomic-kernel-rollback-invariants",
+      "sha": "e06b3ec9d7d09927c806873bfdbbbcf25a38087e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "test/cross-domain-recovery-matrix-20260911",
+      "sha": "15c2b1a3ec9f53e1e1609df8149266a1214e07ef",
+      "status": "requires_review"
+    },
+    {
+      "branch": "test/cross-domain-refund-recovery-20260911",
+      "sha": "9ac1895c045245d8cb44a7be9121dd7affb2abba",
+      "status": "already_merged"
+    },
+    {
+      "branch": "test/distributed-atomic-chaos-harness-20260911",
+      "sha": "4712272408cebcbf8570dac1247fe31d2869e906",
+      "status": "already_merged"
+    },
+    {
+      "branch": "test/kernel-inflight-halt",
+      "sha": "6c8dc6f6548f129a6c9b62f53ede92b1e987ae24",
+      "status": "already_merged"
+    },
+    {
+      "branch": "test/rehearsal-genesis-state",
+      "sha": "8258042667970039d320dd3152c636a8c4c9447d",
+      "status": "already_merged"
+    },
+    {
+      "branch": "test/runtime-migration-rehearsal",
+      "sha": "5f530a55615f5cfd90d084ff7aca1ab2641ec52a",
+      "status": "already_merged"
+    },
+    {
+      "branch": "test/runtime-storage-version-alignment",
+      "sha": "45eec71c53ececb87ae453cde22c44599f4d9c8d",
+      "status": "already_merged"
+    },
+    {
+      "branch": "test/runtime-variant-dryrun",
+      "sha": "1fd3a33405c81336dcebae2a1615b92f4a11eb2d",
+      "status": "already_merged"
+    },
+    {
+      "branch": "tmp/intent-bridge-rebase",
+      "sha": "e2572927c4f85bd62ac99b10171a6551ac948df1",
+      "status": "already_merged"
+    },
+    {
+      "branch": "verify/master-deep",
+      "sha": "78f6bb566b89e719c4cabf15c448e2f59532c131",
+      "status": "already_merged"
+    },
+    {
+      "branch": "verify/master-fast",
+      "sha": "52f79a4b91312b599b5a776ac16904d8225fa2a1",
+      "status": "already_merged"
+    },
+    {
+      "branch": "wip/chatgpt-mainnet-attestation-20260918",
+      "sha": "e83d3918ee43b10ccd6b819044f817c9dd3c29f3",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/consolidation-20260917/chatgpt-mainnet",
+      "sha": "2df3f5b82b4bf799874b2eafc539d455c206b72c",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/consolidation-20260917/main",
+      "sha": "292730e8dffd232bd9b017d8f916d030edcd7736",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/consolidation-20260917/pasted-text-processing",
+      "sha": "470c778018f8b8ba665a2b8dd267a2ec339d757b",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/consolidation-20260917/recovered-usb-clone",
+      "sha": "157500e668752a91155284b791184df375a37420",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/consolidation-20260917/x3-lang-prototype-20260621",
+      "sha": "ecdcfb90d8ff9bdaa372ead50a0f69db7d968873",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/pr135-trading-core-hardening-rebased-20260917",
+      "sha": "bfd0a7748225af02b273c2fdd3989bb4dea73f59",
+      "status": "already_merged"
+    },
+    {
+      "branch": "wip/pr165-on-no-std-master",
+      "sha": "0121f43f7fd9f94391f20466879f462439870c2e",
+      "status": "already_merged"
+    },
+    {
+      "branch": "wip/pr165-settlement-proofset-gate-rebased-20260917",
+      "sha": "319f0018730f04aba111034045fcdc695208795f",
+      "status": "already_merged"
+    },
+    {
+      "branch": "wip/prompts-to-skills-20260918",
+      "sha": "4a6ffa6f1a86804548a1bba34320c0a1ec1aeb0b",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/x3-evolution-simulator-20260918",
+      "sha": "2cde4933cdbda3380fb7ede51b8b354305f75757",
+      "status": "already_merged"
+    },
+    {
+      "branch": "wip/x3lang-arb-graph-filter-20260919",
+      "sha": "bdc83ba7ffb48407e3cb14d003c6eb274c1b6ac4",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/x3lang-objectives-20260918",
+      "sha": "44a12ba9445f78215a785d7984b0b75a9d8b178f",
+      "status": "already_merged"
+    },
+    {
+      "branch": "wip/x3lang-preserve-packets-and-arbitrage-20260919",
+      "sha": "1bfaa52434885f37dfbafd557cf9d2e8f9299f2e",
+      "status": "requires_review"
+    },
+    {
+      "branch": "wip/x3lang-route-fallback-20260918",
+      "sha": "f44df9e4a940fe55aa2e9e25507c798853649c96",
+      "status": "already_merged"
+    },
+    {
+      "branch": "x3/nostd-port-only",
+      "sha": "4557cc0c0d46d4aaa6fa92904f1677aea05d8eae",
+      "status": "already_merged"
+    },
+    {
+      "branch": "x3lang-live-quotes",
+      "sha": "8d98d1effeba0c2d0dcefafc15bb121e0915a69b",
+      "status": "already_merged"
+    },
+    {
+      "branch": "your-task-branch",
+      "sha": "b19bcef0a5e1a9a4b655a8e7a01637de566e48ff",
+      "status": "requires_review"
+    }
+  ]
+}

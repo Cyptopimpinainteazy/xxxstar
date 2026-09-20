@@ -14,7 +14,7 @@ tracing = "0.1"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 codec = { package = "parity-scale-codec", version = "3.6.5", features = ["derive"] }
-jsonrpsee = { version = "0.22", features = ["ws-client", "http-client"] }
+jsonrpsee = { version = "0.24", features = ["ws-client", "http-client"] }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
