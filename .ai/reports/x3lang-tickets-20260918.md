@@ -997,6 +997,32 @@ Round 33's evidence, kept: `require proof verified` in an intent gave
 `Parser error: expected expression`; the parser read `verified` as the subject and
 then required a value.
 
+## TICKET-027 (progress, 2026-09-20) — the walk, and the two kinds the VM now enforces
+
+Two findings, both from asking what a guard's *checker* actually reads rather than which kinds
+have one. Evidence and measurements: `.ai/reports/x3lang-guards-enforced-20260920.md`.
+
+**The walk read the top level only.** `semantic::require_guards` did not descend into `if`/`while`/
+`for`/`loop`/`atomic` blocks, did not read a `fallback` block's own guard list, and did not look at
+functions, agents, gpu blocks, simulate/task/subscription declarations, choice paths or parallel
+legs — so a guard one block down was invisible to all thirteen checks that read it. Measured:
+`require slippage <= 99` inside a `fallback` compiled against `risk_policy { max_slippage 50 }`,
+while the same guard at the top level was refused. Four `test_parallel_dag.rs` fixtures were relying
+on the hole and now declare the depth their legs' guards name. Closed in `570718bbb`.
+
+**`slippage` and `profit` were not enforced and their bounds did not travel.** The spec's rule is
+"economic constraints enforced by the VM"; the emitter wrote `REQUIRE static 0` — a static guard is
+treated as satisfied and the operand was zero rather than the bound. Measured: `require slippage <= 7`
+and `require slippage <= 99` compiled to **byte-identical artifacts**. They are measured guards now
+(bound in basis points in the operand, judged against what a host reported, refused with
+`X3_GUARD_UNMEASURED` when nothing did, which is the fail-closed half). A `fallback` block's guards
+had been dropped by the lowering outright. Closed in `36f2856e3`, pinned in `c767f6e6d`.
+
+So the per-kind table below gains two rows that say "enforced by the VM" rather than "compile-time",
+and the walk it depends on now reads the whole program. What remains is the row that was always
+last: every *other* guard kind that carries a number still records it in the IR and drops it from
+the artifact (TICKET-114).
+
 ## TICKET-027 (progress, 2026-09-19) — the guard kinds, one row each
 
 `5e89e6c7d` closed one more kind by **evaluation**: `require canonical_supply
@@ -4514,3 +4540,24 @@ Validation: `cargo test --workspace` in `x3-lang` stays green at 1233+, and the 
 `test_require_guards.rs` plus the four tests in `test_keyword_clauses.rs` still pass.
 Why not fixed in this pass: it is cleanup with no user-visible effect, and the three that *were*
 broken are fixed and pinned. Recorded rather than dropped.
+
+## TICKET-114 — a non-economic guard's bound is checked and then dropped from the artifact — OPEN
+Type: OPEN, information loss · Subsystem: x3-lang/compiler (emitter)
+Reason: `require solver_bond >= 10_000`, `require route_score >= 90`, `require bridge_liquidity >= N`
+and the rest are decided at compile time against the declaration they name, and then emitted as
+`REQUIRE static 0` — the operand is **zero**, so the artifact does not carry the bound the program
+wrote. A reader of an artifact (or a replayer, or an auditor) cannot see what was required; the
+instruction says only that some guard was here. The economic kinds stopped doing this in `36f2856e3`
+because their bound is compared against a measurement, so carrying it was necessary rather than
+additional.
+Measured, the same way: build one program with `require route_score >= 90` and another with `>= 10`
+against a policy that permits both, and compare the artifacts.
+Acceptance criteria: for every guard kind whose value is a literal, the artifact states the bound it
+was checked against, or the instruction says by name why that kind's bound is not carried.
+Validation: two programs whose guards differ only in the bound compile to different bytes; `x3c
+explain` prints the figure; a bound the operand cannot hold is refused rather than truncated (the
+rule `finality_policy`'s depth already follows).
+Why not done here: the operand is two bytes and the kinds' units differ (an absolute amount for a
+bond, a score for route_score, a basis-point figure for the measured kinds), and the flags byte's
+unit code currently means profit / delta / slippage in basis points — so this needs a per-kind unit
+decision, which is a small design choice rather than a copy of the enforcement change.

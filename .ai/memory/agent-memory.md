@@ -5137,3 +5137,42 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   clean, and the piles are committed on `master` as patches under `.ai/wip-backups/` (the Sept-18
   three plus the `20260920-*` three found later). Not merged to their branches — the merge-queue
   adjudication still applies.
+
+## 2026-09-20 — guards: the walk, and what the VM actually enforces
+
+**Facts discovered**
+
+- `semantic::require_guards` (`compiler/src/semantic.rs`) read only the **top level** of an intent
+  body plus four declarations' `requires` lists. It did not descend into `if`/`while`/`for`/`loop`/
+  `atomic`, did not read `Statement::RouteFallback.requires`, and did not look at functions, agents,
+  gpu blocks, simulate/task/subscription bodies, choice paths or parallel legs. Thirteen checks read
+  it, so a guard one block down was invisible to every one of them. Fixed in `570718bbb`.
+- `Statement::RouteFallback { replacements, .. }` in lowering **dropped** the block's guards with
+  `..` — `fallback { require profit >= 0 }` reached neither artifact nor runtime.
+- A user-written economic guard lowered with `measured: false` → the emitter wrote
+  `REQUIRE static 0`, and `static` is treated as satisfied by the executor. Two programs with
+  different slippage ceilings compiled to **byte-identical artifacts**. Fixed in `36f2856e3`: the
+  bound is converted with `semantic::slippage_bps_from_text` (bare number = basis points, `5%` = 500)
+  and emitted as a measured guard.
+- The spec (`pasted-text-1.txt` line 41-42) requires exactly this: "Native fee/slippage guards —
+  Economic constraints enforced by the VM".
+- Old artifacts are unaffected (`static 0` still reads as satisfied); no version bump needed. The
+  version byte is a function of the opcode set; `POLICY_VERSION` is carried, not compared.
+- The CLI already had `--measured-profit-bps` / `--measured-slippage-bps`; they are now required for
+  a program's own economic guards too, not only for plan floors.
+
+**Decisions made**
+
+- Enforce rather than record (fail-closed): an unmeasured guard refuses with `X3_GUARD_UNMEASURED`.
+  Sweep: run-with-a-stated-outcome stays 19/20, run-unmeasured is 8/20.
+- `slippage >= n` and `profit <= n` stay static: the direction is not what the quantity means, and
+  inverting it at the emitter would enforce something the program did not write.
+- One existing test asserted the old design ("a program's own guard is a compile-time constraint and
+  must still run unmeasured"); it now asserts both halves of the new one. Flagged rather than
+  silently adjusted.
+
+**Next task seed**
+
+- TICKET-114: every non-economic guard kind still emits `REQUIRE static 0`, so its bound is checked
+  and then dropped from the artifact. Needs a per-kind unit decision for the operand.
+- `risk { max_total_fee_bps }` is compile-time only; no fee quantity is stateable.
