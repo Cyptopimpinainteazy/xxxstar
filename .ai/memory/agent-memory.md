@@ -5288,3 +5288,16 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - Trap: `git rev-parse '<branch>:x3-lang'` echoes its argument on failure, so a scan that strips
   stderr sees a "tree hash" that is really a branch name. Check `git cat-file -e '<ref>:x3-lang'`
   first.
+
+**2026-09-20 — TICKET-018 closed; TICKET-016's blocker re-measured (it is now two blockers)**
+
+- A release's proof obligation is the two *named* proofs, enforced on mainnet:
+  `mainnet: Bridge operation present without a source-lock proof` / `destnation-fill proof` (measured).
+  The open design question ("should a release also require a receipt or a quorum attestation") is
+  answered by the language's own rule: a requirement nothing declares is refused by name
+  (`verify_guard_kinds_are_checkable`), so nothing was guessed at.
+- TICKET-016: the *mechanism* for host-reported quantities now exists (measured guards +
+  `--measured-*-bps`), so its blocker has changed from "no mechanism" to (1) no host measures price
+  impact / MEV leakage, and (2) **the guard quantity code is full** (8 of 8: none/profit, delta,
+  slippage, amount, score, count, blocks, fees) — a third measured quantity needs a wider field,
+  which is a format decision.

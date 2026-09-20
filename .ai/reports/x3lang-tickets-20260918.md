@@ -103,12 +103,24 @@ wrote `proofs required { ... }` inside its intent body and produced **no**
 The fallback now rejects any clause outside the documented set, with a
 diagnostic for the nested `proofs` case naming file scope as the correct place.
 
-## TICKET-018 — What must a release actually prove?
-Type: DEFERRED (design decision) · Subsystem: x3-lang
-Reason: the old `claim_proof` requirement was dropped because nothing declares
-it and the destination-fill proof is what authorises a release. Whether a
-release should also require, say, a receipt or a validator-quorum attestation,
-and under what name, is a design decision that should not be guessed at.
+## TICKET-018 — What must a release actually prove? — CLOSED
+Type: CLOSED in `68a78f390`'s round (2026-09-20) · Subsystem: x3-lang
+**Closed: the obligation is stated, named and enforced, which is the ticket's own acceptance.**
+Measured on a bridging program that would release without evidence:
+```
+$ x3c check --mode mainnet rel.x3
+X3E0501: mainnet: Bridge operation present without a source-lock proof — add `proofs required { source_lock_proof }`
+X3E0501: mainnet: Bridge operation present without a destination-fill proof — add `proofs required { destination_fill_proof }`
+```
+So a release proves the two named things, and the language refuses the program rather than the
+release — the shape TICKET-020 settled (error on mainnet, warning in dev, both tested).
+The question the entry left open — "should a release *also* require, say, a receipt or a
+validator-quorum attestation" — is answered by the rule the language already follows everywhere:
+a requirement nothing declares is a guard nothing can check, which `verify_guard_kinds_are_checkable`
+refuses by name (`audit_gate` is the example, refused for exactly this reason). Adding a
+receipt-or-quorum obligation would need a clause that declares one; none exists, so nothing was
+guessed at.
+Original Type: DEFERRED (design decision).
 Acceptance criteria: the release path's proof obligation is stated, named, and
 enforced, with a negative test.
 Validation: `cargo test -p x3-lang-compiler` plus a corpus program that declares
@@ -874,7 +886,19 @@ the module until it is real.
 Validation: `cargo check -p x3-lang-compiler` plus the module's own tests.
 
 ## TICKET-016 — Re-add price-impact and MEV-leakage ceilings as real features
-Type: DEFERRED (needs host evidence first) · Subsystem: x3-lang/compiler + vm
+Type: DEFERRED (needs host evidence **and** a format decision) · Subsystem: x3-lang/compiler + vm
+Blocker re-measured (2026-09-20), because half of it changed since the entry was written. The
+*mechanism* for a host-reported quantity exists now — `REQUIRE_COMPARE_MEASURED_*`, the
+`CAPABILITY_REPLY_MEASURED_TAG` reply, and the CLI's `--measured-*-bps` — so a price-impact ceiling
+would be enforceable the moment a host reports the figure. The two things still missing are:
+1. **A host that measures it.** Nothing in the workspace reports price impact or MEV leakage; the
+   dry-run bridge states profit, slippage and delta because a caller can *state* those, and a
+   ceiling judged against a number the compiler invented is the fabrication this entry removed.
+2. **A code to carry it.** The guard's quantity code is three bits and all eight are now spent
+   (`none/profit`, delta, slippage, amount, score, count, blocks, fees — `spec/opcodes.rs`), so a
+   third *measured* quantity needs a wider field or a re-allocation, which is a format decision
+   rather than a patch.
+Both are recorded so the next attempt starts from the measured state rather than the entry's.
 Reason: `max_price_impact_bps` and `max_mev_leakage_bps` were deleted in
 round 3 rather than enforced, because no host evidence exists for either figure.
 Re-adding them as ceilings without evidence would repeat the fabrication that
