@@ -218,7 +218,8 @@ number as authoritative — re-`ls .github/workflows/*.yml` if it matters.
 | `feat/secret-release-firewall-20260911` | 3 | `crates/x3-atomic-swap/src/secret_release.rs` | superseded by `feat/live-secret-release-firewall-20260911` (in master) |
 | `feat/canonical-cross-domain-proof-bundle-20260911-pre-rebase-20260917` | 3 | `crates/x3-atomic-swap/{lib,proof_bundle}.rs` | archival — verified 2026-09-19: its rebased sibling `feat/canonical-cross-domain-proof-bundle-20260911` is fully patch-equivalent to master (empty `git cherry`), and a direct tree diff shows master strictly larger in the same files this branch touches (e.g. `x3vm_htlc.rs`/`x3vm_live.rs`/`x3vm_native.rs` hundreds of lines bigger on master) — this pre-rebase snapshot predates work master has since grown past. Do not merge |
 | `feat/idempotent-cross-domain-coordinator-20260911-pre-rebase-20260917` | 1 | 2 files | archival — verified 2026-09-19, same evidence as its sibling row above: rebased sibling branch fully lands in master, this pre-rebase snapshot's tree is a strict subset. Do not merge |
-| `wip/chatgpt-mainnet-attestation-20260918`, `wip/consolidation-20260917/chatgpt-mainnet` | 1 each | 22 files | snapshot of uncommitted work |
+| `wip/chatgpt-mainnet-attestation-20260918`, `wip/consolidation-20260917/chatgpt-mainnet` | 1 each | 22 files | archival — verified 2026-09-19 via direct per-file content comparison against master's tip (not triple-dot, per the caution above): the two branches are byte-identical to each other (same snapshot taken twice). `crates/x3-relayer/src/relayer.rs` and `pallets/x3-atomic-kernel/src/lib.rs` are stale/regressive — master already fixed the exact bugs this snapshot targets (PRs #265, #268, #271: real Ed25519 SVM verification, governance-controlled validator set, stop fabricating relayer attestations); merging would revert those fixes and the branch's own EVM-path replacement is incomplete (builds an always-empty `AttestationSet`, so it would dispute every valid EVM proof). `pallets/x3-atomic-kernel/src/lib.rs`'s slashing model has independently diverged on master (50/10/100% schedule vs. the branch's 2-tier model) — needs reconciliation, not a port. Two genuinely novel pieces were extracted and hand-ported onto current master in a follow-up PR instead of merging this branch: `crates/confidential-gpu/src/attestation.rs` (fail-closed report generation instead of fabricating one) and `crates/x3-validator-attestation/src/lib.rs` (real Ed25519 verification in `AttestationSet::add_attestation`, which master's current version still lacks — confirmed as a defense-in-depth gap, not currently exploitable, since the one real caller (`x3-relayer`'s SVM path) is already gated by `SolanaFinalizedVerifier`'s real Ed25519 check upstream). Do not merge either `wip/*` branch as-is |
+| `codex/chatgpt-mainnet-work` | 0 | 0 files | archival — verified 2026-09-19: tip *is* the merge-base commit (`83bc5254f`), already an ancestor of master. Zero unique commits, zero content. Nothing to review |
 | `archive/stale-x3lang-trading-wip-20260918` | 3 | 68 files | archival |
 | `ci/path-filter-heavy-gates-20260910` (9), `ci/consolidate-workflows-20260910` (7), `ops/drain-actions-queue-20260911` (1) | 1–9 | workflow files | verified 2026-09-19 as archival (see Update 7) — `01d2b64e5` already reached the same or a further end state for all three |
 | `preserve/20260918/*` (28 branches) | 0–13 | mixed | verified 2026-09-19 as a batch (see Update 6) — 26 fully archival/redundant, 2 (`cargo/ark-ec-0.6.0`, `cargo/ark-ff-0.6.0`) are a stale dependency bump that needs fresh work, not a merge |
@@ -271,3 +272,27 @@ gh workflow run production-gate.yml --ref <batch-branch>
 `git cherry` is the check that stops a "merge everything" pass from silently
 reverting newer work — run it against `origin/master` for every branch before
 merging it.
+
+## 2026-09-19 (round 72) — the `x3lang` family, re-checked
+
+Every `origin/*` branch whose name says `x3lang`, re-diffed against `master` at
+`5ccd725c3`:
+
+| branch | verdict | evidence |
+|---|---|---|
+| `wip/x3lang-arb-graph-filter-20260919` (`bdc83ba7f`) | **superseded — do not merge** | master's `compiler/src/arb.rs` already carries `venue_standings`, `OpportunityConstraints`, `path_reject_reason` and a doc section naming TICKET-076; `git diff 44a12ba94..bdc83ba7f` is a strict subset of master's version |
+| `wip/x3lang-preserve-packets-and-arbitrage-20260919` (`1bfaa5243`) | **superseded — do not merge** | `x3-lang/vm/src/opportunity_packet.rs` (1131 lines) and `x3-lang/vm/tests/opportunity_packets.rs` are on master |
+| `wip/x3lang-objectives-20260918` (`44a12ba94`) | **merged** | `git merge-base --is-ancestor origin/wip/x3lang-objectives-20260918 origin/master` → true, 0 commits ahead |
+| `salvage/x3lang-intent-bridge` (`fbc095420`) | **content landed — do not merge** | re-derived and landed as `5ccd725c3` (TICKET-095); the branch fixes the same two defects 13+2 lines at the readers, the landing fixes them at `parse_decimal` and adds the typechecker message and two tests |
+| `archive/stale-x3lang-trading-wip-20260918` | archival by design | not for merging |
+
+**Duplicate commits on master, resolved and harmless:** `14a450368` (this line of work) and
+`6f91aa696` (`openclaw-agent`) fix the *same* three unformatted files that made
+`format check:cargo fmt --all -- --check` red. Content is byte-identical — verified with
+`git diff 14a450368:<path> origin/master:<path>` for all three paths. Only one of them changed
+anything; neither should be reverted. Two agents reading the same gate is the safe failure, but
+it is also two agents' worth of work for one fix: the gate is the cheapest thing in
+`GATES_FAST` to run before starting a round.
+
+**Merge order for the remaining work** is unchanged — this round added no branch that needs
+merging.
