@@ -4805,8 +4805,30 @@ separate claim. Five tests, including a control that the corpus's own shape meet
 This is the same shape as TICKET-111 (`@subscription`, `audit_gate`) and the `finality_explicit` find:
 a construct the artifact cannot carry and no pass reads is refused, not dropped.
 
-## TICKET-118 — a module's declared `max_gas` is not enforced — OPEN
-Type: OPEN, PHASE 41 remainder · Subsystem: x3-lang/compiler + vm
+## TICKET-118 — a module's declared `max_gas` is not enforced — CLOSED
+Type: CLOSED in `8c155d4c3` (2026-09-20), filed and fixed in the same pass · Subsystem: x3-lang/compiler (lowering + emitter + cost)
+**Closed by route (a), with one property the entry did not anticipate.** A module declaring
+`bounds { max_gas 1 }` ran to completion with 999115 gas left; it is refused now with the figure:
+
+```
+X3E4021: strategy 'TriDexArb' declares `max_gas 1` and its body's operations cost 272 by the VM's
+own weight table: a module whose body exceeds its own resource cap is refused rather than published
+as bounded
+```
+The figure is measured by emitting the module's own operations (a sub-IR of exactly those) and
+asking `cost::estimate_artifact`, with the header every artifact carries measured once and subtracted
+— so the number is the module's cost rather than the module's plus a constant. Counting opcodes here
+was not an option the entry should have repeated: an operation writes zero frames (a branch the
+compiler decided false), one, or several (a branch's body is emitted inline).
+**What the entry missed:** the measurement *emits*, so an operation the emitter cannot write — an `if`
+over a condition the compiler could not decide — made the cap check report a codegen error from the
+lowering, moving that refusal to a stage whose diagnostics are about lowering. Two
+`test_branch_folding.rs` tests caught it. The measurement is best-effort by construction now: an
+unemittable module yields "cannot measure", the cap check is skipped, and the program still fails at
+emission with the message written for it.
+Route (b) — marking module boundaries in the IR — was not needed, which is worth recording: the
+sub-emission is exact, and it keeps the weights in the one table.
+Original Type: OPEN, PHASE 41 remainder.
 Reason: PHASE 41 says a strategy's resource caps exist to "prevent pathological execution graphs",
 and `bounds { max_gas N }` is checked for being *stated and non-zero* and nothing else. Measured:
 a module declaring `max_gas 1` with a body whose artifact is 296 bytes and 74 operations ran to

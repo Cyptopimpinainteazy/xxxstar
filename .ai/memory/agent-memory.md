@@ -5329,3 +5329,17 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - PHASE 41's spec spelling is `resources { max_compute/max_memory/max_network_calls/max_routes/max_branches }`;
   the implementation has `bounds { max_steps max_gas }` — a subset under a different name, now recorded
   in the phase ledger rather than left implicit. `cost::HOST_FACING` already counts network calls.
+
+**2026-09-20 — `max_gas` enforced; PHASE 41's two caps both bound the body (TICKET-118 closed)**
+
+- The figure is measured by emitting the module's own operations as a sub-IR and calling
+  `cost::estimate_artifact`, minus the header measured once (`module_gas` in lowering.rs). Counting
+  opcodes is not an option: an operation writes zero frames (a folded branch), one, or several (a
+  branch's body is emitted inline).
+- **A measurement that emits can move where a failure is reported.** The first version propagated the
+  emission error, so an undecidable `if` failed during *lowering* with a codegen message; two
+  `test_branch_folding.rs` tests caught it. `module_gas` returns `Ok(None)` for "cannot measure" and
+  the cap check is skipped — the program still fails at emission, with the message written for it.
+- Both cap tests derive their figures from the refusal message and assert both sides of the boundary
+  (equal passes, one less fails), so no test carries a second opinion about the lowering.
+- The emitter and `cost` do not reference the lowering, so lowering → emitter/cost is a one-way edge.
