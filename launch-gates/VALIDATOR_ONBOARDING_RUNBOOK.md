@@ -7,6 +7,30 @@
 
 ---
 
+## Read this first — what exists today
+
+This runbook previously described a repository (`github.com/x3network/x3-chain`), a
+`v1.0.0` tag, pre-built release tarballs, a Docker image and mainnet bootnode DNS
+names that **do not exist**. Every one of those URLs returns 404 and
+`--chain mainnet` is not a chain id this node accepts. The instructions below have
+been rewritten against the repository that exists; this block says which parts of
+the launch are still missing, so nothing below sends you to a dead end.
+
+| thing | state | what to do |
+| --- | --- | --- |
+| canonical repository | `https://github.com/Cyptopimpinainteazy/xxxstar` | use this; `x3network/x3-chain` does not exist |
+| published release with a binary | **none** (only a draft tag `v0.4.0-rc.1`, drafts have no public assets) | `scripts/install-validator.sh --from-release` refuses and prints the build route. Build from source (Option B). |
+| Docker image | **not published** | Option C is not available yet |
+| mainnet genesis | must be generated; `chain-specs/x3-mainnet-*.json` is not committed | `scripts/mainnet/generate_mainnet_chain_spec.sh` (needs the authority/council/treasury keys and escrow addresses) |
+| `--chain mainnet` | **not a valid id** | pass a spec **path** (`--chain /etc/x3/chain-spec.json`), or the built-in `production` id |
+
+Everything in this runbook that touches the binary, the genesis and the systemd
+unit is exercised by `scripts/mainnet/validator_install_gate.sh` (release-gate
+stage 2d) and `scripts/mainnet/production_genesis_gate.sh` (stage 3b), so a change
+that breaks the operator path fails a gate rather than a validator.
+
+---
+
 ## Executive Summary
 
 This runbook provides **complete instructions** for setting up and operating an X3 ATOMIC STAR validator node. Whether you're joining the testnet or preparing for mainnet, this guide covers everything from hardware selection to slashing prevention.
@@ -172,43 +196,32 @@ network:
 - [ ] Static IP address configured
 - [ ] DNS records updated (optional but recommended)
 
-### Option A: Install from Pre-Built Binary (Fastest)
+### Option A: Install from a Published Release
 
-**Recommended for most users**
+**Not available yet.** The repository has no published release, so there is no
+binary or `.sha256` to download. `scripts/install-validator.sh --from-release`
+says exactly that and prints the build route instead of installing something
+unverifiable:
 
 ```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install dependencies
-sudo apt install -y \
-  curl \
-  wget \
-  git \
-  build-essential \
-  libssl-dev \
-  pkg-config \
-  jq
-
-# Download latest release
-cd /tmp
-LATEST_VERSION="v1.0.0"  # Check https://github.com/X3/releases for latest
-wget https://github.com/x3network/x3-chain/releases/download/${LATEST_VERSION}/x3-chain-node-linux-amd64.tar.gz
-
-# Verify checksum
-wget https://github.com/x3network/x3-chain/releases/download/${LATEST_VERSION}/x3-chain-node-linux-amd64.tar.gz.sha256
-sha256sum -c x3-chain-node-linux-amd64.tar.gz.sha256
-# Should output: x3-chain-node-linux-amd64.tar.gz: OK
-
-# Extract and install
-tar -xzf x3-chain-node-linux-amd64.tar.gz
-sudo mv x3-chain-node /usr/local/bin/
-sudo chmod +x /usr/local/bin/x3-chain-node
-
-# Verify installation
-x3-chain-node --version
-# Expected: x3-chain-node 1.0.0-dc9d1bd
+bash scripts/install-validator.sh --check --from-release --chain ./x3-mainnet-plain.json
+# ERROR: no published release to install from.
+#     The repository's only release is a draft, and drafts have no public assets.
+#     Build one instead:  cargo build --release -p x3-chain-node
 ```
+
+When a release *is* published, the command is:
+
+```bash
+sudo bash scripts/install-validator.sh \
+  --from-release <tag> \
+  --chain ./x3-mainnet-plain.json
+```
+
+That downloads the binary and its `.sha256` into a temporary directory, verifies
+the digest **before** installing (a missing checksum is an error, not a warning),
+validates the genesis, installs the systemd unit and tells you which keys to
+insert. Until then, use Option B.
 
 ### Option B: Build from Source (Most Secure)
 
@@ -230,121 +243,94 @@ sudo apt install -y \
   cmake \
   protobuf-compiler
 
-# Clone repository
-git clone https://github.com/x3network/x3-chain.git
-cd x3-chain
 
-# Checkout specific version (NEVER use main/master for validators)
-git checkout tags/v1.0.0
+# Clone the canonical repository
+git clone https://github.com/Cyptopimpinainteazy/xxxstar.git
+cd xxxstar
 
-# Verify git tag signature (optional but recommended)
-git verify-tag v1.0.0
+# Check out the commit your launch coordinator names. Do not build a validator
+# from a moving branch: record the commit hash in your run log.
+git checkout <commit-or-tag>
 
-# Build in release mode (takes 30-60 minutes)
-cargo build --release
+# Build the node (30-60 minutes on a cold target directory)
+cargo build --release -p x3-chain-node
 
-# Move binary to system path
-sudo mv target/release/x3-chain-node /usr/local/bin/
-sudo chmod +x /usr/local/bin/x3-chain-node
+# What did you just build? Record this digest — it is the artifact you will run.
+sha256sum target/release/x3-chain-node
+x3-chain-node --version   # or: ./target/release/x3-chain-node --version
 
-# Verify build
-x3-chain-node --version
+# Install binary + genesis + systemd unit. The installer validates the genesis
+# (it must be a Live spec with bootnodes), verifies the digest you pin, and
+# refuses to continue if anything is missing. Run it in --check mode first.
+bash scripts/install-validator.sh --check \
+  --binary target/release/x3-chain-node \
+  --chain ./x3-mainnet-plain.json
+
+sudo bash scripts/install-validator.sh \
+  --binary target/release/x3-chain-node \
+  --sha256 "$(sha256sum target/release/x3-chain-node | awk '{print $1}')" \
+  --chain ./x3-mainnet-plain.json
+```
+
+**Getting the genesis.** `x3-mainnet-plain.json` is produced by
+`scripts/mainnet/generate_mainnet_chain_spec.sh`, which needs the authority,
+endowed, council and treasury keys plus the EVM/SVM escrow addresses (see
+`launch-gates/GENESIS_CEREMONY_CHECKLIST.md`). One validator does not build the
+genesis alone — it must be identical on every validator, so take it from the
+ceremony and check its `sha256sum` against the published value.
+
+The authority keys the genesis names are inserted into the node's keystore with
+the node's own CLI (the installer prints these two lines for you):
+
+```bash
+sudo -u x3 /usr/local/bin/x3-chain-node keys insert --key-type aura    --seed <suri>
+sudo -u x3 /usr/local/bin/x3-chain-node keys insert --key-type grandpa --seed <suri>
+sudo -u x3 /usr/local/bin/x3-chain-node keys list
 ```
 
 ### Option C: Docker (Advanced)
 
-```bash
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# Pull official image
-docker pull x3network/x3-chain:v1.0.0
-
-# Verify image
-docker run --rm x3network/x3-chain:v1.0.0 --version
-
-# Create data directory
-sudo mkdir -p /var/lib/x3-data
-sudo chown 1000:1000 /var/lib/x3-data
-
-# Run container
-docker run -d \
-  --name x3-validator \
-  --restart unless-stopped \
-  -p 30333:30333 \
-  -v /var/lib/x3-data:/data \
-  x3network/x3-chain:v1.0.0 \
-  --base-path /data \
-  --chain mainnet \
-  --validator \
-  --name "MyValidator"
-```
+**Not available.** No Docker image has been published for this project
+(`x3network/x3-chain` returns 404 from Docker Hub), and the repository's
+`Dockerfile.validator` has not been published either. Do not run a validator
+from an image you cannot verify — use Option B until an image is published with
+a digest you can pin.
 
 ### System Service Setup (systemd)
 
-**Create service file:**
+You do not need to write this unit by hand: `scripts/install-validator.sh`
+installs `packaging/systemd/x3-validator.service`, which is the maintained unit.
+Read it before you start the service — it is the file that will actually run.
 
-```bash
-sudo nano /etc/systemd/system/x3-validator.service
-```
+Notes on what the old hand-written unit got wrong:
 
-**Add configuration:**
-
-```ini
-[Unit]
-Description=X3 ATOMIC STAR Validator Node
-After=network.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=x3
-Group=x3
-ExecStart=/usr/local/bin/x3-chain-node \
-  --base-path /var/lib/x3-data \
-  --chain mainnet \
-  --validator \
-  --name "MyValidator-City" \
-  --port 30333 \
-  --rpc-port 9944 \
-  --ws-port 9945 \
-  --rpc-cors all \
-  --rpc-methods Safe \
-  --prometheus-port 9615 \
-  --prometheus-external \
-  --telemetry-url 'wss://telemetry.x3.network/submit 0' \
-  --bootnodes /dns/bootnode-1.x3.network/tcp/30333/p2p/12D3KooWXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
-  --bootnodes /dns/bootnode-2.x3.network/tcp/30333/p2p/12D3KooWXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
-  --bootnodes /dns/bootnode-3.x3.network/tcp/30333/p2p/12D3KooWXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-
-Restart=always
-RestartSec=10
-LimitNOFILE=65536
-
-StandardOutput=append:/var/log/x3-validator.log
-StandardError=append:/var/log/x3-validator.log
-
-[Install]
-WantedBy=multi-user.target
-```
+- `--chain mainnet` is not a chain id. The unit points at the installed spec
+  (`/etc/x3/chain-spec.json`); `production` is the only built-in Live id.
+- `--ws-port` does not exist in this node (the WebSocket endpoint shares
+  `--rpc-port`). Passing it makes the node exit with a usage error.
+- The `--bootnodes` lines carried placeholder peer ids
+  (`12D3KooWXXXX…`) for DNS names that do not resolve. Bootnodes belong in the
+  genesis (`TESTNET_BOOTNODES` when you build it), and each one must be a real
+  `/ip4/.../p2p/<peerid>` — the peer id is derivable from the node key, which is
+  what `scripts/mainnet/production_genesis_gate.sh` asserts.
+- The telemetry URL was fictional. Telemetry and Prometheus are optional; leave
+  them out unless your coordinator publishes an endpoint.
 
 **Create user and directories:**
 
-```bash
-# Create dedicated user
-sudo useradd -r -s /bin/false x3
+You do not need to do this by hand — `scripts/install-validator.sh` creates the
+`x3` system user and the directories the unit declares, and the unit runs as
+that user. The paths it uses are the ones the unit expects:
 
-# Create data directory
-sudo mkdir -p /var/lib/x3-data
-sudo chown x3:x3 /var/lib/x3-data
-sudo chmod 700 /var/lib/x3-data
+| path | purpose |
+| --- | --- |
+| `/usr/local/bin/x3-chain-node` | binary |
+| `/etc/x3/chain-spec.json` | genesis (`--chain`) |
+| `/var/lib/x3` | `--base-path`; the keystore lives at `/var/lib/x3/chains/x3_chain_production/keystore` |
+| `/run/x3`, `/var/log/x3` | runtime and log directories the unit is allowed to write |
 
-# Create log directory
-sudo mkdir -p /var/log
-sudo touch /var/log/x3-validator.log
-sudo chown x3:x3 /var/log/x3-validator.log
-```
+Logs go to the journal (`StandardOutput=journal`), not to a file, so read them
+with `journalctl -fu x3-validator`.
 
 **Enable and start service:**
 
@@ -483,7 +469,7 @@ echo "Session Keys: $SESSION_KEYS" > ~/session-keys.txt
 
 **What just happened?**
 - Node generated 5 keys (BABE, GRANDPA, ImOnline, Authority Discovery, + 1 more)
-- Keys stored in `/var/lib/x3-data/chains/x3_mainnet/keystore/`
+- Keys stored in `/var/lib/x3/chains/x3_chain_production/keystore/`
 - You received the **public** session keys (384 hex chars)
 - The **private** session keys remain on the node (never leave the server)
 
@@ -492,7 +478,7 @@ echo "Session Keys: $SESSION_KEYS" > ~/session-keys.txt
 ```bash
 # Backup session keys (in case node crashes)
 sudo tar -czf ~/session-keys-backup-$(date +%Y%m%d).tar.gz \
-  /var/lib/x3-data/chains/x3_mainnet/keystore/
+  /var/lib/x3/chains/x3_chain_production/keystore/
 
 # Encrypt backup
 gpg --symmetric --cipher-algo AES256 ~/session-keys-backup-*.tar.gz
@@ -535,15 +521,23 @@ x3-chain-node send-extrinsic \
 ### Network Configuration
 
 **Chain Specs:**
-- **Mainnet:** `--chain mainnet` or path to `x3-mainnet-raw.json`
-- **Testnet:** `--chain testnet` or path to `x3-testnet-raw.json`
+- **Mainnet (production):** the generated spec, installed at
+  `/etc/x3/chain-spec.json` (`--chain /etc/x3/chain-spec.json`). The built-in
+  `--chain production` builds the same genesis from the `X3_PRODUCTION_*`
+  environment, but a validator should run the file the ceremony published.
+- **Testnet:** `--chain testnet` (built-in) or a spec path.
+- **These are the only Live ids.** `mainnet` is not one of them; passing it makes
+  the node try to open a *file* called `mainnet` and fail.
 
 **Bootnodes:**
 ```bash
-# Mainnet bootnodes (always up-to-date list at https://docs.x3.network/nodes)
---bootnodes /dns/bootnode-1.x3.network/tcp/30333/p2p/12D3KooW...
---bootnodes /dns/bootnode-2.x3.network/tcp/30333/p2p/12D3KooW...
---bootnodes /dns/bootnode-3.x3.network/tcp/30333/p2p/12D3KooW...
+# Bootnodes come from the genesis (`TESTNET_BOOTNODES` when it was built), so a
+# validator that runs the published spec needs no --bootnodes flag at all.
+# When you do pass them, each entry must be a real multiaddr with a real peer id:
+#   /ip4/<host>/tcp/<port>/p2p/12D3KooW...
+# A placeholder peer id (12D3KooWXXXX…) parses but matches nothing, and the node
+# silently never connects — the three DNS names that used to be listed here do
+# not resolve.
 ```
 
 ### Performance Tuning
@@ -588,14 +582,13 @@ x3-chain-node send-extrinsic \
 
 ```bash
 x3-chain-node \
-  --base-path /var/lib/x3-data \
-  --chain mainnet \
+  --base-path /var/lib/x3 \
+  --chain /etc/x3/chain-spec.json \
   --validator \
   --name "MyOrg-Validator-NYC" \
   \
   --port 30333 \
   --rpc-port 9944 \
-  --ws-port 9945 \
   --prometheus-port 9615 \
   --prometheus-external \
   \
@@ -800,8 +793,10 @@ sudo systemctl start grafana-server
 4. Save & Test
 5. Import dashboard:
    - Dashboards → Import
-   - Download: https://github.com/x3network/monitoring/x3-validator-dashboard.json
-   - Upload JSON
+   - The Grafana dashboard JSON that used to be linked here
+     (`x3network/monitoring/x3-validator-dashboard.json`) does not exist. Build
+     the panels you need from the metrics below; nothing in this repository
+     ships a dashboard export.
    - Select Prometheus data source
    - Import
 
@@ -939,20 +934,23 @@ groups:
 **Upgrade Procedure:**
 
 ```bash
-# 1. Download new binary
-cd /tmp
-wget https://github.com/x3network/x3-chain/releases/download/v1.1.0/x3-chain-node-linux-amd64.tar.gz
-sha256sum -c x3-chain-node-linux-amd64.tar.gz.sha256
+# 1. Build the new binary from the commit your coordinator names
+cd xxxstar
+git fetch && git checkout <commit-or-tag>
+cargo build --release -p x3-chain-node
 
-# 2. Extract
-tar -xzf x3-chain-node-linux-amd64.tar.gz
+# 2. Record what you built (this is the digest you will pin)
+sha256sum target/release/x3-chain-node
 
-# 3. Backup old binary
+# 3. Back up the running binary
 sudo cp /usr/local/bin/x3-chain-node /usr/local/bin/x3-chain-node.backup
 
-# 4. Install new binary
-sudo mv x3-chain-node /usr/local/bin/
-sudo chmod +x /usr/local/bin/x3-chain-node
+# 4. Install it through the installer, which re-validates the genesis and the
+#    digest before replacing anything
+sudo bash scripts/install-validator.sh \
+  --binary target/release/x3-chain-node \
+  --sha256 "$(sha256sum target/release/x3-chain-node | awk '{print $1}')" \
+  --chain /etc/x3/chain-spec.json
 
 # 5. Restart node
 sudo systemctl restart x3-validator
@@ -979,8 +977,8 @@ sudo systemctl stop x3-validator
 
 # Prune database (removes old state, keeps recent)
 x3-chain-node purge-chain \
-  --base-path /var/lib/x3-data \
-  --chain mainnet \
+  --base-path /var/lib/x3 \
+  --chain /etc/x3/chain-spec.json \
   --pruning 256
 
 # Restart
@@ -993,16 +991,16 @@ sudo systemctl start x3-validator
 # Only if database corrupted
 
 # 1. Backup keys
-sudo cp -r /var/lib/x3-data/chains/x3_mainnet/keystore ~/keystore-backup
+sudo cp -r /var/lib/x3/chains/x3_chain_production/keystore ~/keystore-backup
 
 # 2. Stop node
 sudo systemctl stop x3-validator
 
 # 3. Delete database
-sudo rm -rf /var/lib/x3-data/chains/x3_mainnet/db
+sudo rm -rf /var/lib/x3/chains/x3_chain_production/db
 
 # 4. Restore keys
-sudo cp -r ~/keystore-backup/* /var/lib/x3-data/chains/x3_mainnet/keystore/
+sudo cp -r ~/keystore-backup/* /var/lib/x3/chains/x3_chain_production/keystore/
 
 # 5. Restart (will sync from genesis)
 sudo systemctl start x3-validator
@@ -1137,13 +1135,13 @@ sudo lsof -i :30333
 **Error: "Database lock"**
 ```bash
 # Node crashed without releasing lock
-sudo rm /var/lib/x3-data/chains/x3_mainnet/db/LOCK
+sudo rm /var/lib/x3/chains/x3_chain_production/db/LOCK
 ```
 
 **Error: "Permission denied"**
 ```bash
 # Fix ownership
-sudo chown -R x3:x3 /var/lib/x3-data
+sudo chown -R x3:x3 /var/lib/x3
 ```
 
 ### Node Not Syncing
