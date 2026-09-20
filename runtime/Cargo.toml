@@ -23,7 +23,16 @@ codec = { workspace = true, default-features = false, features = ["derive"] }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 log = { workspace = true, default-features = false }
 
-frame-support = { workspace = true, default-features = false }
+# `tuples-96` is **not** optional. `construct_runtime!` builds a tuple of the pallets, and
+# this runtime has more than the default limit of them, so the feature is required for the
+# crate to compile at all. It used to sit in `default`, which meant `--no-default-features`
+# turned it off and the runtime failed with
+#
+#   error: The number of pallets exceeds the maximum number of tuple elements. To increase
+#
+# — a build that cannot be configured a certain way rather than a claim about std. Declared
+# on the dependency, like TICKET-082's `hex/alloc` (TICKET-093).
+frame-support = { workspace = true, default-features = false, features = ["tuples-96"] }
 frame-system = { workspace = true, default-features = false }
 frame-executive = { workspace = true, default-features = false }
 frame-benchmarking = { workspace = true, default-features = false, optional = true }
@@ -161,8 +170,10 @@ substrate-wasm-builder = { workspace = true }
 sp-io = { workspace = true, features = ["std"] }
 
 [features]
-default = ["std", "tuples-96"]
-tuples-96 = ["frame-support/tuples-96"]
+# `tuples-96` was here and in `default`. It is on the `frame-support` dependency now,
+# because the runtime cannot be compiled without it and a feature that *has* to be on for
+# the build to succeed is not a feature — see the note on that dependency (TICKET-093).
+default = ["std"]
 dev = ["pallet-sudo"]
 
 # Testnet feature: enables NoOpCrossChainValidator (accepts all proofs),

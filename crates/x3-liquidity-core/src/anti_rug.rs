@@ -177,12 +177,18 @@ impl LpLockRegistry {
             .map(|lock| lock.lp_amount)
             .sum();
 
-        let lock_percentage = if total_lp_supply > 0 {
-            ((locked_lp as f64) * 10000.0 / (total_lp_supply as f64)) as u16
-        } else {
-            0
-        };
-        let lock_percentage = lock_percentage.min(10000);
+        // Integer arithmetic, not `f64` (PHASE 43): a share of a supply is a ratio of two
+        // integers. The float form was lossy above 2^53 and — the reason it matters here —
+        // its value depended on the platform's floating-point behaviour, so a score built
+        // from it was a decision that varied with where it ran. A supply too large to scale
+        // is scored at the ceiling rather than wrapped, because an unrepresentable share is
+        // not a small one.
+        let lock_percentage = locked_lp
+            .checked_mul(10_000)
+            .map(|scaled| scaled / total_lp_supply)
+            .map_or(10_000, |basis_points| {
+                u16::try_from(basis_points).unwrap_or(10_000).min(10_000)
+            });
 
         // Estimate lock duration (use the longest lock for this pool)
         let lock_duration = self
@@ -194,11 +200,12 @@ impl LpLockRegistry {
             .unwrap_or(0);
 
         // Team wallet concentration (percentage of total supply held by team)
-        let team_concentration = if total_lp_supply > 0 {
-            ((team_wallet_balance as f64) * 100.0 / (total_lp_supply as f64)) as u8
-        } else {
-            100
-        };
+        // The same, and the ceiling here is 100: a concentration that cannot be expressed is
+        // scored as total, which is the fail-closed direction for a rug heuristic.
+        let team_concentration = team_wallet_balance
+            .checked_mul(100)
+            .map(|scaled| scaled / total_lp_supply)
+            .map_or(100, |percent| u8::try_from(percent).unwrap_or(100).min(100));
 
         // Days since launch (simplified)
         let days_since_launch =
@@ -218,10 +225,23 @@ impl LpLockRegistry {
         // Lock percentage (40% weight) - higher locks = higher score
         score += (lock_percentage as u32) * 40 / 10000;
 
-        // Lock duration (20% weight) - longer locks = higher score
+        // Lock duration (20% weight) - longer locks = higher score, 30 days max.
+        //
+        // `ln` rather than integer arithmetic for two reasons, and the second forced the
+        // change: a float logarithm is not deterministic across platforms — its value comes
+        // from the platform's `libm` — so a score computed from it was a decision that
+        // depended on where it ran (PHASE 43's prohibition), and `ln` is not in `core`, so
+        // this crate could not be built without `std` while it used it (TICKET-093).
+        //
+        // `ln(a)/ln(b) == log2(a)/log2(b)`, so the ratio is the same function of the two
+        // arguments and integer `ilog2` computes it without a float anywhere. Each
+        // logarithm is floored, so this sub-score can differ from the float form by at most
+        // one point of twenty — and it no longer depends on the platform, which is the
+        // property that matters.
+        const THIRTY_DAYS_SECONDS: u64 = 30 * 24 * 3600;
         let duration_score = if lock_duration > 0 {
-            ((lock_duration as f64).ln() * 20.0 / (30.0_f64 * 24.0 * 3600.0).ln()) as u32
-        // 30 days max
+            let ratio = (u128::from(lock_duration).ilog2() * 20) / u128::from(THIRTY_DAYS_SECONDS).ilog2();
+            ratio.min(20)
         } else {
             0
         };
@@ -257,5 +277,86 @@ impl LpLockRegistry {
             risk_level,
             factors,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A pool that is fully locked, holds no team allocation, has a flat distribution and is
+    /// older than a month. Every other term is at its maximum — 40 for the lock, 20 for team
+    /// concentration, 10 for distribution and 10 for age — so the total isolates the
+    /// duration term, which is 20 at most: `score == 80 + duration`.
+    fn fully_locked_for(unlock_at_block: u64) -> u8 {
+        let mut registry = LpLockRegistry::new();
+        registry
+            .lock([1u8; 32], 7, 1_000_000, unlock_at_block)
+            .expect("a first lock is accepted");
+        let day = 86_400u64;
+        registry
+            .compute_rug_score(7, 1_000_000, 0, 0, 0, 31 * day)
+            .expect("the pool is scoreable")
+            .score
+    }
+
+    /// The duration term is integer arithmetic, and this pins what it produces.
+    ///
+    /// It used to be `ln(lock_duration) * 20 / ln(30 days)` in `f64` — which is PHASE 43's
+    /// prohibition for a consensus-sensitive decision, because the value of a platform's
+    /// `ln` is the platform's, and because `ln` is not in `core`, so the crate could not be
+    /// built without `std` while it used it (TICKET-093). `ln(a)/ln(b) == log2(a)/log2(b)`,
+    /// so the integer form computes the same ratio; flooring each logarithm means the
+    /// sub-score can differ from the old one by at most one point of twenty.
+    #[test]
+    fn the_duration_term_is_integer_arithmetic_with_a_reachable_maximum() {
+        // 30 days is the documented ceiling, and it has to be reachable — a maximum the
+        // heuristic can never award is a bug in the heuristic.
+        assert_eq!(fully_locked_for(30 * 86_400), 100, "a 30-day lock is the maximum");
+        assert_eq!(fully_locked_for(1), 80, "a one-second lock contributes nothing");
+        // And it is monotonic in the duration: more lock is never worse.
+        let scores: Vec<u8> = [1u64, 3_600, 86_400, 604_800, 2_592_000]
+            .iter()
+            .map(|seconds| fully_locked_for(*seconds))
+            .collect();
+        assert!(
+            scores.windows(2).all(|pair| pair[0] <= pair[1]),
+            "the duration term must not decrease as the lock lengthens: {scores:?}"
+        );
+        // The four data points the ladder passes through, so a change to the scaling is a
+        // failing test rather than a quiet one.
+        assert_eq!(scores, vec![80, 90, 95, 98, 100]);
+    }
+
+    /// A share of the supply is a ratio of two integers, and the conversion is exact where
+    /// the float form was not.
+    #[test]
+    fn supply_shares_are_exact_integers() {
+        let mut registry = LpLockRegistry::new();
+        // Half the supply locked: 5000 basis points, exactly.
+        registry
+            .lock([1u8; 32], 7, 500_000, 30 * 86_400)
+            .expect("lock");
+        let result = registry
+            .compute_rug_score(7, 1_000_000, 0, 0, 0, 31 * 86_400)
+            .expect("the pool is scoreable");
+        assert_eq!(result.factors.lock_percentage, 5_000);
+
+        // A third, where the float form would have carried a fraction: 3_333, truncated.
+        let mut registry = LpLockRegistry::new();
+        registry.lock([1u8; 32], 7, 1, 30 * 86_400).expect("lock");
+        let result = registry
+            .compute_rug_score(7, 3, 0, 0, 0, 31 * 86_400)
+            .expect("the pool is scoreable");
+        assert_eq!(result.factors.lock_percentage, 3_333);
+
+        // And a supply whose scaling overflows is scored at the ceiling rather than wrapped:
+        // an unrepresentable share is not a small one.
+        let mut registry = LpLockRegistry::new();
+        registry.lock([1u8; 32], 7, u128::MAX / 2, 30 * 86_400).expect("lock");
+        let result = registry
+            .compute_rug_score(7, u128::MAX, 0, 0, 0, 31 * 86_400)
+            .expect("the pool is scoreable");
+        assert_eq!(result.factors.lock_percentage, 10_000);
     }
 }

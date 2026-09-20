@@ -110,12 +110,20 @@ fi
 #
 # Measured with `cargo check -p <crate> --no-default-features`:
 KNOWN_UNBUILDABLE=(
-  "x3-chain-runtime"        #   1 error  (E0599)
   "x3-external-chains"      # 184 errors (E0433 ×87, E0412 ×55)
   "x3-gateway-risk-engine"  #   7 errors (E0412, E0599)
-  "x3-liquidity-core"       #   3 errors (E0599)
   "x3-sdk"                  # 216 errors (E0412 ×147, E0433 ×31)
 )
+# Two came off this list the same day it was written:
+#   * `x3-chain-runtime` — `frame-support/tuples-96` was in the crate's `default`, so
+#     `--no-default-features` turned it off and `construct_runtime!` failed with "the number
+#     of pallets exceeds the maximum number of tuple elements". It is on the dependency now.
+#   * `x3-liquidity-core` — it scored a pool with `f64`, including `ln(lock_duration) * 20 /
+#     ln(30 days)` for the duration term. `ln` is not in `core`, so the crate could not be
+#     built without `std`; and a platform-dependent logarithm in an anti-rug score is
+#     PHASE 43's prohibition. The percentages are exact integer ratios now and the duration
+#     term is `ilog2(d) * 20 / ilog2(30 days)`, which is the same ratio (`ln a / ln b ==
+#     log2 a / log2 b`) computed without a float.
 
 is_known() {
   local crate="$1"
