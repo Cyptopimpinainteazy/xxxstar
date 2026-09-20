@@ -29,8 +29,24 @@ FAILURES: list[str] = []
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def run(cmd: list[str], cwd: pathlib.Path | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd or ROOT)
+def run(
+    cmd: list[str],
+    cwd: pathlib.Path | None = None,
+    env: dict | None = None,
+) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd or ROOT, env=env)
+
+
+def node_binary_env() -> dict:
+    """The environment that pins a child gate to the binary stage 2 built.
+
+    The chain-booting gates look for a node binary in `CARGO_TARGET_DIR` (or
+    `target/`), which is the same directory stage 2 builds into — but only when
+    the ambient environment happens to agree. Passing the path explicitly makes
+    these stages test the artifact the release gate just built and verified,
+    whichever target directory this run uses.
+    """
+    return {**os.environ, "X3_NODE_BIN": str(TARGET_DIR / "release" / "x3-chain-node")}
 
 
 def fail(msg: str) -> None:
@@ -154,7 +170,7 @@ def check_chain_runs() -> None:
         fail("scripts/local-node-smoke.sh is missing — nothing boots a chain")
         return
 
-    result = run(["bash", str(script)])
+    result = run(["bash", str(script)], env=node_binary_env())
     output = result.stdout + result.stderr
     if result.returncode != 0:
         fail("the chain did not run (scripts/local-node-smoke.sh failed)")
@@ -230,6 +246,48 @@ def check_chain_spec_artifacts() -> None:
         fail("node/src/chain_spec.rs not found")
 
 
+def check_validator_install() -> None:
+    """The operator's install path has to work, or nobody can run a validator.
+
+    `scripts/install-validator.sh` downloaded `releases/download/latest/…` — a
+    draft release with no assets — printed "WARNING: No checksum file found.
+    Skipping verification." and installed a systemd unit pointing at a chain spec
+    it had failed to fetch. Nothing in the repository ran the script, so none of
+    that was visible. This stage runs it in `--check` mode (no root, no writes)
+    against a real generated Live genesis and a real built binary, and against
+    each way the inputs can be wrong.
+    """
+    print("\n── 2d. Validator install path ──")
+    script = ROOT / "scripts" / "mainnet" / "validator_install_gate.sh"
+    if not script.exists():
+        fail(
+            "scripts/mainnet/validator_install_gate.sh is missing — nothing "
+            "exercises the validator install path"
+        )
+        return
+
+    result = run(["bash", str(script)], env=node_binary_env())
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("the validator install path did not behave as required")
+        for line in output.splitlines()[-15:]:
+            print(f"    {line}")
+        return
+
+    accepted = sum("-> exit 0 (ok)" in line for line in output.splitlines())
+    refused = sum("-> exit 1 (fail)" in line for line in output.splitlines())
+    if accepted < 3 or refused < 5:
+        fail(
+            f"the install gate only exercised {accepted} accepted and {refused} "
+            "refused cases; expected at least 3 and 5"
+        )
+        return
+    ok(
+        f"install path: {accepted} cases accepted, {refused} refused, "
+        "nothing written in check mode"
+    )
+
+
 def check_production_genesis() -> None:
     """The mainnet genesis has to be built *and* it has to boot.
 
@@ -250,7 +308,7 @@ def check_production_genesis() -> None:
         )
         return
 
-    result = run(["bash", str(script)])
+    result = run(["bash", str(script)], env=node_binary_env())
     output = result.stdout + result.stderr
     if result.returncode != 0:
         fail("the production genesis did not build, boot and finalize")
@@ -532,6 +590,7 @@ def main() -> int:
     check_build()
     check_chain_runs()
     check_validators_agree()
+    check_validator_install()
     check_chain_spec_artifacts()
     check_production_genesis()
     check_test_suites()

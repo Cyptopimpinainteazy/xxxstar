@@ -33,14 +33,6 @@ BASE_DIR="$(mktemp -d)"
 BASE_PORT="${X3_PRODUCTION_GENESIS_BASE_PORT:-21100}"
 NODE_PIDS=()
 
-# Fixture seeds. Deliberately not dev aliases (production_config refuses those)
-# and deliberately constant so the gate is reproducible. They are not secrets:
-# they exist only inside this run's temporary directory.
-SEED_1=0x0101010101010101010101010101010101010101010101010101010101010101
-SEED_2=0x0202020202020202020202020202020202020202020202020202020202020202
-SEED_3=0x0303030303030303030303030303030303030303030303030303030303030303
-SEEDS=("$SEED_1" "$SEED_2" "$SEED_3")
-
 cleanup() {
   for pid in "${NODE_PIDS[@]:-}"; do
     kill "$pid" 2>/dev/null || true
@@ -64,7 +56,7 @@ fail() {
   exit 1
 }
 
-# ── the binary ───────────────────────────────────────────────────────────────
+# ── 1. the binary and the genesis ────────────────────────────────────────────
 NODE_BIN="${X3_NODE_BIN:-}"
 if [ -z "$NODE_BIN" ]; then
   for candidate in \
@@ -75,147 +67,29 @@ if [ -z "$NODE_BIN" ]; then
     if [ -x "$candidate" ]; then NODE_BIN="$candidate"; break; fi
   done
 fi
-[ -n "$NODE_BIN" ] && [ -x "$NODE_BIN" ] || fail "node binary not found; build it with cargo build -p x3-chain-node"
+[ -n "$NODE_BIN" ] && [ -x "$NODE_BIN" ] \
+  || fail "node binary not found; build it with cargo build -p x3-chain-node"
 info "node: $NODE_BIN"
 
-# `keys generate` writes the public key to stdout and the banner/advice to
-# stderr, so `--output ss58` is pipeable.
-keygen() { "$NODE_BIN" keys generate --key-type "$1" --seed "$2" --output "$3" 2>/dev/null; }
+# Building the spec (and asserting it is a Live, mainnet-shaped genesis) lives in
+# one place, shared with scripts/mainnet/validator_install_gate.sh.
+X3_NODE_BIN="$NODE_BIN" bash "$ROOT/scripts/mainnet/make-fixture-mainnet-spec.sh" \
+  "$BASE_DIR" "$BASE_PORT" || fail "could not build the fixture production genesis"
 
-# A binary whose `keys generate` is still the old placeholder prints advice
-# instead of a key. Without this check the derivation below dies in Python with
-# `non-hexadecimal number found in fromhex()` — which says nothing about the
-# real problem, that the binary under test predates the implementation.
-require_key_output() {  # require_key_output <value> <what> <pattern>
-  local value="$1" what="$2" pattern="$3"
-  if ! printf '%s' "$value" | grep -Eq "$pattern"; then
-    fail "$NODE_BIN did not return a $what (got '${value:0:60}').
-    This is what a stale binary or a placeholder \`keys generate\` looks like.
-    Rebuild it: cargo build --release -p x3-chain-node"
-  fi
-}
+FIXTURE="$BASE_DIR/fixture.json"
+PLAIN="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['spec'])" "$FIXTURE")"
+BOOTNODES="$(python3 -c "import json,sys; print(','.join(json.load(open(sys.argv[1]))['bootnodes']))" "$FIXTURE")"
+PEER_IDS=($(python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1]))['peers']))" "$FIXTURE"))
+NODE_KEYS=($(python3 -c "import json,sys; print(' '.join(s.removeprefix('0x') for s in json.load(open(sys.argv[1]))['seeds']))" "$FIXTURE"))
+SEEDS=($(python3 -c "import json,sys; print(' '.join(json.load(open(sys.argv[1]))['seeds']))" "$FIXTURE"))
+info "bootnodes: $BOOTNODES"
 
-# libp2p peer id for an ed25519 node key: base58btc(0x00 0x24 || protobuf(ed25519 pub)).
-# The node's network identity is the ed25519 key built from the same 32 bytes,
-# so this is the peer id the node will report — and check 4 asserts that.
-peer_id_for() {
-  local pub_hex="$1"
-  python3 - "$pub_hex" <<'PY'
-import sys
-ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-def b58(data: bytes) -> str:
-    n = int.from_bytes(data, "big")
-    out = ""
-    while n:
-        n, r = divmod(n, 58)
-        out = ALPHABET[r] + out
-    pad = 0
-    for byte in data:
-        if byte == 0:
-            pad += 1
-        else:
-            break
-    return "1" * pad + out
-pub = bytes.fromhex(sys.argv[1].removeprefix("0x"))
-assert len(pub) == 32, "ed25519 public key must be 32 bytes"
-print(b58(bytes([0x00, 0x24, 0x08, 0x01, 0x12, 0x20]) + pub))
-PY
-}
-
-info "deriving three authority keypairs from fixture seeds"
-AUTHORITIES="["
-ENDOWED="["
-COUNCIL="["
-TREASURY="["
-PEER_IDS=()
-NODE_KEYS=()
-for i in 0 1 2; do
-  seed="${SEEDS[$i]}"
-  aura="$(keygen aura "$seed" ss58)" || fail "keys generate (aura) failed"
-  grandpa="$(keygen grandpa "$seed" ss58)" || fail "keys generate (grandpa) failed"
-  ed_hex="$(keygen grandpa "$seed" hex)" || fail "keys generate (grandpa hex) failed"
-  # SS58 addresses are base58 and start with a 5 (32-byte key, prefix 42).
-  require_key_output "$aura" "SS58 address for aura" '^[1-9A-HJ-NP-Za-km-z]{47,48}$'
-  require_key_output "$grandpa" "SS58 address for grandpa" '^[1-9A-HJ-NP-Za-km-z]{47,48}$'
-  require_key_output "$ed_hex" "hex public key for grandpa" '^0x[0-9a-f]{64}$'
-
-  PEER_IDS+=("$(peer_id_for "$ed_hex")")
-  NODE_KEYS+=("${seed#0x}")
-
-  [ "$i" -gt 0 ] && AUTHORITIES="$AUTHORITIES," && ENDOWED="$ENDOWED,"
-  AUTHORITIES="$AUTHORITIES{\"aura\":\"$aura\",\"grandpa\":\"$grandpa\"}"
-  ENDOWED="$ENDOWED\"$aura\""
-  # A live council needs at least two members; the treasury needs at least one.
-  if [ "$i" -lt 2 ]; then
-    [ "$i" -gt 0 ] && COUNCIL="$COUNCIL,"
-    COUNCIL="$COUNCIL\"$aura\""
-  fi
-  [ "$i" -gt 0 ] && TREASURY="$TREASURY,"
-  TREASURY="$TREASURY\"$aura\""
-done
-AUTHORITIES="$AUTHORITIES]"
-ENDOWED="$ENDOWED]"
-COUNCIL="$COUNCIL]"
-TREASURY="$TREASURY]"
-
-A_P2P=$(( BASE_PORT + 1 ))   # 21101
-B_P2P=$(( BASE_PORT + 2 ))   # 21102
-C_P2P=$(( BASE_PORT + 3 ))   # 21103
 A_RPC=$(( BASE_PORT + 101 ))
 B_RPC=$(( BASE_PORT + 102 ))
 C_RPC=$(( BASE_PORT + 103 ))
-
-BOOTNODES="/ip4/127.0.0.1/tcp/$A_P2P/p2p/${PEER_IDS[0]},/ip4/127.0.0.1/tcp/$B_P2P/p2p/${PEER_IDS[1]},/ip4/127.0.0.1/tcp/$C_P2P/p2p/${PEER_IDS[2]}"
-info "bootnodes: $BOOTNODES"
-
-# ── 2. build the production spec ─────────────────────────────────────────────
-export X3_PRODUCTION_AUTHORITIES="$AUTHORITIES"
-export X3_PRODUCTION_ENDOWED_ACCOUNTS="$ENDOWED"
-export X3_PRODUCTION_COUNCIL_MEMBERS="$COUNCIL"
-export X3_PRODUCTION_TREASURY_SIGNERS="$TREASURY"
-export X3_EVM_ESCROW_ADDR="0x$(printf '11%.0s' $(seq 1 20))"
-export X3_SVM_ESCROW_ADDR="0x$(printf '22%.0s' $(seq 1 32))"
-export TESTNET_BOOTNODES="$BOOTNODES"
-
-PLAIN="$BASE_DIR/x3-production-plain.json"
-info "building the production spec"
-"$NODE_BIN" build-spec --chain production --disable-log-color >"$PLAIN" \
-  || fail "build-spec --chain production failed"
-[ -s "$PLAIN" ] || fail "build-spec produced an empty file"
-
-# ── 3. assert the artifact ───────────────────────────────────────────────────
-info "asserting the generated spec"
-python3 - "$PLAIN" "$AUTHORITIES" "$BOOTNODES" <<'PY' || fail "the generated spec is not a valid mainnet genesis"
-import json
-import os
-import sys
-
-path, authorities_json, bootnodes = sys.argv[1], sys.argv[2], sys.argv[3]
-raw = open(path, encoding="utf-8").read()
-
-# Parsing the whole file is the point: `build-spec` writes the spec to stdout,
-# so a startup banner on stdout (the bug this gate exists to catch) makes this
-# json.loads fail rather than producing a spec nobody can boot.
-spec = json.loads(raw)
-
-assert spec["name"] == "X3 Chain Production", spec["name"]
-assert spec["id"] == "x3_chain_production", spec["id"]
-assert spec["chainType"] == "Live", spec["chainType"]
-
-authorities = json.loads(authorities_json)
-for entry in authorities:
-    for key in ("aura", "grandpa"):
-        assert entry[key] in raw, f"authority {entry[key]} is missing from the genesis"
-
-boot = spec.get("bootNodes") or []
-expected = bootnodes.split(",")
-assert boot == expected, f"bootNodes mismatch:\n  spec:     {boot}\n  expected: {expected}"
-
-for forbidden in ("Alice", "Bob", "Charlie", "/Alice", "/Bob", "TestnetAlpha", "ValidatorAlpha"):
-    assert forbidden not in raw, f"dev seed marker {forbidden!r} leaked into the production genesis"
-
-print(f"[genesis-gate] spec ok: {os.path.getsize(path)} bytes, {len(authorities)} authorities, {len(boot)} bootnodes")
-PY
+A_P2P=$(( BASE_PORT + 1 ))
+B_P2P=$(( BASE_PORT + 2 ))
+C_P2P=$(( BASE_PORT + 3 ))
 
 # ── 4. boot the network on the generated genesis ─────────────────────────────
 rpc() {
