@@ -2297,6 +2297,15 @@ pub mod pallet {
 
         /// Verify EVM receipt proof
         /// Bridge Integration: Calls cross-chain-validator to verify against canonical headers
+        ///
+        /// The root this walks the receipt to is the one
+        /// `pallet-cross-chain-validator` stored for the header, and it is walked **as a
+        /// Merkle Patricia receipts root** — `rlp(index)` as the key, the node path, the
+        /// receipt as the leaf. That pallet validates its roots as flat Merkle trees over
+        /// submitted leaves instead, so it cannot tell the two apart: the root being the
+        /// block's `receiptsRoot` is the authorized submitter's claim, and an attested root
+        /// of the wrong kind fails here rather than settling against the wrong tree
+        /// (TICKET-063 item (b), the module documentation of `pallet-cross-chain-validator`).
         fn verify_evm_receipt_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
             // Stage 1: Basic structural validation
             let proof_type_ok = matches!(

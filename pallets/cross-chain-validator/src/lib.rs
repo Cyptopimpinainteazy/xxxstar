@@ -30,6 +30,31 @@
 //!    equal the claimed root (real Merkle inclusion, `_expected_root` is no longer
 //!    ignored).
 //! 4. Only after every check passes is any storage written.
+//!
+//! ## What `merkle_root` has to be for the settlement engine
+//!
+//! `pallet-x3-settlement-engine` settles an EVM leg by walking a **Merkle Patricia
+//! receipt** proof — `rlp(index)` as the key, an RLP node path, the receipt as the leaf —
+//! against this pallet's stored root. This pallet validates the root the other way: as
+//! the root of a **flat** Merkle tree over the submitted 32-byte leaves. Those are two
+//! different structures over the same 32 bytes, so a submitter who attests a block's
+//! leaf-Merkle root makes that block impossible to settle, and nothing here complains:
+//! the shape is valid, the root is stored, and only the trie walk refuses.
+//!
+//! So the root submitted for a block the settlement engine will settle **must be that
+//! block's `receiptsRoot`** — and this pallet cannot check that, because it never sees an
+//! RLP header. The whole header, hash included, is the authorized submitter's attestation
+//! (see the security model above); what this pallet does check is that the submitted
+//! `proof` really has the claimed root as its root, so a submitter cannot store a root
+//! they cannot open. The *meaning* of the root is their claim.
+//!
+//! The failure mode is liveness rather than theft — a root of the wrong kind is refused
+//! by the walk rather than settled against — which is why it is stated here rather than
+//! enforced: there is nothing to enforce against. An operator wiring the settlement path
+//! has to set this field to the receipts root, and
+//! `pallets/x3-settlement-engine/src/tests.rs` pins the four ways the walk fails, so a
+//! wrong root shows up as a refused settlement rather than as a settlement against the
+//! wrong tree.
 
 pub use pallet::*;
 
@@ -126,6 +151,13 @@ pub mod pallet {
         pub block_number: u64,
         pub block_hash: H256,
         pub state_root: H256,
+        /// The root this header was attested with, validated as the root of a flat Merkle
+        /// tree over the submitted leaves.
+        ///
+        /// For a block the settlement engine settles it has to be that block's
+        /// **`receiptsRoot`** — the engine walks a Merkle Patricia receipt proof against
+        /// it, which is a different structure over the same 32 bytes. See the module
+        /// documentation; the wrong kind fails closed at settlement rather than here.
         pub merkle_root: H256,
         pub validator_set_hash: H256,
         pub verified_at_block: u32,
@@ -279,6 +311,13 @@ pub mod pallet {
 
         /// Submit and validate an EVM block header. Only authorized submitters may
         /// call; all checks happen before any storage write.
+        ///
+        /// `merkle_root` is checked to be the root of a **flat** Merkle tree over the
+        /// `proof`'s leaves, and for a block the settlement engine will settle it must be
+        /// that block's **`receiptsRoot`** — the engine walks a Merkle Patricia receipt
+        /// proof against it, which is a different structure. See the module documentation:
+        /// this pallet cannot tell the two apart, so the meaning of the root is the
+        /// submitter's claim and the wrong choice fails closed at settlement.
         #[pallet::call_index(0)]
         #[pallet::weight(T::WeightInfo::validate_evm_header())]
         pub fn validate_evm_header(
