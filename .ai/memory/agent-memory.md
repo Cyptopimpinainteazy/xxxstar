@@ -5195,3 +5195,20 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   depth) already refused or fell through to a mode word.
 - Pattern worth keeping: `unwrap_or(0)` on a value the compiler *should* be able to read turns an
   unreadable input into the weakest possible claim. Grep for `.unwrap_or(0)` next to a parse.
+
+**2026-09-20 — the fee ceiling, and the `unwrap_or` sweep**
+
+- A strategy's `risk { max_total_fee_bps N }` bounded nothing: a module declaring 1 and routing
+  through a venue declaring `fee_bps 100` passed `x3c check` and its artifact carried no record of
+  the ceiling. `strategy.rs`'s per-module loop now compares every declared venue the body's swaps
+  name against the ceiling (`declared_venue_fee`; `None` = "nothing to compare", never 0bps).
+  Closed in `0c7f1b171`. The `arb` path already had the rule, as *standings* rather than a refusal.
+- TICKET-115 files PHASE 7's other half: the fee ceiling has no artifact representation. The three
+  options (a `fees` guard kind / a static record with no guard behind it / a new capability opcode +
+  version bump) are written down with their trade-offs.
+- Sweep result, so it need not be redone: six `unwrap_or(<permissive default>)` sites examined
+  (min_output in lowering and in the intent bridge, objective `hops <= 0`, arb `max_hops`, hyperarb's
+  leg selection, metadata's risk class) — every one is caught by a downstream check. The pattern is
+  only dangerous when the default feeds a *check directly*, which is what TICKET-114's turn found.
+- `strategy.rs` already had a recursive `walk(statements, out)` for nested blocks — reuse it rather
+  than writing another walker (that is what the fee-chain and guard walks should have done).
