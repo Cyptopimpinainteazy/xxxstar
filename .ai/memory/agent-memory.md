@@ -5212,3 +5212,17 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   only dangerous when the default feeds a *check directly*, which is what TICKET-114's turn found.
 - `strategy.rs` already had a recursive `walk(statements, out)` for nested blocks — reuse it rather
   than writing another walker (that is what the fee-chain and guard walks should have done).
+
+**2026-09-20 — the fee ceiling reaches the artifact (TICKET-115), and the third option that was better**
+
+- `Item::FinalityPolicy` is the precedent for "a *declaration* lowers to a records": a `REQUIRE` with
+  an explicit kind and its figure. The fee ceiling now does the same (`RequireKind::FeeCeiling`),
+  rather than a new opcode (version bump) or a guard kind (a language addition).
+- Guard quantity codes: 0 none/profit, 1 delta, 2 slippage, 3 amount, 4 score, 5 count, 6 blocks,
+  **7 fees**. The three bits are full, so the verifier's static set is total and its test asserts the
+  *measured* closure (a measured guard may not borrow a static code) instead.
+- Test-writing lesson: `cli.rs`'s folded-`if` test pinned two absolute instruction counts; an
+  unrelated new record shifted both. Assert the *difference* the test is about, with a non-vacuity
+  floor, or an unrelated emitter change edits a test about folding.
+- TICKET-116 files the `fees` guard kind (a program stating its own ceiling) — the language addition
+  that TICKET-115 did not need.

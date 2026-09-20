@@ -4589,8 +4589,31 @@ bond, a score for route_score, a basis-point figure for the measured kinds), and
 unit code currently means profit / delta / slippage in basis points — so this needs a per-kind unit
 decision, which is a small design choice rather than a copy of the enforcement change.
 
-## TICKET-115 — the fee ceiling has no representation an artifact can carry — OPEN
-Type: OPEN, PHASE 7 gap · Subsystem: x3-lang/spec + compiler (emitter)
+## TICKET-115 — the fee ceiling has no representation an artifact can carry — CLOSED
+Type: CLOSED in `bf5bea2e9` (2026-09-20) · Subsystem: x3-lang/spec + compiler (lowering + emitter) + x3-lang/vm
+**Closed with a declaration record, which is the shape the finality policy's depth already had.**
+`risk { max_total_fee_bps N }` lowers to `RequireKind::FeeCeiling` — a `REQUIRE` whose doc says it is
+a declaration rather than a guard the body wrote — and the emitter carries its figure with the
+quantity code `GUARD_QUANTITY_FEES_BPS` (7), the same machinery TICKET-114 built:
+```
+$ x3c explain strategy_module.x3b | grep REQUIRE
+  0003  0x40  REQUIRE static fees 8
+  0006  0x40  REQUIRE measured slippage 50
+```
+Two modules with different ceilings compile to different bytes, and the trace says what the figure
+counts.
+**The options, and why (a') rather than the filed three.** The ticket offered (a) a `fees` guard kind,
+(b) a static record with no declaration behind it, (c) a new capability opcode. Reading the finality
+policy's lowering showed a fourth that is better than all three: `Item::FinalityPolicy` already
+lowers to a `REQUIRE` with an *explicit* kind and its depth in the record, so a declaration reaching
+the artifact is established practice, needs no new opcode and no version bump, and does not pretend
+the program wrote a guard. (a) remains the way a *program* would state its own fee ceiling — a
+language addition, filed as TICKET-116 rather than smuggled in here.
+One consequence worth recording: the guard's quantity code is three bits and the fee ceiling's is the
+**last** of the eight, so the verifier's static set is total. Its test now asserts the meaningful
+closure — every code is defined, and a *measured* guard may not borrow a static one — rather than a
+refusal that can no longer happen.
+Original Type: OPEN, PHASE 7 gap.
 Reason: PHASE 7 says "Risk policy **must compile into the artifact**" and "Runtime callers MUST NOT
 be able to silently override compiled safety settings". Measured on `examples/strategy_module.x3`,
 which declares `risk { max_slippage_bps 50 max_total_fee_bps 8 }`:
@@ -4618,3 +4641,20 @@ runtime reading only the artifact can refuse a route that exceeds it; the choice
 with its reason.
 Validation: `x3c explain` on `strategy_module.x3b` prints the ceiling; a replayer that reads only the
 artifact can answer "what fee ceiling did this module declare".
+
+## TICKET-116 — a program cannot state a fee ceiling of its own — OPEN
+Type: OPEN, language addition · Subsystem: x3-lang/compiler (parser + checks) + spec
+Reason: the wire the fee ceiling travels is the *declaration* record (TICKET-115), so a module's
+`risk { max_total_fee_bps N }` reaches the artifact. A program cannot write the same claim as a
+guard the way it writes `require slippage <= 50`, because there is no `fees` guard kind. The
+slippage pair is the model: a guard the body writes, backed by the policy the module declares,
+refused when the guard is looser than the policy. For fees only the policy half exists.
+Acceptance criteria: `require fees <= <bps>` parses; it is refused when it exceeds the module's
+declared `max_total_fee_bps` (the `verify_risk_policy_bounds_guards` shape); it lowers to a static
+guard with the `fees` quantity code, so `x3c explain` shows it; and the existing suite and corpus
+stay green.
+Validation: a guard above the declared ceiling is refused with both numbers, one at or below it
+compiles, and the artifact's trace shows `REQUIRE static fees <n>`.
+Why not done here: it is a new guard kind (parser + `REQUIRE_KIND_NAMES` + the check + a test), and
+PHASE 7's requirement — the policy compiling into the artifact — is met without it. Adding a language
+feature in the same change as the record it would use makes both harder to review.
