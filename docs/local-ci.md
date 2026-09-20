@@ -78,6 +78,7 @@ a sequential run.
 | `workflow wiring` | every script/action/make target a workflow calls exists, and every workflow can actually fire |
 | `test integrity diff` | no `#[ignore]`, `.skip(`, `assert true` added by this change set |
 | `readiness consistency` | `FEATURE_REGISTRY.toml` `required_tests` are real test function names |
+| `runtime hash freshness` | if the diff touches a package in the runtime's dependency graph, `docs/reports/runtime-wasm-hashes.json` must move with it |
 | `workspace check` | `cargo check --workspace` |
 | `clippy workspace`, `clippy runtime rc1`, `clippy node rc1` | the three lint configurations, `-D warnings` |
 | `test x3-lang`, `test atomic-kernel`, `test atomic-swap std`, `test settlement-engine`, `test node`, `test cross-vm-coordinator` | the unit suites that gate landing |
