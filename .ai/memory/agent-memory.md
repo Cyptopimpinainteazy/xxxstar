@@ -5064,3 +5064,51 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   declaration boundaries and it warns); annotations are now covered.
 - A typed record per host operation (instead of `HostCall`'s positional strings)
   needs a new opcode and therefore a bytecode version bump (TICKET-097's gate).
+
+## 2026-09-20 — clause words, and the identifier arms that can never run (TICKET-046 closed)
+
+**Facts discovered**
+
+- The lexer maps `swap`, `bridge`, `require`, `emit`, `use`, `mint`, `burn`, `lock`, `release` to
+  keywords, and `keyword_to_tok` (`compiler/src/parser.rs`, ~line 6430) gives each a `Tok::Kw*`
+  variant. **An arm of the form `Tok::Ident(ref s) if s == "<one of those>"` can never run.** Three
+  clauses were written that way and were unreadable: `use <target> <config>` in an intent body,
+  the terse `finality_policy { ethereum require finalized }`, and inline
+  `rpc_quorum { source require 2_of_3 }`. Each was fixed by matching the `Tok::Kw*` token.
+- `CLAUSE_WORDS` (the guard lookahead) had a stale entry: `balance` appears exactly once in
+  parser.rs — the list entry itself. Nothing dispatches on it.
+- A guard can only be followed by a clause in a body that also holds statements. Those bodies are
+  the intent body and the `atomic swap` body. Route blocks are read by a step loop that refuses
+  statements (`expected route operation (…)`), so route-step words (`fallback`, and the keywords
+  `swap`/`bridge`) never need a list entry.
+- The guard fixture mechanism (`compiler/tests/test_require_guards.rs`) is a list of clause lines;
+  adding lines to it is what "reaching every clause word means writing a fixture per grammar"
+  turned out to cost once the question was narrowed to guard-bearing bodies. 9 → 13 words.
+- Writing a commit message with backticks inside a shell `-m "…"` expands them. Use a heredoc file
+  or single quotes. `c7dfb461a`'s message lost three backticked fragments this way; the content
+  (code, tests) is unaffected and the ledger/report carry the correct text.
+- Seven more identifier-arms-for-keywords survive as dead duplicates (`TICKET-113`); the keyword
+  twin does the work in each.
+
+**Decisions made**
+
+- TICKET-046: keep the union list (option (a)), because the acceptance's *purpose* — a guard that
+  stops without a list — already holds for the nine words that are keywords, and (b) would require
+  every name position to accept a keyword token (`debt.amount` is in two shipped examples).
+  Option (c) stays the follow-up if drift is judged material; it is not, because both directions
+  of drift now fail a test.
+- Did **not** force-push to correct `c7dfb461a`'s commit message.
+
+**Dead ends to avoid**
+
+- `git stash create` exits 1 in the `/tmp/x3-*` worktrees.
+- The sandbox denies loopback (`bind`/`connect 127.0.0.1` → EPERM), which is what makes the
+  `nested workspaces`, `test node` and `js sdk tests` local-ci gates red.
+- Grepping the parser for clause words by line number is unreliable (offsets shift); anchor on the
+  function name or read the source in a test.
+
+**Next task seed**
+
+- TICKET-113: delete the seven dead duplicate arms (method in the ticket). Cheapest is to add a
+  source-scanning test that fails for any `Tok::Ident(ref s) if s == w` where `w` is a lexer keyword
+  with a `Tok::Kw*` mapping — that makes the class impossible to reintroduce.

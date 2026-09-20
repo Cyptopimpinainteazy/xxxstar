@@ -1148,9 +1148,80 @@ Validation: `compiler/tests/test_timeout_units.rs` extended with the deadline
 clause, or a sibling test; a trading program with `deadline: 2h` lowers to the
 same blocks as `timeout 2h`.
 
-## TICKET-046 — clause words are a list rather than a lexical class — PARTIAL
-Type: PARTIAL in `4bed37b14` (2026-09-20) — the validation is landed, and the acceptance **conflicts
-with the language** · Subsystem: x3-lang/compiler/parser + x3-lang/crates/x3-lexer
+## TICKET-046 — clause words are a list rather than a lexical class — CLOSED
+Type: CLOSED in `c7dfb461a` (2026-09-20), on `4bed37b14` · Subsystem: x3-lang/compiler/parser +
+x3-lang/crates/x3-lexer
+**Closed: the decision is (a) — keep the union list — and measuring the ticket instead of deciding it
+found the defect the acceptance was actually pointing at.** The acceptance asked for the 22 words to
+become keyword tokens "so [a clause word] cannot begin an expression and no guard needs a list to stop
+at one". That is **already true of nine of them**: `swap`, `bridge`, `require`, `emit`, `use`, `mint`,
+`burn`, `lock` and `release` are lexer keywords with `Tok::Kw*` mappings, and `can_start_expression`
+refuses a keyword, so a guard stops there with no list entry (the const says so, and it is right).
+What was *not* true is the consequence of the same fact, and it is the reason this was worth
+measuring: **an arm written against `Tok::Ident(ref s) if s == "<keyword>"` can never run**, and three
+clauses were written that way. Each was refused while the comment above it, the error message and the
+formatter all said the clause was supported:
+
+```
+$ x3c build use_probe.x3          # `use uniswap 1` in an intent body
+x3c: compile error: Parser error: unexpected clause in intent body: KwUse; expected one of
+  `from`, `to`, `route`, `require`, `timeout`, `on_fail`, `use` or `on`
+$ x3c check fp_terse.x3           # finality_policy strict { ethereum require finalized  blocks 12 }
+x3c: parsing failed: Parser error: expected '}' after finality_policy body
+$ x3c check rq_inline.x3          # rpc_quorum { source require 2_of_3  relayers a b c }
+x3c: parsing failed: Parser error: rpc_quorum source chain: expected identifier
+```
+
+All three parse now — the arms match `Tok::KwUse` / `Tok::KwRequire` — and the first one runs:
+`use uniswap 1` reaches the artifact as `HostCall { function: "use", args: ["uniswap", "1"] }`,
+424 bytes, `x3c run: ok`.
+
+`CLAUSE_WORDS` itself lost one entry and kept the rest, and both halves are now measured rather
+than argued:
+
+- **`balance` removed.** It was listed under "statements and trade bodies that carry a guard" and
+  **no arm anywhere in the parser dispatches on it** (one occurrence in the file: the list entry).
+  A lookahead that stops at a word which begins nothing reads `require <kind> balance` as a guard
+  with no subject. `every_word_in_this_list_begins_a_clause` reads the const out of the parser source
+  and fails for any word no arm dispatches — verified load-bearing by re-adding `balance`, which
+  fails it with *"these words stop a guard but begin no clause in the parser: [balance]"*.
+- **Nothing is missing.** The words a guard can actually be followed by in a body that holds
+  statements are the intent body's (`from`, `to`, `route`, `timeout`, `on_fail`, `allow`, `on`,
+  `proofs`) and the swap body's (`amount`, `receiver`, `hashlock`, `min_output`); both are covered.
+  `fallback` — the one route-step word that is *not* a lexer keyword — cannot follow a guard: route
+  blocks are read by a step loop that accepts only route operations, measured by putting a `require`
+  between two steps (`expected route operation (swap/bridge/lock/mint/burn/release/fallback)`), so
+  no entry is needed for it or for the rest of the route-step words.
+
+The ticket's own validation was extended from nine words to thirteen: `allow`, `on`, `use` (intent
+body) and `min_output` (swap body) were reachable in the two bodies the fixtures already express —
+which is what "reaching them means writing a valid fixture for each of those grammars" turned out to
+cost, once the question was which bodies can hold a `require` at all rather than which words are
+interesting. The `use` fixture is the one that would have caught the dead arm: with the identifier
+form restored it panics with the parser's own `unexpected clause in intent body: KwUse`.
+The other two are in `compiler/tests/test_keyword_clauses.rs`, and with the identifier lookahead put
+back, two of its four tests fail.
+
+Options (b) and (c) from the decision request are recorded as not taken. (b) still requires every
+name position to accept a keyword token — `debt.amount` is written by two shipped examples — which is
+the opposite of the acceptance's premise, and the measurement above shows the acceptance's *purpose*
+(a guard that stops without a list) already holds for the words that are keywords. (c) — the block's
+own clause set instead of the union — remains the follow-up if drift is ever judged material; it is
+not today, because both directions of drift now fail a test rather than a program.
+
+Proof: 1233 workspace tests (was 1228; +1 staleness, +4 keyword clauses), clippy `-D warnings`, fmt
+clean, 23 python tests, sweep `20/20/20/19`, and `no-float-in-consensus`, `cargo-lockfile-locked`,
+`invariant-registry`, `workspace-membership` PASS.
+
+Note on the commit message of `c7dfb461a`: it was written with backticks quoted into a shell
+argument, so three of them were expanded away (`lists \`use\` among`, and the argument list of the
+`HostCall` record). The content is correct; this entry and
+`.ai/reports/x3lang-keyword-clauses-20260920.md` carry the text as intended. Not force-pushed —
+rewriting a pushed `master` while other agents are working on it is the hazard the merge-queue doc
+names.
+
+Original Type: PARTIAL in `4bed37b14` (2026-09-20) — the validation is landed, and the acceptance
+**conflicts with the language**.
 **Landed: the ticket's own validation.** A guard stops at the next clause because `CLAUSE_WORDS`
 names the words that can begin one, and two entries were missing on the first pass (`amount`,
 `timeout`) — each cost a round. Two tests covered those two and nothing covered the rest. The
@@ -4349,3 +4420,30 @@ Measured after: `receipt execute examples/arb_scope.x3` refuses honestly
 (`compiled trading program must begin with BeginAtomicTrade` — the fixture is an arb plan, not a trading
 program) and a trading program's receipt still verifies. Validation: x3-lang `cargo test --workspace`
 **1218 passed / 0 failed** (1216 before); clippy `-D warnings` and fmt clean; sweep 19/19/19/18.
+
+## TICKET-113 — seven more arms match an identifier for a word the lexer reserves — OPEN
+Type: OPEN, cleanup · Subsystem: x3-lang/compiler/parser
+Reason: TICKET-046 closed three clauses whose arms could never run because they tested
+`Tok::Ident(ref s) if s == "<word>"` for a word the lexer sends as a keyword token. The same shape
+survives in seven places where a `Tok::Kw*` arm in the same match does the work, so nothing is
+broken — but an unreachable arm is what let the three broken ones look correct for as long as they
+did, and a reader of `parse_route_step` currently has two arms for `swap` with no way to tell which
+one runs.
+Measurement (the method, so the fix can be re-derived rather than trusted): the words are
+`{w : w is a lexer keyword}` ∩ `{w : keyword_to_tok has a Tok::Kw* arm for it}`, and the sites are
+every `Tok::Ident(ref s) if s == w` for such a `w`. As of `c7dfb461a`, ignoring the three that were
+fixed:
+- `parse_trade_stmt` — `bridge` (its `Tok::KwBridge` twin is the live arm)
+- `parse_intent_clause` — `on_fail` (twin `Tok::KwOnFail`)
+- `parse_route_step` — `swap`, `bridge`, `lock`/`mint`/`burn`/`release` (twins `Tok::KwSwap`,
+  `Tok::KwBridge`, `Tok::KwLock..KwRelease`)
+- `parse_rpc_quorum_item` — `require` (twin `Tok::KwRequire`)
+- `parse_finality_policy_item` — the `s == "require"` half of `requirement || require`; the
+  `requirement` half is live and is what the long form uses
+Acceptance criteria: each site is either deleted (the keyword arm is the only path) or annotated
+with the reason it can be reached. Deleting is the expected answer; the one thing that would make it
+wrong is a second front-end that constructs `Tok::Ident("swap")` directly, which nothing does today.
+Validation: `cargo test --workspace` in `x3-lang` stays green at 1233+, and the clause fixtures in
+`test_require_guards.rs` plus the four tests in `test_keyword_clauses.rs` still pass.
+Why not fixed in this pass: it is cleanup with no user-visible effect, and the three that *were*
+broken are fixed and pinned. Recorded rather than dropped.
