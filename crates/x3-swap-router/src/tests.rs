@@ -178,8 +178,19 @@ async fn fee_calculator_applies_two_percent_for_same_vm_cross_chain() {
     assert_eq!(fees.total_fee, U256::from(27_000u64));
 }
 
+/// The executor refuses rather than fabricating a success.
+///
+/// This test used to be `executor_marks_success_with_nonempty_inputs` and asserted
+/// `res.success` plus `res.gas_used > 0` — pinning a record whose `execution_id` was always
+/// `H256::zero()`, whose `gas_used` was the gas *limit*, whose `execution_time_ms` was the
+/// constant 10, and whose `success` was `!hops.is_empty() || amount_in > 0`. No swap was
+/// executed, and the test is what made that look intentional (TICKET-094).
+///
+/// A caller that reads `success: true` on an atomic swap bundle believes value moved, so the
+/// assertion is that it cannot: the bundle is refused with a variant that says the executor
+/// is missing, which is a configuration fact rather than a market outcome.
 #[tokio::test]
-async fn executor_marks_success_with_nonempty_inputs() {
+async fn executor_refuses_a_bundle_instead_of_fabricating_a_success() {
     let exec = AtomicSwapExecutor::new().unwrap();
     let route = SwapRoute {
         hops: vec![hop(100)],
@@ -195,12 +206,12 @@ async fn executor_marks_success_with_nonempty_inputs() {
         params: sample_params(),
         slippage_bps: 50,
     };
-    let res = exec
-        .execute_swap_bundle(&route, &gas, &params)
-        .await
-        .unwrap();
-    assert!(res.success);
-    assert!(res.gas_used > U256::zero());
+    let result = exec.execute_swap_bundle(&route, &gas, &params).await;
+    assert_eq!(
+        result.err(),
+        Some(SwapRouterError::NoExecutorConfigured),
+        "a bundle that cannot be executed must not come back as a success record"
+    );
 }
 
 #[tokio::test]

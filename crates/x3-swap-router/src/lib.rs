@@ -73,6 +73,13 @@ pub enum SwapRouterError {
     InvalidParameters,
     /// Route execution failed.
     ExecutionFailed,
+    /// No executor is wired, so a bundle cannot be executed and must not be reported as one.
+    ///
+    /// Its own variant rather than `ExecutionFailed`, because the two mean different things
+    /// to a caller: `ExecutionFailed` is a market outcome and this is a configuration fact.
+    /// `AtomicSwapExecutor::execute_swap_bundle` used to return `Ok` with a fabricated
+    /// success record instead (TICKET-094).
+    NoExecutorConfigured,
 }
 
 impl core::fmt::Display for SwapRouterError {
@@ -82,6 +89,11 @@ impl core::fmt::Display for SwapRouterError {
             SwapRouterError::HighSlippage => write!(f, "slippage tolerance too high or unset"),
             SwapRouterError::InvalidParameters => write!(f, "invalid swap parameters"),
             SwapRouterError::ExecutionFailed => write!(f, "route execution failed"),
+            SwapRouterError::NoExecutorConfigured => write!(
+                f,
+                "no swap executor is configured: this router has no chain integration, so it \
+                 cannot execute a bundle and does not report one as executed"
+            ),
         }
     }
 }
