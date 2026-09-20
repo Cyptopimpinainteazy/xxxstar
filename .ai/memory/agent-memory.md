@@ -5343,3 +5343,18 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - Both cap tests derive their figures from the refusal message and assert both sides of the boundary
   (equal passes, one less fails), so no test carries a second opinion about the lowering.
 - The emitter and `cost` do not reference the lowering, so lowering → emitter/cost is a one-way edge.
+
+**2026-09-20 — PHASE 41's `resources { }` block (four caps enforced, `max_memory` refused)**
+
+- The phase's spelling is `resources { max_compute = …; max_memory = …; max_network_calls = …;
+  max_routes = …; max_branches = …; }` with `=`; the implementation had `bounds { max_steps max_gas }`.
+  Both exist now; the `resources` caps are checked at the same lowering site.
+- Figures: compute = the module's lowered operation count; network calls = `host_facing` from the same
+  sub-emission that weighs the body (`cost::HOST_FACING` lists BRIDGE/CALL_HOST/MEMPOOL_SCAN/… — a
+  `swap` is *not* host-facing, so a cap of 0 passes a swap-only body); routes = Swap|Bridge operations;
+  branches = If|AtomicChoice operations. `max_memory` is refused by name: no memory model.
+- **A new declaration needs a formatter arm or `x3c fmt` deletes it** — the `resources` block was
+  dropped, exactly as the annotations were. The generalisable test: a cap that *binds* must still
+  refuse after a format round trip, which catches the drop even when a non-binding cap would hide it.
+- `StrategyResources` carries `#[serde(default)]` on the strategy field, so an AST stored before it
+  existed still loads (TICKET-067's rule).
