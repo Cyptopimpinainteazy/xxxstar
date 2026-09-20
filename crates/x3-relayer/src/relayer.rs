@@ -40,6 +40,12 @@ struct RelayerSafetyPipeline {
     risk_engine: GatewayRiskEngine,
     evm_finality_thresholds: BTreeMap<u32, u32>,
     svm_finality_thresholds: BTreeMap<u32, u32>,
+    /// The same authorized-validator set the router's `SolanaFinalizedVerifier`
+    /// was constructed with (issue #351): `evaluate_svm_proof` builds its
+    /// `AttestationSet` from this field rather than a second, independent
+    /// list, so the router-level check and the attestation-level check can
+    /// never silently disagree about who's authorized.
+    svm_authorized_validators: Vec<[u8; 32]>,
 }
 
 struct RelayerInternalState {
@@ -591,10 +597,18 @@ impl RelayerSafetyPipeline {
         // a 12-confirmation default. Per-chain thresholds may override
         // this in the proof envelope.
         verification_router.register_verifier(Arc::new(ProductionEvmReceiptVerifier::new(12)));
-        // Production: register a Solana finalization verifier. The
-        // struct is identical to the X3 finalization proof shape; the
-        // real implementation will plug in a real SVM light client.
-        verification_router.register_verifier(Arc::new(SolanaFinalizationVerifier));
+        // Production: register the real Solana finalized-proof verifier
+        // (issue #351 — this used to be a permissive stub,
+        // `SolanaFinalizationVerifier`, that accepted any non-empty
+        // payload). No governance-controlled SVM validator set is wired
+        // into this pipeline's config yet, so this constructs the verifier
+        // with an empty authorized set: `SolanaFinalizedVerifier::empty()`
+        // fails closed on every SVM proof rather than accepting a forged
+        // one. Swap in `SolanaFinalizedVerifier::new(validators, threshold)`
+        // once a real validator set is sourced for this relayer's context.
+        verification_router.register_verifier(Arc::new(
+            x3_verification_router::SolanaFinalizedVerifier::empty(),
+        ));
 
         Self {
             finality_oracle,
@@ -602,6 +616,7 @@ impl RelayerSafetyPipeline {
             risk_engine: GatewayRiskEngine::new(RiskPolicy::default()),
             evm_finality_thresholds,
             svm_finality_thresholds,
+            svm_authorized_validators: Vec::new(),
         }
     }
 
@@ -613,7 +628,11 @@ impl RelayerSafetyPipeline {
     /// this constructor to register a permissive verifier. The
     /// production verifier is still tested in `x3-verification-router`.
     #[cfg(test)]
-    fn for_test(config: &RelayerConfig, verification_router: VerificationRouter) -> Self {
+    fn for_test(
+        config: &RelayerConfig,
+        verification_router: VerificationRouter,
+        svm_authorized_validators: Vec<[u8; 32]>,
+    ) -> Self {
         let mut finality_oracle = InMemoryFinalityOracle::new();
         let mut evm_finality_thresholds = BTreeMap::new();
         let mut svm_finality_thresholds = BTreeMap::new();
@@ -645,6 +664,7 @@ impl RelayerSafetyPipeline {
             risk_engine: GatewayRiskEngine::new(RiskPolicy::default()),
             evm_finality_thresholds,
             svm_finality_thresholds,
+            svm_authorized_validators,
         }
     }
 
@@ -717,13 +737,18 @@ impl RelayerSafetyPipeline {
         // (`proof_id`) used for dispute bookkeeping below.
         let signed_message =
             x3_verification_router::solana_attestation_message(proof.slot, &proof.blockhash);
-        // KNOWN GAP (tracked in issue #351, same root cause: no governance/
-        // config-sourced SVM validator set is wired into this pipeline yet):
-        // `AttestationSet::new` performs no authorization check, so a
-        // self-generated keypair signs just as validly as a real validator's.
-        // Use `AttestationSet::with_authorized_validators` here once such a
-        // set exists for this relayer.
-        let mut attestations = AttestationSet::new(signed_message);
+        // Same root cause as the router fix above (issue #351):
+        // `AttestationSet::new` used to perform no authorization check at
+        // all, so a self-generated keypair signed just as validly as a real
+        // validator's. `self.svm_authorized_validators` is the exact same
+        // set the router's `SolanaFinalizedVerifier` was constructed with
+        // (empty in production today — fails closed on every attestation —
+        // populated by tests via `solana_pipeline_with`), so the two checks
+        // can never silently disagree about who's authorized.
+        let mut attestations = AttestationSet::with_authorized_validators(
+            signed_message,
+            self.svm_authorized_validators.iter().copied(),
+        );
         for signature in proof.validator_signatures.iter() {
             let attestation = Attestation {
                 // Identity is the validator's public key, not its position in the
@@ -850,45 +875,6 @@ impl RelayerSafetyPipeline {
         } else {
             Err(format!("{}; dispute_status=Rejected", reason))
         }
-    }
-}
-
-// ── Solana finalization verifier ────────────────────────────────────────────
-//
-// The relayer registers an SVM-side verifier in production. The real
-// implementation will plug in an SVM light client or a validator
-// attestation set. For now, the verifier enforces the minimum
-// structural properties: the source chain must be Solana, the payload
-// must contain at least one byte, and the strategy must be
-// `SolanaFinalizedProof`. Anything else fails closed.
-pub struct SolanaFinalizationVerifier;
-
-impl x3_verification_router::Verifier for SolanaFinalizationVerifier {
-    fn strategy(&self) -> x3_verification_router::VerificationStrategy {
-        x3_verification_router::VerificationStrategy::SolanaFinalizedProof
-    }
-
-    fn verify(
-        &self,
-        proof: &x3_verification_router::ProofEnvelope,
-    ) -> Result<
-        x3_verification_router::VerificationOutcome,
-        x3_verification_router::VerificationError,
-    > {
-        if proof.payload.is_empty() {
-            return Err(x3_verification_router::VerificationError::MalformedProof);
-        }
-        if !matches!(
-            proof.source_chain,
-            x3_verification_router::ChainKind::Solana
-        ) {
-            return Err(x3_verification_router::VerificationError::UnsupportedChain);
-        }
-        Ok(x3_verification_router::VerificationOutcome {
-            accepted: true,
-            reason: "solana_finalization_verified",
-            verified_at_height: None,
-        })
     }
 }
 
@@ -1162,7 +1148,7 @@ mod tests {
         let config = test_config();
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(AcceptAnyEvmVerifier));
-        let pipeline = RelayerSafetyPipeline::for_test(&config, router);
+        let pipeline = RelayerSafetyPipeline::for_test(&config, router, Vec::new());
         let proof = EvmProof {
             source_domain: 100,
             block_hash: [1u8; 32],
@@ -1193,23 +1179,69 @@ mod tests {
         assert!(err.contains("dispute_status=Accepted"));
     }
 
+    /// A router-level quorum of 1 (one authorized signer is enough to pass
+    /// `SolanaFinalizedVerifier`) is deliberately lower than the proof's own
+    /// `required_signatures` (2), so this proof clears router verification
+    /// but still can't meet its own claimed quorum at the attestation-count
+    /// stage — the case this test actually regression-tests. Supplying zero
+    /// signatures (as this test did before issue #351's fix wired in a real
+    /// router) is no longer a way to reach this code path at all: the
+    /// router itself now rejects a zero-signature proof first, with its own
+    /// `InsufficientValidSignatures`/`NoAuthorizedValidators` reason.
     #[test]
     fn safety_pipeline_rejects_svm_quorum_gap() {
-        let config = test_config();
-        let pipeline = RelayerSafetyPipeline::new(&config);
+        let key = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
+        let slot = 42u64;
+        let blockhash = [8u8; 32];
+        let pipeline = solana_pipeline_with(vec![key.verifying_key().to_bytes()], 1);
         let proof = SvmProof {
             source_domain: 200,
-            slot: 42,
-            blockhash: [8u8; 32],
-            validator_signatures: vec![],
+            slot,
+            blockhash,
+            validator_signatures: vec![signed_validator(&key, slot, &blockhash)],
             required_signatures: 2,
         };
 
         let err = pipeline
             .evaluate_svm_proof(&proof, 0)
             .expect_err("insufficient signatures should fail quorum");
-        assert!(err.contains("attestation_quorum_not_met"));
+        assert!(err.contains("attestation_quorum_not_met"), "got: {err}");
         assert!(err.contains("dispute_status=Accepted"));
+    }
+
+    /// Issue #351: the production pipeline used to register
+    /// `SolanaFinalizationVerifier`, a stub that accepted any non-empty
+    /// payload with no cryptographic check at all — a forged SVM proof with
+    /// a made-up signature would have passed. `RelayerSafetyPipeline::new`
+    /// now registers the real `SolanaFinalizedVerifier`, and with no
+    /// governance-controlled validator set wired into `RelayerConfig` yet,
+    /// it's constructed via `::empty()`, which fails closed on every SVM
+    /// proof rather than accepting a fabricated one. This proof carries a
+    /// real, correctly-signed attestation from a genuine keypair — the
+    /// point is that even a *valid* signature is rejected by the default
+    /// pipeline, because nobody has been authorized yet.
+    #[test]
+    fn safety_pipeline_default_fails_closed_on_svm_proof_even_with_a_real_signature() {
+        let config = test_config();
+        let pipeline = RelayerSafetyPipeline::new(&config);
+        let key = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
+        let slot = 42u64;
+        let blockhash = [8u8; 32];
+        let proof = SvmProof {
+            source_domain: 200,
+            slot,
+            blockhash,
+            validator_signatures: vec![signed_validator(&key, slot, &blockhash)],
+            required_signatures: 1,
+        };
+
+        let err = pipeline
+            .evaluate_svm_proof(&proof, 0)
+            .expect_err("no validator set is authorized yet; every SVM proof must fail closed");
+        assert!(
+            err.contains("no authorized validators configured"),
+            "got: {err}"
+        );
     }
 
     /// Regression: the quorum used to key each attestation on its *position* in
@@ -1223,11 +1255,14 @@ mod tests {
     /// actually regression-testing.
     #[test]
     fn safety_pipeline_rejects_repeated_svm_signer() {
-        let config = test_config();
-        let pipeline = RelayerSafetyPipeline::new(&config);
         let key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
         let slot = 42u64;
         let blockhash = [8u8; 32];
+        // Authorize the one key this test uses so the proof clears
+        // router-level verification (issue #351's fix made the router a
+        // real, fail-closed verifier) and reaches the attestation-level
+        // duplicate-signer check this test actually regression-tests.
+        let pipeline = solana_pipeline_with(vec![key.verifying_key().to_bytes()], 1);
         let signer = signed_validator(&key, slot, &blockhash);
         let proof = SvmProof {
             source_domain: 200,
@@ -1285,9 +1320,9 @@ mod tests {
 
         let mut router = VerificationRouter::new();
         let verifier: Arc<dyn Verifier> =
-            Arc::new(SolanaFinalizedVerifier::new(pubkeys, threshold));
+            Arc::new(SolanaFinalizedVerifier::new(pubkeys.clone(), threshold));
         router.register_verifier(verifier);
-        RelayerSafetyPipeline::for_test(&test_config(), router)
+        RelayerSafetyPipeline::for_test(&test_config(), router, pubkeys)
     }
 
     #[test]
