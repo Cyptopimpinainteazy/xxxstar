@@ -885,7 +885,7 @@ pub fn run() -> CliResult<()> {
                         Err(e) => {
                             println!("--- Account Inspection Failed ---");
                             println!("Error: {e}");
-                            return Ok(());
+                            return Err(query_failed("account inspection", rpc_url, e));
                         }
                     };
                     match make_rpc_call(
@@ -901,9 +901,60 @@ pub fn run() -> CliResult<()> {
                                 .unwrap_or("<no balance field>");
                             println!("Native X3 (Asset 0): {}", balance);
 
-                            // In a full implementation, this would iterate through all assets
-                            println!();
-                            println!("Note: Full account inspection requires asset enumeration.");
+                            // The native balance above is the one this command has
+                            // always asked for. Everything else the account holds in
+                            // another asset was previously left to a note about
+                            // enumeration — so the per-asset balances are queried here
+                            // for every asset the registry actually returns.
+                            match scan_asset_metadata(rpc_url) {
+                                Ok(assets) => {
+                                    let others: Vec<_> = assets
+                                        .iter()
+                                        .filter(|meta| {
+                                            meta.get("asset_id").and_then(|v| v.as_u64()) != Some(0)
+                                        })
+                                        .collect();
+                                    if others.is_empty() {
+                                        println!(
+                                            "No other asset ids returned metadata in {ASSET_SCAN_MIN}..={ASSET_SCAN_MAX}."
+                                        );
+                                    } else {
+                                        println!(
+                                            "--- Balances for registered assets ({ASSET_SCAN_MIN}..={ASSET_SCAN_MAX}) ---"
+                                        );
+                                        for meta in others {
+                                            let id = meta
+                                                .get("asset_id")
+                                                .and_then(|v| v.as_u64())
+                                                .unwrap_or(0);
+                                            let symbol = meta
+                                                .get("symbol")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("<no symbol>");
+                                            match make_rpc_call(
+                                                rpc_url,
+                                                "x3_getCanonicalBalance",
+                                                serde_json::json!([account_hex, id]),
+                                            ) {
+                                                Ok(balance) => {
+                                                    let value = balance
+                                                        .get("balance")
+                                                        .and_then(|v| v.as_str())
+                                                        .unwrap_or("<no balance field>");
+                                                    println!("  {id} {symbol}: {value}");
+                                                }
+                                                Err(e) => {
+                                                    println!("  {id} {symbol}: <query failed: {e}>")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    println!();
+                                    println!("Note: could not enumerate assets ({e}).");
+                                }
+                            }
                         }
                         Err(e) => {
                             warn!("RPC call failed: {}", e);
@@ -911,6 +962,7 @@ pub fn run() -> CliResult<()> {
                             println!("Error: {}", e);
                             println!();
                             println!("Note: Ensure a node is running on {}", rpc_url);
+                            return Err(query_failed("account inspection", rpc_url, e));
                         }
                     }
 
@@ -955,6 +1007,7 @@ pub fn run() -> CliResult<()> {
                             println!("Error: {}", e);
                             println!();
                             println!("Note: Ensure a node is running on {}", rpc_url);
+                            return Err(query_failed("asset inspection", rpc_url, e));
                         }
                     }
 
@@ -970,15 +1023,56 @@ pub fn run() -> CliResult<()> {
                     println!("Output:   {}", output);
                     println!();
 
-                    // In a full implementation, this would enumerate all assets
-                    println!("--- Registered Assets ---");
-                    println!("Note: Full asset enumeration requires runtime API support.");
-                    println!("Known assets:");
-                    println!("  0: X3 (native token, 12 decimals)");
-                    println!("  1: ETH (18 decimals)");
-                    println!("  2: SOL (9 decimals)");
-                    println!("  3: USDC (6 decimals)");
+                    // This used to print a hardcoded list — "0: X3 (native token,
+                    // 12 decimals) / 1: ETH / 2: SOL / 3: USDC" — under the heading
+                    // "Registered Assets", with the note that enumeration was not
+                    // supported. An operator reading that cannot tell chain state
+                    // from a comment in the binary. The runtime has no "list all
+                    // assets" API, so the honest query is `x3_getAssetMetadata` over
+                    // a bounded id range, printing only what the chain answers.
+                    println!(
+                        "--- Registered Assets (x3_getAssetMetadata, ids {ASSET_SCAN_MIN}..={ASSET_SCAN_MAX}) ---"
+                    );
+                    let mut assets: Vec<serde_json::Value> = Vec::new();
+                    match scan_asset_metadata(rpc_url) {
+                        Ok(found) => {
+                            for meta in &found {
+                                let id = meta.get("asset_id").and_then(|v| v.as_u64()).unwrap_or(0);
+                                let symbol = meta
+                                    .get("symbol")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("<no symbol>");
+                                let decimals =
+                                    meta.get("decimals").and_then(|v| v.as_u64()).unwrap_or(0);
+                                println!("  {id}: {symbol} ({decimals} decimals)");
+                                assets.push(meta.clone());
+                            }
+                            if found.is_empty() {
+                                // Not an error: a chain with nothing registered answers
+                                // `null` for every id, and that is the truthful answer.
+                                println!("  (the chain returned no asset metadata in that range)");
+                            }
+                        }
+                        Err(e) => {
+                            println!("--- Asset Query Failed ---");
+                            println!("Error: {e}");
+                            println!();
+                            println!("Note: Ensure a node is running on {rpc_url}");
+                            return Err(query_failed("asset enumeration", rpc_url, e));
+                        }
+                    }
 
+                    if output.eq_ignore_ascii_case("json") {
+                        let payload = serde_json::json!({
+                            "scanned_ids": { "from": ASSET_SCAN_MIN, "to": ASSET_SCAN_MAX },
+                            "assets": assets,
+                        });
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&payload)
+                                .map_err(|e| format!("could not render JSON: {e}"))?
+                        );
+                    }
                     Ok(())
                 }
                 InspectSubcommand::Authorities { rpc_url } => {
@@ -1198,6 +1292,117 @@ fn make_rpc_call(
         .get("result")
         .cloned()
         .ok_or_else(|| "No result in response".to_string())
+}
+
+// ── Asset enumeration ───────────────────────────────────────────────────────
+//
+// The runtime answers `get_asset_metadata(asset_id)` but exposes no "list every
+// asset" call, so the CLI asks for ids `ASSET_SCAN_MIN..=ASSET_SCAN_MAX` and
+// prints only what the chain returns. The bound is printed next to the results:
+// an id outside it is *not claimed to be absent*, which is what the previous
+// hardcoded list got wrong in the other direction.
+const ASSET_SCAN_MIN: u32 = 0;
+const ASSET_SCAN_MAX: u32 = 31;
+
+/// `x3_getAssetMetadata` answers `null` for an unregistered id. A `null` is
+/// data; a malformed object is not silently turned into one.
+fn parse_asset_metadata(value: &serde_json::Value) -> Option<serde_json::Value> {
+    if value.is_null() {
+        return None;
+    }
+    let asset_id = value.get("asset_id")?.as_u64()?;
+    let symbol = value.get("symbol")?.as_str()?;
+    let decimals = value.get("decimals")?.as_u64()?;
+    Some(serde_json::json!({
+        "asset_id": asset_id,
+        "symbol": symbol,
+        "decimals": decimals,
+    }))
+}
+
+/// Query every id in the scan range, stopping at the first RPC failure.
+///
+/// Stopping matters: a node that does not serve `x3_getAssetMetadata` must not
+/// produce "no assets registered", which is the same answer a healthy empty
+/// registry gives.
+fn scan_asset_metadata(rpc_url: &str) -> Result<Vec<serde_json::Value>, String> {
+    let mut found = Vec::new();
+    for asset_id in ASSET_SCAN_MIN..=ASSET_SCAN_MAX {
+        let answer = make_rpc_call(
+            rpc_url,
+            "x3_getAssetMetadata",
+            serde_json::json!([asset_id]),
+        )?;
+        if let Some(metadata) = parse_asset_metadata(&answer) {
+            found.push(metadata);
+        }
+    }
+    Ok(found)
+}
+
+/// A read-only query that never answered is a failure, not a result.
+///
+/// Every `inspect` arm used to print the error and `return Ok(())`, so
+/// `x3-chain-node inspect account … || exit 1` succeeded against a node that was
+/// down, and against a method the node does not serve. A `null` answer from the
+/// chain is different: that is data ("no such asset") and stays a success.
+fn query_failed(what: &str, rpc_url: &str, error: impl std::fmt::Display) -> CliError {
+    CliError::Input(format!(
+        "{what} failed: {error}\nNote: ensure a node is running on {rpc_url}"
+    ))
+}
+
+#[cfg(test)]
+mod asset_scan_tests {
+    use super::*;
+
+    #[test]
+    fn asset_metadata_is_taken_from_the_chain_answer() {
+        let answer = serde_json::json!({
+            "asset_id": 7,
+            "symbol": "ATLAS",
+            "decimals": 18,
+        });
+        let parsed = parse_asset_metadata(&answer).expect("well-formed metadata");
+        assert_eq!(parsed["asset_id"], 7);
+        assert_eq!(parsed["symbol"], "ATLAS");
+        assert_eq!(parsed["decimals"], 18);
+    }
+
+    #[test]
+    fn an_unregistered_id_is_null_and_not_an_asset() {
+        assert!(parse_asset_metadata(&serde_json::Value::Null).is_none());
+    }
+
+    #[test]
+    fn half_formed_metadata_is_refused_rather_than_defaulted() {
+        // A missing symbol or decimals must not become "" or 0: the CLI would
+        // print a fabricated asset, which is exactly the bug this replaced.
+        for broken in [
+            serde_json::json!({ "asset_id": 1, "decimals": 12 }),
+            serde_json::json!({ "asset_id": 1, "symbol": "X3" }),
+            serde_json::json!({ "symbol": "X3", "decimals": 12 }),
+            serde_json::json!({ "asset_id": "1", "symbol": "X3", "decimals": 12 }),
+        ] {
+            assert!(
+                parse_asset_metadata(&broken).is_none(),
+                "{broken} must not be accepted as asset metadata"
+            );
+        }
+    }
+
+    #[test]
+    fn the_scan_range_is_bounded_and_printed() {
+        // The bound is part of the contract: it is printed with every result so
+        // an operator can tell "no assets" from "no assets in this range".
+        let scanned: Vec<u32> = (ASSET_SCAN_MIN..=ASSET_SCAN_MAX).collect();
+        assert_eq!(scanned.first().copied(), Some(0));
+        assert!(
+            scanned.len() > 8 && scanned.len() <= 256,
+            "a bound of {} ids is not a useful scan",
+            scanned.len()
+        );
+    }
 }
 
 #[cfg(test)]
