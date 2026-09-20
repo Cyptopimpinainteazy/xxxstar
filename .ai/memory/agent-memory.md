@@ -5292,7 +5292,7 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 **2026-09-20 — TICKET-018 closed; TICKET-016's blocker re-measured (it is now two blockers)**
 
 - A release's proof obligation is the two *named* proofs, enforced on mainnet:
-  `mainnet: Bridge operation present without a source-lock proof` / `destnation-fill proof` (measured).
+  `mainnet: Bridge operation present without a source-lock proof` / `destination-fill proof` (measured).
   The open design question ("should a release also require a receipt or a quorum attestation") is
   answered by the language's own rule: a requirement nothing declares is refused by name
   (`verify_guard_kinds_are_checkable`), so nothing was guessed at.
