@@ -348,8 +348,9 @@ mod integration_tests {
             let addr = listener.local_addr().expect("local addr");
 
             tokio::spawn(async move {
-                axum::Server::bind(&addr)
-                    .serve(app.into_make_service())
+                // axum 0.7: the listener is bound above and handed to
+                // `axum::serve` — `axum::Server` no longer exists.
+                axum::serve(listener, app)
                     .await
                     .expect("serve");
             });

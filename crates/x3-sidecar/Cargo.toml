@@ -4,7 +4,16 @@ version = "0.1.0"
 edition = "2021"
 description = "X3 Cross-VM Sidecar — monitors Solana/EVM chains and bridges events into X3"
 license = "MIT"
-autolib = false
+
+# `src/lib.rs` and its eleven modules — gateway_client, benchmark, executor,
+# job, config, evm_provider, rpc, state, submitter, receipt, telemetry — are the
+# sidecar's actual implementation. There was no `[lib]` target (and `autolib`
+# is not a cargo key, so it did nothing), which meant the library was never
+# compiled: `cargo check` here built `src/main.rs` only, and the end-to-end test
+# in `tests/` could not link `x3_sidecar` at all (32 `unresolved crate` errors).
+[lib]
+name = "x3_sidecar"
+path = "src/lib.rs"
 
 [[bin]]
 name = "x3-sidecar"
@@ -19,12 +28,38 @@ reqwest  = { version = "0.11", features = ["json"] }
 serde    = { version = "1",    features = ["derive"] }
 serde_json = "1"
 hex      = "0.4"
+# The library (`src/lib.rs` and its modules) uses these; the manifest never
+# listed them because the library was never compiled. See the `[lib]` note above.
+anyhow   = "1"
+thiserror = "1"
+tracing  = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+axum     = "0.7"
+sled     = "0.34"
+ed25519-dalek = "2"
+blake2   = "0.10"
+uuid     = { version = "1", features = ["v4"] }
+toml     = "0.8"
+rand     = "0.8"
+x3-rpc   = { path = "../x3-rpc" }
+x3-orchestra-control-plane = { path = "../x3-orchestra-control-plane" }
 # Cryptographic primitives
 blake2b_simd = "1"          # Blake2b-256 root hash (same hasher as sp-crypto-hashing)
 schnorrkel   = "0.11"       # Sr25519 signing — same version as Substrate stable2512
 zeroize      = "1"          # Secure key material zeroization
 
 [dev-dependencies]
-axum     = "0.7"
+wiremock = "0.6"
+httpmock = "0.7"
+tower    = { version = "0.5", features = ["util"] }
+hyper    = "1"
+tokio-postgres = "0.7"
+tempfile = "3"
 
 [workspace]
+
+# This crate is a nested workspace, so it does not inherit the root manifest's
+# `[patch]` section — and `x3-rpc` pulls the polkadot-sdk graph, which requires
+# `core2 0.4.0` (yanked from crates.io). Same local copy as the root uses.
+[patch.crates-io]
+core2 = { path = "../../patches/core2" }

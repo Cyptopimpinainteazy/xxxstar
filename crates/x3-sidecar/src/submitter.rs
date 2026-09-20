@@ -317,12 +317,11 @@ mod tests {
             .await
             .expect("bind listener");
         let address = listener.local_addr().expect("listener address");
-        let listener = listener.into_std().expect("convert listener");
 
         tokio::spawn(async move {
-            axum::Server::from_tcp(listener)
-                .expect("server from tcp")
-                .serve(app.into_make_service())
+            // axum 0.7: `axum::serve` takes the tokio listener directly;
+            // `Server::from_tcp` is gone.
+            axum::serve(listener, app)
                 .await
                 .expect("serve mock rpc");
         });

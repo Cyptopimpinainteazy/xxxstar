@@ -747,7 +747,7 @@ mod tests {
 
         let resp = app.clone().oneshot(req).await.expect("submit request");
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = hyper::body::to_bytes(resp.into_body())
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
             .await
             .expect("body bytes");
         serde_json::from_slice::<serde_json::Value>(&body)
@@ -770,7 +770,7 @@ mod tests {
             .expect("request build");
         let get_resp = app.clone().oneshot(get_req).await.expect("get request");
         assert_eq!(get_resp.status(), StatusCode::OK);
-        let get_body = hyper::body::to_bytes(get_resp.into_body())
+        let get_body = axum::body::to_bytes(get_resp.into_body(), usize::MAX)
             .await
             .expect("body bytes");
         let get_json: serde_json::Value =
@@ -791,7 +791,7 @@ mod tests {
             .await
             .expect("status request");
         assert_eq!(status_resp.status(), StatusCode::OK);
-        let status_body = hyper::body::to_bytes(status_resp.into_body())
+        let status_body = axum::body::to_bytes(status_resp.into_body(), usize::MAX)
             .await
             .expect("body bytes");
         let status_json: serde_json::Value =
@@ -830,7 +830,7 @@ mod tests {
             .await
             .expect("metrics request");
         assert_eq!(metrics_resp.status(), StatusCode::OK);
-        let metrics_body = hyper::body::to_bytes(metrics_resp.into_body())
+        let metrics_body = axum::body::to_bytes(metrics_resp.into_body(), usize::MAX)
             .await
             .expect("body bytes");
         let metrics_text = String::from_utf8(metrics_body.to_vec()).expect("utf8 metrics");
@@ -870,7 +870,7 @@ mod tests {
             .await
             .expect("submit request");
         assert_eq!(submit_resp.status(), StatusCode::OK);
-        let submit_body = hyper::body::to_bytes(submit_resp.into_body())
+        let submit_body = axum::body::to_bytes(submit_resp.into_body(), usize::MAX)
             .await
             .expect("body bytes");
         let submit_json: serde_json::Value =
@@ -892,7 +892,7 @@ mod tests {
             .expect("report request");
         assert_eq!(report_resp.status(), StatusCode::OK);
 
-        let report_body = hyper::body::to_bytes(report_resp.into_body())
+        let report_body = axum::body::to_bytes(report_resp.into_body(), usize::MAX)
             .await
             .expect("report body");
         let report_json: serde_json::Value =
@@ -937,7 +937,7 @@ mod tests {
             .oneshot(submit_req)
             .await
             .expect("submit request");
-        let submit_body = hyper::body::to_bytes(submit_resp.into_body())
+        let submit_body = axum::body::to_bytes(submit_resp.into_body(), usize::MAX)
             .await
             .expect("body bytes");
         let submit_json: serde_json::Value =
@@ -996,7 +996,7 @@ mod tests {
             .await
             .expect("submit request");
         assert_eq!(submit_resp.status(), StatusCode::OK);
-        let submit_body = hyper::body::to_bytes(submit_resp.into_body())
+        let submit_body = axum::body::to_bytes(submit_resp.into_body(), usize::MAX)
             .await
             .expect("body bytes");
         let submit_json: serde_json::Value =
@@ -1029,7 +1029,7 @@ mod tests {
             .await
             .expect("report request");
         assert_eq!(report_resp.status(), StatusCode::OK);
-        let report_body = hyper::body::to_bytes(report_resp.into_body())
+        let report_body = axum::body::to_bytes(report_resp.into_body(), usize::MAX)
             .await
             .expect("report body");
         let report_json: serde_json::Value =

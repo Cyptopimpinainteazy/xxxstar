@@ -53,6 +53,7 @@ pub mod telemetry;
 
 use std::sync::Arc;
 use std::time::Instant;
+use anyhow::Context;
 use tokio::sync::RwLock;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -225,16 +226,28 @@ impl SidecarDaemon {
 
         // Run HTTP servers. Keep /metrics on RPC for backward compatibility,
         // and serve a dedicated telemetry surface on `metrics_port`.
+        //
+        // axum 0.7 removed `axum::Server`; the listener is a tokio
+        // `TcpListener` and the server is `axum::serve`.
         if self.config.metrics_port == self.config.rpc_port {
-            axum::Server::bind(&rpc_addr)
-                .serve(router.into_make_service())
-                .await?;
+            let listener = tokio::net::TcpListener::bind(rpc_addr)
+                .await
+                .with_context(|| format!("bind RPC listener on {rpc_addr}"))?;
+            axum::serve(listener, router)
+                .await
+                .with_context(|| format!("serve RPC on {rpc_addr}"))?;
         } else {
-            let rpc_server = axum::Server::bind(&rpc_addr).serve(router.into_make_service());
-            let metrics_server =
-                axum::Server::bind(&metrics_addr).serve(metrics_router.into_make_service());
+            let rpc_listener = tokio::net::TcpListener::bind(rpc_addr)
+                .await
+                .with_context(|| format!("bind RPC listener on {rpc_addr}"))?;
+            let metrics_listener = tokio::net::TcpListener::bind(metrics_addr)
+                .await
+                .with_context(|| format!("bind metrics listener on {metrics_addr}"))?;
 
-            tokio::try_join!(rpc_server, metrics_server)?;
+            tokio::try_join!(
+                axum::serve(rpc_listener, router),
+                axum::serve(metrics_listener, metrics_router),
+            )?;
         }
 
         processor_handle.abort();
