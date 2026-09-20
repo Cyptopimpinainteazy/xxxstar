@@ -5431,3 +5431,40 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   stops a second reader inventing a second reading (`Literal(String(Symbol("…")))` was the compiler's
   Debug output reaching a person).
 - 33 CLI commands; `test`/`fuzz`/`chaos` verified real in the same pass; the rest are TICKET-124.
+
+**2026-09-20 — `x3c new` wrote a project its own first command refused (TICKET-125); branch triage (TICKET-126)**
+
+- **The audit method that found it: run the command, then follow its own printed instructions.** The
+  template carried the bare `require nonce unused` (the parser wants `require nonce unused <id>`), so the
+  reader's first command exited 2 on the scaffold the tool had just written. A scaffold is a claim that
+  the language accepts what it wrote, so `cmd_new` now generates, **checks with the same diagnostics
+  `x3c check` runs**, and only then writes — a template that drifts from the language fails the tool, not
+  the reader. The same class as TICKET-123: an output that asserts something no code path verified.
+- **A dependency path is also a claim.** The generated `Cargo.toml` said `../../compiler`, which resolves
+  only for projects created inside the x3-lang tree; `cargo test` in a generated project therefore could
+  not build the test the same command had written. It now points at the compiler crate the running binary
+  was built from (canonicalized), and when that crate is absent the command says so and writes only
+  `src/main.x3` rather than an unresolvable manifest.
+- **A generated test that only parses proves the wrong thing** — it passed on the invalid template. The
+  generated test now asserts parse + clean check + compile, and the regression in
+  `crates/x3-tools/tests/cli.rs` runs the whole printed sequence (new → check --deny-warnings → build →
+  run --measured-slippage-bps → layout).
+- **"Merge all branches" is not a bulk operation here.** Measured, not assumed: 343 refs, 193 already
+  contained in master, 150 carrying unique commits collapsing to 90 distinct tips, and **no branch has
+  master as an ancestor** — so none fast-forwards. A "content-landed" metric (share of a branch's added
+  lines present verbatim in master's copy of the same files) puts 47 tips >=90%, 24 partial, 19 with
+  nothing attributable (lock/generated only), 20 dependabot. Method and the full table:
+  `.ai/reports/branch-consolidation-20260920.md`.
+- **A low landed% is not "the feature is missing".** Three x3-lang candidates were checked at file level:
+  `salvage/x3lang-intent-bridge` (the Decimal-narrows-to-inf and `intent.get('requires') or []` fixes),
+  `wip/x3lang-arb-graph-filter-20260919` (bounds judged against the opportunity graph via
+  `venue_standings`) and `add-slippage` (the measured-slippage path) are all already on master in
+  substance — the branch text is the pre-rewrite spelling. Read the file before believing the metric in
+  either direction.
+- **Default branch is `master`, there is no `main`** (`git ls-remote --symref origin HEAD`). Two separate
+  local-clone traps this session: `git apply --check` against a branch patch reports conflicts because the
+  patch includes the whole branch diff, and `git cherry -` marks patch-equivalents differently from text
+  equivalence.
+- Instrument trap worth remembering: the first run of the landed-line metric silently measured nothing for
+  branches whose only changed file was `Cargo.lock` (a skip-list entry), which read as "0% landed". A `-1`
+  in that table means *nothing attributable*, not *nothing merged*.

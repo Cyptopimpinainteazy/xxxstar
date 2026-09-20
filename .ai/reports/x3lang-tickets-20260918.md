@@ -5039,3 +5039,55 @@ What has not been done is the same check for `prove`, `run-intent`, `intent`, `i
 Acceptance criteria: for each command, either its output is shown to follow from the input (a figure
 the program states, an artifact's bytes, a refusal with a reason), or a defect is filed.
 Validation: one measured run per command, recorded in a report.
+
+**Measured so far (2026-09-20), `new` included:** `new`, `check`, `build`, `run`, `lint`, `test`,
+`fuzz`, `chaos`, `deploy`, `plan`, `audit`, `inspect`, `lanes`, `metadata`, `score`, `fusion`,
+`netting`, `gpu`, `test-fixture`, `intent`, `simulate`, `verify`, `prove`, `refund`. Running `new`
+turned up TICKET-125, which is the second defect this ticket's method has found (`refund` was the
+first). Still unaudited: `lower`, `parse`, `explain`, `replay`, `packet`, `receipt`, `run-intent`,
+`arb`, `calldata`, `wallet`, `doctor` and the remaining subcommands.
+
+## TICKET-125 — the project `x3c new` writes is not one its own first command accepts — CLOSED
+Type: CLOSED in `3ab992eb3` (2026-09-20) · Subsystem: crates/x3-tools/src/bin/x3c.rs
+Found by running `x3c new` and then following its own printed instructions. Two defects:
+- **The template did not parse.** `x3c new demo` printed "Next steps: x3c check src/main.x3" and wrote
+  a template carrying the bare `require nonce unused`; the parser wants `require nonce unused <id>`, so
+  the reader's first command exited 2 on the scaffold the tool had just produced.
+- **The test target could not build.** The generated `Cargo.toml` pointed at `../../compiler`, which
+  only resolves for projects created two levels under the x3-lang tree. `cargo test` in a generated
+  project died on a missing dependency, so the test the same command wrote could never run.
+What changed: the template is generated, checked with the same diagnostics `x3c check` runs, and only
+then written (the half-made project on failure is gone); the test target points at the compiler crate
+the running binary was built from, canonicalized, and when that crate is absent the command says so and
+skips the Cargo.toml instead of writing an unresolvable one; the generated test asserts parse + clean
+check + compile rather than parse alone (which passed on the invalid template); the listing prints the
+files it names.
+Measured, outside the tree (`/tmp/x3new-proof/demo`): `x3c new` exit 0, `x3c check --deny-warnings`
+exit 0 "16 ops, no semantic errors", `x3c build` exit 0 "332 bytes (16 instructions)", `x3c run
+--measured-slippage-bps 8` exit 0 "3 asset ops, 1 bridge ops", `cargo test` 3 passed / 0 failed.
+Regression: `crates/x3-tools/tests/cli.rs` runs that printed sequence against a fresh project.
+
+## TICKET-126 — the 150 refs that are not on master have not been reconciled one by one — OPEN
+Type: OPEN, audit + merge decision · Subsystem: repository history
+Reason: "get all branches on main" cannot be executed as a bulk merge — no remaining branch has master
+as an ancestor, so every one is a real merge against pre-rewrite lineage (830-1010 commits behind). The
+triage in `.ai/reports/branch-consolidation-20260920.md` measures every one of the 90 distinct tips:
+193 refs are already contained in master, and 47 of the 90 tips are >=90% already present verbatim in
+master (19 more have nothing attributable at all — lock/generated files only). Three x3-lang candidates
+(`salvage/x3lang-intent-bridge`, `wip/x3lang-arb-graph-filter-20260919`, `add-slippage`) were inspected
+at file level and their capability is on master already, even where their text is not.
+Acceptance criteria: for each of the 24 tips below 90% landed, either a commit that lands the capability
+master lacks (with the workspace needle green), or a record that names the file proving master already
+has it. Least-landed first: `fix/agent-guard-bip39-allow` (0.0%, 1 line),
+`wip/consolidation-20260917/x3-lang-prototype-20260621` (0.0%), `deps-mod-test` (0.0%),
+`docs/readiness-score-reconciliation` (0.0%), `ci/path-filter-heavy-gates-20260910` (0.9%),
+`ops/drain-actions-queue-20260911` (6.4%), `wip/consolidation-20260917/main` (17.3%),
+`fix/foundry-real-evm-deploy` (28.6%), `ci/master-lineage-gates-20260908` (31.8%),
+`wip/x3lang-arb-graph-filter-20260919` (33.8%, inspected — already on master),
+`fix/fake-metrics-honesty` (51.5%), the two `chatgpt-mainnet` tips (53.1%, same tip),
+`pr-181-check` (56.1%), `wip/x3lang-preserve-packets-and-arbitrage-20260919` (59.6%),
+`fix/workspace-membership-batch-5` (67.6%), the three `pasted-text-processing`/`prompts-to-skills` tips
+(68.4-68.6%, same tip), `ci/harden-self-hosted-jobs` (80.0%), `fix/x3lang-frame-classification` (82.5%),
+`feat/x3vm-durable-recovery-20260911` (84.8%), `ci/route-more-workflows-self-hosted` (87.5%),
+`salvage/x3lang-intent-bridge` (87.5%, inspected — already on master).
+Validation: one measured verdict per tip, recorded in the report above.
