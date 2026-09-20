@@ -244,7 +244,30 @@ Validation: `cargo test -p x3-lang-compiler -p x3-lang-vm`, plus a test assertin
 the code is present for at least one trading diagnostic.
 
 ## TICKET-022 — `principal_preserved` and the remaining roadmap guarantees
-Type: DEFERRED (needs IR meaning first) · Subsystem: x3-lang
+Type: **half CLOSED in `816de4708`**; `principal_preserved` still deferred (design decision) ·
+Subsystem: x3-lang
+Progress (2026-09-20): the spec names two guarantees the language refused, and one of them has a
+discharge now. Measured first — the refusal was live, not hypothetical:
+```
+$ x3c check g_bounded_slippage.x3          # guarantees [min_profit, bounded_slippage]
+x3c: parsing failed: Parser error: unknown guarantee 'bounded_slippage' in a strategy module;
+known: debt_closed, min_profit, solvent
+```
+`bounded_slippage` is **admitted**: discharged by an upper bound (`require slippage <= N`), refused
+when the body has none, with the clause to add in the message — and `verify_slippage_explicit`
+already required that ceiling of any body with a swap leg, so the module is stating what it has.
+`principal_preserved` is **not** admitted, and that is the decision this ticket is still for. Its only
+derivable discharge is a profit floor of zero (the capital comes back / nothing is lost), which is
+exactly what `min_profit` means — a second name for one claim is the "label that means nothing"
+defect. Admitting it needs one of:
+- a *distinct* meaning with its own check (e.g. the capital returned **in the input asset**, which
+  needs a release of the principal the compiler can see), or
+- a decision that it is `min_profit >= 0` and that two names for one claim are wanted anyway.
+A test asserts it is still refused, so the decision cannot be made by accident
+(`a_guarantee_the_language_does_not_model_is_still_refused_by_name`).
+Remaining: `principal_preserved`, and any hedge/liquidation guarantee the roadmap names — the spec's
+own examples use `principal_preserved` and `bounded_slippage` and nothing else.
+Original Type: DEFERRED (needs IR meaning first).
 Reason: round 6 admitted only guarantees the compiler can discharge from the
 body (`debt_closed`, `min_profit`, `solvent`). `principal_preserved`, hedge and
 liquidation guarantees from the roadmap have no IR-level meaning to check

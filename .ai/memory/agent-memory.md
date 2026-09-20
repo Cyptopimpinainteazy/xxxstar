@@ -5255,3 +5255,19 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   that each named check is defined *and called*. Adding a guard kind now fails that test until its
   disposition is written down.
 - The ledger has no OPEN tickets left; TICKET-025 and TICKET-027 are closed with measured evidence.
+
+**2026-09-20 — `bounded_slippage` admitted; `principal_preserved` is a decision, not a patch**
+
+- The spec's two guarantee names: `bounded_slippage` (PHASE 5) and `principal_preserved` (PHASE 3).
+  Both were refused by name until this turn; the first is admitted (discharged by `require slippage
+  <= N`, an *upper* bound), the second is not, because its only derivable discharge (a profit floor
+  of zero) is what `min_profit` already means.
+- `crates/x3-ast/src/trading.rs` has **two** guarantee tables to keep in step: `ALL`/`as_str`/
+  `from_name` and `is_discharged_by` (the atomic-trade dialect, which has no slippage statement — its
+  requirement text points at the policy clause). `compiler/src/strategy.rs` and
+  `compiler/src/trading_verify.rs` each have their own `guarantee_requirement` text.
+- A test asserts `principal_preserved` is still refused, so admitting it later fails a test rather
+  than passing silently.
+- Probe lesson (again): a scripted replacement anchored on a *string* matched a comment that quoted
+  the same clause, and the probe measured an unmodified program. Anchor on the clause's own
+  indentation, then `grep -c` to confirm the edit landed before trusting the measurement.
