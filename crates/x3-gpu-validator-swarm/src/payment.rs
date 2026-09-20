@@ -18,10 +18,18 @@ pub type PaymentAmount = u64;
 pub struct RewardRate {
     /// Base reward per task
     pub base_rate: PaymentAmount,
-    /// Bonus multiplier for verification
-    pub verification_bonus: f64,
-    /// Penalty for divergence
-    pub divergence_penalty: f64,
+    /// Bonus multiplier for verification, in **thousandths**: `1_500` is `1.5×`.
+    ///
+    /// An integer, and not an `f64`, because it multiplies a payment. The reward used to be
+    /// computed as `reward * (verification_bonus * 1000.0) as u128 / 1000`, which truncates
+    /// a float product: `1.001 × 1000.0` is `1000.9999999999999` in IEEE-754 and becomes
+    /// `1000`, so a rate of `1.001` was applied as `1.000` — a payment one part in a
+    /// thousand short, silently. Measured over `0.000..2.000`, **12 of 2001** rates lose
+    /// that unit, and every one of them is a rate a caller can legitimately name
+    /// (TICKET-094, PHASE 43).
+    pub verification_bonus_per_mille: PaymentAmount,
+    /// Penalty for divergence, in **thousandths** — the same unit and the same reason.
+    pub divergence_penalty_per_mille: PaymentAmount,
     /// Minimum stake for rewards
     pub min_stake: PaymentAmount,
 }
@@ -30,8 +38,8 @@ impl Default for RewardRate {
     fn default() -> Self {
         Self {
             base_rate: 1000, // 0.001 X3
-            verification_bonus: 1.5,
-            divergence_penalty: 0.5,
+            verification_bonus_per_mille: 1_500, // 1.5×
+            divergence_penalty_per_mille: 500,   // 0.5×
             min_stake: 1000000, // 1 X3
         }
     }
@@ -332,7 +340,7 @@ impl PaymentSystem {
         // Apply verification bonus with overflow protection
         if record.verified {
             let bonus_reward = (reward as u128)
-                .checked_mul((rate.verification_bonus * 1000.0) as u128)
+                .checked_mul(u128::from(rate.verification_bonus_per_mille))
                 .and_then(|r| (r / 1000).try_into().ok())
                 .ok_or_else(|| {
                     SwarmError::InvalidInput("Reward bonus calculation overflow".to_string())
@@ -343,7 +351,7 @@ impl PaymentSystem {
         // Apply divergence penalty with underflow protection
         if record.divergent {
             let penalty_reward = (reward as u128)
-                .checked_mul((rate.divergence_penalty * 1000.0) as u128)
+                .checked_mul(u128::from(rate.divergence_penalty_per_mille))
                 .and_then(|r| (r / 1000).try_into().ok())
                 .unwrap_or(0); // Penalty can reduce to 0
             reward = penalty_reward;
@@ -677,5 +685,46 @@ mod tests {
     fn test_benchmark() {
         let score = wallet_sync::run_benchmark();
         assert!(score > 0);
+    }
+
+    /// **A rate that binary cannot hold keeps its thousandth** (TICKET-094).
+    ///
+    /// The bonus used to be an `f64` multiplied in as `(bonus * 1000.0) as u128`, which
+    /// truncates a float product. `1.001` is not representable in binary — it is
+    /// `1.0009999999999999…` — so `1.001 * 1000.0` is `1000.9999999999999` and the cast made
+    /// it `1000`: the bonus was applied as `1.000` and the payment came out one part in a
+    /// thousand short. Measured over `0.000..2.000`, twelve of two thousand and one rates
+    /// lose that unit, so this is not a rounding curiosity — it is a rate an operator can
+    /// name, and the amount is what a provider is paid.
+    ///
+    /// The rate is an integer in thousandths now, so `1_001` is exactly `1.001`.
+    #[test]
+    fn a_rate_that_binary_cannot_hold_is_not_lost() {
+        let payment = PaymentSystem::new(SwarmConfig::default());
+        // The rate is private and defaulted, and the test module is part of this file.
+        *payment.reward_rate.write() = RewardRate {
+            base_rate: 1000,
+            verification_bonus_per_mille: 1_001, // 1.001x
+            divergence_penalty_per_mille: 500,
+            min_stake: 0,
+        };
+
+        let record = WorkRecord {
+            provider_id: "provider1".to_string(),
+            task_id: "task1".to_string(),
+            work_type: WorkType::Hash,
+            work_units: 1,
+            verified: true,
+            divergent: false,
+            timestamp: chrono::Utc::now().timestamp(),
+            block_height: 1,
+        };
+
+        // 1000 * 1001 / 1000 == 1001. Under the float form this was 1000.
+        assert_eq!(
+            payment.calculate_reward(&record).expect("no overflow at this size"),
+            1001,
+            "a 1.001x bonus must be 1.001x, not 1.000x"
+        );
     }
 }
