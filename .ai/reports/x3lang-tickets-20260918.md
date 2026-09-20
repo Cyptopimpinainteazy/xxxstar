@@ -4642,8 +4642,29 @@ with its reason.
 Validation: `x3c explain` on `strategy_module.x3b` prints the ceiling; a replayer that reads only the
 artifact can answer "what fee ceiling did this module declare".
 
-## TICKET-116 — a program cannot state a fee ceiling of its own — OPEN
-Type: OPEN, language addition · Subsystem: x3-lang/compiler (parser + checks) + spec
+## TICKET-116 — a program cannot state a fee ceiling of its own — CLOSED
+Type: CLOSED in `e20c15021` (2026-09-20), filed and fixed in the same pass · Subsystem: x3-lang/compiler (ast + parser + checks + formatter) + x3-lang/python surface
+**Closed: `require fees <= <bps>` is a guard kind, and the module's declared profile bounds it.**
+The pair the slippage ceiling has, completed: `risk { max_total_fee_bps M }` is what a module
+accepts (and what TICKET-115 made travel), `require fees <= N` is what a body relies on. The check
+is one function, `semantic::verify_fee_guards_declared`, covering both failures the other declared
+kinds refuse:
+```
+$ x3c check fees_bad.x3      # require fees <= 30 under max_total_fee_bps 8
+X3E4027: declaration 'TriDexArb' requires fees of at most 30bps while its risk profile accepts up
+to 8bps; the guard allows what the policy forbids
+```
+and a guard in a program with no ceiling to compare against — an intent has no `risk { }` clause —
+saying so by name rather than being recorded as a condition nothing checked. A bound the check
+cannot read is refused, not read as zero (TICKET-114's rule).
+The guard-side kind is `RequireKind::Fees` and the declaration-side one `FeeCeiling`, the way
+`Finality` and `FinalityExplicit` are two records rather than one.
+Two name lists had to learn it, and both are the kind of place that would otherwise drift silently:
+`registry.py::REQUIRE_KINDS` (caught by `test_surface_drift.py`, which compares it against
+`REQUIRE_KIND_NAMES` and treats a missing name as "refusing a shipped example") and the formatter's
+exhaustive `format_require_kind` (caught by the compiler). Tests: four in `test_strategy_modules.rs`;
+with the check disabled the two refusals fail.
+Original Type: OPEN, language addition.
 Reason: the wire the fee ceiling travels is the *declaration* record (TICKET-115), so a module's
 `risk { max_total_fee_bps N }` reaches the artifact. A program cannot write the same claim as a
 guard the way it writes `require slippage <= 50`, because there is no `fees` guard kind. The

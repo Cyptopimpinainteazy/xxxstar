@@ -5226,3 +5226,18 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   floor, or an unrelated emitter change edits a test about folding.
 - TICKET-116 files the `fees` guard kind (a program stating its own ceiling) — the language addition
   that TICKET-115 did not need.
+
+**2026-09-20 — the `fees` guard kind (TICKET-116), and the two name lists a new kind must reach**
+
+- A new guard kind touches exactly these places: `ast::RequireKind` (+ `as_str`), `parser::REQUIRE_KIND_NAMES`
+  (+ `require_kind_from_str`), `ir::RequireKind` (+ `require_kind_to_ir`), the emitter's
+  `static_guard_quantity` (its quantity code), a check that backs it, `formatter::format_require_kind`
+  (exhaustive — the compiler catches this one), and the Python surface's `registry.py::REQUIRE_KINDS`
+  (`test_surface_drift.py` catches this one, and its message is the reason: a name the compiler has
+  and the surface does not is "refusing a shipped example").
+- Guard vs declaration kinds: `Fees` (written by a body) and `FeeCeiling` (stated by a policy) are two
+  IR kinds, mirroring `Finality`/`FinalityExplicit`. Both carry the `fees` quantity code, so a reader
+  sees `REQUIRE static fees N` for each.
+- `semantic::verify_fee_guards_declared` is the fee rule in one place (owner → declared ceiling), and
+  it refuses: a non-`<=` bound, an unreadable bound, no declaration at all, and a guard looser than
+  the profile.
