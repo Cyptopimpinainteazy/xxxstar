@@ -15,6 +15,7 @@ Exit 1 → gate FAILS — do NOT cut a release.
 """
 
 import json
+import hashlib
 import os
 import pathlib
 import re
@@ -115,20 +116,26 @@ def check_build() -> None:
     print("\n── 2. Build validation ──")
     print(f"  cargo target dir: {TARGET_DIR}")
     for pkg, artifact_rel in BUILD_TARGETS:
-        # Try to find already-built artifact
         artifact = TARGET_DIR / artifact_rel
-        if artifact.exists():
-            ok(f"{pkg} binary found at {artifact}")
-            continue
-        # Build it
+        # Always build. This used to `continue` as soon as the artifact existed,
+        # so every stage after it — the dev chain boot, the validator set, the
+        # chain-spec checks and the production-genesis gate — ran against
+        # whatever binary happened to be sitting in the target directory from an
+        # earlier run, however old. Cargo makes this a no-op when the tree has
+        # not changed, and the printed digest makes the artifact auditable.
         print(f"  building {pkg}...")
         result = run(["cargo", "build", "--release", "-p", pkg])
         if result.returncode != 0:
             fail(f"{pkg} build failed:\n{result.stderr}")
-        elif artifact.exists():
-            ok(f"{pkg} built at {artifact}")
-        else:
+            continue
+        if not artifact.exists():
             fail(f"{pkg} artifact not found after build at {artifact}")
+            continue
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        ok(
+            f"{pkg} built: {artifact.stat().st_size} bytes, sha256:{digest[:16]}… "
+            f"({artifact})"
+        )
 
 
 # ── 3. Chain-spec / genesis artifact verification ────────────────────────────

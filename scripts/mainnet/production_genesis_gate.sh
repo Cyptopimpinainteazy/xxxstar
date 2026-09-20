@@ -82,6 +82,19 @@ info "node: $NODE_BIN"
 # stderr, so `--output ss58` is pipeable.
 keygen() { "$NODE_BIN" keys generate --key-type "$1" --seed "$2" --output "$3" 2>/dev/null; }
 
+# A binary whose `keys generate` is still the old placeholder prints advice
+# instead of a key. Without this check the derivation below dies in Python with
+# `non-hexadecimal number found in fromhex()` — which says nothing about the
+# real problem, that the binary under test predates the implementation.
+require_key_output() {  # require_key_output <value> <what> <pattern>
+  local value="$1" what="$2" pattern="$3"
+  if ! printf '%s' "$value" | grep -Eq "$pattern"; then
+    fail "$NODE_BIN did not return a $what (got '${value:0:60}').
+    This is what a stale binary or a placeholder \`keys generate\` looks like.
+    Rebuild it: cargo build --release -p x3-chain-node"
+  fi
+}
+
 # libp2p peer id for an ed25519 node key: base58btc(0x00 0x24 || protobuf(ed25519 pub)).
 # The node's network identity is the ed25519 key built from the same 32 bytes,
 # so this is the peer id the node will report — and check 4 asserts that.
@@ -121,7 +134,10 @@ for i in 0 1 2; do
   aura="$(keygen aura "$seed" ss58)" || fail "keys generate (aura) failed"
   grandpa="$(keygen grandpa "$seed" ss58)" || fail "keys generate (grandpa) failed"
   ed_hex="$(keygen grandpa "$seed" hex)" || fail "keys generate (grandpa hex) failed"
-  [ -n "$aura" ] && [ -n "$grandpa" ] || fail "keys generate produced an empty key"
+  # SS58 addresses are base58 and start with a 5 (32-byte key, prefix 42).
+  require_key_output "$aura" "SS58 address for aura" '^[1-9A-HJ-NP-Za-km-z]{47,48}$'
+  require_key_output "$grandpa" "SS58 address for grandpa" '^[1-9A-HJ-NP-Za-km-z]{47,48}$'
+  require_key_output "$ed_hex" "hex public key for grandpa" '^0x[0-9a-f]{64}$'
 
   PEER_IDS+=("$(peer_id_for "$ed_hex")")
   NODE_KEYS+=("${seed#0x}")
