@@ -158,3 +158,23 @@ A third site was invisible to the scanner and was found by reading:
 `requirement || require` in `parse_finality_policy_item`. The scanner reports the first quoted
 word after `Tok::Ident(ref`, so the dead half hid behind the live one. That is the limit of a
 textual scan, and it is why the test is a floor rather than a proof of absence.
+
+## Sweep: the `unwrap_or(<permissive default>)` pattern, and what it found
+
+The `unwrap_or(0)` in three guard checks (TICKET-114's turn) was worth sweeping for. Six
+sites were examined, each measured against a real program rather than read:
+
+| site | what a permissive default would do | measured |
+|---|---|---|
+| a swap step with no `min_output` (`lowering.rs:1300`) | 0 as the floor | refused: `X3E0501: swap min_output must be greater than zero` |
+| an objective with `hops <= 0` (`objective.rs:288`) | read as "unstated" → the search's default bound | refused: `X3E4024: objective bounds hops at zero` |
+| `discover { }` with no `max_hops` (`parser.rs:4033`) | 0 as the bound | refused by the arb analysis ("a search that may take no hop cannot leave the asset it starts from") |
+| a hyperarb with an empty `parallel { }` (`hyperarb.rs:501`) | leg 0 of no legs | refused: "declares 0 leg(s) … with fewer than two there is nothing to choose between" |
+| a strategy module with no `risk { }` (`metadata.rs:111`) | published as **Low risk** on a budget of zero | unreachable: the strategy pass refuses a module with no risk profile (`X3E4025`) |
+| the intent-bridge's `min_output` (`intent_bridge.rs:212`) | 0 as the floor | covered: `x3c run-intent` runs `check_ir`, which is where the rule lives (`verify.rs:545`) |
+
+So the three sites the previous turn fixed were the exception, not the rule: every other
+permissive default in the compiler is caught by a downstream check, and the two that were
+not (the guard bounds) are fixed. What the sweep *did* find is that `metadata.rs`'s
+`unwrap_or(0)` would class an undeclared module as Low risk if the strategy pass ever
+stopped requiring a risk profile — worth knowing, not worth a change today.

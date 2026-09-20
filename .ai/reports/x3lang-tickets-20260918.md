@@ -4588,3 +4588,33 @@ Why not done here: the operand is two bytes and the kinds' units differ (an abso
 bond, a score for route_score, a basis-point figure for the measured kinds), and the flags byte's
 unit code currently means profit / delta / slippage in basis points — so this needs a per-kind unit
 decision, which is a small design choice rather than a copy of the enforcement change.
+
+## TICKET-115 — the fee ceiling has no representation an artifact can carry — OPEN
+Type: OPEN, PHASE 7 gap · Subsystem: x3-lang/spec + compiler (emitter)
+Reason: PHASE 7 says "Risk policy **must compile into the artifact**" and "Runtime callers MUST NOT
+be able to silently override compiled safety settings". Measured on `examples/strategy_module.x3`,
+which declares `risk { max_slippage_bps 50 max_total_fee_bps 8 }`:
+```
+$ x3c explain /tmp/sm.x3b | grep -iE "risk|fee|slippage"
+  0005  0x40  REQUIRE measured slippage 50      <- the slippage ceiling, via the guard the body writes
+```
+The slippage ceiling reaches the artifact *because the program also writes `require slippage <= 50`*
+and the guard is what the artifact carries. `max_total_fee_bps` has no guard kind, so the ceiling
+reaches nothing: not the artifact, and (until `0c7f1b171`) not the venues either — that half is fixed,
+this half is not.
+What this needs is a decision as much as code, which is why it is filed rather than started:
+- **(a) a `fees` guard kind**, so a program writes `require fees <= 8` and the ceiling travels the way
+  the slippage ceiling does. Consistent with the language's shape, and it makes the ceiling
+  *enforceable* rather than merely stated — but it is a new language feature (parser + guard kind +
+  its check against `risk { max_total_fee_bps }` + the emitter's quantity code, which TICKET-114's
+  closed set can take as `FEES_BPS`).
+- **(b) emit the declared ceiling as a static record** without a guard. Cheaper, and dishonest in a
+  small way: `REQUIRE` means "the program wrote a guard", so a record with no guard behind it would
+  claim something the source does not say.
+- **(c) a new capability opcode** carrying the risk policy as a record. Honest, and a version bump
+  (the version byte is a function of the opcode set, TICKET-097's gate), for one field.
+Acceptance criteria: an artifact for a module that declares `max_total_fee_bps N` states N, and a
+runtime reading only the artifact can refuse a route that exceeds it; the choice above is recorded
+with its reason.
+Validation: `x3c explain` on `strategy_module.x3b` prints the ceiling; a replayer that reads only the
+artifact can answer "what fee ceiling did this module declare".
