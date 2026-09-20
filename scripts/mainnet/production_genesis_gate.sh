@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# production_genesis_gate.sh — prove the mainnet genesis path is real
+# production_genesis_gate.sh — prove a Live genesis path is real
 #
-# `production_config()` builds the Live (mainnet) chain spec and refuses to run
+# `production_config()` / `testnet_config()` build the Live chain specs and refuse to run
 # without X3_PRODUCTION_AUTHORITIES, the endowed/council/treasury accounts and
 # non-zero escrow addresses. `scripts/mainnet/generate_mainnet_chain_spec.sh`
 # called it with no env at all, so the documented mainnet genesis could never be
@@ -14,15 +14,16 @@
 #   1. derive three authority keypairs with the node's own `keys generate`
 #      (deterministic seeds: this is a fixture, and it is the same command an
 #      operator uses with their own seeds)
-#   2. build the production spec from the X3_PRODUCTION_* env
-#   3. assert the artifact: parses as JSON, Live, id `x3_chain_production`,
+#   2. build the spec from the X3_PRODUCTION_* / X3_TESTNET_* env
+#   3. assert the artifact: parses as JSON, Live, the expected id,
 #      every authority we supplied is present, the three bootnodes are exactly
 #      the peer ids derived from the fixture node keys, and no dev seed leaked in
 #   4. boot the three validators on that spec and require finalized height >= 3
 #      with all three agreeing on the canonical hash — a spec that parses but
 #      cannot start a chain fails here
 #
-# Usage: bash scripts/mainnet/production_genesis_gate.sh
+# Usage: bash scripts/mainnet/production_genesis_gate.sh                 # production
+#        X3_GENESIS_CHAIN=testnet bash scripts/mainnet/production_genesis_gate.sh
 #        X3_NODE_BIN=/path/to/x3-chain-node bash scripts/mainnet/production_genesis_gate.sh
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -31,6 +32,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 BASE_DIR="$(mktemp -d)"
 BASE_PORT="${X3_PRODUCTION_GENESIS_BASE_PORT:-21100}"
+# Which built-in Live chain to prove: production (mainnet) or testnet.
+GENESIS_CHAIN="${X3_GENESIS_CHAIN:-production}"
 NODE_PIDS=()
 
 cleanup() {
@@ -73,8 +76,8 @@ info "node: $NODE_BIN"
 
 # Building the spec (and asserting it is a Live, mainnet-shaped genesis) lives in
 # one place, shared with scripts/mainnet/validator_install_gate.sh.
-X3_NODE_BIN="$NODE_BIN" bash "$ROOT/scripts/mainnet/make-fixture-mainnet-spec.sh" \
-  "$BASE_DIR" "$BASE_PORT" || fail "could not build the fixture production genesis"
+X3_NODE_BIN="$NODE_BIN" bash "$ROOT/scripts/mainnet/make-fixture-live-spec.sh" \
+  "$BASE_DIR" "$BASE_PORT" "$GENESIS_CHAIN" || fail "could not build the fixture $GENESIS_CHAIN genesis"
 
 FIXTURE="$BASE_DIR/fixture.json"
 PLAIN="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['spec'])" "$FIXTURE")"
@@ -179,7 +182,7 @@ for _ in $(seq 1 120); do
   if [ "$lowest" -ge 3 ]; then break; fi
   sleep 1
 done
-[ "$lowest" -ge 3 ] || fail "the production genesis did not reach finality (a=$fa b=$fb c=$fc)"
+[ "$lowest" -ge 3 ] || fail "the $GENESIS_CHAIN genesis did not reach finality (a=$fa b=$fb c=$fc)"
 info "all three finalized at least block $lowest (a=$fa b=$fb c=$fc)"
 
 hex_height="$(printf '0x%x' "$lowest")"
@@ -194,4 +197,4 @@ if [ "$hash_a" != "$hash_b" ] || [ "$hash_a" != "$hash_c" ]; then
     gamma: $hash_c"
 fi
 
-info "PASS — production genesis builds, boots, finalizes and agrees at height $lowest ($hash_a)"
+info "PASS — $GENESIS_CHAIN genesis builds, boots, finalizes and agrees at height $lowest ($hash_a)"

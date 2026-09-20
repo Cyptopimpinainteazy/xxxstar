@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# make-fixture-mainnet-spec.sh — build a mainnet (Live) spec from fixture keys
+# make-fixture-live-spec.sh — build a Live spec (production or testnet) from
+# fixture keys
 #
-# One source of truth for "a production genesis that is real enough to boot",
-# used by the two gates that need one:
+# One source of truth for "a Live genesis that is real enough to boot", used by
+# the gates that need one:
 #
-#   scripts/mainnet/production_genesis_gate.sh   (builds it, then boots it)
+#   scripts/mainnet/production_genesis_gate.sh   (builds it, then boots it;
+#                                                 X3_GENESIS_CHAIN picks production or testnet)
 #   scripts/mainnet/validator_install_gate.sh    (builds it, then installs it)
 #
 # The fixture keys are constants and are not secrets: they exist only inside one
@@ -13,15 +15,37 @@
 # boots a validator, which is what makes the genesis authorities and the node's
 # session keys match.
 #
-# Usage: make-fixture-mainnet-spec.sh <out-dir> [base-port]
-#   writes <out-dir>/x3-production-plain.json
+# Usage: make-fixture-live-spec.sh <out-dir> [base-port] [chain-id]
+#   chain-id: production (default) or testnet
+#   writes <out-dir>/x3-<chain-id>-plain.json
 #   writes <out-dir>/fixture.json   {spec, seeds, peers, bootnodes, authorities}
 # Requires: a built x3-chain-node (X3_NODE_BIN or a target/ path), python3, curl.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-OUT_DIR="${1:?usage: make-fixture-mainnet-spec.sh <out-dir> [base-port]}"
+OUT_DIR="${1:?usage: make-fixture-live-spec.sh <out-dir> [base-port] [chain-id]}"
 BASE_PORT="${2:-${X3_PRODUCTION_GENESIS_BASE_PORT:-21100}}"
+# Which Live chain to build. `production` and `testnet` are the two built-in Live
+# ids; they take the same shape of input under different env prefixes and carry
+# different names.
+CHAIN_ID="${3:-${X3_FIXTURE_CHAIN:-production}}"
+case "$CHAIN_ID" in
+  production)
+    ENV_PREFIX="X3_PRODUCTION"
+    EXPECTED_NAME="X3 Chain Production"
+    EXPECTED_ID="x3_chain_production"
+    ;;
+  testnet)
+    ENV_PREFIX="X3_TESTNET"
+    EXPECTED_NAME="X3 Chain Testnet"
+    EXPECTED_ID="x3_chain_testnet"
+    ;;
+  *)
+    echo "unknown chain id '$CHAIN_ID': expected production or testnet" >&2
+    exit 2
+    ;;
+esac
+PLAIN_NAME="$(printf '%s' "$CHAIN_ID" | tr '[:upper:]' '[:lower:]')"
 mkdir -p "$OUT_DIR"
 
 info() { printf '[fixture-spec] %s\n' "$*"; }
@@ -129,34 +153,35 @@ BOOTNODES="/ip4/127.0.0.1/tcp/$(( BASE_PORT + 1 ))/p2p/${PEERS[0]},\
 /ip4/127.0.0.1/tcp/$(( BASE_PORT + 2 ))/p2p/${PEERS[1]},\
 /ip4/127.0.0.1/tcp/$(( BASE_PORT + 3 ))/p2p/${PEERS[2]}"
 
-export X3_PRODUCTION_AUTHORITIES="$AUTHORITIES"
-export X3_PRODUCTION_ENDOWED_ACCOUNTS="$ENDOWED"
-export X3_PRODUCTION_COUNCIL_MEMBERS="$COUNCIL"
-export X3_PRODUCTION_TREASURY_SIGNERS="$TREASURY"
+export "${ENV_PREFIX}_AUTHORITIES=$AUTHORITIES"
+export "${ENV_PREFIX}_ENDOWED_ACCOUNTS=$ENDOWED"
+export "${ENV_PREFIX}_COUNCIL_MEMBERS=$COUNCIL"
+export "${ENV_PREFIX}_TREASURY_SIGNERS=$TREASURY"
 export X3_EVM_ESCROW_ADDR="0x$(printf '11%.0s' $(seq 1 20))"
 export X3_SVM_ESCROW_ADDR="0x$(printf '22%.0s' $(seq 1 32))"
 export TESTNET_BOOTNODES="$BOOTNODES"
 
-PLAIN="$OUT_DIR/x3-production-plain.json"
-info "building the production spec"
-"$NODE_BIN" build-spec --chain production --disable-log-color >"$PLAIN" \
-  || die "build-spec --chain production failed"
+PLAIN="$OUT_DIR/x3-${PLAIN_NAME}-plain.json"
+info "building the $CHAIN_ID spec"
+"$NODE_BIN" build-spec --chain "$CHAIN_ID" --disable-log-color >"$PLAIN" \
+  || die "build-spec --chain $CHAIN_ID failed"
 [ -s "$PLAIN" ] || die "build-spec produced an empty file"
 
-python3 - "$PLAIN" "$AUTHORITIES" "$BOOTNODES" <<'PY' || die "the generated spec is not a valid mainnet genesis"
+python3 - "$PLAIN" "$AUTHORITIES" "$BOOTNODES" "$EXPECTED_NAME" "$EXPECTED_ID" <<'PY' \
+  || die "the generated spec is not a valid Live genesis"
 import json
 import os
 import sys
 
-path, authorities_json, bootnodes = sys.argv[1], sys.argv[2], sys.argv[3]
+path, authorities_json, bootnodes, expected_name, expected_id = sys.argv[1:6]
 raw = open(path, encoding="utf-8").read()
 
 # Parsing the whole file is the point: `build-spec` writes the spec to stdout, so
 # a startup banner on stdout (the bug these gates exist to catch) makes this fail
 # rather than producing a spec nobody can boot.
 spec = json.loads(raw)
-assert spec["name"] == "X3 Chain Production", spec["name"]
-assert spec["id"] == "x3_chain_production", spec["id"]
+assert spec["name"] == expected_name, spec["name"]
+assert spec["id"] == expected_id, spec["id"]
 assert spec["chainType"] == "Live", spec["chainType"]
 
 for entry in json.loads(authorities_json):
@@ -168,7 +193,7 @@ expected = bootnodes.split(",")
 assert boot == expected, f"bootNodes mismatch:\n  spec:     {boot}\n  expected: {expected}"
 
 for forbidden in ("Alice", "Bob", "Charlie", "/Alice", "/Bob", "TestnetAlpha", "ValidatorAlpha"):
-    assert forbidden not in raw, f"dev seed marker {forbidden!r} leaked into the production genesis"
+    assert forbidden not in raw, f"dev seed marker {forbidden!r} leaked into the {expected_name} genesis"
 
 print(f"[fixture-spec] spec ok: {os.path.getsize(path)} bytes, 3 authorities, {len(boot)} bootnodes")
 PY
