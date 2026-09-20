@@ -602,10 +602,10 @@ pub mod pallet {
                     bond_id,
                     severity: 3,
                     amount_slashed: bond_state.amount.saturated_into::<u128>(),
-                    reason: b"bond_expiry"
-                        .to_vec()
-                        .try_into()
-                        .expect("bond_expiry fits in bounded reason"),
+                    // Same rule as in x3-slash: this runs inside `on_finalize`, so
+                    // it must not be able to panic. The old `.expect()` asserted a
+                    // fact about a constant; `truncate_from` cannot fail.
+                    reason: BoundedVec::truncate_from(b"bond_expiry".to_vec()),
                     slashed_at: now,
                 };
                 SlashRecords::<T>::insert(slash_id, slash_record);

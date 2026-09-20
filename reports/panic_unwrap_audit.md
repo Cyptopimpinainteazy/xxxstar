@@ -1,6 +1,6 @@
 # Panic Unwrap Audit
 
-Generated: 2026-09-20T10:28:27Z by scripts/mainnet/panic_unwrap_audit.sh
+Generated: 2026-09-20T11:54:10Z by scripts/mainnet/panic_unwrap_audit.sh
 
 ## Classification
 
@@ -15,7 +15,7 @@ exist in the runtime or in a release node build.
 
 | class | current | baseline |
 | --- | --- | --- |
-| runtime-hook | 2 | 2 |
+| runtime-hook | 0 | 0 |
 | pallet-call | 0 | 0 |
 | production | 2269 | 2269 |
 
@@ -23,8 +23,7 @@ files scanned: 1298
 
 ## Block-hook panics
 
-- `pallets/pallet-x3-agent-registry/src/lib.rs:608` (allowlisted)
-- `pallets/x3-slash/src/lib.rs:576` (allowlisted)
+None. No panic is reachable from a block hook.
 
 ## Production findings by file
 

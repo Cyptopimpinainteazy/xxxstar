@@ -570,10 +570,13 @@ pub mod pallet {
                     bond_id,
                     severity: 3, // Critical — bond expiry is treated as a full slash
                     amount_slashed: bond_state.amount.saturated_into::<u128>(),
-                    reason: b"bond_expiry"
-                        .to_vec()
-                        .try_into()
-                        .expect("bond_expiry fits in bounded reason"),
+                    // `on_finalize` must not panic: a panic in a block hook stops
+                    // block production for every validator. The `.expect()` that
+                    // used to be here was an assertion where a constant belongs —
+                    // true for this 11-byte literal against a 256-byte bound, but
+                    // one edit to the bound away from halting the chain.
+                    // `truncate_from` is infallible.
+                    reason: BoundedVec::truncate_from(b"bond_expiry".to_vec()),
                     slashed_at: now,
                 };
                 SlashRecords::<T>::insert(slash_id, slash_record);
