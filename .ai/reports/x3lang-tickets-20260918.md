@@ -4804,3 +4804,24 @@ Closed: `verify_declarations_have_a_reader` refuses each of the seven by name wi
 separate claim. Five tests, including a control that the corpus's own shape meets no such rule.
 This is the same shape as TICKET-111 (`@subscription`, `audit_gate`) and the `finality_explicit` find:
 a construct the artifact cannot carry and no pass reads is refused, not dropped.
+
+## TICKET-118 — a module's declared `max_gas` is not enforced — OPEN
+Type: OPEN, PHASE 41 remainder · Subsystem: x3-lang/compiler + vm
+Reason: PHASE 41 says a strategy's resource caps exist to "prevent pathological execution graphs",
+and `bounds { max_gas N }` is checked for being *stated and non-zero* and nothing else. Measured:
+a module declaring `max_gas 1` with a body whose artifact is 296 bytes and 74 operations ran to
+completion with 999115 gas left. `max_steps` was the same and is enforced now (`13f597655`).
+What makes this one harder than `max_steps`: the step count is exact at lowering time (the number of
+operations the module pushes), while a *gas* figure is the weight the emitter charges per opcode
+(`spec::opcodes::base_gas_cost`), and the IR carries no per-operation weight. Two honest routes:
+- **(a) weight the module's slice through the emitter**: build a sub-IR from the module's operations
+  and run `emit_x3ir` + `cost::estimate_artifact` on it. Exact, reuses the one weight table, and costs
+  a second emission at compile time.
+- **(b) mark module boundaries in the IR** (a marker operation or an index range) so the emitter can
+  accumulate the charge for each module as it writes, then compare with that module's cap.
+The route *not* to take: comparing the declared cap against the whole artifact's estimate, which
+would refuse a legitimate two-module program whose modules are each within their own bound.
+Acceptance criteria: a module whose artifact weight for its own operations exceeds `max_gas` is
+refused with both figures; one at the cap is accepted; the count is per module.
+Validation: the measurement above, turned around — `max_gas 1` refused by name — plus a
+two-module control that is not refused.

@@ -5315,3 +5315,17 @@ No code this turn; two **verification** artifacts, which is what the ledger need
   *nothing* (672/872 bytes before and after) — the cheap proof that a declaration was inert.
 - `Item::Const` and `Item::Struct` etc. still need their match arms (exhaustiveness, TICKET-078); the
   refusal is a semantic pass, so the *parser* keeps accepting them.
+
+**2026-09-20 — `max_steps` enforced; `max_gas` filed with its two routes (TICKET-118)**
+
+- PHASE 41's purpose is "prevent pathological execution graphs", so a cap is a *compile-time* property:
+  `max_steps` is now compared with the module's own lowered operation count (the slice between
+  `AtomicBegin` and `AtomicEnd`, so two modules keep separate bounds, and the licence/mode/fee records
+  do not count). Refusal gives both figures.
+- `max_gas` needs the per-operation weight the emitter charges; the IR carries no weight, so either
+  weight the module's slice through the emitter (sub-IR + `cost::estimate_artifact`) or mark module
+  boundaries in the IR. **Not** the artifact-wide estimate — it would refuse a legitimate two-module
+  program.
+- PHASE 41's spec spelling is `resources { max_compute/max_memory/max_network_calls/max_routes/max_branches }`;
+  the implementation has `bounds { max_steps max_gas }` — a subset under a different name, now recorded
+  in the phase ledger rather than left implicit. `cost::HOST_FACING` already counts network calls.
