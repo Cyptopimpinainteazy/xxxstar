@@ -5241,3 +5241,17 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - `semantic::verify_fee_guards_declared` is the fee rule in one place (owner → declared ceiling), and
   it refuses: a non-`<=` bound, an unreadable bound, no declaration at all, and a guard looser than
   the profile.
+
+**2026-09-20 — the last unchecked guard kind, and the enumeration that finds them (TICKET-027/025 closed)**
+
+- `finality_explicit` was a *second spelling* of a finality guard: in `REQUIRE_KIND_NAMES`, mapped by
+  the JSON intent bridge, and decided by nothing. A program writing it got `status: ok` and an
+  artifact carrying `static 0`. `verify_finality_guards_declared` now matches `Finality |
+  FinalityExplicit` and renders the guard's own spelling in refusals.
+- Guard kinds with two spellings of one claim are where this hides: check whether each spelling is
+  decided, and grep the *kind name* rather than the surface word.
+- `every_guard_kind_has_a_disposition` (test_guard_declarations.rs) is the guard against the class:
+  a row per kind naming its deciding `fn`, asserting the rows cover `REQUIRE_KIND_NAMES` exactly and
+  that each named check is defined *and called*. Adding a guard kind now fails that test until its
+  disposition is written down.
+- The ledger has no OPEN tickets left; TICKET-025 and TICKET-027 are closed with measured evidence.

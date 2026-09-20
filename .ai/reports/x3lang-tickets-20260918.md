@@ -273,8 +273,19 @@ Measured: `examples/trading_core_v1.x3` and `examples/trading_effects.x3` go
 from `X3_VERIFY_FAILED: InvalidOpcode(176, 1)` to `x3c run: ok`. Corpus
 execution over `examples/*.x3`: 7 clean, up from 5.
 
-## TICKET-025 — The flagship cross-chain examples fail at runtime — PARTIAL
-Type: FIXED IN PART in `5ff7c9ecf`; remainder is TICKET-027 · Subsystem: x3-lang
+## TICKET-025 — The flagship cross-chain examples fail at runtime — CLOSED
+Type: CLOSED in `4b2a2ea63` (2026-09-20) · Subsystem: x3-lang
+**Closed: both examples run, and the remainder — TICKET-027 — is closed too.** Measured on the
+shipped artifacts rather than argued:
+```
+$ x3c run /tmp/mainnet_safe_swap.x3b
+x3c run: ok — 2 asset ops, 1 bridge ops, 3 receipts, gas remaining 997896
+$ x3c run /tmp/flagship_b52.x3b
+x3c run: ok — 3 asset ops, 1 bridge ops, 3 receipts, gas remaining 997502
+```
+(The run states the market outcome, because the programs' economic guards are enforced now: see
+TICKET-027 and `.ai/reports/x3lang-guards-enforced-20260920.md`.)
+Original Type: FIXED IN PART in `5ff7c9ecf`; remainder is TICKET-027.
 Reason: `examples/mainnet_safe_swap.x3` and `examples/flagship_b52.x3` build and
 verify, then panic at execution:
 
@@ -376,8 +387,37 @@ Acceptance criteria: the instruction count from `disassemble` equals the number
 of instructions the executor walks for the same stream, on every example.
 Validation: compare both counts programmatically over `examples/*.x3`.
 
-## TICKET-027 — Guards are not evaluated — PARTIAL
-Type: FIXED IN PART in `c1306b929` and `f2b972a3c` · Subsystem: x3-lang/compiler + vm
+## TICKET-027 — Guards are not evaluated — CLOSED
+Type: CLOSED in `4b2a2ea63` (2026-09-20) · Subsystem: x3-lang/compiler + vm
+**Closed: every guard kind the language defines has a disposition, and the list is now a test.**
+The acceptance is per kind — each one either gains a declared quantity and a check, or is refused by
+name — and the last kind without one was found by writing the enumeration down rather than by
+looking for it:
+```
+$ x3c check fe.x3      # require finality_explicit solana == finalized, no finality_policy for solana
+  "status": "ok"       # and the artifact carried `REQUIRE static 0` — no mode, no depth
+```
+`finality_explicit` is the other spelling of a finality guard. It is listed in
+`REQUIRE_KIND_NAMES`, the JSON intent bridge maps its kind string to the same variant, and nothing
+decided it. The finality check decides both spellings now, and a refusal names the one the program
+wrote:
+```
+X3E4027: declaration 'explicit_finality' requires `finality_explicit solana`, but no
+`finality_policy` names that chain — the guard has nothing to compare against. Write
+`finality_policy <mode> { chain solana requirement finalized blocks <n> }`
+```
+**The durable half is `every_guard_kind_has_a_disposition`** (tests in
+`test_guard_declarations.rs`): one row per kind naming the `fn` that decides it, asserting that the
+rows cover `REQUIRE_KIND_NAMES` exactly *and* that every named check is a defined, called function.
+Both halves are load-bearing — a removed row fails with `only here: ["finality_explicit"]`, a
+renamed check with `not a defined, called function: ["verify_no_such_check"]`.
+The dispositions, in the table's own words: `finality`, `finality_explicit` and `fees` and the rest
+of the declared kinds are decided against the clause each names; `slippage` against the risk policy
+and the module's profile, and — with `profit` and the hedge's `delta` — *evaluated* by the VM
+against what a host reported, refusing when nothing did; `nonce` is the one run-time fact, decided by
+`NONCE_UNUSED` leaving the answer in `r0`; `audit_gate` is refused by name because no clause can
+state that an audit ran.
+Original Type: FIXED IN PART in `c1306b929` and `f2b972a3c`.
 Reason: `Operation::Require` is emitted as `[REQUIRE][u16 0]` — no operand, no
 condition, no identity. The executor's `REQUIRE` arm therefore tests **r0**, and
 nothing sets r0 *for the guard*: it holds whatever the previous operation left
