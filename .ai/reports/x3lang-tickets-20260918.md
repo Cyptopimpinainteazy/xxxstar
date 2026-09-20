@@ -4541,8 +4541,35 @@ Validation: `cargo test --workspace` in `x3-lang` stays green at 1233+, and the 
 Why not fixed in this pass: it is cleanup with no user-visible effect, and the three that *were*
 broken are fixed and pinned. Recorded rather than dropped.
 
-## TICKET-114 — a non-economic guard's bound is checked and then dropped from the artifact — OPEN
-Type: OPEN, information loss · Subsystem: x3-lang/compiler (emitter)
+## TICKET-114 — a non-economic guard's bound is checked and then dropped from the artifact — CLOSED
+Type: CLOSED in `326f8f968` (2026-09-20), filed and fixed in the same pass · Subsystem: x3-lang/compiler (emitter) + x3-lang/spec/opcodes.rs
+**Closed: the figure travels, and the measurement found a worse defect next to it.**
+The three bits above the guard operator — the field a *measured* guard uses for its unit — now name
+the quantity a static guard's figure counts (`amount`, `score`, `count`, `blocks`), and the figure is
+the operand. `x3c explain` prints both, so a reader can tell a bond from a score. The set is closed in
+the verifier, for the reason the measured units' is; zero stays "no figure carried", which is what
+every artifact written before this reads as, so nothing already emitted changes meaning.
+```
+$ x3c explain rs_90.x3b | grep REQUIRE          # require route_score >= 90
+  0007  0x40  REQUIRE static score 90
+$ x3c explain mainnet_safe_swap.x3b | grep REQUIRE
+  0012  0x40  REQUIRE static blocks 32
+  0033  0x40  REQUIRE static count 3
+```
+A figure the two-byte operand cannot hold is refused rather than truncated, the rule the finality
+policy's depth already follows. Tests: four in `test_guard_declarations.rs` (bounds differ → bytes
+differ; the trace names the figure and its quantity; an unreadable bound refused; a 70 000 bond
+refused by the operand's width) and one in `verifier.rs` for the closed set. With the emitter's
+figure reverted, the two artifact tests fail.
+
+**And the hole the measurement turned up, which is worse.** Three checks read a bound they could not
+evaluate as **zero** — `unwrap_or(0)` in `verify_route_score_declared`, `verify_solver_bond_declared`
+and `verify_relayer_quorum_declared`. `require route_score >= min_score` was therefore read as "at
+least zero", which every policy satisfies, and the artifact recorded a threshold of zero for it: an
+unreadable bound made the guard *weaker* rather than refusing it. Measured before the fix: that
+program passed `x3c check` with `"status": "ok"`. All three refuse by name now, the rule an unknown
+guard kind already follows (TICKET-049).
+Original Type: OPEN, information loss.
 Reason: `require solver_bond >= 10_000`, `require route_score >= 90`, `require bridge_liquidity >= N`
 and the rest are decided at compile time against the declaration they name, and then emitted as
 `REQUIRE static 0` — the operand is **zero**, so the artifact does not carry the bound the program

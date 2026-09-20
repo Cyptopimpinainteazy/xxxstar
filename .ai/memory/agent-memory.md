@@ -5176,3 +5176,22 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - TICKET-114: every non-economic guard kind still emits `REQUIRE static 0`, so its bound is checked
   and then dropped from the artifact. Needs a per-kind unit decision for the operand.
 - `risk { max_total_fee_bps }` is compile-time only; no fee quantity is stateable.
+
+**2026-09-20 — TICKET-114 closed, and the `unwrap_or(0)` hole it uncovered**
+
+- The flags byte's bits 5-7 (the measured guard's unit code) now also name the quantity a *static*
+  guard's figure counts: `GUARD_QUANTITY_{AMOUNT,SCORE,COUNT,BLOCKS}` = 3,4,5,6 in
+  `spec/opcodes.rs`. Zero is "no figure carried" (backward compatible); the set is closed in the
+  verifier (`is_known_guard_quantity`).
+- `x3c explain` prints `REQUIRE static score 90` / `static amount 10000` / `static blocks 32` /
+  `static count 3`.
+- `static_guard_quantity` in `compiler/src/emitter.rs` picks the code per IR kind (RouteScore |
+  RiskScore → score, SolverBond | BridgeLiquidity → amount, RelayerQuorum → count); the finality
+  branch uses blocks. A figure that does not fit u16 is refused, not truncated.
+- **The hole:** `verify_route_score_declared`, `verify_solver_bond_declared` and
+  `verify_relayer_quorum_declared` read `guard.value.and_then(extract_int_from_expr).unwrap_or(0)` —
+  so `require route_score >= min_score` passed every policy and recorded threshold 0. All three now
+  refuse a bound that is not a number. Other checks (fallback bounds, atomic-swap output, finality
+  depth) already refused or fell through to a mode word.
+- Pattern worth keeping: `unwrap_or(0)` on a value the compiler *should* be able to read turns an
+  unreadable input into the weakest possible claim. Grep for `.unwrap_or(0)` next to a parse.
