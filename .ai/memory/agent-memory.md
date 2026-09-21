@@ -5468,3 +5468,40 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - Instrument trap worth remembering: the first run of the landed-line metric silently measured nothing for
   branches whose only changed file was `Cargo.lock` (a skip-list entry), which read as "0% landed". A `-1`
   in that table means *nothing attributable*, not *nothing merged*.
+
+**2026-09-20 — the formatter was deleting declarations (TICKET-127), and two more commands lied (TICKET-128/129)**
+
+- **A bytecode-equality round-trip test cannot see a dropped declaration.** `trading_effects.x3` with its
+  `effects [..]`/`guarantees [..]` deleted compiles to *identical* bytes — the body still produces and
+  discharges them — so the formatter could delete the declarations and the corpus test stayed green. The
+  criterion that catches it is the **AST** (spans stripped): the declaration lives there even when the
+  artifact does not. The corpus test now compares both, and it was made to fail first (with the clause
+  writes removed it names `trading_effects.x3`).
+- **The enforcement is what makes a dropped declaration expensive.** Same edit (`repay debt` deleted):
+  original refused with 2 errors (X3E4021 unfulfilled effect + X3E4022 unrepaid debt), formatted file with
+  1. `quote_freshness` is the same shape without a body: the VM enforces it
+  (`vm/src/economic.rs` refuses a policy weaker than the compiled one states). `format_generics` was
+  missing from both `fn` and `struct`, so `fn identity<T>(value: T) -> T` came back as
+  `fn identity(value: T) -> T`.
+- **The field-vs-writer audit generalises; keep running it after any AST change.** Two passes: (a) every
+  `pub struct *Decl` field vs. mentions in `formatter.rs`; (b) every AST struct the formatter *names*, vs.
+  its fields. Pass (b) is the one that found `quote_freshness`; pass (a) alone missed it because the same
+  field name appears in another arm (name-based hits are not evidence — read the arm).
+- **`fmt` formats in place and takes no `--out`.** Running it "to capture output" rewrote 19 corpus
+  examples. Restored with `git checkout` after copying them to /tmp; the copies are what produced the
+  text diff inventory that started this whole thread.
+- **`x3c test-fixture`'s output is committed at `x3-lang/x3c-fixture.x3`** and the tree-wide gate
+  `every_x3_file_the_tooling_walks_is_a_program` walks it. It failed `x3c check` (three X3E0501) while the
+  test asserted the file contains the word "intent". Deleted-but-tracked files are not walked, which is
+  why a green suite and a red tree could coexist; the fixture now checks before it is written.
+- **`x3c intent` read the destination only from `mint`.** Every cross-chain intent in the corpus has a
+  bridge route and no mint, so `dest_chain` was the draft's hardcoded `"x3"`, `dest_asset` `"UNKNOWN"`.
+  The `to` clause lowers to `Statement::Release` — the walker reads it now. Lesson: a `default_*` or a
+  literal in a constructor is a placeholder until something overwrites it, and nothing checks that it was.
+- **TICKET-124 is closed: all 36 commands have been run against an input that should exercise the claim**
+  (`graph`/`optimize` figures checked against the venue declarations and the documented "worst leg"
+  slippage aggregation; `run-intent` driven from `runner.py`'s real envelope). It produced five defects
+  (123, 125, 127, 128, 129) — one in six commands was not saying what it did.
+- Instrument note: `--out`/`-o` vs positional arguments differ per command, and a wrong invocation (exit 2
+  from clap) reads exactly like a failing check if you do not capture the exit code separately from a
+  pipe. Use `${PIPESTATUS[0]}`, not `$?`, after a pipe.

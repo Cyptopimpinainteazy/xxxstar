@@ -5028,8 +5028,9 @@ fabrication here is the class AGENTS.md forbids outright). Three defects in one 
 One test asserts all three. The coverage gap that let it ship: no CLI test had run `refund` on a
 program with a refund path, so the fabricated line was never compared against anything.
 
-## TICKET-124 — the CLI surface has not been audited command by command — OPEN
-Type: OPEN, audit · Subsystem: crates/x3-tools/src/bin/x3c.rs
+## TICKET-124 — the CLI surface has not been audited command by command — CLOSED
+Type: CLOSED 2026-09-20 (every command measured; the defects it found are TICKET-123/125/127/128/129)
+· Subsystem: crates/x3-tools/src/bin/x3c.rs
 Reason: the defect above was found by running one command; the surface has 33. `x3c test`, `fuzz` and
 `chaos` were checked in the same pass and generate real artifacts (test files that parse/compile/check,
 an `Arbitrary` input struct, scenarios) — not stubs. `deploy`/`plan` report the artifact's own figures.
@@ -5040,12 +5041,36 @@ Acceptance criteria: for each command, either its output is shown to follow from
 the program states, an artifact's bytes, a refusal with a reason), or a defect is filed.
 Validation: one measured run per command, recorded in a report.
 
-**Measured so far (2026-09-20), `new` included:** `new`, `check`, `build`, `run`, `lint`, `test`,
-`fuzz`, `chaos`, `deploy`, `plan`, `audit`, `inspect`, `lanes`, `metadata`, `score`, `fusion`,
-`netting`, `gpu`, `test-fixture`, `intent`, `simulate`, `verify`, `prove`, `refund`. Running `new`
-turned up TICKET-125, which is the second defect this ticket's method has found (`refund` was the
-first). Still unaudited: `lower`, `parse`, `explain`, `replay`, `packet`, `receipt`, `run-intent`,
-`arb`, `calldata`, `wallet`, `doctor` and the remaining subcommands.
+**Every command has now been run against an input that should exercise its claim.** The last pass
+(2026-09-20) covered the eleven that were outstanding, each measured rather than read:
+- `parse`, `lower` — the AST/IR follow the source: `simple_swap.x3`'s `chain arbitrum / blocks 32` and
+  `nonce simple_swap_001` come back as written, 19 operations, and lowering agrees with `check`.
+- `explain`, `estimate` — the listing's 19 frames and the estimate's "19 instructions / 348 bytes"
+  agree with `build`'s own line for the same artifact. The metadata records share the listing's counter
+  (so 21 numbered lines for 19 instructions); they are labelled `meta.*`, and the width of the metadata
+  block does not shift the instruction walk: measured for nonce lengths 1-12, the opcode sequence and
+  the run outcome are identical for all twelve (TICKET-023's settled format).
+- `fmt` — see TICKET-127. Idempotent over the corpus (20/20), and the corpus round-trips to identical
+  bytecode.
+- `graph`, `optimize` — `opportunity_graph.x3` declares deep_pool (fee 7, slippage 8, liquidity 4M),
+  wide_pool (4, 21, 100k) and x3_bridge (2, 5, 500k); the search reports the two paths with fee 6 and 9
+  (pool + bridge), slippage 21 and 8 (the worst leg, as `EdgeAttributes::slippage_bps` documents),
+  finality 32 (the max) and liquidity 100000/500000 (the min); `optimize` picks `wide_pool` for
+  `minimize_fees`, which is the lower fee and the documented default objective.
+- `receipt inspect` / `verify` / `execute` — a signed receipt is emitted, verified, and `replay` reports
+  what it checked from the receipt, what it checked here (the artifact hash matches), and what it did
+  not check (risk ceilings, finality references, host inputs) by name.
+- `packet inspect` / `verify` — signed passes; tampered is refused naming both commitments; `--block`
+  past `deadline_blocks` is refused; a packet whose requirements are declared and given no `--evidence`
+  is refused naming them, and stale evidence is refused with the block figures.
+- `run-intent` — driven end to end from the real producer: `runner.py --dry-run` emits the
+  `validated_intent_v1` envelope (from/to matching the source), and `x3c run-intent` executes it
+  ("5 asset ops, 1 bridge ops, 1 receipts"). A draft without `schema_version` is refused naming the
+  field rather than guessed at.
+- `test-fixture` — see TICKET-128. `intent` — see TICKET-129.
+Defects this audit produced: TICKET-123 (`refund`), TICKET-125 (`new`), TICKET-127 (`fmt`),
+TICKET-128 (`test-fixture`), TICKET-129 (`intent`). Five of thirty-six commands were not saying what
+they did; the method is worth repeating on the surface whenever it grows.
 
 ## TICKET-125 — the project `x3c new` writes is not one its own first command accepts — CLOSED
 Type: CLOSED in `3ab992eb3` (2026-09-20) · Subsystem: crates/x3-tools/src/bin/x3c.rs
@@ -5091,3 +5116,53 @@ has it. Least-landed first: `fix/agent-guard-bip39-allow` (0.0%, 1 line),
 `feat/x3vm-durable-recovery-20260911` (84.8%), `ci/route-more-workflows-self-hosted` (87.5%),
 `salvage/x3lang-intent-bridge` (87.5%, inspected — already on master).
 Validation: one measured verdict per tip, recorded in the report above.
+
+## TICKET-127 — `x3c fmt` deleted declarations and parameter lists — CLOSED
+Type: CLOSED in `bf37dcb14` (2026-09-20) · Subsystem: compiler/src/formatter.rs
+Found by running the command and reading its output against the input (TICKET-124's method).
+Three drops, all AST-visible, none artifact-visible — which is why the round-trip test's bytecode
+comparison never saw them:
+- **`effects [..]` / `guarantees [..]`** on an `atomic trade` were written nowhere. Measured harm on
+  `trading_effects.x3` with `repay debt` deleted: the original is refused with 2 errors (X3E4021
+  unfulfilled effect + X3E4022 unrepaid debt), the formatted file with 1 — the effect check is gone,
+  because the declaration that carries it is gone. The artifact is byte-identical either way, so the
+  body satisfied the obligations until it did not.
+- **`quote_freshness: 5`** was missing from the policy arm; the VM enforces it
+  (`vm/src/economic.rs` refuses a policy weaker than the compiled one states), so formatting removed
+  an enforced bound. Measured: came back without the line, now round-trips.
+- **`<T: Ordered + Sized>`** on `struct` and `fn` was written nowhere: `fn identity<T>(value: T) -> T`
+  became `fn identity(value: T) -> T`, a signature naming a parameter nothing declares.
+What changed: the two clause writes, the `quote_freshness` arm, and a shared `format_generics` used by
+both arms. The guard is the criterion that was missing — the round-trip test now compares the **AST**
+(spans stripped) as well as the bytecode, and it was made to fail first: with the clause writes removed
+it names `trading_effects.x3`. Two synthetic families cover what the corpus does not contain (generics;
+the optional policy ceilings).
+Validation: corpus 20/20 bytecode-identical *and* AST-identical; workspace 1302 passed / 0 failed;
+clippy and fmt clean.
+
+## TICKET-128 — `x3c test-fixture` emitted a program the compiler refuses — CLOSED
+Type: CLOSED in `bf37dcb14` (2026-09-20) · Subsystem: crates/x3-tools/src/bin/x3c.rs
+Found by the tree-wide gate `every_x3_file_the_tooling_walks_is_a_program`, which walks every `.x3`
+outside the named non-language directories: `x3-lang/x3c-fixture.x3` — committed, byte-identical to the
+command's output — fails `x3c check` with three X3E0501 errors (no refund path, a `Lock` with no way
+back, a swap leg with no slippage bound), while the command describes itself as emitting "a known-good
+fixture for the test harness" and its test asserted only that the file contains the word `intent`.
+Measured: `git ls-files` shows the file tracked; `diff` of the emitted text against it is empty; the
+suite is red with the fixture present (67 tests: 66 passed / 1 failed) and green with it deleted, which
+is how the two states disagreed.
+What changed: the fixture carries the clauses that make it a program, and it is generated, checked with
+the same diagnostics `x3c check` runs, and only then written — the same shape as `cmd_new` (TICKET-125);
+its test now asserts check + build; the committed copy is regenerated. Suite: 67 passed / 0 failed.
+
+## TICKET-129 — the intent spec's destination was a hardcoded placeholder — CLOSED
+Type: CLOSED in `b612becd3` (2026-09-20) · Subsystem: compiler/src/intent_emit.rs
+`x3c intent examples/simple_swap.x3` reported `dest_chain: "x3"`, `dest_asset: "UNKNOWN"`,
+`dest_receiver: "unknown"` for a program whose `to` clause reads `solana.SOL receiver wallet` and whose
+artifact releases to solana.SOL. `from_intent_decl` began from those placeholders and filled the
+destination only from `Statement::Mint`; an intent whose route is a bridge has no mint, so every
+cross-chain intent in the corpus compiled to a spec naming a destination that does not exist. The `to`
+clause lowers to `Statement::Release`, which the walker now reads.
+Measured (`dest_chain`/`dest_asset`/`dest_receiver` against each source's `to` line): `simple_swap.x3`
+solana/SOL/wallet; `staking_intent.x3` solana/stakedSOL/vault; `timeout_refund_minimal.x3`
+Solana/USDC/4Nd1mz… — all three were `x3`/`UNKNOWN`/`unknown` before.
+Regression: `compiler/tests/test_intent_endpoints.rs` pins the three fields on a cross-chain fixture.
