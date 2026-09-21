@@ -168,9 +168,15 @@ impl RpcClient {
             .map_err(|e| SwapError::RpcError(format!("Failed to parse response: {}", e)))?;
 
         if let Some(err) = &rpc_resp.error {
+            // A JSON-RPC error without the request it answered is not
+            // diagnosable: "Failed to decode transaction" says nothing about
+            // which field the node rejected, and the caller has already thrown
+            // the request away. Truncated, because a calldata-carrying request
+            // is long and this path is for humans reading logs.
+            let sent = &body[..body.len().min(512)];
             return Err(SwapError::RpcError(format!(
-                "JSON-RPC error {}: {}",
-                err.code, err.message
+                "JSON-RPC error {}: {} (request: {})",
+                err.code, err.message, sent
             )));
         }
 

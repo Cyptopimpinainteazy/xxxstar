@@ -40,20 +40,33 @@ fn dev_account(name: &str) -> AccountId {
 }
 
 fn spawn_x3_node() -> NodeGuard {
+    // See `node/tests/x3vm_evm_live.rs`: `--dev` alone boots a chain whose
+    // genesis allows unattested cross-domain proof sets. `X3_TEST_CHAIN_SPEC`
+    // points the same lifecycle at another spec (the gate builds one with that
+    // policy flipped), and `--dev` stays because it is what gives the node its
+    // authority key; an explicit `--chain` takes precedence over the chain id
+    // `--dev` would otherwise use.
+    let mut args: Vec<String> = vec![
+        "--tmp".into(),
+        "--rpc-port".into(),
+        "19946".into(),
+        "--port".into(),
+        "30381".into(),
+        "--no-telemetry".into(),
+    ];
+    match std::env::var("X3_TEST_CHAIN_SPEC") {
+        Ok(spec) => {
+            args.push("--dev".into());
+            args.push(format!("--chain={spec}"));
+        }
+        Err(_) => args.push("--dev".into()),
+    }
     let child = Command::new(env!("CARGO_BIN_EXE_x3-chain-node"))
-        .args([
-            "--dev",
-            "--tmp",
-            "--rpc-port",
-            "19946",
-            "--port",
-            "30381",
-            "--no-telemetry",
-        ])
+        .args(&args)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
-        .expect("spawn x3-chain-node --dev");
+        .unwrap_or_else(|e| panic!("spawn x3-chain-node {args:?}: {e}"));
     NodeGuard(child)
 }
 
@@ -62,11 +75,41 @@ fn wait_x3_rpc(timeout: Duration) {
     while started.elapsed() < timeout {
         let mut rpc = RpcClient::new(X3_RPC.into(), 0);
         if rpc.call("system_health", Vec::new()).is_ok() {
+            assert_requested_cross_domain_posture();
             return;
         }
         thread::sleep(Duration::from_millis(500));
     }
     panic!("X3 dev node RPC did not become ready");
+}
+
+/// See `node/tests/x3vm_evm_live.rs` for why this exists: a "strict" run that
+/// silently ignored the spec would pass exactly like a strict one.
+fn assert_requested_cross_domain_posture() {
+    if std::env::var("X3_TEST_CHAIN_SPEC").is_err() {
+        return; // a `--dev` run: permissive on purpose
+    }
+    let key = format!(
+        "0x{}",
+        hex::encode(frame_support::storage::storage_prefix(
+            b"X3SettlementEngine",
+            b"AllowUnattestedCrossDomainProofs"
+        ))
+    );
+    let mut rpc = RpcClient::new(X3_RPC.into(), 0);
+    let value = rpc
+        .call("state_getStorage", vec![Value::String(key.clone())])
+        .expect("state_getStorage for the cross-domain proof policy")
+        .result
+        .unwrap_or_else(|| panic!("no storage value at {key}: the policy was never set"));
+    let raw = value
+        .as_str()
+        .unwrap_or_else(|| panic!("policy value is not a hex string: {value}"));
+    assert_eq!(
+        raw, "0x00",
+        "X3_TEST_CHAIN_SPEC was given, so this run must be the strict posture \
+         (allowUnattestedCrossDomainProofs = false), but the chain reports {raw}"
+    );
 }
 
 fn submit_x3(signed: &str) -> String {

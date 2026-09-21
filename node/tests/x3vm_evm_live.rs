@@ -41,20 +41,39 @@ fn dev_account(name: &str) -> AccountId {
 }
 
 fn spawn_x3_node() -> NodeGuard {
+    // `--dev` boots a chain whose genesis allows unattested cross-domain proof
+    // sets. That is a dev-only posture: every joinable network passes
+    // `allowUnattestedCrossDomainProofs: false`, because a terminal refund
+    // released against a self-attested bundle is a fund loss. Setting
+    // `X3_TEST_CHAIN_SPEC` runs this same lifecycle against another spec — the
+    // gate builds a dev spec with that one policy flipped — so the honest path
+    // is proven in the posture mainnet actually uses.
+    let mut args: Vec<String> = vec![
+        "--tmp".into(),
+        "--rpc-port".into(),
+        "19945".into(),
+        "--port".into(),
+        "30380".into(),
+        "--no-telemetry".into(),
+    ];
+    match std::env::var("X3_TEST_CHAIN_SPEC") {
+        Ok(spec) => {
+            // `--dev` stays: it is what makes this node an authority with the
+            // dev network key and forced authoring, and without it the node
+            // does not start ("NetworkKeyNotFound"). An explicit `--chain`
+            // takes precedence over the chain id `--dev` would use, so the only
+            // thing that changes for a strict run is the genesis.
+            args.push("--dev".into());
+            args.push(format!("--chain={spec}"));
+        }
+        Err(_) => args.push("--dev".into()),
+    }
     let child = Command::new(env!("CARGO_BIN_EXE_x3-chain-node"))
-        .args([
-            "--dev",
-            "--tmp",
-            "--rpc-port",
-            "19945",
-            "--port",
-            "30380",
-            "--no-telemetry",
-        ])
+        .args(&args)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
-        .expect("spawn x3-chain-node --dev");
+        .unwrap_or_else(|e| panic!("spawn x3-chain-node {args:?}: {e}"));
     NodeGuard(child)
 }
 
@@ -63,11 +82,50 @@ fn wait_x3_rpc(timeout: Duration) {
     while started.elapsed() < timeout {
         let mut rpc = RpcClient::new(X3_RPC.into(), 0);
         if rpc.call("system_health", Vec::new()).is_ok() {
+            assert_requested_cross_domain_posture();
             return;
         }
         thread::sleep(Duration::from_millis(500));
     }
     panic!("X3 dev node RPC did not become ready");
+}
+
+/// Prove the node is running the posture the caller asked for.
+///
+/// `X3_TEST_CHAIN_SPEC` is meant to boot this lifecycle on a spec whose
+/// `allowUnattestedCrossDomainProofs` is `false` — the posture every joinable
+/// network uses. Without this check a run that silently ignored the spec (an
+/// argument the node dropped, a file that never loaded) would pass exactly like
+/// a strict run, and the gate would be reporting a posture it never applied.
+///
+/// Read as raw SCALE: `bool` is one byte, so `false` is `0x00`. Anything else —
+/// a `0x01`, a missing key, an RPC error — fails, because "I could not read the
+/// policy" is not evidence that the policy is strict.
+fn assert_requested_cross_domain_posture() {
+    if std::env::var("X3_TEST_CHAIN_SPEC").is_err() {
+        return; // a `--dev` run: permissive on purpose
+    }
+    let key = format!(
+        "0x{}",
+        hex::encode(frame_support::storage::storage_prefix(
+            b"X3SettlementEngine",
+            b"AllowUnattestedCrossDomainProofs"
+        ))
+    );
+    let mut rpc = RpcClient::new(X3_RPC.into(), 0);
+    let value = rpc
+        .call("state_getStorage", vec![Value::String(key.clone())])
+        .expect("state_getStorage for the cross-domain proof policy")
+        .result
+        .unwrap_or_else(|| panic!("no storage value at {key}: the policy was never set"));
+    let raw = value
+        .as_str()
+        .unwrap_or_else(|| panic!("policy value is not a hex string: {value}"));
+    assert_eq!(
+        raw, "0x00",
+        "X3_TEST_CHAIN_SPEC was given, so this run must be the strict posture \
+         (allowUnattestedCrossDomainProofs = false), but the chain reports {raw}"
+    );
 }
 
 fn submit_x3(signed: &str) -> String {
