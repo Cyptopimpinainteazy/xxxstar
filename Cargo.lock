@@ -27367,6 +27367,7 @@ dependencies = [
  "sp-runtime 45.0.0",
  "sp-std 14.0.0",
  "tokio",
+ "x3-atomic-swap",
  "x3-cross-vm-bridge",
  "x3-evm-integration",
 ]

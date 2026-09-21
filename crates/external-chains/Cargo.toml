@@ -19,6 +19,12 @@ sp-io = { workspace = true, default-features = false }
 # Internal crates
 x3-evm-integration = { path = "../evm-integration", default-features = false }
 x3-cross-vm-bridge = { path = "../cross-vm-bridge", default-features = false }
+# Signing a transaction is the one thing this crate cannot do itself: the adapters
+# hold no key material and no RLP/secp256k1 code. `x3-atomic-swap` owns the single
+# EIP-155 implementation in the workspace (`ethereum_tx`), so sending reuses it
+# rather than growing a second one. Optional and `std`-only: a no_std build has no
+# signer, and every send path refuses there.
+x3-atomic-swap = { path = "../x3-atomic-swap", default-features = false, features = ["std"], optional = true }
 
 # Async runtime
 async-trait = "0.1"
@@ -58,6 +64,7 @@ std = [
     "sp-io/std",
     "x3-evm-integration/std",
     "x3-cross-vm-bridge/std",
+    "x3-atomic-swap/std",
     "serde/std",
     "serde_json/std",
     "log/std",
