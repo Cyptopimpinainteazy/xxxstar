@@ -51,17 +51,74 @@ pub fn l2_to_l1_tx_topic() -> [u8; 32] {
 /// Arbitrum is an L2: an `L2ToL1Tx` is bound for Ethereum.
 pub const L1_CHAIN_ID: u64 = 1;
 
+/// Headroom over `eth_estimateGas`, in percent, before a send is signed — the same
+/// rule and the same reason as the Base adapter's.
+pub const GAS_ESTIMATE_MARGIN_PERCENT: u64 = 25;
+
+/// Selector for `ArbSys.sendTxToL1(address,bytes)`.
+///
+/// Computed rather than pasted: the sibling call in this adapter
+/// (`arbBlockNumber()`) already derives its selector with
+/// `sp_io::hashing::keccak_256`, and a hardcoded four-byte literal is a value
+/// nobody can check by reading it.
+pub fn send_tx_to_l1_selector() -> [u8; 4] {
+    let digest = sp_io::hashing::keccak_256(b"sendTxToL1(address,bytes)");
+    [digest[0], digest[1], digest[2], digest[3]]
+}
+
 /// Arbitrum chain adapter
 pub struct ArbitrumAdapter {
     config: ChainConfig,
     #[allow(dead_code)]
     nonce: u64,
+    /// Present only when the caller supplied a key; `send_message` refuses without
+    /// one rather than returning a hash for a transaction nobody signed.
+    #[cfg(feature = "std")]
+    signer: Option<crate::signer::EvmSigner>,
 }
 
 impl ArbitrumAdapter {
     /// Create new Arbitrum adapter
     pub fn new(config: ChainConfig) -> Self {
-        Self { config, nonce: 0 }
+        Self {
+            config,
+            nonce: 0,
+            #[cfg(feature = "std")]
+            signer: None,
+        }
+    }
+
+    /// An adapter that can send, with the key its transactions are signed by.
+    #[cfg(feature = "std")]
+    pub fn with_signer(config: ChainConfig, signer: crate::signer::EvmSigner) -> Self {
+        Self {
+            config,
+            nonce: 0,
+            signer: Some(signer),
+        }
+    }
+
+    /// `ArbSys.sendTxToL1(address,bytes)` calldata.
+    ///
+    /// Two head words (destination, offset to the bytes) and the bytes tail —
+    /// the ABI shape for this signature, which is not the shape of the Inbox's
+    /// opposite-direction `sendL2Message`.
+    pub fn encode_send_tx_to_l1(destination: H160, data: &[u8]) -> Vec<u8> {
+        let mut encoded = Vec::with_capacity(4 + 64 + 32 + data.len() + 31);
+        encoded.extend_from_slice(&send_tx_to_l1_selector());
+        // destination, padded to a word
+        encoded.extend_from_slice(&[0u8; 12]);
+        encoded.extend_from_slice(destination.as_bytes());
+        // offset to `bytes data` = 64 (0x40), after the two head words
+        encoded.extend_from_slice(&[0u8; 31]);
+        encoded.push(0x40);
+        // length, then the data padded to a word
+        let len = data.len() as u64;
+        encoded.extend_from_slice(&[0u8; 24]);
+        encoded.extend_from_slice(&len.to_be_bytes());
+        encoded.extend_from_slice(data);
+        encoded.extend_from_slice(&vec![0u8; (32 - data.len() % 32) % 32]);
+        encoded
     }
 
     /// Decode one `L2ToL1Tx` log into a `ChainMessage`.
@@ -282,13 +339,54 @@ impl ChainAdapter for ArbitrumAdapter {
         crate::evm_rpc::token_balance(&crate::evm_rpc::url(&self.config), token, address).await
     }
 
-    async fn send_message(&self, _message: ChainMessage) -> AdapterResult<H256> {
-        // Refused, not invented. This returned `message.hash()` for a message
-        // that was never broadcast over ArbSys.sendTxToL1.
-        Err(ExternalChainError::adapter_unimplemented(
-            "arbitrum: send_message needs a signed ArbSys.sendTxToL1 transaction and this \
-             adapter has no signer",
-        ))
+    async fn send_message(&self, message: ChainMessage) -> AdapterResult<H256> {
+        #[cfg(not(feature = "std"))]
+        {
+            let _ = message;
+            return Err(ExternalChainError::adapter_unimplemented(
+                "arbitrum: send_message needs a signer and this build has no std feature",
+            ));
+        }
+
+        #[cfg(feature = "std")]
+        {
+            // Refused without a signer, not invented. This used to return
+            // `message.hash()` for a message that was never broadcast.
+            let Some(signer) = self.signer.as_ref() else {
+                return Err(ExternalChainError::adapter_unimplemented(
+                    "arbitrum: send_message needs a signed ArbSys.sendTxToL1 transaction and this \
+                     adapter has no signer; build it with `ArbitrumAdapter::with_signer` rather \
+                     than receiving a hash for an unsent message",
+                ));
+            };
+
+            let url = crate::evm_rpc::url(&self.config);
+            // The destination is the recipient on L1 and the payload is the
+            // message body — the same two values `decode_l2_to_l1_tx` reads back
+            // out of the resulting `L2ToL1Tx`.
+            let data = Self::encode_send_tx_to_l1(message.recipient, &message.payload);
+
+            let nonce = crate::evm_rpc::transaction_count(&url, signer.address()).await?;
+            let gas_price = crate::evm_rpc::gas_price(&url).await?;
+            let gas_price: u128 = gas_price.try_into().map_err(|_| {
+                ExternalChainError::rpc_error("eth_gasPrice does not fit in the transaction field")
+            })?;
+            let estimate =
+                crate::evm_rpc::estimate_gas(&url, signer.address(), ARBSYS_ADDRESS, &data).await?;
+            let gas_limit = estimate + estimate * GAS_ESTIMATE_MARGIN_PERCENT / 100;
+
+            let transaction = x3_atomic_swap::ethereum_tx::Transaction {
+                nonce,
+                gas_price,
+                gas_limit,
+                to: Some(format!("0x{}", hex::encode(ARBSYS_ADDRESS.as_bytes()))),
+                value: 0,
+                data: format!("0x{}", hex::encode(&data)),
+                chain_id: self.config.chain_type,
+            };
+            let signed = signer.sign_transaction(transaction)?;
+            crate::evm_rpc::send_raw_transaction(&url, &signed).await
+        }
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {

@@ -42,6 +42,8 @@ pub mod rpc;
 pub mod rpc_http;
 pub mod settlement;
 pub mod settlement_integration;
+#[cfg(feature = "std")]
+pub mod signer;
 
 pub use adapter::{ChainAdapter, ChainConfig, ChainMessage, CrossChainTransfer, TransferStatus};
 pub use assets::{AssetMetadata, AssetRegistry, MirroredAsset, TokenMapping};
