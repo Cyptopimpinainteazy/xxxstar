@@ -256,7 +256,7 @@ Validation: `cargo test -p x3-lang-compiler -p x3-lang-vm`, plus a test assertin
 the code is present for at least one trading diagnostic.
 
 ## TICKET-022 — `principal_preserved` and the remaining roadmap guarantees
-Type: **half CLOSED in `816de4708`**; `principal_preserved` still deferred (design decision) ·
+Type: CLOSED (2026-09-21, design decision: `principal_preserved` stays refused) ·
 Subsystem: x3-lang
 Progress (2026-09-20): the spec names two guarantees the language refused, and one of them has a
 discharge now. Measured first — the refusal was live, not hypothetical:
@@ -277,8 +277,12 @@ defect. Admitting it needs one of:
 - a decision that it is `min_profit >= 0` and that two names for one claim are wanted anyway.
 A test asserts it is still refused, so the decision cannot be made by accident
 (`a_guarantee_the_language_does_not_model_is_still_refused_by_name`).
-Remaining: `principal_preserved`, and any hedge/liquidation guarantee the roadmap names — the spec's
-own examples use `principal_preserved` and `bounded_slippage` and nothing else.
+Decision (2026-09-21): refuse rather than admit an alias. The only two derivable
+discharges are already expressible as `min_profit` (a non-negative settlement
+profit floor) and `solvent` (every touched asset nets non-negative), so a third
+name would carry no independent IR check. The roadmap's hedge/liquidation names
+are effects (`borrow`/`swap`/`bridge`/`repay`), not guarantees, and the spec's
+only other guarantee name (`bounded_slippage`) is already admitted.
 Original Type: DEFERRED (needs IR meaning first).
 Reason: round 6 admitted only guarantees the compiler can discharge from the
 body (`debt_closed`, `min_profit`, `solvent`). `principal_preserved`, hedge and
