@@ -1720,8 +1720,8 @@ stage is named). Materialized here because the number was cited in three reports
 entry for it.
 Original report: `.ai/reports/x3lang-round60-20260919.md`.
 
-## TICKET-096 — `crates/x3-oracle` is not a workspace member — OPEN
-Type: OPEN, decision · Subsystem: repo/workspace + crate design
+## TICKET-096 — `crates/x3-oracle` is not a workspace member — CLOSED
+Type: CLOSED (2026-09-20, member + caller + test) · Subsystem: repo/workspace + crate design
 Reason: `crates/x3-oracle` is not a workspace member and nothing calls its float paths, so it is code
 with no consumer and no evidence contract; `x3-foundry-core` and `x3-foundry-revenue` are members with
 no dependents either. The decision is member-plus-consumer or delete — recorded here because it was
@@ -1735,6 +1735,9 @@ Progress 2026-09-20: `crates/x3-oracle` now has a manifest, is a workspace membe
 `x3-foundry-core` now imports the crate through `crates/x3-foundry-core/src/oracle.rs`, providing the
 production caller and a test. The remaining decision is `x3-foundry-revenue`, which still has no
 caller.
+
+Resolution: all three crates now satisfy the acceptance path. `x3-foundry-core` is a workspace member
+with a `x3-foundry-smoke` entrypoint and tests, and it calls `x3-oracle` and `x3-foundry-revenue`.
 
 ## TICKET-042 — `x3c graph` does not say that a declared objective is being ignored — CLOSED
 Type: CLOSED in `52f79a4b9` (2026-09-19) · Subsystem: x3-lang/crates/x3-tools

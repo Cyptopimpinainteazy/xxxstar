@@ -21,6 +21,7 @@ tracing = "0.1"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 x3-foundry-auditor = { path = "../x3-foundry-auditor" }
+x3-foundry-revenue = { path = "../x3-foundry-revenue" }
 x3-oracle = { path = "../x3-oracle" }
 codec = { workspace = true }
 scale-info = { workspace = true }
@@ -45,3 +46,7 @@ std = [
 [lib]
 name = "x3_foundry_core"
 path = "src/lib.rs"
+
+[[bin]]
+name = "x3-foundry-smoke"
+path = "src/bin/smoke.rs"

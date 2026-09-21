@@ -27470,6 +27470,7 @@ dependencies = [
  "tracing",
  "uuid 1.21.0",
  "x3-foundry-auditor",
+ "x3-foundry-revenue",
  "x3-oracle",
 ]
 

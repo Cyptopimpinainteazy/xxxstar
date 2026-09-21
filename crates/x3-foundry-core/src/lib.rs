@@ -9,6 +9,7 @@ pub mod error;
 pub mod generator;
 pub mod oracle;
 pub mod revenue;
+pub mod revenue_bridge;
 pub mod security;
 pub mod simulator;
 pub mod templates;
