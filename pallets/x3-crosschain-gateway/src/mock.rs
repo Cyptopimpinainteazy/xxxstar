@@ -72,6 +72,60 @@ impl pallet_x3_crosschain_gateway::Config for Test {
     type RelayerOrigin = frame_system::EnsureSigned<AccountId>;
     type OperationalOrigin = frame_system::EnsureSigned<AccountId>;
     type DailyLimitWindowBlocks = DailyWindow;
+    type EvmHeaderAnchor = MockEvmAnchor;
+}
+
+// ── The attested-header anchor ────────────────────────────────────────────
+
+thread_local! {
+    /// What this test thread's chain has attested, if anything. A test sets it
+    /// with `attest_header` and it starts empty — which is the state a chain
+    /// with no header submissions is in, and one the EVM-receipt route must
+    /// refuse in.
+    static ATTESTED: std::cell::RefCell<
+        Option<(x3_verification_router::evm_receipt::AnchoredEvmHeader, u64)>,
+    > =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// The mock's stand-in for the validator pallet's attested headers.
+pub struct MockEvmAnchor;
+
+impl x3_verification_router::evm_receipt::EvmHeaderAnchor for MockEvmAnchor {
+    fn anchored_header(
+        block_number: u64,
+    ) -> Option<x3_verification_router::evm_receipt::AnchoredEvmHeader> {
+        ATTESTED.with(|cell| {
+            cell.borrow()
+                .as_ref()
+                .map(|(header, _)| *header)
+                .filter(|header| header.number == block_number)
+        })
+    }
+
+    fn attested_head() -> Option<u64> {
+        ATTESTED.with(|cell| cell.borrow().as_ref().map(|(_, head)| *head))
+    }
+}
+
+/// Record what this chain has attested: a receipts root at a height, and the
+/// attested head it is measured against.
+pub fn attest_header(receipts_root: [u8; 32], number: u64, head: u64) {
+    ATTESTED.with(|cell| {
+        *cell.borrow_mut() = Some((
+            x3_verification_router::evm_receipt::AnchoredEvmHeader {
+                number,
+                receipts_root,
+                state_root: [0u8; 32],
+                block_hash: [0u8; 32],
+            },
+            head,
+        ))
+    });
+}
+
+pub fn forget_attested_header() {
+    ATTESTED.with(|cell| *cell.borrow_mut() = None);
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
@@ -229,4 +283,110 @@ pub fn evm_route() -> RouteConfig {
 
 pub fn valid_proof_payload() -> BoundedVec<u8, ConstU32<4096>> {
     bounded_payload("some_valid_payload_data_1234567890")
+}
+
+/// A real `EvmReceiptProof` payload for `evm_route()`: a receipt with one
+/// `DepositLocked` log for `amount`, in the receipts trie of a header whose
+/// receipts root is returned alongside it.
+///
+/// Returns `(payload, receipts_root, block_number, head)` — the caller attests
+/// that root at that height (or does not, to prove the route refuses).
+pub fn evm_deposit_payload(amount: u128) -> (BoundedVec<u8, ConstU32<4096>>, [u8; 32], u64, u64) {
+    use x3_verification_router::evm_receipt::{
+        encode_proof_payload, receipt_trie_key, deposit_locked_selector,
+    };
+
+    let contract = [0xaa; 20]; // `evm_route().contract_address`
+    let mut log_data = [0u8; 32];
+    log_data[16..].copy_from_slice(&amount.to_be_bytes());
+    let log = rlp_list(&[
+        rlp_bytes(&contract),
+        rlp_list(&[rlp_bytes(&deposit_locked_selector())]),
+        rlp_bytes(&log_data),
+    ]);
+    // Post-Byzantium receipt: [status, cumulative_gas_used, logs].
+    let receipt = rlp_list(&[
+        rlp_bytes(&[0x01]),
+        rlp_bytes(&[0x00]),
+        rlp_list(&[log]),
+    ]);
+
+    let key = receipt_trie_key(1);
+    let leaf = rlp_list(&[rlp_bytes(&compact_leaf_path(&key)), rlp_bytes(&receipt)]);
+    let receipts_root = sp_io::hashing::keccak_256(&leaf);
+    let proof = rlp_list(&[rlp_bytes(&leaf)]);
+
+    let block_number = 100u64;
+    let head = block_number + 12;
+    let header = evm_header_rlp(receipts_root, block_number);
+    let payload = encode_proof_payload(head, 0, &header, &receipt, &key, &proof);
+    (
+        BoundedVec::try_from(payload).expect("payload fits the proof bound"),
+        receipts_root,
+        block_number,
+        head,
+    )
+}
+
+fn rlp_bytes(bytes: &[u8]) -> Vec<u8> {
+    let mut stream = rlp::RlpStream::new();
+    stream.append(&bytes.to_vec());
+    stream.out().to_vec()
+}
+
+fn rlp_list(items: &[Vec<u8>]) -> Vec<u8> {
+    let mut stream = rlp::RlpStream::new_list(items.len());
+    for item in items {
+        stream.append_raw(item, 1);
+    }
+    stream.out().to_vec()
+}
+
+/// Hex-prefix encoding of a leaf path (yellow paper appendix C).
+fn compact_leaf_path(key: &[u8]) -> Vec<u8> {
+    let mut nibbles = Vec::with_capacity(key.len() * 2);
+    for byte in key {
+        nibbles.push(byte >> 4);
+        nibbles.push(byte & 0x0F);
+    }
+    let mut out = Vec::new();
+    if nibbles.len().is_multiple_of(2) {
+        out.push(0x20);
+        for pair in nibbles.chunks(2) {
+            out.push((pair[0] << 4) | pair[1]);
+        }
+    } else {
+        out.push(0x30);
+        for pair in nibbles[1..].chunks(2) {
+            out.push((pair[0] << 4) | pair[1]);
+        }
+    }
+    out
+}
+
+/// A 15-field EIP-1186 header: `receiptsRoot` at index 5 and `number` at 8, the
+/// two fields the verifier reads.
+fn evm_header_rlp(receipts_root: [u8; 32], number: u64) -> Vec<u8> {
+    let zeros = [0u8; 32];
+    let mut number_bytes = number.to_be_bytes().to_vec();
+    while number_bytes.len() > 1 && number_bytes[0] == 0 {
+        number_bytes.remove(0);
+    }
+    rlp_list(&[
+        rlp_bytes(&zeros),         // parentHash
+        rlp_bytes(&zeros),         // sha3Uncles
+        rlp_bytes(&zeros),         // beneficiary
+        rlp_bytes(&zeros),         // stateRoot
+        rlp_bytes(&zeros),         // transactionsRoot
+        rlp_bytes(&receipts_root), // receiptsRoot
+        rlp_bytes(&[0u8; 256]),    // logsBloom
+        rlp_bytes(&[0x01]),        // difficulty
+        rlp_bytes(&number_bytes),  // number
+        rlp_bytes(&[0x01]),        // gasLimit
+        rlp_bytes(&[0x00]),        // gasUsed
+        rlp_bytes(&[0x01]),        // timestamp
+        rlp_bytes(&[]),            // extraData
+        rlp_bytes(&zeros),         // mixHash
+        rlp_bytes(&[0u8; 8]),      // nonce
+    ])
 }

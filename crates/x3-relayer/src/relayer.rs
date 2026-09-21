@@ -596,7 +596,16 @@ impl RelayerSafetyPipeline {
         // Production: register the real EVM receipt proof verifier with
         // a 12-confirmation default. Per-chain thresholds may override
         // this in the proof envelope.
-        verification_router.register_verifier(Arc::new(ProductionEvmReceiptVerifier::new(12)));
+        // Anchored to `NoEvmHeaderAnchor`: this pipeline has no store of
+        // attested external headers, and a receipt proof carries a header of its
+        // own, so there is nothing here to check one against. Every EVM proof is
+        // refused until a source is wired in — which is the honest state, rather
+        // than verifying a receipt against the root the prover chose.
+        verification_router.register_verifier(Arc::new(
+            ProductionEvmReceiptVerifier::anchored_by::<
+                x3_verification_router::evm_receipt::NoEvmHeaderAnchor,
+            >(12),
+        ));
         // Production: register the real Solana finalized-proof verifier
         // (issue #351 — this used to be a permissive stub,
         // `SolanaFinalizationVerifier`, that accepted any non-empty

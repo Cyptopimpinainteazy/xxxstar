@@ -11844,6 +11844,7 @@ dependencies = [
  "sp-io 44.0.0",
  "sp-runtime 45.0.0",
  "sp-std 14.0.0",
+ "x3-verification-router",
 ]
 
 [[package]]
@@ -12536,6 +12537,7 @@ dependencies = [
  "frame-system",
  "log",
  "parity-scale-codec",
+ "rlp 0.5.2",
  "scale-info",
  "serde",
  "sp-core 39.0.0",
@@ -27218,6 +27220,8 @@ dependencies = [
 name = "x3-crosschain-gateway"
 version = "0.1.0"
 dependencies = [
+ "blake2 0.10.6",
+ "ed25519-dalek 2.2.0",
  "x3-asset-kernel-types",
  "x3-circuit-breaker",
  "x3-external-route-registry",

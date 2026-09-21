@@ -38,6 +38,8 @@ sp-core = { workspace = true, features = ["std"] }
 x3-verification-router = { path = "../../crates/x3-verification-router", default-features = false, features = ["test-verifier", "std"] }
 # Ed25519 signing so the tests can produce real SVM attestations.
 ed25519-dalek = { version = "2", features = ["rand_core"] }
+# Building a real receipts-trie fixture for the EVM-receipt route tests.
+rlp = { version = "0.5", default-features = false }
 
 [features]
 default = ["std"]

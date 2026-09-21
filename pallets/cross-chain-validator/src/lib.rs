@@ -716,4 +716,42 @@ pub mod pallet {
             }
         }
     }
+
+    /// This pallet is the chain's store of attested external headers, which is
+    /// what an EVM receipt proof has to be checked against: the proof carries a
+    /// header of its own, so a verifier without an anchor would be checking the
+    /// receipt against the root the prover chose.
+    ///
+    /// Both answers come from storage written by an authorized submitter, and
+    /// both fail closed when nothing has been attested:
+    ///
+    /// - `anchored_header` reads the receipts root recorded for a height. That
+    ///   root is the one the settlement engine walks a receipt proof to, so a
+    ///   proof for a height with no recorded root is refused rather than checked
+    ///   against the one it carries.
+    /// - `attested_head` is the newest attested header's height, and it is what
+    ///   confirmation depth is measured from. The proof's own idea of the head
+    ///   (`current_block_number` in the wire format) is not consulted.
+    impl<T: Config> x3_verification_router::evm_receipt::EvmHeaderAnchor for Pallet<T> {
+        fn anchored_header(
+            block_number: u64,
+        ) -> Option<x3_verification_router::evm_receipt::AnchoredEvmHeader> {
+            let receipts_root = EvmMerkleRoots::<T>::get(block_number)?;
+            // The state root and block hash are only known for the newest header
+            // this pallet stores; for an older height the receipts root is what
+            // the proof is checked against, and the other two are left zeroed
+            // rather than filled in from something unrelated.
+            let newest = LastEvmHeader::<T>::get().filter(|header| header.block_number == block_number);
+            Some(x3_verification_router::evm_receipt::AnchoredEvmHeader {
+                number: block_number,
+                receipts_root: receipts_root.0,
+                state_root: newest.as_ref().map(|h| h.state_root.0).unwrap_or_default(),
+                block_hash: newest.as_ref().map(|h| h.block_hash.0).unwrap_or_default(),
+            })
+        }
+
+        fn attested_head() -> Option<u64> {
+            LastEvmHeader::<T>::get().map(|header| header.block_number)
+        }
+    }
 }

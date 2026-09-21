@@ -395,6 +395,13 @@ pub mod pallet {
         /// Daily-limit reset window in blocks.
         #[pallet::constant]
         type DailyLimitWindowBlocks: Get<BlockNumberFor<Self>>;
+
+        /// The chain's store of attested external EVM headers.
+        ///
+        /// A route whose verification level is `EvmReceiptProof` checks a deposit
+        /// receipt against the header this source reports — never against the
+        /// header the proof carries, which belongs to whoever submitted it.
+        type EvmHeaderAnchor: x3_verification_router::evm_receipt::EvmHeaderAnchor;
     }
 
     // ── Storage ──────────────────────────────────────────────────────────
@@ -1273,9 +1280,11 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::EvmReceiptProof => {
-                    let v: Arc<dyn Verifier> = Arc::new(ProductionEvmReceiptVerifier::new(
-                        route.finality_requirement,
-                    ));
+                    let v: Arc<dyn Verifier> = Arc::new(
+                        ProductionEvmReceiptVerifier::anchored_by::<T::EvmHeaderAnchor>(
+                            route.finality_requirement,
+                        ),
+                    );
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::SolanaFinalizedProof => {
@@ -1317,8 +1326,10 @@ pub mod pallet {
             match route.verification_level {
                 RouteVerificationLevel::EvmReceiptProof => {
                     let v: Arc<dyn Verifier> = Arc::new(
-                        ProductionEvmReceiptVerifier::new(route.finality_requirement)
-                            .with_selector(withdrawal_released_selector()),
+                        ProductionEvmReceiptVerifier::anchored_by::<T::EvmHeaderAnchor>(
+                            route.finality_requirement,
+                        )
+                        .with_selector(withdrawal_released_selector()),
                     );
                     router.register_verifier(v);
                 }

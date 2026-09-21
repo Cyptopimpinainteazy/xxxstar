@@ -1364,3 +1364,118 @@ fn clearing_svm_validators_fails_closed() {
         );
     });
 }
+
+// ── The EVM-receipt route and its header anchor ────────────────────────────
+
+#[test]
+fn an_evm_route_refuses_a_proof_when_no_header_is_attested() {
+    new_test_ext().execute_with(|| {
+        forget_attested_header();
+        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        enable_route_for(evm_route());
+        let (payload, _, _, _) = evm_deposit_payload(100);
+
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [5u8; 32],
+                deposit_proof_with(
+                    [1u8; 32],
+                    100,
+                    ExternalChainId::BaseSepolia,
+                    asset(),
+                    1,
+                    payload,
+                ),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+        assert_eq!(Pallet::<Test>::external_locked([9u8; 32]), 0);
+    });
+}
+
+#[test]
+fn an_evm_route_refuses_a_proof_for_a_header_the_chain_did_not_attest() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        enable_route_for(evm_route());
+        let (payload, receipts_root, number, head) = evm_deposit_payload(100);
+
+        // A different root attested at the same height: the receipt is real, the
+        // trie is real, the walk is real — and it is not the chain's block.
+        let mut other_root = receipts_root;
+        other_root[0] ^= 0xFF;
+        attest_header(other_root, number, head);
+
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [5u8; 32],
+                deposit_proof_with(
+                    [1u8; 32],
+                    100,
+                    ExternalChainId::BaseSepolia,
+                    asset(),
+                    1,
+                    payload,
+                ),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+        assert_eq!(Pallet::<Test>::external_locked([9u8; 32]), 0);
+    });
+}
+
+#[test]
+fn an_evm_route_verifies_a_proof_anchored_to_the_attested_header() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        enable_route_for(evm_route());
+        let (payload, receipts_root, number, head) = evm_deposit_payload(100);
+        attest_header(receipts_root, number, head);
+
+        assert_ok!(X3CrosschainGateway::submit_deposit_proof(
+            RuntimeOrigin::signed(1),
+            [5u8; 32],
+            deposit_proof_with(
+                [1u8; 32],
+                100,
+                ExternalChainId::BaseSepolia,
+                asset(),
+                1,
+                payload,
+            ),
+        ));
+        assert_eq!(Pallet::<Test>::external_locked([9u8; 32]), 100);
+    });
+}
+
+#[test]
+fn an_evm_route_measures_depth_from_the_attested_head_not_the_proof() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        enable_route_for(evm_route()); // finality_requirement = 12
+        let (payload, receipts_root, number, _head) = evm_deposit_payload(100);
+
+        // The payload claims a head 12 blocks past the header. The chain has
+        // attested a head only 4 blocks past it, so the deposit is too shallow
+        // whatever the payload says.
+        attest_header(receipts_root, number, number + 4);
+
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [5u8; 32],
+                deposit_proof_with(
+                    [1u8; 32],
+                    100,
+                    ExternalChainId::BaseSepolia,
+                    asset(),
+                    1,
+                    payload,
+                ),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+    });
+}

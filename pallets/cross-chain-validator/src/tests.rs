@@ -470,3 +470,90 @@ fn test_c01_only_admin_can_change_authorized_set() {
         .is_err());
     });
 }
+
+// ---------------------------------------------------------------------------
+// Header anchor
+//
+// A receipt proof carries a header of its own — the receipts root it walks to and
+// the head height its depth is measured from are both fields of the proof. The
+// verifier's anchor is what decides which header it is allowed to be about, and
+// on X3 that answer has to come from this pallet's storage: the root an
+// authorized submitter attested for the height.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn the_anchor_is_empty_until_a_header_is_attested() {
+    use x3_verification_router::evm_receipt::EvmHeaderAnchor;
+
+    new_test_ext().execute_with(|| {
+        assert_eq!(crate::Pallet::<MockRuntime>::attested_head(), None);
+        assert!(crate::Pallet::<MockRuntime>::anchored_header(100).is_none());
+    });
+}
+
+#[test]
+fn the_anchor_reports_the_attested_root_and_head() {
+    use x3_verification_router::evm_receipt::EvmHeaderAnchor;
+
+    new_test_ext().execute_with(|| {
+        enroll(1);
+        let block_number = 100u64;
+        let block_hash = H256::from([1u8; 32]);
+        let state_root = H256::from([2u8; 32]);
+        let merkle_root = H256::from([4u8; 32]);
+        assert_ok!(crate::Pallet::<MockRuntime>::validate_evm_header(
+            RuntimeOrigin::signed(1),
+            block_number,
+            block_hash,
+            state_root,
+            merkle_root,
+            evm_leaf(4),
+        ));
+
+        let anchored = crate::Pallet::<MockRuntime>::anchored_header(block_number)
+            .expect("an attested height answers with its header");
+        assert_eq!(anchored.number, block_number);
+        assert_eq!(
+            anchored.receipts_root, merkle_root.0,
+            "the root a receipt proof has to walk to"
+        );
+        assert_eq!(anchored.state_root, state_root.0);
+        assert_eq!(anchored.block_hash, block_hash.0);
+        assert_eq!(
+            crate::Pallet::<MockRuntime>::attested_head(),
+            Some(block_number),
+            "depth is measured from the attested head"
+        );
+
+        // A height nobody attested has no anchor, so a proof for it is refused
+        // rather than checked against the header it carries.
+        assert!(crate::Pallet::<MockRuntime>::anchored_header(block_number + 1).is_none());
+    });
+}
+
+#[test]
+fn an_unattested_height_is_never_anchored_even_when_a_later_one_exists() {
+    use x3_verification_router::evm_receipt::EvmHeaderAnchor;
+
+    new_test_ext().execute_with(|| {
+        enroll(1);
+        assert_ok!(crate::Pallet::<MockRuntime>::validate_evm_header(
+            RuntimeOrigin::signed(1),
+            200,
+            H256::from([9u8; 32]),
+            H256::from([8u8; 32]),
+            H256::from([7u8; 32]),
+            evm_leaf(7),
+        ));
+
+        assert_eq!(
+            crate::Pallet::<MockRuntime>::attested_head(),
+            Some(200),
+            "the head moved"
+        );
+        assert!(
+            crate::Pallet::<MockRuntime>::anchored_header(199).is_none(),
+            "a height with no attested root is not anchored by a later header"
+        );
+    });
+}
