@@ -5155,6 +5155,10 @@ Progress 2026-09-21: local-head snapshot appended to
 `.ai/reports/branch-consolidation-20260920.md` — 265 local heads, 214 patch-equivalent and 51 novel
 against current `master`. The one-at-a-time review of the 51 novel heads remains.
 
+Progress 2026-09-21: x3-lang-specific novel heads were triaged in the same report: three are
+already-on-master or pre-rewrite, one is unrelated-lineage archive material, and
+`wip/x3lang-preserve-packets-and-arbitrage-20260919` is the remaining large candidate to review.
+
 ## TICKET-127 — `x3c fmt` deleted declarations and parameter lists — CLOSED
 Type: CLOSED in `bf37dcb14` (2026-09-20) · Subsystem: compiler/src/formatter.rs
 Found by running the command and reading its output against the input (TICKET-124's method).

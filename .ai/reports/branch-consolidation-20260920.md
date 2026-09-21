@@ -131,6 +131,19 @@ novel=51
 This is a smaller, local-head snapshot than the origin-wide table above. The 214 patch-equivalent
 branches carry no `git cherry master <branch>` `+` patches; the 51 novel branches still need the
 one-at-a-time `diff -> keep missing capability -> drop the rest` review TICKET-126 prescribes.
+
+### x3-lang-specific novel-head verdicts
+
+- `salvage/x3lang-intent-bridge` — already on master. The branch's `numeric.py` float-narrowing guard
+  and `runner.py` `or []` / `or {}` normalization are both present verbatim in the current tree.
+- `wip/x3lang-arb-graph-filter-20260919` — pre-rewrite spelling. Current `compiler/src/arb.rs` already
+  implements graph-judged venue bounds with the same tests (`test_arb.rs`,
+  `test_opportunity_graph.rs`).
+- `archive/stale-x3lang-trading-wip-20260918` — stale. Trading Core v1 was later implemented and merged
+  through `codex/x3-trading-core-v1`; this branch is the earlier WIP and should remain archived.
+- `fix-x3lang-python` — unrelated lineage with no merge base against master; archive rather than merge.
+- `wip/x3lang-preserve-packets-and-arbitrage-20260919` — still needs review; it is the largest
+  x3-lang branch and may carry novel packet/arbitrage capability not yet on master.
 | 94.2% | 56 | 3917 | 3691 | 25 | `origin/archive/local-20260920/finish/x3vm-live-transport` |
 | 94.5% | 5 | 73 | 69 | 5 | `origin/archive/local-20260920/feat/x3-lang-crosschain-integration-20260909` |
 | 94.9% | 21 | 2604 | 2470 | 14 | `origin/archive/local-20260920/finish/x3vm-live-transport-fix` |
