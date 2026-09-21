@@ -33,6 +33,7 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt::{Display, Formatter};
 use core::option::Option;
@@ -311,9 +312,15 @@ pub fn verify_merkle_patricia_proof(
         let item_count = r.item_count().unwrap_or(0);
         if item_count == 17 {
             // Branch node.
-            if i != last {
-                return Err(EvmReceiptError::BadProof);
-            }
+            //
+            // A branch is a real node in the middle of the walk, not a terminal
+            // one. This used to require `i == last`, which made every proof for a
+            // block with more than one transaction unverifiable: the path from the
+            // receipts root to a receipt is *root branch → … → leaf*, so the branch
+            // was never last and every such proof came back `BadProof`. The only
+            // proof the walk accepted was a single leaf at the root — a one-receipt
+            // block — which is why this survived: no live path had ever fed it a
+            // proof built from a real block.
             if nibbles.is_empty() {
                 let stored_value: Vec<u8> = r.at(16)?.as_val()?;
                 return if Some(stored_value.as_slice()) == value {
@@ -323,24 +330,17 @@ pub fn verify_merkle_patricia_proof(
                 };
             }
             let n = nibbles.pop_front();
-            if n < 16 {
-                let child: Vec<u8> = r.at(n as usize)?.as_val()?;
-                if child.is_empty() {
-                    return Err(EvmReceiptError::InclusionFailed);
-                }
-                if child.len() == 32 {
-                    expected_hash = bytes32_const(&child);
-                } else {
-                    return Err(EvmReceiptError::BadProof);
-                }
-            } else {
-                let stored_value: Vec<u8> = r.at(16)?.as_val()?;
-                return if Some(stored_value.as_slice()) == value {
-                    Ok(())
-                } else {
-                    Err(EvmReceiptError::InclusionFailed)
-                };
+            let child: Vec<u8> = r.at(n as usize)?.as_val()?;
+            if child.is_empty() {
+                return Err(EvmReceiptError::InclusionFailed);
             }
+            if child.len() != 32 {
+                // A child whose RLP is shorter than 32 bytes is embedded in the
+                // branch rather than referenced by hash. Real receipts are far
+                // larger than that, so this is refused rather than mis-walked.
+                return Err(EvmReceiptError::BadProof);
+            }
+            expected_hash = bytes32_const(&child);
         } else if item_count == 2 {
             // Leaf or extension.
             let path: Vec<u8> = r.at(0)?.as_val()?;
@@ -357,7 +357,17 @@ pub fn verify_merkle_patricia_proof(
                 };
             }
             let first_nibble = path[0] >> 4;
-            if first_nibble & 1 == 0 {
+            // Hex-prefix flags (yellow paper appendix C): the first nibble is
+            // `2 * leaf + odd`. So the *low* bit says whether the path length is
+            // odd and the second bit says leaf-vs-extension. This read `& 1`,
+            // which is the odd/even bit, so a leaf whose remaining path happened
+            // to be an odd number of nibbles was walked as an extension — its
+            // receipt read as a child hash — and refused with `BadProof`. Keys
+            // are `rlp(index)`, whose nibble length is always even, so the bug
+            // only showed on leaves that sit at an odd depth: which is most
+            // leaves in any block with more than one transaction.
+            let is_leaf = first_nibble & 0x2 != 0;
+            if is_leaf {
                 // Leaf.
                 if i != last {
                     return Err(EvmReceiptError::BadProof);
@@ -501,6 +511,250 @@ impl Nibbles {
         }
         true
     }
+}
+
+// ── Receipts-trie construction ─────────────────────────────────────────────
+//
+// The verifier above answers "is this receipt in the tree with this root?". This
+// section builds the other side of that question: given a block's receipts, the
+// trie root (to compare against the header's `receiptsRoot`) and the inclusion
+// proof for one of them.
+//
+// It belongs in this crate because the receipts trie is a wire format, and a
+// producer that disagrees with the verifier in one detail (a different
+// hex-prefix flag, the key encoded as a list instead of `rlp(index)`) produces
+// proofs that never verify — with no way to tell which side is wrong. Here the
+// two are tested against each other, and both are tested against a real block.
+
+/// The root of an empty receipts trie: `keccak256(rlp(""))`, which is what a
+/// block with no transactions carries.
+pub const EMPTY_RECEIPTS_TRIE_ROOT: [u8; 32] = [
+    0x56, 0xe8, 0x1f, 0x17, 0x1b, 0xcc, 0x55, 0xa6, 0xff, 0x83, 0x45, 0xe6, 0x92, 0xc0, 0xf8, 0x6e,
+    0x5b, 0x48, 0xe0, 0x1b, 0x99, 0x6c, 0xad, 0xc0, 0x01, 0x62, 0x2f, 0xb5, 0xe3, 0x63, 0xb4, 0x21,
+];
+
+enum TrieNode {
+    Leaf {
+        path: Vec<u8>,
+        value: Vec<u8>,
+    },
+    Extension {
+        path: Vec<u8>,
+        child: Box<TrieNode>,
+    },
+    Branch {
+        children: [Option<Box<TrieNode>>; 16],
+        value: Option<Vec<u8>>,
+    },
+}
+
+/// Hex-prefix encoding of a nibble path (yellow paper appendix C).
+fn hex_prefix(path: &[u8], leaf: bool) -> Vec<u8> {
+    let odd = path.len() % 2 == 1;
+    let flag = if leaf { 0x20 } else { 0x00 };
+    let mut out = Vec::with_capacity(path.len() / 2 + 1);
+    if odd {
+        out.push(flag | 0x10 | path[0]);
+        for pair in path[1..].chunks(2) {
+            out.push((pair[0] << 4) | pair[1]);
+        }
+    } else {
+        out.push(flag);
+        for pair in path.chunks(2) {
+            out.push((pair[0] << 4) | pair[1]);
+        }
+    }
+    out
+}
+
+fn nibbles(bytes: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(byte >> 4);
+        out.push(byte & 0x0F);
+    }
+    out
+}
+
+fn common_prefix_len(entries: &[(Vec<u8>, Vec<u8>)]) -> usize {
+    let mut len = entries[0].0.len();
+    for (key, _) in &entries[1..] {
+        let mut shared = 0;
+        while shared < len && shared < key.len() && key[shared] == entries[0].0[shared] {
+            shared += 1;
+        }
+        len = shared;
+    }
+    len
+}
+
+fn build_node(entries: &[(Vec<u8>, Vec<u8>)]) -> Option<TrieNode> {
+    match entries.len() {
+        0 => None,
+        1 => Some(TrieNode::Leaf {
+            path: entries[0].0.clone(),
+            value: entries[0].1.clone(),
+        }),
+        _ => {
+            let shared = common_prefix_len(entries);
+            if shared > 0 {
+                let rest: Vec<(Vec<u8>, Vec<u8>)> = entries
+                    .iter()
+                    .map(|(key, value)| (key[shared..].to_vec(), value.clone()))
+                    .collect();
+                let child = build_node(&rest)?;
+                return Some(TrieNode::Extension {
+                    path: entries[0].0[..shared].to_vec(),
+                    child: Box::new(child),
+                });
+            }
+
+            let mut children: [Option<Box<TrieNode>>; 16] =
+                core::array::from_fn(|_| Option::None);
+            let mut value: Option<Vec<u8>> = Option::None;
+            for (key, entry_value) in entries {
+                let Some(first) = key.first().copied() else {
+                    value = Some(entry_value.clone());
+                    continue;
+                };
+                let group: Vec<(Vec<u8>, Vec<u8>)> = entries
+                    .iter()
+                    .filter(|(other, _)| other.first().copied() == Some(first))
+                    .map(|(other, item)| (other[1..].to_vec(), item.clone()))
+                    .collect();
+                children[first as usize] = Some(Box::new(build_node(&group)?));
+            }
+            Some(TrieNode::Branch { children, value })
+        }
+    }
+}
+
+fn encode_node(node: &TrieNode) -> Vec<u8> {
+    match node {
+        TrieNode::Leaf { path, value } => {
+            let mut stream = rlp::RlpStream::new_list(2);
+            stream.append(&hex_prefix(path, true));
+            stream.append(value);
+            stream.out().to_vec()
+        }
+        TrieNode::Extension { path, child } => {
+            let encoded_child = encode_node(child);
+            let mut stream = rlp::RlpStream::new_list(2);
+            stream.append(&hex_prefix(path, false));
+            // A child whose RLP is at least 32 bytes is referenced by its hash;
+            // anything shorter is embedded. `verify_merkle_patricia_proof` accepts
+            // only the hash form, which is also the only form real receipts
+            // produce: every leaf carries a whole receipt.
+            if encoded_child.len() >= 32 {
+                stream.append(&keccak256_bytes(&encoded_child).to_vec());
+            } else {
+                stream.append_raw(&encoded_child, 1);
+            }
+            stream.out().to_vec()
+        }
+        TrieNode::Branch { children, value } => {
+            let mut stream = rlp::RlpStream::new_list(17);
+            for child in children.iter() {
+                match child {
+                    Option::None => {
+                        stream.append_empty_data();
+                    }
+                    Option::Some(child) => {
+                        let encoded_child = encode_node(child);
+                        if encoded_child.len() >= 32 {
+                            stream.append(&keccak256_bytes(&encoded_child).to_vec());
+                        } else {
+                            stream.append_raw(&encoded_child, 1);
+                        }
+                    }
+                }
+            }
+            match value {
+                Option::Some(value) => {
+                    stream.append(value);
+                }
+                Option::None => {
+                    stream.append_empty_data();
+                }
+            }
+            stream.out().to_vec()
+        }
+    }
+}
+
+fn entries_for(receipts: &[Vec<u8>]) -> Vec<(Vec<u8>, Vec<u8>)> {
+    receipts
+        .iter()
+        .enumerate()
+        .map(|(index, receipt)| {
+            (
+                nibbles(&receipt_trie_key(index as u64)),
+                receipt.clone(),
+            )
+        })
+        .collect()
+}
+
+/// The receipts-trie root of a block's receipts, in the order the block listed
+/// them.
+///
+/// This is the value a prover compares against the block header's
+/// `receiptsRoot` before it hands a proof to anyone: if they differ, the trie was
+/// built over the wrong receipts (or the encoding is wrong), and no proof
+/// produced from it can verify.
+pub fn receipts_trie_root(receipts: &[Vec<u8>]) -> Result<[u8; 32], EvmReceiptError> {
+    if receipts.is_empty() {
+        return Ok(EMPTY_RECEIPTS_TRIE_ROOT);
+    }
+    let entries = entries_for(receipts);
+    let root = build_node(&entries).ok_or(EvmReceiptError::BadProof)?;
+    Ok(keccak256_bytes(&encode_node(&root)))
+}
+
+fn collect_path_nodes(node: &TrieNode, path: &[u8], nodes: &mut Vec<Vec<u8>>) {
+    nodes.push(encode_node(node));
+    match node {
+        TrieNode::Leaf { .. } => {}
+        TrieNode::Extension { path: skip, child } => {
+            let next = if path.len() >= skip.len() {
+                &path[skip.len()..]
+            } else {
+                &[]
+            };
+            collect_path_nodes(child, next, nodes);
+        }
+        TrieNode::Branch { children, .. } => {
+            if let Some(first) = path.first() {
+                if let Option::Some(child) = &children[*first as usize] {
+                    collect_path_nodes(child, &path[1..], nodes);
+                }
+            }
+        }
+    }
+}
+
+/// The Merkle-Patricia inclusion proof for one receipt of a block, as the flat
+/// RLP list of node byte strings that [`verify_merkle_patricia_proof`] expects.
+///
+/// `receipt_index` is the index the block listed the receipt at: the trie key is
+/// `rlp(index)`, so the proof is only meaningful together with that index.
+pub fn receipts_trie_proof(
+    receipts: &[Vec<u8>],
+    receipt_index: usize,
+) -> Result<Vec<u8>, EvmReceiptError> {
+    if receipt_index >= receipts.len() {
+        return Err(EvmReceiptError::BadProof);
+    }
+    let entries = entries_for(receipts);
+    let root = build_node(&entries).ok_or(EvmReceiptError::BadProof)?;
+    let mut nodes = Vec::new();
+    collect_path_nodes(&root, &entries[receipt_index].0, &mut nodes);
+
+    let mut stream = rlp::RlpStream::new_list(nodes.len());
+    for node in &nodes {
+        stream.append(node);
+    }
+    Ok(stream.out().to_vec())
 }
 
 // ── Wire format ────────────────────────────────────────────────────────────
@@ -1076,6 +1330,178 @@ mod tests {
             expected_recipient: vec![0u8; 20],
         });
         assert!(matches!(r, Err(VerificationError::MalformedProof)));
+    }
+
+    // ── Producer ↔ verifier ────────────────────────────────────────────────
+
+    /// Receipts the size of real ones: the verifier only follows hash
+    /// references, which a trie of tiny fixtures would never produce.
+    fn realistic_receipt(seed: u8) -> Vec<u8> {
+        let mut bloom = [0u8; 256];
+        bloom[seed as usize] = seed;
+        rlp_list(&[
+            rlp_bytes(&[0x01]),
+            rlp_bytes(&[seed, 0x10, 0x00]),
+            rlp_bytes(&bloom),
+            rlp_list(&[deposit_log([seed; 20])]),
+        ])
+    }
+
+    #[test]
+    fn the_root_of_no_receipts_is_the_empty_trie_root() {
+        assert_eq!(
+            receipts_trie_root(&[]).expect("empty trie"),
+            EMPTY_RECEIPTS_TRIE_ROOT
+        );
+        assert_eq!(receipts_trie_proof(&[], 0), Err(EvmReceiptError::BadProof));
+    }
+
+    #[test]
+    fn the_producer_and_the_verifier_agree_on_a_one_receipt_block() {
+        let receipts = vec![realistic_receipt(0x11)];
+        let root = receipts_trie_root(&receipts).expect("root");
+        let proof = receipts_trie_proof(&receipts, 0).expect("proof");
+        assert_eq!(
+            verify_merkle_patricia_proof(
+                &root,
+                &receipt_trie_key(0),
+                Some(receipts[0].as_slice()),
+                &proof
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn the_producer_and_the_verifier_agree_on_a_multi_receipt_block() {
+        // Enough receipts that the index key is more than one byte and the path
+        // leaves the root's first branch — a one-leaf trie proves neither.
+        let receipts: Vec<Vec<u8>> = (0u8..130).map(realistic_receipt).collect();
+        let root = receipts_trie_root(&receipts).expect("root");
+        for index in [0usize, 1, 15, 16, 127, 128, 129] {
+            let proof = receipts_trie_proof(&receipts, index).expect("proof");
+            assert_eq!(
+                verify_merkle_patricia_proof(
+                    &root,
+                    &receipt_trie_key(index as u64),
+                    Some(receipts[index].as_slice()),
+                    &proof
+                ),
+                Ok(()),
+                "receipt {index} must be provable"
+            );
+        }
+    }
+
+    #[test]
+    fn a_proof_for_one_receipt_does_not_admit_another() {
+        let receipts: Vec<Vec<u8>> = (0u8..8).map(realistic_receipt).collect();
+        let root = receipts_trie_root(&receipts).expect("root");
+        let proof = receipts_trie_proof(&receipts, 3).expect("proof");
+
+        // The same proof under a different key is not this receipt's proof.
+        assert_eq!(
+            verify_merkle_patricia_proof(
+                &root,
+                &receipt_trie_key(4),
+                Some(receipts[3].as_slice()),
+                &proof
+            ),
+            Err(EvmReceiptError::InclusionFailed)
+        );
+        // Nor does it admit a receipt the block did not contain.
+        assert_eq!(
+            verify_merkle_patricia_proof(
+                &root,
+                &receipt_trie_key(3),
+                Some(realistic_receipt(0xEE).as_slice()),
+                &proof
+            ),
+            Err(EvmReceiptError::InclusionFailed)
+        );
+        // And it is not a valid proof against a different root.
+        let mut other_root = root;
+        other_root[0] ^= 0xFF;
+        assert_eq!(
+            verify_merkle_patricia_proof(
+                &other_root,
+                &receipt_trie_key(3),
+                Some(receipts[3].as_slice()),
+                &proof
+            ),
+            Err(EvmReceiptError::InclusionFailed)
+        );
+    }
+
+    #[test]
+    fn an_out_of_range_index_has_no_proof() {
+        let receipts = vec![realistic_receipt(0x01), realistic_receipt(0x02)];
+        assert_eq!(
+            receipts_trie_proof(&receipts, 2),
+            Err(EvmReceiptError::BadProof)
+        );
+    }
+
+    fn proof_nodes(proof: &[u8]) -> Vec<Vec<u8>> {
+        rlp::Rlp::new(proof)
+            .iter()
+            .map(|node| node.as_val::<Vec<u8>>().expect("a proof node"))
+            .collect()
+    }
+
+    /// The proof wire format: a list of *byte strings*, each one a node's RLP.
+    /// (`rlp_list` above nests each item as a list, which is right for building
+    /// nodes and wrong for building a proof.)
+    fn proof_list(nodes: &[Vec<u8>]) -> Vec<u8> {
+        let mut stream = rlp::RlpStream::new_list(nodes.len());
+        for node in nodes {
+            stream.append(node);
+        }
+        stream.out().to_vec()
+    }
+
+    #[test]
+    fn a_truncated_proof_is_rejected() {
+        // The fix for the branch walk must not turn "a branch was followed" into
+        // "a branch was enough": a proof that stops at the branch names the child
+        // but never shows it, so it must not verify.
+        let receipts: Vec<Vec<u8>> = (0u8..4).map(realistic_receipt).collect();
+        let root = receipts_trie_root(&receipts).expect("root");
+        let proof = receipts_trie_proof(&receipts, 2).expect("proof");
+        let nodes = proof_nodes(&proof);
+        assert!(nodes.len() > 1, "this block's proof must have a branch");
+
+        let branch_only = proof_list(&nodes[..1]);
+        assert_eq!(
+            verify_merkle_patricia_proof(
+                &root,
+                &receipt_trie_key(2),
+                Some(receipts[2].as_slice()),
+                &branch_only
+            ),
+            Err(EvmReceiptError::InclusionFailed)
+        );
+    }
+
+    #[test]
+    fn a_leaf_borrowed_from_another_index_is_rejected() {
+        let receipts: Vec<Vec<u8>> = (0u8..4).map(realistic_receipt).collect();
+        let root = receipts_trie_root(&receipts).expect("root");
+        let mut nodes = proof_nodes(&receipts_trie_proof(&receipts, 1).expect("proof for 1"));
+        let other = proof_nodes(&receipts_trie_proof(&receipts, 3).expect("proof for 3"));
+        // Keep the path to index 1 and swap in the leaf of index 3: the branch's
+        // child reference no longer hashes to the leaf that follows it.
+        *nodes.last_mut().expect("a leaf") = other.last().expect("a leaf").clone();
+        let spliced = proof_list(&nodes);
+        assert_ne!(
+            verify_merkle_patricia_proof(
+                &root,
+                &receipt_trie_key(1),
+                Some(receipts[1].as_slice()),
+                &spliced
+            ),
+            Ok(())
+        );
     }
 
     #[test]
