@@ -238,3 +238,17 @@ wip/x3lang-arb-graph-filter-20260919
 wip/x3lang-preserve-packets-and-arbitrage-20260919
 your-task-branch
 ```
+
+### Dependency-bump novel heads
+
+The following are dependency-version branches, not capability branches. They modify `Cargo.toml` and
+`Cargo.lock` only:
+
+- `dependabot/cargo/ark-ec-0.6.0`
+- `dependabot/cargo/ark-ff-0.6.0`
+- `dependabot/cargo/ark-std-0.6.0`
+- `deps-batch-test`
+- `deps-mod-test`
+
+Disposition: review against the current dependency policy and archive unless a specific upgrade is
+still needed. They add no product capability to master.
