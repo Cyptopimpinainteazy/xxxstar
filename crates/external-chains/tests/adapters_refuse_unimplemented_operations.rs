@@ -16,7 +16,7 @@
 
 use sp_core::{H160, H256, U256};
 use x3_external_chains::adapter::{ChainMessage, CrossChainTransfer, TransferStatus};
-use x3_external_chains::{create_all_adapters, ExternalChainError};
+use x3_external_chains::{create_all_adapters, ChainType, ExternalChainError};
 
 fn message() -> ChainMessage {
     ChainMessage::new(
@@ -124,6 +124,15 @@ async fn no_adapter_reports_finalization_it_did_not_perform() {
 async fn no_adapter_answers_the_message_queue_it_cannot_decode() {
     for adapter in create_all_adapters() {
         let chain = adapter.chain_type();
+        // Base and Arbitrum decode `receive_messages` now. Their default configs
+        // point at real mainnet endpoints, so calling them here would make this
+        // test depend on the network; what they do when a chain *answers* is
+        // covered by `receive_messages_decodes_logs.rs`, which drives a stub and
+        // asserts the query's emitter address, event topic and block range — and
+        // that a malformed log is an error rather than a short queue.
+        if matches!(chain, ChainType::Base | ChainType::Arbitrum) {
+            continue;
+        }
         let result = adapter.receive_messages().await;
         assert!(
             matches!(result, Err(ExternalChainError::AdapterUnimplemented(_))),

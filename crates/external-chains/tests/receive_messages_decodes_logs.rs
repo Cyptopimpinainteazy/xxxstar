@@ -16,6 +16,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use x3_external_chains::adapter::ChainAdapter;
+use x3_external_chains::chains::arbitrum::{l2_to_l1_tx_topic, ArbitrumAdapter, ARBSYS_ADDRESS};
 use x3_external_chains::chains::base::BaseAdapter;
 use x3_external_chains::{ChainConfig, ChainType};
 
@@ -234,4 +235,114 @@ async fn a_chain_with_no_logs_answers_with_no_messages() {
         .await
         .expect("empty is not an error");
     assert!(messages.is_empty());
+}
+
+// ── Arbitrum ────────────────────────────────────────────────────────────────
+
+/// `abi.encode(address caller, uint256 arbBlockNum, uint256 ethBlockNum,
+///             uint256 timestamp, uint256 callvalue, bytes data)`
+fn l2_to_l1_data(caller: H160, timestamp: u64, callvalue: U256, data: &[u8]) -> Vec<u8> {
+    let mut payload = Vec::new();
+    let mut word = [0u8; 32];
+    word[12..].copy_from_slice(caller.as_bytes());
+    payload.extend_from_slice(&word);
+    payload.extend_from_slice(&[0u8; 32]); // arbBlockNum
+    payload.extend_from_slice(&[0u8; 32]); // ethBlockNum
+    let mut word = [0u8; 32];
+    word[24..].copy_from_slice(&timestamp.to_be_bytes());
+    payload.extend_from_slice(&word);
+    payload.extend_from_slice(&callvalue.to_big_endian());
+    let mut word = [0u8; 32];
+    word[31] = 192; // six head words
+    payload.extend_from_slice(&word);
+    let mut word = [0u8; 32];
+    word[24..].copy_from_slice(&(data.len() as u64).to_be_bytes());
+    payload.extend_from_slice(&word);
+    payload.extend_from_slice(data);
+    payload.extend_from_slice(&vec![0u8; (32 - data.len() % 32) % 32]);
+    payload
+}
+
+fn l2_to_l1_log_json(destination: H160, position: u64, payload: Vec<u8>) -> String {
+    let mut destination_topic = [0u8; 32];
+    destination_topic[12..].copy_from_slice(destination.as_bytes());
+    let mut position_topic = [0u8; 32];
+    position_topic[24..].copy_from_slice(&position.to_be_bytes());
+    format!(
+        r#"{{"address":"0x{}","topics":["0x{}","0x{}","0x{}","0x{}"],"data":"0x{}","blockNumber":"0x1e","transactionHash":"0x{}","logIndex":"0x0"}}"#,
+        hex::encode(ARBSYS_ADDRESS.as_bytes()),
+        hex::encode(l2_to_l1_tx_topic()),
+        hex::encode(destination_topic),
+        hex::encode([0x77u8; 32]),
+        hex::encode(position_topic),
+        hex::encode(&payload),
+        hex::encode([0x44u8; 32])
+    )
+}
+
+fn arbitrum_adapter_for(url: &str) -> ArbitrumAdapter {
+    let mut config = ChainConfig::for_chain(ChainType::Arbitrum);
+    config.rpc_url = url.as_bytes().to_vec();
+    config.confirmations = 1;
+    ArbitrumAdapter::new(config)
+}
+
+#[tokio::test]
+async fn arbitrum_receive_messages_decodes_an_l2_to_l1_tx_log() {
+    let caller = H160([0x11; 20]);
+    let destination = H160([0x22; 20]);
+    let payload = l2_to_l1_data(caller, 1_700_000_456, U256::from(555u64), b"to L1");
+    let (url, seen) = spawn_stub(format!(
+        "[{}]",
+        l2_to_l1_log_json(destination, 12_345, payload)
+    ));
+    let adapter = arbitrum_adapter_for(&url);
+
+    let messages = adapter.receive_messages().await.expect("decodes");
+    assert_eq!(messages.len(), 1);
+    let message = &messages[0];
+    assert_eq!(message.source_chain, 42_161);
+    assert_eq!(message.dest_chain, 1);
+    assert_eq!(message.sender, caller);
+    assert_eq!(message.recipient, destination);
+    assert_eq!(
+        message.nonce, 12_345,
+        "position is the identifier this event carries"
+    );
+    assert_eq!(message.value, U256::from(555u64));
+    assert_eq!(message.payload, b"to L1".to_vec());
+    assert_eq!(message.timestamp, 1_700_000_456);
+    assert_eq!(message.gas_limit, 0, "the event states no gas limit");
+
+    // Filtered by ArbSys, the topic, and a bounded range — not by a configurable
+    // address that could be wrong.
+    let requests = seen.lock().unwrap();
+    let logs_request = requests
+        .iter()
+        .find(|body| body.contains("eth_getLogs"))
+        .expect("the adapter asked for logs");
+    assert!(
+        logs_request.contains(&hex::encode(ARBSYS_ADDRESS.as_bytes())),
+        "eth_getLogs must filter by ArbSys: {logs_request}"
+    );
+    assert!(
+        logs_request.contains(&hex::encode(l2_to_l1_tx_topic())),
+        "eth_getLogs must filter by the L2ToL1Tx topic: {logs_request}"
+    );
+    assert!(logs_request.contains("\"fromBlock\"") && logs_request.contains("\"toBlock\""));
+}
+
+#[tokio::test]
+async fn arbitrum_refuses_a_malformed_l2_to_l1_tx() {
+    let mut payload = l2_to_l1_data(H160([0x11; 20]), 1, U256::zero(), b"payload");
+    payload.truncate(120);
+    let (url, _seen) = spawn_stub(format!(
+        "[{}]",
+        l2_to_l1_log_json(H160([0x22; 20]), 1, payload)
+    ));
+    let adapter = arbitrum_adapter_for(&url);
+    assert!(
+        adapter.receive_messages().await.is_err(),
+        "a truncated L2ToL1Tx must be an error, not a short queue"
+    );
 }

@@ -4,6 +4,7 @@
 //! Chain ID: 42161
 
 use crate::adapter::*;
+use crate::evm_rpc::LogEntry;
 use crate::ChainType;
 use crate::ExternalChainError;
 use alloc::{
@@ -12,6 +13,43 @@ use alloc::{
 };
 use sp_core::{H160, H256, U256};
 use sp_std::vec::Vec;
+
+/// `ArbSys`, the Arbitrum system predeploy that emits `L2ToL1Tx`.
+///
+/// A constant, not `config.bridge_contract`: ArbSys is part of the chain, not a
+/// contract an operator deploys, and filtering on a configurable address is how a
+/// log query ends up answering "no messages" for a chain that has them.
+pub const ARBSYS_ADDRESS: H160 = H160(hex_literal::hex!(
+    "0000000000000000000000000000000000000064"
+));
+
+/// Sourced lookback for one `receive_messages` call, in blocks — the same bound
+/// and the same reason as the Base adapter: `eth_getLogs` over an open range is
+/// refused by most public nodes.
+pub const MESSAGE_LOOKBACK_BLOCKS: u64 = 5_000;
+
+/// Refuse a batch larger than this rather than returning a truncated list.
+pub const MAX_MESSAGES_PER_CALL: usize = 256;
+
+/// The canonical Arbitrum L2→L1 event:
+///
+/// ```solidity
+/// event L2ToL1Tx(address caller, address indexed destination,
+///                uint256 indexed hash, uint256 indexed position,
+///                uint256 arbBlockNum, uint256 ethBlockNum, uint256 timestamp,
+///                uint256 callvalue, bytes data);
+/// ```
+///
+/// `destination`, `hash` and `position` are indexed, so they live in `topics`;
+/// the rest is ABI-encoded in `data`.
+pub fn l2_to_l1_tx_topic() -> [u8; 32] {
+    sp_io::hashing::keccak_256(
+        b"L2ToL1Tx(address,address,uint256,uint256,uint256,uint256,uint256,uint256,bytes)",
+    )
+}
+
+/// Arbitrum is an L2: an `L2ToL1Tx` is bound for Ethereum.
+pub const L1_CHAIN_ID: u64 = 1;
 
 /// Arbitrum chain adapter
 pub struct ArbitrumAdapter {
@@ -24,6 +62,94 @@ impl ArbitrumAdapter {
     /// Create new Arbitrum adapter
     pub fn new(config: ChainConfig) -> Self {
         Self { config, nonce: 0 }
+    }
+
+    /// Decode one `L2ToL1Tx` log into a `ChainMessage`.
+    ///
+    /// Every field comes from the log. The two that do not have an obvious
+    /// counterpart are named rather than guessed: `nonce` is the outbox
+    /// `position` (the unique identifier this event carries), and `gas_limit` is
+    /// zero because `L2ToL1Tx` states no gas limit — a caller that needs one must
+    /// not read this zero as a limit the chain chose.
+    pub fn decode_l2_to_l1_tx(log: &LogEntry) -> AdapterResult<ChainMessage> {
+        let expected_topic = l2_to_l1_tx_topic();
+        if log.topics.len() != 4 {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "L2ToL1Tx log has {} topics, expected 4 (signature + destination, hash, position)",
+                log.topics.len()
+            )));
+        }
+        if log.topics[0].as_bytes() != expected_topic {
+            return Err(ExternalChainError::rpc_error(
+                "log is not an L2ToL1Tx event: topic 0 does not match the ArbSys signature",
+            ));
+        }
+
+        let mut recipient = [0u8; 20];
+        recipient.copy_from_slice(&log.topics[1].as_bytes()[12..]);
+        let position = U256::from_big_endian(log.topics[3].as_bytes());
+
+        // data = abi.encode(caller, arbBlockNum, ethBlockNum, timestamp, callvalue, data)
+        const HEAD_WORDS: usize = 6;
+        let head_bytes = HEAD_WORDS * 32;
+        if log.data.len() < head_bytes {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "L2ToL1Tx data is {} bytes, shorter than the {head_bytes}-byte head",
+                log.data.len()
+            )));
+        }
+        let word = |index: usize| -> &[u8] { &log.data[index * 32..(index + 1) * 32] };
+
+        let mut sender = [0u8; 20];
+        sender.copy_from_slice(&word(0)[12..]);
+        let timestamp = u64::from_be_bytes(word(3)[24..].try_into().unwrap_or([0u8; 8]));
+        let callvalue = U256::from_big_endian(word(4));
+
+        let offset = U256::from_big_endian(word(5));
+        if offset != U256::from(head_bytes as u64) {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "L2ToL1Tx data offset is {offset}, expected {head_bytes}"
+            )));
+        }
+        if log.data.len() < head_bytes + 32 {
+            return Err(ExternalChainError::rpc_error(
+                "L2ToL1Tx data has no length word",
+            ));
+        }
+        let length = U256::from_big_endian(&log.data[head_bytes..head_bytes + 32]);
+        let length: usize = length
+            .try_into()
+            .map_err(|_| ExternalChainError::rpc_error("L2ToL1Tx data length overflows a usize"))?;
+        let start = head_bytes + 32;
+        let padded = length
+            .checked_add(31)
+            .map(|v| v / 32 * 32)
+            .ok_or_else(|| ExternalChainError::rpc_error("L2ToL1Tx data length overflows"))?;
+        if log.data.len() < start + padded {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "L2ToL1Tx declares {length} bytes of data but carries {}",
+                log.data.len().saturating_sub(start)
+            )));
+        }
+        let payload = log.data[start..start + length].to_vec();
+
+        if position > U256::from(u64::MAX) {
+            return Err(ExternalChainError::rpc_error(
+                "L2ToL1Tx position does not fit in the message nonce",
+            ));
+        }
+
+        Ok(ChainMessage {
+            source_chain: 42_161,
+            dest_chain: L1_CHAIN_ID,
+            sender: H160(sender),
+            recipient: H160(recipient),
+            nonce: position.as_u64(),
+            payload,
+            value: callvalue,
+            gas_limit: 0,
+            timestamp,
+        })
     }
 
     /// Arbitrum Inbox contract for L1->L2 messages
@@ -166,12 +292,45 @@ impl ChainAdapter for ArbitrumAdapter {
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        // Refused, not answered with an empty list: an empty list reads as
+        // Decoded, not answered with an empty list: an empty list used to read as
         // "no pending L2ToL1Tx events" no matter what the chain said.
-        Err(ExternalChainError::adapter_unimplemented(
-            "arbitrum: receive_messages cannot decode L2ToL1Tx events yet; refusing rather than \
-             reporting an empty message queue",
-        ))
+        let url = crate::evm_rpc::url(&self.config);
+
+        let latest = crate::evm_rpc::block_number(&url).await?;
+        let confirmations = u64::from(self.config.confirmations);
+        let Some(to_block) = latest.checked_sub(confirmations) else {
+            return Ok(Vec::new());
+        };
+        let from_block = to_block.saturating_sub(MESSAGE_LOOKBACK_BLOCKS);
+
+        // The emitter is ArbSys, a system predeploy — not a contract an operator
+        // deploys — so the filter is this constant rather than a configured
+        // address. `L2ToL1Tx` is emitted from nowhere else, and filtering on a
+        // configurably-wrong address is how a log query answers "no messages"
+        // for a chain that has them.
+        let entries = crate::evm_rpc::logs(
+            &url,
+            from_block,
+            to_block,
+            ARBSYS_ADDRESS,
+            H256::from(l2_to_l1_tx_topic()),
+        )
+        .await?;
+
+        if entries.len() > MAX_MESSAGES_PER_CALL {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "{} L2ToL1Tx events in blocks {from_block}..={to_block}, more than the \
+                 {MAX_MESSAGES_PER_CALL} this call returns; narrow the range rather than \
+                 receiving a truncated queue",
+                entries.len()
+            )));
+        }
+
+        let mut messages = Vec::with_capacity(entries.len());
+        for entry in &entries {
+            messages.push(Self::decode_l2_to_l1_tx(entry)?);
+        }
+        Ok(messages)
     }
 
     async fn initiate_transfer(&self, _transfer: CrossChainTransfer) -> AdapterResult<H256> {
@@ -257,5 +416,118 @@ mod tests {
         assert_eq!(encoded[4 + 32 + 31], 0x40);
         // dynamic length word should match payload length
         assert_eq!(encoded[4 + 64 + 31], payload.len() as u8);
+    }
+
+    /// An `L2ToL1Tx` log as ArbSys emits it.
+    fn l2_to_l1_tx_log(
+        caller: H160,
+        destination: H160,
+        position: u64,
+        timestamp: u64,
+        callvalue: U256,
+        data: &[u8],
+    ) -> LogEntry {
+        let mut payload = Vec::new();
+        let mut word = [0u8; 32];
+        word[12..].copy_from_slice(caller.as_bytes());
+        payload.extend_from_slice(&word);
+        payload.extend_from_slice(&[0u8; 32]); // arbBlockNum
+        payload.extend_from_slice(&[0u8; 32]); // ethBlockNum
+        let mut word = [0u8; 32];
+        word[24..].copy_from_slice(&timestamp.to_be_bytes());
+        payload.extend_from_slice(&word);
+        payload.extend_from_slice(&callvalue.to_big_endian());
+        let mut word = [0u8; 32];
+        word[31] = 192; // six head words
+        payload.extend_from_slice(&word);
+        let mut word = [0u8; 32];
+        word[24..].copy_from_slice(&(data.len() as u64).to_be_bytes());
+        payload.extend_from_slice(&word);
+        payload.extend_from_slice(data);
+        payload.extend_from_slice(&vec![0u8; (32 - data.len() % 32) % 32]);
+
+        let mut destination_topic = [0u8; 32];
+        destination_topic[12..].copy_from_slice(destination.as_bytes());
+        let mut position_topic = [0u8; 32];
+        position_topic[24..].copy_from_slice(&position.to_be_bytes());
+
+        LogEntry {
+            address: ARBSYS_ADDRESS,
+            topics: vec![
+                H256::from(l2_to_l1_tx_topic()),
+                H256::from(destination_topic),
+                H256::from([0x77u8; 32]), // hash
+                H256::from(position_topic),
+            ],
+            data: payload,
+            block_number: 300,
+            transaction_hash: H256::from([0x88u8; 32]),
+            log_index: 1,
+        }
+    }
+
+    #[test]
+    fn an_l2_to_l1_tx_log_decodes_into_every_field_it_carries() {
+        let caller = H160([0x11; 20]);
+        let destination = H160([0x22; 20]);
+        let log = l2_to_l1_tx_log(
+            caller,
+            destination,
+            9_001,
+            1_700_000_123,
+            U256::from(12_345u64),
+            b"escrowed",
+        );
+
+        let message = ArbitrumAdapter::decode_l2_to_l1_tx(&log).expect("decodes");
+        assert_eq!(message.source_chain, 42_161);
+        assert_eq!(message.dest_chain, 1);
+        assert_eq!(message.sender, caller);
+        assert_eq!(message.recipient, destination);
+        assert_eq!(message.nonce, 9_001);
+        assert_eq!(message.value, U256::from(12_345u64));
+        assert_eq!(message.payload, b"escrowed".to_vec());
+        assert_eq!(message.timestamp, 1_700_000_123);
+        // The event states no gas limit, so the field is zero and the decoder
+        // says so rather than inventing one.
+        assert_eq!(message.gas_limit, 0);
+    }
+
+    #[test]
+    fn a_log_with_a_different_signature_is_refused() {
+        let mut log = l2_to_l1_tx_log(H160([0x11; 20]), H160([0x22; 20]), 1, 1, U256::zero(), b"x");
+        log.topics[0] = H256::from([0x55; 32]);
+        assert!(ArbitrumAdapter::decode_l2_to_l1_tx(&log).is_err());
+    }
+
+    #[test]
+    fn a_log_without_its_indexed_fields_is_refused() {
+        let mut log = l2_to_l1_tx_log(H160([0x11; 20]), H160([0x22; 20]), 1, 1, U256::zero(), b"x");
+        log.topics.truncate(2);
+        assert!(ArbitrumAdapter::decode_l2_to_l1_tx(&log).is_err());
+    }
+
+    #[test]
+    fn a_log_shorter_than_the_head_is_refused() {
+        let mut log = l2_to_l1_tx_log(H160([0x11; 20]), H160([0x22; 20]), 1, 1, U256::zero(), b"x");
+        log.data.truncate(128);
+        assert!(ArbitrumAdapter::decode_l2_to_l1_tx(&log).is_err());
+    }
+
+    #[test]
+    fn a_log_with_a_shifted_data_offset_is_refused() {
+        let mut log = l2_to_l1_tx_log(H160([0x11; 20]), H160([0x22; 20]), 1, 1, U256::zero(), b"x");
+        log.data[191] = 128;
+        assert!(ArbitrumAdapter::decode_l2_to_l1_tx(&log).is_err());
+    }
+
+    #[test]
+    fn a_log_whose_length_overruns_the_data_is_refused() {
+        let mut log = l2_to_l1_tx_log(H160([0x11; 20]), H160([0x22; 20]), 1, 1, U256::zero(), b"x");
+        // Claim 255 bytes in a log whose payload is one byte plus padding. The
+        // length word's low byte is the last byte of the sixth... seventh word:
+        // head (192) + length word, so `data[223]` is that low byte.
+        log.data[223] = 0xff;
+        assert!(ArbitrumAdapter::decode_l2_to_l1_tx(&log).is_err());
     }
 }
