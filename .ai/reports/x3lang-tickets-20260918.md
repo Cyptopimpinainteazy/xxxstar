@@ -1622,8 +1622,8 @@ agree on; a round-trip test covers the body form.
 Validation: `invariant a { assert x <= 5 }` formats, re-parses, and compiles to
 the same bytecode.
 
-## TICKET-040 — `flash_capital` cannot be tested — OPEN
-Type: OPEN, decision needed · Subsystem: x3-lang/compiler (strategy modules)
+## TICKET-040 — `flash_capital` cannot be tested — CLOSED
+Type: CLOSED (2026-09-20, removed from the closed permission set) · Subsystem: x3-lang/compiler (strategy modules)
 Reason: nothing in a module body *requires* flash liquidity, so the permission is declarable and
 unverifiable. The strategy module's own doc cites this ticket ("recorded in TICKET-040 rather than
 papered over with a check that always passes"), and the round-26 report wrote the text — but the
@@ -1638,6 +1638,11 @@ capability and the check reads it, or the permission is removed from `StrategyPe
 refusal with it.
 Validation: a module whose body requires flash liquidity is refused without the permission and
 accepted with it; or the set has three members and the corpus is unchanged.
+
+Resolution: the permission was removed from `StrategyPermission::ALL`. `flash_capital` is now an
+unknown permission and is refused by name; the remaining set is `private_submission`,
+`intent_fusion`, and `cross_domain`. Regression test updated in
+`x3-lang/compiler/tests/test_strategy_modules.rs`.
 
 ## TICKET-036 — the first instruction of a stream must be ≤3 bytes — CLOSED
 Type: CLOSED by the versions record (measured 2026-09-20) · Subsystem: x3-lang/compiler + vm
