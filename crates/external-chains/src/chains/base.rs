@@ -5,9 +5,43 @@
 
 use crate::adapter::*;
 use crate::error::ExternalChainError;
+use crate::evm_rpc::LogEntry;
 use crate::ChainType;
 use sp_core::{H160, H256, U256};
 use sp_std::vec::Vec;
+
+/// Sourced lookback for one `receive_messages` call, in blocks.
+///
+/// Bounded on purpose: `eth_getLogs` over an open range is refused by most
+/// public nodes, and a request that cannot succeed is not a query.
+pub const MESSAGE_LOOKBACK_BLOCKS: u64 = 5_000;
+
+/// Refuse a batch larger than this rather than returning a partial list. A
+/// caller that silently receives the first N of N+M messages believes it has
+/// them all.
+pub const MAX_MESSAGES_PER_CALL: usize = 256;
+
+/// Base is an L2: a `SentMessage` it emits is bound for Ethereum.
+///
+/// The event carries no destination chain, so the decoder states the one the
+/// messenger's counterpart lives on rather than leaving the field to be guessed
+/// by a consumer. If Base ever relays elsewhere, this is the constant to change
+/// and the reason the field is not derived from the log.
+pub const L1_CHAIN_ID: u64 = 1;
+
+/// The canonical OP-Stack message event:
+///
+/// ```solidity
+/// event SentMessage(address indexed target, address sender, uint256 value,
+///                   uint256 messageNonce, uint256 gasLimit, bytes message);
+/// ```
+///
+/// Topic 0 is the keccak of that signature; `target` is the only indexed
+/// parameter, so it is the only field that lives in `topics` — everything else
+/// is ABI-encoded in `data`, which is what `decode_sent_message` walks.
+pub fn sent_message_topic() -> [u8; 32] {
+    sp_io::hashing::keccak_256(b"SentMessage(address,address,uint256,uint256,uint256,bytes)")
+}
 
 /// Base chain adapter
 pub struct BaseAdapter {
@@ -26,6 +60,100 @@ impl BaseAdapter {
     pub fn bridge_abi() -> &'static [u8] {
         // L2StandardBridge ABI for OP Stack
         include_bytes!("../../abi/l2_standard_bridge.json")
+    }
+
+    /// Decode one `SentMessage` log into a `ChainMessage`.
+    ///
+    /// Every field is taken from the log; nothing is defaulted. A log whose
+    /// data is short, whose `message` offset is not where the ABI puts it, or
+    /// whose declared `message` length runs past the data is *refused* — a
+    /// relayer acting on a half-decoded message is worse than one that stops.
+    pub fn decode_sent_message(
+        log: &LogEntry,
+        timestamp: u64,
+        source_chain: u64,
+        dest_chain: u64,
+    ) -> AdapterResult<ChainMessage> {
+        let expected_topic = sent_message_topic();
+        if log.topics.len() != 2 {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "SentMessage log has {} topics, expected 2 (signature + indexed target)",
+                log.topics.len()
+            )));
+        }
+        if log.topics[0].as_bytes() != expected_topic {
+            return Err(ExternalChainError::rpc_error(
+                "log is not a SentMessage event: topic 0 does not match the OP-Stack signature",
+            ));
+        }
+
+        // `target` is indexed: the ABI pads an address to 32 bytes, so the
+        // address is the low 20.
+        let mut recipient = [0u8; 20];
+        recipient.copy_from_slice(&log.topics[1].as_bytes()[12..]);
+
+        // data = abi.encode(sender, value, messageNonce, gasLimit, message)
+        // Five head words, then the tail the last word points at.
+        const HEAD_WORDS: usize = 5;
+        let head_bytes = HEAD_WORDS * 32;
+        if log.data.len() < head_bytes {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "SentMessage data is {} bytes, shorter than the {head_bytes}-byte head",
+                log.data.len()
+            )));
+        }
+        let word = |index: usize| -> &[u8] { &log.data[index * 32..(index + 1) * 32] };
+
+        let mut sender = [0u8; 20];
+        sender.copy_from_slice(&word(0)[12..]);
+        let value = U256::from_big_endian(word(1));
+        let message_nonce = u64::from_be_bytes(word(2)[24..].try_into().unwrap_or([0u8; 8]));
+        let gas_limit = u64::from_be_bytes(word(3)[24..].try_into().unwrap_or([0u8; 8]));
+
+        // The offset of `bytes message` is fixed by the ABI for this signature:
+        // five head words. Anything else is a log whose shape this decoder does
+        // not understand, and guessing a different offset is how a decoder reads
+        // one field as another.
+        let offset = U256::from_big_endian(word(4));
+        if offset != U256::from(head_bytes as u64) {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "SentMessage message offset is {offset}, expected {head_bytes}"
+            )));
+        }
+        if log.data.len() < head_bytes + 32 {
+            return Err(ExternalChainError::rpc_error(
+                "SentMessage data has no length word for `message`",
+            ));
+        }
+        let length_word = &log.data[head_bytes..head_bytes + 32];
+        let length = U256::from_big_endian(length_word);
+        let length: usize = length.try_into().map_err(|_| {
+            ExternalChainError::rpc_error("SentMessage message length does not fit a usize")
+        })?;
+        let start = head_bytes + 32;
+        let padded = length
+            .checked_add(31)
+            .map(|v| v / 32 * 32)
+            .ok_or_else(|| ExternalChainError::rpc_error("SentMessage message length overflows"))?;
+        if log.data.len() < start + padded {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "SentMessage declares a {length}-byte message but carries only {} bytes of it",
+                log.data.len().saturating_sub(start)
+            )));
+        }
+        let payload = log.data[start..start + length].to_vec();
+
+        Ok(ChainMessage {
+            source_chain,
+            dest_chain,
+            sender: H160(sender),
+            recipient: H160(recipient),
+            nonce: message_nonce,
+            payload,
+            value,
+            gas_limit,
+            timestamp,
+        })
     }
 
     /// Encode bridge deposit call
@@ -132,15 +260,72 @@ impl ChainAdapter for BaseAdapter {
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        // Refused, not answered with an empty list. This used to run
+        // Decoded, not answered with an empty list. This used to run
         // `eth_getLogs`, throw the logs away and return `Ok(vec![])` — which
         // reads as "the chain has no pending messages" no matter what it said.
-        // Decoding a `SentMessage` event into a `ChainMessage` is not
-        // implemented (see docs/reports/SECURITY_BLOCKERS.md finding 6).
-        Err(ExternalChainError::adapter_unimplemented(
-            "base: receive_messages cannot decode SentMessage logs yet; refusing rather than \
-             reporting an empty message queue",
-        ))
+        let url = crate::evm_rpc::url(&self.config);
+
+        // `ChainConfig::default_contracts` derives an address from a hash, so an
+        // unconfigured adapter would filter logs on an address no chain has ever
+        // deployed and return an empty queue — the same lie in a new shape.
+        let placeholder = ChainConfig::for_chain(ChainType::Base).bridge_contract;
+        if self.config.bridge_contract == placeholder {
+            return Err(ExternalChainError::adapter_unimplemented(
+                "base: no messenger contract configured — ChainConfig's default bridge address is \
+                 derived from a hash, not deployed on Base, so a log query against it would \
+                 report an empty queue for a chain that has messages. Set the adapter's \
+                 bridge_contract to the deployed L2CrossDomainMessenger",
+            ));
+        }
+
+        let latest = crate::evm_rpc::block_number(&url).await?;
+        let confirmations = u64::from(self.config.confirmations);
+        // Nothing is final until the chain has that many blocks on top.
+        let Some(to_block) = latest.checked_sub(confirmations) else {
+            return Ok(Vec::new());
+        };
+        let from_block = to_block.saturating_sub(MESSAGE_LOOKBACK_BLOCKS);
+
+        let entries = crate::evm_rpc::logs(
+            &url,
+            from_block,
+            to_block,
+            self.config.bridge_contract,
+            H256::from(sent_message_topic()),
+        )
+        .await?;
+
+        if entries.len() > MAX_MESSAGES_PER_CALL {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "{} SentMessage logs in blocks {from_block}..={to_block}, more than the \
+                 {MAX_MESSAGES_PER_CALL} this call returns; narrow the range rather than \
+                 receiving a truncated queue",
+                entries.len()
+            )));
+        }
+
+        // One timestamp per block, fetched once. `eth_getLogs` does not carry
+        // one, and inventing a timestamp for a message is the same class of
+        // error as inventing its nonce.
+        let mut timestamps: Vec<(u64, u64)> = Vec::new();
+        let mut messages = Vec::with_capacity(entries.len());
+        for entry in &entries {
+            let timestamp = match timestamps.iter().find(|(b, _)| *b == entry.block_number) {
+                Some((_, t)) => *t,
+                None => {
+                    let t = crate::evm_rpc::block_timestamp(&url, entry.block_number).await?;
+                    timestamps.push((entry.block_number, t));
+                    t
+                }
+            };
+            messages.push(Self::decode_sent_message(
+                entry,
+                timestamp,
+                self.config.chain_type,
+                L1_CHAIN_ID,
+            )?);
+        }
+        Ok(messages)
     }
 
     async fn initiate_transfer(&self, _transfer: CrossChainTransfer) -> AdapterResult<H256> {
@@ -302,6 +487,12 @@ mod tests {
             adapter.receive_messages().await,
             Err(ExternalChainError::AdapterUnimplemented(_))
         ));
+        // `receive_messages` now decodes `SentMessage` logs; what it refuses here
+        // is the *unconfigured* case. `ChainConfig::default_contracts` derives the
+        // bridge address from a hash, so this adapter would filter logs on an
+        // address no chain has deployed and report an empty queue. A configured
+        // adapter queries — see `receive_messages_decodes_logs_and_refuses_a_bad_one`
+        // in crates/external-chains/tests/.
         assert!(matches!(
             adapter.check_transfer_status(H256::zero()).await,
             Err(ExternalChainError::AdapterUnimplemented(_))
@@ -310,5 +501,125 @@ mod tests {
             adapter.finalize_transfer(H256::zero(), vec![1, 2, 3]).await,
             Err(ExternalChainError::AdapterUnimplemented(_))
         ));
+    }
+
+    /// A `SentMessage` log exactly as the OP-Stack messenger emits it.
+    fn sent_message_log(
+        target: H160,
+        sender: H160,
+        value: U256,
+        nonce: u64,
+        gas_limit: u64,
+        message: &[u8],
+    ) -> LogEntry {
+        let mut data = Vec::new();
+        let mut word = [0u8; 32];
+        word[12..].copy_from_slice(sender.as_bytes());
+        data.extend_from_slice(&word);
+
+        data.extend_from_slice(&value.to_big_endian());
+
+        let mut word = [0u8; 32];
+        word[24..].copy_from_slice(&nonce.to_be_bytes());
+        data.extend_from_slice(&word);
+
+        let mut word = [0u8; 32];
+        word[24..].copy_from_slice(&gas_limit.to_be_bytes());
+        data.extend_from_slice(&word);
+
+        // Offset of `bytes message`: five head words.
+        let mut word = [0u8; 32];
+        word[31] = 160;
+        data.extend_from_slice(&word);
+
+        let mut word = [0u8; 32];
+        word[24..].copy_from_slice(&(message.len() as u64).to_be_bytes());
+        data.extend_from_slice(&word);
+
+        data.extend_from_slice(message);
+        let padding = (32 - message.len() % 32) % 32;
+        data.extend_from_slice(&vec![0u8; padding]);
+
+        let mut target_topic = [0u8; 32];
+        target_topic[12..].copy_from_slice(target.as_bytes());
+
+        LogEntry {
+            address: H160([0x11; 20]),
+            topics: vec![H256::from(sent_message_topic()), H256::from(target_topic)],
+            data,
+            block_number: 100,
+            transaction_hash: H256::from([0x22; 32]),
+            log_index: 3,
+        }
+    }
+
+    #[test]
+    fn a_sent_message_log_decodes_into_every_field_it_carries() {
+        let target = H160([0xaa; 20]);
+        let sender = H160([0xbb; 20]);
+        let log = sent_message_log(
+            target,
+            sender,
+            U256::from(7_000_000_000u64),
+            42,
+            200_000,
+            b"hello bridge",
+        );
+
+        let message = BaseAdapter::decode_sent_message(&log, 1_700_000_000, 8453, 1)
+            .expect("a well-formed SentMessage log decodes");
+        assert_eq!(message.source_chain, 8453);
+        assert_eq!(message.dest_chain, 1);
+        assert_eq!(message.sender, sender);
+        assert_eq!(message.recipient, target);
+        assert_eq!(message.nonce, 42);
+        assert_eq!(message.gas_limit, 200_000);
+        assert_eq!(message.value, U256::from(7_000_000_000u64));
+        assert_eq!(message.payload, b"hello bridge".to_vec());
+        assert_eq!(message.timestamp, 1_700_000_000);
+    }
+
+    #[test]
+    fn a_log_with_a_different_event_signature_is_refused() {
+        let mut log =
+            sent_message_log(H160([0xaa; 20]), H160([0xbb; 20]), U256::zero(), 1, 1, b"x");
+        log.topics[0] = H256::from([0x99; 32]);
+        assert!(BaseAdapter::decode_sent_message(&log, 0, 8453, 1).is_err());
+    }
+
+    #[test]
+    fn a_log_missing_the_indexed_target_is_refused() {
+        let mut log =
+            sent_message_log(H160([0xaa; 20]), H160([0xbb; 20]), U256::zero(), 1, 1, b"x");
+        log.topics.truncate(1);
+        assert!(BaseAdapter::decode_sent_message(&log, 0, 8453, 1).is_err());
+    }
+
+    #[test]
+    fn a_log_shorter_than_the_head_is_refused() {
+        let mut log =
+            sent_message_log(H160([0xaa; 20]), H160([0xbb; 20]), U256::zero(), 1, 1, b"x");
+        log.data.truncate(96);
+        assert!(BaseAdapter::decode_sent_message(&log, 0, 8453, 1).is_err());
+    }
+
+    #[test]
+    fn a_log_whose_offset_is_not_where_the_abi_puts_it_is_refused() {
+        let mut log =
+            sent_message_log(H160([0xaa; 20]), H160([0xbb; 20]), U256::zero(), 1, 1, b"x");
+        // Point at a different offset: reading the tail from wherever a log
+        // claims is how one field gets read as another.
+        log.data[159] = 128;
+        assert!(BaseAdapter::decode_sent_message(&log, 0, 8453, 1).is_err());
+    }
+
+    #[test]
+    fn a_log_whose_message_length_overruns_the_data_is_refused() {
+        let mut log =
+            sent_message_log(H160([0xaa; 20]), H160([0xbb; 20]), U256::zero(), 1, 1, b"x");
+        // Claim 1000 bytes of message in a log that carries three.
+        log.data[191] = 0xe8;
+        log.data[190] = 0x03;
+        assert!(BaseAdapter::decode_sent_message(&log, 0, 8453, 1).is_err());
     }
 }

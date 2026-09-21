@@ -206,6 +206,185 @@ pub(crate) async fn receipt(url: &str, tx_hash: H256) -> AdapterResult<Option<Tr
     parse_receipt(tx_hash, &result)
 }
 
+/// One `eth_getLogs` entry, as the node stated it.
+///
+/// Every field is required: a log missing one of them is refused by `logs()`
+/// rather than defaulted, because a defaulted block number or topic would be a
+/// message the relayer acts on but the chain never emitted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogEntry {
+    pub address: H160,
+    pub topics: Vec<H256>,
+    pub data: Vec<u8>,
+    pub block_number: u64,
+    pub transaction_hash: H256,
+    pub log_index: u64,
+}
+
+/// Hex-decode a `0x`-prefixed string, refusing an odd length or a bad digit.
+fn decode_hex(value: &str, what: &str) -> AdapterResult<Vec<u8>> {
+    let digits = value.strip_prefix("0x").unwrap_or(value);
+    if digits.len() % 2 != 0 {
+        return Err(ExternalChainError::rpc_error(&format!(
+            "{what} has an odd number of hex digits: {value}"
+        )));
+    }
+    hex::decode(digits)
+        .map_err(|e| ExternalChainError::rpc_error(&format!("{what} is not hex ({value}): {e}")))
+}
+
+fn field_u64(value: &serde_json::Value, what: &str) -> AdapterResult<u64> {
+    let text = value
+        .as_str()
+        .ok_or_else(|| ExternalChainError::rpc_error(&format!("{what} is not a string")))?;
+    parse_hex_u64(text)
+        .map_err(|e| ExternalChainError::rpc_error(&format!("{what} is not a quantity: {e}")))
+}
+
+/// Parse one `eth_getLogs` entry.
+pub(crate) fn parse_log_entry(entry: &serde_json::Value) -> AdapterResult<LogEntry> {
+    let object = entry
+        .as_object()
+        .ok_or_else(|| ExternalChainError::rpc_error("a log entry is not an object"))?;
+    let get = |name: &str| -> AdapterResult<&serde_json::Value> {
+        object
+            .get(name)
+            .ok_or_else(|| ExternalChainError::rpc_error(&format!("a log entry has no {name}")))
+    };
+
+    let address_bytes = decode_hex(
+        get("address")?
+            .as_str()
+            .ok_or_else(|| ExternalChainError::rpc_error("log address is not a string"))?,
+        "log address",
+    )?;
+    if address_bytes.len() != 20 {
+        return Err(ExternalChainError::rpc_error(&format!(
+            "log address is {} bytes, not 20",
+            address_bytes.len()
+        )));
+    }
+    let mut address = [0u8; 20];
+    address.copy_from_slice(&address_bytes);
+
+    let mut topics = Vec::new();
+    for topic in get("topics")?
+        .as_array()
+        .ok_or_else(|| ExternalChainError::rpc_error("log topics are not an array"))?
+    {
+        let bytes = decode_hex(
+            topic
+                .as_str()
+                .ok_or_else(|| ExternalChainError::rpc_error("a topic is not a string"))?,
+            "log topic",
+        )?;
+        if bytes.len() != 32 {
+            return Err(ExternalChainError::rpc_error(&format!(
+                "a log topic is {} bytes, not 32",
+                bytes.len()
+            )));
+        }
+        topics.push(H256::from_slice(&bytes));
+    }
+
+    let data = decode_hex(
+        get("data")?
+            .as_str()
+            .ok_or_else(|| ExternalChainError::rpc_error("log data is not a string"))?,
+        "log data",
+    )?;
+
+    let transaction_hash_bytes = decode_hex(
+        get("transactionHash")?
+            .as_str()
+            .ok_or_else(|| ExternalChainError::rpc_error("log transactionHash is not a string"))?,
+        "log transactionHash",
+    )?;
+    if transaction_hash_bytes.len() != 32 {
+        return Err(ExternalChainError::rpc_error(&format!(
+            "log transactionHash is {} bytes, not 32",
+            transaction_hash_bytes.len()
+        )));
+    }
+
+    Ok(LogEntry {
+        address: H160(address),
+        topics,
+        data,
+        block_number: field_u64(get("blockNumber")?, "log blockNumber")?,
+        transaction_hash: H256::from_slice(&transaction_hash_bytes),
+        log_index: field_u64(get("logIndex")?, "log logIndex")?,
+    })
+}
+
+/// Fetch logs for a bounded block range, filtered by address and first topic.
+///
+/// The range is inclusive and bounded by the caller on purpose: `eth_getLogs`
+/// over an open range is a request every public node refuses, and a silent
+/// fallback to "no range" would be a query that never returns logs.
+pub(crate) async fn logs(
+    url: &str,
+    from_block: u64,
+    to_block: u64,
+    address: H160,
+    topic0: H256,
+) -> AdapterResult<Vec<LogEntry>> {
+    if from_block > to_block {
+        return Err(ExternalChainError::rpc_error(&format!(
+            "log range is inverted: {from_block}..{to_block}"
+        )));
+    }
+    let params = format!(
+        r#"[{{"fromBlock":"0x{:x}","toBlock":"0x{:x}","address":"0x{}","topics":["0x{}"]}}]"#,
+        from_block,
+        to_block,
+        hex::encode(address.as_bytes()),
+        hex::encode(topic0.as_bytes())
+    );
+    let response = call(url, "eth_getLogs", &params).await?;
+    let text = String::from_utf8_lossy(&response);
+    let parsed: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
+        ExternalChainError::rpc_error(&format!("eth_getLogs response is not JSON: {e}"))
+    })?;
+    if let Some(error) = parsed.get("error").filter(|e| !e.is_null()) {
+        return Err(ExternalChainError::rpc_error(&format!(
+            "eth_getLogs error: {error}"
+        )));
+    }
+    let result = parsed
+        .get("result")
+        .and_then(|r| r.as_array())
+        .ok_or_else(|| ExternalChainError::rpc_error("eth_getLogs returned no result array"))?;
+
+    let mut entries = Vec::with_capacity(result.len());
+    for entry in result {
+        entries.push(parse_log_entry(entry)?);
+    }
+    Ok(entries)
+}
+
+/// The Unix timestamp of a block, as the chain states it.
+pub(crate) async fn block_timestamp(url: &str, block_number: u64) -> AdapterResult<u64> {
+    let params = format!(r#"["0x{block_number:x}",false]"#);
+    let response = call(url, "eth_getBlockByNumber", &params).await?;
+    let text = String::from_utf8_lossy(&response);
+    let parsed: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
+        ExternalChainError::rpc_error(&format!("eth_getBlockByNumber response is not JSON: {e}"))
+    })?;
+    let result = parsed
+        .get("result")
+        .filter(|r| !r.is_null())
+        .ok_or_else(|| {
+            ExternalChainError::rpc_error(&format!("no block at height {block_number}"))
+        })?;
+    field_u64(
+        result
+            .get("timestamp")
+            .ok_or_else(|| ExternalChainError::rpc_error("the block has no timestamp"))?,
+        "block timestamp",
+    )
+}
+
 /// Encode the ERC20 `balanceOf(address)` call.
 pub(crate) fn encode_balance_of(address: H160) -> Vec<u8> {
     let mut calldata = Vec::with_capacity(36);
