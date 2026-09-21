@@ -8,11 +8,18 @@ Workspace: `/home/lojak/Desktop/xxxstar-main/x3-lang`
 ```text
 OPENSSL_DIR=/usr OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu OPENSSL_INCLUDE_DIR=/usr/include \
 rustup run stable cargo test --workspace --all-targets --all-features
+
+OPENSSL_DIR=/usr OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu OPENSSL_INCLUDE_DIR=/usr/include \
+rustup run 1.90.0 cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+rustup run 1.90.0 cargo fmt --all -- --check
 ```
 
 ## Results
 
 - Tests: PASS
+- Clippy (`-D warnings`, pinned 1.90.0): PASS
+- Formatting (`cargo fmt --all -- --check`): PASS
 
 `cargo test --workspace --all-targets --all-features` passed at the current
 `master` head. The OPENSSL environment variables force openssl-sys to link the
