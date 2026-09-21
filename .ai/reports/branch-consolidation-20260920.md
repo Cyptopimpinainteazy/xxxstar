@@ -328,3 +328,7 @@ The remaining heads group as:
 `agents/pasted-text-processing` is **merge-worthy**, not archive: it updates CI/workflows and SVM
 programs plus `scripts/agent_guard.py` allow-list patterns and a PR-supervisor test. It needs a
 focused review to keep only the changes master lacks.
+
+`agents/setup-instructions-request` is superseded: its `x3-lang/compiler/src/intent_bridge.rs` and
+Python validator changes are already represented by master, and master's `numeric.py` has an
+additional finite-float-narrowing guard the branch lacks. No merge is needed.
