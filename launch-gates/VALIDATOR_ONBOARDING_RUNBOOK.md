@@ -223,6 +223,31 @@ the digest **before** installing (a missing checksum is an error, not a warning)
 validates the genesis, installs the systemd unit and tells you which keys to
 insert. Until then, use Option B.
 
+**Producing a release to publish.** The release workflow has never completed a
+step — the tag it last ran on (`v0.4.0-rc.1`) is over a thousand commits behind
+master and its copy of the workflow asked for a GitHub-hosted runner, which this
+account cannot use — so no release has assets. Build the same artifact set
+locally, from the commit you intend to release:
+
+```bash
+git checkout <commit-to-release>
+bash scripts/mainnet/build-release-artifacts.sh v0.4.0-rc.2 \
+     --chain ./x3-mainnet-plain.json
+# writes dist/v0.4.0-rc.2/: the binary, x3-chain-node.sha256, the runtime wasm,
+# the genesis, a MANIFEST with the commit and toolchain, and a .tar.gz
+
+gh release create v0.4.0-rc.2 --draft --title "X3 v0.4.0-rc.2" --notes "..."
+gh release upload v0.4.0-rc.2 dist/v0.4.0-rc.2/x3-chain-node \
+     dist/v0.4.0-rc.2/x3-chain-node.sha256 dist/v0.4.0-rc.2/*.wasm* \
+     dist/v0.4.0-rc.2/*.cdx.json --clobber
+```
+
+`scripts/mainnet/release-artifacts-gate.sh` (release-gate stage 2e) proves that
+bundle verifies against its own checksum file, extracts to a runnable binary, and
+is accepted by `install-validator.sh` — and that a tampered copy is refused.
+Publishing is the coordinator's call: `--from-release` only works once the
+release is published, because GitHub does not serve drafts anonymously.
+
 ### Option B: Build from Source (Most Secure)
 
 **Recommended for production mainnet validators**
