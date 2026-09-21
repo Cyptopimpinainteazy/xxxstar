@@ -266,15 +266,18 @@ Still triaged as **superseded by master**, not deleted:
   implementations of `proof_bundle.rs`, `secret_release.rs`, `x3vm_htlc.rs`,
   `state_machine.rs`, and `persistence.rs`.
 
-Genuinely missing but **not landed yet** (needs a focused rebase + real proof,
-not a wholesale merge):
+`fix/foundry-real-evm-deploy` capability was landed as a focused port (not a
+wholesale merge) in `a4f63684c`:
 
-- `fix/foundry-real-evm-deploy` — replaces `Deployer::simulate_deploy` /
-  `simulate_block_number` / `estimate_gas` with an ethers-based real EVM
-  deployment path (`evm_deploy.rs`, auditor `compile_contract_bytecode`).
-  `git apply --check` against current master conflicts in
-  `crates/x3-foundry-core/Cargo.toml` and `src/lib.rs`, so it is a follow-up
-  rather than a cherry-pick.
+- `Deployer::simulate_deploy` / `simulate_block_number` / `estimate_gas` are
+  removed and replaced with `evm_deploy::deploy_bytecode`, which signs and
+  submits a real contract-creation transaction and reads the address, tx hash,
+  block number, and gas used from the node's own receipt.
+- `x3-foundry-auditor` now exposes `compile_contract_bytecode`, shared with the
+  deployer so there is one place that invokes the Solidity compiler.
+- The fake-success unit tests became honest invalid-key refusals plus real
+  `anvil` end-to-end proofs (single-chain and two-chain).
+- Two `x3-oracle` clippy lints were fixed so the root clippy gate stays green.
 
 Note: local `master` is `ahead 1, behind 2` versus `origin/master`, and the
 workspace has no network (`git ls-remote` fails DNS for github.com), so push
