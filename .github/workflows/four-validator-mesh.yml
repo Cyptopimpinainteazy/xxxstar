@@ -12,7 +12,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install system dependencies
         # x3star1 already has protobuf-compiler/clang/cmake and has no

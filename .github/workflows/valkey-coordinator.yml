@@ -22,7 +22,7 @@ jobs:
       X3_REQUIRE_VALKEY_TESTS: "1"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup pinned Rust
         uses: dtolnay/rust-toolchain@master

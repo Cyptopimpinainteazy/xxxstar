@@ -41,7 +41,7 @@ jobs:
       X3_SWARM_SOAK_OUT_DIR: target/swarm-tps-soak
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

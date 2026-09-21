@@ -19,7 +19,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - name: Checkout exact head
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5

@@ -38,7 +38,7 @@ jobs:
   substrate-build:
     runs-on: [self-hosted, Linux, X64, x3]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
@@ -59,7 +59,7 @@ jobs:
       run:
         working-directory: X3-contracts/evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Install Foundry
@@ -74,7 +74,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, x3]
     needs: [substrate-build]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
@@ -117,7 +117,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, x3]
     needs: [substrate-build]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build x3-readiness and regenerate report
         run: |
           cargo build --release -p x3-readiness
@@ -142,7 +142,7 @@ jobs:
       name: testnet
       url: https://github.com/Cyptopimpinainteazy/xxxstar/releases
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
@@ -179,7 +179,7 @@ jobs:
     outputs:
       verifier_address: ${{ steps.deploy.outputs.verifier_address }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Install Foundry
@@ -221,7 +221,7 @@ jobs:
       run:
         working-directory: X3-contracts/evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Install Foundry
