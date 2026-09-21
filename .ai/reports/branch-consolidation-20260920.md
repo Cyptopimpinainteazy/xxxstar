@@ -276,6 +276,13 @@ missing from master, otherwise archive.
 carry the measured-slippage state and `X3_SLIPPAGE_ABOVE_CEILING` enforcement. The branch is a
 pre-rewrite/partial spelling of that path and should be archived.
 
+### Correction: not archive material
+
+`codex/x3-economic-safety-kernel` carries real x3-lang work that is **not all on master**. A bulk
+cherry-pick attempted on a clean master worktree conflicts in `lib.rs` and the economic test files,
+and taking the whole tree would revert newer master work such as bridge `min_receive`. This branch is
+**merge-worthy** and must be landed with a focused rebase that keeps the newer master hunks.
+
 ### Already-represented runtime branches
 
 - `feat/secret-release-firewall-20260911`
