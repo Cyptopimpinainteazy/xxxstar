@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir -p _site/transparency
           cp -R apps/x3-transparency/dist/. _site/transparency/
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
