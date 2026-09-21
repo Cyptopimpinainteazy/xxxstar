@@ -174,11 +174,6 @@ impl pallet_x3_settlement_engine::Config for Test {
     // everything, so this test runtime states that it stands in for a validator
     // that would do the binding.
     type AllowUnboundSvmProofs = frame_support::traits::ConstBool<true>;
-    // Permissive, like `AllowUnboundSvmProofs` above: the mock has no external
-    // chain to prove against, so the lifecycle tests exercise the bookkeeping
-    // path. The strict rule is tested directly through
-    // `bundle_needs_verified_proof` and `require_verified_external_bundle`.
-    type AllowUnattestedCrossDomainProofs = frame_support::traits::ConstBool<true>;
 }
 
 thread_local! {

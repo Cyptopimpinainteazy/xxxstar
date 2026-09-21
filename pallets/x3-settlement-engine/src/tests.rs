@@ -5,9 +5,12 @@ use crate::mock::{RuntimeEvent, RuntimeOrigin};
 use crate::types::{
     AssetSpec, BtcBlockHeader, ExternalChainId, IntentState, ProofType, SettlementProof, TokenId,
 };
-use crate::{Bonds, BondsByOwner, Pallet, SettlementIntents};
-use frame_support::{assert_ok, traits::Hooks, BoundedVec};
+use crate::{Bonds, BondsByOwner, Error, Pallet, SettlementIntents};
+use frame_support::{assert_noop, assert_ok, traits::Hooks, BoundedVec};
 use sp_core::{ed25519, Pair, H256};
+use x3_atomic_swap::{
+    CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType,
+};
 
 /// The height every fixture proof states.
 ///
