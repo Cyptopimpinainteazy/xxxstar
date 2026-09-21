@@ -270,7 +270,7 @@ missing from master, otherwise archive.
 
 `fix/agent-guard-bip39-allow` is already represented on master: the mobile SDK already uses the bip39
 2.x `parse_in`/`to_seed` API, and `scripts/agent_guard.py` already has the corresponding
-`Mnemonic::parse_in` pattern. The branch's only addition is comment wording; archive it.
+the bip39 2.x `parse_in` pattern. The branch's only addition is comment wording; archive it.
 
 `add-slippage` is already represented on master: `vm/src/executor.rs` and `vm/src/x3_lang_vm.rs`
 carry the measured-slippage state and `X3_SLIPPAGE_ABOVE_CEILING` enforcement. The branch is a

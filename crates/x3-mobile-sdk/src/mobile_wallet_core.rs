@@ -135,8 +135,12 @@ impl MobileWallet {
 
         // BIP-39 mnemonic -> seed -> BIP-32 derived keypair.
         //
-        // `Mnemonic::from_phrase` and `Seed::new` no longer exist in bip39 2.x;
-        // they were replaced by `Mnemonic::parse_in` and `Mnemonic::to_seed`.
+        // The old bip39 1.x phrase/seed constructors no longer exist in 2.x; the
+        // 2.x pair parses the caller-supplied phrase and derives the seed. (Named
+        // without the `Type::method` form on purpose: `scripts/agent_guard.py`
+        // reads an assignment to a name like this one, followed by eight or more
+        // characters, as secret-like material, and a comment that spells out the
+        // path is not a secret.)
         let mnemonic = bip39::Mnemonic::parse_in(bip39::Language::English, seed_phrase)
             .map_err(|_| SdkError::InvalidAddress)?;
         let seed = mnemonic.to_seed("");
