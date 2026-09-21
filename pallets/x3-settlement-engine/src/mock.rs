@@ -174,6 +174,11 @@ impl pallet_x3_settlement_engine::Config for Test {
     // everything, so this test runtime states that it stands in for a validator
     // that would do the binding.
     type AllowUnboundSvmProofs = frame_support::traits::ConstBool<true>;
+    // Permissive, like `AllowUnboundSvmProofs` above: the mock has no external
+    // chain to prove against, so the lifecycle tests exercise the bookkeeping
+    // path. The strict rule is tested directly through
+    // `bundle_needs_verified_proof` and `require_verified_external_bundle`.
+    type AllowUnattestedCrossDomainProofs = frame_support::traits::ConstBool<true>;
 }
 
 thread_local! {
@@ -238,6 +243,11 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     ext.execute_with(|| {
         System::set_block_number(1);
         Timestamp::set_timestamp(1_000);
+        // Permissive, like a dev/local genesis: the mock has no external chain to
+        // prove against, so the lifecycle tests drive the bookkeeping path. Tests
+        // that exercise the strict rule (the production/testnet posture) set this
+        // to false themselves — see `allow_unattested_cross_domain_proofs_is_false_by_default_in_live_genesis`.
+        crate::AllowUnattestedCrossDomainProofs::<Test>::put(true);
     });
     ext
 }
