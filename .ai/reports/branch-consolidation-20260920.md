@@ -332,3 +332,12 @@ focused review to keep only the changes master lacks.
 `agents/setup-instructions-request` is superseded: its `x3-lang/compiler/src/intent_bridge.rs` and
 Python validator changes are already represented by master, and master's `numeric.py` has an
 additional finite-float-narrowing guard the branch lacks. No merge is needed.
+
+The remaining x3-lang-touching heads are also superseded:
+
+- `archive/stale-x3lang-trading-wip-20260918` — earlier Trading Core v1 WIP; master already has the
+  completed trading core.
+- `batch/20260918T2015Z` — same intent-bridge/Python batch as `agents/setup-instructions-request`.
+- `wip/consolidation-20260917/main` — a one-line Cargo manifest change already resolved by master.
+- `wip/consolidation-20260917/x3-lang-prototype-20260621` — an old prototype that deletes current
+  x3-lang files; do not merge.
