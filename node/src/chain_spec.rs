@@ -12,7 +12,7 @@ use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
     CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, TreasuryConfig, X3CoinConfig,
-    X3CrosschainGatewayConfig, WASM_BINARY,
+    X3CrosschainGatewayConfig, X3SettlementEngineConfig, WASM_BINARY,
 };
 
 /// Chain specification specialized to this runtime's genesis configuration.
@@ -464,6 +464,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         sp_core::H160::zero(),
         [0u8; 32],
         X3CrosschainGatewayConfig::dev_defaults(),
+        true,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Development")
@@ -508,6 +509,7 @@ pub fn development_config_with_bridge_escrows(
         evm_escrow_addr,
         svm_escrow_addr,
         X3CrosschainGatewayConfig::dev_defaults(),
+        true,
     );
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
@@ -556,6 +558,7 @@ pub fn local_two_validator_config_with_bridge_escrows(
         evm_escrow_addr,
         svm_escrow_addr,
         X3CrosschainGatewayConfig::dev_defaults(),
+        true,
     );
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
@@ -600,6 +603,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         sp_core::H160::zero(),
         [0u8; 32],
         X3CrosschainGatewayConfig::dev_defaults(),
+        true,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local Testnet")
@@ -645,6 +649,7 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         sp_core::H160::zero(),
         [0u8; 32],
         X3CrosschainGatewayConfig::dev_defaults(),
+        true,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local 3-Validator Testnet")
@@ -693,6 +698,7 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         evm_escrow,
         svm_escrow,
         X3CrosschainGatewayConfig::testnet_defaults(),
+        false,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Staging")
@@ -754,6 +760,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
         evm_escrow,
         svm_escrow,
         X3CrosschainGatewayConfig::testnet_defaults(),
+        false,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Testnet")
@@ -812,6 +819,7 @@ pub fn production_config() -> Result<ChainSpec, String> {
         evm_escrow,
         svm_escrow,
         X3CrosschainGatewayConfig::empty(),
+        false,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Production")
@@ -882,6 +890,12 @@ fn x3_chain_genesis(
     evm_escrow_addr: sp_core::H160,
     svm_escrow_addr: [u8; 32],
     gateway_config: X3CrosschainGatewayConfig,
+    // Whether this network accepts a cross-domain proof set whose underlying
+    // proof the settlement engine never verified. `true` only for dev/local:
+    // there is no external chain to prove against there. Every network a
+    // validator can join passes `false`, because a terminal refund released
+    // against a self-attested bundle is a fund loss.
+    allow_unattested_cross_domain_proofs: bool,
 ) -> RuntimeGenesisConfig {
     let mut endowed: BTreeSet<AccountId> = endowed_accounts.into_iter().collect();
 
@@ -977,6 +991,10 @@ fn x3_chain_genesis(
         #[cfg(not(feature = "mainnet-rc1"))]
         x3_flash_loan: Default::default(),
         x3_crosschain_gateway: gateway_config,
+        x3_settlement_engine: X3SettlementEngineConfig {
+            allow_unattested_cross_domain_proofs,
+            _phantom: core::marker::PhantomData,
+        },
     }
 }
 

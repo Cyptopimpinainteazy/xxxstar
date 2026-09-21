@@ -2959,6 +2959,248 @@ fn adaptor_swap_real_full_lifecycle() {
     });
 }
 
+/// Render an `H256` the way proof bundles carry a transaction id.
+fn hex32(value: H256) -> String {
+    let mut out = String::from("0x");
+    for byte in value.as_bytes() {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out
+}
+
+/// A proof bundle that is internally consistent and whose evidence says nothing.
+///
+/// `execution_evidence` is two bytes and `finality_source` names the caller: both
+/// passed validation before this change, which is exactly the gap these tests
+/// pin. `bundle_needs_verified_proof` is the rule that now refuses it on a Live
+/// network.
+fn fabricated_bundle(
+    runtime_intent_id: [u8; 32],
+    chain_id: &str,
+    vm_type: VmType,
+    operation: CrossDomainOperation,
+    tx_id: String,
+) -> CrossDomainProofBundle {
+    let block_hash = format!("0xfabricatedblock{}", &tx_id[2..6.min(tx_id.len())]);
+    let mut bundle = CrossDomainProofBundle {
+        version: CrossDomainProofBundle::VERSION,
+        intent_id: 1,
+        runtime_intent_id,
+        intent_hash: [0x11u8; 32],
+        chain_id: chain_id.into(),
+        vm_type,
+        operation,
+        tx_id: tx_id.clone(),
+        block_number: 1,
+        block_hash: block_hash.clone(),
+        execution_evidence: vec![0xde, 0xad],
+        finality: FinalityProof {
+            chain_id: chain_id.into(),
+            vm_type,
+            tx_id,
+            block_number: 1,
+            block_hash,
+            confirmations: 12,
+            finalized: true,
+            finality_source: "fabricated-by-the-caller".into(),
+            safe_to_reveal_secret: true,
+        },
+        proof_hash: [0u8; 32],
+    };
+    bundle.proof_hash = bundle.compute_hash().expect("self-consistent hash");
+    bundle
+}
+
+/// Create an intent with an Ethereum leg and a Solana leg, both escrowed.
+fn intent_with_two_external_legs() -> H256 {
+    let maker = ALICE;
+    let taker = BOB;
+    let secret_hash = H256::from(sp_io::hashing::sha2_256(
+        H256::from([0x33u8; 32]).as_bytes(),
+    ));
+
+    assert_ok!(Pallet::<Test>::create_intent(
+        RuntimeOrigin::signed(maker),
+        taker,
+        AssetSpec {
+            chain: ExternalChainId::Ethereum,
+            token: TokenId::Native,
+            amount: 1_000,
+        },
+        AssetSpec {
+            chain: ExternalChainId::Solana,
+            token: TokenId::Native,
+            amount: 500,
+        },
+        secret_hash,
+        Some(3_600),
+    ));
+
+    let intent_id = crate::SettlementIntents::<Test>::iter()
+        .find(|(_, intent)| intent.maker == maker && intent.secret_hash == secret_hash)
+        .map(|(id, _)| id)
+        .expect("intent exists");
+
+    assert_ok!(Pallet::<Test>::lock_escrow(
+        RuntimeOrigin::signed(taker),
+        intent_id,
+        0,
+        ExternalChainId::Ethereum,
+        1_000,
+        vec![],
+    ));
+    assert_ok!(Pallet::<Test>::lock_escrow(
+        RuntimeOrigin::signed(maker),
+        intent_id,
+        1,
+        ExternalChainId::Solana,
+        500,
+        vec![],
+    ));
+    intent_id
+}
+
+/// The policy rule, stated so both postures are visible in one place.
+#[test]
+fn the_rule_for_requiring_a_verified_proof_is_explicit() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        // Live posture (production/testnet/staging): an external bundle needs a
+        // proof this pallet verified.
+        assert!(Pallet::<Test>::bundle_needs_verified_proof(false, false));
+        // Dev/local posture: the bookkeeping path is exercised without one.
+        assert!(!Pallet::<Test>::bundle_needs_verified_proof(true, false));
+        // An X3-native leg is verified by this chain itself.
+        assert!(!Pallet::<Test>::bundle_needs_verified_proof(false, true));
+    });
+}
+
+/// The production/testnet posture refuses a bundle no verifier backed.
+///
+/// Before this rule the set was self-attested: `submit_proof` verified the
+/// proof and `submit_cross_domain_proof_set` accepted any bundle whose own
+/// fields agreed with each other, so a caller could name a transaction that
+/// never happened, have it recorded as an accepted proof, and reach a terminal
+/// refund against an external leg that never settled.
+#[test]
+fn live_posture_refuses_an_external_bundle_no_verifier_backed() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        crate::AllowUnattestedCrossDomainProofs::<Test>::put(false);
+        let intent_id = intent_with_two_external_legs();
+        let runtime_intent_id = intent_id.to_fixed_bytes();
+
+        let set = CrossDomainProofSet {
+            intent_id: 1,
+            runtime_intent_id,
+            intent_hash: [0x11u8; 32],
+            bundles: vec![fabricated_bundle(
+                runtime_intent_id,
+                "ethereum-mainnet",
+                VmType::Evm,
+                CrossDomainOperation::Refund,
+                "0xfabricatedrefund".into(),
+            )],
+        };
+
+        assert_noop!(
+            Pallet::<Test>::submit_cross_domain_proof_set(
+                RuntimeOrigin::signed(ALICE),
+                intent_id,
+                set
+            ),
+            Error::<Test>::CrossDomainProofUnverified
+        );
+    });
+}
+
+/// ...and accepts it once the bundle points at a proof the pallet verified.
+#[test]
+fn a_bundle_matching_the_verified_proof_is_accepted() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        crate::AllowUnattestedCrossDomainProofs::<Test>::put(false);
+        let intent_id = intent_with_two_external_legs();
+        let runtime_intent_id = intent_id.to_fixed_bytes();
+
+        // The verifying path: confirmation depth, proof type, and a real
+        // receipts-trie walk against the block's receipts root.
+        let proof = create_evm_receipt_proof();
+        let verified_tx = proof.tx_hash;
+        assert_ok!(Pallet::<Test>::submit_proof(
+            RuntimeOrigin::signed(ALICE),
+            intent_id,
+            ExternalChainId::Ethereum,
+            proof,
+        ));
+
+        // `submit_proof` records the verified proof on the leg it belongs to.
+        let escrow = crate::EscrowStates::<Test>::get(intent_id, 0).expect("ethereum leg");
+        assert_eq!(
+            escrow.proof.as_ref().map(|p| p.tx_hash),
+            Some(verified_tx),
+            "the verified proof must be attached to the escrowed leg"
+        );
+
+        let set = CrossDomainProofSet {
+            intent_id: 1,
+            runtime_intent_id,
+            intent_hash: [0x11u8; 32],
+            bundles: vec![fabricated_bundle(
+                runtime_intent_id,
+                "ethereum-mainnet",
+                VmType::Evm,
+                CrossDomainOperation::Claim,
+                hex32(verified_tx),
+            )],
+        };
+        assert_ok!(Pallet::<Test>::submit_cross_domain_proof_set(
+            RuntimeOrigin::signed(ALICE),
+            intent_id,
+            set
+        ));
+    });
+}
+
+/// A bundle naming the *other* transaction on the same leg is still refused.
+#[test]
+fn a_bundle_naming_a_different_transaction_is_refused() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        crate::AllowUnattestedCrossDomainProofs::<Test>::put(false);
+        let intent_id = intent_with_two_external_legs();
+        let runtime_intent_id = intent_id.to_fixed_bytes();
+
+        assert_ok!(Pallet::<Test>::submit_proof(
+            RuntimeOrigin::signed(ALICE),
+            intent_id,
+            ExternalChainId::Ethereum,
+            create_evm_receipt_proof(),
+        ));
+
+        let set = CrossDomainProofSet {
+            intent_id: 1,
+            runtime_intent_id,
+            intent_hash: [0x11u8; 32],
+            bundles: vec![fabricated_bundle(
+                runtime_intent_id,
+                "ethereum-mainnet",
+                VmType::Evm,
+                CrossDomainOperation::Claim,
+                hex32(H256::from([0x99u8; 32])),
+            )],
+        };
+        assert_noop!(
+            Pallet::<Test>::submit_cross_domain_proof_set(
+                RuntimeOrigin::signed(ALICE),
+                intent_id,
+                set
+            ),
+            Error::<Test>::CrossDomainProofUnverified
+        );
+    });
+}
+
 #[test]
 fn local_claims_do_not_finalize_without_cross_domain_proof_set() {
     let mut ext = new_test_ext();
