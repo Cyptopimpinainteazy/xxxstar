@@ -5005,8 +5005,8 @@ Five tests. Note for the audit's next step: the scan skipped nested structs whos
 `ParallelLeg`, `ChoicePath` and `ObligationDecl` were checked by name-presence only and are worth the
 same treatment.
 
-## TICKET-122 — an `atomic swap` cannot state a minimum output — OPEN
-Type: OPEN, language gap · Subsystem: x3-lang/crates/x3-ast + compiler
+## TICKET-122 — an `atomic swap` cannot state a minimum output — CLOSED
+Type: CLOSED (2026-09-20, decision recorded) · Subsystem: x3-lang/compiler (parser + spec)
 Reason: `AtomicSwapDecl` has no `min_output` field, its body's clause loop has no arm for the word, and
 the declaration lowers to `Lock` + `Release` rather than a `Swap` — so `atomic swap eth.USDC -> sol.SOL
 { amount 500  receiver R  min_output 400 }` parsed `min_output` and `400` as two statements that lower
@@ -5020,6 +5020,11 @@ Acceptance criteria: either `atomic swap` accepts `min_output <expr>` and the ar
 bounded by it (with a test that an under-delivery is refused), or the declaration's shape is recorded as
 deliberately unprotected and the spec's phase says why.
 Validation: an atomic swap with a floor, and one whose counterparty delivers less, refused.
+
+Resolution: the declaration shape is recorded as deliberately unprotected. `min_output` is refused by
+name inside `atomic swap`/`atomic_swap` rather than silently dropped, and the diagnostic directs the
+author to a route `swap`. The decision is recorded in `x3-lang/spec/INDEX.md`; the parser test is
+`x3-lang/compiler/tests/test_atomic_swap_syntax.rs`.
 
 ## TICKET-123 — `x3c refund` announced a transaction it never sent — CLOSED
 Type: CLOSED in `2c983e2fa` (2026-09-20), filed and fixed in the same pass · Subsystem: crates/x3-tools/src/bin/x3c.rs
