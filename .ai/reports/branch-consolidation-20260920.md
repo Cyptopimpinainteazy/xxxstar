@@ -239,6 +239,47 @@ wip/x3lang-preserve-packets-and-arbitrage-20260919
 your-task-branch
 ```
 
+## Update — 2026-09-21 (focused landing)
+
+Landed one genuinely missing, focused patch rather than importing whole old trees:
+
+- `fix/agent-guard-bip39-allow` — the allow-list only matched the old
+  `bip39::Mnemonic::from_phrase` spelling. The live code uses
+  `parse_in(Language, phrase)`, so `scripts/agent_guard.py` misclassified a
+  caller-supplied phrase as secret-like material. Applied as the focused hunk
+  (`274bfff8a`) onto current `master`; the branch's unrelated SVM/CI churn was
+  deliberately not imported. Verified with a direct import test:
+  `is_allowed_line("... Mnemonic::parse_in(...)") == True`.
+
+Still triaged as **superseded by master**, not deleted:
+
+- `add-slippage` — master's `vm/src/trading.rs` already has `QuoteRequest`,
+  `QuoteResult`, `SlippageExceeded`, `check_slippage_bps`, and quote freshness.
+- `fix/svm-htlc-native-custody-master` — the custody/signer-set fixes are on
+  master; the remaining diff only adds push/PR `branches: [master]` triggers
+  that master's SVM lifecycle workflow intentionally removed.
+- `feat/canonical-cross-domain-proof-bundle-20260911`,
+  `feat/secret-release-firewall-20260911`,
+  `feat/x3vm-durable-recovery-20260911`,
+  `feat/idempotent-cross-domain-coordinator-20260911`,
+  `feat/settlement-proofset-gate-20260911` — master carries newer, larger
+  implementations of `proof_bundle.rs`, `secret_release.rs`, `x3vm_htlc.rs`,
+  `state_machine.rs`, and `persistence.rs`.
+
+Genuinely missing but **not landed yet** (needs a focused rebase + real proof,
+not a wholesale merge):
+
+- `fix/foundry-real-evm-deploy` — replaces `Deployer::simulate_deploy` /
+  `simulate_block_number` / `estimate_gas` with an ethers-based real EVM
+  deployment path (`evm_deploy.rs`, auditor `compile_contract_bytecode`).
+  `git apply --check` against current master conflicts in
+  `crates/x3-foundry-core/Cargo.toml` and `src/lib.rs`, so it is a follow-up
+  rather than a cherry-pick.
+
+Note: local `master` is `ahead 1, behind 2` versus `origin/master`, and the
+workspace has no network (`git ls-remote` fails DNS for github.com), so push
+and remote fetch could not be completed this session.
+
 ### Dependency-bump novel heads
 
 The following are dependency-version branches, not capability branches. They modify `Cargo.toml` and
