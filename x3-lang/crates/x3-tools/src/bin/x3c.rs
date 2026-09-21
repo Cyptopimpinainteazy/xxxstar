@@ -151,6 +151,25 @@ enum Cmd {
         /// The realised slippage, in basis points, for a plan's `slippage <= <n>` ceiling.
         #[arg(long)]
         measured_slippage_bps: Option<u128>,
+        /// The delta a venue actually left open, in basis points, that a hedge's
+        /// `require delta <= <n>` post-condition is judged against. Independent of the two
+        /// above because a hedge states neither a profit nor a slippage.
+        #[arg(long)]
+        measured_delta_bps: Option<u128>,
+    },
+    /// Replay an economic receipt against the artifact it claims to be about (PHASE 32).
+    ///
+    /// The phase names five inputs — compiled artifact, inputs, operation sequence, state evidence,
+    /// receipt — and nine claims it verifies. This command takes the two the repository carries as
+    /// files and checks what they can decide: that the receipt is about *this* artifact, that the
+    /// receipt's own replay holds, and that the profit it reports is one the artifact's own floor
+    /// permits. The rest are named in the report as checked-from-the-receipt or as needing the inputs
+    /// and the state evidence the command was not given, rather than passed over.
+    Replay {
+        /// The compiled artifact the receipt claims to be about.
+        artifact: PathBuf,
+        /// The economic receipt, as JSON.
+        receipt: PathBuf,
     },
     /// Disassemble bytecode to a human-readable IR trace.
     Explain { input: PathBuf },
@@ -356,6 +375,12 @@ enum PacketAction {
     /// operator names, so `--trusted` is required: a signature checked against
     /// a key that arrived inside the packet is not a check, it is a restatement
     /// of the packet's own claim.
+    ///
+    /// `--evidence` is the facts a host states, and it is what the packet's `proof_requirements` are
+    /// checked against: freshness of its state roots, whether the venues will fill at the liquidity
+    /// and fee the route was scored from, and whether a trusted key signed its execution commitment.
+    /// A packet that requires any of those and is given no evidence is refused naming what could not
+    /// be checked, rather than reported as verified for its form (TICKET-074).
     Verify {
         input: PathBuf,
         /// Block height the packet is being admitted at, checked against its
@@ -366,6 +391,9 @@ enum PacketAction {
         /// so a rotation or a marketplace of solvers is one invocation.
         #[arg(long = "trusted", value_name = "KEY_ID=HEX", required = true)]
         trusted: Vec<String>,
+        /// The facts a host states, as JSON, for the packet's proof requirements.
+        #[arg(long, value_name = "EVIDENCE.JSON")]
+        evidence: Option<PathBuf>,
     },
 }
 
@@ -441,7 +469,14 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
             gas,
             measured_profit_bps,
             measured_slippage_bps,
-        } => cmd_run(&input, gas, measured_profit_bps, measured_slippage_bps),
+            measured_delta_bps,
+        } => cmd_run(
+            &input,
+            gas,
+            measured_profit_bps,
+            measured_slippage_bps,
+            measured_delta_bps,
+        ),
         Cmd::Explain { input } => cmd_explain(&input),
         Cmd::TestFixture { out } => cmd_test_fixture(&out),
         Cmd::Intent {
@@ -504,6 +539,7 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
             show_route,
             json,
         } => cmd_plan(&input, show_route, json),
+        Cmd::Replay { artifact, receipt } => cmd_replay(&artifact, &receipt),
         Cmd::Receipt { action } => match action {
             ReceiptAction::Inspect { input } => cmd_receipt_inspect(&input),
             ReceiptAction::Verify { input } => cmd_receipt_verify(&input),
@@ -516,7 +552,12 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
         },
         Cmd::Packet { action } => match action {
             PacketAction::Inspect { input } => cmd_packet_inspect(&input),
-            PacketAction::Verify { input, block, trusted } => cmd_packet_verify(&input, block, &trusted),
+            PacketAction::Verify {
+                input,
+                block,
+                trusted,
+                evidence,
+            } => cmd_packet_verify(&input, block, &trusted, evidence.as_ref()),
         },
     }
 }
@@ -1268,10 +1309,18 @@ fn cmd_build(
             document.repository_commit,
         );
     }
+    // The frame count comes from the walker, not from the byte length: a compiler stream frames
+    // instructions with a width that varies and pads them to absolute four-byte boundaries, so
+    // `bytes / 4` is not a count of anything — this printed "296 bytes (74 ops)" for an artifact with
+    // **9** instructions, and `x3c estimate` (which walks the stream) reports the same 9. A figure a
+    // reader could act on is the one the VM charges for, and `instructions` is what it is called.
+    let instructions = x3_lang_compiler::emitter::instructions(&bytecode)
+        .map_err(|error| format!("the emitted artifact must be walkable: {error}"))?
+        .len();
     println!(
-        "x3c build: {} bytes ({} ops){} -> {}",
+        "x3c build: {} bytes ({} instructions){} -> {}",
         bytecode.len(),
-        bytecode.len() / 4,
+        instructions,
         if outcome.warnings.is_empty() {
             String::new()
         } else {
@@ -1287,33 +1336,28 @@ fn cmd_run(
     gas: u128,
     measured_profit_bps: Option<u128>,
     measured_slippage_bps: Option<u128>,
+    measured_delta_bps: Option<u128>,
 ) -> Result<ExitCode, String> {
     let bytecode = std::fs::read(input).map_err(|e| format!("read {input:?}: {e}"))?;
     if bytecode.is_empty() {
         return Err("bytecode is empty".into());
     }
     let mut vm = VM::new(bytecode, VMConfig::default(), gas);
-    // A dry run has no prices, so a plan's economic floor has nothing to be judged
-    // against unless the caller states what the market did. Stating it is explicit and
-    // the floor is *then* enforced against it; leaving either half out makes the floor
-    // refuse rather than pass on a number nobody measured, and stating only one half is
-    // refused because the other would have to be invented.
-    match (measured_profit_bps, measured_slippage_bps) {
-        (Some(profit), Some(slippage)) => vm.report_measurement(profit, slippage),
-        (None, None) => {}
-        (profit, slippage) => {
-            return Err(format!(
-                "state both measurements or neither: `--measured-profit-bps` was {} and \
-                 `--measured-slippage-bps` was {}",
-                profit
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "not given".to_string()),
-                slippage
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "not given".to_string()),
-            ));
-        }
-    }
+    // A dry run has no prices, so a plan's economic floor has nothing to be judged against
+    // unless the caller states what the market did. Every quantity is independent, because a
+    // *program* states which ones it has: a plan states a profit floor and a slippage
+    // ceiling, a liquidation states a profit floor and no ceiling, and a hedge states a delta
+    // and neither of those. The rule used to be "state the profit and the slippage, or
+    // neither", which was true of a plan and made a liquidation unable to state the one
+    // quantity it is bounded by.
+    //
+    // Dropping the pair rule does not make a missing measurement silent: a measured guard
+    // whose quantity nobody stated refuses with `X3_GUARD_UNMEASURED`, naming the guard and
+    // the quantity — a better diagnosis than the one this replaced, which named neither. The
+    // property is the same (nothing is invented); the surface is where the guard is instead
+    // of where the flags are.
+    vm.report_outcome(measured_profit_bps, measured_slippage_bps, measured_delta_bps);
+
     match vm.execute() {
         Ok(()) => {
             let (asset_ops, bridge_ops, receipts) = collect_stats(&vm.state);
@@ -1356,6 +1400,22 @@ fn artifact_floors(bytecode: &[u8]) -> Result<simulation::ArtifactFloors, String
         // hand is what made this reader miss both measured guards in an artifact that
         // had them.
         match opcodes::require_comparison(instruction.flags) {
+            opcodes::REQUIRE_COMPARE_MEASURED_PROFIT
+                if opcodes::require_measured_unit_code(instruction.flags) == opcodes::MEASURED_UNIT_CODE_DELTA_BPS =>
+            {
+                // A hedge's delta bound shares the profit mode, because the mode field's
+                // four values were spent before a third measured quantity existed and the
+                // *unit code* is what tells them apart. Reading it as a profit floor would
+                // compare a floor against a delta — two different quantities, and the
+                // mismatch this reader's own sibling rule exists to refuse.
+                //
+                // It used to refuse the whole artifact, because a simulation that read the bound as a
+                // profit floor would compare the wrong quantity and one that skipped it would report
+                // a verdict as if the artifact had no bound at all. Both were the wrong answer to a
+                // missing field: the snapshot carries the delta now, and the ceiling is the smallest
+                // one the artifact states, exactly as the slippage ceiling is (TICKET-099).
+                floors.delta_ceiling_bps = Some(floors.delta_ceiling_bps.map_or(threshold, |held| held.min(threshold)));
+            }
             opcodes::REQUIRE_COMPARE_MEASURED_PROFIT => {
                 floors.profit_floor_bps = Some(floors.profit_floor_bps.map_or(threshold, |held| held.max(threshold)));
             }
@@ -1425,22 +1485,20 @@ fn cmd_simulate(
                     .map_err(|error| error.to_string())?
                     .unwrap_or(0),
             );
-            vm.report_measurement(profit, slippage);
+            // The delta is the third quantity and it used to be `None` here — an artifact that
+            // states a delta bound was refused before it got this far, so the placeholder was
+            // unreachable. Now that a hedge's bound is decidable against a snapshot, the figure has
+            // to reach the VM: a run judged against a delta the VM was never told would refuse
+            // `X3_GUARD_UNMEASURED` while the report said it was inside the bound (TICKET-099).
+            let delta = snapshot
+                .measured_delta_bps(&floors)
+                .map_err(|error| error.to_string())?
+                .map(u128::from);
+            vm.report_outcome(Some(profit), Some(slippage), delta);
         }
-        (None, Some(profit), Some(slippage)) => vm.report_measurement(profit, slippage),
-        (None, None, None) => {}
-        (None, profit, slippage) => {
-            return Err(format!(
-                "state both measurements or neither: `--measured-profit-bps` was {} and \
-                 `--measured-slippage-bps` was {}",
-                profit
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "not given".to_string()),
-                slippage
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "not given".to_string()),
-            ));
-        }
+        // Each quantity is independent and a guard whose quantity is absent refuses by name,
+        // for the reason `cmd_run` gives.
+        (None, profit, slippage) => vm.report_outcome(profit, slippage, None),
     }
 
     // The run first, then the report: a refusal *is* the thing the report is for, so
@@ -2670,23 +2728,40 @@ fn cmd_refund(intent_hash: &str, check_only: bool) -> Result<ExitCode, String> {
                 match stmt {
                     x3_lang_ast::ast::Statement::OnTimeout { duration, action } => {
                         has_timeout = true;
-                        if let x3_lang_ast::ast::Expression::Literal(x3_lang_ast::ast::LiteralExpr::Int {
-                            value, ..
-                        }) = duration
-                        {
-                            timeout_duration = *value as u64;
-                        }
+                        // `45s` is a **Duration** literal, not an `Int`: reading only the integer shape
+                        // reported "Timeout duration: 0s" for a program that states 45 seconds. The
+                        // unit travels with it, so the report names the one the program wrote and
+                        // does the conversion in the same place the lowering does (`blocks_from_duration`).
+                        timeout_duration = match duration {
+                            x3_lang_ast::ast::Expression::Literal(x3_lang_ast::ast::LiteralExpr::Int {
+                                value, ..
+                            }) => u64::try_from(*value).unwrap_or(u64::MAX),
+                            x3_lang_ast::ast::Expression::Literal(x3_lang_ast::ast::LiteralExpr::Duration {
+                                value,
+                                ..
+                            }) => *value,
+                            _ => 0,
+                        };
                         if matches!(action, x3_lang_ast::ast::FailureAction::Refund(_)) {
                             refund_action = Some("refund".into());
                             if let x3_lang_ast::ast::FailureAction::Refund(target) = action {
-                                refund_target = Some(format!("{:?}", target));
+                                // The clause's own two parts rather than the compiler's `Debug` output:
+                                // `Literal(String(Symbol("Ethereum.USDC:sender")))` is the AST, and a
+                                // report is read by a person. One splitter, shared with the formatter.
+                                refund_target = Some(match x3_lang_compiler::formatter::refund_target(target) {
+                                    Some((asset, receiver)) => format!("{asset} to {receiver}"),
+                                    None => format!("{:?}", target),
+                                });
                             }
                         }
                     }
                     x3_lang_ast::ast::Statement::OnFail(x3_lang_ast::ast::FailureAction::Refund(target)) => {
                         has_refund_path = true;
                         refund_action = Some("refund".into());
-                        refund_target = Some(format!("{:?}", target));
+                        refund_target = Some(match x3_lang_compiler::formatter::refund_target(target) {
+                            Some((asset, receiver)) => format!("{asset} to {receiver}"),
+                            None => format!("{:?}", target),
+                        });
                     }
                     x3_lang_ast::ast::Statement::Require(guard) => {
                         if matches!(guard.kind, x3_lang_ast::ast::RequireKind::RefundPath) {
@@ -2710,7 +2785,16 @@ fn cmd_refund(intent_hash: &str, check_only: bool) -> Result<ExitCode, String> {
             if refund_path_exists { "present" } else { "missing" }
         );
         if refund_path_exists {
-            println!("Refund path verified — conditions met for refund trigger");
+            // What this command *did*: it read the source and found the path. It has no chain
+            // connection, so it cannot submit anything — and the line here used to say
+            // "Refund submitted — transaction pending confirmation", which is a transaction nobody
+            // sent. An inspection that announces an on-chain action is the fabricated evidence
+            // AGENTS.md forbids and the settlement report had to retract once already.
+            println!("Refund path verified — the path is present in the program");
+            println!(
+                "This command does not submit a refund: it has no chain connection. Submitting one is \
+                 the timeout/refund engine's job, on a node that holds the key"
+            );
             Ok(ExitCode::SUCCESS)
         } else {
             println!("No valid refund path found");
@@ -2724,8 +2808,13 @@ fn cmd_refund(intent_hash: &str, check_only: bool) -> Result<ExitCode, String> {
         println!("Refund target: {}", refund_target.as_deref().unwrap_or("none"));
         if refund_path_exists {
             println!();
-            println!("Triggering refund for intent...");
-            println!("Refund submitted — transaction pending confirmation");
+            // See the check-only branch: this does not submit, and saying it did is a fabricated
+            // transaction. The plan is reported, and what would submit it is named.
+            println!("Refund path: present — nothing is submitted by this command");
+            println!(
+                "To trigger it, hand the artifact to the timeout/refund engine on a node that holds \
+                 the key; this tool cannot, and says so rather than printing a confirmation"
+            );
         } else {
             println!();
             println!("Cannot trigger refund — no valid refund path in intent");
@@ -2742,13 +2831,24 @@ fn cmd_new(name: &str, path: Option<&PathBuf>) -> Result<ExitCode, String> {
         None => PathBuf::from(name),
     };
 
-    std::fs::create_dir_all(&project_dir).map_err(|e| format!("create {project_dir:?}: {e}"))?;
-    std::fs::create_dir_all(project_dir.join("src")).map_err(|e| format!("create src: {e}"))?;
-    std::fs::create_dir_all(project_dir.join("tests")).map_err(|e| format!("create tests: {e}"))?;
-
-    // Main intent file
+    // Every clause in this template is one `x3c check` accepts with no errors and no warnings,
+    // because the next step printed below tells the reader to run exactly that: a scaffold that
+    // fails its own first command is a bug the reader has to debug, not a starting point. The shape
+    // is the spec's own bridge example — a `finality_policy` the `require finality.ethereum` guard
+    // can read, the two proof obligations a bridge carries, a bounded timeout with a refund, the
+    // failure action — plus a slippage bound the language's measured-run path can discharge.
+    //
+    // The nonce guard takes an identifier (`require nonce unused <id>`); the bare `require nonce
+    // unused` this template used to carry is refused by the parser, so the scaffold did not parse.
+    // TICKET-125.
     let main_x3 = r#"//! {name} — X3 Cross-Chain Intent
 //! Generated by `x3c new {name}`
+
+finality_policy strict {
+    chain ethereum
+    requirement finalized
+    blocks 12
+}
 
 intent {name}_swap {
     from ethereum.USDC amount 1000 receiver sender
@@ -2756,14 +2856,61 @@ intent {name}_swap {
     route {
         bridge x3 ethereum.USDC -> solana.USDC
     }
-    require nonce unused;
-    require slippage <= 3;
-    timeout 3600 refund ethereum.USDC to sender;
-    on_fail rollback;
+    require nonce unused {name}_swap_001
+    require slippage <= 50
+    require finality.ethereum >= 12
+    timeout 3600 refund ethereum.USDC to sender
+    on_fail rollback
+}
+
+proofs required {
+    source_lock_proof
+    destination_fill_proof
 }
 "#;
     let main_x3 = main_x3.replace("{name}", name);
+
+    // The template is generated *and* checked before anything is written. Writing first and
+    // discovering afterwards leaves a half-made project behind, which is how this command used to
+    // fail: the reader got a Cargo.toml and a src/main.x3 whose own `x3c check` exited 2.
+    let (_, ir, outcome) = x3_lang_compiler::check_source_diagnostics(&main_x3).map_err(|e| {
+        format!(
+            "the generated template is not valid x3-lang, refusing to write it: {}",
+            e.staged()
+        )
+    })?;
+    if !outcome.errors.is_empty() || !outcome.warnings.is_empty() {
+        return Err(format!(
+            "the generated template is not clean x3-lang ({} error(s), {} warning(s)); refusing to \
+             write a project that does not pass its own `x3c check`: {:?} {:?}",
+            outcome.errors.len(),
+            outcome.warnings.len(),
+            outcome.errors,
+            outcome.warnings
+        ));
+    }
+
+    std::fs::create_dir_all(&project_dir).map_err(|e| format!("create {project_dir:?}: {e}"))?;
+    std::fs::create_dir_all(project_dir.join("src")).map_err(|e| format!("create src: {e}"))?;
+    std::fs::create_dir_all(project_dir.join("tests")).map_err(|e| format!("create tests: {e}"))?;
     std::fs::write(project_dir.join("src").join("main.x3"), &main_x3).map_err(|e| format!("write main.x3: {e}"))?;
+
+    // The test target builds against the compiler crate this binary was built from. The relative
+    // `../../compiler` this file used to carry only resolved for projects created two levels under
+    // the x3-lang tree; anywhere else `cargo test` in the generated project died on a missing
+    // dependency, so the project it wrote could not run the tests it wrote. TICKET-125.
+    let compiler_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .map(|x3_lang| x3_lang.join("compiler"))
+        .filter(|dir| dir.join("Cargo.toml").is_file());
+    let compiler_dir = compiler_dir.map(|dir| std::fs::canonicalize(&dir).unwrap_or(dir));
+    if compiler_dir.is_none() {
+        print_warning(
+            "the compiler crate this binary was built from is not on disk, so no Cargo.toml or test \
+             target was written — the project has src/main.x3 only",
+        );
+    }
 
     // Cargo.toml for tests
     let cargo_toml = r#"[package]
@@ -2772,16 +2919,24 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-x3-lang-compiler = { path = "../../compiler" }
+# The compiler crate the generating `x3c` was built from, resolved when this project was created.
+x3-lang-compiler = { path = "{compiler_dir}" }
 
 [[test]]
 name = "test_{name}"
 path = "tests/test_{name}.rs"
 "#;
-    let cargo_toml = cargo_toml.replace("{name}", name);
-    std::fs::write(project_dir.join("Cargo.toml"), &cargo_toml).map_err(|e| format!("write Cargo.toml: {e}"))?;
+    let cargo_toml = cargo_toml.replace("{name}", name).replace(
+        "{compiler_dir}",
+        &compiler_dir
+            .as_ref()
+            .map(|dir| dir.display().to_string())
+            .unwrap_or_default(),
+    );
 
-    // Test file
+    // The test asserts what the printed next steps assert: the scaffold parses, checks clean, and
+    // compiles. A parse-only test passed on the template that `x3c check` refused, so it proved the
+    // wrong thing. TICKET-125.
     let test_rs = format!(
         r#"//! Tests for {name}
 //! Generated by `x3c new {name}`
@@ -2792,25 +2947,62 @@ fn test_{name}_parse() {{
     let program = x3_lang_compiler::parser::parse_source(source).expect("parse source");
     assert!(!program.items.is_empty(), "program should have items");
 }}
+
+#[test]
+fn test_{name}_check_is_clean() {{
+    let source = include_str!("../src/main.x3");
+    let (_, _, outcome) = x3_lang_compiler::check_source_diagnostics(source).expect("check source");
+    assert!(outcome.errors.is_empty(), "semantic errors: {{:?}}", outcome.errors);
+    assert!(outcome.warnings.is_empty(), "semantic warnings: {{:?}}", outcome.warnings);
+}}
+
+#[test]
+fn test_{name}_compiles() {{
+    let source = include_str!("../src/main.x3");
+    let bytecode = x3_lang_compiler::compile_source(source).expect("compile source");
+    assert!(!bytecode.is_empty(), "compiled artifact should not be empty");
+}}
 "#,
         name = name
     );
-    std::fs::write(project_dir.join("tests").join(format!("test_{name}.rs")), &test_rs)
-        .map_err(|e| format!("write test file: {e}"))?;
+
+    if compiler_dir.is_some() {
+        std::fs::write(project_dir.join("Cargo.toml"), &cargo_toml).map_err(|e| format!("write Cargo.toml: {e}"))?;
+        std::fs::write(project_dir.join("tests").join(format!("test_{name}.rs")), &test_rs)
+            .map_err(|e| format!("write test file: {e}"))?;
+    }
 
     println!("x3c new: created project '{}' at {}", name, project_dir.display());
     println!();
-    println!("  {} src/main.x3", project_dir.join("src").display());
-    println!("  {} Cargo.toml", project_dir.join("Cargo.toml").display());
-    println!(
-        "  {}",
-        project_dir.join("tests").join(format!("test_{name}.rs")).display()
-    );
+    // These used to print the directory followed by a literal "src/main.x3", so the listed path was
+    // not a path. Each line is now the file it names.
+    println!("  {}", project_dir.join("src").join("main.x3").display());
+    if compiler_dir.is_some() {
+        println!("  {}", project_dir.join("Cargo.toml").display());
+        println!(
+            "  {}",
+            project_dir.join("tests").join(format!("test_{name}.rs")).display()
+        );
+    }
     println!();
     println!("Next steps:");
     println!("  cd {}", project_dir.display());
     println!("  # edit src/main.x3");
     println!("  x3c check src/main.x3");
+    println!("  x3c build src/main.x3 --out main.x3b");
+    // The template carries a slippage bound, and a bound has to be discharged by a measured run;
+    // this is the command that does it.
+    println!("  x3c run main.x3b --measured-slippage-bps 8");
+    if compiler_dir.is_some() {
+        println!("  cargo test");
+    }
+    // `check_source_diagnostics` runs the same pass `x3c check` does, so the reported op count is
+    // the one the reader's next command will print.
+    println!();
+    println!(
+        "  (the template checks clean: {} ops, no errors, no warnings)",
+        ir.operations.len()
+    );
 
     Ok(ExitCode::SUCCESS)
 }
@@ -3145,6 +3337,69 @@ fn cmd_receipt_inspect(input: &PathBuf) -> Result<ExitCode, String> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// PHASE 32 through the binary: replay an economic receipt against the artifact it claims to be about.
+///
+/// The receipt carries its own operation sequence and the VM re-verifies it (`verify_receipt` runs
+/// `verify_receipt_economics`), so what this command adds is the *artifact* side of the phase's input
+/// list: a receipt is not evidence about an execution unless it is about the artifact in hand. The
+/// report names the phase's nine claims and says, for each, what was checked and what it would need —
+/// the host's inputs and the state evidence are exactly the two things a receipt and an artifact do
+/// not carry, and saying so is the honest half of this command.
+///
+/// **What is deliberately not compared**: the artifact's floors against the receipt's figures. A receipt
+/// whose `artifact_hash` matches was produced by executing *that* artifact, so any floor the artifact
+/// states was already enforced when the trade ran, and re-comparing it here would be a second and weaker
+/// copy of a check the run itself made. The floor reader (`artifact_floors`) is for a *simulation*,
+/// where the market is stated by a caller rather than produced by a run.
+fn cmd_replay(artifact: &PathBuf, receipt_path: &PathBuf) -> Result<ExitCode, String> {
+    let bytecode = std::fs::read(artifact).map_err(|error| format!("read {artifact:?}: {error}"))?;
+    if bytecode.is_empty() {
+        return Err(format!("{artifact:?} is empty"));
+    }
+    let receipt = read_receipt(receipt_path)?;
+
+    // The receipt must be about this artifact. The domain separator is the one `receipt execute` hashes
+    // with, so a receipt this tool produced binds to the artifact it ran — and one that is not about
+    // this artifact is refused with both figures rather than assumed to match.
+    let expected = sha256_with_domain(&bytecode, b"x3c-receipt-execute-artifact-hash");
+    if expected != receipt.artifact_hash {
+        return Err(format!(
+            "the receipt is not about this artifact: it commits to artifact hash {} and {} hashes to {}",
+            hex_encode(&receipt.artifact_hash),
+            artifact.display(),
+            hex_encode(&expected)
+        ));
+    }
+
+    // The receipt's own replay: its operation sequence (framing, trade and policy identity), its
+    // commitments, its debt lifecycle, and the profit-versus-outcome relation. `verify_receipt` is the
+    // VM's entry point and runs the economic replay inside it, so there is no second copy of that rule
+    // here — the artifact-side half above is this command's, and this half is the library's.
+    x3_lang_vm::trading::verify_receipt(&receipt).map_err(|error| format!("{}: {error}", receipt.trade_id))?;
+
+    for line in [
+        "checked (by the receipt's own replay): the operation sequence and its framing",
+        "checked (by the receipt's own replay): the assets, and the per-asset deltas",
+        "checked (by the receipt's own replay): the balances the deltas commit to",
+        "checked (by the receipt's own replay): the costs, each with its kind",
+        "checked (by the receipt's own replay): the debt lifecycle against the outcome",
+        "checked (by the receipt's own replay): the profit, which a failed receipt may not report",
+        "checked (by the receipt's own replay): the settlement outcome",
+        "checked (here): the receipt is about the artifact in hand (its artifact hash matches)",
+        "not checked: correct risk checks (the ceilings the run enforced came from the compiled policy, which this pair does not carry beside its figures)",
+        "not checked: correct finality references (the state evidence the phase names is not part of an artifact or a receipt)",
+        "not checked: the host inputs (a receipt records what happened, not what was asked)",
+    ] {
+        println!("{line}");
+    }
+    println!(
+        "x3c replay: ok — {} replays against {}",
+        receipt.trade_id,
+        artifact.display()
+    );
+    Ok(ExitCode::SUCCESS)
+}
+
 fn cmd_receipt_verify(input: &PathBuf) -> Result<ExitCode, String> {
     let receipt = read_receipt(input)?;
     match x3_lang_vm::trading::verify_receipt(&receipt) {
@@ -3173,16 +3428,49 @@ fn cmd_packet_inspect(input: &PathBuf) -> Result<ExitCode, String> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn cmd_packet_verify(input: &PathBuf, block: u64, trusted_specs: &[String]) -> Result<ExitCode, String> {
+fn cmd_packet_verify(
+    input: &PathBuf,
+    block: u64,
+    trusted_specs: &[String],
+    evidence: Option<&PathBuf>,
+) -> Result<ExitCode, String> {
     let packet = read_packet(input)?;
     let trusted = parse_trusted_keys(trusted_specs)?;
-    match x3_lang_vm::opportunity_packet::verify_packet(&packet, &trusted, block) {
-        Ok(()) => {
+    // A packet that promises evidence and is given none has not been verified — it has been verified
+    // partly — so the requirements are named rather than passed over. The verifier would refuse the
+    // same packet with the first requirement it could not check, and this says why *before* it: the
+    // caller has not stated the facts (TICKET-074).
+    let evidence = match evidence {
+        Some(path) => x3_lang_vm::opportunity_packet::PacketEvidence::read(path)?,
+        None if packet.proof_requirements.is_empty() => Default::default(),
+        None => {
+            return Err(format!(
+                "the packet requires {} and no `--evidence <file>` was given, so none of them could be \
+                 checked; `x3c packet verify` checks a packet's claims against the facts a host states",
+                packet
+                    .proof_requirements
+                    .iter()
+                    .map(|requirement| format!("`{requirement}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))
+        }
+    };
+    match x3_lang_vm::opportunity_packet::verify_packet_with_evidence(&packet, &trusted, block, &evidence) {
+        Ok(verification) => {
             println!(
                 "packet verified: strategy '{}', {} venue(s), expires at block {}",
                 packet.strategy_id,
                 packet.route.venues.len(),
                 packet.deadline_blocks
+            );
+            println!(
+                "requirements checked: {}",
+                if verification.checked.is_empty() {
+                    "none declared".to_string()
+                } else {
+                    verification.checked.join(", ")
+                }
             );
             Ok(ExitCode::SUCCESS)
         }

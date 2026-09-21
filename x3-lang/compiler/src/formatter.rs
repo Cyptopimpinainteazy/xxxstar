@@ -39,7 +39,13 @@ fn is_sender_default(expression: &Expression) -> bool {
 ///
 /// `None` when the expression is not that shape, which is every refund written
 /// as an expression rather than as an asset and a receiver.
-fn refund_target(expression: &Expression) -> Option<(String, String)> {
+/// The asset and receiver a folded refund clause carries, or `None`.
+///
+/// Public because the *reader* that wants it is not the formatter: `x3c refund` reported a refund's
+/// target as `Literal(String(Symbol("Ethereum.USDC:sender")))` — the compiler's own `Debug` output,
+/// which is the defect the event payloads had. One splitter, so a second reader cannot invent a
+/// second reading of the same clause.
+pub fn refund_target(expression: &Expression) -> Option<(String, String)> {
     let Expression::Literal(LiteralExpr::String(text)) = expression else {
         return None;
     };
@@ -214,7 +220,29 @@ impl X3Formatter {
         self.write(decl.name.as_str());
         self.write(" using ");
         self.write(decl.risk_policy.as_str());
-        self.write(" {\n");
+        // The `effects` and `guarantees` clauses are written here because they are not decoration:
+        // every declared effect must be produced by a statement and every declared guarantee
+        // discharged by a guard, or the trade is refused (X3E4021/X3E4022). Dropping them from the
+        // formatter's output silently removed the checks — measured on `trading_effects.x3` with
+        // `repay debt` deleted: the original is refused with 2 errors, the formatted file with 1,
+        // because `effects [.., repay]` was gone. TICKET-127.
+        let names = |items: Vec<&str>| items.join(", ");
+        if !decl.effects.is_empty() {
+            // The declaration's own clauses sit one level in from `atomic trade`, as they do in
+            // every program in the corpus; the `{` stays at the declaration's own level.
+            self.write("\n    ");
+            self.write("effects [");
+            self.write(&names(decl.effects.iter().map(|effect| effect.as_str()).collect()));
+            self.write("]");
+        }
+        if !decl.guarantees.is_empty() {
+            self.write("\n    ");
+            self.write("guarantees [");
+            self.write(&names(decl.guarantees.iter().map(|g| g.as_str()).collect()));
+            self.write("]");
+        }
+        self.write("\n");
+        self.write("{\n");
         self.indent();
         for stmt in &decl.body {
             self.format_trade_stmt(stmt);
@@ -400,12 +428,56 @@ impl X3Formatter {
         self.write(";\n");
     }
 
+    /// The `@name(...)` lines a declaration carries, written above it.
+    ///
+    /// The formatter had no notion of annotations at all — `format_function` wrote `async fn …`
+    /// and every `@…` above it disappeared — so `x3c fmt` changed what a program *means*:
+    /// `@subscribe(TransferDone)` and `@sponsor` are host calls, and formatting a program that
+    /// carries them produced text that no longer compiles to the same artifact. It went unnoticed
+    /// because no file in the corpus had an annotation on it, which is what the example beside
+    /// the round-trip test now supplies.
+    ///
+    /// The word comes from `annotations::spelling`, which is already the inverse of the parser's
+    /// name map (and is tested as such); a second table here would be a second answer to "what is
+    /// this annotation called", which is how the two drift apart.
+    fn format_annotations(&mut self, annotations: &[Annotation]) {
+        for annotation in annotations {
+            self.format_annotation(annotation);
+        }
+    }
+
+    fn format_annotation(&mut self, annotation: &Annotation) {
+        self.write("@");
+        self.write(crate::annotations::spelling(annotation));
+        // Only the variants that carry one. The rest are written bare, which is the form the
+        // parser reads back: an empty `@hot()` is not `@hot`.
+        let arguments: Vec<String> = match annotation {
+            Annotation::NoRecursion(depth) => vec![depth.to_string()],
+            Annotation::Multisig(required, total) => vec![required.to_string(), total.to_string()],
+            Annotation::Role(role) => vec![role.as_str().to_string()],
+            Annotation::Version(version) => vec![version.as_str().to_string()],
+            Annotation::UpgradeFrom(version) => vec![version.as_str().to_string()],
+            Annotation::Whitelist(entries) => entries.iter().map(|entry| entry.as_str().to_string()).collect(),
+            Annotation::Scheduled(period_blocks) => vec![period_blocks.to_string()],
+            Annotation::Subscribe(event) => vec![event.as_str().to_string()],
+            _ => vec![],
+        };
+        if !arguments.is_empty() {
+            self.write("(");
+            self.write(&arguments.join(", "));
+            self.write(")");
+        }
+        self.write("\n");
+    }
+
     fn format_function(&mut self, f: &Function) {
+        self.format_annotations(&f.annotations);
         if f.is_async {
             self.write("async ");
         }
         self.write("fn ");
         self.write(f.name.as_str());
+        self.format_generics(&f.generics);
         self.write("(");
         for (i, p) in f.params.iter().enumerate() {
             if i > 0 {
@@ -432,11 +504,47 @@ impl X3Formatter {
     }
 
     fn format_agent(&mut self, a: &Agent) {
+        // An agent carries annotations of its own, not only its methods'.
+        self.format_annotations(&a.annotations);
         self.write("agent ");
         self.write(a.name.as_str());
+        // The grammar reads **three** blocks in order — a context, a state, and the body — and the
+        // first `{` is always the context. This wrote the methods into the first block, so
+        // `x3c fmt` turned every agent into text the parser refuses ("context key: expected
+        // identifier") — the writer's defect was invisible because nothing in the corpus declares an
+        // agent, and a round-trip test only covers what a fixture contains. Empty blocks are written
+        // as `{ }` rather than omitted: an omitted one shifts the block that follows it.
         self.write(" {\n");
+        if let Some(context) = &a.context {
+            self.indent();
+            for (key, value) in &context.entries {
+                self.write_indent();
+                self.write(key.as_str());
+                self.write(": ");
+                self.format_expression(value);
+                self.write(",\n");
+            }
+            self.dedent();
+        }
+        self.write("}\n{\n");
+        if !a.state.is_empty() {
+            self.indent();
+            for field in &a.state {
+                self.write_indent();
+                self.write(field.name.as_str());
+                self.write(": ");
+                self.format_type(&field.ty);
+                self.write(",\n");
+            }
+            self.dedent();
+        }
+        self.write("}\n{\n");
         self.indent();
         for m in &a.methods {
+            // A method is written where a top-level function is written, and that arm's caller writes
+            // the indent — inside a block nobody did, so every method of an agent came out at column
+            // zero while its body was indented one level deeper.
+            self.write_indent();
             self.format_function(&m.node);
         }
         for s in &a.strategies {
@@ -462,6 +570,7 @@ impl X3Formatter {
     fn format_struct(&mut self, s: &StructDecl) {
         self.write("struct ");
         self.write(s.name.as_str());
+        self.format_generics(&s.generics);
         self.write(" {\n");
         self.indent();
         for f in &s.fields {
@@ -473,6 +582,36 @@ impl X3Formatter {
         }
         self.dedent();
         self.write("}\n");
+    }
+
+    /// The `<T, U: Bound + Other>` a declaration carries, or nothing when it carries none.
+    ///
+    /// Written only when there is something to write: the parser records an empty list for a
+    /// declaration that has no generics, so an unconditional `<>` would be text no source wrote.
+    /// Both the struct and the function arms were missing this entirely, which deleted the
+    /// parameter that the body's types name — `fn identity<T>(value: T) -> T` formatted to
+    /// `fn identity(value: T) -> T`, a signature referring to a `T` nothing declares (TICKET-127).
+    fn format_generics(&mut self, generics: &[GenericParam]) {
+        if generics.is_empty() {
+            return;
+        }
+        self.write("<");
+        for (index, param) in generics.iter().enumerate() {
+            if index > 0 {
+                self.write(", ");
+            }
+            self.write(param.name.as_str());
+            if !param.bounds.is_empty() {
+                self.write(": ");
+                for (bound_index, bound) in param.bounds.iter().enumerate() {
+                    if bound_index > 0 {
+                        self.write(" + ");
+                    }
+                    self.format_type(bound);
+                }
+            }
+        }
+        self.write(">");
     }
 
     fn format_enum(&mut self, e: &EnumDecl) {
@@ -515,6 +654,38 @@ impl X3Formatter {
         self.format_asset_ref(&b.to_asset);
         self.write(" {\n");
         self.indent();
+        // Every clause the parser reads has to be written back, which is the lesson
+        // `format_atomic_swap` below records: this arm wrote only the statement body, so
+        // `x3c fmt` deleted a bridge's guards and its failure action — a program that named a
+        // replay-protection nonce guard and a refund path came back with neither, and the
+        // artifact changed by the difference. The two writers are one fix apart because the two
+        // declarations are one shape apart.
+        for guard in &b.requires {
+            self.write_indent();
+            self.write("require ");
+            self.format_require_guard(guard);
+            self.write("\n");
+        }
+        if let Some(timeout) = &b.timeout {
+            self.write_indent();
+            self.write("on_timeout ");
+            self.format_expression(timeout);
+            // The clause's action is required by the parser, and the AST holds one action for both
+            // clauses (`on_timeout` fills `on_fail` when it is not already stated), so the action is
+            // written in both places rather than invented as a new field: the re-parsed program is
+            // the same one, which is what the round trip is for.
+            if let Some(action) = &b.on_fail {
+                self.write(" ");
+                self.format_failure_action(action);
+            }
+            self.write("\n");
+        }
+        if let Some(action) = &b.on_fail {
+            self.write_indent();
+            self.write("on_fail ");
+            self.format_failure_action(action);
+            self.write("\n");
+        }
         for s in &b.body {
             self.format_statement(s);
         }
@@ -878,6 +1049,28 @@ impl X3Formatter {
             self.write(" ");
         }
         self.write("}\n");
+        // PHASE 41's own block, written back where the program put it. It was dropped here — the
+        // formatter had no arm for it, which is the defect the annotations had one construct over:
+        // a declaration the writer does not know about is a declaration `x3c fmt` deletes.
+        if let Some(resources) = &s.resources {
+            self.write_indent();
+            self.write("resources { ");
+            for (name, value) in [
+                ("max_compute", &resources.max_compute),
+                ("max_memory", &resources.max_memory),
+                ("max_network_calls", &resources.max_network_calls),
+                ("max_routes", &resources.max_routes),
+                ("max_branches", &resources.max_branches),
+            ] {
+                if let Some(value) = value {
+                    self.write(name);
+                    self.write(" = ");
+                    self.format_expression(value);
+                    self.write("; ");
+                }
+            }
+            self.write("}\n");
+        }
         self.write_indent();
         self.write("execute {\n");
         self.indent();
@@ -1074,6 +1267,14 @@ impl X3Formatter {
         self.write(s.name.as_str());
         self.write(": ");
         self.write(&s.amount.to_string());
+        // The cadence. The parser defaults it to one block when the comma is absent, so writing
+        // it only when it is not that default keeps the text as short as the program that omitted
+        // it while still round-tripping to the same value — the formatter used to drop the period
+        // here, which turned `subscription keeper: 100, 30` into one charged every block.
+        if s.period_blocks != 1 {
+            self.write(", ");
+            self.write(&s.period_blocks.to_string());
+        }
         self.write(" ");
         self.format_block(&s.body, true);
     }
@@ -1254,6 +1455,23 @@ impl X3Formatter {
         self.write(rebalance.name.as_str());
         self.write(" {\n");
         self.indent();
+        // The holdings first, in the clause the parser reads them from, and only when the
+        // program stated any: writing an empty `holds { }` would be a clause the formatter
+        // invented, and dropping a stated one would lose the input the trades need
+        // (TICKET-070). Both directions are round-trip tested.
+        if !rebalance.holdings.is_empty() {
+            self.write_indent();
+            self.write("holds {\n");
+            self.indent();
+            for (asset, amount) in &rebalance.holdings {
+                self.write_indent();
+                self.format_asset_ref(asset);
+                self.write(&format!(" = {amount};\n"));
+            }
+            self.dedent();
+            self.write_indent();
+            self.write("}\n");
+        }
         for (asset, percent) in &rebalance.weights {
             self.write_indent();
             self.format_asset_ref(asset);
@@ -2204,6 +2422,7 @@ impl X3Formatter {
         match kind {
             RequireKind::Finality => self.write("finality"),
             RequireKind::Slippage => self.write("slippage"),
+            RequireKind::Fees => self.write("fees"),
             RequireKind::Profit => self.write("profit"),
             RequireKind::InvariantCheck => self.write("invariant"),
             RequireKind::RiskScore => self.write("risk"),

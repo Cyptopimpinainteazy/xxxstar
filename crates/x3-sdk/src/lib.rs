@@ -37,7 +37,11 @@
 //! }
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// **No `no_std` posture.** This crate declared `#![cfg_attr(not(feature = "std"), no_std)]` and
+// then wrote `std::` in its client, error and utils modules, so `--no-default-features` failed with
+// 216 errors — all of them an unresolved `std` (TICKET-093). The declaration was a claim it could
+// not honour: the crate is `std`, and says so now. `scripts/check-no-default-features.sh` derives
+// the crates it checks from this attribute, so the false entry goes with it.
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;

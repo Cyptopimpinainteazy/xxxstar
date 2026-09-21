@@ -10,7 +10,7 @@ use crate::hyperarb;
 use crate::intent_emit;
 use crate::ir::{
     self, ChainMetricKind, Condition, CrdtKind as IrCrdtKind, EmergencyKind, LifecycleKind, Operation, ProofKind,
-    SerialFormat, StorageKind, VectorOp, X3IR,
+    ReleaseAct, SerialFormat, StorageKind, VectorOp, X3IR,
 };
 use crate::liquidation;
 use crate::netting;
@@ -21,7 +21,7 @@ use crate::trading_semantic;
 use crate::trading_verify;
 use x3_lang_ast::ast;
 use x3_lang_ast::ast::*;
-use x3_lang_common::Span;
+use x3_lang_common::{BinOp, Span, UnOp};
 
 pub type LoweredInstr = Operation;
 
@@ -165,9 +165,18 @@ pub fn lower_program_with_mode(
                 lower_function_body(&intent.body, &mut ir)?;
             }
             Item::SubscriptionDecl(sub) => {
+                // The cadence travels with the charge. It was read off the declaration and dropped
+                // here — `subscription keeper: 100, 30 { … }` charged `keeper` 100 with nothing
+                // saying how often, so the one fact that makes a subscription periodic was the one
+                // fact the host could not see. A host call is a list of strings, so the period is
+                // the third: name, amount, period in blocks.
                 ir.push(Operation::Call {
                     function: "charge_subscription".to_string(),
-                    args: vec![sub.name.as_str().to_string(), sub.amount.to_string()],
+                    args: vec![
+                        sub.name.as_str().to_string(),
+                        sub.amount.to_string(),
+                        sub.period_blocks.to_string(),
+                    ],
                 });
                 lower_function_body(&sub.body, &mut ir)?;
             }
@@ -465,6 +474,11 @@ pub fn lower_program_with_mode(
                         chain: atomic.to_asset.chain.as_str().to_string(),
                         asset: atomic.to_asset.name.as_str().to_string(),
                         to: receiver_str,
+                        // A **payout**, not a claim: this pays out the asset the route
+                        // delivered. The escrow the source lock created is claimed by the
+                        // route's own settlement, and reading this as a claim is what made
+                        // `no_refund_after_claim` warn on every canonical example (TICKET-035).
+                        act: ReleaseAct::Payout,
                     });
                 }
 
@@ -591,8 +605,34 @@ pub fn lower_program_with_mode(
                         restriction: format!("private_{}", submission.private.as_str()),
                     });
                 }
+                if let Some(risk) = &strategy.risk {
+                    // The fee ceiling the module states travels with it. The *slippage* ceiling
+                    // reaches the artifact through the guard the body writes (`require slippage <=
+                    // 50` lowers to a `SlippageTolerance` record whose figure the emitter carries),
+                    // but no statement writes a fee ceiling, so a runtime reading only the artifact
+                    // could not tell what the module accepts. PHASE 7: "risk policy must compile
+                    // into the artifact". Same shape as the finality policy's depth: a declaration,
+                    // recorded with the figure it states, and decided at compile time by the check
+                    // that compares it against the venues the body routes through.
+                    ir.push(Operation::Require {
+                        kind: ir::RequireKind::FeeCeiling,
+                        subject: None,
+                        condition: ir::Condition::Expression {
+                            expr: risk.max_total_fee_bps.to_string(),
+                        },
+                        error_msg: None,
+                        measured: false,
+                        comparison: Some(ir::ComparisonOp::LessOrEqual),
+                    });
+                }
                 // Lower strategy as constrained execution
                 ir.push(Operation::AtomicBegin);
+                // PHASE 41's `bounds { max_steps … }` is a cap on what the module *does*, so it is
+                // checked against what the module contributes rather than against the whole
+                // artifact (two modules in one program each have their own bound). The count is the
+                // one the VM charges instructions in: every operation this arm pushes from here to
+                // `AtomicEnd`.
+                let module_steps_from = ir.operations.len();
 
                 // Add requires guards first
                 for require in &strategy.requires {
@@ -619,6 +659,123 @@ pub fn lower_program_with_mode(
                 }
 
                 ir.push(Operation::AtomicEnd);
+                // The measured defect: `bounds { max_steps 1 }` on a body that lowers to 74
+                // operations compiled and ran to completion, because nothing compared the number
+                // the module declared with the number it produced. PHASE 41's own words are
+                // "prevent pathological execution graphs", which is a property of the graph the
+                // compiler builds — so the cap is enforced here, where both figures are known, and
+                // the refusal gives both.
+                if let Some(declared) = strategy
+                    .max_steps
+                    .as_ref()
+                    .and_then(|steps| expression_to_u128(steps).ok())
+                {
+                    let steps = (ir.operations.len() - module_steps_from) as u128;
+                    if steps > declared {
+                        return Err(semantic(&format!(
+                            "strategy '{}' declares `max_steps {declared}` and its body lowers to \
+                             {steps} operations: the bound is a cap on what the module does, so a body \
+                             that exceeds it is refused rather than published as bounded",
+                            strategy.name.as_str()
+                        )));
+                    }
+                }
+                // PHASE 41's other cap, in the unit the VM charges: the weight of the instructions
+                // the module's own operations produce. Measured through the emitter and the one cost
+                // model rather than counted here — an operation writes zero frames (a branch the
+                // compiler decided false), one, or several (a branch's body is emitted inline), so a
+                // count of operations is not a count of instructions and a second weight table here
+                // would be a second opinion about the same number.
+                if let Some(declared) = strategy.max_gas.as_ref().and_then(|gas| expression_to_u128(gas).ok()) {
+                    // `None` is "could not be measured", which is what an operation the emitter
+                    // cannot write looks like — an `if` over a condition the compiler could not
+                    // decide. That program fails at emission with the message written for it, and
+                    // measuring it here must not move that refusal to a stage whose diagnostics are
+                    // about lowering.
+                    if let Some((gas, _)) = module_cost(&ir.operations[module_steps_from..])? {
+                        if gas > declared {
+                            return Err(semantic(&format!(
+                                "strategy '{}' declares `max_gas {declared}` and its body's operations \
+                                 cost {gas} by the VM's own weight table: a module whose body exceeds \
+                                 its own resource cap is refused rather than published as bounded",
+                                strategy.name.as_str()
+                            )));
+                        }
+                    }
+                }
+                // PHASE 41's own block: five caps, checked against the figures this compiler has.
+                if let Some(resources) = &strategy.resources {
+                    let module_ops = &ir.operations[module_steps_from..];
+                    let bound = |cap: &Option<Expression>| -> Option<u128> {
+                        cap.as_ref().and_then(|value| expression_to_u128(value).ok())
+                    };
+                    // `max_compute` is the count `max_steps` bounds: the VM charges instructions in
+                    // the same unit for both, so they are checked against one figure rather than two.
+                    if let Some(declared) = bound(&resources.max_compute) {
+                        let steps = module_ops.len() as u128;
+                        if steps > declared {
+                            return Err(semantic(&format!(
+                                "strategy '{}' declares `resources {{ max_compute {declared} }}` and its \
+                                 body lowers to {steps} operations: the cap is on what the module does, \
+                                 so a body that exceeds it is refused rather than published as bounded",
+                                strategy.name.as_str()
+                            )));
+                        }
+                    }
+                    if let Some(declared) = bound(&resources.max_network_calls) {
+                        if let Some((_, calls)) = module_cost(module_ops)? {
+                            if calls as u128 > declared {
+                                return Err(semantic(&format!(
+                                    "strategy '{}' declares `resources {{ max_network_calls {declared} \
+                                     }}` and its body makes {calls} call(s) that leave the VM for a host \
+                                     adapter: the cap is a count of host-facing instructions, and this \
+                                     body has more",
+                                    strategy.name.as_str()
+                                )));
+                            }
+                        }
+                    }
+                    // A route's hops: a `swap` or a `bridge` is one leg of one, which is the graph the
+                    // phase's cap exists to keep from growing without bound.
+                    if let Some(declared) = bound(&resources.max_routes) {
+                        let routes = module_ops
+                            .iter()
+                            .filter(|op| matches!(op, Operation::Swap { .. } | Operation::Bridge { .. }))
+                            .count() as u128;
+                        if routes > declared {
+                            return Err(semantic(&format!(
+                                "strategy '{}' declares `resources {{ max_routes {declared} }}` and its \
+                                 body takes {routes} hop(s)",
+                                strategy.name.as_str()
+                            )));
+                        }
+                    }
+                    if let Some(declared) = bound(&resources.max_branches) {
+                        let branches = module_ops
+                            .iter()
+                            .filter(|op| matches!(op, Operation::If { .. } | Operation::AtomicChoice { .. }))
+                            .count() as u128;
+                        if branches > declared {
+                            return Err(semantic(&format!(
+                                "strategy '{}' declares `resources {{ max_branches {declared} }}` and its \
+                                 body contains {branches} decision(s)",
+                                strategy.name.as_str()
+                            )));
+                        }
+                    }
+                    // The one cap this VM cannot back, refused rather than accepted: the phase's own
+                    // purpose for the block is "prevent pathological execution graphs", and a memory
+                    // cap here would be a number nothing measures — the rule `audit_gate` and the
+                    // seven inert declarations follow.
+                    if resources.max_memory.is_some() {
+                        return Err(semantic(&format!(
+                            "strategy '{}' declares `resources {{ max_memory … }}`, and this VM has no \
+                             memory model to bound: it holds registers and a call stack, and nothing \
+                             charges for memory, so the cap would be a number nothing measures",
+                            strategy.name.as_str()
+                        )));
+                    }
+                }
             }
             Item::VmDecl(vm) => {
                 ir.push(Operation::VmAdapterCall {
@@ -712,6 +869,19 @@ pub fn lower_program_with_mode(
                     comparison: None,
                 });
             }
+            Item::VenueDecl(venue) => {
+                // A venue's *attributes* reach the artifact through the plan a route
+                // produced, and they always did. Its **settlement guarantee** did not:
+                // the plan carries which legs run, not how each one finally settles, so
+                // a reader of the artifact could not tell a leg the VM executes both
+                // sides of from one an off-chain venue fills and something else makes
+                // whole. PHASE 39's whole point is that distinction, so it travels here
+                // the way the finality depth does (TICKET-059).
+                ir.push(Operation::VenueSettlement {
+                    venue: venue.name.as_str().to_string(),
+                    guarantee: venue.settlement,
+                });
+            }
             Item::ProofsRequired(proofs) => {
                 for proof in &proofs.proofs {
                     ir.push(Operation::ProofRequired {
@@ -765,6 +935,10 @@ pub fn lower_program_with_mode(
                 let portfolio = rebalance::portfolio(rebalance_decl).map_err(|reason| semantic(&reason))?;
                 ir.push(Operation::Rebalance {
                     name: portfolio.name.clone(),
+                    // What the account holds now, when the program states it. The trades to
+                    // the target are computed from where the portfolio starts, so this is
+                    // the input the target alone leaves a host without (TICKET-070).
+                    holdings: portfolio.holdings.clone(),
                     weights: portfolio.weights.clone(),
                     criterion: portfolio.criterion.name().to_string(),
                 });
@@ -775,15 +949,18 @@ pub fn lower_program_with_mode(
                 // book binds each party to. The offsets are decided (`netting::verify`)
                 // and this is what executes them.
                 let settled = netting::settlement(netting_decl).map_err(|reason| semantic(&reason))?;
-                // One atomic route per residual transfer, not one for the book. A route
-                // carries one claim (`no_double_claim`), and a `Release` does not name the
-                // lock it claims — so two transfers of the same asset in one route are two
-                // claims a replayer cannot tell apart. Each transfer's own atomicity is
-                // real and complete: lock, release, and a refund if the release does not
-                // happen. What is *not* expressed is settlement of the whole residual set
-                // as one unit, and that needs a release that names its lock (TICKET-080).
-                for transfer in &settled.transfers {
-                    ir.push(Operation::AtomicBegin);
+                // **One atomic route for the whole book**, which is what makes netting valid:
+                // if some residual transfers settle and others do not, the positions that
+                // result are not the positions the offsetting preserved.
+                //
+                // It used to be one route per transfer, because a `Release` named its claim by
+                // asset alone — so two transfers of one asset in a route were two claims no
+                // reader could tell apart, and `no_double_claim` refused them. A book nets
+                // *within* one asset, so that was the normal case rather than a corner. Each
+                // release names its own lock's position among this route's locks now, so the
+                // claims are distinguishable and one route settles the set (TICKET-080).
+                ir.push(Operation::AtomicBegin);
+                for (index, transfer) in settled.transfers.iter().enumerate() {
                     // The debtor's value is locked before it is released: a release with
                     // nothing locked in front of it is a mint, and the pair is the idiom
                     // every other settlement path in this language uses.
@@ -797,14 +974,19 @@ pub fn lower_program_with_mode(
                         chain: transfer.domain.clone(),
                         asset: transfer.asset.clone(),
                         to: transfer.creditor_account.clone(),
+                        // This transfer's own lock, counted among this route's locks in the
+                        // order they are written — a claim of the escrow written just above.
+                        act: ReleaseAct::Claims(
+                            u32::try_from(index)
+                                .map_err(|_| semantic("a book has more transfers than a claim index can name"))?,
+                        ),
                     });
-                    // No refund handler, and none is wanted: a route that fails rolls
-                    // back, so the lock never takes effect and the value never left. A
-                    // handler here would refund an escrow this route claims, which
-                    // `no_refund_after_claim` refuses — correctly, because the handler
-                    // would be describing a path the route cannot reach.
-                    ir.push(Operation::AtomicEnd);
                 }
+                // No refund handler, and none is wanted: a route that fails rolls back, so no
+                // lock takes effect and no value left. A handler here would refund an escrow
+                // this route claims, which `no_refund_after_claim` refuses — correctly,
+                // because the handler would describe a path the route cannot reach.
+                ir.push(Operation::AtomicEnd);
             }
             Item::Arb(arb_decl) => {
                 // The declaration lowers to the *plan*: an atomic block holding the asset
@@ -964,14 +1146,19 @@ pub fn lower_program_with_mode(
                     min_output: ledger.min_output,
                     dex: None,
                 });
-                // The floor travels as a *constraint* rather than a measured guard, and the
-                // difference is the conversion: a plan's measured floors follow a host call
-                // whose reply carries a measurement, and a `Swap` is an asset-op *record* —
-                // it never reaches the host, so no reply could carry one. What the floor is
-                // derived from is the swap's declared `min_output` against the repayment,
-                // which `liquidation::verify` already checks at compile time. Enforcing the
-                // realised net instead needs the conversion to report an output, which the
-                // asset-op path does not do (TICKET-069).
+                // The floor travels as a **post-condition**. It used to be a constraint,
+                // because the conversion is a `Swap` — an asset-op *record* the executor
+                // resolves locally from the declaration's own amounts, so no reply could
+                // carry what was seized (TICKET-069).
+                //
+                // It does not need the conversion to change shape. The quantity the floor is
+                // about is the **net the seizure realised**, and the venue orders above are
+                // the calls that did the seizing: `liquidate` and `receive_collateral` reach
+                // the host, and a venue that reports a net answers this guard. The compile-time
+                // check stays what it was — `liquidation::verify` refuses a swap whose declared
+                // minimum cannot repay — so the compiler bounds the plan and the runtime
+                // measures it, the same division of labour as a plan's profit floor
+                // (TICKET-027) and a hedge's delta (TICKET-068).
                 if let Some(floor) = ledger.profit_floor {
                     let guard = arb::Guard {
                         kind: ast::RequireKind::Profit,
@@ -984,7 +1171,9 @@ pub fn lower_program_with_mode(
                         subject: Some(ledger.debt_asset.clone()),
                         condition: guard_condition(&bps_guard(&guard))?,
                         error_msg: None,
-                        measured: false,
+                        // Measured: the quantity is the net the venue's orders realised, and
+                        // the executor refuses when no venue reported one.
+                        measured: true,
                         comparison: Some(guard.comparison),
                     });
                 }
@@ -1008,14 +1197,14 @@ pub fn lower_program_with_mode(
                         quantity: order.quantity,
                     });
                 }
-                // The bound travels as a guard. It is a *constraint* rather than a
-                // post-condition: the delta is computed from the legs the program
-                // declared, and whether the venue filled what was asked is a question the
-                // artifact cannot answer without the venue reporting a size — which is
-                // TICKET-068's host half.
+                // The bound travels as a **post-condition**. It used to be a constraint
+                // on the declaration, because whether the venue filled what was asked is a
+                // question the artifact could not answer — the venue reports it now, in
+                // the reply to the orders above (`MEASURED_UNIT_DELTA_BPS`), and a venue
+                // that reports nothing makes the guard refuse rather than pass.
                 if let Some(bound) = hedge_decl.delta_bound_bps {
                     let guard = arb::Guard {
-                        kind: ast::RequireKind::Custom(x3_lang_common::Symbol::new("delta")),
+                        kind: ast::RequireKind::Custom(x3_lang_common::Symbol::new(hedge::DELTA_GUARD_SUBJECT)),
                         comparison: ast::ComparisonOp::LessOrEqual,
                         bps: u16::try_from(bound)
                             .map_err(|_| semantic("a hedge's delta bound does not fit the guard's operand"))?,
@@ -1025,7 +1214,9 @@ pub fn lower_program_with_mode(
                         subject: Some(exposure.asset.clone()),
                         condition: guard_condition(&bps_guard(&guard))?,
                         error_msg: None,
-                        measured: false,
+                        // Measured: the quantity is the delta the venue reported for the
+                        // orders above, and the executor refuses when no venue reported one.
+                        measured: true,
                         comparison: Some(guard.comparison),
                     });
                 }
@@ -1045,25 +1236,34 @@ pub fn lower_program_with_mode(
             // items that lower to nothing, and the compiler checks that this list is
             // *complete* rather than trusting a comment.
             Item::Struct(_) | Item::Enum(_) | Item::Use(_) | Item::Mod(_) | Item::Import(_) => {
-                // Type and module machinery: the compiler reads it, the artifact runs
-                // operations.
+                // This comment used to claim "the compiler reads it", and nothing does: no pass
+                // resolves a type name, and there is no module system for an import to reach. The
+                // arm stays — the match is exhaustive on purpose (TICKET-078) — and
+                // `verify_declarations_have_a_reader` refuses the declarations by name, so a program
+                // that relies on one is told rather than silently given nothing.
             }
             Item::Const(_) => {
-                // A constant is evaluated where it is used, so the artifact carries the
-                // value rather than the name.
+                // The old comment here claimed "a constant is evaluated where it is used, so the
+                // artifact carries the value rather than the name". Nothing evaluates them: a
+                // reference reaches a guard as the name, which the guard's check refuses as a bound
+                // it cannot read (TICKET-114's rule), and reaches an expression as an identifier
+                // that lowers to nothing. `verify_declarations_have_a_reader` refuses the
+                // declaration, so the failure is at the source line rather than at the guard.
             }
             Item::ErrorDecl(_) => {
-                // A name a program may raise. Raising it is a `Statement`, which
-                // lowers; the declaration is the name.
+                // The old comment claimed "raising it is a `Statement`, which lowers". There is no
+                // statement that raises a named error — the AST has none — so the name is one
+                // nothing can raise, and the check refuses the declaration.
             }
             Item::ObjectiveDecl(_) => {
                 // What the optimizer should rank by. The ranking happens at compile
                 // time, and the choice it produced is what the artifact carries.
             }
-            Item::AssetDecl(_) | Item::TradeRiskPolicy(_) | Item::VenueDecl(_) => {
+            Item::AssetDecl(_) | Item::TradeRiskPolicy(_) => {
                 // Declarations the verifier and the opportunity graph read. A venue is
                 // an edge in a graph, not an instruction, and its attributes reach the
-                // artifact through the plan a route produced.
+                // artifact through the plan a route produced. Its settlement guarantee
+                // does not — see the `Item::VenueDecl` arm above.
             }
         }
     }
@@ -1075,6 +1275,21 @@ pub fn lower_program_with_mode(
 fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common::X3Error> {
     match stmt {
         Statement::Expr(expr) => {
+            // An expression statement that calls something has an effect; one that does not is a line
+            // the author believed was a declaration. `transfer_proof eth_receipt` written on its own
+            // line after a bridge — the step's option, meant to be part of the step — parses as two
+            // identifier statements, does nothing, and `x3c check` says `ok` (TICKET-037). The same
+            // shape swallows a stray `to sender` after a half-written clause. A statement is a call or
+            // it is refused by name, which is the rule a declaration nothing reads follows.
+            if !matches!(expr, Expression::Call { .. }) {
+                return Err(semantic(&format!(
+                    "`{}` is a statement with no effect: it calls nothing and sets nothing, so the line \
+                     would reach the artifact as nothing at all. A clause option belongs on the \
+                     statement it modifies (write `bridge … transfer_proof <name>`), an expression \
+                     belongs where its value is used, and a call is a statement",
+                    expression_to_string(expr)
+                )));
+            }
             // Lower expression (may produce multiple operations)
             lower_expression(expr, ir)?;
         }
@@ -1083,7 +1298,20 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             then_block,
             else_block,
         } => {
-            let cond_ir = expression_to_condition(cond)?;
+            // A condition the program makes decidable is decided *here*, and the decision is
+            // what travels: `Condition::True`/`Condition::False` say the compiler knows which
+            // branch runs, and the emitter writes that branch's body inline. Everything else
+            // stays `Condition::Expression` and is refused downstream — this VM branches on a
+            // register and the compiler emits no arithmetic to put one there (TICKET-058).
+            //
+            // Both bodies are still lowered into the IR, so `x3c lower` shows the branch that
+            // was *not* taken next to the one that was. Dropping it would leave an artifact
+            // whose reader cannot tell a folded branch from straight-line code.
+            let cond_ir = match fold_condition(cond) {
+                Some(true) => Condition::True,
+                Some(false) => Condition::False,
+                None => expression_to_condition(cond)?,
+            };
             let then_ops = {
                 let mut temp_ir = X3IR::new();
                 lower_function_body(then_block, &mut temp_ir)?;
@@ -1105,7 +1333,18 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             });
         }
         Statement::While { cond, body } => {
-            let _cond_ir = expression_to_condition(cond)?;
+            // The condition is decided by the same folder `if` uses, and it travels with the loop
+            // either way. `while false { … }` is a body that never runs — the language's meaning,
+            // and a decision the compiler may make because `fold_condition` only decides literals,
+            // arithmetic on them and logical combinations, so nothing in the decision is a call
+            // with a side effect. Everything else keeps its condition as `Condition::Expression`,
+            // which is what lets the verifier and the emitter name the guard they refuse
+            // (TICKET-098).
+            let cond_ir = match fold_condition(cond) {
+                Some(true) => Condition::True,
+                Some(false) => Condition::False,
+                None => expression_to_condition(cond)?,
+            };
             let body_ops = {
                 let mut temp_ir = X3IR::new();
                 lower_function_body(body, &mut temp_ir)?;
@@ -1114,6 +1353,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
 
             ir.push(Operation::Loop {
                 max_iterations: 1000, // Safe default limit
+                condition: cond_ir,
                 body: body_ops,
             });
         }
@@ -1128,7 +1368,12 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             // per-instance hash seed (PHASE 42).
             let mut data = std::collections::BTreeMap::new();
             for (i, arg) in event.payload.iter().enumerate() {
-                data.insert(format!("arg{}", i), format!("{:?}", arg));
+                // The source text of the argument, not its `Debug` form: this string is the
+                // event's payload in the artifact, and `{:?}` put the compiler's own AST
+                // representation in it (`Literal(Int { value: 1, base: Decimal, suffix: None })`),
+                // which no consumer of an event could agree on. Same renderer every other
+                // payload field uses.
+                data.insert(format!("arg{}", i), expression_to_string(arg));
             }
             ir.push(Operation::Emit {
                 name: event.name.as_str().to_string(),
@@ -1168,11 +1413,13 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             });
         }
         Statement::Release { chain, asset, to } => {
-            // release CHAIN.ASSET to ADDR
+            // release CHAIN.ASSET to ADDR — a payout of an asset the program holds or a route
+            // delivered, which claims no escrow (TICKET-101).
             ir.push(Operation::Release {
                 chain: chain_to_string(chain),
                 asset: asset.name.as_str().to_string(),
                 to: expression_to_string(to),
+                act: ReleaseAct::Payout,
             });
         }
         Statement::Swap {
@@ -1280,16 +1527,30 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                 // guard because the guard tests `r0` and nothing else writes it.
                 ir.push(Operation::NonceUnused { nonce });
             }
+            // An economic guard is enforced by the VM against what the host measured — that is
+            // what the language says it is for ("economic constraints enforced by the VM"), and
+            // it is what the plan-generated floors have done since TICKET-106. Without this the
+            // guard was a `STATIC` record with threshold **zero**: measured on the corpus,
+            // `require slippage <= 7` and `require slippage <= 99` compiled to byte-identical
+            // artifacts, so the bound reached neither the artifact nor the runtime.
+            //
+            // The bound travels in the instruction's operand, which is where a measured guard's
+            // threshold goes, so it has to be basis points — the same reading the linter and the
+            // risk-policy check already give a guard's literal. A guard whose direction is not the
+            // one its quantity means (`slippage >= n`, `profit <= n`) is left as the static record
+            // it was: those are refused where they matter, and inverting the comparison here would
+            // enforce the opposite of what the program wrote.
+            let enforced = enforceable_economic_guard(guard);
             ir.push(Operation::Require {
                 kind: require_kind_to_ir(&guard.kind),
                 subject: guard.subject.as_ref().map(|s| s.as_str().to_string()),
-                condition: guard_condition(guard)?,
+                condition: guard_condition(enforced.as_ref().unwrap_or(guard))?,
                 error_msg: None,
-                measured: false,
+                measured: enforced.is_some(),
                 comparison: guard.comparison,
             });
         }
-        Statement::RouteFallback { replacements, .. } => {
+        Statement::RouteFallback { replacements, requires } => {
             // The approvals are the record. Each one was verified as a route in
             // its own right by `verify_route_fallbacks` before lowering ran, so
             // this arm only materialises the list the artifact has to carry —
@@ -1300,6 +1561,25 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                     .map(|replacement| replacement.venue.as_str().to_string())
                     .collect(),
             });
+            // The block's own bounds are guards, and they were lowered to **nothing**: this arm
+            // destructured the list away with `..`, so `fallback { require profit >= 0 }` reached
+            // neither the artifact nor the runtime. The slippage half is still enforced where it
+            // is decided — every approved venue's declared slippage is checked against the bound
+            // before the list is admitted (`verify_route_fallbacks`) — but a bound on what the
+            // substitution *realises* is a post-condition on the trade, and the same guard is a
+            // measured one outside the block, so dropping it here made the block the one place a
+            // guard meant less.
+            for guard in requires {
+                let enforced = enforceable_economic_guard(guard);
+                ir.push(Operation::Require {
+                    kind: require_kind_to_ir(&guard.kind),
+                    subject: guard.subject.as_ref().map(|s| s.as_str().to_string()),
+                    condition: guard_condition(enforced.as_ref().unwrap_or(guard))?,
+                    error_msg: None,
+                    measured: enforced.is_some(),
+                    comparison: guard.comparison,
+                });
+            }
         }
         Statement::Allow { feature } => {
             // The consent is the point, so it goes in the artifact. An opt-in
@@ -1356,6 +1636,10 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                         chain: chain.to_ascii_lowercase(),
                         asset,
                         to,
+                        // A refund *returns* the escrow to the payer: the inverse of a lock,
+                        // and its own act — it is what the `OnTimeout` above describes, emitted
+                        // as the instruction that performs it (TICKET-001).
+                        act: ReleaseAct::Refund,
                     });
                 }
             }
@@ -1448,9 +1732,77 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                 target: Some(expression_to_string(new_contract)),
             });
         }
-        _ => {
-            // Other statement types (return, break, etc.)
-            ir.push(Operation::Nop);
+        // ===== Statements this compiler cannot lower, refused rather than dropped =====
+        //
+        // There is deliberately no catch-all arm. One used to sit here — `_ => ir.push(Nop)` under
+        // the comment "Other statement types (return, break, etc.)" — and it is why
+        // `tests/sketches/arithmetic.x3` — which sat in `tests/` until TICKET-109, where it
+        // *passed* the corpus gate — whose whole subject is arithmetic,
+        //```
+        //    let a = 1; let b = 2; let c = a + b;
+        //```
+        // lowered to **one `Nop` per statement** and checked clean with no warnings. `NOP` is
+        // written as four zero bytes, which the compiler's own instruction walker skips as padding
+        // and the VM's verifier breaks on as the end of the stream: the record is invisible to every
+        // reader, so the artifact of a program whose every statement was dropped is
+        // indistinguishable from the artifact of an empty program. "A `.x3` file in a directory the
+        // tooling walks is a claim that it is a program" — the corpus gate's own words — and this
+        // is where that claim was being satisfied by an artifact of the drop (TICKET-109).
+        //
+        // Each arm names the construct and what is missing, because the alternative a program's
+        // author has to know about is what the compiler *can* do: the const/declaration surface and
+        // the operation statements above.
+        Statement::Let { name, .. } => {
+            return Err(semantic(&format!(
+                "`let {name} = …` binds a name this compiler has no place to keep: it emits no \
+                 arithmetic and no register holds a source-level binding, so the value would be \
+                 dropped and every *use* of `{name}` already refuses. Write the value where it is \
+                 used. (The trading dialect's `let <name> = <swap …>` is a different construct and \
+                 does lower — it binds an operation's result.)"
+            )));
+        }
+        Statement::Return(_) => {
+            return Err(semantic(
+                "`return` would be dropped: this compiler does not emit a statement's return, and an \
+                 artifact has no frame for one, so a program that returns a value would reach the VM \
+                 saying nothing about it",
+            ));
+        }
+        Statement::Break => {
+            return Err(semantic(
+                "`break` would be dropped: the artifact has no loop the VM can execute — a `while` \
+                 is refused unless the compiler can decide it — so there is no loop to break out of",
+            ));
+        }
+        Statement::Continue => {
+            return Err(semantic(
+                "`continue` would be dropped: the artifact has no loop the VM can execute — a \
+                 `while` is refused unless the compiler can decide it — so there is no loop to \
+                 continue",
+            ));
+        }
+        Statement::For { iterable, .. } => {
+            return Err(semantic(&format!(
+                "`for … in {}` would be dropped: this compiler emits no iteration codegen and this VM \
+                 branches on a register, so the body could not run even once",
+                expression_to_string(iterable)
+            )));
+        }
+        // A bare `loop` is the unbounded loop `while true` spells, so it takes the same path: it
+        // lowers with a decided-true condition and the refusal that names it comes from the verifier
+        // and the emitter, where `while true`'s comes from. A second refusal here would be a second
+        // answer to a question TICKET-098 settled in one place.
+        Statement::Loop(body) => {
+            let body_ops = {
+                let mut temp_ir = X3IR::new();
+                lower_function_body(body, &mut temp_ir)?;
+                temp_ir.operations
+            };
+            ir.push(Operation::Loop {
+                max_iterations: 1000,
+                condition: Condition::True,
+                body: body_ops,
+            });
         }
     }
     Ok(())
@@ -1502,10 +1854,6 @@ fn lower_annotations_prefix(annotations: &[Annotation], ir: &mut X3IR) -> Result
                     total: *total,
                 });
             }
-            Annotation::Subscription(amount, period) => ir.push(Operation::Call {
-                function: "charge_subscription".to_string(),
-                args: vec![amount.to_string(), period.to_string()],
-            }),
             Annotation::Subscribe(event) => ir.push(Operation::Call {
                 function: "subscribe_event".to_string(),
                 args: vec![event.as_str().to_string()],
@@ -1545,11 +1893,20 @@ fn lower_annotations_prefix(annotations: &[Annotation], ir: &mut X3IR) -> Result
                 params: vec![],
                 ret: "()".to_string(),
             }),
-            Annotation::GasAdaptive => ir.push(Operation::GasAdaptive {
-                high_gas_ops: vec![Operation::Nop],
-                low_gas_ops: vec![Operation::Nop],
-            }),
+            // `@gas_adaptive` states two gas paths, and the *annotation* has no way to name them —
+            // it takes no arguments. The artifact's record demands two non-empty bodies
+            // (`verify_ir`: "gas-adaptive branches must not be empty"), so this arm used to satisfy
+            // that rule with `vec![Operation::Nop]` on each side: a record claiming the program has
+            // two paths, neither of which is one, and both of whose bodies were four zero bytes no
+            // reader can see (TICKET-110).
+            //
+            // So it lowers to nothing, like every other modifier the artifact has no form for
+            // (`NoHeap`, `OnChain`, `Payable`, `Simd`, … below). The opcode stays — it is a real VM
+            // capability (`GAS_ADAPTIVE`, and `bridge.gas_adaptive_select()` is what answers it) and a
+            // hand-built IR can still carry it — but a *source* surface for it needs syntax the
+            // annotation does not have, which is TICKET-111's question rather than this arm's.
             Annotation::NoHeap
+            | Annotation::GasAdaptive
             | Annotation::NoRecursion(_)
             | Annotation::OnChain
             | Annotation::OffChain
@@ -1708,14 +2065,173 @@ fn lower_builtin_call(callee: &Expression, args: &[Expression], ir: &mut X3IR) -
 }
 
 /// Convert an AST expression to an IR Condition
+/// The value of an integer expression, when the program states one.
+///
+/// Arithmetic is evaluated with `checked_*`, so an overflow or a division by zero returns `None`
+/// and the branch that depended on it stays undecided. A branch decided from a wrapped number is
+/// a branch decided wrongly, which is worse than one that refuses.
+///
+/// Narrow on purpose: only the operations whose result a `u128` can hold are folded. The shifts
+/// and the bitwise operators are `None` — a left shift that discards high bits wraps, and
+/// checking that costs more than the case is worth when the fallback is a refusal that names why.
+fn fold_int(expr: &Expression) -> Option<u128> {
+    match expr {
+        Expression::Literal(LiteralExpr::Int { value, .. }) => Some(*value),
+        Expression::Binary { op, lhs, rhs } => {
+            let left = fold_int(lhs)?;
+            let right = fold_int(rhs)?;
+            match op {
+                BinOp::Plus => left.checked_add(right),
+                BinOp::Minus => left.checked_sub(right),
+                BinOp::Star => left.checked_mul(right),
+                BinOp::Slash => left.checked_div(right),
+                BinOp::Percent => left.checked_rem(right),
+                BinOp::Power => u32::try_from(right)
+                    .ok()
+                    .and_then(|exponent| left.checked_pow(exponent)),
+                _ => None,
+            }
+        }
+        // `u128` has no negative value, so a negation has none either — `-5 < 0` is undecided
+        // rather than false, and the branch that needs it is refused.
+        _ => None,
+    }
+}
+
+/// Decide a branch condition at compile time, when the program made it decidable.
+///
+/// `Some(..)` means the compiler knows which branch runs and the emitter writes that one.
+/// `None` means it does not — and that is exactly the case this VM cannot execute, because it
+/// branches on a register and the compiler emits no arithmetic to put a value there, so the
+/// branch is refused downstream with that reason rather than guessed at (TICKET-058).
+///
+/// `&&` and `||` keep the language's short-circuit meaning: a decidable `false` on either side of
+/// `&&` decides the whole condition even when the other side is undecided, and likewise a
+/// decidable `true` for `||`.
+fn fold_condition(expr: &Expression) -> Option<bool> {
+    match expr {
+        Expression::Literal(LiteralExpr::Bool(value)) => Some(*value),
+        Expression::Unary { op: UnOp::Not, expr } => fold_condition(expr).map(|value| !value),
+        Expression::Binary { op, lhs, rhs } => match op {
+            BinOp::AndAnd => match (fold_condition(lhs), fold_condition(rhs)) {
+                (Some(false), _) | (_, Some(false)) => Some(false),
+                (Some(true), Some(true)) => Some(true),
+                _ => None,
+            },
+            BinOp::OrOr => match (fold_condition(lhs), fold_condition(rhs)) {
+                (Some(true), _) | (_, Some(true)) => Some(true),
+                (Some(false), Some(false)) => Some(false),
+                _ => None,
+            },
+            BinOp::EqEq => Some(fold_int(lhs)? == fold_int(rhs)?),
+            BinOp::Ne => Some(fold_int(lhs)? != fold_int(rhs)?),
+            BinOp::Lt => Some(fold_int(lhs)? < fold_int(rhs)?),
+            BinOp::Le => Some(fold_int(lhs)? <= fold_int(rhs)?),
+            BinOp::Gt => Some(fold_int(lhs)? > fold_int(rhs)?),
+            BinOp::Ge => Some(fold_int(lhs)? >= fold_int(rhs)?),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 fn expression_to_condition(expr: &Expression) -> Result<Condition, x3_lang_common::X3Error> {
     match expr {
         Expression::Literal(LiteralExpr::Bool(true)) => Ok(Condition::True),
         Expression::Literal(LiteralExpr::Bool(false)) => Ok(Condition::False),
         Expression::Call { callee, args } => condition_from_call(callee, args),
+        // `if profit >= 20` — a comparison of a quantity a host measures, which is the one class of
+        // condition this VM can decide without arithmetic: it holds the quantity and has a mode for
+        // the comparison. Anything else stays `Condition::Expression` and is refused downstream,
+        // which is TICKET-106's boundary and not a gap in this arm.
+        Expression::Binary { op, lhs, rhs } => match measured_condition(op, lhs, rhs)? {
+            Some(condition) => Ok(condition),
+            None => Ok(Condition::Expression {
+                expr: expression_to_string(expr),
+            }),
+        },
         _ => Ok(Condition::Expression {
             expr: expression_to_string(expr),
         }),
+    }
+}
+
+/// `Ident(<measured quantity>) <comparison> <bound>` as a [`Condition::Measured`], or `None` when
+/// the expression is not that shape.
+///
+/// `Err` — rather than `None` — when the left-hand side *is* a measured quantity and the comparison
+/// is one the VM has no direction for: `if profit == 20` names a quantity the runtime holds and
+/// asks a question nothing executes, and answering it with the generic "the condition is not
+/// decidable at compile time" would send its author looking for a way to make it decidable. The
+/// bound is read by the same exact converter the guards use, so `if profit >= 0.05%` means the same
+/// figure as `require profit >= 0.05%` or neither does.
+fn measured_condition(
+    op: &x3_lang_common::BinOp,
+    lhs: &Expression,
+    rhs: &Expression,
+) -> Result<Option<Condition>, x3_lang_common::X3Error> {
+    let Some(quantity) = measured_quantity_of(lhs) else {
+        return Ok(None);
+    };
+    let Some(comparison) = comparison_of(op) else {
+        return Ok(None);
+    };
+    if !quantity.supports(comparison) {
+        return Err(semantic(&format!(
+            "`{} {} …` is not a comparison this runtime makes about the {} a host measures: a branch \
+             on it is `{} {} <bound>` or `{} {} <bound>`",
+            quantity.spelling(),
+            comparison.as_str(),
+            quantity.spelling(),
+            quantity.spelling(),
+            quantity.guard_comparison().as_str(),
+            quantity.spelling(),
+            quantity.complement_comparison().as_str(),
+        )));
+    }
+    let Some(bps) = crate::semantic::bound_bps_from_expr(rhs) else {
+        return Err(semantic(&format!(
+            "`{} {} {}` — the bound has to be a whole number of basis points, a percentage \
+             (`0.05%`), or a bare fraction of one; a sub-basis-point bound is not a figure this \
+             runtime can compare and is refused rather than rounded",
+            quantity.spelling(),
+            comparison.as_str(),
+            expression_to_string(rhs)
+        )));
+    };
+    let threshold_bps = u16::try_from(bps).map_err(|_| {
+        semantic(&format!(
+            "the bound {bps}bps is larger than a measured comparison's operand, which is a `u16`"
+        ))
+    })?;
+    Ok(Some(Condition::Measured {
+        quantity,
+        comparison,
+        threshold_bps,
+    }))
+}
+
+/// The measured quantity an expression names, if it names one at all.
+fn measured_quantity_of(expr: &Expression) -> Option<ir::MeasuredQuantity> {
+    match expr {
+        Expression::Ident(name) => ir::MeasuredQuantity::from_name(name.as_str()),
+        _ => None,
+    }
+}
+
+/// The IR comparison an operator is, if it is one.
+///
+/// `&&` and `||` are not: a branch on two measurements at once is two branches, and combining them
+/// would need a value in a register, which is the thing this compiler cannot make.
+fn comparison_of(op: &x3_lang_common::BinOp) -> Option<ir::ComparisonOp> {
+    match op {
+        x3_lang_common::BinOp::Lt => Some(ir::ComparisonOp::Less),
+        x3_lang_common::BinOp::Le => Some(ir::ComparisonOp::LessOrEqual),
+        x3_lang_common::BinOp::Gt => Some(ir::ComparisonOp::Greater),
+        x3_lang_common::BinOp::Ge => Some(ir::ComparisonOp::GreaterOrEqual),
+        x3_lang_common::BinOp::EqEq => Some(ir::ComparisonOp::Equal),
+        x3_lang_common::BinOp::Ne => Some(ir::ComparisonOp::NotEqual),
+        _ => None,
     }
 }
 
@@ -1738,12 +2254,48 @@ fn bps_guard(guard: &arb::Guard) -> ast::RequireGuard {
     }
 }
 
+/// The guard with its bound stated in basis points, when the VM is the thing that enforces it.
+///
+/// `None` means "the static record it already was". Two quantities are enforced by the VM — a
+/// slippage ceiling and a profit floor — because they are the two the host measures and reports
+/// (PHASE 7's native risk policy, and the spec's "economic constraints enforced by the VM"). Every
+/// other guard kind is a claim about the artifact's *configuration*, which the compile-time pass
+/// for that kind decides, and its bound stays where the pass read it.
+///
+/// The unit is basis points because the bound becomes the instruction's operand and the executor
+/// compares it against a measurement in basis points. The reading of a bare number is the one the
+/// linter and the risk-policy check already use, so `require slippage <= 50` and
+/// `risk_policy { max_slippage 50 }` mean the same figure rather than two.
+fn enforceable_economic_guard(guard: &ast::RequireGuard) -> Option<ast::RequireGuard> {
+    let comparison = guard.comparison?;
+    let is_ceiling = comparison.is_upper_bound();
+    let wanted_ceiling = match guard.kind {
+        ast::RequireKind::Slippage => true,
+        ast::RequireKind::Profit => false,
+        _ => return None,
+    };
+    if is_ceiling != wanted_ceiling {
+        return None;
+    }
+    let bound = crate::semantic::slippage_bps_from_text(&expression_to_string(guard.value.as_ref()?))?;
+    let bound = u16::try_from(bound).ok()?;
+    Some(ast::RequireGuard {
+        value: Some(Expression::Literal(LiteralExpr::Int {
+            value: u128::from(bound),
+            base: x3_lang_common::IntBase::Decimal,
+            suffix: None,
+        })),
+        ..guard.clone()
+    })
+}
+
 fn require_kind_to_ir(kind: &ast::RequireKind) -> ir::RequireKind {
     match kind {
         ast::RequireKind::CanonicalSupply => ir::RequireKind::CanonicalSupply,
         ast::RequireKind::Nonce => ir::RequireKind::NonceUnused,
         ast::RequireKind::BridgeLiquidity => ir::RequireKind::BridgeLiquidity,
         ast::RequireKind::Slippage => ir::RequireKind::SlippageTolerance,
+        ast::RequireKind::Fees => ir::RequireKind::Fees,
         ast::RequireKind::Profit => ir::RequireKind::ProfitThreshold,
         ast::RequireKind::Finality => ir::RequireKind::Finality,
         ast::RequireKind::Custom(name) => ir::RequireKind::Custom(name.as_str().to_string()),
@@ -2028,9 +2580,18 @@ pub(crate) fn expression_to_string(expr: &Expression) -> String {
         Expression::FieldAccess { target, field } => {
             format!("{}.{}", expression_to_string(target), field.as_str())
         }
+        // `{:?}` on the operator renders its Rust *variant* name, so `while steps < 10` reached the
+        // IR, `x3c lower` and every diagnostic that names a condition as `steps Lt 10` — a guard
+        // the program never wrote, in a spelling no reader of this language can parse back. `BinOp`
+        // already implements `Display` with the language's own symbols, which is the one fact that
+        // makes this a rendering choice rather than a second grammar (TICKET-098).
         Expression::Binary { op, lhs, rhs } => {
-            format!("{} {:?} {}", expression_to_string(lhs), op, expression_to_string(rhs))
+            format!("{} {} {}", expression_to_string(lhs), op, expression_to_string(rhs))
         }
+        // The same defect one arm down: a unary condition was rendered as `{:?}`, so `while !ready`
+        // would have arrived as `Unary { op: Not, … }` — a Rust debug string in a diagnostic that
+        // is supposed to name the guard the program wrote.
+        Expression::Unary { op, expr } => format!("{}{}", op, expression_to_string(expr)),
         Expression::Call { callee, args } => format!(
             "{}({})",
             expression_to_string(callee),
@@ -2038,6 +2599,35 @@ pub(crate) fn expression_to_string(expr: &Expression) -> String {
         ),
         _ => format!("{:?}", expr),
     }
+}
+
+/// What the VM's own weight table charges for a module's operations.
+///
+/// Measured by emitting them and asking `cost`, which is the same table the VM charges from
+/// (`spec::opcodes::base_gas_cost`): a count of operations is not a count of instructions — an
+/// operation writes zero frames (a branch the compiler decided false writes nothing), one, or
+/// several (a branch's body is emitted inline) — so the figure has to come from the writer and the
+/// one cost model rather than from arithmetic here.
+///
+/// The header every artifact carries (the version byte, the version binding) is subtracted by
+/// measuring an empty program once and taking the difference, so the number is the module's own
+/// cost rather than the module's plus a constant that would make the cap stricter than it reads.
+fn module_cost(ops: &[Operation]) -> Result<Option<(u128, usize)>, x3_lang_common::X3Error> {
+    let Ok(header_bytes) = crate::emitter::emit_x3ir(&ir::X3IR::new()) else {
+        return Ok(None);
+    };
+    let header = crate::cost::estimate_artifact(&header_bytes)?.base_weight;
+    let mut module = ir::X3IR::new();
+    module.operations = ops.to_vec();
+    let Ok(module_bytes) = crate::emitter::emit_x3ir(&module) else {
+        return Ok(None);
+    };
+    let estimate = crate::cost::estimate_artifact(&module_bytes)?;
+    // `host_facing` needs no subtraction: the header record is not a host call.
+    Ok(Some((
+        estimate.base_weight.saturating_sub(header),
+        estimate.host_facing,
+    )))
 }
 
 fn expression_to_u128(expr: &Expression) -> Result<u128, x3_lang_common::X3Error> {

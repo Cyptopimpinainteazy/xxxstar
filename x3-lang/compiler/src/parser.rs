@@ -1111,7 +1111,6 @@ impl<'a> Parser<'a> {
                 })
             }
             Tok::KwBridge => self.parse_bridge_trade_stmt(),
-            Tok::Ident(ref s) if s == "bridge" => self.parse_bridge_trade_stmt(),
             Tok::KwRequire => {
                 self.advance();
                 match self.peek() {
@@ -1342,9 +1341,6 @@ impl<'a> Parser<'a> {
                 Tok::KwSwap | Tok::KwBridge | Tok::KwLock | Tok::KwMint | Tok::KwBurn | Tok::KwRelease => {
                     body.push(self.parse_route_step()?);
                 }
-                Tok::Ident(ref s) if matches!(s.as_str(), "swap" | "bridge" | "lock" | "mint" | "burn" | "release") => {
-                    body.push(self.parse_route_step()?);
-                }
                 _ => body.push(self.parse_statement()?),
             }
         }
@@ -1448,6 +1444,7 @@ impl<'a> Parser<'a> {
         let mut risk: Option<StrategyRisk> = None;
         let mut license: Option<StrategyLicense> = None;
         let mut submission: Option<SubmissionPolicy> = None;
+        let mut resources: Option<StrategyResources> = None;
         let mut split: Option<ProfitSplit> = None;
         let mut max_steps: Option<Expression> = None;
         let mut max_gas: Option<Expression> = None;
@@ -1556,6 +1553,13 @@ impl<'a> Parser<'a> {
                         self.opt_semi();
                     }
                     self.expect(Tok::RBrace, "expected '}' to close bounds")?;
+                }
+                "resources" => {
+                    // PHASE 41's own spelling for the caps `bounds` states two of. Parsed as the
+                    // phase writes it (`max_compute = …;`) with the `=` optional, because the
+                    // implementation's `bounds` block writes the same shape without one.
+                    resources = Some(self.parse_strategy_resources()?);
+                    self.opt_semi();
                 }
                 "submission" => {
                     self.expect(Tok::LBrace, "expected '{' after submission")?;
@@ -1666,10 +1670,54 @@ impl<'a> Parser<'a> {
             license,
             split,
             submission,
+            resources,
         }))
     }
 
     /// `license { creator <who> profit_share <N>% [executions <N>] [expires_block <N>] }`
+    ///
+    /// `resources { max_compute = N; … }` — PHASE 41's block, with the `=` the phase writes optional
+    /// so the same five names read the same way as `bounds` does. Every name is checked against the
+    /// vocabulary rather than stored as written: a cap nothing measures is the defect TICKET-116's
+    /// neighbour, one construct over.
+    fn parse_strategy_resources(&mut self) -> Result<StrategyResources, X3Error> {
+        self.expect(Tok::LBrace, "expected '{' after resources")?;
+        let mut resources = StrategyResources::default();
+        while self.peek() != Tok::RBrace && self.peek() != Tok::Eof {
+            let key = self.expect_ident("resources field")?;
+            if self.peek() == Tok::Eq {
+                self.advance();
+            }
+            let value = self.parse_expr()?;
+            let slot = match key.as_str() {
+                "max_compute" => &mut resources.max_compute,
+                "max_memory" => &mut resources.max_memory,
+                "max_network_calls" => &mut resources.max_network_calls,
+                "max_routes" => &mut resources.max_routes,
+                "max_branches" => &mut resources.max_branches,
+                other => {
+                    return Err(parse_err(
+                        format!(
+                            "unknown resources field '{other}'; PHASE 41's caps are max_compute, \
+                             max_memory, max_network_calls, max_routes and max_branches"
+                        ),
+                        self.peek(),
+                    ))
+                }
+            };
+            if slot.is_some() {
+                return Err(parse_err(
+                    format!("the resources block declares '{key}' twice"),
+                    self.peek(),
+                ));
+            }
+            *slot = Some(value);
+            self.opt_semi();
+        }
+        self.expect(Tok::RBrace, "expected '}' to close resources")?;
+        Ok(resources)
+    }
+
     ///
     /// `creator` and `profit_share` are required: a licence that does not say who
     /// holds it, or what it earns them, is a heading rather than a licence.
@@ -1978,9 +2026,14 @@ impl<'a> Parser<'a> {
                     feature: Symbol::new(&feature),
                 })
             }
-            Tok::Ident(ref s) if s == "on_fail" => self.parse_intent_onfail(),
             Tok::KwOnFail => self.parse_intent_onfail(),
-            Tok::Ident(ref s) if s == "use" => self.parse_intent_use(),
+            // `use` is a **keyword** to the lexer (`Keyword::Use`, the top-level import), so this
+            // arm has to match the keyword token. It matched `Tok::Ident(ref s) if s == "use"` —
+            // the shape every other clause uses — which no program could reach, because a lexer
+            // keyword never arrives as an identifier. `use uniswap 1` inside an intent body was
+            // refused while the arm below this one advertised `use` in the list of clauses it
+            // accepts, and the formatter wrote the clause back out (TICKET-046).
+            Tok::KwUse => self.parse_intent_use(),
             Tok::Ident(ref s) if s == "on" => self.parse_intent_on_event(),
             Tok::Ident(ref s) if s == "proofs" => Err(parse_err(
                 "`proofs required { ... }` must be declared at file scope, not inside an intent body: a \
@@ -2094,18 +2147,18 @@ impl<'a> Parser<'a> {
                 self.advance();
                 self.parse_lmbr_step(kw)
             }
-            // Bare-identifier route keywords. The dispatcher does NOT
-            // advance: each sub-parser checks for its own leading
-            // identifier and consumes it. This avoids a rewind/peek
-            // dance.
-            Tok::Ident(ref s) if s == "swap" => self.parse_swap_step(),
-            Tok::Ident(ref s) if s == "bridge" => self.parse_bridge_step(),
+            // `fallback` is the one route operation that is **not** a lexer keyword, so it is the
+            // only one that arrives as an identifier. The dispatcher does not advance for it: the
+            // sub-parser checks for its own leading word and consumes it, which avoids a
+            // rewind/peek dance.
+            //
+            // `swap`, `bridge` and the four `lock`/`mint`/`burn`/`release` steps used to have arms
+            // here too, matching an identifier for a word the lexer sends as a keyword token — arms
+            // no program could reach, with the `Tok::Kw*` arms above doing the work
+            // (`no_arm_matches_an_identifier_for_a_lexer_keyword` in
+            // `compiler/tests/test_keyword_clauses.rs`). The pattern is worth remembering: it is
+            // how three clauses were refused while the comments beside them said they were read.
             Tok::Ident(ref s) if s == "fallback" => self.parse_route_fallback(),
-            Tok::Ident(ref s) if s == "lock" || s == "mint" || s == "burn" || s == "release" => {
-                let kw = s.clone();
-                self.advance();
-                self.parse_lmbr_step(&kw)
-            }
             _ => Err(parse_err(
                 "expected route operation (swap/bridge/lock/mint/burn/release/fallback)".into(),
                 self.peek(),
@@ -3212,7 +3265,11 @@ impl<'a> Parser<'a> {
                 Tok::Ident(ref s) if s == "source" => {
                     self.advance();
                     // source can be followed by chain name OR directly by require
-                    if matches!(self.peek(), Tok::Ident(ref s2) if s2 == "require") {
+                    // `require` reaches the parser as `KwRequire` — it is a lexer keyword — so the
+                    // identifier form this check used to test could never match, and the inline
+                    // `source require 2_of_3` form was refused with "rpc_quorum source chain:
+                    // expected identifier" (TICKET-046's class).
+                    if matches!(self.peek(), Tok::KwRequire) {
                         // inline: source require N_of_M
                         source = Symbol::new("source");
                     } else {
@@ -3223,15 +3280,6 @@ impl<'a> Parser<'a> {
                     self.advance();
                     // skip, we only store the source
                 }
-                Tok::Ident(ref s) if s == "require" => {
-                    self.advance();
-                    let (n, m) = self.parse_n_of_m()?;
-                    require_numerator = n;
-                    require_denominator = m;
-                }
-                // `require` is a keyword, so the arm above can never fire for
-                // the shorthand the examples are documented with. The arm that
-                // reads it is this one.
                 Tok::KwRequire => {
                     self.advance();
                     let (n, m) = self.parse_n_of_m()?;
@@ -3488,6 +3536,7 @@ impl<'a> Parser<'a> {
         let name = Symbol::new(&self.expect_ident("rebalance name")?);
         self.expect(Tok::LBrace, "expected '{' after the rebalance name")?;
         let mut weights: Vec<(AssetRef, u32)> = Vec::new();
+        let mut holdings: Vec<(AssetRef, u128)> = Vec::new();
         let mut minimize: Vec<ObjectiveMetric> = Vec::new();
         let mut atomic = false;
 
@@ -3498,9 +3547,40 @@ impl<'a> Parser<'a> {
                 atomic = true;
                 continue;
             }
-            let clause = self
-                .peek_word()
-                .ok_or_else(|| parse_err("expected a weight, `minimize { … }` or `atomic;`".into(), self.peek()))?;
+            let clause = self.peek_word().ok_or_else(|| {
+                parse_err(
+                    "expected a weight, `holds { … }`, `minimize { … }` or `atomic;`".into(),
+                    self.peek(),
+                )
+            })?;
+            if clause == "holds" {
+                // What the account holds now, which is the input the target alone lacks.
+                self.advance();
+                self.expect(Tok::LBrace, "expected '{' after `holds`")?;
+                while self.peek() != Tok::RBrace && self.peek() != Tok::Eof {
+                    let asset = self.parse_hedge_asset()?;
+                    self.expect(Tok::Eq, "expected '=' after the asset in a holding")?;
+                    let amount = match self.peek() {
+                        Tok::Int(value) => {
+                            self.advance();
+                            value
+                        }
+                        _ => {
+                            return Err(parse_err(
+                                "a holding is an amount in the asset's own units: write \
+                                 `<chain.ASSET> = <n>`"
+                                    .into(),
+                                self.peek(),
+                            ))
+                        }
+                    };
+                    self.opt_semi();
+                    holdings.push((asset, amount));
+                }
+                self.expect(Tok::RBrace, "expected '}' after the holdings")?;
+                self.opt_semi();
+                continue;
+            }
             if clause == "minimize" {
                 self.advance();
                 self.expect(Tok::LBrace, "expected '{' after `minimize`")?;
@@ -3570,6 +3650,7 @@ impl<'a> Parser<'a> {
         }
         Ok(Item::Rebalance(RebalanceDecl {
             name,
+            holdings,
             weights,
             minimize,
         }))
@@ -4654,7 +4735,10 @@ impl<'a> Parser<'a> {
                     self.advance();
                     chain = Symbol::new(&self.expect_ident("finality chain name")?);
                 }
-                Tok::Ident(ref s) if s == "requirement" || s == "require" => {
+                // `requirement` only: the `require` half of this guard was a second word the arm
+                // could never see, because `require` reaches the parser as `KwRequire`. The form
+                // that spells it that way is the terse one below, which matches the keyword.
+                Tok::Ident(ref s) if s == "requirement" => {
                     self.advance();
                     requirement = Symbol::new(&self.expect_ident("finality requirement")?);
                 }
@@ -4669,7 +4753,11 @@ impl<'a> Parser<'a> {
                 // The terse form: `<chain_name> require <mode>`.
                 Tok::Ident(_) => {
                     chain = Symbol::new(&self.expect_ident("finality chain name")?);
-                    if matches!(self.peek(), Tok::Ident(ref r) if r == "require") {
+                    // `require` is a lexer keyword, so it arrives as `KwRequire`; the identifier
+                    // form this used to test could never match and the terse form —
+                    // `ethereum require finalized`, which this comment documents — failed with
+                    // "expected '}' after finality_policy body" (TICKET-046's class).
+                    if matches!(self.peek(), Tok::KwRequire) {
                         self.advance();
                         requirement = Symbol::new(&self.expect_ident("finality requirement")?);
                     }
@@ -4790,7 +4878,28 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_single_annotation(&mut self) -> Result<Annotation, X3Error> {
-        let name = self.expect_ident("annotation name")?;
+        // A word the lexer reserves cannot name an annotation, because `expect_ident` refuses a keyword
+        // token — and its message ("annotation name: expected identifier") told an author their *syntax*
+        // was wrong when the fact is about the word. `subscription` is the one such word today, and it
+        // names an item (TICKET-111).
+        let name = match self.peek() {
+            Tok::Ident(_) => self.expect_ident("annotation name")?,
+            Tok::KwSubscription => {
+                return Err(parse_err(
+                    "`@subscription` is not an annotation: `subscription` begins a `subscription \
+                     <name>: <amount>, <period> { … }` item, which is where a subscription's work is \
+                     written — a keyword cannot name an annotation"
+                        .to_string(),
+                    self.peek(),
+                ))
+            }
+            other => {
+                return Err(parse_err(
+                    format!("an annotation is named by an identifier, and `{other:?}` is not one"),
+                    other,
+                ))
+            }
+        };
         let args: Vec<Expression> = if self.peek() == Tok::LParen {
             self.advance();
             let exprs = self.parse_expr_list()?;
@@ -5720,8 +5829,30 @@ impl<'a> Parser<'a> {
             }
             Tok::Ident(ref s) if s == "refund" => {
                 self.advance();
-                let expr = self.parse_expr()?;
-                Ok(FailureAction::Refund(expr))
+                // The clause is `refund <chain.ASSET> to <receiver>`, and this arm used to read only
+                // the first half: `to <receiver>` was left in the token stream, where the enclosing
+                // body parsed it as two expression statements (`to;` and `sender;`) that lower to
+                // nothing. The receiver — the whole point of naming a refund — never reached the
+                // action, and `x3c fmt` wrote the residue back out as statements. Folded the way the
+                // intent path folds it (`chain.ASSET:receiver`, receiver defaulting to `sender`, which
+                // the formatter splits back with `refund_target`), so one clause has one shape.
+                let asset = self.parse_asset_ref()?;
+                let mut receiver = None;
+                if matches!(self.peek(), Tok::Ident(ref s) if s == "to") {
+                    self.advance();
+                    receiver = Some(self.parse_expr()?);
+                }
+                let receiver = receiver
+                    .map(|expr| expression_debug_string(&expr))
+                    .unwrap_or_else(|| "sender".to_string());
+                Ok(FailureAction::Refund(Expression::Literal(LiteralExpr::String(
+                    Symbol::new(&format!(
+                        "{}.{}:{}",
+                        asset.chain.as_str(),
+                        asset.name.as_str(),
+                        receiver
+                    )),
+                ))))
             }
             Tok::Ident(ref s) if s == "halt" => {
                 self.advance();
@@ -5815,13 +5946,25 @@ impl<'a> Parser<'a> {
 /// `bridge`, `require`, `emit`, `use`, `mint`, `burn`, `lock` and `release` are
 /// mapped to keyword tokens, which cannot begin an expression either, so they
 /// stop a guard without help.
+///
+/// Every word here is dispatched by an arm of the form `Tok::Ident(ref s) if s
+/// == "<word>"`; `every_word_in_this_list_begins_a_clause` in
+/// `compiler/tests/test_require_guards.rs` reads this const out of the source
+/// and checks that, so an entry the grammar has moved past fails a test instead
+/// of stopping a guard at a word that begins nothing. `balance` was exactly
+/// that: it was listed under "statements and trade bodies" and no arm anywhere
+/// dispatched on it, so `require <kind> balance` — a guard whose subject is the
+/// identifier `balance` — was read as a guard with no subject.
 const CLAUSE_WORDS: &[&str] = &[
     // intent body
     "from",
     "to",
     "route",
     "timeout",
-    "on_fail",
+    // `on_fail` is deliberately absent: it is `Tok::KwOnFail`, and a keyword cannot begin an
+    // expression, so a valueless guard stops at it without help — the rule this const's own doc
+    // states. It was listed anyway, which is a second statement of the grammar naming a word the
+    // lookahead does not need.
     "allow",
     "on",
     "proofs",
@@ -5839,7 +5982,6 @@ const CLAUSE_WORDS: &[&str] = &[
     // statements and trade bodies that carry a guard
     "repay",
     "borrow",
-    "balance",
     "invariant",
     "net_profit",
 ];
@@ -5884,6 +6026,7 @@ pub(crate) fn duration_unit_from_suffix(suffix: &str) -> Option<x3_lang_common::
 pub const REQUIRE_KIND_NAMES: &[&str] = &[
     "finality",
     "slippage",
+    "fees",
     "profit",
     "invariant",
     "risk",
@@ -5906,6 +6049,7 @@ fn require_kind_from_str(name: &str) -> Result<RequireKind, X3Error> {
     Ok(match name {
         "finality" => RequireKind::Finality,
         "slippage" => RequireKind::Slippage,
+        "fees" => RequireKind::Fees,
         "profit" => RequireKind::Profit,
         "invariant" => RequireKind::InvariantCheck,
         "risk" => RequireKind::RiskScore,
@@ -5997,33 +6141,12 @@ fn annotation_from_name_args(name: &str, args: &[Expression]) -> Result<Annotati
                 .unwrap_or(1);
             Ok(Annotation::Scheduled(period))
         }
-        "subscription" => {
-            let amount = args
-                .iter()
-                .find_map(|e| {
-                    let s = expr_to_string(e);
-                    if let Some(val) = s.strip_prefix("amount=") {
-                        val.parse::<u128>().ok()
-                    } else {
-                        None
-                    }
-                })
-                .or_else(|| args.first().and_then(|e| expr_to_u128(e).ok()))
-                .unwrap_or(0);
-            let period = args
-                .iter()
-                .find_map(|e| {
-                    let s = expr_to_string(e);
-                    if let Some(val) = s.strip_prefix("period=") {
-                        val.parse::<u64>().ok()
-                    } else {
-                        None
-                    }
-                })
-                .or_else(|| args.get(1).and_then(|e| expr_to_u128(e).ok().map(|v| v as u64)))
-                .unwrap_or(1);
-            Ok(Annotation::Subscription(amount, period))
-        }
+        // `"subscription"` is deliberately absent. The word is a **keyword** the lexer reserves for the
+        // `subscription <name>: <amount>, <period> { … }` item, so `parse_single_annotation`'s
+        // `expect_ident` never sees it as a name: the arm that used to be here could not be reached by
+        // any program (measured: `@subscription(amount=100, period=30)` fails with "annotation name:
+        // expected identifier", and the other twenty spellings parse). A name map that claims a
+        // spelling the lexer forbids is a capability nothing can use (TICKET-111).
         "extern" => Ok(Annotation::Extern),
         "payable" => Ok(Annotation::Payable),
         "simd" => Ok(Annotation::Simd),
@@ -6031,7 +6154,18 @@ fn annotation_from_name_args(name: &str, args: &[Expression]) -> Result<Annotati
         "sponsor" => Ok(Annotation::Sponsor),
         "gas_adaptive" => Ok(Annotation::GasAdaptive),
         _ => Err(X3Error::ParseError {
-            message: format!("unknown annotation @{name}"),
+            // A word the lexer reserves cannot name an annotation — `expect_ident` refuses a keyword —
+            // so a program that writes one is told what the language does accept instead of being told
+            // the word is unknown. `subscription` is the only one today: an annotation spelling for it
+            // existed in this map and no program could reach it (TICKET-111).
+            message: if name == "subscription" {
+                "`@subscription` is not an annotation: `subscription` begins a `subscription <name>: \
+                 <amount>, <period> { … }` item, which is where a subscription's work is written — a \
+                 keyword cannot name an annotation"
+                    .to_string()
+            } else {
+                format!("unknown annotation @{name}")
+            },
             span: Span::DUMMY,
             expected: vec![],
             found: name.into(),

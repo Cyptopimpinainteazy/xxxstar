@@ -8,7 +8,19 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::U256;
 use sp_runtime::SaturatedConversion;
-use sp_std::vec::Vec;
+// **`alloc` directly, not `sp_std`.** This crate writes `String`, `format!` and `.to_string()`,
+// none of which is in `core`; only `Vec` was imported, so the `no_std` build the crate declares
+// failed with seven errors about missing types and macros. `sp_std` is not the answer: at
+// `default-features = false` it has no allocator-backed types (it stubs `Vec` so the *name*
+// resolves, and `sp-std` 14 has no `alloc` feature to turn them on), and its `String` only exists
+// with `std`. `alloc` is the crate that owns them, it needs no feature here, and with it the
+// crate's `no_std` configuration is one that can actually build something (TICKET-093).
+extern crate alloc;
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 // Note: Would integrate with oracle pallet for price data
 
 /// Risk levels for transactions/operations

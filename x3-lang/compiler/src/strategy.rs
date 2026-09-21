@@ -34,6 +34,8 @@
 
 use std::collections::BTreeSet;
 
+use crate::lowering::expression_to_string;
+
 use x3_lang_ast::ast::{SplitRecipient, Statement, StrategyPermission};
 use x3_lang_common::{Bps, ErrorAccumulator, X3Error};
 
@@ -45,19 +47,24 @@ use x3_lang_ast::trading::{TradeEffect, TradeGuarantee};
 /// rather than spelled as a literal (PHASE 43).
 const MAX_BPS: u32 = Bps::WHOLE.raw();
 
-fn err(message: String) -> X3Error {
-    X3Error::SemanticError {
-        message,
-        span: x3_lang_common::Span::DUMMY,
-    }
-}
-
 /// A diagnostic a build system can key on: the code says *what kind* of thing is
 /// wrong, which a message cannot (PHASE 52, TICKET-021). The effects and
 /// guarantees checks below report as `X3E4021` — "unresolved economic effect" —
 /// because that is what a declaration nothing discharges is.
 fn coded_err(code: crate::diagnostic::DiagnosticCode, message: String) -> X3Error {
     crate::diagnostic::CompilerDiagnostic::error(code, message, x3_lang_common::Span::DUMMY).into_error()
+}
+
+/// The fee a `venue` declaration states, or `None` when no declaration names that venue.
+///
+/// `None` is not "no fee": it is "nothing to compare", which the caller must not read as zero. A
+/// module may route through a venue the program never describes — the corpus's own strategy example
+/// does — and a check that treated that as a 0bps venue would pass every ceiling.
+fn declared_venue_fee(program: &Program, name: &str) -> Option<u32> {
+    program.items.iter().find_map(|item| match &item.node {
+        Item::VenueDecl(venue) if venue.name.as_str() == name => Some(venue.fee_bps),
+        _ => None,
+    })
 }
 
 /// Every statement of a body, including the ones inside blocks.
@@ -118,50 +125,102 @@ pub fn verify_strategy_modules(program: &Program, acc: &mut ErrorAccumulator) {
 
         // ── the declarations that are simply required ──────────────────────
         if module.inputs.is_empty() {
-            acc.add_error(err(format!(
-                "strategy '{name}' declares no input; a reusable module that does not say what it is \
+            acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' declares no input; a reusable module that does not say what it is \
                  handed cannot be instantiated"
-            )));
+                ),
+            ));
         }
         for input in &module.inputs {
             if input.amount.is_none() {
-                acc.add_error(err(format!(
-                    "strategy '{name}' input {}.{} states no amount; capital nobody bounded is capital \
+                acc.add_error(coded_err(
+                    crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "strategy '{name}' input {}.{} states no amount; capital nobody bounded is capital \
                      nobody agreed to",
-                    input.asset.chain.as_str(),
-                    input.asset.name.as_str()
-                )));
+                        input.asset.chain.as_str(),
+                        input.asset.name.as_str()
+                    ),
+                ));
             }
         }
         if module.outputs.is_empty() {
-            acc.add_error(err(format!(
-                "strategy '{name}' declares no output; a module that does not say what it produces \
+            acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' declares no output; a module that does not say what it produces \
                  cannot be composed"
-            )));
+                ),
+            ));
         }
         if module.domains.is_empty() {
-            acc.add_error(err(format!(
-                "strategy '{name}' declares no required domains; the plan cannot know which VMs it \
+            acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' declares no required domains; the plan cannot know which VMs it \
                  needs"
-            )));
+                ),
+            ));
         }
         match &module.risk {
-            None => acc.add_error(err(format!(
-                "strategy '{name}' declares no risk profile; the bounds it accepts are part of the \
+            None => acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' declares no risk profile; the bounds it accepts are part of the \
                  module, not an operator's setting"
-            ))),
+                ),
+            )),
             Some(risk) => {
                 if risk.max_slippage_bps > MAX_BPS {
-                    acc.add_error(err(format!(
-                        "strategy '{name}' declares max_slippage_bps {}, above {MAX_BPS}",
-                        risk.max_slippage_bps
-                    )));
+                    acc.add_error(coded_err(
+                        crate::diagnostic::DiagnosticCode::RiskPolicyBound,
+                        format!(
+                            "strategy '{name}' declares max_slippage_bps {}, above {MAX_BPS}",
+                            risk.max_slippage_bps
+                        ),
+                    ));
                 }
                 if risk.max_total_fee_bps > MAX_BPS {
-                    acc.add_error(err(format!(
-                        "strategy '{name}' declares max_total_fee_bps {}, above {MAX_BPS}",
-                        risk.max_total_fee_bps
-                    )));
+                    acc.add_error(coded_err(
+                        crate::diagnostic::DiagnosticCode::RiskPolicyBound,
+                        format!(
+                            "strategy '{name}' declares max_total_fee_bps {}, above {MAX_BPS}",
+                            risk.max_total_fee_bps
+                        ),
+                    ));
+                }
+                // A fee ceiling is a bound on what the module spends, and nothing compared it to
+                // what its route *costs*: a module declaring 1bps and routing through a venue that
+                // declares 100bps compiled with no error, and the artifact carried no record of the
+                // ceiling at all. The `arb` path has had this rule since it had a search — a venue
+                // over the ceiling is struck from the standings — and a strategy names its venue
+                // rather than searching, so here it is a refusal.
+                //
+                // Only a *declared* venue can be compared. A body may name one no `venue`
+                // declaration describes (the corpus's own example does), and that is a different
+                // question: the compiler has no fee to compare, so it says nothing rather than
+                // inventing one.
+                for statement in &statements {
+                    let Statement::Swap { dex: Some(dex), .. } = statement else {
+                        continue;
+                    };
+                    let venue_name = expression_to_string(dex);
+                    let Some(fee) = declared_venue_fee(program, &venue_name) else {
+                        continue;
+                    };
+                    if fee > risk.max_total_fee_bps {
+                        acc.add_error(coded_err(
+                            crate::diagnostic::DiagnosticCode::RiskPolicyBound,
+                            format!(
+                                "strategy '{name}' routes through '{venue_name}', which declares {fee}bps \
+                                 of fee, and the module's `risk {{ max_total_fee_bps }}` is {}; one hop \
+                                 would spend more than the whole ceiling",
+                                risk.max_total_fee_bps
+                            ),
+                        ));
+                    }
                 }
             }
         }
@@ -170,16 +229,23 @@ pub fn verify_strategy_modules(program: &Program, acc: &mut ErrorAccumulator) {
             module.max_gas.as_ref().and_then(expression_to_u128),
         ) {
             (Some(steps), _) if steps > 0 => {}
-            (Some(_), _) => acc.add_error(err(format!("strategy '{name}' bounds max_steps at zero"))),
-            (None, _) => acc.add_error(err(format!(
-                "strategy '{name}' declares no max_steps bound; an unbounded module is not a bounded \
+            (Some(_), _) => acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::RiskPolicyBound,
+                format!("strategy '{name}' bounds max_steps at zero"),
+            )),
+            (None, _) => acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' declares no max_steps bound; an unbounded module is not a bounded \
                  strategy"
-            ))),
+                ),
+            )),
         }
         if module.max_gas.is_none() {
-            acc.add_error(err(format!(
-                "strategy '{name}' declares no max_gas bound; resource bounds are part of the module"
-            )));
+            acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!("strategy '{name}' declares no max_gas bound; resource bounds are part of the module"),
+            ));
         }
 
         // ── effects, discharged by the body ───────────────────────────────
@@ -230,24 +296,56 @@ pub fn verify_strategy_modules(program: &Program, acc: &mut ErrorAccumulator) {
         }
 
         // ── permissions: the body may not exceed them ─────────────────────
+        // Two of the four are untested, and a permission nothing tests is a capability the compiler
+        // cannot honour — the rule a declaration nothing reads follows (TICKET-117), one clause over.
+        // Measured: `StrategyPermission::PrivateSubmission` and `::FlashCapital` have no reader
+        // anywhere in the compiler, the VM or the tooling.
+        if module.permissions.contains(&StrategyPermission::PrivateSubmission) {
+            acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' declares the `private_submission` permission, which nothing \
+                     tests: the claim it states has a spelling that reaches the artifact — \
+                     `submission {{ private = <required|preferred> }}`, which lowers to a mode check the \
+                     VM enforces — so write that instead of a permission no pass reads"
+                ),
+            ));
+        }
+        if module.permissions.contains(&StrategyPermission::FlashCapital) {
+            acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' declares the `flash_capital` permission, and nothing in a module \
+                     body can *require* flash liquidity: the permission is declarable and unverifiable \
+                     (TICKET-040). Either a body needs a borrow statement — which would also discharge \
+                     the `borrow`/`repay` effects — or the permission should leave the set"
+                ),
+            ));
+        }
         let body_chains = chains(&statements);
         if body_chains.len() > 1 && !module.permissions.contains(&StrategyPermission::CrossDomain) {
-            acc.add_error(err(format!(
-                "strategy '{name}' `execute` touches {} chains ({}) but the module does not declare \
+            acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' `execute` touches {} chains ({}) but the module does not declare \
                  the `cross_domain` permission",
-                body_chains.len(),
-                body_chains.iter().cloned().collect::<Vec<_>>().join(", ")
-            )));
+                    body_chains.len(),
+                    body_chains.iter().cloned().collect::<Vec<_>>().join(", ")
+                ),
+            ));
         }
         if statements
             .iter()
             .any(|statement| matches!(statement, Statement::Allow { .. }))
             && !module.permissions.contains(&StrategyPermission::IntentFusion)
         {
-            acc.add_error(err(format!(
-                "strategy '{name}' `execute` opts into intent fusion but the module does not declare \
+            acc.add_error(coded_err(
+                crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                format!(
+                    "strategy '{name}' `execute` opts into intent fusion but the module does not declare \
                  the `intent_fusion` permission"
-            )));
+                ),
+            ));
         }
 
         // ── required domains: every chain the body reaches must be declared ─
@@ -258,11 +356,14 @@ pub fn verify_strategy_modules(program: &Program, acc: &mut ErrorAccumulator) {
             .collect();
         for chain in &body_chains {
             if !declared.contains(chain) {
-                acc.add_error(err(format!(
-                    "strategy '{name}' `execute` touches chain '{chain}' but the module's domains do \
+                acc.add_error(coded_err(
+                    crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "strategy '{name}' `execute` touches chain '{chain}' but the module's domains do \
                      not include it; a module that reaches a chain it never listed has not declared \
                      its requirements"
-                )));
+                    ),
+                ));
             }
         }
 
@@ -276,28 +377,37 @@ pub fn verify_strategy_modules(program: &Program, acc: &mut ErrorAccumulator) {
         if let Some(split) = &module.split {
             let total: u32 = split.shares.iter().map(|(_, bps)| *bps).sum();
             if total != MAX_BPS {
-                acc.add_error(err(format!(
-                    "strategy '{name}' profit split totals {total} bps, not 10_000; a split that does \
+                acc.add_error(coded_err(
+                    crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "strategy '{name}' profit split totals {total} bps, not 10_000; a split that does \
                      not add up is distributing something it does not have, or leaving part of the \
                      profit unassigned"
-                )));
+                    ),
+                ));
             }
             let mut seen: Vec<&str> = Vec::new();
             for (recipient, bps) in &split.shares {
                 if seen.contains(&recipient.as_str()) {
-                    acc.add_error(err(format!(
-                        "strategy '{name}' profit split names '{}' twice; the shares would be \
+                    acc.add_error(coded_err(
+                        crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                        format!(
+                            "strategy '{name}' profit split names '{}' twice; the shares would be \
                          ambiguous",
-                        recipient.as_str()
-                    )));
+                            recipient.as_str()
+                        ),
+                    ));
                 }
                 seen.push(recipient.as_str());
                 if *bps == 0 {
-                    acc.add_error(err(format!(
-                        "strategy '{name}' profit split gives '{}' nothing; leave the recipient out \
+                    acc.add_error(coded_err(
+                        crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                        format!(
+                            "strategy '{name}' profit split gives '{}' nothing; leave the recipient out \
                          rather than writing a zero share",
-                        recipient.as_str()
-                    )));
+                            recipient.as_str()
+                        ),
+                    ));
                 }
             }
 
@@ -312,11 +422,14 @@ pub fn verify_strategy_modules(program: &Program, acc: &mut ErrorAccumulator) {
                 _ => false,
             });
             if !has_floor {
-                acc.add_error(err(format!(
-                    "strategy '{name}' splits profit but asserts no profit floor; distribution \
+                acc.add_error(coded_err(
+                    crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "strategy '{name}' splits profit but asserts no profit floor; distribution \
                      happens after final net profit is known, so the body has to say what that is \
                      (`require profit >= <amount>`)"
-                )));
+                    ),
+                ));
             }
 
             // The royalty the licence promises must be a share the split pays.
@@ -330,37 +443,49 @@ pub fn verify_strategy_modules(program: &Program, acc: &mut ErrorAccumulator) {
                     .map(|(_, bps)| *bps)
                     .unwrap_or(0);
                 if paid < license.profit_share_bps {
-                    acc.add_error(err(format!(
-                        "strategy '{name}' licence grants the author {} bps of profit but the split \
+                    acc.add_error(coded_err(
+                        crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                        format!(
+                            "strategy '{name}' licence grants the author {} bps of profit but the split \
                          pays {} bps; the royalty has to be a share the split actually pays",
-                        license.profit_share_bps, paid
-                    )));
+                            license.profit_share_bps, paid
+                        ),
+                    ));
                 }
             }
         } else if let Some(license) = &module.license {
             // A licence that grants a profit share and no split to pay it from
             // is the same unkept promise, one step earlier.
             if license.profit_share_bps > 0 {
-                acc.add_error(err(format!(
-                    "strategy '{name}' licence grants the author {} bps of profit but the module \
+                acc.add_error(coded_err(
+                    crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "strategy '{name}' licence grants the author {} bps of profit but the module \
                      declares no `split profit`; there is nothing for the royalty to be paid from",
-                    license.profit_share_bps
-                )));
+                        license.profit_share_bps
+                    ),
+                ));
             }
         }
 
         if let Some(license) = &module.license {
             if license.profit_share_bps > MAX_BPS {
-                acc.add_error(err(format!(
-                    "strategy '{name}' licence share {} bps exceeds {MAX_BPS}",
-                    license.profit_share_bps
-                )));
+                acc.add_error(coded_err(
+                    crate::diagnostic::DiagnosticCode::RiskPolicyBound,
+                    format!(
+                        "strategy '{name}' licence share {} bps exceeds {MAX_BPS}",
+                        license.profit_share_bps
+                    ),
+                ));
             }
             if license.executions == Some(0) {
-                acc.add_error(err(format!(
-                    "strategy '{name}' licence grants zero executions; that is not a licence to run \
+                acc.add_error(coded_err(
+                    crate::diagnostic::DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "strategy '{name}' licence grants zero executions; that is not a licence to run \
                      the module"
-                )));
+                    ),
+                ));
             }
         }
 
@@ -384,12 +509,15 @@ pub fn verify_strategy_modules(program: &Program, acc: &mut ErrorAccumulator) {
                                 .flatten()
                         }) {
                             if bound > u128::from(risk.max_slippage_bps) {
-                                acc.add_error(err(format!(
-                                    "strategy '{name}' `execute` relies on `require slippage <= \
+                                acc.add_error(coded_err(
+                                    crate::diagnostic::DiagnosticCode::RiskPolicyBound,
+                                    format!(
+                                        "strategy '{name}' `execute` relies on `require slippage <= \
                                      {bound}`, above the module's declared max_slippage_bps {}; the \
                                      risk profile has to bound what the body accepts",
-                                    risk.max_slippage_bps
-                                )));
+                                        risk.max_slippage_bps
+                                    ),
+                                ));
                             }
                         }
                     }
@@ -465,6 +593,23 @@ fn guarantee_is_discharged(guarantee: TradeGuarantee, statements: &[&Statement])
             }
         }
         TradeGuarantee::DebtClosed => Discharge::NoStatementForm,
+        TradeGuarantee::BoundedSlippage => {
+            // The ceiling, not the floor: `require slippage <= 50` bounds what the body accepts,
+            // and a guard written the other way says the slippage may be *at least* this much —
+            // the same distinction the profit guarantee's comparison preserves.
+            let discharged = statements.iter().any(|statement| match statement {
+                Statement::Require(guard) => {
+                    guard.kind == x3_lang_ast::ast::RequireKind::Slippage
+                        && guard.comparison.is_some_and(|op| op.is_upper_bound())
+                }
+                _ => false,
+            });
+            if discharged {
+                Discharge::Yes
+            } else {
+                Discharge::No
+            }
+        }
     }
 }
 
@@ -475,6 +620,7 @@ fn guarantee_requirement(guarantee: TradeGuarantee) -> &'static str {
         TradeGuarantee::DebtClosed => "add `require all_debts_repaid`",
         TradeGuarantee::MinProfit => "add `require profit >= <amount>`",
         TradeGuarantee::Solvent => "add `require invariant solvent == ...`",
+        TradeGuarantee::BoundedSlippage => "add `require slippage <= <bps>`",
     }
 }
 

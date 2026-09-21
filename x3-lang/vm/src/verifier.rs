@@ -32,6 +32,26 @@ pub enum VerifyError {
         bound: u16,
         supported: u16,
     },
+    /// The artifact states a bytecode version this reader does not know.
+    ///
+    /// Its own variant rather than reading one byte as an opcode: a version this reader does not
+    /// know says the *opcode set* is not one it knows, so every width after the first byte is a
+    /// guess. Refusing is the only answer that cannot be a misparse (TICKET-097), and the message
+    /// comes from `spec::opcodes::version_refusal` so the reader and the writer's own refusal name
+    /// the same version.
+    UnsupportedBytecodeVersion(u8),
+    /// An opcode that the version the artifact states does not contain — either because this format
+    /// does not define it at all, or because it was introduced after that version.
+    ///
+    /// Separate from `InvalidOpcode` because the two say different things to whoever has to fix
+    /// it: an opcode no version defines is a malformed artifact, and an opcode from a *later*
+    /// version is a well-formed artifact this reader must not walk — the same distinction
+    /// `VersionMismatch` draws one level up.
+    OpcodeNotInVersion {
+        opcode: u8,
+        version: u8,
+        pc: usize,
+    },
 }
 
 impl std::fmt::Display for VerifyError {
@@ -45,6 +65,21 @@ impl std::fmt::Display for VerifyError {
                 f,
                 "X3_VERSION_MISMATCH: the artifact binds {field} version {bound} and this runtime \
                  supports {supported}, so it is not one this VM may execute"
+            ),
+            VerifyError::UnsupportedBytecodeVersion(version) => write!(
+                f,
+                "X3_BYTECODE_VERSION_UNSUPPORTED: {}",
+                crate::spec::opcodes::version_refusal(*version).unwrap_or_else(|| format!(
+                    "the artifact states bytecode version {version} and this reader does not know it"
+                ))
+            ),
+            VerifyError::OpcodeNotInVersion { opcode, version, pc } => write!(
+                f,
+                "X3_OPCODE_NOT_IN_VERSION: at pc {pc}, {}",
+                crate::spec::opcodes::opcode_version_refusal(*opcode, *version).unwrap_or_else(|| format!(
+                    "opcode 0x{opcode:02X} is not one this reader may walk in an artifact stating \
+                     bytecode version {version}"
+                ))
             ),
             other => write!(f, "{other:?}"),
         }
@@ -61,9 +96,24 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
     let mut boundaries = HashSet::new();
     let bytes = code.as_slice();
     let compiler_stream = has_compiler_header(bytes);
+    // Which opcode set the artifact's own version promises. A raw stream (no version byte) is not
+    // an artifact and has no other version to bind to than this build's, which is what an
+    // in-process caller that assembles instructions by hand means by them.
+    let artifact_version = if compiler_stream {
+        bytes[0]
+    } else {
+        crate::spec::opcodes::CURRENT_BYTECODE_VERSION
+    };
     // The version binding is checked before anything is read: an artifact this runtime
     // must not execute is refused whether or not the rest of it decodes (PHASE 45).
     if compiler_stream {
+        // A *defined* version this reader does not know is refused by name. It is not treated as
+        // raw bytecode: the first byte of an artifact is a version, and walking it as an
+        // instruction is the misparse — with a newer version it would be a different instruction,
+        // and with a payload opcode it would be `3 + whatever the next two bytes say`.
+        if crate::spec::opcodes::version_refusal(bytes[0]).is_some() {
+            return Err(VerifyError::UnsupportedBytecodeVersion(bytes[0]));
+        }
         verify_version_binding(bytes)?;
     }
     let mut pc = first_instruction_pc(bytes);
@@ -73,12 +123,29 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
         }
         boundaries.insert(pc);
         let opcode = bytes[pc];
-        if !valid_opcode(opcode) {
-            return Err(VerifyError::InvalidOpcode(opcode, pc));
+        // The acceptance set is `spec/opcodes.rs`'s one table of registered opcodes, not a list of
+        // ranges kept here. The range list this replaced is why: the trading range was missing from
+        // it, so `verify` rejected every artifact a trading-core program produces with
+        // `X3_VERIFY_FAILED: InvalidOpcode(176, 1)`, and it accepted every unassigned byte in
+        // 0x00..=0xAB — leaving the executor to refuse them one instruction later, at the wrong
+        // place and for the wrong reason (TICKET-097).
+        match crate::spec::opcodes::opcode_version(opcode) {
+            // Not an instruction at any version: a malformed artifact.
+            None => return Err(VerifyError::InvalidOpcode(opcode, pc)),
+            // An instruction from a version this artifact does not state, so this reader has no
+            // width for it. Refused by name rather than guessed at (TICKET-097).
+            Some(version) if version > artifact_version => {
+                return Err(VerifyError::OpcodeNotInVersion {
+                    opcode,
+                    version: artifact_version,
+                    pc,
+                })
+            }
+            Some(_) => {}
         }
         if is_payload_opcode(opcode, compiler_stream) {
             let payload = read_payload(bytes, pc)?;
-            validate_payload_opcode(opcode, payload, pc)?;
+            validate_payload_opcode(opcode, payload, pc, bytes.len())?;
             pc = align4(pc + 3 + payload.len());
             continue;
         }
@@ -117,6 +184,32 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
                 // criteria hit in `89a15ccc5`.
                 let mode = bytes[pc + 1] & REQUIRE_COMPARE_MASK;
                 if mode > REQUIRE_COMPARE_MEASURED_SLIPPAGE {
+                    return Err(VerifyError::InvalidOperand(pc));
+                }
+                // A measured guard names *which* quantity it compares in the flags' high
+                // bits, and the set is closed: a code outside it would be compared against
+                // whichever field the executor's fall-through happened to read, so a
+                // hand-assembled artifact could ask for a measurement the language does not
+                // have and be answered with a different one. The code is only meaningful
+                // for a measured guard, and code 0 is "no unit stated" — the profit for
+                // mode 2, and what every artifact written before the field existed carries.
+                let unit_code = require_measured_unit_code(bytes[pc + 1]);
+                if mode == REQUIRE_COMPARE_MEASURED_PROFIT {
+                    if !is_known_measured_unit_code(unit_code) {
+                        return Err(VerifyError::InvalidOperand(pc));
+                    }
+                } else if mode == REQUIRE_COMPARE_STATIC {
+                    // A static guard's operand carries the figure it was *checked against* — a
+                    // bond, a score, a depth, a fee ceiling — and the same three bits say what
+                    // that figure counts. Every one of the eight codes now names a quantity, so
+                    // there is nothing left "outside the set"; the check stays because it names
+                    // the set in one place and a fourth bit would have to widen it deliberately.
+                    // Zero means "no figure carried", which is what every artifact written
+                    // before the figure was carried reads as.
+                    if !is_known_guard_quantity(unit_code) {
+                        return Err(VerifyError::InvalidOperand(pc));
+                    }
+                } else if unit_code != MEASURED_UNIT_CODE_PROFIT_BPS {
                     return Err(VerifyError::InvalidOperand(pc));
                 }
                 if require_guard_operator(bytes[pc + 1]) > GUARD_OP_NE {
@@ -225,7 +318,15 @@ fn has_compiler_header(bytes: &[u8]) -> bool {
     // Same rule as the executor's `has_compiler_header`: a version byte
     // followed by a real record. A stream of `[0x01][0x00..]` is raw bytecode
     // that happens to start with the version byte, not a compiler stream.
-    bytes.first() == Some(&BYTECODE_VERSION_1) && bytes.get(1).copied().unwrap_or(NOP) != NOP
+    //
+    // The first byte must be a version this format *defines* rather than only the one this reader
+    // supports: a version-2 artifact has to arrive here so `verify` can refuse it by name, and if
+    // it were not recognised as a stream it would be walked as raw bytecode instead — the misparse
+    // this whole file exists to prevent (TICKET-097). `is_reserved_version_byte` answers the framing
+    // question — it claims the space, so a version from a *future* build is a stream to refuse rather
+    // than raw bytecode to walk — and `is_supported_version` answers the compatibility one, which
+    // `version_refusal` applies before anything is read (TICKET-105).
+    is_reserved_version_byte(bytes.first().copied().unwrap_or(0)) && bytes.get(1).copied().unwrap_or(NOP) != NOP
 }
 
 // The classification comes from `spec/opcodes.rs`, shared with the compiler's
@@ -249,7 +350,7 @@ fn read_payload(bytes: &[u8], pc: usize) -> Result<&[u8], VerifyError> {
     Ok(&bytes[start..end])
 }
 
-fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), VerifyError> {
+fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize, stream_len: usize) -> Result<(), VerifyError> {
     if matches!(opcode, LOCK | MINT | BURN | RELEASE | SWAP) {
         let payload = decode_asset_op_payload(opcode, payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
         match payload {
@@ -275,7 +376,7 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
                     return Err(VerifyError::InvalidOperand(pc));
                 }
             }
-            AssetOpPayload::Release { chain, asset, to } => {
+            AssetOpPayload::Release { chain, asset, to, .. } => {
                 if chain.is_empty() || asset.is_empty() || to.is_empty() {
                     return Err(VerifyError::InvalidOperand(pc));
                 }
@@ -446,6 +547,22 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
         return Ok(());
     }
 
+    if opcode == IF_MEASURED {
+        // `unit:invert:threshold:skip`. Every field is checked, and the skip is checked against where
+        // it lands: a branch whose target is outside the stream, or inside the middle of an
+        // instruction, is a record no execution could follow, and the executor would compute it from
+        // the same figures — so this is where it is caught rather than at the jump.
+        let Some((_, _, _, skip)) = parse_if_measured(payload) else {
+            return Err(VerifyError::InvalidOperand(pc));
+        };
+        let after = align4(pc + 3 + payload.len());
+        let target = after.saturating_add((skip as usize).saturating_mul(4));
+        if target > stream_len {
+            return Err(VerifyError::InvalidOperand(pc));
+        }
+        return Ok(());
+    }
+
     if opcode == ATOMIC_CHOICE {
         // `criterion:paths:selected`. The verifier checks the record describes a
         // branch set that could have been verified — a known criterion, at least
@@ -480,6 +597,29 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
         let approved: Vec<&str> = text.split(',').collect();
         if approved.is_empty() || approved.iter().any(|venue| venue.is_empty()) || approved.len() > MAX_ROUTE_FALLBACKS
         {
+            return Err(VerifyError::InvalidOperand(pc));
+        }
+        return Ok(());
+    }
+
+    if opcode == VENUE_SETTLEMENT {
+        // `venue:shape`, a plain payload the capability decoder below cannot read — the
+        // same shape as the branch above, and it needs the same handling for the same
+        // reason: without it the fall-through rejects the opcode and every program that
+        // declares a venue fails verification while the executor can run it.
+        //
+        // The shape vocabulary is checked here as well as in the executor, against the
+        // compiler's own `SettlementGuarantee`, so a hand-assembled artifact carrying
+        // `settlement vibes` is refused at the door rather than at the leg it describes.
+        let text = std::str::from_utf8(payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
+        let (venue, shape) = text.split_once(':').ok_or(VerifyError::InvalidOperand(pc))?;
+        // `trim()` to match the compiler's rule (`semantic`/`verify` refuse a name that
+        // is blank rather than only one that is empty), so the two cannot disagree about a
+        // name the other refuses to emit.
+        if venue.trim().is_empty() || shape.contains(':') {
+            return Err(VerifyError::InvalidOperand(pc));
+        }
+        if !shape.is_empty() && x3_lang_compiler::ir::SettlementGuarantee::parse(shape).is_none() {
             return Err(VerifyError::InvalidOperand(pc));
         }
         return Ok(());
@@ -527,27 +667,25 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
                 return Err(VerifyError::InvalidOperand(pc));
             }
         }
+        CapabilityPayload::EmitEvent { name, fields } => {
+            // An event with no name is an event no consumer can subscribe to, and an
+            // argument with no name is one the event's own reader cannot address — the
+            // record would carry a value nobody could bind to a parameter.
+            if name.is_empty() || fields.iter().any(|(key, value)| key.is_empty() || value.is_empty()) {
+                return Err(VerifyError::InvalidOperand(pc));
+            }
+        }
+        CapabilityPayload::HostCall { function, .. } => {
+            // The host is asked for a function *by name*: `CALL_HOST` carries no other
+            // selector, so an empty one is a call the host cannot route and must not
+            // receive as a no-op.
+            if function.is_empty() {
+                return Err(VerifyError::InvalidOperand(pc));
+            }
+        }
         _ => {}
     }
     Ok(())
-}
-
-fn valid_opcode(op: u8) -> bool {
-    // Accept every opcode the emitter can produce, including
-    // asset ops (0x20-0x24), control (0x30-0x33), guards
-    // (0x40-0x44), atomic (0x50-0x52), emit/call (0x60-0x66),
-    // vector (0x70-0x73), capability payloads (0x80-0x9B),
-    // extras (0xA0-0xAB) and the trading core (0xB0-0xBA). Halt (0xFF)
-    // and reserved (0x00-0x18) are also valid. Anything outside
-    // 0x00-0xFF is impossible.
-    //
-    // The trading range was missing, so `verify` rejected every bytecode a
-    // trading-core program produces: `x3c run examples/trading_core_v1.x3`
-    // failed with `X3_VERIFY_FAILED: InvalidOpcode(176, 1)` — 0xB0 is
-    // TRADING_BEGIN, the first instruction of the stream. The compiler's
-    // disassembler already carries this range, and carries a comment about
-    // having been fixed for the same reason.
-    op <= 0xAB || (TRADING_BEGIN..=TRADING_BRIDGE).contains(&op) || op == HALT
 }
 
 #[cfg(test)]
@@ -564,6 +702,54 @@ mod tests {
             bytes.push(0);
         }
         InstructionStream::new(bytes)
+    }
+
+    /// A measured `REQUIRE` names *which* quantity it compares in the flags' high bits, and
+    /// the set is closed — a code outside it would be compared against whichever field the
+    /// executor's fall-through happened to read, so a hand-assembled artifact could ask for
+    /// a measurement the language does not have and be answered with a different one
+    /// (TICKET-068).
+    #[test]
+    fn verifier_rejects_a_measured_guard_naming_a_quantity_the_language_does_not_have() {
+        // A `REQUIRE` frame is `[opcode][flags][operand lo][operand hi]`.
+        let require = |flags: u8| InstructionStream::new(vec![REQUIRE, flags, 1, 0]);
+
+        // The profit's own code is zero, which is what every artifact written before the
+        // field existed carries — so this is the backward-compatibility assertion as much
+        // as it is the acceptance of the code.
+        assert!(
+            verify(&require(require_flags(REQUIRE_COMPARE_MEASURED_PROFIT, GUARD_OP_LE))).is_ok(),
+            "a measured profit guard carries no unit code and must still verify"
+        );
+        assert!(
+            verify(&require(require_flags_measured(
+                REQUIRE_COMPARE_MEASURED_PROFIT,
+                GUARD_OP_LE,
+                MEASURED_UNIT_CODE_DELTA_BPS
+            )))
+            .is_ok(),
+            "and a measured delta guard names its quantity and must verify"
+        );
+
+        assert!(
+            verify(&require(require_flags_measured(
+                REQUIRE_COMPARE_MEASURED_PROFIT,
+                GUARD_OP_LE,
+                5
+            )))
+            .is_err(),
+            "a code outside the set is not a measurement this VM can answer"
+        );
+        assert!(
+            verify(&require(require_flags_measured(
+                REQUIRE_COMPARE_MEASURED_SLIPPAGE,
+                GUARD_OP_LE,
+                MEASURED_UNIT_CODE_DELTA_BPS
+            )))
+            .is_err(),
+            "a unit code on a mode whose quantity is already named is a second answer to a \
+             question that has one"
+        );
     }
 
     #[test]
@@ -758,6 +944,164 @@ mod tests {
         assert!(
             boundaries.contains(&expected),
             "the first instruction must be found at {expected}, got {boundaries:?}"
+        );
+    }
+
+    /// An event a host cannot name is refused where it is read.
+    ///
+    /// The compiler states the same rule, so no artifact it writes can carry an empty name — this
+    /// is the hand-assembled case, and it is the one that matters: `EMIT`'s only routing
+    /// information is the name, so a host receiving an unnamed event has nothing to dispatch on
+    /// while the VM reports that it emitted one.
+    #[test]
+    fn verifier_refuses_an_event_that_names_nothing() {
+        let empty_name = payload_code(
+            EMIT,
+            CapabilityPayload::EmitEvent {
+                name: String::new(),
+                fields: vec![("arg0".to_string(), "1".to_string())],
+            },
+        );
+        assert!(
+            matches!(verify(&empty_name), Err(VerifyError::InvalidOperand(_))),
+            "an event with no name must be refused as an invalid operand"
+        );
+
+        // The same record with a name verifies, so the refusal above is the name and not the
+        // record's shape.
+        let named = payload_code(
+            EMIT,
+            CapabilityPayload::EmitEvent {
+                name: "TransferDone".to_string(),
+                fields: vec![("arg0".to_string(), "1".to_string())],
+            },
+        );
+        assert!(verify(&named).is_ok(), "the same event with a name must verify");
+
+        let unnamed_argument = payload_code(
+            EMIT,
+            CapabilityPayload::EmitEvent {
+                name: "TransferDone".to_string(),
+                fields: vec![(String::new(), "1".to_string())],
+            },
+        );
+        assert!(
+            matches!(verify(&unnamed_argument), Err(VerifyError::InvalidOperand(_))),
+            "an argument no reader can bind to a parameter must be refused"
+        );
+    }
+
+    /// `CALL_HOST` carries no selector other than the function's name.
+    #[test]
+    fn verifier_refuses_a_host_call_that_names_nothing() {
+        let empty_function = payload_code(
+            CALL_HOST,
+            CapabilityPayload::HostCall {
+                function: String::new(),
+                args: vec![],
+            },
+        );
+        assert!(
+            matches!(verify(&empty_function), Err(VerifyError::InvalidOperand(_))),
+            "a call naming no function must be refused rather than answered as a no-op"
+        );
+
+        let named = payload_code(
+            CALL_HOST,
+            CapabilityPayload::HostCall {
+                function: "charge_subscription".to_string(),
+                args: vec!["keeper".to_string(), "100".to_string()],
+            },
+        );
+        assert!(verify(&named).is_ok(), "a named call with arguments must verify");
+    }
+
+    /// The bytes the emitter used to write for these two opcodes are refused, not reinterpreted.
+    ///
+    /// Before this record existed the payload was `"{name}:{data:?}"` — a formatted string with no
+    /// length prefix for the name and no field count. It could never be executed (the decoder had no
+    /// arm for either opcode), so no artifact anywhere depends on it; the assertion is here because
+    /// "nothing depended on it" should be a checked statement rather than an assumption, and because
+    /// the new record's first field is also a string, which is exactly the shape a lenient decoder
+    /// would read the old payload's prefix as.
+    #[test]
+    fn the_old_hand_written_event_payload_is_refused_rather_than_misread() {
+        let old_form = b"TransferDone:{\"arg0\": \"Literal(Int { value: 1, base: Decimal, suffix: None })\"}";
+        let mut bytes = vec![EMIT];
+        bytes.extend_from_slice(&(old_form.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(old_form);
+        while bytes.len() % 4 != 0 {
+            bytes.push(0);
+        }
+        assert!(
+            matches!(
+                verify(&InstructionStream::new(bytes)),
+                Err(VerifyError::InvalidOperand(_))
+            ),
+            "the old payload is not an `EmitEvent` and must not be read as one"
+        );
+    }
+}
+
+#[cfg(test)]
+mod static_guard_quantity_tests {
+    use super::*;
+
+    fn require(flags: u8) -> InstructionStream {
+        InstructionStream::new(vec![REQUIRE, flags, 1, 0])
+    }
+
+    /// A static guard's figure is only readable if the code that says *what it counts* is one this
+    /// format defines.
+    ///
+    /// The set is closed for the reason the measured units' is: a reader that printed an unknown
+    /// code would name a quantity the guard is not about. Zero is "no figure carried", which is
+    /// what every artifact written before the figure was carried reads as — so this is the
+    /// backward-compatibility assertion as much as it is the acceptance of the codes.
+    /// Every static code names a quantity, and a *measured* guard may not borrow one.
+    ///
+    /// The two sets are separate claims: a measured code names something a host reported, a static
+    /// code names a figure the compiler checked. A measured guard carrying a static code would be a
+    /// comparison against something nobody measured, which is what this refuses.
+    #[test]
+    fn verifier_accepts_every_static_quantity_and_no_measured_guard_borrows_one() {
+        assert!(
+            verify(&require(require_flags(REQUIRE_COMPARE_STATIC, GUARD_OP_GE))).is_ok(),
+            "a static guard carrying no figure must still verify"
+        );
+        for code in [
+            GUARD_QUANTITY_AMOUNT,
+            GUARD_QUANTITY_SCORE,
+            GUARD_QUANTITY_COUNT,
+            GUARD_QUANTITY_BLOCKS,
+            GUARD_QUANTITY_FEES_BPS,
+        ] {
+            assert!(
+                verify(&require(require_flags_measured(
+                    REQUIRE_COMPARE_STATIC,
+                    GUARD_OP_GE,
+                    code
+                )))
+                .is_ok(),
+                "code {code} is one this format defines"
+            );
+        }
+        // 7 is the fee ceiling, and the three bits are now full.
+        assert!(
+            verify(&require(require_flags_measured(REQUIRE_COMPARE_STATIC, GUARD_OP_GE, 7))).is_ok(),
+            "the last code is the fee ceiling's: the three bits are full, and every code names a \
+             quantity"
+        );
+        // And a measured guard may not borrow a static quantity's code: the two sets are separate
+        // because a measurement and a compile-time figure are different claims.
+        assert!(
+            verify(&require(require_flags_measured(
+                REQUIRE_COMPARE_MEASURED_PROFIT,
+                GUARD_OP_GE,
+                GUARD_QUANTITY_SCORE
+            )))
+            .is_err(),
+            "a measured guard's code is a measured quantity, not a score"
         );
     }
 }

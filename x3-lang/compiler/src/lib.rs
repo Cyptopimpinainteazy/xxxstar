@@ -12,6 +12,7 @@
 //!    allow-lists, refund paths, explicit finality/proofs, route scores,
 //!    invariant rules, compile-mode gating, and risk scoring).
 
+pub mod annotations;
 pub mod arb;
 pub mod cost;
 pub mod dag;
@@ -57,11 +58,11 @@ use parser::parse_source;
 use semantic::verify_atomic_swap_decls;
 use semantic::verify_with_config as verify_semantics;
 use semantic::{
-    verify_atomic_choice_decls, verify_bridge_liquidity_declared, verify_finality_guards_declared,
-    verify_guard_kinds_are_checkable, verify_invariant_guards_declared, verify_parallel_decls, verify_privacy_decls,
-    verify_proof_complete_declared, verify_relayer_quorum_declared, verify_risk_policy_bounds_guards,
-    verify_route_fallbacks, verify_route_score_declared, verify_solver_bond_declared, verify_venue_decls,
-    verify_vm_supported_declared,
+    verify_atomic_choice_decls, verify_bridge_liquidity_declared, verify_declarations_have_a_reader,
+    verify_fee_guards_declared, verify_finality_guards_declared, verify_guard_kinds_are_checkable,
+    verify_invariant_guards_declared, verify_parallel_decls, verify_privacy_decls, verify_proof_complete_declared,
+    verify_relayer_quorum_declared, verify_risk_policy_bounds_guards, verify_route_fallbacks,
+    verify_route_score_declared, verify_solver_bond_declared, verify_venue_decls, verify_vm_supported_declared,
 };
 use x3_lang_ast::ast::Program;
 use x3_lang_common::{ErrorAccumulator, Span, X3Error};
@@ -155,6 +156,9 @@ pub(crate) fn run_pre_emission_layers_with_context(
     // program's declarations with each other (PHASE 36).
     let mut warnings = outcome.warnings;
     warnings.extend(profitability::warnings(program));
+    // A modifier the artifact has no form for is stated as policy or reported, and never silently
+    // nothing — the table in `annotations` is the enumeration (TICKET-111).
+    warnings.extend(annotations::warnings(program));
 
     Ok(PreEmission { ir, errors, warnings })
 }
@@ -199,6 +203,8 @@ fn ast_level_errors(program: &Program) -> Vec<X3Error> {
     verify_relayer_quorum_declared(program, &mut acc);
     verify_proof_complete_declared(program, &mut acc);
     verify_route_score_declared(program, &mut acc);
+    verify_fee_guards_declared(program, &mut acc);
+    verify_declarations_have_a_reader(program, &mut acc);
     verify_finality_guards_declared(program, &mut acc);
     verify_risk_policy_bounds_guards(program, &mut acc);
     verify_vm_supported_declared(program, &mut acc);

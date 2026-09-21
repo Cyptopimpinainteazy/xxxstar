@@ -439,9 +439,40 @@ mod tests {
         assert!(!provider.is_ws());
     }
 
+    /// A WebSocket client is constructible **without a network** (TICKET-102).
+    ///
+    /// This test used to connect to `ws://localhost:9944` — a node nobody had started — so it
+    /// panicked wherever a socket was not available:
+    /// `Connection("WebSocket connection failed: IO error: Operation not permitted")`, which is a
+    /// sandbox, an air-gapped release build, or a CI runner with egress closed. `cargo test
+    /// --workspace` is one of the commands this repository's own rules require as proof, and it
+    /// could not be green offline because of this line.
+    ///
+    /// It starts a **loopback listener** and completes the handshake itself, so the assertion is
+    /// about the client rather than about the internet. The port is the kernel's (`:0`), which is
+    /// also what keeps two runs from colliding.
     #[tokio::test]
     async fn test_ws_client_creation() {
-        let client = WsRpcClient::connect("ws://localhost:9944").await.unwrap();
-        assert_eq!(client.endpoint(), "ws://localhost:9944");
+        use tokio::net::TcpListener;
+        use tokio_tungstenite::accept_async;
+
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("a loopback listener: this test needs a socket, not a network");
+        let addr = listener.local_addr().expect("the bound address");
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("one connection");
+            // The handshake the client waits for. Its result is irrelevant: what this test
+            // asserts is that the client gets through `connect`, not what it does afterwards.
+            let _ = accept_async(stream).await;
+        });
+
+        let endpoint = format!("ws://{addr}");
+        let client = WsRpcClient::connect(endpoint.clone())
+            .await
+            .expect("the client must construct against a listener that answers");
+        assert_eq!(client.endpoint(), endpoint);
+
+        server.abort();
     }
 }

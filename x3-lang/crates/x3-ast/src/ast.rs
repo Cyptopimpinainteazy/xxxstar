@@ -415,7 +415,6 @@ pub enum Annotation {
     Whitelist(Vec<Symbol>),
     Concurrent,
     Scheduled(u64),
-    Subscription(u128, u64),
     Extern,
     Payable,
     Simd,
@@ -524,6 +523,14 @@ pub enum RequireKind {
     Finality,
     /// `require slippage <= <pct>`
     Slippage,
+    /// `require fees <= <bps>` — the most this program will pay in fees.
+    ///
+    /// The pair the slippage ceiling has: a policy declares the bound a module accepts
+    /// (`risk { max_total_fee_bps N }`), and a guard states the one a body relies on. Before this
+    /// there was no `fees` guard, so only the policy half existed — a module could declare a fee
+    /// ceiling and its body could route through a venue that broke it with nothing to compare
+    /// (TICKET-116, TICKET-027's shape).
+    Fees,
     /// `require profit > <amount>`
     Profit,
     /// `require invariant <name> == <expected>`
@@ -589,6 +596,7 @@ impl RequireKind {
         match self {
             RequireKind::Finality => "finality",
             RequireKind::Slippage => "slippage",
+            RequireKind::Fees => "fees",
             RequireKind::Profit => "profit",
             RequireKind::InvariantCheck => "invariant",
             RequireKind::RiskScore => "risk",
@@ -1148,6 +1156,35 @@ pub struct CrossChainStrategy {
     /// the compiled policy requires privacy, so this is a *requirement the
     /// artifact states* rather than a description of the source.
     pub submission: Option<SubmissionPolicy>,
+    /// `resources { max_compute …; max_memory …; max_network_calls …; max_routes …; max_branches …; }`
+    /// — PHASE 41's own spelling for its resource caps.
+    ///
+    /// The implementation already had `bounds { max_steps … max_gas … }`; this is the phase's block,
+    /// and the caps the compiler can measure are checked against the same figures. `max_memory` is
+    /// refused by name rather than accepted: this VM has no memory model, so a memory cap would be a
+    /// number nothing measures.
+    #[serde(default)]
+    pub resources: Option<StrategyResources>,
+}
+
+/// PHASE 41's resource caps, as the phase spells them.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StrategyResources {
+    /// `max_compute` — the same figure `bounds { max_steps … }` bounds: the operations the module
+    /// lowers to. The phase's word is "compute" and the implementation's is "steps"; both are the
+    /// count the VM charges instructions in, so they are checked against one number rather than two.
+    pub max_compute: Option<Expression>,
+    /// `max_memory` — no counterpart: this VM holds registers and a call stack, and has no memory
+    /// model to bound. Declaring it is refused with that reason.
+    pub max_memory: Option<Expression>,
+    /// `max_network_calls` — the instructions that leave the VM for a host adapter
+    /// (`cost::HOST_FACING`), counted from the module's own operations.
+    pub max_network_calls: Option<Expression>,
+    /// `max_routes` — the steps the module takes: a `swap` or a `bridge` is one hop of a route, and
+    /// the phase's purpose for this cap is to stop a pathological graph rather than to price one.
+    pub max_routes: Option<Expression>,
+    /// `max_branches` — the decisions the module contains: an `if` and an `atomic_choice` path set.
+    pub max_branches: Option<Expression>,
 }
 
 /// How a module requires its submission to travel.
@@ -1702,6 +1739,20 @@ pub struct LiquidationSwap {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RebalanceDecl {
     pub name: Symbol,
+    /// `holds { ethereum.BTC = 5; … }` — what the account holds **now**, in each asset's
+    /// own units.
+    ///
+    /// The phase says the compiler should "eventually" generate the transaction graph that
+    /// reaches the target, and this is the input it was missing: every trade to the target
+    /// depends on where the portfolio starts, and a compiler has no state. With the
+    /// holdings stated, the artifact carries both ends — what is held and what is wanted —
+    /// and a host that prices them can compute the trades. Without it the target is a
+    /// direction with no origin, which is what the artifact carried before (TICKET-070).
+    ///
+    /// `#[serde(default)]`: an AST stored before the clause existed carries no holdings,
+    /// and "nothing was written" is the honest answer for it rather than a load failure.
+    #[serde(default)]
+    pub holdings: Vec<(AssetRef, u128)>,
     /// `BTC = 40%` — the target weight of each asset, in percent.
     pub weights: Vec<(AssetRef, u32)>,
     /// `minimize { fees; slippage; }` — in the order written. The first is the

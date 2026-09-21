@@ -3082,9 +3082,13 @@ pub trait BridgeAdapter {
     fn venue_order(&self, order: &[u8]) -> BridgeResult;
     /// Move an account to a target portfolio.
     ///
-    /// `portfolio\x1fasset:percent,…\x1fcriterion`. The compiler decides the target and
-    /// the criterion; the trades that reach them depend on the account's current holdings,
-    /// which only the host has.
+    /// `portfolio\x1fasset:amount,…\x1fasset:percent,…\x1fcriterion` — both ends of the move,
+    /// because the trades that reach a target depend on where the portfolio starts.
+    ///
+    /// The compiler decides the target and the criterion. The second field carries what the
+    /// program stated it holds (`holds { … }`), and is **empty** when it stated none — a host
+    /// can tell that from holding nothing, and a target with no origin is what it could not
+    /// act on before (TICKET-070).
     fn rebalance_target(&self, target: &[u8]) -> BridgeResult;
     fn bridge_transfer(
         &self,
@@ -3229,21 +3233,55 @@ impl BridgeAdapter for UnconfiguredBridge {
 /// here, on the adapter, because only a host can know what the market did.
 pub struct DryRunBridge {
     /// `(profit bps, slippage bps)` a trade call should report.
-    pub measurement: Option<(u128, u128)>,
+    /// The profit a caller stated, in basis points. Reported by whichever call the program's
+    /// measured guard follows: a plan's floor follows a `multi_hop_swap`, and a liquidation's
+    /// follows the venue orders that seized the collateral — the same quantity, so the same
+    /// unit, and one field rather than one per call.
+    pub profit_measurement: Option<u128>,
+    /// The slippage a caller stated, in basis points. A plan's ceiling follows a
+    /// `multi_hop_swap`, so this rides the same call the profit does.
+    pub slippage_measurement: Option<u128>,
+    /// The hedge delta the venue reports, when a caller stated one.
+    ///
+    /// A hedge's bound is about the delta the venue actually filled, and the venue is
+    /// asked through `venue_order` — so this is the quantity that call answers, and it is
+    /// independent of the profit and the slippage a `multi_hop_swap` reports because a
+    /// hedge's program states none of those.
+    pub delta_measurement: Option<u128>,
 }
 
 impl DryRunBridge {
     /// A dry run that reports the market outcome it is given.
     pub fn with_measurement(profit_bps: u128, slippage_bps: u128) -> Self {
         DryRunBridge {
-            measurement: Some((profit_bps, slippage_bps)),
+            profit_measurement: Some(profit_bps),
+            slippage_measurement: Some(slippage_bps),
+            delta_measurement: None,
+        }
+    }
+
+    /// The general form: each quantity a host can measure, stated independently.
+    ///
+    /// A hedge is bounded by a **delta** and a plan by a **profit** and a **slippage**, so a
+    /// caller told to state all three would be inventing the ones its program never reads.
+    /// The profit and the slippage still travel together, because one call answers both of
+    /// the guards a plan emits; the delta belongs to the venue order a hedge asks.
+    pub fn with_outcome(profit_bps: Option<u128>, slippage_bps: Option<u128>, delta_bps: Option<u128>) -> Self {
+        DryRunBridge {
+            profit_measurement: profit_bps,
+            slippage_measurement: slippage_bps,
+            delta_measurement: delta_bps,
         }
     }
 }
 
 impl Default for DryRunBridge {
     fn default() -> Self {
-        DryRunBridge { measurement: None }
+        DryRunBridge {
+            profit_measurement: None,
+            slippage_measurement: None,
+            delta_measurement: None,
+        }
     }
 }
 
@@ -3320,24 +3358,55 @@ impl BridgeAdapter for DryRunBridge {
         Ok([b"dry-run-rebalance_target:".as_slice(), target].concat())
     }
     fn venue_order(&self, order: &[u8]) -> BridgeResult {
-        // What a dry run can say about an order: what it was asked to do. It reports no
-        // measurement, because a dry run has no prices — so a hedge's delta bound, a
-        // compile-time constraint, stays a record and nothing pretends to have measured it.
+        // What a dry run can say about an order: what it was asked to do. A dry run has no
+        // prices, so it reports **no** measurement unless the caller stated the outcome —
+        // and then the delta is the venue's answer, which is what turns a hedge's bound
+        // from a constraint on the declaration into a post-condition on the trade. A dry
+        // run must not invent a number to satisfy a guard.
+        let mut reply = Vec::new();
+        // A liquidation's floor is about the net its venue orders realised, so the profit a
+        // caller stated is reported here as well as on the swap call a plan makes: the
+        // quantity is the same and the unit is the same, and which call answers it is
+        // whichever one the measured guard follows.
+        if let Some(profit_bps) = self.profit_measurement {
+            reply.extend(crate::spec::opcodes::measured_reply(
+                crate::spec::opcodes::MEASURED_UNIT_PROFIT_BPS,
+                profit_bps,
+            ));
+        }
+        if let Some(delta_bps) = self.delta_measurement {
+            reply.extend(crate::spec::opcodes::measured_reply(
+                crate::spec::opcodes::MEASURED_UNIT_DELTA_BPS,
+                delta_bps,
+            ));
+        }
+        if !reply.is_empty() {
+            return Ok(reply);
+        }
         Ok([b"dry-run-venue_order:".as_slice(), order].concat())
     }
     fn multi_hop_swap(&self, path: &[u8], amount: u128) -> BridgeResult {
         // A stated measurement is what the trade reports; without one the reply is an
         // echo, which says nothing about the market and therefore reports nothing. A
         // dry run must not invent a number to satisfy a guard.
-        if let Some((profit_bps, slippage_bps)) = self.measurement {
+        let (profit_bps, slippage_bps) = (self.profit_measurement, self.slippage_measurement);
+        if profit_bps.is_some() || slippage_bps.is_some() {
             let _ = (path, amount);
-            let mut reply =
-                crate::spec::opcodes::measured_reply(crate::spec::opcodes::MEASURED_UNIT_PROFIT_BPS, profit_bps);
-            // The slippage measurement follows in the same reply, so one call can answer
-            // both guards a plan emits.
-            reply.push(crate::spec::opcodes::CAPABILITY_REPLY_MEASURED_TAG);
-            reply.push(crate::spec::opcodes::MEASURED_UNIT_SLIPPAGE_BPS);
-            reply.extend_from_slice(&slippage_bps.to_le_bytes());
+            let mut reply = Vec::new();
+            // The two travel in one reply so a single call can answer both guards a plan
+            // emits; either may be absent, and a guard whose quantity is absent refuses.
+            if let Some(profit_bps) = profit_bps {
+                reply.extend(crate::spec::opcodes::measured_reply(
+                    crate::spec::opcodes::MEASURED_UNIT_PROFIT_BPS,
+                    profit_bps,
+                ));
+            }
+            if let Some(slippage_bps) = slippage_bps {
+                reply.extend(crate::spec::opcodes::measured_reply(
+                    crate::spec::opcodes::MEASURED_UNIT_SLIPPAGE_BPS,
+                    slippage_bps,
+                ));
+            }
             return Ok(reply);
         }
         Ok([format!("dry-run-multi_hop_swap:{amount}:").as_bytes(), path].concat())

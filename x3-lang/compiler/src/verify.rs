@@ -4,7 +4,7 @@
 //! invariants that should never be delegated to an emitter or runtime decoder.
 
 use crate::diagnostic::{CompilerDiagnostic, DiagnosticCode};
-use crate::ir::{AssetKey, Operation, TradingOperation, ValueRef, X3IR};
+use crate::ir::{AssetKey, Condition, Operation, ReleaseAct, TradingOperation, ValueRef, X3IR};
 use std::collections::{BTreeMap, BTreeSet};
 use x3_lang_common::{Bps, Span};
 
@@ -47,11 +47,16 @@ fn require_non_empty(diagnostics: &mut Vec<CompilerDiagnostic>, context: &str, f
 
 fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<CompilerDiagnostic>) {
     let mut atomic_depth: i32 = 0;
+    // How many locks the atomic block currently open has written, so a *claim* can be checked
+    // against the route it names a lock in. A payout names no lock and is not checked
+    // (TICKET-101).
+    let mut locks_in_block: usize = 0;
 
     for (index, op) in ops.iter().enumerate() {
         let op_context = format!("{context}[{index}]");
         match op {
             Operation::AtomicBegin => {
+                locks_in_block = 0;
                 if atomic_depth > 0 {
                     push_unsafe(
                         diagnostics,
@@ -278,6 +283,39 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
                     );
                 }
             }
+            Operation::VenueSettlement { venue, guarantee } => {
+                // An unnamed venue makes the record unattributable — a reader could not
+                // tell which declaration the guarantee belongs to, and that attribution
+                // is the whole content of the record.
+                if venue.trim().is_empty() {
+                    push_unsafe(
+                        diagnostics,
+                        format!("{op_context}: venue settlement record names no venue"),
+                    );
+                }
+                // The separator is what the encoding splits on and the shape word is
+                // written after it, so a name carrying either would read back as a
+                // different venue or a different shape. Refused rather than escaped: no
+                // real venue name needs one.
+                if venue.contains(':') || venue.contains(',') {
+                    push_unsafe(
+                        diagnostics,
+                        format!(
+                            "{op_context}: venue '{venue}' contains the payload separator, so its \
+                             settlement record would not read back as this venue"
+                        ),
+                    );
+                }
+                // The shape is a closed enum, so the only way to reach the artifact with a
+                // word the VM does not know is to change the enum without changing the
+                // word it renders, which the round-trip test covers.
+                if let Some(shape) = guarantee {
+                    debug_assert!(
+                        x3_lang_ast::ast::SettlementGuarantee::parse(shape.as_str()) == Some(*shape),
+                        "a settlement guarantee must round-trip through its own word"
+                    );
+                }
+            }
             Operation::AtomicEnd => {
                 if atomic_depth == 0 {
                     push_unsafe(
@@ -290,13 +328,14 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
             }
             Operation::Rebalance {
                 name,
+                holdings,
                 weights,
                 criterion,
             } => {
-                // A target portfolio is an instruction, not a graph: nothing in the language
-                // or the compiler holds the *current* portfolio, and every trade that reaches
-                // the target depends on it. So what is checked here is what the instruction
-                // says, and what it says is refused when it is empty.
+                // A target portfolio is an instruction, not a graph: every trade that reaches
+                // the target depends on where the portfolio starts. The program may state it
+                // now — `holds { … }` — and when it does it travels, so what is checked here
+                // is what the instruction says, and what it says is refused when it is empty.
                 require_non_empty(diagnostics, &op_context, "portfolio", name);
                 require_non_empty(diagnostics, &op_context, "criterion", criterion);
                 if weights.is_empty() {
@@ -304,6 +343,36 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
                         diagnostics,
                         format!("{op_context}: the rebalance '{name}' carries no weights to reach"),
                     );
+                }
+                // A holding named twice is a defect `rebalance::portfolio` already refuses, so
+                // reaching here with one means an IR assembled by hand. The second amount would
+                // replace the first and one of them would not be in force.
+                let mut held: Vec<&str> = Vec::new();
+                for (asset, _) in holdings {
+                    if held.contains(&asset.as_str()) {
+                        push_unsafe(
+                            diagnostics,
+                            format!(
+                                "{op_context}: the rebalance '{name}' states what it holds of \
+                                     '{asset}' twice, so one of the two amounts would not be in \
+                                     force"
+                            ),
+                        );
+                    }
+                    held.push(asset.as_str());
+                }
+                // A holding of nothing is a statement about nothing: `holds { X = 0; }` is how
+                // zero is written, and an empty asset name is not a holding at all.
+                for (asset, _) in holdings {
+                    if asset.trim().is_empty() {
+                        push_unsafe(
+                            diagnostics,
+                            format!(
+                                "{op_context}: the rebalance '{name}' states a holding with no \
+                                     asset"
+                            ),
+                        );
+                    }
                 }
             }
             Operation::VenueOrder {
@@ -321,23 +390,72 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
                     );
                 }
             }
-            Operation::If { .. } => push_unsafe(
-                diagnostics,
-                format!(
-                    "{op_context}: `if` cannot be executed — this VM branches on a register and skips \
-                     four-byte instructions, and a compiler stream is framed with variable widths and \
-                     padded, so the branch has no target it could jump to and no condition it could \
-                     read"
+            Operation::If {
+                condition, then_ops, ..
+            } => match condition {
+                // A branch the compiler *decided* is emittable, and the emitter writes the branch
+                // that runs straight into the stream — no `IF` record at all, so every instruction
+                // in the artifact is at an absolute boundary and walkable. What is left for this
+                // verifier is the decision's own soundness: `Condition::True` with an empty branch
+                // is a decision with nothing to run, which the emitter would write as nothing at
+                // all and a reader would never see that the program branched.
+                Condition::True => {
+                    if then_ops.is_empty() {
+                        push_unsafe(
+                            diagnostics,
+                            format!(
+                                "{op_context}: `if` was decided true and its branch is empty, so the \
+                                     artifact would show no trace of the branch the program wrote"
+                            ),
+                        );
+                    }
+                }
+                // A `False` is written by writing its `else`, or by writing nothing when there is
+                // none — which is the language's meaning for `if c { a }` with `c` false.
+                Condition::False => {}
+                // A branch on a quantity a host measured is emittable: the record carries the
+                // quantity, the comparison's direction, the bound and the distance to skip, and the
+                // VM decides it from what a venue actually reported (TICKET-106). The body it does
+                // not take is written beside it, so a reader sees both paths.
+                Condition::Measured { .. } => {}
+                // Undecidable, so this VM cannot run it: it branches on a register and skips whole
+                // four-byte instructions, and a compiler stream is framed with variable widths and
+                // padded, so the branch has no target it could jump to and no condition it could
+                // read (TICKET-058).
+                _ => push_unsafe(
+                    diagnostics,
+                    format!(
+                        "{op_context}: `if` cannot be executed — the condition is not decidable at \
+                         compile time, and this VM branches on a register and skips four-byte \
+                         instructions, and a compiler stream is framed with variable widths and \
+                         padded, so the branch has no target it could jump to and no condition it \
+                         could read"
+                    ),
                 ),
-            ),
-            Operation::Loop { .. } => push_unsafe(
-                diagnostics,
-                format!(
-                    "{op_context}: `loop` cannot be executed — this VM branches on a register and skips \
-                     four-byte instructions, and a compiler stream is framed with variable widths and \
-                     padded, so the loop has no target it could jump back to"
+            },
+            Operation::Loop { condition, .. } => match condition {
+                // `while <decided false> { … }` never runs its body. That is the language's
+                // meaning and a decision the compiler made, so there is no target to jump back to
+                // and nothing to refuse: the emitter writes no record at all, the way an `if`
+                // decided false with no `else` writes nothing.
+                Condition::False => {}
+                // Anything else needs the register codegen TICKET-058 names — a condition in a
+                // register and a target in stream coordinates — and is refused rather than written.
+                // The refusal names the guard the program wrote, not only the construct: with
+                // several `while`s in a program, "the loop cannot be executed" left its reader to
+                // guess which one, and the loop's own condition was the one fact the IR had thrown
+                // away (TICKET-098).
+                other => push_unsafe(
+                    diagnostics,
+                    format!(
+                        "{op_context}: `loop` over `{}` cannot be executed — this VM branches on a \
+                         register and skips four-byte instructions, and a compiler stream is framed \
+                         with variable widths and padded, so the loop has no target it could jump \
+                         back to and no instruction that puts its condition in a register",
+                        other.describe()
+                    ),
                 ),
-            ),
+            },
             Operation::Lock {
                 chain,
                 asset,
@@ -356,6 +474,10 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
                 amount,
                 from,
             } => {
+                // A `Lock` is what a claim names; a mint or a burn creates no claimable escrow.
+                if matches!(op, Operation::Lock { .. }) && atomic_depth > 0 {
+                    locks_in_block += 1;
+                }
                 require_non_empty(diagnostics, &op_context, "chain", chain);
                 require_non_empty(diagnostics, &op_context, "asset", asset);
                 require_non_empty(diagnostics, &op_context, "account", from);
@@ -366,10 +488,34 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
                     );
                 }
             }
-            Operation::Release { chain, asset, to } => {
+            Operation::Release { chain, asset, to, act } => {
                 require_non_empty(diagnostics, &op_context, "chain", chain);
                 require_non_empty(diagnostics, &op_context, "asset", asset);
                 require_non_empty(diagnostics, &op_context, "to", to);
+                // `Some(index)` claims a lock; `None` pays out an asset. That distinction is
+                // what lets this check exist at all: the first attempt at it had to guess which
+                // of the two a release was, refused payouts, and failed four cross-chain
+                // parallel-plan tests (TICKET-101).
+                if let ReleaseAct::Claims(index) = act {
+                    if atomic_depth == 0 {
+                        push_unsafe(
+                            diagnostics,
+                            format!(
+                                "{op_context}: the release claims lock #{index}, and it is not \
+                                 inside an atomic route — a claim is about a lock its own route \
+                                 wrote, and there is no route here"
+                            ),
+                        );
+                    } else if usize::try_from(*index).map_or(true, |position| position >= locks_in_block) {
+                        push_unsafe(
+                            diagnostics,
+                            format!(
+                                "{op_context}: the release claims lock #{index} of its route, which \
+                                 has written {locks_in_block} lock(s) so far"
+                            ),
+                        );
+                    }
+                }
             }
             Operation::Swap {
                 from_chain,

@@ -1,5 +1,7 @@
 //! Typed binary payloads for X3 capability opcodes.
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CapabilityPayload {
     GpuDispatch {
@@ -142,6 +144,12 @@ pub enum CapabilityPayload {
     /// `spec::opcodes::REBALANCE_TARGET`.
     RebalanceTarget {
         portfolio: String,
+        /// `chain.ASSET` and what the account holds, in the asset's own units. Empty when the
+        /// program stated none. Carried because the trades to the target depend on where the
+        /// portfolio starts, which is the input the target alone lacks (TICKET-070); appended
+        /// to this record's fields rather than inserted, so a payload written before it existed
+        /// ends early and is **refused** as short rather than misread.
+        holdings: Vec<(String, u128)>,
         weights: Vec<(String, u32)>,
         criterion: String,
     },
@@ -202,10 +210,73 @@ pub enum CapabilityPayload {
         target: String,
         after_blocks: u32,
     },
+    /// `emit Name(arg, …)` (`EMIT`, `0x60`) — a named event and what it carries.
+    ///
+    /// This record had no arm anywhere until now: the emitter wrote the payload by hand as
+    /// `format!("{name}:{data:?}")` and the shared decoder rejected `0x60` outright, so every
+    /// program containing an `emit` statement built an artifact the verifier refused with
+    /// `InvalidOperand`. The hand-written form also reached the host as Rust `Debug` text —
+    /// `TransferDone:{"arg0": "Literal(Int { value: 1, … })"}` — which is the compiler's own AST
+    /// representation and not a payload any consumer could agree on.
+    ///
+    /// `fields` is a sequence rather than a map because the order reaches the artifact's bytes and
+    /// a map's iteration order is a property of its implementation; the lowering sorts by argument
+    /// name before it gets here, so the order is the program's, not the runtime's.
+    EmitEvent {
+        name: String,
+        /// Argument name (`arg0`, …) and the expression the program wrote, rendered as source.
+        fields: Vec<(String, String)>,
+    },
+    /// A call to a named host function (`CALL_HOST`, `0x61`).
+    ///
+    /// What `@subscription`, `@subscribe`, `@sponsor`, `diff before after`, a subscription
+    /// declaration and an unclaimed function call all lower to. It is the IR's untyped host call:
+    /// the name says what is asked for and the arguments are the source text of each, so a host
+    /// that does not know the function can still refuse it by name instead of acting on a number
+    /// it was handed without context.
+    HostCall {
+        function: String,
+        args: Vec<String>,
+    },
+}
+
+/// What a `Release` **does**. One opcode, three acts (TICKET-001).
+///
+/// `Release` carried three meanings and said none of them, so every rule that reasoned about it
+/// inferred which one from context: `no_refund_after_claim` kept a lookup to tell a payout from a
+/// claim, and a range check could not be written at all because it read payouts as claims
+/// (TICKET-101). A refund's concrete release was indistinguishable from a payout of the same
+/// asset, which is what left the builtin invariants false-positiving on well-formed intents until
+/// they were scoped away from it (TICKET-002).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReleaseAct {
+    /// Pays out the asset a route delivered, or an asset the program holds. Claims no escrow.
+    Payout,
+    /// Claims the lock at this index among its route's locks.
+    Claims(u32),
+    /// Returns an escrow to its payer: the concrete instruction a refund handler's
+    /// `FailureAction::Refund` produces. The inverse of a lock, and neither of the other two.
+    Refund,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AssetOpPayload {
+    /// `lock chain.ASSET amount V from ADDR` — escrow `amount` on the source chain.
+    ///
+    /// **`from` is the payer**: the account on *this* endpoint's chain whose funds are
+    /// held, which is what a host debits. TICKET-072 read it as the payee and reported a
+    /// mis-debit; it is not one. An intent writes `from <chain.ASSET> … receiver <addr>`,
+    /// and that endpoint's `receiver` is an account on the **from** chain — the Python
+    /// validator checks it against `from.chain`, and the destination side's account is the
+    /// `to` endpoint's own receiver, which is what [`AssetOpPayload::Release`] carries.
+    /// Each endpoint names the account on its own chain, so a lock naming its payer and a
+    /// release naming its payee are the same rule read twice.
+    ///
+    /// Two spellings reach this field for the same quantity: a concrete address (an
+    /// intent's endpoint receiver) and the keyword `"sender"` (the atomic-swap path, where
+    /// the payer is whoever submitted the trade). They agree about *what* the field is;
+    /// they differ about how a host resolves it, which is the residual this doc records
+    /// rather than a defect it hides.
     Lock {
         chain: String,
         asset: String,
@@ -228,6 +299,12 @@ pub enum AssetOpPayload {
         chain: String,
         asset: String,
         to: String,
+        /// Which of the three acts this release performs. A tag byte carries it, and the index
+        /// follows only for a claim, so the act is *written* rather than inferred from a
+        /// sentinel — the same shape as a venue stating no settlement. Appended to this record
+        /// rather than inserted, so a payload written before the fields existed ends early and
+        /// is **refused** as short rather than read as a whole release.
+        act: ReleaseAct,
     },
     Swap {
         from_chain: String,
@@ -264,6 +341,12 @@ pub enum CapabilityCodecError {
     InvalidOpcode(u8),
     TrailingBytes,
     PayloadTooLarge,
+    /// A record carried a tag the encoder does not write.
+    ///
+    /// Its own variant rather than a fall-through to a default: the tags in this format say
+    /// *which* of two acts a record describes, so a tag nobody wrote must be refused rather
+    /// than read as the one that happens to be the default (TICKET-101).
+    UnknownTag(u8),
 }
 
 impl std::fmt::Display for CapabilityCodecError {
@@ -410,10 +493,16 @@ pub fn encode_capability_payload(payload: &CapabilityPayload) -> Result<Vec<u8>,
         // ===== B-52 Feature Lock encode =====
         CapabilityPayload::RebalanceTarget {
             portfolio,
+            holdings,
             weights,
             criterion,
         } => {
             write_string(&mut out, portfolio)?;
+            write_u16(&mut out, holdings.len() as u16);
+            for (key, amount) in holdings {
+                write_string(&mut out, key)?;
+                write_u128(&mut out, *amount);
+            }
             write_u16(&mut out, weights.len() as u16);
             for (key, percent) in weights {
                 write_string(&mut out, key)?;
@@ -502,6 +591,18 @@ pub fn encode_capability_payload(payload: &CapabilityPayload) -> Result<Vec<u8>,
             write_string(&mut out, target)?;
             write_u32(&mut out, *after_blocks);
         }
+        CapabilityPayload::EmitEvent { name, fields } => {
+            write_string(&mut out, name)?;
+            write_u16(&mut out, fields.len() as u16);
+            for (key, value) in fields {
+                write_string(&mut out, key)?;
+                write_string(&mut out, value)?;
+            }
+        }
+        CapabilityPayload::HostCall { function, args } => {
+            write_string(&mut out, function)?;
+            write_string_vec(&mut out, args)?;
+        }
     }
     Ok(out)
 }
@@ -542,10 +643,19 @@ pub fn encode_asset_op_payload(payload: &AssetOpPayload) -> Result<Vec<u8>, Capa
             write_u128(&mut out, *amount);
             write_string(&mut out, from)?;
         }
-        AssetOpPayload::Release { chain, asset, to } => {
+        AssetOpPayload::Release { chain, asset, to, act } => {
             write_string(&mut out, chain)?;
             write_string(&mut out, asset)?;
             write_string(&mut out, to)?;
+            // A tag byte per act: three acts that must not be spelled as one another.
+            match act {
+                ReleaseAct::Payout => write_u8(&mut out, 0),
+                ReleaseAct::Claims(index) => {
+                    write_u8(&mut out, 1);
+                    write_u32(&mut out, *index);
+                }
+                ReleaseAct::Refund => write_u8(&mut out, 2),
+            }
         }
         AssetOpPayload::Swap {
             from_chain,
@@ -593,6 +703,14 @@ pub fn decode_asset_op_payload(opcode: u8, bytes: &[u8]) -> Result<AssetOpPayloa
             chain: reader.read_string()?,
             asset: reader.read_string()?,
             to: reader.read_string()?,
+            act: match reader.read_u8()? {
+                0 => ReleaseAct::Payout,
+                1 => ReleaseAct::Claims(reader.read_u32()?),
+                2 => ReleaseAct::Refund,
+                // A tag the encoder never writes is a record this reader does not understand,
+                // and reading it as one of the three would be the inference the tag removed.
+                other => return Err(CapabilityCodecError::UnknownTag(other)),
+            },
         },
         0x24 => AssetOpPayload::Swap {
             from_chain: reader.read_string()?,
@@ -775,6 +893,16 @@ pub fn decode_capability_payload(opcode: u8, bytes: &[u8]) -> Result<CapabilityP
         // ===== B-52 Feature Lock decode =====
         0x9E => CapabilityPayload::RebalanceTarget {
             portfolio: reader.read_string()?,
+            holdings: {
+                let hlen = reader.read_u16()? as usize;
+                let mut h = Vec::with_capacity(hlen);
+                for _ in 0..hlen {
+                    let k = reader.read_string()?;
+                    let v = reader.read_u128()?;
+                    h.push((k, v));
+                }
+                h
+            },
             weights: {
                 let wlen = reader.read_u16()? as usize;
                 let mut w = Vec::with_capacity(wlen);
@@ -852,6 +980,28 @@ pub fn decode_capability_payload(opcode: u8, bytes: &[u8]) -> Result<CapabilityP
             action: reader.read_string()?,
             target: reader.read_string()?,
             after_blocks: reader.read_u32()?,
+        },
+        // `EMIT` and `CALL_HOST` reach this decoder from the verifier, which routes every payload
+        // opcode it has no earlier rule for here. They used to fall to `_`, so the two opcodes the
+        // emitter writes for an `emit` statement and a host call were refused as "not a payload
+        // this runtime has" — which is exactly what an artifact-level decoder cannot know, since
+        // the opcode is one the spec defines.
+        0x60 => CapabilityPayload::EmitEvent {
+            name: reader.read_string()?,
+            fields: {
+                let count = reader.read_u16()? as usize;
+                let mut fields = Vec::with_capacity(count);
+                for _ in 0..count {
+                    let key = reader.read_string()?;
+                    let value = reader.read_string()?;
+                    fields.push((key, value));
+                }
+                fields
+            },
+        },
+        0x61 => CapabilityPayload::HostCall {
+            function: reader.read_string()?,
+            args: reader.read_string_vec()?,
         },
         _ => return Err(CapabilityCodecError::InvalidOpcode(opcode)),
     };

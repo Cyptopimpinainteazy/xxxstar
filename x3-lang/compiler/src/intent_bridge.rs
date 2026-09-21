@@ -10,7 +10,7 @@ use serde_json::Value;
 use x3_lang_common::X3Error;
 
 use crate::intent_emit::{IntentSpecDraft, SourceConstraint};
-use crate::ir::{FailureAction, Operation, RequireKind, X3IR};
+use crate::ir::{FailureAction, Operation, ReleaseAct, RequireKind, X3IR};
 
 pub const VALIDATED_INTENT_SCHEMA_VERSION: u32 = 1;
 
@@ -186,6 +186,10 @@ pub fn to_ir(intent: &ValidatedIntentV1) -> Result<X3IR, X3Error> {
         chain: intent.to.chain.to_ascii_lowercase(),
         asset: intent.to.asset.clone(),
         to: intent.to.receiver.clone().unwrap_or_else(|| "receiver".to_string()),
+        // A payout of the destination asset, matching the endpoint `Lock` above the way
+        // `lowering.rs` does: the source escrow is claimed by the route's settlement, and this
+        // is what that settlement pays out (TICKET-101).
+        act: ReleaseAct::Payout,
     });
 
     ir.push(Operation::AtomicBegin);
@@ -304,7 +308,14 @@ pub fn to_ir(intent: &ValidatedIntentV1) -> Result<X3IR, X3Error> {
         // failure action also emits a concrete `Release` op so the refund
         // is actually executed by the VM, not just recorded as metadata.
         if let FailureAction::Refund { chain, asset, to } = action {
-            ir.push(Operation::Release { chain, asset, to });
+            ir.push(Operation::Release {
+                chain,
+                asset,
+                to,
+                // The `OnTimeout` above, emitted as the instruction that performs it: a refund
+                // *returns* the escrow, which is its own act (TICKET-001).
+                act: ReleaseAct::Refund,
+            });
         }
     }
 

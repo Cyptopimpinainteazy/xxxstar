@@ -164,6 +164,23 @@ GATES_FAST=(
   "script syntax:bash scripts/check-script-syntax.sh"
   "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
   "workspace membership:python3 scripts/check-workspace-membership.py"
+  # PHASE 43 is a prohibition, not a feature: a value that becomes a balance, a reward, a slash or a
+  # settlement amount must be computed exactly. `x3-lang` has had this check for its own two crates for
+  # a while (`compiler/tests/test_computation_discipline.rs`); the *root* workspace's consensus surface
+  # was never scanned, which is how "no native float in a consensus-sensitive path" came to be a claim
+  # about one directory (TICKET-094). Measured when the gate was added: `pallets/*/src` and
+  # `runtime/src` contain zero `f64`/`f32`, so this is a line held, not a line drawn — the scan refuses
+  # the next one, and a legitimate float states `// float-exemption: <reason>` on its own line.
+  "no float in consensus:python3 scripts/check-no-float-in-consensus.py"
+  # A `Cargo.lock` resolved by hand during a merge has to be re-checked by cargo. It
+  # was not: the x3-swap-router merge kept the branch's package entry verbatim, where
+  # its sole `sp-std` is the 14.0.0 one while the merged graph has two, so the bare
+  # name was ambiguous and cargo rewrote it — `cargo metadata --locked` exited 101
+  # ("the lock file needs to be updated but --locked was passed") on master, which is
+  # what every `--locked` gate in CI would have reported (TICKET-062). Measured both
+  # ways: exit 0 on a consistent lock, and exit 101 after adding a dependency to one
+  # member's manifest without touching the lock.
+  "cargo lockfile locked:cargo metadata --locked --format-version 1"
   # Every id in `tests/invariants/registry.toml` must be referenced by a test.
   # This check lived in `tests_core/invariant_registry_check.rs`, which no crate,
   # script or Makefile ever compiled — so an invariant could be registered with
@@ -308,8 +325,18 @@ GATES_DEEP=(
   "test workspace:env -u SKIP_WASM_BUILD cargo test --workspace"
 )
 
+# The cross-domain gates were listed in `describe_all` for a long time without
+# being runnable: the three lifecycles below boot a chain each, and the two
+# X3VM<->EVM / X3VM<->SVM tests are `#[ignore]`d in the source because they need
+# one. Their pass evidence lived only in `.ai/runlogs` (which is gitignored) and
+# in CI history, so "the cross-domain leg is proven" was a claim about a past
+# run, not something a reader could reproduce with one command. The two scripts
+# now supply anvil + AtlasHTLC and solana-test-validator + the SBF program, so
+# they are gates like any other.
 GATES_CROSS=(
   "X3-native lifecycles:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
+  "cross-domain EVM:bash scripts/cross-domain-evm-gate.sh"
+  "cross-domain SVM:bash scripts/cross-domain-svm-gate.sh"
 )
 
 # Slugs are the `--only`/`--skip` keys, so keep them lowercase: gate names carry
@@ -323,10 +350,6 @@ describe_all() {
   printf '  - %s\n' "${GATES_LIVE[@]%%:*}"
   echo "cross-domain gates (--cross):"
   printf '  - %s\n' "${GATES_CROSS[@]%%:*}"
-  cat <<'EOF'
-  - X3VM<->EVM cross-domain lifecycles (needs anvil + deployed AtlasHTLC; see .ai/runlogs for the runner recipe)
-  - X3VM<->SVM cross-domain lifecycles (needs solana-test-validator + SBF program)
-EOF
   echo "release gate (--release):"
   printf '  - %s\n' "${GATES_RELEASE[@]%%:*}"
   echo "runtime variants (--variants):"

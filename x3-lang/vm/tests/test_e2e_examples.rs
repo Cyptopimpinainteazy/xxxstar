@@ -338,6 +338,9 @@ fn b52_simple_executes_through_vm() {
     let src = example_source("simple_swap.x3");
     let bytecode = compile_source(&src).expect("simple_swap.x3 should compile");
     let mut vm = VM::new(bytecode, VMConfig::default(), 1_000_000u128);
+    // The example writes an economic guard (`require slippage <= 50`), which the VM judges
+    // against what a host measured: a dry run states the outcome rather than assuming one.
+    vm.report_outcome(Some(10), Some(0), None);
     vm.execute().expect("simple_swap VM execution should succeed");
 }
 
@@ -377,6 +380,9 @@ fn a_guard_first_program_verifies_and_runs() {
     );
 
     let mut vm = VM::new(bytecode, VMConfig::default(), 1_000_000);
+    // The example writes an economic guard (`require slippage <= 50`), which the VM judges
+    // against what a host measured: a dry run states the outcome rather than assuming one.
+    vm.report_outcome(Some(10), Some(0), None);
     vm.execute().expect("the executor must run it");
 }
 
@@ -423,9 +429,107 @@ fn the_readers_visit_exactly_the_instructions_the_writer_wrote() {
     );
 
     let mut vm = VM::new(bytecode, VMConfig::default(), 1_000_000);
+    // The example writes an economic guard (`require slippage <= 50`), which the VM judges
+    // against what a host measured: a dry run states the outcome rather than assuming one.
+    vm.report_outcome(Some(10), Some(0), None);
     vm.execute().expect("the executor must run it");
     assert_eq!(
         vm.state.instruction_count, emitted as u128,
         "the executor must dispatch one instruction per emitted operation"
+    );
+}
+
+/// What a program that uses a host-facing instruction compiles to, and whether it runs.
+///
+/// `EMIT` (`0x60`) and `CALL_HOST` (`0x61`) are the two payload opcodes the emitter wrote by hand
+/// as `format!("{name}:{args:?}")` while the shared decoder had an arm for neither. Every program
+/// using one built an artifact and then failed to execute — `x3c run` reported
+/// `X3_VERIFY_FAILED: InvalidOperand` — and the payload it failed on was the compiler's Rust
+/// `Debug` output (`Literal(Int { value: 1, base: Decimal, suffix: None })`), which is the AST the
+/// compiler happens to hold rather than a record any host could read.
+///
+/// These run the *artifact*: a test that only checked the lowering, or only the emitted bytes,
+/// would have passed on the broken version, because both were fine — the defect was that the two
+/// halves disagreed.
+fn compile_and_run(src: &str) -> (Vec<u8>, String) {
+    let bytecode = compile_source(src).expect("source should compile");
+    verify(&InstructionStream::new(bytecode.clone())).expect("the verifier must accept what the emitter wrote");
+    let mut vm = VM::new(bytecode.clone(), VMConfig::default(), 1_000_000u128);
+    vm.execute().expect("a verified artifact must execute");
+    let trace = x3_lang_compiler::emitter::disassemble(&bytecode).expect("artifact should disassemble");
+    (bytecode, trace)
+}
+
+#[test]
+fn an_emit_statement_builds_an_artifact_that_runs() {
+    let (_, trace) = compile_and_run("fn main() { emit TransferDone(1); }");
+    assert!(
+        trace.contains("EmitEvent { name: \"TransferDone\""),
+        "the artifact must carry the event as a record: {trace}"
+    );
+    assert!(
+        !trace.contains("Literal("),
+        "the event's payload must be the argument's source text, not the compiler's AST: {trace}"
+    );
+}
+
+#[test]
+fn an_emit_statement_carries_every_argument_in_order() {
+    let (_, trace) = compile_and_run("fn main() { emit Filled(\"x3\", 7); }");
+    assert!(
+        trace.contains("fields: [(\"arg0\", \"x3\"), (\"arg1\", \"7\")]"),
+        "arguments are the source text of each, in the order the program wrote them: {trace}"
+    );
+}
+
+#[test]
+fn a_host_call_builds_an_artifact_that_runs() {
+    let (_, trace) = compile_and_run("fn main() { custom_thing(1, 2); }");
+    assert!(
+        trace.contains("HostCall { function: \"custom_thing\", args: [\"1\", \"2\"] }"),
+        "a call the language does not claim is a named host call, with its arguments: {trace}"
+    );
+}
+
+#[test]
+fn a_subscription_item_charges_by_name() {
+    // The ticket's own repro: this is what `subscription keeper: 100, 30 { … }` lowers to, and
+    // it is the instruction that could not run.
+    let (_, trace) = compile_and_run("subscription keeper: 100, 30 { emit Charged(1); }");
+    assert!(
+        trace.contains("HostCall { function: \"charge_subscription\", args: [\"keeper\", \"100\", \"30\"] }"),
+        "the charge names the subscription, states the amount and carries the cadence it was \
+         declared with — the period used to be read off the declaration and dropped: {trace}"
+    );
+    assert!(
+        trace.contains("EmitEvent { name: \"Charged\""),
+        "the body runs after the charge in the same artifact: {trace}"
+    );
+}
+
+#[test]
+fn a_sponsored_program_asks_the_host_for_both_annotations() {
+    let (_, trace) = compile_and_run("@subscribe(TransferDone)\n@sponsor\nfn main() { emit Started(2); }");
+    assert!(
+        trace.contains("HostCall { function: \"subscribe_event\", args: [\"TransferDone\"] }"),
+        "`@subscribe` names the event it subscribes to: {trace}"
+    );
+    assert!(
+        trace.contains("HostCall { function: \"deduct_sponsor_fee\", args: [] }"),
+        "`@sponsor` asks for the fee and states no arguments: {trace}"
+    );
+}
+
+#[test]
+fn an_annotated_function_emits_its_own_entry_and_exit() {
+    // `@hot` and `@audit` are lowered from the annotation, not from a statement, and they are
+    // the other shape an event takes: no fields at all. The verifier refuses an event whose
+    // *name* is empty — a record that names nothing cannot be dispatched on — and this is the
+    // case that shows the rule is the name and not a field count.
+    let (_, trace) = compile_and_run("@hot\nfn main() { }");
+    assert!(
+        trace.contains("EmitEvent { name: \"hot_enter\", fields: [] }")
+            && trace.contains("EmitEvent { name: \"hot_exit\", fields: [] }"),
+        "`@hot` marks the body's entry and exit as events that carry nothing: {trace}"
     );
 }

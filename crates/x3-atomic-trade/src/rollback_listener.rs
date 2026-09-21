@@ -3,6 +3,9 @@
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
+/// One hundred percent, in the basis points a compensation is stated in.
+pub const FULL_REFUND_BPS: u128 = 10_000;
+
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TradeBatchFailure {
     pub batch_id: [u8; 32],
@@ -143,15 +146,30 @@ impl RollbackEventListener {
     }
 
     /// Complete rollback and mark batch as rolled back
+    ///
+    /// The compensation is stated in **basis points** (`10_500` is a five percent compensation, `10_000`
+    /// is a full refund). It was an `f64` factor and the refund was
+    /// `(refund_amount as f64 * compensation_factor) as u128`: `1.05` is not representable in binary and
+    /// a token amount needs more than `f64`'s 53 bits, so the compensated figure — money owed to the
+    /// party whose trade failed — came out **short by 7 units** at `10^18 + 7` and by **860** at
+    /// `12345678901234567890`, and over at other magnitudes. Measured, not reasoned about (TICKET-094).
+    ///
+    /// The result is rounded **up**: "at least five percent" is the claim the parameter makes, and a
+    /// compensation that floors to the unit below it underpays by exactly the amount it exists to
+    /// make good. `refund * 105 / 100` floors for most refunds.
     pub fn complete_rollback(
         failure: &mut TradeBatchFailure,
-        compensation_factor: f64, // 1.0 = full refund, 1.05 = 5% compensation
+        compensation_bps: u32,
     ) -> Result<(), &'static str> {
         if failure.rollback_status != RollbackStatus::RollingBack {
             return Err("Rollback not in progress");
         }
 
-        let compensated_refund = (failure.refund_amount as f64 * compensation_factor) as u128;
+        let compensated_refund = failure
+            .refund_amount
+            .checked_mul(u128::from(compensation_bps))
+            .map(|scaled| scaled.div_ceil(FULL_REFUND_BPS))
+            .ok_or("the compensated refund does not fit this amount type")?;
         failure.refund_amount = compensated_refund;
         failure.rollback_status = RollbackStatus::RollbackComplete;
         failure.trade_state = TradeState::RolledBack;
@@ -372,10 +390,84 @@ mod tests {
         .unwrap();
 
         RollbackEventListener::initiate_rollback(&mut failure, vec![]).unwrap();
-        RollbackEventListener::complete_rollback(&mut failure, 1.05).unwrap();
+        RollbackEventListener::complete_rollback(&mut failure, 10_500).unwrap();
 
         assert_eq!(failure.rollback_status, RollbackStatus::RollbackComplete);
         assert!(failure.refund_amount > 100000); // Compensated
+    }
+
+    #[test]
+    fn a_compensated_refund_is_exact_and_never_underpays() {
+        // The defect this replaced, measured: `(refund as f64 * 1.05) as u128` came out **7 units
+        // short** at `10^18 + 7` and **860 short** at `12345678901234567890` — the party whose trade
+        // failed was underpaid by the arithmetic that exists to make them whole. (`1.05` is not
+        // representable in binary, and a token amount needs more than `f64`'s 53 bits.)
+        // The contract is "the exact compensation, rounded up to the unit": never below the stated
+        // five percent, and never more than one unit above it. The float's figures are 7 and 860 units
+        // *below* the exact value, which is underpayment — the direction the assertion above excludes.
+        for (refund, exact) in [
+            (100u128, 105u128),
+            (10u128.pow(18) + 7, 1_050_000_000_000_000_007),
+            (12_345_678_901_234_567_890, 12_962_962_846_296_296_284),
+        ] {
+            let mut failure = RollbackEventListener::record_failure(
+                [1; 32],
+                [2; 32],
+                1,
+                FailureReason::SlippageExceeded,
+                refund,
+                1000,
+            )
+            .unwrap();
+            RollbackEventListener::initiate_rollback(&mut failure, vec![]).unwrap();
+            RollbackEventListener::complete_rollback(&mut failure, 10_500).unwrap();
+            assert!(
+                failure.refund_amount >= exact,
+                "a 5% compensation of {refund} is at least {exact}; it was {} (the float's figure)",
+                failure.refund_amount
+            );
+            assert!(
+                failure.refund_amount - exact <= 1,
+                "and at most one unit above it — a rounding, not a bonus: {} against {exact}",
+                failure.refund_amount
+            );
+            assert!(
+                failure.refund_amount >= refund,
+                "and never less than the refund itself"
+            );
+        }
+        // Where the compensation *is* a whole unit, the figure is exact: 5% of 100 is 105.
+        let mut exact_case = RollbackEventListener::record_failure(
+            [1; 32],
+            [2; 32],
+            1,
+            FailureReason::Timeout,
+            100,
+            1000,
+        )
+        .unwrap();
+        RollbackEventListener::initiate_rollback(&mut exact_case, vec![]).unwrap();
+        RollbackEventListener::complete_rollback(&mut exact_case, 10_500).unwrap();
+        assert_eq!(
+            exact_case.refund_amount, 105,
+            "a whole-unit compensation is exact"
+        );
+
+        // A whole-basis-point rate that is not a whole unit of the refund rounds **up**: the parameter
+        // claims "at least this much", so flooring would underpay by the amount it exists to make good.
+        let mut failure = RollbackEventListener::record_failure(
+            [1; 32],
+            [2; 32],
+            1,
+            FailureReason::Timeout,
+            3,
+            1000,
+        )
+        .unwrap();
+        RollbackEventListener::initiate_rollback(&mut failure, vec![]).unwrap();
+        // 3 * 105 / 100 = 3.15 -> 4, not 3.
+        RollbackEventListener::complete_rollback(&mut failure, 10_500).unwrap();
+        assert_eq!(failure.refund_amount, 4);
     }
 
     #[test]
@@ -408,7 +500,7 @@ mod tests {
         .unwrap();
 
         RollbackEventListener::initiate_rollback(&mut failure, vec![]).unwrap();
-        RollbackEventListener::complete_rollback(&mut failure, 1.0).unwrap();
+        RollbackEventListener::complete_rollback(&mut failure, FULL_REFUND_BPS as u32).unwrap();
 
         let payout = RollbackEventListener::issue_compensation(&mut failure, 5000).unwrap();
         assert!(payout > 100000);

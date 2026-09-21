@@ -39,7 +39,8 @@
 //! Diagnostics accumulate via [`ErrorAccumulator`] so a single `check`
 //! call reports every problem rather than failing on the first one.
 
-use crate::ir::{Condition, FailureAction, Operation, X3IR};
+use crate::diagnostic::{CompilerDiagnostic, DiagnosticCode, DiagnosticSeverity};
+use crate::ir::{Condition, FailureAction, Operation, ReleaseAct, X3IR};
 use std::collections::{HashMap, HashSet};
 use x3_lang_ast::ast::{AtomicSwapDecl, Expression, Item, LiteralExpr, Program};
 use x3_lang_common::{Bps, ErrorAccumulator, Span, Spanned, X3Error};
@@ -146,6 +147,28 @@ impl VerifyOutcome {
     /// True when nothing rejected the program. Warnings do not fail a program.
     pub fn is_ok(&self) -> bool {
         self.errors.is_empty()
+    }
+
+    /// File a coded diagnostic in the vector its own severity names.
+    ///
+    /// The two vectors are this accumulator's severity channel — `X3Error` carries no level — so
+    /// "which vector" is the severity decision, and a caller that picks it by hand has decided the
+    /// same thing twice: once when it built the diagnostic and once when it chose the vector. This
+    /// is the single place that choice is made, and it is made from the diagnostic's own field.
+    /// Before it, a warning-severity diagnostic could not be built at all, so nothing suffered; the
+    /// moment one could, the hand-chosen vector was the drift severity-as-a-field exists to prevent
+    /// (TICKET-104).
+    ///
+    /// Note that the *ticket* that asked for this said the accumulator "already accepts"
+    /// `x3-common`'s `Diagnostic`. It does not: both vectors are `Vec<X3Error>`. That is why this
+    /// method exists in the shape it does — the severity is carried by the channel and the faithful
+    /// conversion (`Diagnostic::from`) is what a consumer with a richer type takes.
+    pub fn push_diagnostic(&mut self, diagnostic: CompilerDiagnostic) {
+        if diagnostic.severity == DiagnosticSeverity::Error {
+            self.errors.push(diagnostic.into_error());
+        } else {
+            self.warnings.push(diagnostic.into_warning());
+        }
     }
 
     pub fn into_result(self) -> Result<(), Vec<X3Error>> {
@@ -292,11 +315,18 @@ fn span() -> Span {
     Span::DUMMY
 }
 
-fn err(message: impl Into<String>) -> X3Error {
-    X3Error::SemanticError {
-        message: message.into(),
-        span: span(),
-    }
+/// A semantic finding, with the catalogue class it belongs to.
+///
+/// **The code is a parameter, not a helper per class.** The class is a fact about each *site* — a guard
+/// whose claim nothing backs is not the same defect as a declaration that contradicts itself, and
+/// neither is a mainnet configuration the gates refuse — so a helper that chose one code for the whole
+/// file would be the uncoded helper under a new name, which is what TICKET-021 is about. The signature
+/// is the gate: a site cannot be added without stating its class.
+///
+/// The rendering goes through `CompilerDiagnostic::error`, the one place "code: message" is spelled,
+/// so a second spelling cannot drift from the tooling's.
+fn err(code: DiagnosticCode, message: impl Into<String>) -> X3Error {
+    CompilerDiagnostic::error(code, message, span()).into_error()
 }
 
 /// A `require invariant <name>` guard needs that invariant to be declared.
@@ -321,13 +351,13 @@ pub fn verify_invariant_guards_declared(program: &Program, acc: &mut ErrorAccumu
             continue;
         }
         let Some(named) = guard.subject.as_ref() else {
-            acc.add_error(err(format!(
+            acc.add_error(err(DiagnosticCode::GuardClaimUnbacked, format!(
                 "declaration '{owner}' requires `invariant` without naming it; there is nothing to have checked — write `require invariant <name>`"
             )));
             continue;
         };
         if !declared.iter().any(|name| *name == named.as_str()) {
-            acc.add_error(err(if declared.is_empty() {
+            acc.add_error(err(DiagnosticCode::GuardClaimUnbacked, if declared.is_empty() {
                 format!(
                     "declaration '{owner}' requires the invariant '{}', and the program declares no `invariant` at all — a guard names a rule the artifact has to state",
                     named.as_str()
@@ -375,32 +405,44 @@ pub fn verify_bridge_liquidity_declared(program: &Program, acc: &mut ErrorAccumu
         // A floor, like the other liquidity claims: written as a ceiling it would
         // say the bridges may not be deep.
         if !guard.comparison.is_some_and(|op| op.is_lower_bound()) {
-            acc.add_error(err(format!(
-                "declaration '{owner}' states `require bridge_liquidity` without a `>=` bound; a \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' states `require bridge_liquidity` without a `>=` bound; a \
                  liquidity guard is a floor, and the check reads it as one"
-            )));
+                ),
+            ));
             continue;
         }
         let Some(required) = guard.value.as_ref().and_then(extract_int_from_expr) else {
-            acc.add_error(err(format!(
-                "declaration '{owner}' requires bridge liquidity of a value the compiler cannot read \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires bridge liquidity of a value the compiler cannot read \
                  as a number; the check compares it against what a venue declares"
-            )));
+                ),
+            ));
             continue;
         };
         if declared.is_empty() {
-            acc.add_error(err(format!(
-                "declaration '{owner}' requires {required} of bridge liquidity, and the program \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires {required} of bridge liquidity, and the program \
                  declares no `venue {{ kind bridge … }}` — the guard has nothing to compare against"
-            )));
+                ),
+            ));
             continue;
         }
         for (venue, liquidity) in &declared {
             if *liquidity < required {
-                acc.add_error(err(format!(
-                    "declaration '{owner}' requires {required} of bridge liquidity, and the bridge \
+                acc.add_error(err(
+                    DiagnosticCode::GuardClaimUnbacked,
+                    format!(
+                        "declaration '{owner}' requires {required} of bridge liquidity, and the bridge \
                      '{venue}' declares {liquidity}"
-                )));
+                    ),
+                ));
             }
         }
     }
@@ -437,29 +479,35 @@ pub fn verify_vm_supported_declared(program: &Program, acc: &mut ErrorAccumulato
             continue;
         }
         let Some(named) = guard.subject.as_ref() else {
-            acc.add_error(err(format!(
-                "declaration '{owner}' requires `vm_supported` without naming the VM; every program \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires `vm_supported` without naming the VM; every program \
                  runs on some VM, so the guard says nothing — write `require vm_supported <vm>`"
-            )));
+                ),
+            ));
             continue;
         };
         let wanted = vm_family(named.as_str());
         if !declared.iter().any(|declaration| vm_family(declaration) == wanted) {
-            acc.add_error(err(if declared.is_empty() {
-                format!(
-                    "declaration '{owner}' requires the VM '{}' to be supported, and the program \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                if declared.is_empty() {
+                    format!(
+                        "declaration '{owner}' requires the VM '{}' to be supported, and the program \
                      declares no `vm`, `target` or `venue` at all — the guard has nothing to be \
                      backed by",
-                    named.as_str()
-                )
-            } else {
-                format!(
-                    "declaration '{owner}' requires the VM '{}' to be supported, and the program \
+                        named.as_str()
+                    )
+                } else {
+                    format!(
+                        "declaration '{owner}' requires the VM '{}' to be supported, and the program \
                      declares {{{}}} — a VM no declaration uses is one no adapter here provides",
-                    named.as_str(),
-                    declared.join(", ")
-                )
-            }));
+                        named.as_str(),
+                        declared.join(", ")
+                    )
+                },
+            ));
         }
     }
 }
@@ -508,10 +556,176 @@ pub fn verify_risk_policy_bounds_guards(program: &Program, acc: &mut ErrorAccumu
         // Both sides in basis points: the policy's field is a bare number in the
         // same unit as a guard's (TICKET-054).
         if bound > u32::try_from(policy).unwrap_or(u32::MAX) {
-            acc.add_error(err(format!(
-                "declaration '{owner}' permits a slippage of {bound} while the risk policy accepts \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' permits a slippage of {bound} while the risk policy accepts \
                  at most {policy}; the guard allows what the policy forbids"
-            )));
+                ),
+            ));
+        }
+    }
+}
+
+/// A `require fees <= N` guard needs a fee ceiling to compare against.
+///
+/// The pair the slippage ceiling has: `risk { max_total_fee_bps M }` is the ceiling a module
+/// accepts, and the guard is the one its body relies on. The same two failures the other declared
+/// kinds refuse — a guard *looser* than the declaration permits what the policy forbids, and a
+/// guard in a program that declares no ceiling at all claims something nothing backs.
+/// A declaration nothing reads is refused by name.
+///
+/// `struct`, `enum`, `use`, `mod`, `import`, `const` and `error` are accepted by the parser and
+/// lower to nothing — and, measured, **nothing reads them either**: the only mention of any of them
+/// outside the parser and the formatter was a lowering arm whose comment claimed a consumer that
+/// does not exist ("the compiler reads it", "a constant is evaluated where it is used", "raising it
+/// is a `Statement`" — there is no statement that raises a named error, and no constant is
+/// evaluated anywhere). A program could therefore write `import foo;` and believe it imported
+/// something, or declare an error nothing can raise.
+///
+/// This is the shape TICKET-111 closed for annotations and `audit_gate`: a construct the artifact
+/// cannot carry and no pass reads is refused rather than silently dropped. The three comments are
+/// corrected with it, because a comment claiming a consumer is how this survived (`finality_explicit`
+/// was found the same way).
+///
+/// The *parser* still reads them, deliberately: `test_parser_coverage.rs` asserts that the grammar
+/// accepts a `struct` and an `enum`, and a grammar's coverage is a separate claim from what the
+/// compiler does with what it parsed.
+pub fn verify_declarations_have_a_reader(program: &Program, acc: &mut ErrorAccumulator) {
+    for item in &program.items {
+        // An agent's own two blocks, which nothing reads either: its methods and strategies lower to
+        // the artifact, and its `context` (key/value pairs) and `state` (typed fields) reach no pass,
+        // no artifact and no reader — the same finding as the seven declarations below, one level
+        // into a declaration. They are refused rather than left as decoration, and `x3c fmt` had been
+        // deleting them, which is what decoration looks like when a writer is honest about it.
+        if let Item::Agent(agent) = &item.node {
+            // An **empty** context block is the grammar's braces rather than a claim: the parser reads
+            // the first `{ }` after an agent's name as the context, so refusing an empty one would
+            // make an agent unwritable. Content is the claim, and content is what nothing reads.
+            if agent
+                .context
+                .as_ref()
+                .is_some_and(|context| !context.entries.is_empty())
+            {
+                acc.add_error(err(
+                    DiagnosticCode::UnresolvedEconomicEffect,
+                    format!(
+                        "agent '{}' declares a `context` block and nothing reads it: no pass, no \
+                         artifact and no command consults an agent's context, so the entries would be \
+                         configuration the runtime never sees",
+                        agent.name.as_str()
+                    ),
+                ));
+            }
+            if !agent.state.is_empty() {
+                acc.add_error(err(
+                    DiagnosticCode::UnresolvedEconomicEffect,
+                    format!(
+                        "agent '{}' declares `state` fields and nothing reads them: the VM holds \
+                         registers and a call stack, and an agent's declared state reaches neither a \
+                         pass nor the artifact",
+                        agent.name.as_str()
+                    ),
+                ));
+            }
+        }
+        let (what, why) = match &item.node {
+            Item::Struct(_) | Item::Enum(_) => (
+                "a type declaration",
+                "nothing in this compiler reads a declared type: the artifact runs operations, and no \
+                 pass resolves a struct or enum name",
+            ),
+            Item::Use(_) | Item::Mod(_) | Item::Import(_) => (
+                "a module import",
+                "this language has no module system: nothing resolves an imported name, so the line \
+                 would import nothing",
+            ),
+            Item::Const(_) => (
+                "a constant",
+                "nothing evaluates a constant where it is used: a reference to it reaches a guard as \
+                 the name rather than the value, and the guard refuses a bound it cannot read",
+            ),
+            Item::ErrorDecl(_) => (
+                "an error declaration",
+                "no statement raises a named error, so the name is one nothing can raise",
+            ),
+            _ => continue,
+        };
+        let name = match &item.node {
+            Item::ErrorDecl(decl) => decl.name.as_str().to_string(),
+            Item::Struct(decl) => decl.name.as_str().to_string(),
+            Item::Enum(decl) => decl.name.as_str().to_string(),
+            Item::Const(decl) => decl.name.as_str().to_string(),
+            _ => String::new(),
+        };
+        acc.add_error(err(
+            DiagnosticCode::UnresolvedEconomicEffect,
+            format!(
+                "{what} `{name}` cannot be used: {why}. Remove it, or give the construct a consumer \
+                 before a program relies on it"
+            ),
+        ));
+    }
+}
+
+pub fn verify_fee_guards_declared(program: &Program, acc: &mut ErrorAccumulator) {
+    // Looked up by the owner the guard walk reports, because a guard belongs to the module whose
+    // body it is written in: two modules in one program may accept different ceilings.
+    let declared = |owner: &str| -> Option<u32> {
+        program.items.iter().find_map(|item| match &item.node {
+            Item::Strategy(module) if module.name.as_str() == owner => {
+                module.risk.as_ref().map(|risk| risk.max_total_fee_bps)
+            }
+            _ => None,
+        })
+    };
+
+    for (owner, guard) in require_guards(program) {
+        if guard.kind != x3_lang_ast::ast::RequireKind::Fees {
+            continue;
+        }
+        // A ceiling is a bound (`<=`). Written the other way the guard says the program will pay at
+        // *least* this much, which is not a ceiling and not something a profile can back.
+        if !guard.comparison.is_some_and(|op| op.is_upper_bound()) {
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' states `require fees` without a `<=` bound; a fee ceiling is \
+                     a ceiling — write `require fees <= <bps>`"
+                ),
+            ));
+            continue;
+        }
+        // The same rule the other declared kinds follow: a bound the check cannot read is refused,
+        // not read as zero (TICKET-114's turn).
+        let Some(required) = guard.value.as_ref().and_then(bound_bps_from_expr) else {
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' states `require fees <= <bound>` with a bound that is not a \
+                     number; the bound is what the check compares against the declared ceiling, so it \
+                     has to be one this compiler can read"
+                ),
+            ));
+            continue;
+        };
+        match declared(owner) {
+            None => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires a fee ceiling of {required}bps, but nothing declares \
+                     one: a module states it with `risk {{ max_total_fee_bps <bps> }}`, and a program \
+                     that is not a module has no clause that could"
+                ),
+            )),
+            Some(ceiling) if required > ceiling => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires fees of at most {required}bps while its risk profile \
+                     accepts up to {ceiling}bps; the guard allows what the policy forbids"
+                ),
+            )),
+            Some(_) => {}
         }
     }
 }
@@ -539,23 +753,47 @@ pub fn verify_route_score_declared(program: &Program, acc: &mut ErrorAccumulator
         // may not score *well*, and comparing that against a declared minimum
         // would answer a question nobody asked.
         if !guard.comparison.is_some_and(|op| op.is_lower_bound()) {
-            acc.add_error(err(format!(
-                "declaration '{owner}' states `require route_score` without a `>=` bound; a route \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' states `require route_score` without a `>=` bound; a route \
                  score guard is a floor, and the check reads it as one"
-            )));
+                ),
+            ));
             continue;
         }
-        let required = guard.value.as_ref().and_then(extract_int_from_expr).unwrap_or(0);
+        // A bound the check cannot read is not a weaker claim, it is *no* claim: `unwrap_or(0)`
+        // here read `require route_score >= min_score` as "at least zero", which every policy
+        // satisfies, and the artifact recorded a threshold of zero for it. A figure the compiler
+        // cannot compare is refused by name instead, the rule an unknown guard *kind* already
+        // follows (TICKET-049).
+        let Some(required) = guard.value.as_ref().and_then(extract_int_from_expr) else {
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' states `require route_score >= <bound>` with a bound that is \
+                 not a number; the bound is what the check compares against the declared minimum, so \
+                 it has to be one this compiler can read"
+                ),
+            ));
+            continue;
+        };
         match declared {
-            None => acc.add_error(err(format!(
-                "declaration '{owner}' requires a route score of {required} but the program declares \
+            None => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires a route score of {required} but the program declares \
                  no `risk_policy {{ min_route_score <n> }}` — the guard has nothing to compare \
                  against"
-            ))),
-            Some(declared) if required > u128::from(declared) => acc.add_error(err(format!(
-                "declaration '{owner}' requires a route score of {required}, but the declared \
+                ),
+            )),
+            Some(declared) if required > u128::from(declared) => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires a route score of {required}, but the declared \
                  minimum is {declared}"
-            ))),
+                ),
+            )),
             Some(_) => {}
         }
     }
@@ -591,9 +829,23 @@ pub fn verify_finality_guards_declared(program: &Program, acc: &mut ErrorAccumul
         .collect();
 
     for (owner, guard) in require_guards(program) {
-        if guard.kind != x3_lang_ast::ast::RequireKind::Finality {
+        // Both spellings of one claim: `require finality.<chain> >= 32` and `require
+        // finality_explicit <chain> >= 32`. The second is listed in `REQUIRE_KIND_NAMES`, is read by
+        // the JSON intent bridge (which maps its kind string to the same variant), and was checked by
+        // **nothing** — a program writing it got a guard whose depth or mode reached neither a
+        // declaration nor the artifact, and `x3c check` said nothing (TICKET-027's last kind).
+        if !matches!(
+            guard.kind,
+            x3_lang_ast::ast::RequireKind::Finality | x3_lang_ast::ast::RequireKind::FinalityExplicit
+        ) {
             continue;
         }
+        // The guard as the program wrote it, so a refusal names the spelling the author used rather
+        // than the other one.
+        let spelling = |chain: &str| match guard.kind {
+            x3_lang_ast::ast::RequireKind::FinalityExplicit => format!("finality_explicit {chain}"),
+            _ => format!("finality.{chain}"),
+        };
         // `require source_finality` / `dest_finality` name a side of the program
         // rather than a chain, and no declaration states what such a side must
         // reach; they are decided by the program's own finality pass.
@@ -605,36 +857,44 @@ pub fn verify_finality_guards_declared(program: &Program, acc: &mut ErrorAccumul
             .filter(|policy| policy.chain.as_str().eq_ignore_ascii_case(chain.as_str()))
             .collect();
         if matching.is_empty() {
-            acc.add_error(err(format!(
-                "declaration '{owner}' requires `finality.{}`, but no `finality_policy` names that \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires `{}`, but no `finality_policy` names that \
                  chain — the guard has nothing to compare against. Write `finality_policy <mode> {{ \
                  chain {} requirement finalized blocks <n> }}`",
-                chain.as_str(),
-                chain.as_str()
-            )));
+                    spelling(chain.as_str()),
+                    chain.as_str()
+                ),
+            ));
             continue;
         }
         if matching.len() > 1 {
-            acc.add_error(err(format!(
-                "{} `finality_policy` declarations name chain '{}' while '{owner}' guards it; one \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "{} `finality_policy` declarations name chain '{}' while '{owner}' guards it; one \
                  chain has one policy, and a guard read against the first of two depths is read \
                  against whichever happened to be written first",
-                matching.len(),
-                chain.as_str()
-            )));
+                    matching.len(),
+                    chain.as_str()
+                ),
+            ));
             continue;
         }
         let policy = matching[0];
 
         let Some(value) = guard.value.as_ref() else {
-            acc.add_error(err(format!(
-                "declaration '{owner}' states `require finality.{}` with no depth and no mode; write \
-                 a floor (`require finality.{} >= 32`) or a mode (`require finality.{} == \
-                 finalized`)",
-                chain.as_str(),
-                chain.as_str(),
-                chain.as_str()
-            )));
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' states `require {}` with no depth and no mode; write a \
+                 floor (`{} >= 32`) or a mode (`{} == finalized`)",
+                    spelling(chain.as_str()),
+                    spelling(chain.as_str()),
+                    spelling(chain.as_str())
+                ),
+            ));
             continue;
         };
 
@@ -643,52 +903,66 @@ pub fn verify_finality_guards_declared(program: &Program, acc: &mut ErrorAccumul
             // chain may not be *well* settled, and comparing that against a
             // declared depth answers a question nobody asked.
             if !guard.comparison.is_some_and(|op| op.is_lower_bound()) {
-                acc.add_error(err(format!(
-                    "declaration '{owner}' states `require finality.{}` without a `>=` bound; a \
-                     finality depth is a floor — write `require finality.{} >= {required}`",
-                    chain.as_str(),
-                    chain.as_str()
-                )));
+                acc.add_error(err(
+                    DiagnosticCode::GuardClaimUnbacked,
+                    format!(
+                        "declaration '{owner}' states `require {}` without a `>=` bound; a finality \
+                     depth is a floor — write `require {} >= {required}`",
+                        spelling(chain.as_str()),
+                        spelling(chain.as_str())
+                    ),
+                ));
                 continue;
             }
             match policy.blocks {
-                None => acc.add_error(err(format!(
-                    "declaration '{owner}' requires {required} blocks of finality on '{}', but the \
+                None => acc.add_error(err(
+                    DiagnosticCode::GuardClaimUnbacked,
+                    format!(
+                        "declaration '{owner}' requires {required} blocks of finality on '{}', but the \
                      `finality_policy` for that chain states no `blocks`; add `blocks {required}` \
                      (or more) to the policy",
-                    chain.as_str()
-                ))),
-                Some(declared) if required < u128::from(declared) => acc.add_error(err(format!(
-                    "declaration '{owner}' requires only {required} blocks of finality on '{}', while \
+                        chain.as_str()
+                    ),
+                )),
+                Some(declared) if required < u128::from(declared) => acc.add_error(err(
+                    DiagnosticCode::GuardClaimUnbacked,
+                    format!(
+                        "declaration '{owner}' requires only {required} blocks of finality on '{}', while \
                      the policy declared for that chain requires {declared}: the guard would pass at \
-                     a depth the program itself says is not final. Write `require finality.{} >= \
-                     {declared}`, or lower the policy if {required} is what the program means",
-                    chain.as_str(),
-                    chain.as_str()
-                ))),
+                     a depth the program itself says is not final. Write `require {} >= {declared}`, \
+                     or lower the policy if {required} is what the program means",
+                        chain.as_str(),
+                        spelling(chain.as_str())
+                    ),
+                )),
                 Some(_) => {}
             }
             continue;
         }
 
         let Some(mode) = guard_word(value) else {
-            acc.add_error(err(format!(
-                "declaration '{owner}' compares `finality.{}` against something that is neither a \
-                 depth nor a mode; write `require finality.{} >= <blocks>` or `require finality.{} \
-                 == <mode>`",
-                chain.as_str(),
-                chain.as_str(),
-                chain.as_str()
-            )));
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' compares `{}` against something that is neither a depth \
+                 nor a mode; write `{} >= <blocks>` or `{} == <mode>`",
+                    spelling(chain.as_str()),
+                    spelling(chain.as_str()),
+                    spelling(chain.as_str())
+                ),
+            ));
             continue;
         };
         if !policy.requirement.as_str().eq_ignore_ascii_case(mode) {
-            acc.add_error(err(format!(
-                "declaration '{owner}' requires finality mode '{mode}' on '{}', but the declared \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires finality mode '{mode}' on '{}', but the declared \
                  policy for that chain requires '{}'",
-                chain.as_str(),
-                policy.requirement.as_str()
-            )));
+                    chain.as_str(),
+                    policy.requirement.as_str()
+                ),
+            ));
         }
     }
 }
@@ -729,19 +1003,25 @@ fn guard_word(expr: &Expression) -> Option<&str> {
 pub fn verify_guard_kinds_are_checkable(program: &Program, acc: &mut ErrorAccumulator) {
     for (owner, guard) in require_guards(program) {
         match &guard.kind {
-            x3_lang_ast::ast::RequireKind::Custom(_) => acc.add_error(err(format!(
-                "declaration '{owner}' requires `{}`, which is not a guard kind this compiler knows, \
+            x3_lang_ast::ast::RequireKind::Custom(_) => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires `{}`, which is not a guard kind this compiler knows, \
                  so nothing would ever check it. The kinds it knows are: {}",
-                guard.kind.as_str(),
-                crate::parser::REQUIRE_KIND_NAMES.join(", ")
-            ))),
-            x3_lang_ast::ast::RequireKind::AuditGate => acc.add_error(err(format!(
-                "declaration '{owner}' requires `audit_gate`, which this language cannot back: no \
+                    guard.kind.as_str(),
+                    crate::parser::REQUIRE_KIND_NAMES.join(", ")
+                ),
+            )),
+            x3_lang_ast::ast::RequireKind::AuditGate => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires `audit_gate`, which this language cannot back: no \
                  clause in a program declares that an audit ran, so the guard would be recorded as a \
                  condition that is true because nothing looked. An audit is evidence about the \
                  delivery process rather than a property of the artifact — keep it where it can be \
                  verified, and remove the guard"
-            ))),
+                ),
+            )),
             _ => {}
         }
     }
@@ -771,28 +1051,34 @@ pub fn verify_proof_complete_declared(program: &Program, acc: &mut ErrorAccumula
             continue;
         }
         let Some(proof) = guard.subject.as_ref() else {
-            acc.add_error(err(format!(
-                "declaration '{owner}' requires `proof_complete` without naming the proof; there is \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires `proof_complete` without naming the proof; there is \
                  nothing to have completed — write `require proof_complete <proof_type>`"
-            )));
+                ),
+            ));
             continue;
         };
         if !declared.iter().any(|name| *name == proof.as_str()) {
-            acc.add_error(err(if declared.is_empty() {
-                format!(
-                    "declaration '{owner}' requires the proof '{}' to be complete, but the program \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                if declared.is_empty() {
+                    format!(
+                        "declaration '{owner}' requires the proof '{}' to be complete, but the program \
                      declares no `proofs required {{ … }}` at all — the guard has nothing to be \
                      backed by",
-                    proof.as_str()
-                )
-            } else {
-                format!(
-                    "declaration '{owner}' requires the proof '{}' to be complete, and the program \
+                        proof.as_str()
+                    )
+                } else {
+                    format!(
+                        "declaration '{owner}' requires the proof '{}' to be complete, and the program \
                      declares {{{}}} — a proof it never declares is one no operation can carry",
-                    proof.as_str(),
-                    declared.join(", ")
-                )
-            }));
+                        proof.as_str(),
+                        declared.join(", ")
+                    )
+                },
+            ));
         }
     }
 }
@@ -817,20 +1103,26 @@ pub fn verify_canonical_supply(program: &Program, ir: &X3IR) -> Vec<X3Error> {
             continue;
         }
         let Some(asset) = guard.subject.as_ref() else {
-            errors.push(err(format!(
-                "declaration '{owner}' requires `canonical_supply` without naming the asset; there \
+            errors.push(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires `canonical_supply` without naming the asset; there \
                  is nothing to hold the supply of — write `require canonical_supply USDC`"
-            )));
+                ),
+            ));
             continue;
         };
         let wanted = asset.as_str();
         let (minted, burned) = supply_totals(ir, wanted);
         if minted != burned {
-            errors.push(err(format!(
-                "declaration '{owner}' requires the canonical supply of {wanted} to be preserved, \
+            errors.push(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires the canonical supply of {wanted} to be preserved, \
                  but the program mints {minted} and burns {burned} of it; the guard is a claim the \
                  program's own operations contradict"
-            )));
+                ),
+            ));
         }
     }
     errors
@@ -887,7 +1179,7 @@ fn verify_symbols(ir: &X3IR, acc: &mut ErrorAccumulator) {
                 check_safe_symbol("asset", asset, acc);
                 check_safe_symbol("from", from, acc);
             }
-            Operation::Release { chain, asset, to } => {
+            Operation::Release { chain, asset, to, .. } => {
                 check_safe_symbol("chain", chain, acc);
                 check_safe_symbol("asset", asset, acc);
                 check_safe_symbol("to", to, acc);
@@ -929,7 +1221,7 @@ fn verify_symbols(ir: &X3IR, acc: &mut ErrorAccumulator) {
 
 fn check_safe_symbol(field: &str, value: &str, acc: &mut ErrorAccumulator) {
     if value.is_empty() {
-        acc.add_error(err(format!("{field} is empty")));
+        acc.add_error(err(DiagnosticCode::UndefinedSymbol, format!("{field} is empty")));
         return;
     }
     // `.` is allowed because a receiver is written as a dotted path —
@@ -944,13 +1236,19 @@ fn check_safe_symbol(field: &str, value: &str, acc: &mut ErrorAccumulator) {
         .any(|c| !c.is_ascii_alphanumeric() && c != '_' && c != '-' && c != '.');
     let unsafe_segment = value.split('.').any(|segment| segment.is_empty() || segment == "..");
     if unsafe_char || unsafe_segment {
-        acc.add_error(err(format!(
-            "{field}={value:?} contains unsafe characters (allowed: alnum, _, -, and single dots \
+        acc.add_error(err(
+            DiagnosticCode::UnsafeIr,
+            format!(
+                "{field}={value:?} contains unsafe characters (allowed: alnum, _, -, and single dots \
              between non-empty segments)"
-        )));
+            ),
+        ));
     }
     if value.len() > 64 {
-        acc.add_error(err(format!("{field}={value:?} exceeds 64-character safety limit")));
+        acc.add_error(err(
+            DiagnosticCode::UnsafeIr,
+            format!("{field}={value:?} exceeds 64-character safety limit"),
+        ));
     }
 }
 
@@ -965,7 +1263,7 @@ fn verify_route_depths(ir: &X3IR, acc: &mut ErrorAccumulator, max_atomic_ops: u3
             atomic_depth = atomic_depth.saturating_sub(1);
         }
         if atomic_depth > 1 {
-            acc.add_error(err("nested atomic blocks are not allowed"));
+            acc.add_error(err(DiagnosticCode::UnsafeIr, "nested atomic blocks are not allowed"));
         }
     }
 
@@ -981,14 +1279,16 @@ fn verify_route_depths(ir: &X3IR, acc: &mut ErrorAccumulator, max_atomic_ops: u3
         } else if matches!(op, Operation::AtomicEnd) {
             if inside_atomic {
                 if current_block > max_atomic_ops {
-                    acc.add_error(err(format!(
-                        "atomic block has {current_block} operations (max {max_atomic_ops})"
-                    )));
+                    acc.add_error(err(
+                        DiagnosticCode::UnsafeIr,
+                        format!("atomic block has {current_block} operations (max {max_atomic_ops})"),
+                    ));
                 }
                 if current_hops > max_route_hops {
-                    acc.add_error(err(format!(
-                        "atomic block has {current_hops} cross-VM hops (max {max_route_hops})"
-                    )));
+                    acc.add_error(err(
+                        DiagnosticCode::UnsafeIr,
+                        format!("atomic block has {current_hops} cross-VM hops (max {max_route_hops})"),
+                    ));
                 }
             }
             inside_atomic = false;
@@ -1014,12 +1314,15 @@ fn verify_atomic_balance(ir: &X3IR, acc: &mut ErrorAccumulator) {
         if matches!(op, Operation::AtomicEnd) {
             depth -= 1;
             if depth < 0 {
-                acc.add_error(err("AtomicEnd without matching AtomicBegin"));
+                acc.add_error(err(DiagnosticCode::UnsafeIr, "AtomicEnd without matching AtomicBegin"));
             }
         }
     }
     if depth > 0 {
-        acc.add_error(err(format!("{} unmatched AtomicBegin (missing AtomicEnd)", depth)));
+        acc.add_error(err(
+            DiagnosticCode::UnsafeIr,
+            format!("{} unmatched AtomicBegin (missing AtomicEnd)", depth),
+        ));
     }
 }
 
@@ -1034,10 +1337,13 @@ fn verify_rollback_presence(ir: &X3IR, acc: &mut ErrorAccumulator) {
             inside_atomic = false;
         }
         if !inside_atomic && is_cross_vm_op(op) {
-            acc.add_error(err(format!(
-                "cross-VM operation {op:?} is not inside an atomic block — rollback cannot be \
+            acc.add_error(err(
+                DiagnosticCode::UnsafeIr,
+                format!(
+                    "cross-VM operation {op:?} is not inside an atomic block — rollback cannot be \
                  guaranteed"
-            )));
+                ),
+            ));
         }
     }
 }
@@ -1053,12 +1359,14 @@ fn verify_replay_and_expiry(ir: &X3IR, acc: &mut ErrorAccumulator) {
         .any(|op| matches!(op, Operation::OnTimeout { duration_blocks, .. } if *duration_blocks > 0));
     if !has_timeout {
         acc.add_error(err(
+            DiagnosticCode::UnsafeIr,
             "bridge operation present without an OnTimeout policy — expiry/deadline required for \
              replay protection",
         ));
     }
     if ir.metadata.nonce.is_none() {
         acc.add_error(err(
+            DiagnosticCode::UnsafeIr,
             "bridge operation present without a nonce in program metadata — replay protection \
              required",
         ));
@@ -1070,11 +1378,14 @@ fn verify_bridge_adapter_allowlist(ir: &X3IR, acc: &mut ErrorAccumulator) {
     for op in &ir.operations {
         if let Operation::Bridge { via, .. } = op {
             if !allow.contains(via.to_ascii_lowercase().as_str()) {
-                acc.add_error(err(format!(
-                    "bridge via={via:?} is not in the production adapter allow-list \
+                acc.add_error(err(
+                    DiagnosticCode::UnsafeIr,
+                    format!(
+                        "bridge via={via:?} is not in the production adapter allow-list \
                      ({}); add the adapter explicitly or use a known one",
-                    KNOWN_BRIDGE_ADAPTERS.join(", ")
-                )));
+                        KNOWN_BRIDGE_ADAPTERS.join(", ")
+                    ),
+                ));
             }
         }
     }
@@ -1089,25 +1400,34 @@ fn verify_adapter_compatibility(ir: &X3IR, acc: &mut ErrorAccumulator) {
             } => {
                 let from_norm = from_chain.to_ascii_lowercase();
                 if !known.contains(from_norm.as_str()) {
-                    acc.add_error(err(format!(
-                        "source chain {from_chain:?} is not a known production chain; refuse to \
+                    acc.add_error(err(
+                        DiagnosticCode::UnsafeIr,
+                        format!(
+                            "source chain {from_chain:?} is not a known production chain; refuse to \
                          silently route through an unknown adapter"
-                    )));
+                        ),
+                    ));
                 }
                 if from_chain == to_chain {
-                    acc.add_error(err(format!(
-                        "bridge from_chain == to_chain ({from_chain:?}); cross-VM bridge must \
+                    acc.add_error(err(
+                        DiagnosticCode::UnsafeIr,
+                        format!(
+                            "bridge from_chain == to_chain ({from_chain:?}); cross-VM bridge must \
                          target a different chain"
-                    )));
+                        ),
+                    ));
                 }
             }
             Operation::Swap { from_chain, .. } => {
                 let from_norm = from_chain.to_ascii_lowercase();
                 if !known.contains(from_norm.as_str()) {
-                    acc.add_error(err(format!(
-                        "swap on unknown chain {from_chain:?}; add the chain to the production \
+                    acc.add_error(err(
+                        DiagnosticCode::UnsafeIr,
+                        format!(
+                            "swap on unknown chain {from_chain:?}; add the chain to the production \
                          allow-list or use a known chain"
-                    )));
+                        ),
+                    ));
                 }
             }
             Operation::Lock { chain, .. }
@@ -1115,10 +1435,13 @@ fn verify_adapter_compatibility(ir: &X3IR, acc: &mut ErrorAccumulator) {
             | Operation::Burn { chain, .. }
             | Operation::Release { chain, .. } => {
                 if !known.contains(chain.to_ascii_lowercase().as_str()) {
-                    acc.add_error(err(format!(
-                        "asset operation on unknown chain {chain:?}; add the chain to the \
+                    acc.add_error(err(
+                        DiagnosticCode::UnsafeIr,
+                        format!(
+                            "asset operation on unknown chain {chain:?}; add the chain to the \
                          production allow-list or use a known chain"
-                    )));
+                        ),
+                    ));
                 }
             }
             _ => {}
@@ -1131,17 +1454,20 @@ fn verify_asset_moves(ir: &X3IR, acc: &mut ErrorAccumulator) {
         match op {
             Operation::Lock { amount, .. } | Operation::Mint { amount, .. } | Operation::Burn { amount, .. } => {
                 if *amount == 0 {
-                    acc.add_error(err(format!("asset move operation has zero amount: {op:?}")));
+                    acc.add_error(err(
+                        DiagnosticCode::UnsafeIr,
+                        format!("asset move operation has zero amount: {op:?}"),
+                    ));
                 }
             }
             Operation::Swap { input_amount, .. } => {
                 if *input_amount == 0 {
-                    acc.add_error(err("swap has zero input_amount"));
+                    acc.add_error(err(DiagnosticCode::UnsafeIr, "swap has zero input_amount"));
                 }
             }
             Operation::Bridge { amount, .. } => {
                 if *amount == 0 {
-                    acc.add_error(err("bridge has zero amount"));
+                    acc.add_error(err(DiagnosticCode::UnsafeIr, "bridge has zero amount"));
                 }
             }
             Operation::Require {
@@ -1152,15 +1478,18 @@ fn verify_asset_moves(ir: &X3IR, acc: &mut ErrorAccumulator) {
                 ..
             } => {
                 if matches!(condition, Condition::False) {
-                    acc.add_error(err(format!(
-                        "require is statically false: {}",
-                        error_msg.clone().unwrap_or_else(|| "<no message>".into())
-                    )));
+                    acc.add_error(err(
+                        DiagnosticCode::UnsafeIr,
+                        format!(
+                            "require is statically false: {}",
+                            error_msg.clone().unwrap_or_else(|| "<no message>".into())
+                        ),
+                    ));
                 }
             }
             Operation::OnTimeout { duration_blocks, .. } => {
                 if *duration_blocks == 0 {
-                    acc.add_error(err("OnTimeout with zero duration"));
+                    acc.add_error(err(DiagnosticCode::UnsafeIr, "OnTimeout with zero duration"));
                 }
             }
             Operation::OnFail { action } => {
@@ -1225,11 +1554,7 @@ pub(crate) fn require_guards(program: &Program) -> Vec<(&str, &x3_lang_ast::ast:
     for item in &program.items {
         match &item.node {
             Item::IntentDecl(intent) => {
-                for statement in &intent.body.stmts {
-                    if let x3_lang_ast::ast::Statement::Require(guard) = statement {
-                        guards.push((intent.name.as_str(), guard));
-                    }
-                }
+                collect_block_guards(&intent.body, intent.name.as_str(), &mut guards);
             }
             Item::Bridge(decl) => {
                 guards.extend(decl.requires.iter().map(|guard| (decl.name.as_str(), guard)));
@@ -1239,14 +1564,104 @@ pub(crate) fn require_guards(program: &Program) -> Vec<(&str, &x3_lang_ast::ast:
             }
             Item::Strategy(decl) => {
                 guards.extend(decl.requires.iter().map(|guard| (decl.name.as_str(), guard)));
+                collect_statement_guards(&decl.body, decl.name.as_str(), &mut guards);
             }
             Item::Proposal(decl) => {
                 guards.extend(decl.requires.iter().map(|guard| (decl.name.as_str(), guard)));
+            }
+            // Every other place a guard can be written. A guard is a claim that something backs it,
+            // and where it is written does not change that — so a check that reads this list must
+            // read all of it, or the trailing half of a program is unchecked. The list is
+            // item-shaped rather than statement-shaped because a guard can only appear inside a
+            // body, and these are the items that have one (the declaration kinds that carry fields
+            // instead — `arb`, `netting`, `atomic hedge` — generate their guards during lowering,
+            // which is why those are `measured: true`).
+            Item::Function(function) => {
+                collect_block_guards(&function.body, function.name.as_str(), &mut guards);
+            }
+            Item::Agent(agent) => {
+                for method in &agent.methods {
+                    collect_block_guards(&method.node.body, method.node.name.as_str(), &mut guards);
+                }
+                for strategy in &agent.strategies {
+                    collect_block_guards(&strategy.node.body, strategy.node.name.as_str(), &mut guards);
+                }
+            }
+            Item::GpuBlock(block) => collect_block_guards(&block.body, "gpu block", &mut guards),
+            Item::SimulateDecl(decl) => {
+                collect_block_guards(&decl.body, decl.name.as_str(), &mut guards);
+            }
+            Item::ScheduledTask(task) => {
+                collect_block_guards(&task.body, task.name.as_str(), &mut guards);
+            }
+            Item::SubscriptionDecl(decl) => {
+                collect_block_guards(&decl.body, decl.name.as_str(), &mut guards);
+            }
+            Item::AtomicChoice(choice) => {
+                for path in &choice.paths {
+                    collect_statement_guards(&path.body, path.name.as_str(), &mut guards);
+                }
+            }
+            Item::ParallelDecl(parallel) => {
+                for leg in &parallel.legs {
+                    collect_statement_guards(&leg.body, leg.name.as_str(), &mut guards);
+                }
             }
             _ => {}
         }
     }
     guards
+}
+
+/// Every guard in a block, including the ones inside nested blocks.
+///
+/// This walked the *top level* of an intent body only, so a guard one block down was invisible to
+/// every check built on it — thirteen of them, by `grep require_guards` — and the most common place
+/// to write one is a block: `fallback { require slippage <= 7 }` is how the corpus bounds a
+/// substitution. Measured: `require slippage <= 99` inside a `fallback` block compiled against
+/// `risk_policy { max_slippage 50 }`, while the same guard at the top level of the intent was
+/// refused (`X3E4027: permits a slippage of 50 while the risk policy accepts at most 1`). A guard
+/// that the checks cannot see is a guard the compiler never bothered to back, which is the state
+/// TICKET-027 exists to end — and it reads as enforced in the source either way.
+fn collect_block_guards<'a>(
+    block: &'a x3_lang_ast::ast::Block,
+    owner: &'a str,
+    guards: &mut Vec<(&'a str, &'a x3_lang_ast::ast::RequireGuard)>,
+) {
+    collect_statement_guards(&block.stmts, owner, guards);
+}
+
+fn collect_statement_guards<'a>(
+    statements: &'a [x3_lang_ast::ast::Statement],
+    owner: &'a str,
+    guards: &mut Vec<(&'a str, &'a x3_lang_ast::ast::RequireGuard)>,
+) {
+    use x3_lang_ast::ast::Statement;
+
+    for statement in statements {
+        match statement {
+            Statement::Require(guard) => guards.push((owner, guard)),
+            // A fallback's bounds are ordinary guards, kept in their own list because the block
+            // they bound is a list of replacements rather than a body.
+            Statement::RouteFallback { requires, .. } => {
+                guards.extend(requires.iter().map(|guard| (owner, guard)));
+            }
+            Statement::If {
+                then_block, else_block, ..
+            } => {
+                collect_block_guards(then_block, owner, guards);
+                if let Some(else_block) = else_block {
+                    collect_block_guards(else_block, owner, guards);
+                }
+            }
+            Statement::While { body, .. } | Statement::For { body, .. } => {
+                collect_block_guards(body, owner, guards);
+            }
+            Statement::Loop(body) => collect_block_guards(body, owner, guards),
+            Statement::Atomic(atomic) => collect_block_guards(&atomic.body, owner, guards),
+            _ => {}
+        }
+    }
 }
 
 /// How many hops a path's body represents, when it is written as statements.
@@ -1303,17 +1718,23 @@ pub fn verify_atomic_choice_decls(program: &Program, acc: &mut ErrorAccumulator)
         let name = choice.name.as_str();
 
         if choice.paths.len() < 2 {
-            acc.add_error(err(format!(
-                "atomic_choice '{name}' declares {} path(s); a choice needs at least two branches",
-                choice.paths.len()
-            )));
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "atomic_choice '{name}' declares {} path(s); a choice needs at least two branches",
+                    choice.paths.len()
+                ),
+            ));
         }
         if choice.paths.len() as u32 > MAX_ATOMIC_CHOICE_PATHS {
-            acc.add_error(err(format!(
-                "atomic_choice '{name}' declares {} paths, above the {MAX_ATOMIC_CHOICE_PATHS}-path \
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "atomic_choice '{name}' declares {} paths, above the {MAX_ATOMIC_CHOICE_PATHS}-path \
                  production bound for bounded branch execution",
-                choice.paths.len()
-            )));
+                    choice.paths.len()
+                ),
+            ));
         }
 
         // `lowest_declared_fee` ranks a venue chain, and an `atomic_choice`'s paths
@@ -1323,7 +1744,7 @@ pub fn verify_atomic_choice_decls(program: &Program, acc: &mut ErrorAccumulator)
         // the venues are resolved; here it is refused with that reason rather than
         // ranked by a number the declaration never contained.
         if choice.criterion == x3_lang_ast::ast::ChoiceCriterion::LowestDeclaredFee {
-            acc.add_error(err(format!(
+            acc.add_error(err(DiagnosticCode::TradeDeclaration, format!(
                 "atomic_choice '{name}' chooses by `lowest_declared_fee`, which ranks the venues a                  plan resolves a route to; a path body names hops, not venues, so its declared fee                  is not computable here. Write `fewest_hops` or `highest_net_output`, or let an \
                  `arb` scope rank its cycles"
             )));
@@ -1334,33 +1755,45 @@ pub fn verify_atomic_choice_decls(program: &Program, acc: &mut ErrorAccumulator)
         for path in &choice.paths {
             let path_name = path.name.as_str();
             if seen.contains(&path_name) {
-                acc.add_error(err(format!(
-                    "atomic_choice '{name}' declares path '{path_name}' twice; branches are selected \
+                acc.add_error(err(
+                    DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "atomic_choice '{name}' declares path '{path_name}' twice; branches are selected \
                      by index and a duplicate name makes the set ambiguous"
-                )));
+                    ),
+                ));
             }
             seen.push(path_name);
 
             if path.body.is_empty() {
-                acc.add_error(err(format!(
-                    "atomic_choice '{name}' path '{path_name}' has no executable body — a hop chain \
+                acc.add_error(err(
+                    DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "atomic_choice '{name}' path '{path_name}' has no executable body — a hop chain \
                      alone names a route but no venue to execute it against, so there is nothing to \
                      verify"
-                )));
+                    ),
+                ));
             }
 
             match &path.net_output {
-                None => acc.add_error(err(format!(
-                    "atomic_choice '{name}' path '{path_name}' declares no `net_output <amount> \
+                None => acc.add_error(err(
+                    DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "atomic_choice '{name}' path '{path_name}' declares no `net_output <amount> \
                      <ASSET>`; the compiler cannot compare a branch whose output it does not know"
-                ))),
+                    ),
+                )),
                 Some(output) => {
                     if extract_int_from_expr(&output.value).is_none() {
-                        acc.add_error(err(format!(
-                            "atomic_choice '{name}' path '{path_name}' has a `net_output` that is not \
+                        acc.add_error(err(
+                            DiagnosticCode::TradeDeclaration,
+                            format!(
+                                "atomic_choice '{name}' path '{path_name}' has a `net_output` that is not \
                              an integer literal; choosing between branches needs values the compiler \
                              can evaluate, not expressions it must defer"
-                        )));
+                            ),
+                        ));
                     }
                     outputs.push((path_name, output.asset.as_str()));
                 }
@@ -1370,11 +1803,14 @@ pub fn verify_atomic_choice_decls(program: &Program, acc: &mut ErrorAccumulator)
         if let Some((first_path, first_asset)) = outputs.first() {
             for (path_name, asset) in outputs.iter().skip(1) {
                 if asset != first_asset {
-                    acc.add_error(err(format!(
-                        "atomic_choice '{name}' paths do not require the same output asset: path \
+                    acc.add_error(err(
+                        DiagnosticCode::TradeDeclaration,
+                        format!(
+                            "atomic_choice '{name}' paths do not require the same output asset: path \
                          '{first_path}' produces {first_asset} and path '{path_name}' produces \
                          {asset}; a choice must compare equivalent outputs"
-                    )));
+                        ),
+                    ));
                 }
             }
         }
@@ -1382,11 +1818,14 @@ pub fn verify_atomic_choice_decls(program: &Program, acc: &mut ErrorAccumulator)
         if choice.criterion == x3_lang_ast::ast::ChoiceCriterion::FewestHops {
             for path in &choice.paths {
                 if path_hop_count(path).is_none() {
-                    acc.add_error(err(format!(
-                        "atomic_choice '{name}' path '{}' has no hops to count — declare a hop chain \
+                    acc.add_error(err(
+                        DiagnosticCode::TradeDeclaration,
+                        format!(
+                            "atomic_choice '{name}' path '{}' has no hops to count — declare a hop chain \
                          or a swap/bridge statement for `choose fewest_hops`",
-                        path.name.as_str()
-                    )));
+                            path.name.as_str()
+                        ),
+                    ));
                 }
             }
         }
@@ -1449,26 +1888,33 @@ pub fn verify_route_fallbacks(program: &Program, acc: &mut ErrorAccumulator) {
                 x3_lang_ast::ast::Statement::RouteFallback { replacements, requires } => {
                     if replacements.is_empty() {
                         acc.add_error(err(
+                            DiagnosticCode::TradeDeclaration,
                             "fallback block approves no replacements; an empty approval set would let a \
                              failing leg be re-routed by something the compiler never checked",
                         ));
                     }
                     if replacements.len() > crate::spec::opcodes::MAX_ROUTE_FALLBACKS {
-                        acc.add_error(err(format!(
-                            "fallback approves {} replacements, above the {}-venue production bound for \
+                        acc.add_error(err(
+                            DiagnosticCode::TradeDeclaration,
+                            format!(
+                                "fallback approves {} replacements, above the {}-venue production bound for \
                              statically bounded fallbacks",
-                            replacements.len(),
-                            crate::spec::opcodes::MAX_ROUTE_FALLBACKS
-                        )));
+                                replacements.len(),
+                                crate::spec::opcodes::MAX_ROUTE_FALLBACKS
+                            ),
+                        ));
                     }
                     let mut seen: Vec<&str> = Vec::new();
                     for replacement in replacements {
                         let venue = replacement.venue.as_str();
                         if seen.contains(&venue) {
-                            acc.add_error(err(format!(
-                                "fallback approves venue '{venue}' twice; the approved set is a set, and a \
+                            acc.add_error(err(
+                                DiagnosticCode::TradeDeclaration,
+                                format!(
+                                    "fallback approves venue '{venue}' twice; the approved set is a set, and a \
                                  duplicate would make it ambiguous which entry was verified"
-                            )));
+                                ),
+                            ));
                         }
                         seen.push(venue);
 
@@ -1490,34 +1936,44 @@ pub fn verify_route_fallbacks(program: &Program, acc: &mut ErrorAccumulator) {
                             if guard.kind == x3_lang_ast::ast::RequireKind::Slippage
                                 && !guard.comparison.is_some_and(|op| op.is_upper_bound())
                             {
-                                acc.add_error(err("a fallback's slippage bound must be a ceiling (`<=`); the check \
+                                acc.add_error(err(
+                                    DiagnosticCode::TradeDeclaration,
+                                    "a fallback's slippage bound must be a ceiling (`<=`); the check \
                                      compares it against what the approved venue declares, which only \
                                      means something if the guard names an upper bound"
-                                    .to_string()));
+                                        .to_string(),
+                                ));
                             }
                         }
                         if let (Some(bound), Some((_, venue_slippage))) =
                             (bound, declared.iter().find(|(name, _)| *name == venue).copied())
                         {
                             if u128::from(venue_slippage) > bound {
-                                acc.add_error(err(format!(
-                                    "fallback approves venue '{venue}', which declares {venue_slippage} \
+                                acc.add_error(err(
+                                    DiagnosticCode::TradeDeclaration,
+                                    format!(
+                                        "fallback approves venue '{venue}', which declares {venue_slippage} \
                                      bps of slippage, but the fallback bounds slippage at {bound} bps; \
                                      the approval promises something the venue does not offer"
-                                )));
+                                    ),
+                                ));
                             }
                         }
                     }
                     for guard in requires {
                         if !guard_bounds_a_substitution(&guard.kind) {
-                            acc.add_error(err(format!(
-                                "fallback contains `require {}`, which does not bound a substitution; a \
+                            acc.add_error(err(
+                                DiagnosticCode::TradeDeclaration,
+                                format!(
+                                    "fallback contains `require {}`, which does not bound a substitution; a \
                                  fallback may only constrain what a replacement may cost",
-                                format!("{:?}", guard.kind).to_lowercase()
-                            )));
+                                    format!("{:?}", guard.kind).to_lowercase()
+                                ),
+                            ));
                         }
                         if guard.value.as_ref().and_then(extract_int_from_expr).is_none() {
                             acc.add_error(err(
+                                DiagnosticCode::TradeDeclaration,
                                 "fallback bound is not an integer literal; a bound the compiler cannot \
                                  evaluate does not bound the runtime",
                             ));
@@ -1563,35 +2019,47 @@ pub fn verify_parallel_decls(program: &Program, acc: &mut ErrorAccumulator) {
         };
         let name = parallel.name.as_str();
         if parallel.legs.len() < 2 {
-            acc.add_error(err(format!(
-                "parallel '{name}' declares {} leg(s); a parallel block with one leg is not \
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "parallel '{name}' declares {} leg(s); a parallel block with one leg is not \
                  parallel, and accepting it would make the artifact's claim of concurrent \
                  execution false",
-                parallel.legs.len()
-            )));
+                    parallel.legs.len()
+                ),
+            ));
         }
         if parallel.legs.len() > crate::dag::MAX_PARALLEL_LEGS {
-            acc.add_error(err(format!(
-                "parallel '{name}' declares {} legs, above the {}-leg production bound",
-                parallel.legs.len(),
-                crate::dag::MAX_PARALLEL_LEGS
-            )));
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "parallel '{name}' declares {} legs, above the {}-leg production bound",
+                    parallel.legs.len(),
+                    crate::dag::MAX_PARALLEL_LEGS
+                ),
+            ));
         }
         let mut seen: Vec<&str> = Vec::new();
         for leg in &parallel.legs {
             let leg_name = leg.name.as_str();
             if seen.contains(&leg_name) {
-                acc.add_error(err(format!(
-                    "parallel '{name}' declares leg '{leg_name}' twice; the plan names legs, so a \
+                acc.add_error(err(
+                    DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "parallel '{name}' declares leg '{leg_name}' twice; the plan names legs, so a \
                      duplicate makes the plan ambiguous"
-                )));
+                    ),
+                ));
             }
             seen.push(leg_name);
             if leg.body.is_empty() {
-                acc.add_error(err(format!(
-                    "parallel '{name}' leg '{leg_name}' is empty; it would contribute no dependencies \
+                acc.add_error(err(
+                    DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "parallel '{name}' leg '{leg_name}' is empty; it would contribute no dependencies \
                      and no work"
-                )));
+                    ),
+                ));
             }
         }
     }
@@ -1640,12 +2108,15 @@ pub fn verify_privacy_decls(program: &Program, acc: &mut ErrorAccumulator) {
                 .iter()
                 .map(|(level, what)| format!("\n  - {level}: {what}"))
                 .collect();
-            acc.add_error(err(format!(
-                "privacy declares `encrypted true`, and no mechanism in this language implements \
+            acc.add_error(err(
+                DiagnosticCode::DeclarationHasNoArtifactForm,
+                format!(
+                    "privacy declares `encrypted true`, and no mechanism in this language implements \
                  encryption: the artifact would carry a claim of encryption that nothing provides. \
                  The levels that are implemented are:{}",
-                implemented.join("")
-            )));
+                    implemented.join("")
+                ),
+            ));
         }
     }
 }
@@ -1665,10 +2136,13 @@ pub fn verify_venue_decls(program: &Program, acc: &mut ErrorAccumulator) {
         };
         let name = venue.name.as_str();
         if seen.contains(&name) {
-            acc.add_error(err(format!(
-                "venue '{name}' is declared twice; the graph addresses venues by name, so a \
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "venue '{name}' is declared twice; the graph addresses venues by name, so a \
                  duplicate makes an edge ambiguous"
-            )));
+                ),
+            ));
         }
         seen.push(name);
 
@@ -1676,29 +2150,41 @@ pub fn verify_venue_decls(program: &Program, acc: &mut ErrorAccumulator) {
         // that high is not a venue. The message said "at or above" while the code
         // checked strictly above, which is how the boundary case went unchecked.
         if venue.fee_bps >= Bps::WHOLE.raw() {
-            acc.add_error(err(format!(
-                "venue '{name}' declares a fee of {} bps; a fee at or above 10_000 bps is the whole \
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "venue '{name}' declares a fee of {} bps; a fee at or above 10_000 bps is the whole \
                  amount",
-                venue.fee_bps
-            )));
+                    venue.fee_bps
+                ),
+            ));
         }
         if !Bps::from_raw(venue.slippage_bps).is_within_whole() {
-            acc.add_error(err(format!(
-                "venue '{name}' declares {} bps of slippage, above 10_000 bps",
-                venue.slippage_bps
-            )));
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "venue '{name}' declares {} bps of slippage, above 10_000 bps",
+                    venue.slippage_bps
+                ),
+            ));
         }
         if venue.risk > 100 {
-            acc.add_error(err(format!(
-                "venue '{name}' declares risk {}; the scale is 0 (safest) to 100",
-                venue.risk
-            )));
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "venue '{name}' declares risk {}; the scale is 0 (safest) to 100",
+                    venue.risk
+                ),
+            ));
         }
         if venue.liquidity == 0 {
-            acc.add_error(err(format!(
-                "venue '{name}' declares zero liquidity; the graph would offer a route no size can \
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "venue '{name}' declares zero liquidity; the graph would offer a route no size can \
                  use"
-            )));
+                ),
+            ));
         }
 
         // An off-chain venue has no enforceable settlement, so a leg on it has to
@@ -1707,18 +2193,24 @@ pub fn verify_venue_decls(program: &Program, acc: &mut ErrorAccumulator) {
         // exposes enforceable settlement semantics."
         if venue.kind == VenueKind::Orderbook {
             match venue.settlement {
-                None => acc.add_error(err(format!(
-                    "venue '{name}' is an `orderbook` venue and declares no `settlement`; a venue \
+                None => acc.add_error(err(
+                    DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "venue '{name}' is an `orderbook` venue and declares no `settlement`; a venue \
                      that matches off-chain does not settle both sides or neither by itself, so the \
                      program has to say what does: one of trusted_adapter, escrow, pre_funded, \
                      attested or compensating"
-                ))),
-                Some(guarantee) if guarantee.is_atomic() => acc.add_error(err(format!(
-                    "venue '{name}' is an `orderbook` venue and claims `settlement atomic`; an \
+                    ),
+                )),
+                Some(guarantee) if guarantee.is_atomic() => acc.add_error(err(
+                    DiagnosticCode::TradeDeclaration,
+                    format!(
+                        "venue '{name}' is an `orderbook` venue and claims `settlement atomic`; an \
                      off-chain venue does not expose enforceable settlement semantics, so the claim \
                      would be false. Say where the guarantee really comes from: trusted_adapter, \
                      escrow, pre_funded, attested or compensating"
-                ))),
+                    ),
+                )),
                 Some(_) => {}
             }
         }
@@ -1726,22 +2218,28 @@ pub fn verify_venue_decls(program: &Program, acc: &mut ErrorAccumulator) {
         let asset_in = format!("{}.{}", venue.asset_in.chain.as_str(), venue.asset_in.name.as_str());
         let asset_out = format!("{}.{}", venue.asset_out.chain.as_str(), venue.asset_out.name.as_str());
         if asset_in == asset_out && venue.kind != VenueKind::Lending && venue.kind != VenueKind::Flash {
-            acc.add_error(err(format!(
-                "venue '{name}' takes in and gives out the same asset ({asset_in}); only a lending or \
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "venue '{name}' takes in and gives out the same asset ({asset_in}); only a lending or \
                  flash venue moves one asset, and a {} venue that does would be an edge from an asset \
                  to itself, which no path can use",
-                venue.kind.as_str()
-            )));
+                    venue.kind.as_str()
+                ),
+            ));
         }
 
         // A venue that settles on a chain it does not trade on would put the
         // path on a chain the graph never names.
         let chain = venue.chain.as_str();
         if asset_in.split('.').next() != Some(chain) && venue.kind != VenueKind::Bridge {
-            acc.add_error(err(format!(
-                "venue '{name}' trades {asset_in} but settles on chain '{chain}'; only a bridge \
+            acc.add_error(err(
+                DiagnosticCode::TradeDeclaration,
+                format!(
+                    "venue '{name}' trades {asset_in} but settles on chain '{chain}'; only a bridge \
                  adapter moves an asset to another chain"
-            )));
+                ),
+            ));
         }
     }
 }
@@ -1768,21 +2266,36 @@ pub fn verify_solver_bond_declared(program: &Program, acc: &mut ErrorAccumulator
         // guard says something else, and comparing it against the declared bond
         // as though it were a floor would answer a question nobody asked.
         if !guard.comparison.is_some_and(|op| op.is_lower_bound()) {
-            acc.add_error(err(format!(
+            acc.add_error(err(DiagnosticCode::GuardClaimUnbacked, format!(
                 "declaration '{owner}' states `require solver_bond` without a `>=` bound; a solver bond guard is a floor, and the check reads it as one"
             )));
             continue;
         }
-        let required = guard.value.as_ref().and_then(extract_int_from_expr).unwrap_or(0);
+        // See `verify_route_score_declared`: an unreadable bound is refused, not read as zero.
+        let Some(required) = guard.value.as_ref().and_then(extract_int_from_expr) else {
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' states `require solver_bond >= <bound>` with a bound that is \
+                 not a number; the bound is what the check compares against the declared bond, so it \
+                 has to be one this compiler can read"
+                ),
+            ));
+            continue;
+        };
         match declared {
-            None => acc.add_error(err(format!(
-                "declaration '{owner}' requires a solver bond of {required} but the program declares \
+            None => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires a solver bond of {required} but the program declares \
                  no `solver_market {{ bond <amount> <ASSET> }}` — the guard has nothing to compare \
                  against"
-            ))),
-            Some(bond) if required > bond => acc.add_error(err(format!(
-                "declaration '{owner}' requires a solver bond of {required}, but the declared bond is {bond}"
-            ))),
+                ),
+            )),
+            Some(bond) if required > bond => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!("declaration '{owner}' requires a solver bond of {required}, but the declared bond is {bond}"),
+            )),
             Some(_) => {}
         }
     }
@@ -1807,21 +2320,38 @@ pub fn verify_relayer_quorum_declared(program: &Program, acc: &mut ErrorAccumula
             continue;
         }
         if !guard.comparison.is_some_and(|op| op.is_lower_bound()) {
-            acc.add_error(err(format!(
+            acc.add_error(err(DiagnosticCode::GuardClaimUnbacked, format!(
                 "declaration '{owner}' states `require relayer_quorum` without a `>=` bound; a quorum guard is a floor, and the check reads it as one"
             )));
             continue;
         }
-        let required = guard.value.as_ref().and_then(extract_int_from_expr).unwrap_or(0);
+        // See `verify_route_score_declared`: an unreadable bound is refused, not read as zero.
+        let Some(required) = guard.value.as_ref().and_then(extract_int_from_expr) else {
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' states `require relayer_quorum >= <bound>` with a bound that \
+                 is not a number; the bound is what the check compares against the declared quorum, so \
+                 it has to be one this compiler can read"
+                ),
+            ));
+            continue;
+        };
         match declared {
-            None => acc.add_error(err(format!(
-                "declaration '{owner}' requires a relayer quorum of {required} but the program \
+            None => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires a relayer quorum of {required} but the program \
                  declares no `relayers {{ quorum N_of_M }}` — the guard has nothing to compare against"
-            ))),
-            Some(quorum) if required > u128::from(quorum) => acc.add_error(err(format!(
-                "declaration '{owner}' requires a relayer quorum of {required}, but the declared \
+                ),
+            )),
+            Some(quorum) if required > u128::from(quorum) => acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "declaration '{owner}' requires a relayer quorum of {required}, but the declared \
                  swarm attests with a quorum of {quorum}"
-            ))),
+                ),
+            )),
             Some(_) => {}
         }
     }
@@ -1859,15 +2389,24 @@ fn validate_atomic_swap(decl: &AtomicSwapDecl, acc: &mut ErrorAccumulator) {
     let to_chain = decl.to_asset.chain.as_str();
 
     if !is_known_chain(from_chain) {
-        acc.add_error(err(format!("Unknown chain '{from_chain}' in atomic swap")));
+        acc.add_error(err(
+            DiagnosticCode::InvalidCrossChainRoute,
+            format!("Unknown chain '{from_chain}' in atomic swap"),
+        ));
     }
     if !is_known_chain(to_chain) {
-        acc.add_error(err(format!("Unknown chain '{to_chain}' in atomic swap")));
+        acc.add_error(err(
+            DiagnosticCode::InvalidCrossChainRoute,
+            format!("Unknown chain '{to_chain}' in atomic swap"),
+        ));
     }
 
     // Validate 2: Cross-chain (different source/dest)
     if from_chain.to_ascii_lowercase() == to_chain.to_ascii_lowercase() {
-        acc.add_error(err("Atomic swap must be between different chains"));
+        acc.add_error(err(
+            DiagnosticCode::InvalidCrossChainRoute,
+            "Atomic swap must be between different chains",
+        ));
     }
 
     // Validate 3: Valid hash function
@@ -1877,9 +2416,10 @@ fn validate_atomic_swap(decl: &AtomicSwapDecl, acc: &mut ErrorAccumulator) {
             .iter()
             .any(|h| *h == hash_fn.to_ascii_lowercase())
         {
-            acc.add_error(err(format!(
-                "Unknown hash function '{hash_fn}' in atomic swap. Supported: sha256, blake2b"
-            )));
+            acc.add_error(err(
+                DiagnosticCode::UndefinedSymbol,
+                format!("Unknown hash function '{hash_fn}' in atomic swap. Supported: sha256, blake2b"),
+            ));
         }
     }
 
@@ -1887,7 +2427,10 @@ fn validate_atomic_swap(decl: &AtomicSwapDecl, acc: &mut ErrorAccumulator) {
     if let Some(amount_expr) = &decl.amount {
         if let Some(n) = extract_int_from_expr(amount_expr) {
             if n == 0 {
-                acc.add_error(err("Atomic swap amount must be positive"));
+                acc.add_error(err(
+                    DiagnosticCode::InvalidCrossChainRoute,
+                    "Atomic swap amount must be positive",
+                ));
             }
         }
     }
@@ -1903,10 +2446,13 @@ fn validate_atomic_swap(decl: &AtomicSwapDecl, acc: &mut ErrorAccumulator) {
             crate::lowering::timeout_expression_to_blocks(dst_expr),
         ) {
             if src_blocks <= dst_blocks {
-                acc.add_error(err(format!(
-                    "Source timeout ({src_blocks} blocks) must be greater than destination timeout \
+                acc.add_error(err(
+                    DiagnosticCode::InvalidCrossChainRoute,
+                    format!(
+                        "Source timeout ({src_blocks} blocks) must be greater than destination timeout \
                      ({dst_blocks} blocks) in atomic swap"
-                )));
+                    ),
+                ));
             }
         }
     }
@@ -1923,6 +2469,7 @@ fn validate_atomic_swap_require(require: &x3_lang_ast::ast::RequireGuard, acc: &
             // finality requires a subject (chain name)
             if require.subject.is_none() {
                 acc.add_error(err(
+                    DiagnosticCode::GuardClaimUnbacked,
                     "require finality needs a chain subject (e.g. 'finality.eth >= 12')",
                 ));
             }
@@ -1931,7 +2478,10 @@ fn validate_atomic_swap_require(require: &x3_lang_ast::ast::RequireGuard, acc: &
             // relayer_quorum must be a positive integer
             if let Some(n) = require.value.as_ref().and_then(extract_int_from_expr) {
                 if n == 0 {
-                    acc.add_error(err("require relayer_quorum must be positive"));
+                    acc.add_error(err(
+                        DiagnosticCode::GuardClaimUnbacked,
+                        "require relayer_quorum must be positive",
+                    ));
                 }
             }
         }
@@ -1979,11 +2529,12 @@ pub fn verify_refund_path_exists(ir: &X3IR, acc: &mut ErrorAccumulator) {
     let rollback_covers_locks = escrows_claimed_in_their_own_route(ir);
     if has_cross_chain && !has_refund {
         acc.add_error(err(
+            DiagnosticCode::UnsafeIr,
             "cross-chain operation present without a refund path — add an OnFail or OnTimeout with Refund action",
         ));
     }
     if has_lock && !has_refund && !rollback_covers_locks {
-        acc.add_error(err(
+        acc.add_error(err(DiagnosticCode::UnsafeIr,
             "a `Lock` leaves the program's control with no way back — add an OnFail or OnTimeout              with a Refund action, or release the escrow inside the same atomic route, where a              failed route's rollback means the lock never took effect",
         ));
     }
@@ -2004,6 +2555,7 @@ pub fn verify_refund_path_exists(ir: &X3IR, acc: &mut ErrorAccumulator) {
     });
     if guards_refund_path && !has_refund {
         acc.add_error(err(
+            DiagnosticCode::UnsafeIr,
             "`require refund_path` demands a refund path, and this program has none — add an OnFail \
              or OnTimeout with a Refund action, or drop the guard",
         ));
@@ -2048,7 +2600,7 @@ pub fn verify_finality_explicit(ir: &X3IR, acc: &mut ErrorAccumulator) {
 
     for chain in &bridge_chains {
         if !finality_chains.contains(chain) {
-            acc.add_error(err(format!(
+            acc.add_error(err(DiagnosticCode::UnsafeIr, format!(
                 "bridge from chain '{chain}' has no explicit finality requirement — add `require finality.{chain} >= <confirmations>`"
             )));
         }
@@ -2084,6 +2636,7 @@ pub fn verify_slippage_explicit(ir: &X3IR, acc: &mut ErrorAccumulator) {
     });
     if !has_slippage_bound {
         acc.add_error(err(
+            DiagnosticCode::UnsafeIr,
             "swap leg present without an explicit slippage bound — add `require slippage <= <percent>`",
         ));
     }
@@ -2165,7 +2718,7 @@ pub fn verify_proof_requirements(ir: &X3IR, mode: Option<CompilationMode>, acc: 
     let report = |acc: &mut ErrorAccumulator, obligation: &str| {
         let message = format!("Bridge operation present without {obligation}");
         if mode == Some(CompilationMode::Mainnet) {
-            acc.add_error(err(format!("mainnet: {message}")));
+            acc.add_error(err(DiagnosticCode::UnsafeIr, format!("mainnet: {message}")));
         } else {
             acc.add_warning(X3Error::SemanticError { message, span: span() });
         }
@@ -2194,26 +2747,33 @@ pub fn verify_invariants_on_intent(ir: &X3IR, invariants: &[InvariantRule]) -> V
     violations
 }
 
-/// Verify invariants and emit structured warnings via the ErrorAccumulator.
+/// Report a violated invariant rule as **an error**.
 ///
-/// NOTE (2026-09-18): these rules are unsound for `intent` programs and must
-/// not be promoted to errors yet. They reason about linear position in
-/// `ir.operations`, but intent lowering emits the `from`/`to` endpoints
-/// *before* the route body, and it uses `Release` for the destination endpoint
-/// rather than for a source-chain claim. A well-formed intent such as
-/// `internal_swap.x3` therefore trips four of the six rules — double-claim,
-/// both claim/refund orderings, and destination-fill-before-claim — which
-/// makes them false positives against the intent surface rather than findings.
-/// See `.ai/reports/x3lang-intent-guards-20260918.md`.
+/// They were warnings, and this note used to say why: the rules reasoned about linear position in
+/// `ir.operations` while intent lowering emits the `from`/`to` endpoints *before* the route body and a
+/// timeout/on-fail handler *after* it, so a well-formed intent tripped four of the six. A warning
+/// nobody can promote is a rule that protects nothing — it is invisible in a build and green in the
+/// corpus gates — which is why "all are errors" is part of TICKET-002b rather than a nicety.
+///
+/// What makes the promotion sound is the scoping, not a change of mind: the four positional rules read
+/// [`atomic_scoped_operations`] (operations that actually execute together, so a body nested in a
+/// branch or loop is still seen), `destination_fill_before_source_claim` returns early for a route that
+/// does not bridge, and the claim/refund rules count per lock rather than per program. Measured after
+/// that: **every `.x3` outside the skipped directories checks with zero invariant findings** (25 files),
+/// and `tests/test_invariant_rules.rs` holds the discriminating half — for each of the six there is an
+/// input that violates *that* rule and leaves the other five silent, so a rule that had become noise
+/// would fail its own case rather than hide among warnings.
 pub fn verify_invariants_structured(ir: &X3IR, invariants: &[InvariantRule], acc: &mut ErrorAccumulator) {
     for rule in invariants {
         match (rule.check_fn)(ir) {
             Ok(()) => {}
             Err(msg) => {
-                acc.add_warning(X3Error::SemanticError {
-                    message: format!("invariant '{}' violated: {}", rule.name, msg),
-                    span: Span::DUMMY,
-                });
+                // An invariant the program states is a rejection, so it carries the IR class and the
+                // rule's own name: tooling keys on the code and a reader needs the rule.
+                acc.add_error(err(
+                    DiagnosticCode::UnsafeIr,
+                    format!("invariant '{}' violated: {}", rule.name, msg),
+                ));
             }
         }
     }
@@ -2299,11 +2859,33 @@ fn refund_lock(op: &Operation) -> Option<(&str, &str)> {
     }
 }
 
+/// The lock a refund handler refunds, **and which exit path it fires on**.
+///
+/// `true` for `OnTimeout`, `false` for `OnFail`. The distinction is the difference between two
+/// handlers that can both run and two that cannot: a run leaves through one of them, so "refunded
+/// twice" is a claim about one path rather than about the program (TICKET-002b).
+fn refund_lock_with_path(op: &Operation) -> Option<((&str, &str), bool)> {
+    match op {
+        Operation::OnTimeout {
+            action: FailureAction::Refund { chain, asset, .. },
+            ..
+        } => Some(((chain.as_str(), asset.as_str()), true)),
+        Operation::OnFail {
+            action: FailureAction::Refund { chain, asset, .. },
+        } => Some(((chain.as_str(), asset.as_str()), false)),
+        _ => None,
+    }
+}
+
 /// Whether some atomic route locks an escrow and claims it again inside itself.
 ///
 /// That route's refund path is its own rollback, which is a real mechanism and not an
 /// exemption: a route that fails records no asset operations at all.
 fn escrows_claimed_in_their_own_route(ir: &X3IR) -> bool {
+    // Escrow-level, deliberately: the question is whether *this program's* escrow of an asset
+    // is claimed again inside the route that locked it, and a refund path is keyed by asset
+    // rather than by which of a route's locks it names. The claim *index* is what
+    // `no_double_claim` needs, and it is read there (TICKET-080).
     let mut locks: Vec<(&str, &str)> = Vec::new();
     let mut claims: Vec<(&str, &str)> = Vec::new();
     let mut depth = 0usize;
@@ -2333,49 +2915,38 @@ fn escrows_claimed_in_their_own_route(ir: &X3IR) -> bool {
     false
 }
 
-/// The lock a claim releases, as `(chain, asset)`.
+/// The escrow a claim releases, as `(chain, asset)`, **for a release that claims one**.
+///
+/// A payout is not a claim and does not appear here. That distinction used to be inferred —
+/// `no_refund_after_claim` kept a `locked_escrows` guard because a payout of an asset nobody
+/// locked was being read as a claim, and the canonical two-legged swap warned on every check and
+/// build for it (TICKET-035). The IR says which a release is now, so the rule reads it
+/// (TICKET-101).
 fn release_lock(op: &Operation) -> Option<(&str, &str)> {
     match op {
-        Operation::Release { chain, asset, .. } => Some((chain.as_str(), asset.as_str())),
+        Operation::Release {
+            chain,
+            asset,
+            act: ReleaseAct::Claims(_),
+            ..
+        } => Some((chain.as_str(), asset.as_str())),
         _ => None,
     }
 }
 
-/// The escrows a program creates, as `(chain, asset)`, wherever they are.
+/// Which of its route's locks a claim names, or `None` for a release that claims nothing.
 ///
-/// Program-wide rather than atomic-scoped, and that asymmetry is the point:
-/// whether an asset was locked is a property of the program, while *when* it was
-/// claimed and refunded is a property of a position inside one atomic route. An
-/// escrow locked at the top level — which is where intent lowering puts the `from`
-/// endpoint — is still the escrow a claim and a refund inside the route refer to,
-/// so a rule that only looked inside the block would lose the genuine case.
-fn locked_escrows(ir: &X3IR) -> Vec<(&str, &str)> {
-    fn collect<'a>(operations: &'a [Operation], out: &mut Vec<(&'a str, &'a str)>) {
-        for op in operations {
-            match op {
-                Operation::Lock { chain, asset, .. } => out.push((chain.as_str(), asset.as_str())),
-                Operation::If { then_ops, else_ops, .. } => {
-                    collect(then_ops, out);
-                    if let Some(else_ops) = else_ops {
-                        collect(else_ops, out);
-                    }
-                }
-                Operation::Loop { body, .. } | Operation::Simulate { body, .. } => collect(body, out),
-                Operation::ScheduledDispatch { entry, .. } => collect(entry, out),
-                Operation::GasAdaptive {
-                    high_gas_ops,
-                    low_gas_ops,
-                } => {
-                    collect(high_gas_ops, out);
-                    collect(low_gas_ops, out);
-                }
-                _ => {}
-            }
-        }
+/// This is the identity `no_double_claim` needs: two releases of one asset in one route name
+/// two different locks, and without the index they were the same claim to every reader — which
+/// is what forced a book to settle one transfer per route (TICKET-080).
+fn claimed_lock(op: &Operation) -> Option<u32> {
+    match op {
+        Operation::Release {
+            act: ReleaseAct::Claims(index),
+            ..
+        } => Some(*index),
+        _ => None,
     }
-    let mut out = Vec::new();
-    collect(&ir.operations, &mut out);
-    out
 }
 
 /// Return the list of built-in invariant rules for static analysis.
@@ -2412,7 +2983,7 @@ pub fn get_builtin_invariants() -> Vec<InvariantRule> {
                 // Per route rather than per program because a route is the unit that
                 // settles: claims in two routes are two settlements, not one claim made
                 // twice.
-                let mut claims: Vec<(&str, &str)> = Vec::new();
+                let mut claims: Vec<(&str, &str, u32)> = Vec::new();
                 let mut depth = 0usize;
                 for op in &ir.operations {
                     match op {
@@ -2425,14 +2996,15 @@ pub fn get_builtin_invariants() -> Vec<InvariantRule> {
                             claims.clear();
                         }
                         _ if depth > 0 => {
-                            let Some(lock) = release_lock(op) else {
+                            let (Some((chain, asset)), Some(index)) = (release_lock(op), claimed_lock(op)) else {
                                 continue;
                             };
+                            let lock = (chain, asset, index);
                             if claims.contains(&lock) {
                                 return Err(format!(
                                     "multiple Release (claim) operations found for the same lock \
-                                     ({}.{}) inside one atomic route",
-                                    lock.0, lock.1
+                                     ({chain}.{asset}, lock #{} of its route) inside one atomic route",
+                                    lock.2
                                 ));
                             }
                             claims.push(lock);
@@ -2452,18 +3024,31 @@ pub fn get_builtin_invariants() -> Vec<InvariantRule> {
                 // swap: `examples/atomic_swap.x3` refunds `eth.USDC` on the
                 // source timeout and `sol.SOL` on the destination timeout, and
                 // those are two different locks, not one lock refunded twice.
-                let mut refunds: Vec<(&str, &str)> = Vec::new();
+                //
+                // Counted **per lock and per exit path**, which is what "twice" means: `OnTimeout`
+                // fires on the timeout path and `OnFail` on the failure path, so a program that
+                // refunds one lock on each of them has two handlers and two ways out — not one refund
+                // taken twice. The canonical bridged `parallel` leg writes exactly that
+                // (`timeout 30s refund ethereum.ETH to sender` beside `on_fail refund ethereum.ETH to
+                // sender`), and it compiled warning-free until this rule became an error: the
+                // promotion is what made the false positive visible, which is the whole argument for
+                // "all are errors" in TICKET-002b.
+                let mut refunds: Vec<(&str, &str, bool)> = Vec::new();
                 for op in &ir.operations {
-                    let Some(lock) = refund_lock(op) else {
+                    let Some((lock, on_timeout)) = refund_lock_with_path(op) else {
                         continue;
                     };
-                    if refunds.contains(&lock) {
+                    if refunds.contains(&(lock.0, lock.1, on_timeout)) {
                         return Err(format!(
-                            "multiple refund operations found for the same lock ({}.{})",
-                            lock.0, lock.1
+                            "multiple {} refund operations found for the same lock ({}.{}): a run takes \
+                             one exit path, so two handlers on the same one cannot both be about a \
+                             single refund",
+                            if on_timeout { "timeout" } else { "failure" },
+                            lock.0,
+                            lock.1
                         ));
                     }
-                    refunds.push(lock);
+                    refunds.push((lock.0, lock.1, on_timeout));
                 }
                 Ok(())
             },
@@ -2477,7 +3062,15 @@ pub fn get_builtin_invariants() -> Vec<InvariantRule> {
                     if is_refund_action(op) {
                         found_refund = true;
                     }
-                    if found_refund && matches!(op, Operation::Release { .. }) {
+                    // A **claim**, not any release: `Release` means two things in this IR — claiming an
+                    // escrow the program locked, and paying out the asset a route delivered — and the
+                    // rule is about claims. Reading a payout as one called the canonical bridged
+                    // `parallel` leg (a bridge, then a timeout refund and an on-fail refund, then the
+                    // destination payout) a claim-after-refund; its sibling `no_refund_after_claim` was
+                    // corrected for exactly this with `release_lock`, and this arm kept the broader
+                    // reading until the rules became errors (TICKET-035's defect, TICKET-002b's
+                    // promotion).
+                    if found_refund && release_lock(op).is_some() {
                         return Err("Release (claim) found after refund".into());
                     }
                 }
@@ -2503,14 +3096,18 @@ pub fn get_builtin_invariants() -> Vec<InvariantRule> {
                 // payout of an asset nobody locked is not a claim this rule is
                 // about, while a claim of a locked escrow that is refunded later in
                 // the same route is still caught.
-                let locked = locked_escrows(ir);
                 let mut claimed: Vec<(&str, &str)> = Vec::new();
                 for op in atomic_scoped_operations(ir) {
                     if let Some(lock) = release_lock(op) {
                         claimed.push(lock);
                     }
                     if let Some(lock) = refund_lock(op) {
-                        if claimed.contains(&lock) && locked.contains(&lock) {
+                        // No `locked` guard: a release that appears in `claimed` **is** a claim,
+                        // and a claim names a lock its route holds — so the escrow exists by
+                        // construction rather than by a second lookup. The guard was here
+                        // because a payout of an unlocked asset used to be indistinguishable
+                        // from a claim; the IR says which is which now (TICKET-101).
+                        if claimed.contains(&lock) {
                             return Err(format!(
                                 "Refund of {}.{} found after its Release (claim)",
                                 lock.0, lock.1
@@ -2583,15 +3180,17 @@ pub fn verify_route_score(ir: &X3IR, acc: &mut ErrorAccumulator) {
         if let Operation::RouteScore { strategy, weights } = op {
             let total: u32 = weights.values().sum();
             if total != 100 {
-                acc.add_error(err(format!(
-                    "route score strategy '{strategy}' weights sum to {total}, expected 100"
-                )));
+                acc.add_error(err(
+                    DiagnosticCode::TradeDeclaration,
+                    format!("route score strategy '{strategy}' weights sum to {total}, expected 100"),
+                ));
             }
             for (key, &val) in weights {
                 if val > 100 {
-                    acc.add_error(err(format!(
-                        "route score strategy '{strategy}' weight '{key}' is {val}, exceeds 100"
-                    )));
+                    acc.add_error(err(
+                        DiagnosticCode::TradeDeclaration,
+                        format!("route score strategy '{strategy}' weight '{key}' is {val}, exceeds 100"),
+                    ));
                 }
             }
         }
@@ -2635,17 +3234,21 @@ pub fn verify_risk_score_guards(ir: &X3IR, acc: &mut ErrorAccumulator) {
     let score = compute_risk_score(ir);
     for (comparison, limit) in guards {
         if !comparison.is_some_and(|op| op.is_upper_bound()) {
-            acc.add_error(err(format!(
-                "`require risk` states a risk score without a ceiling; the score is a risk, so the \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "`require risk` states a risk score without a ceiling; the score is a risk, so the \
                  bound is an upper one — write `require risk <= {}`",
-                limit
-                    .map(|limit| limit.to_string())
-                    .unwrap_or_else(|| "<n>".to_string())
-            )));
+                    limit
+                        .map(|limit| limit.to_string())
+                        .unwrap_or_else(|| "<n>".to_string())
+                ),
+            ));
             continue;
         }
         let Some(limit) = limit else {
             acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
                 "`require risk` states a bound the compiler cannot read as a number; the score it is \
                  checked against is computed, so the guard has to state an integer"
                     .to_string(),
@@ -2653,22 +3256,25 @@ pub fn verify_risk_score_guards(ir: &X3IR, acc: &mut ErrorAccumulator) {
             continue;
         };
         if u128::from(score.total) > limit {
-            acc.add_error(err(format!(
-                "`require risk <= {limit}` claims a risk score of at most {limit}, but this program's \
+            acc.add_error(err(
+                DiagnosticCode::GuardClaimUnbacked,
+                format!(
+                    "`require risk <= {limit}` claims a risk score of at most {limit}, but this program's \
                  computed score is {} (chain {}, bridge {}, solver {}, relayer {}, rpc {}, liquidity \
                  {}, finality {}, mev {}, timeout {}, refund {})",
-                score.total,
-                score.chain_risk,
-                score.bridge_risk,
-                score.solver_risk,
-                score.relayer_risk,
-                score.rpc_risk,
-                score.liquidity_risk,
-                score.finality_risk,
-                score.mev_risk,
-                score.timeout_risk,
-                score.refund_risk
-            )));
+                    score.total,
+                    score.chain_risk,
+                    score.bridge_risk,
+                    score.solver_risk,
+                    score.relayer_risk,
+                    score.rpc_risk,
+                    score.liquidity_risk,
+                    score.finality_risk,
+                    score.mev_risk,
+                    score.timeout_risk,
+                    score.refund_risk
+                ),
+            ));
         }
     }
 }
@@ -2735,17 +3341,23 @@ fn verify_single_rpc(ir: &X3IR, acc: &mut ErrorAccumulator) {
         .count();
     if rpc_count == 0 {
         if has_cross_chain_operation(ir) {
-            acc.add_error(err("mainnet: no RPC consensus declared — single-RPC is unsafe"));
+            acc.add_error(err(
+                DiagnosticCode::MainnetConfigurationUnsafe,
+                "mainnet: no RPC consensus declared — single-RPC is unsafe",
+            ));
         }
         return;
     }
     for op in &ir.operations {
         if let Operation::RpcConsensus { chain, require, .. } = op {
             if require.0 < 2 || require.1 < 2 {
-                acc.add_error(err(format!(
-                    "mainnet: chain '{chain}' RPC quorum {}/{} is unsafe — minimum 2_of_3 required",
-                    require.0, require.1
-                )));
+                acc.add_error(err(
+                    DiagnosticCode::MainnetConfigurationUnsafe,
+                    format!(
+                        "mainnet: chain '{chain}' RPC quorum {}/{} is unsafe — minimum 2_of_3 required",
+                        require.0, require.1
+                    ),
+                ));
             }
         }
     }
@@ -2760,6 +3372,7 @@ fn verify_single_relayer(ir: &X3IR, acc: &mut ErrorAccumulator) {
     if relayer_count == 0 {
         if has_cross_chain_operation(ir) {
             acc.add_error(err(
+                DiagnosticCode::MainnetConfigurationUnsafe,
                 "mainnet: no relayer attestation declared — single-relayer is unsafe",
             ));
         }
@@ -2768,16 +3381,22 @@ fn verify_single_relayer(ir: &X3IR, acc: &mut ErrorAccumulator) {
     for op in &ir.operations {
         if let Operation::RelayerAttest { relayers, quorum, .. } = op {
             if quorum.0 < 2 || quorum.1 < 2 {
-                acc.add_error(err(format!(
-                    "mainnet: relayer quorum {}/{} is unsafe — minimum 2_of_3 required",
-                    quorum.0, quorum.1
-                )));
+                acc.add_error(err(
+                    DiagnosticCode::MainnetConfigurationUnsafe,
+                    format!(
+                        "mainnet: relayer quorum {}/{} is unsafe — minimum 2_of_3 required",
+                        quorum.0, quorum.1
+                    ),
+                ));
             }
             if relayers.len() < 3 {
-                acc.add_error(err(format!(
-                    "mainnet: only {} relayers declared — minimum 3 required for quorum safety",
-                    relayers.len()
-                )));
+                acc.add_error(err(
+                    DiagnosticCode::MainnetConfigurationUnsafe,
+                    format!(
+                        "mainnet: only {} relayers declared — minimum 3 required for quorum safety",
+                        relayers.len()
+                    ),
+                ));
             }
         }
     }
@@ -2804,12 +3423,16 @@ fn verify_solver_bond(ir: &X3IR, acc: &mut ErrorAccumulator) {
                 _ => None,
             };
             if declared == Some(0) {
-                acc.add_error(err("mainnet: solver bond must be greater than zero"));
+                acc.add_error(err(
+                    DiagnosticCode::MainnetConfigurationUnsafe,
+                    "mainnet: solver bond must be greater than zero",
+                ));
             }
         }
     }
     if !saw_bond && has_cross_chain_operation(ir) {
         acc.add_error(err(
+            DiagnosticCode::MainnetConfigurationUnsafe,
             "mainnet: missing solver bond declaration — add `require solver_bond >= <amount>`",
         ));
     }
@@ -2824,19 +3447,28 @@ fn verify_known_assets(ir: &X3IR, acc: &mut ErrorAccumulator) {
         match op {
             Operation::Lock { asset, .. } | Operation::Mint { asset, .. } | Operation::Burn { asset, .. } => {
                 if !known.contains(asset.to_uppercase().as_str()) {
-                    acc.add_error(err(format!(
+                    acc.add_error(err(
+                        DiagnosticCode::MainnetConfigurationUnsafe,
+                        format!(
                         "mainnet: unknown asset '{asset}' — must be one of: USDC, USDT, WETH, WBTC, SOL, ETH, BTC, X3"
-                    )));
+                    ),
+                    ));
                 }
             }
             Operation::Bridge {
                 from_asset, to_asset, ..
             } => {
                 if !known.contains(from_asset.to_uppercase().as_str()) {
-                    acc.add_error(err(format!("mainnet: unknown from_asset '{from_asset}' in bridge")));
+                    acc.add_error(err(
+                        DiagnosticCode::MainnetConfigurationUnsafe,
+                        format!("mainnet: unknown from_asset '{from_asset}' in bridge"),
+                    ));
                 }
                 if !known.contains(to_asset.to_uppercase().as_str()) {
-                    acc.add_error(err(format!("mainnet: unknown to_asset '{to_asset}' in bridge")));
+                    acc.add_error(err(
+                        DiagnosticCode::MainnetConfigurationUnsafe,
+                        format!("mainnet: unknown to_asset '{to_asset}' in bridge"),
+                    ));
                 }
             }
             _ => {}
@@ -2856,11 +3488,14 @@ fn verify_slippage_safe(ir: &X3IR, acc: &mut ErrorAccumulator) {
             // rejection, and a value one ulp either side of 5.0 would decide it
             // differently on a different runtime.
             if let Some(bps) = slippage_bps_from_text(expr).filter(|bps| *bps > SLIPPAGE_CEILING_BPS) {
-                acc.add_error(err(format!(
-                    "mainnet: slippage tolerance {}.{:02}% exceeds maximum 5%",
-                    bps / 100,
-                    bps % 100
-                )));
+                acc.add_error(err(
+                    DiagnosticCode::MainnetConfigurationUnsafe,
+                    format!(
+                        "mainnet: slippage tolerance {}.{:02}% exceeds maximum 5%",
+                        bps / 100,
+                        bps % 100
+                    ),
+                ));
             }
         }
     }
@@ -2940,11 +3575,14 @@ fn verify_deadline_bounded(ir: &X3IR, acc: &mut ErrorAccumulator) {
     for op in &ir.operations {
         if let Operation::OnTimeout { duration_blocks, .. } = op {
             if *duration_blocks > max_allowed_blocks {
-                acc.add_error(err(format!(
-                    "mainnet: timeout {duration_blocks} blocks exceeds the maximum of \
+                acc.add_error(err(
+                    DiagnosticCode::MainnetConfigurationUnsafe,
+                    format!(
+                        "mainnet: timeout {duration_blocks} blocks exceeds the maximum of \
                      {max_allowed_blocks} (24 hours at {}s/block)",
-                    crate::lowering::SECONDS_PER_BLOCK
-                )));
+                        crate::lowering::SECONDS_PER_BLOCK
+                    ),
+                ));
             }
         }
     }
@@ -2962,6 +3600,7 @@ fn verify_manual_recovery(ir: &X3IR, acc: &mut ErrorAccumulator) {
     });
     if has_manual_only && !has_auto_recovery {
         acc.add_error(err(
+            DiagnosticCode::MainnetConfigurationUnsafe,
             "mainnet: manual-only recovery paths (Halt/Quarantine) without automatic refund — unsafe",
         ));
     }
@@ -3288,6 +3927,7 @@ mod tests {
                 chain: "solana".into(),
                 asset: "USDC".into(),
                 to: "4Nd1".into(),
+                act: ReleaseAct::Claims(0),
             },
             Operation::AtomicBegin,
             Operation::Bridge {
@@ -3323,6 +3963,7 @@ mod tests {
                 chain: "ethereum".into(),
                 asset: "USDC".into(),
                 to: "sender".into(),
+                act: ReleaseAct::Payout,
             },
             Operation::OnFail {
                 action: FailureAction::Rollback,
@@ -3360,15 +4001,19 @@ mod tests {
         // Non-vacuous: scoping the rules must not turn them off.
         let mut ir = empty_ir();
         ir.operations = atomic(vec![
+            // Two claims of the *same* lock: one lock claimed twice is the violation the rule
+            // names, and two claims of two different locks are what TICKET-080 made possible.
             Operation::Release {
                 chain: "solana".into(),
                 asset: "USDC".into(),
                 to: "a".into(),
+                act: ReleaseAct::Claims(0),
             },
             Operation::Release {
                 chain: "solana".into(),
                 asset: "USDC".into(),
                 to: "b".into(),
+                act: ReleaseAct::Claims(0),
             },
         ]);
         assert!(
@@ -3399,6 +4044,7 @@ mod tests {
                 chain: "solana".into(),
                 asset: "USDC".into(),
                 to: "a".into(),
+                act: ReleaseAct::Claims(0),
             },
             Operation::OnTimeout {
                 duration_blocks: 30,
@@ -3438,6 +4084,9 @@ mod tests {
                 chain: "solana".into(),
                 asset: "SOL".into(),
                 to: "4Nd1".into(),
+                // The destination asset's payout, which claims no lock — which is what this
+                // fixture exists to say, in the IR's own terms now rather than by proxy.
+                act: ReleaseAct::Payout,
             },
             Operation::OnTimeout {
                 duration_blocks: 30,
@@ -3477,6 +4126,7 @@ mod tests {
             chain: "solana".into(),
             asset: "USDC".into(),
             to: "a".into(),
+            act: ReleaseAct::Payout,
         }]);
         assert!(
             !invariant_violations(&same_chain)
@@ -3492,6 +4142,7 @@ mod tests {
                 chain: "solana".into(),
                 asset: "USDC".into(),
                 to: "a".into(),
+                act: ReleaseAct::Payout,
             },
             Operation::Bridge {
                 via: "x3".into(),
@@ -3515,12 +4166,25 @@ mod tests {
 
     #[test]
     fn no_double_refund_counts_on_fail_refunds_as_well_as_timeout_refunds() {
-        // "At most one refund handler" is the property; counting only timeout
-        // handlers missed an on-fail refund alongside a timeout refund.
+        // The property is "at most one refund **per exit path**", and both kinds count: an `OnFail`
+        // refund executes on the failure path and an `OnTimeout` refund is the timeout path's. Counting
+        // only timeouts missed an on-fail refund beside one (why this test exists), and counting both
+        // kinds as one number refused a program the language writes on purpose — see the pair below,
+        // which the canonical bridged `parallel` leg is (TICKET-002b).
         let mut ir = empty_ir();
         ir.operations = vec![
             Operation::OnTimeout {
                 duration_blocks: 30,
+                action: FailureAction::Refund {
+                    chain: "solana".into(),
+                    asset: "USDC".into(),
+                    to: "sender".into(),
+                },
+            },
+            // A second *timeout* refund of the same lock is a violation: two deadlines for one lock are
+            // two declarations about the same exit, and the engine can only honour one.
+            Operation::OnTimeout {
+                duration_blocks: 60,
                 action: FailureAction::Refund {
                     chain: "solana".into(),
                     asset: "USDC".into(),
@@ -3539,7 +4203,35 @@ mod tests {
             invariant_violations(&ir)
                 .iter()
                 .any(|v| v.starts_with("no_double_refund")),
-            "two refund handlers must be reported regardless of which handler kind they are"
+            "two refund handlers on one exit path must be reported"
+        );
+
+        // And the pair that is *not* a violation: one handler per path. The failure handler is what the
+        // artifact carries; the timeout's refund is a declaration the emitter does not write (it writes
+        // `[ON_TIMEOUT][0]` and leaves `duration_blocks` to the timeout/refund engine), so a run leaves
+        // through one of them and neither is a second refund of the same escrow.
+        let mut pair = empty_ir();
+        pair.operations = vec![
+            Operation::OnTimeout {
+                duration_blocks: 30,
+                action: FailureAction::Refund {
+                    chain: "solana".into(),
+                    asset: "USDC".into(),
+                    to: "sender".into(),
+                },
+            },
+            Operation::OnFail {
+                action: FailureAction::Refund {
+                    chain: "solana".into(),
+                    asset: "USDC".into(),
+                    to: "sender".into(),
+                },
+            },
+        ];
+        assert!(
+            invariant_violations(&pair).is_empty(),
+            "one handler per exit path is not one refund taken twice: {:?}",
+            invariant_violations(&pair)
         );
     }
 
@@ -3682,6 +4374,7 @@ mod tests {
                 chain: "ethereum".into(),
                 asset: "ETH".into(),
                 to: "0x1".into(),
+                act: ReleaseAct::Claims(0),
             },
         ];
         let outcome = verify_collect(&ir, DEFAULT_MAX_ATOMIC_OPS, DEFAULT_MAX_ROUTE_HOPS, None);
@@ -4619,11 +5312,15 @@ mod tests {
                 chain: "solana".into(),
                 asset: "USDC".into(),
                 to: "alice".into(),
+                act: ReleaseAct::Claims(0),
             },
             Operation::Release {
                 chain: "solana".into(),
                 asset: "USDC".into(),
                 to: "bob".into(),
+                // The same lock, claimed a second time — which is the violation, and the
+                // index is how the rule can now tell that from two claims of two locks.
+                act: ReleaseAct::Claims(0),
             },
             Operation::AtomicEnd,
         ];
@@ -4660,11 +5357,43 @@ mod tests {
                 chain: "solana".into(),
                 asset: "USDC".into(),
                 to: "alice".into(),
+                // A **claim**. This fixture used `ReleaseAct::Payout` until TICKET-002b: a payout is
+                // what a route delivers rather than an escrow the program locked, and the rule is about
+                // claims — the distinction TICKET-101 added the act field for. The pair below is what
+                // keeps the narrowing honest.
+                act: ReleaseAct::Claims(0),
             },
             Operation::AtomicEnd,
         ];
         let violations = verify_invariants_on_intent(&ir, &invariants);
         assert!(violations.iter().any(|v| v.contains("no_claim_after_refund")));
+
+        // A payout after a refund is not a claim after a refund, so it is not this rule's business:
+        // the canonical bridged `parallel` leg pays the destination out after its two refund handlers.
+        let mut payout = empty_ir();
+        payout.operations = vec![
+            Operation::AtomicBegin,
+            Operation::OnTimeout {
+                duration_blocks: 30,
+                action: FailureAction::Refund {
+                    chain: "solana".into(),
+                    asset: "USDC".into(),
+                    to: "sender".into(),
+                },
+            },
+            Operation::Release {
+                chain: "solana".into(),
+                asset: "SOL".into(),
+                to: "alice".into(),
+                act: ReleaseAct::Payout,
+            },
+            Operation::AtomicEnd,
+        ];
+        let after_payout = verify_invariants_on_intent(&payout, &invariants);
+        assert!(
+            !after_payout.iter().any(|v| v.contains("no_claim_after_refund")),
+            "a payout is not a claim: {after_payout:?}"
+        );
     }
 
     // ───── Risk score tests ──────────────────────────────────────────────
@@ -4807,6 +5536,7 @@ mod refund_path_tests {
                 chain: "ethereum".into(),
                 asset: "USDC".into(),
                 to: "0xB1".into(),
+                act: ReleaseAct::Claims(0),
             },
             Operation::AtomicEnd,
         ]);
@@ -4851,6 +5581,7 @@ mod refund_path_tests {
                 chain: "ethereum".into(),
                 asset: "ETH".into(),
                 to: "0xB1".into(),
+                act: ReleaseAct::Claims(0),
             },
             Operation::AtomicEnd,
         ]);

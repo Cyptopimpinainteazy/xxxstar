@@ -273,8 +273,6 @@ finality_policy strict {
     requirement finalized
 }
 
-error SlippageExceeded
-
 target evm {
     adapter evm_adapter
     contract 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18
@@ -482,7 +480,15 @@ fn cli_run_executes_atomic_bytecode_successfully() {
         .arg(&bytecode)
         .status()
         .expect("build");
-    let out = x3c().arg("run").arg(&bytecode).output().expect("x3c run");
+    // `GOOD_SOURCE` writes `require slippage <= 50`, which the VM judges against what a host
+    // measured — so the run states the slippage it realised rather than leaving the guard to pass
+    // on a number nobody took.
+    let out = x3c()
+        .arg("run")
+        .args(["--measured-slippage-bps", "0"])
+        .arg(&bytecode)
+        .output()
+        .expect("x3c run");
     assert!(
         out.status.success(),
         "run must succeed — AtomicBegin/AtomicEnd are wired, got stdout: {}, stderr: {}",
@@ -1126,14 +1132,21 @@ fn cli_fusion_never_internalizes_an_intent_that_did_not_opt_in() {
     );
 }
 
-/// `if`/`loop` were emitted as records no reader could follow.
+/// An `if` whose condition nothing can decide is refused, by both commands.
 ///
-/// Measured on this program before the refusal: `x3c build` wrote 320 bytes,
-/// `x3c explain` printed the condition text as opcodes, and `x3c run` failed with
-/// `X3_VERIFY_FAILED: OutOfBounds(292)`. The IR verifier and the emitter refuse
-/// now, and the refusal has to reach *both* commands — a `check` that accepted
-/// what `build` refuses is the split this test exists to prevent — and neither may
-/// leave an artifact behind.
+/// `if`/`loop` were emitted as records no reader could follow: measured on this program
+/// before the refusal, `x3c build` wrote 320 bytes, `x3c explain` printed the condition text
+/// as opcodes, and `x3c run` failed with `X3_VERIFY_FAILED: OutOfBounds(292)`. The IR
+/// verifier and the emitter refuse now, and the refusal has to reach *both* commands — a
+/// `check` that accepted what `build` refuses is the split this test exists to prevent — and
+/// neither may leave an artifact behind.
+///
+/// The condition here is deliberately one the compiler *cannot* decide (`steps > 0`), because
+/// a decidable one is no longer refused: it is folded and the taken branch is written, which
+/// `cli_folds_a_decidable_branch_and_writes_the_branch_that_runs` covers. The two tests are
+/// the two halves of the same rule, and this one would pass vacuously if the fold stopped
+/// deciding anything, which is why the other asserts the fold *works* rather than that it
+/// exists.
 #[test]
 fn cli_refuses_a_branch_no_reader_could_follow_instead_of_writing_one() {
     let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1150,7 +1163,7 @@ fn cli_refuses_a_branch_no_reader_could_follow_instead_of_writing_one() {
     );
     let branched = source.replace(
         anchor,
-        "        if 1 > 0 {\n            require profit >= 5\n        }\n",
+        "        if steps > 0 {\n            require profit >= 5\n        }\n",
     );
     let fixture = write_fixture("cli_strategy_with_a_branch.x3", &branched);
 
@@ -1182,6 +1195,126 @@ fn cli_refuses_a_branch_no_reader_could_follow_instead_of_writing_one() {
     );
     assert!(!build.status.success(), "build must refuse the branch: {build_output}");
     assert!(!out.exists(), "and no artifact may be written next to it");
+}
+
+/// A branch the compiler *can* decide is folded, and the branch that runs is the one written
+/// (TICKET-058).
+///
+/// This is the feature half of the construct's rule: `if 1 > 0 { a } else { b }` is a program
+/// whose meaning is `a`, and the artifact holds `a`'s instructions — inline, at the stream's own
+/// absolute boundaries, so every reader can walk them. No `IF` record is written, because this
+/// format's frames vary in width and pad absolutely and a record holding a branch would need a
+/// target in stream coordinates that no half of the pipeline computes.
+///
+/// The test proves *which* branch ran rather than only that something built, by giving the two
+/// branches different lengths and reading the instruction count out of the artifact. Counted the
+/// way `x3c explain` lists them — one record per line — the example is 8 records with the
+/// one-guard branch and 9 with the two-guard one:
+///   `if 1 > 0` is true  -> the one-guard branch  -> 8
+///   `if 1 > 2` is false -> the two-guard branch  -> 9
+/// A fold that picked the wrong side, or emitted both branches, would not land on those two
+/// numbers. (`x3c build` reports a larger figure for the same artifact — it counts the encoded
+/// instructions, and the two views differ by the payloads' own contents. The relationship is
+/// what this test is about, and the relationship is one record.)
+#[test]
+fn cli_folds_a_decidable_branch_and_writes_the_branch_that_runs() {
+    let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("the crate lives under x3-lang")
+        .join("examples")
+        .join("strategy_module.x3");
+    let source = std::fs::read_to_string(&example).expect("the strategy example must be readable");
+    let anchor = "        require slippage <= 50\n        require profit >= 5\n";
+    assert!(
+        source.contains(anchor),
+        "this test replaces the two guards with a branch over them: {example:?}"
+    );
+
+    // Two branches of different lengths, so the artifact says which one was taken. `profit >= 5`
+    // is in both, because the module's `guarantees [min_profit]` asks for a floor in the body.
+    let branched = |condition: &str| {
+        source.replace(
+            anchor,
+            &format!(
+                "        require slippage <= 50\n        if {condition} {{\n            require \
+                 profit >= 5\n        }} else {{\n            require profit >= 5\n            \
+                 require profit >= 99\n        }}\n"
+            ),
+        )
+    };
+
+    let mut counts = Vec::new();
+    for (name, condition) in [("true", "1 > 0"), ("false", "1 > 2")] {
+        let fixture = write_fixture(&format!("cli_folded_branch_{name}.x3"), &branched(condition));
+        let out = std::env::temp_dir().join(format!("cli_folded_branch_{name}.x3b"));
+        let _ = std::fs::remove_file(&out);
+
+        let check = x3c().arg("check").arg(&fixture).output().expect("run x3c check");
+        let check_output = format!(
+            "{}{}",
+            String::from_utf8_lossy(&check.stdout),
+            String::from_utf8_lossy(&check.stderr)
+        );
+        assert!(
+            check.status.success(),
+            "a decidable `if {condition}` must check — the compiler knows which branch runs: {check_output}"
+        );
+
+        let build = x3c()
+            .arg("build")
+            .arg(&fixture)
+            .arg("--out")
+            .arg(&out)
+            .output()
+            .expect("run x3c build");
+        let build_output = format!(
+            "{}{}",
+            String::from_utf8_lossy(&build.stdout),
+            String::from_utf8_lossy(&build.stderr)
+        );
+        assert!(build.status.success(), "and it must build: {build_output}");
+
+        let explain = x3c().arg("explain").arg(&out).output().expect("run x3c explain");
+        let disassembly = format!(
+            "{}{}",
+            String::from_utf8_lossy(&explain.stdout),
+            String::from_utf8_lossy(&explain.stderr)
+        );
+        assert!(
+            explain.status.success(),
+            "and the artifact must be walkable: {disassembly}"
+        );
+        // Instruction lines are `  {index}  0x{opcode}  {detail}`; the version banner and the
+        // metadata lines carry no `0x` in their second column.
+        let instructions = disassembly
+            .lines()
+            .filter(|line| {
+                line.split_whitespace()
+                    .nth(1)
+                    .is_some_and(|column| column.starts_with("0x"))
+            })
+            .count();
+        counts.push((name, condition, instructions));
+    }
+
+    let (_, _, true_records) = counts[0];
+    let (_, _, false_records) = counts[1];
+    // The claim is the **difference**: the branch not taken writes nothing, so the program that
+    // folds to the one-guard branch is exactly one record shorter than the one that folds to the
+    // two-guard branch. Two absolutes would also pin every unrelated record — the module's declared
+    // fee ceiling is one, and it shifted both counts by one when the emitter started carrying it —
+    // and a count that moves for a reason the test is not about is a test that has to be edited
+    // every time the emitter grows.
+    assert!(
+        true_records > 0,
+        "the folded program must have a body at all: {counts:?}"
+    );
+    assert_eq!(
+        false_records,
+        true_records + 1,
+        "`if 1 > 2` takes the two-guard branch, one record longer than `if 1 > 0`: {counts:?}"
+    );
 }
 
 /// The proof obligation is a *mainnet* requirement (TICKET-020/024).
@@ -1459,13 +1592,21 @@ fn cli_warns_when_a_declared_floor_is_below_the_declared_fees() {
     );
 }
 
-/// PHASE 9 — a hedge lowers to orders, and it runs.
+/// PHASE 9 — a hedge lowers to orders, and its bound is a post-condition on what the venue
+/// reported (TICKET-068).
 ///
 /// The legs used to be resolved and refused: a perp leg needs a venue adapter, so the
 /// exposure was decided and the execution was not pretended. They lower to **venue orders**
 /// now — an action from a vocabulary the compiler owns, an asset and a quantity — so the
 /// whole path holds, and the artifact carries what the hedge decided. The other half is
 /// unchanged: a hedge whose legs do not net is refused with the delta, before any of this.
+///
+/// What changed here: the delta bound used to be a *constraint on the declaration* — the
+/// compiler computed the delta from the legs the program wrote and checked it, and whether
+/// the venue filled what was asked was a question nothing asked. It is a post-condition now,
+/// compared against the delta the venue reports, so the run needs one: a venue that reports
+/// nothing makes the guard refuse rather than pass on a number nobody measured, and a venue
+/// that reports too much makes it refuse with the figures.
 #[test]
 fn cli_lowers_a_hedge_to_venue_orders_and_runs_it() {
     let balanced = write_fixture(
@@ -1522,8 +1663,10 @@ fn cli_lowers_a_hedge_to_venue_orders_and_runs_it() {
         "the actions must say which market and which direction: {disassembly}"
     );
     assert!(
-        disassembly.contains("REQUIRE"),
-        "the delta bound must travel as a guard: {disassembly}"
+        disassembly.contains("REQUIRE measured delta 1"),
+        "the delta bound must travel as a *post-condition on the venue's answer*, and say so — a \
+         reader who cannot tell a measured delta from a profit floor cannot tell what the \
+         artifact claims: {disassembly}"
     );
 
     // The quantities live in the payload, which `explain` prints as bytes — so the
@@ -1549,15 +1692,62 @@ fn cli_lowers_a_hedge_to_venue_orders_and_runs_it() {
         "and each says which market and which direction: {ir}"
     );
 
-    let run = x3c().arg("run").arg(&out).output().expect("x3c run");
-    let run_text = format!(
+    // A venue that reports nothing must not satisfy the bound: the guard refuses with
+    // `X3_GUARD_UNMEASURED` rather than passing on whatever `r0` held.
+    let unmeasured = x3c().arg("run").arg(&out).output().expect("x3c run");
+    let unmeasured_text = format!(
         "{}{}",
-        String::from_utf8_lossy(&run.stdout),
-        String::from_utf8_lossy(&run.stderr)
+        String::from_utf8_lossy(&unmeasured.stdout),
+        String::from_utf8_lossy(&unmeasured.stderr)
     );
     assert!(
-        run.status.success() && run_text.contains("x3c run: ok"),
-        "the hedge's orders must run against the fixture host: {run_text}"
+        !unmeasured.status.success(),
+        "a hedge whose venue measured nothing must not settle: {unmeasured_text}"
+    );
+    assert!(
+        unmeasured_text.contains("X3_GUARD_UNMEASURED") && unmeasured_text.contains("delta"),
+        "and the refusal must name the quantity it needs: {unmeasured_text}"
+    );
+
+    // A venue that reports a delta *within* the bound settles.
+    let within = x3c()
+        .arg("run")
+        .arg(&out)
+        .arg("--measured-delta-bps")
+        .arg("1")
+        .output()
+        .expect("x3c run --measured-delta-bps 1");
+    let within_text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&within.stdout),
+        String::from_utf8_lossy(&within.stderr)
+    );
+    assert!(
+        within.status.success() && within_text.contains("x3c run: ok"),
+        "a delta at the bound must settle: {within_text}"
+    );
+
+    // And a venue that filled something else is caught **at the guard**, which is the half
+    // this ticket was about: the compiler's own check cannot see what the venue did.
+    let beyond = x3c()
+        .arg("run")
+        .arg(&out)
+        .arg("--measured-delta-bps")
+        .arg("250")
+        .output()
+        .expect("x3c run --measured-delta-bps 250");
+    let beyond_text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&beyond.stdout),
+        String::from_utf8_lossy(&beyond.stderr)
+    );
+    assert!(
+        !beyond.status.success(),
+        "a venue that filled something else must not settle: {beyond_text}"
+    );
+    assert!(
+        beyond_text.contains("X3_DELTA_ABOVE_BOUND") && beyond_text.contains("250"),
+        "and the refusal must carry both figures: {beyond_text}"
     );
 }
 
@@ -1655,19 +1845,64 @@ fn cli_lowers_a_liquidation_to_its_calls_and_runs_it() {
         "the net-profit floor must travel as a guard: {ir}"
     );
 
-    // The floor is a *constraint* here rather than a measured guard, because the plan's
-    // conversion is a `Swap` — an asset-op record that never reaches the host, so no reply
-    // could carry a measurement. It derives from the declared `min_output` the verifier
-    // already checked against the repayment, so the plan runs with nothing to measure.
-    let run = x3c().arg("run").arg(&out).output().expect("x3c run");
-    let run_text = format!(
+    // The floor is a **post-condition** on the net the venue's orders realised (TICKET-100).
+    // It used to be a constraint, because the conversion is a `Swap` — an asset-op record the
+    // executor resolves locally, so no reply could carry what was seized. The quantity the
+    // floor is about is the net, and the two venue orders above are the calls that seized:
+    // they reach the host, and a venue that reports a net answers this guard.
+    let explain = x3c().arg("explain").arg(&out).output().expect("x3c explain");
+    let disassembly = format!(
         "{}{}",
-        String::from_utf8_lossy(&run.stdout),
-        String::from_utf8_lossy(&run.stderr)
+        String::from_utf8_lossy(&explain.stdout),
+        String::from_utf8_lossy(&explain.stderr)
     );
     assert!(
-        run.status.success() && run_text.contains("x3c run: ok"),
-        "the liquidation's plan must run: {run_text}"
+        disassembly.contains("REQUIRE measured profit 100"),
+        "the floor must say it is judged against a measurement, and of what: {disassembly}"
+    );
+
+    let run = |args: &[&str]| {
+        let mut command = x3c();
+        command.arg("run").args(args).arg(&out);
+        let output = command.output().expect("x3c run");
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+    };
+
+    // A venue that reported nothing does not satisfy it. The slippage *is* stated, because the
+    // program writes its own ceiling (`require slippage <= 50`) and that guard is judged first —
+    // leaving it unstated would make this test about the wrong guard.
+    let unmeasured = run(&["--measured-slippage-bps", "0"]);
+    assert!(
+        unmeasured.contains("X3_GUARD_UNMEASURED") && unmeasured.contains("profit >= 100bps"),
+        "an unmeasured net must refuse rather than pass: {unmeasured}"
+    );
+
+    // A net at or above the floor settles. The *plan* states a floor and no ceiling — the pair
+    // rule that used to require both is what made this program's own quantity unstateable — but
+    // the program writes a ceiling of its own, and a ceiling is judged, so the slippage is stated
+    // too. Stating it is the caller's half of a guard the VM enforces; leaving it out would make
+    // this case about the ceiling rather than the floor.
+    let cleared = run(&["--measured-profit-bps", "100", "--measured-slippage-bps", "0"]);
+    assert!(
+        cleared.contains("x3c run: ok"),
+        "a net at the floor must settle: {cleared}"
+    );
+
+    // And a seizure that realised less than the floor is refused **at the guard**, which is
+    // the half the compiler's own check cannot see: it knows the declared `min_output`, not
+    // what the venue did.
+    // The slippage is stated for the same reason as above: the program's own ceiling is judged
+    // before the plan's floor, and this case is about the floor.
+    let short = run(&["--measured-profit-bps", "40", "--measured-slippage-bps", "0"]);
+    assert!(
+        short.contains("X3_PROFIT_BELOW_FLOOR")
+            && short.contains("realised 40bps")
+            && short.contains("at least 100bps"),
+        "the refusal must carry both figures: {short}"
     );
 }
 
@@ -1733,6 +1968,68 @@ fn cli_decides_a_rebalances_weights_and_carries_the_target() {
     assert!(
         run.status.success() && run_text.contains("x3c run: ok"),
         "the target must reach the host: {run_text}"
+    );
+
+    // A portfolio may state what it holds, and then the artifact carries **both ends** of the
+    // move — which is the input the target alone lacked, because every trade to the target
+    // depends on where the portfolio starts (TICKET-070).
+    let with_holds = write_fixture(
+        "cli_rebalance_with_holdings.x3",
+        &sound.replace(
+            "    BTC = 40%;",
+            "    holds {\n        ethereum.BTC = 5;\n        ethereum.ETH = 40;\n    }\n\n    BTC = 40%;",
+        ),
+    );
+    let out = std::env::temp_dir().join("cli_rebalance_with_holdings.x3b");
+    let build = x3c()
+        .arg("build")
+        .arg(&with_holds)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .expect("x3c build");
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    assert!(
+        build.status.success(),
+        "a portfolio that states its holdings must build: {text}"
+    );
+
+    let explain = x3c().arg("explain").arg(&out).output().expect("x3c explain");
+    let disassembly = format!(
+        "{}{}",
+        String::from_utf8_lossy(&explain.stdout),
+        String::from_utf8_lossy(&explain.stderr)
+    );
+    // The record's payload is rendered as its bytes, so the evidence is the held assets
+    // themselves. It is unambiguous here: this fixture writes its weights without a chain
+    // (`BTC = 40%`), which lower as `unknown.BTC`, so a chain-qualified name in the record can
+    // only have come from `holds`.
+    assert!(
+        disassembly.contains("ethereum.BTC") && disassembly.contains("ethereum.ETH"),
+        "the artifact must carry what is held as well as what is wanted: {disassembly}"
+    );
+    assert!(
+        disassembly.contains("unknown.BTC"),
+        "and what is wanted is still there beside it, so the two ends are both in the record: \
+         {disassembly}"
+    );
+
+    // And the clause survives a reformat, so `x3c fmt` cannot delete the input the trades need.
+    let formatted = x3c().arg("fmt").arg(&with_holds).output().expect("x3c fmt");
+    let formatted_text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&formatted.stdout),
+        String::from_utf8_lossy(&formatted.stderr)
+    );
+    assert!(formatted.status.success(), "it must format: {formatted_text}");
+    let after = std::fs::read_to_string(&with_holds).expect("the formatted fixture");
+    assert!(
+        after.contains("holds {") && after.contains("ethereum.BTC = 5;"),
+        "the holdings must survive `x3c fmt`: {after}"
     );
 
     let unbalanced = write_fixture("cli_rebalance_unbalanced.x3", &sound.replace("SOL = 15%", "SOL = 5%"));
@@ -2175,7 +2472,12 @@ fn hex_encode_bytes(bytes: &[u8]) -> String {
 
 /// A signed opportunity packet, optionally with one term edited after signing
 /// so the packet's own hash no longer covers it.
-fn opportunity_packet_json(tamper: bool) -> String {
+/// A signed packet as JSON, with the requirements its signer stated **before** signing.
+///
+/// The requirements are a parameter because they are part of the packet's execution terms: editing them
+/// into the JSON of an already-signed packet changes what the commitment covers, and the packet refuses
+/// on `ExecutionCommitmentMismatch` — which is what the first version of the TICKET-074 test did.
+fn opportunity_packet_json_with(requirements: &[&str], tamper: bool) -> String {
     use std::collections::{BTreeMap, BTreeSet};
 
     use x3_lang_compiler::opportunity::Opportunity;
@@ -2203,7 +2505,14 @@ fn opportunity_packet_json(tamper: bool) -> String {
         maximum_fee: 2_000,
         maximum_slippage_bps: 50,
         deadline_blocks: 500,
-        proof_requirements: BTreeSet::from(["state".to_string()]),
+        // No requirements: this fixture is about the packet's *form* — its commitments, its
+        // signature, its deadline — and a packet's claims are checked in
+        // `packet_verify_checks_the_requirements_a_packet_declares` against host evidence
+        // (TICKET-074). The name it carried before ("state") had no verifier behind it.
+        proof_requirements: requirements
+            .iter()
+            .map(|requirement| (*requirement).to_string())
+            .collect::<BTreeSet<String>>(),
         execution_commitment: [0u8; 32],
         packet_hash: [0u8; 32],
         signature: None,
@@ -2213,6 +2522,10 @@ fn opportunity_packet_json(tamper: bool) -> String {
         packet.expected_output += 1;
     }
     serde_json::to_string_pretty(&packet).expect("packet serializes")
+}
+
+fn opportunity_packet_json(tamper: bool) -> String {
+    opportunity_packet_json_with(&[], tamper)
 }
 
 #[test]
@@ -2754,20 +3067,31 @@ fn cli_enforces_a_plans_floor_against_a_measured_outcome() {
         "the refusal must give what was realised and what was required: {below}"
     );
 
-    // Measured above the slippage ceiling: refused, with both figures.
-    let slippy = run(&["--measured-profit-bps", "100", "--measured-slippage-bps", "90"]);
+    // Measured above the *plan's* ceiling: refused, with both figures. The figure is 40 rather
+    // than 90 because the program writes a ceiling of its own (`require slippage <= 50`), and a
+    // slippage that breaks both would be refused by whichever instruction comes first — which is
+    // the program's guard, not the plan's floor this case is about.
+    let slippy = run(&["--measured-profit-bps", "100", "--measured-slippage-bps", "40"]);
     assert!(
         slippy.contains("X3_SLIPPAGE_ABOVE_CEILING")
-            && slippy.contains("realised 90bps")
+            && slippy.contains("realised 40bps")
             && slippy.contains("at most 8bps"),
         "the refusal must give what was realised and what was allowed: {slippy}"
     );
 
-    // Half a measurement is refused rather than completed by inventing the other half.
+    // Half a measurement is not completed by inventing the other half — the *guard* for the
+    // unstated quantity is what refuses, and it names the quantity. The rule used to be
+    // "state the profit and the slippage, or neither", which was true of this plan and made a
+    // liquidation unable to state the one quantity it is bounded by (TICKET-100); the property
+    // is the same, and the diagnosis is better because the old message named neither guard.
     let half = run(&["--measured-profit-bps", "100"]);
     assert!(
-        half.contains("state both measurements or neither"),
-        "a half-stated measurement must be refused: {half}"
+        !half.contains("x3c run: ok"),
+        "a program with a slippage ceiling must not settle when no slippage was measured: {half}"
+    );
+    assert!(
+        half.contains("X3_GUARD_UNMEASURED") && half.contains("slippage"),
+        "and the refusal must name the quantity it is missing: {half}"
     );
 
     // And a *program's* guard is a different thing: `simple_swap`'s `require slippage <= 50`
@@ -2796,7 +3120,18 @@ fn cli_enforces_a_plans_floor_against_a_measured_outcome() {
         .output()
         .expect("x3c build");
     assert!(build.status.success(), "the source-guard program must build");
-    let output = x3c().arg("run").arg(&source_artifact).output().expect("x3c run");
+    // A program's own economic guard is judged by the VM against what the host measured, so the
+    // run states the slippage it realised. This case used to assert the opposite — that such a
+    // guard was a compile-time constraint and the run proceeded unmeasured — which was true while
+    // the emitter recorded the guard with a threshold of zero and the executor treated every
+    // static guard as satisfied. The spec's rule for these two kinds is that they are "enforced by
+    // the VM", so the unmeasured case is a refusal now and the measured one is the success.
+    let output = x3c()
+        .arg("run")
+        .args(["--measured-slippage-bps", "0"])
+        .arg(&source_artifact)
+        .output()
+        .expect("x3c run");
     let text = format!(
         "{}{}",
         String::from_utf8_lossy(&output.stdout),
@@ -2804,7 +3139,127 @@ fn cli_enforces_a_plans_floor_against_a_measured_outcome() {
     );
     assert!(
         output.status.success() && text.contains("x3c run: ok"),
-        "a program's own guard is a compile-time constraint and must still run unmeasured: {text}"
+        "a program's own slippage ceiling is enforced against the stateable outcome, which is what \
+         makes it a constraint rather than a record: {text}"
+    );
+    // And the half that makes the previous assertion mean something: nothing stated is a refusal,
+    // not a pass.
+    let unmeasured = x3c().arg("run").arg(&source_artifact).output().expect("x3c run");
+    let unmeasured_text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&unmeasured.stdout),
+        String::from_utf8_lossy(&unmeasured.stderr)
+    );
+    assert!(
+        !unmeasured.status.success()
+            && unmeasured_text.contains("X3_GUARD_UNMEASURED")
+            && unmeasured_text.contains("slippage <= 50bps"),
+        "an unmeasured slippage must refuse rather than pass: {unmeasured_text}"
+    );
+}
+
+/// TICKET-106 through the binary: an `if` on a quantity a host measured is decided by the figure the
+/// caller stated, and a quantity nothing stated refuses.
+///
+/// The observation is gas. Which body ran is not in the summary — but the body's instructions cost
+/// gas, so a run that entered it has strictly less left than one that skipped it, and that difference
+/// is the skip working. Before this, the program could not be compiled at all: `if` was refused
+/// unless the compiler could decide it, and the one class it could decide was literals.
+#[test]
+fn cli_branches_on_a_quantity_a_host_measured() {
+    let fixture = write_fixture(
+        "cli_measured_branch.x3",
+        "strategy Measured {\n\
+         \x20   input ethereum.USDC amount 25_000_000 max 50_000_000\n\
+         \x20   output ethereum.ETH\n\
+         \x20   effects [swap]\n\
+         \x20   guarantees [min_profit]\n\
+         \x20   domains [ethereum]\n\
+         \x20   risk { max_slippage_bps 50 max_total_fee_bps 8 }\n\
+         \x20   bounds { max_steps 10 max_gas 200_000 }\n\
+         \x20   execute {\n\
+         \x20       swap uniswap ethereum.USDC -> ethereum.ETH amount 1_000 min_output 1\n\
+         \x20       require slippage <= 50\n\
+         \x20       require profit >= 5\n\
+         \x20       if profit >= 20 {\n\
+         \x20           mempool_scan(max_results=10);\n\
+         \x20       }\n\
+         \x20       on_fail refund ethereum.USDC to sender\n\
+         \x20   }\n\
+         }\n",
+    );
+    let out = std::env::temp_dir().join("cli_measured_branch.x3b");
+    let build = x3c()
+        .arg("build")
+        .arg(&fixture)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .expect("x3c build");
+    assert!(
+        build.status.success(),
+        "an `if` on a measured quantity must build: {}{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    // The artifact says the branch is on the profit and which way it goes.
+    let trace = x3c().arg("explain").arg(&out).output().expect("x3c explain");
+    let trace = String::from_utf8_lossy(&trace.stdout).to_string();
+    assert!(
+        trace.contains("IF_MEASURED profit >= 20bps"),
+        "the branch must be readable in the artifact: {trace}"
+    );
+
+    let run = |args: &[&str]| -> (bool, String) {
+        let mut command = x3c();
+        command.arg("run").args(args).arg(&out);
+        let output = command.output().expect("x3c run");
+        (
+            output.status.success(),
+            format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        )
+    };
+    let gas_of = |report: &str| -> u128 {
+        report
+            .split("gas remaining ")
+            .nth(1)
+            .and_then(|rest| rest.trim().parse::<u128>().ok())
+            .unwrap_or_else(|| panic!("no gas figure in: {report}"))
+    };
+
+    // The slippage is stated because the fixture carries the language's own ceiling
+    // (`require slippage <= 50`) as well as the branch's bound, and a measured guard refuses when
+    // nothing reported the quantity it compares.
+    let (ok, entered) = run(&["--measured-profit-bps", "25", "--measured-slippage-bps", "0"]);
+    assert!(ok, "25 is at or above the bound, so the body runs: {entered}");
+    let (ok, skipped) = run(&["--measured-profit-bps", "5", "--measured-slippage-bps", "0"]);
+    assert!(ok, "5 is below the bound, so the empty branch runs: {skipped}");
+    assert!(
+        gas_of(&skipped) > gas_of(&entered),
+        "the body's instructions cost gas, so a run that skipped it has more left — {} against {}: \
+         {entered}\n{skipped}",
+        gas_of(&skipped),
+        gas_of(&entered)
+    );
+
+    // And nothing measured refuses rather than choosing a path nobody measured — with the
+    // slippage stated, so the guard that refuses is the branch's quantity and not the program's
+    // ceiling, which is checked first.
+    // Nothing measured refuses rather than choosing a path nobody measured. The refusal names the
+    // program's own floor rather than the branch's bound, and that is the design: the floor is an
+    // instruction before the branch and reads the same quantity, so an unmeasured profit is refused
+    // at the guard — the branch is unreachable unmeasured, which is stronger than a branch that
+    // declines to decide.
+    let (ok, unmeasured) = run(&["--measured-slippage-bps", "0"]);
+    assert!(!ok, "an unmeasured branch must not pick a path: {unmeasured}");
+    assert!(
+        unmeasured.contains("X3_GUARD_UNMEASURED") && unmeasured.contains("profit >= 5bps"),
+        "and must say which quantity and which bound: {unmeasured}"
     );
 }
 
@@ -2866,6 +3321,119 @@ fn arb_snapshot(capital: u128, gross: u128, fees: u128, slippage_bps: Option<u32
          \"gross\":   {{ \"asset\": \"ethereum.USDC\", \"amount\": {gross} }},\n  \
          \"fees\":    {{ \"asset\": \"ethereum.USDC\", \"amount\": {fees} }}{slippage}\n}}\n"
     )
+}
+
+/// The same snapshot with a venue-reported **delta** instead of a slippage.
+///
+/// A hedge's quantity, and the one the simulation did not model: `require delta <= 0.01%` is a
+/// measured guard with the profit's comparison mode and the delta's unit code, and reading it by
+/// mode alone would have compared a floor against a delta (TICKET-068, TICKET-099).
+fn hedge_snapshot(capital: u128, gross: u128, fees: u128, delta_bps: Option<u32>) -> String {
+    let delta = match delta_bps {
+        Some(bps) => format!(",\n  \"delta_bps\": {bps}"),
+        None => String::new(),
+    };
+    format!(
+        "{{\n  \"version\": 1,\n  \
+         \"route\": {{ \"chains\": [\"ethereum\"], \"venues\": [\"cex_hedge\"] }},\n  \
+         \"capital\": {{ \"asset\": \"ethereum.ETH\", \"amount\": {capital} }},\n  \
+         \"gross\":   {{ \"asset\": \"ethereum.ETH\", \"amount\": {gross} }},\n  \
+         \"fees\":    {{ \"asset\": \"ethereum.ETH\", \"amount\": {fees} }}{delta}\n}}\n"
+    )
+}
+
+/// PHASE 54 and TICKET-099 through the binary: a hedge's delta bound is decided by the simulation
+/// against the delta the venue reported, and a bound with nothing to measure is refused.
+///
+/// Before this, `artifact_floors` refused *every* artifact stating a delta bound — the fail-closed
+/// half, because a simulation that read the bound as a profit floor would compare two different
+/// quantities and one that ignored it would report a verdict as if the artifact had no bound. The
+/// measurement was missing rather than the rule; now it is a snapshot field, and the three outcomes
+/// are a run inside the bound, a run outside it, and a snapshot that states nothing.
+#[test]
+fn cli_simulates_a_hedge_against_its_delta_bound() {
+    let fixture = write_fixture(
+        "cli_simulate_hedge.x3",
+        "atomic_hedge {\n    buy 1_000 ethereum.ETH spot;\n    short equivalent ethereum.ETH perp;\n\n    \
+         require delta <= 0.01%;\n}\n",
+    );
+    let out = std::env::temp_dir().join("cli_simulate_hedge.x3b");
+    let build = x3c()
+        .arg("build")
+        .arg(&fixture)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .expect("x3c build");
+    assert!(
+        build.status.success(),
+        "the hedge must build: {}{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let simulate = |snapshot: &std::path::Path| {
+        let run = x3c()
+            .arg("simulate")
+            .arg(&out)
+            .arg("--state")
+            .arg(snapshot)
+            .arg("--explain")
+            .output()
+            .expect("x3c simulate");
+        let report = format!(
+            "{}{}",
+            String::from_utf8_lossy(&run.stdout),
+            String::from_utf8_lossy(&run.stderr)
+        );
+        (run.status.success(), report)
+    };
+
+    // `require delta <= 0.01%` is 1bp. A venue that left 1bp of the position open is at the bound,
+    // and the bound is a ceiling: at it is inside it.
+    let within = write_fixture(
+        "cli_simulate_hedge_within.json",
+        &hedge_snapshot(1_000_000, 1_000_100, 100, Some(1)),
+    );
+    let (ok, report) = simulate(&within);
+    assert!(ok, "a hedge inside its bound must settle: {report}");
+    assert!(
+        report.contains("Delta:\n1bps against a ceiling of 1bps — within"),
+        "the report must state the delta and its bound, the way it states the slippage: {report}"
+    );
+
+    // 250bps against a 1bp ceiling: the venue left a quarter of the position open.
+    let over = write_fixture(
+        "cli_simulate_hedge_over.json",
+        &hedge_snapshot(1_000_000, 1_000_100, 100, Some(250)),
+    );
+    let (ok, report) = simulate(&over);
+    assert!(
+        !ok,
+        "a hedge outside its bound must not settle — the artifact's own guard refuses it: {report}"
+    );
+    assert!(
+        report.contains("Delta:\n250bps against a ceiling of 1bps — OVER"),
+        "with both figures, so the reader can see what was left open: {report}"
+    );
+
+    // And a snapshot that states no delta is refused rather than passed: the bound was never
+    // measured, so nothing may be said about whether it held. Measured before the fix, this was the
+    // only outcome a hedge could produce — for *every* hedge artifact, bound violated or not.
+    let unstated = write_fixture(
+        "cli_simulate_hedge_unstated.json",
+        &hedge_snapshot(1_000_000, 1_000_100, 100, None),
+    );
+    let (ok, report) = simulate(&unstated);
+    assert!(!ok, "a bound nothing measured must not pass: {report}");
+    assert!(
+        report.contains("hedge delta ceiling of 1bps") && report.contains("states no delta"),
+        "the refusal must name the quantity that is missing: {report}"
+    );
+    assert!(
+        !report.contains("slippage"),
+        "and must not be confused with the slippage refusal: {report}"
+    );
 }
 
 /// PHASE 54's whole path, through the binary: an artifact whose floors come from its
@@ -3130,4 +3698,518 @@ fn every_example_checks_and_builds() {
         found.len(),
         failures.join("\n")
     );
+}
+
+/// PHASE 39's settlement guarantee is readable from the artifact (TICKET-075).
+///
+/// The phase's clause was enforced at compile time and carried nowhere, so a counterparty,
+/// an auditor or a replayer holding only the `.x3b` could not tell a leg the VM settles
+/// both sides of from one an off-chain venue fills and something else makes whole. The
+/// criterion is stated against this surface on purpose — `x3c inspect` is what a reader
+/// without the source actually runs.
+#[test]
+fn cli_inspect_shows_how_each_venue_settles() {
+    let source = write_fixture(
+        "cli_venue_settlement.x3",
+        r#"intent probe {
+    from ethereum.USDC amount 100 receiver 0x1
+    to ethereum.ETH receiver 0x2
+    route {
+        swap uniswap ethereum.USDC -> ethereum.ETH amount 100 min_output 1
+    }
+    require slippage <= 50
+    on_fail refund ethereum.USDC to sender
+}
+
+venue cex_hedge {
+    kind orderbook
+    chain ethereum
+    domain evm
+    asset_in ethereum.USDC
+    asset_out ethereum.ETH
+    fee_bps 5
+    liquidity 10_000_000
+    slippage_bps 4
+    latency_ms 20
+    finality_blocks 0
+    risk 40
+    settlement compensating
+}
+
+venue pool_plain {
+    kind pool
+    chain ethereum
+    domain evm
+    asset_in ethereum.ETH
+    asset_out ethereum.USDC
+    fee_bps 3
+    liquidity 5_000_000
+    slippage_bps 6
+    latency_ms 12
+    finality_blocks 12
+    risk 2
+}
+"#,
+    );
+
+    let out = std::env::temp_dir().join("cli_venue_settlement.x3b");
+    let build = x3c()
+        .arg("build")
+        .arg(&source)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .expect("x3c build");
+    let built = format!(
+        "{}{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    assert!(build.status.success(), "the program must build: {built}");
+
+    // Everything below reads the artifact. The source variable is not consulted again, so
+    // "recovering it does not require the source" is what the test does rather than what it
+    // says.
+    let inspect = x3c().arg("inspect").arg(&out).output().expect("x3c inspect");
+    let disassembly = format!(
+        "{}{}",
+        String::from_utf8_lossy(&inspect.stdout),
+        String::from_utf8_lossy(&inspect.stderr)
+    );
+    assert!(
+        inspect.status.success(),
+        "inspect must read the artifact: {disassembly}"
+    );
+    assert!(
+        disassembly.contains("venue cex_hedge settles compensating"),
+        "the off-chain leg's guarantee must be in the artifact: {disassembly}"
+    );
+    assert!(
+        disassembly.contains("venue pool_plain settles none"),
+        "and a venue that states none must say none rather than be given a default: {disassembly}"
+    );
+}
+
+/// Every `.x3` file the tooling treats as a program must be one.
+///
+/// The gate above covers `examples/*.x3`, and the harness reads named fixtures rather than
+/// globbing — so two files under `tests/` sat unparseable for as long as nobody opened them
+/// (TICKET-014). A `.x3` file in a directory the tooling walks is a claim that it is a
+/// program, and this is where the claim is checked.
+///
+/// Two directories are skipped **by name**, and both say so in a README beside their
+/// contents: `examples/legacy/` (subjects with no current form, five files) and
+/// `tests/sketches/` (subjects with no surface yet, five files). `tests/conformance/invalid/`
+/// is skipped for the opposite reason — those files are *meant* to be refused, and requiring
+/// them to check would delete the only fixtures that assert refusals happen.
+///
+/// Three of `tests/sketches/`'s five arrived in TICKET-109 for the reason this gate exists,
+/// seen from the other side: they used to live in `tests/` and **pass**, because the compiler
+/// lowered every statement they are made of (`let`, `return`, a call) to `Operation::Nop`,
+/// which is written as four zero bytes and so is invisible to every reader. A file that is
+/// entirely dropped checks clean, and this gate's claim — that a `.x3` in a directory the
+/// tooling walks is a program — was satisfied by the artifact of the dropping rather than by
+/// the program. `lowering` refuses those statements now, which is what makes a file using
+/// them fail here and belong in a skipped directory.
+#[test]
+fn every_x3_file_the_tooling_walks_is_a_program() {
+    fn collect(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.filter_map(|entry| entry.ok()) {
+            let path = entry.path();
+            if path.is_dir() {
+                let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+                // Not programs by construction, and each names why in its own README.
+                let skipped = matches!(
+                    name.as_str(),
+                    "target" | "node_modules" | "__pycache__" | "legacy" | "sketches" | "invalid" | "archive"
+                );
+                if !skipped {
+                    collect(&path, out);
+                }
+            } else if path.extension().is_some_and(|extension| extension == "x3") {
+                out.push(path);
+            }
+        }
+    }
+
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("the crate lives under x3-lang")
+        .to_path_buf();
+    let mut found = Vec::new();
+    collect(&root, &mut found);
+    found.sort();
+
+    assert!(
+        found.len() > 20,
+        "the gate found {} files under {}, which is too few to be reading the tree it thinks it \
+         is reading",
+        found.len(),
+        root.display()
+    );
+
+    let mut failures = Vec::new();
+    for file in &found {
+        let check = x3c().arg("check").arg(file).output().expect("x3c check");
+        if !check.status.success() {
+            let relative = file.strip_prefix(&root).unwrap_or(file).display().to_string();
+            failures.push(format!("{relative}: {}", String::from_utf8_lossy(&check.stdout).trim()));
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "every `.x3` file outside the named non-language directories must check ({} walked):\n{}",
+        found.len(),
+        failures.join("\n")
+    );
+}
+
+/// TICKET-074: `packet verify` checks what a packet *claims*, against the facts a host states, and
+/// reports which requirements it checked.
+///
+/// The fixture this file carries for the form cases declares no requirements, so before this the only
+/// thing a packet's `proof_requirements` ever did was travel: a packet could promise freshness and
+/// venue prices and be verified for its signature. The two halves here are the reporting and the
+/// refusals — a requirement nothing could check must not read as verified.
+#[test]
+fn packet_verify_checks_the_requirements_a_packet_declares() {
+    let trusted = format!(
+        "cli-solver={}",
+        hex_encode_bytes(&packet_solver_key().verifying_key().to_bytes())
+    );
+    // The route is uniswap-v3 at 20bps and raydium at 10bps — 30bps in total, which is the route's own
+    // `fee_bps` — and its `min_liquidity` is 1,000,000.
+    let required = write_fixture(
+        "cli_packet_requirements.json",
+        &opportunity_packet_json_with(&["state_root_freshness", "venue_price_attestation"], false),
+    );
+    let verify = |args: &[&str]| {
+        let mut command = x3c();
+        command.args(["packet", "verify"]).arg(&required);
+        command.args(["--block", "100", "--trusted", &trusted]);
+        command.args(args);
+        let output = command.output().expect("x3c packet verify");
+        (
+            output.status.success(),
+            format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        )
+    };
+
+    // No evidence: the packet promised two checks and nothing stated the facts, so it is refused
+    // naming them rather than reported as verified for its form.
+    let (ok, report) = verify(&[]);
+    assert!(
+        !ok,
+        "a packet with requirements and no evidence must not verify: {report}"
+    );
+    assert!(
+        report.contains("state_root_freshness") && report.contains("venue_price_attestation"),
+        "the refusal must name what could not be checked: {report}"
+    );
+
+    // Evidence that holds: the root was read one block ago within a window of ten, and both venues
+    // will fill at the route's own liquidity and fees.
+    let fresh = write_fixture(
+        "cli_packet_evidence_fresh.json",
+        "{\n  \"state_root_blocks\": { \"ethereum\": 99 },\n  \"observed_block\": 100,\n  \"max_state_root_age_blocks\": 10,\n  \
+         \"venues\": [\n    { \"venue\": \"uniswap-v3\", \"liquidity\": 1500000, \"fee_bps\": 20 },\n    \
+         { \"venue\": \"raydium\", \"liquidity\": 2000000, \"fee_bps\": 10 }\n  ]\n}\n",
+    );
+    let (ok, report) = verify(&["--evidence", fresh.to_str().expect("utf-8 path")]);
+    assert!(ok, "evidence that holds must verify the packet: {report}");
+    assert!(
+        report.contains("requirements checked: state_root_freshness, venue_price_attestation"),
+        "and the report must say which requirements were checked: {report}"
+    );
+
+    // A stale root: the refusal names both block numbers.
+    let stale = write_fixture(
+        "cli_packet_evidence_stale.json",
+        "{\n  \"state_root_blocks\": { \"ethereum\": 50 },\n  \"observed_block\": 100,\n  \"max_state_root_age_blocks\": 10,\n  \
+         \"venues\": [\n    { \"venue\": \"uniswap-v3\", \"liquidity\": 1500000, \"fee_bps\": 20 },\n    \
+         { \"venue\": \"raydium\", \"liquidity\": 2000000, \"fee_bps\": 10 }\n  ]\n}\n",
+    );
+    let (ok, report) = verify(&["--evidence", stale.to_str().expect("utf-8 path")]);
+    assert!(!ok, "a stale root must refuse: {report}");
+    assert!(
+        report.contains("block 50") && report.contains("block 100"),
+        "with both block numbers in the refusal: {report}"
+    );
+
+    // A venue that will not fill at the route's terms: the refusal names the two figures.
+    let thin = write_fixture(
+        "cli_packet_evidence_thin.json",
+        "{\n  \"state_root_blocks\": { \"ethereum\": 99 },\n  \"observed_block\": 100,\n  \"max_state_root_age_blocks\": 10,\n  \
+         \"venues\": [\n    { \"venue\": \"uniswap-v3\", \"liquidity\": 1500000, \"fee_bps\": 20 },\n    \
+         { \"venue\": \"raydium\", \"liquidity\": 999999, \"fee_bps\": 10 }\n  ]\n}\n",
+    );
+    let (ok, report) = verify(&["--evidence", thin.to_str().expect("utf-8 path")]);
+    assert!(!ok, "a venue below the route's liquidity must refuse: {report}");
+    assert!(
+        report.contains("999999") && report.contains("1000000"),
+        "the refusal must state both figures: {report}"
+    );
+}
+
+/// PHASE 32 through the binary: `x3c replay` binds a receipt to its artifact and judges its figures
+/// against the artifact's own bounds.
+///
+/// Before this the repository had the receipt's *internal* replay (`verify_receipt` runs
+/// `verify_receipt_economics`) and no way to ask the artifact-side question the phase's input list
+/// names: is this receipt about *this* artifact, and is what it reports something this artifact permits?
+#[test]
+fn cli_replays_a_receipt_against_its_artifact_and_refuses_another() {
+    let source = write_fixture("cli_replay_trading.x3", TRADING_SOURCE);
+    let artifact = std::env::temp_dir().join("cli_replay_trading.x3b");
+    let build = x3c()
+        .arg("build")
+        .arg(&source)
+        .arg("--out")
+        .arg(&artifact)
+        .output()
+        .expect("x3c build");
+    assert!(
+        build.status.success(),
+        "the trading program must build: {}{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let receipt_path = std::env::temp_dir().join("cli_replay_receipt.json");
+    let execute = x3c()
+        .args(["receipt", "execute"])
+        .arg(&source)
+        .arg("--out")
+        .arg(&receipt_path)
+        .output()
+        .expect("x3c receipt execute");
+    assert!(
+        execute.status.success(),
+        "the receipt must be produced: {}{}",
+        String::from_utf8_lossy(&execute.stdout),
+        String::from_utf8_lossy(&execute.stderr)
+    );
+
+    let run_replay = |artifact: &std::path::Path| {
+        let output = x3c()
+            .arg("replay")
+            .arg(artifact)
+            .arg(&receipt_path)
+            .output()
+            .expect("x3c replay");
+        (
+            output.status.success(),
+            format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        )
+    };
+
+    // The receipt replays against the artifact it was produced from, and the report says which of the
+    // phase's nine claims it checked and which it could not.
+    let (ok, report) = run_replay(&artifact);
+    assert!(ok, "the receipt must replay against its own artifact: {report}");
+    assert!(
+        report.contains("the operation sequence and its framing")
+            && report.contains("the debt lifecycle against the outcome"),
+        "the report must name what it checked: {report}"
+    );
+    assert!(
+        report.contains("not checked: correct finality references"),
+        "and what it could not, rather than passing over it: {report}"
+    );
+
+    // A different artifact: the receipt is not evidence about it, and the refusal names both hashes.
+    let other = std::env::temp_dir().join("cli_replay_other.x3b");
+    let other_build = x3c()
+        .arg("build")
+        .arg(write_fixture("cli_replay_other.x3", arb_scope_source()))
+        .arg("--out")
+        .arg(&other)
+        .output()
+        .expect("x3c build");
+    assert!(other_build.status.success(), "the second artifact must build");
+    let (ok, report) = run_replay(&other);
+    assert!(!ok, "a receipt must not replay against another artifact: {report}");
+    assert!(
+        report.contains("the receipt is not about this artifact") && report.contains("hashes to"),
+        "the refusal must name both hashes: {report}"
+    );
+}
+
+/// `replay` enforces the receipt's own replay as well as the artifact binding.
+///
+/// The receipt is edited *without* re-hashing it, so it fails the receipt-side check rather than the
+/// artifact-side one — which is the pair the two tests make: an untouched receipt replays, one about
+/// another artifact is refused by the binding, and one whose contents moved after signing is refused by
+/// the receipt's own hash. A test that edited the figures *and* re-hashed them would be refused by the
+/// receipt's economics instead, and would prove nothing about either.
+#[test]
+fn cli_refuses_a_receipt_whose_contents_moved_after_signing() {
+    let source = write_fixture("cli_replay_edited.x3", TRADING_SOURCE);
+    let artifact = std::env::temp_dir().join("cli_replay_edited.x3b");
+    let build = x3c()
+        .arg("build")
+        .arg(&source)
+        .arg("--out")
+        .arg(&artifact)
+        .output()
+        .expect("x3c build");
+    assert!(build.status.success(), "the trading program must build");
+
+    let receipt_path = std::env::temp_dir().join("cli_replay_edited_receipt.json");
+    let execute = x3c()
+        .args(["receipt", "execute"])
+        .arg(&source)
+        .arg("--out")
+        .arg(&receipt_path)
+        .output()
+        .expect("x3c receipt execute");
+    assert!(execute.status.success(), "the receipt must be produced");
+
+    // Move one term of the receipt and leave its hash alone.
+    let text = std::fs::read_to_string(&receipt_path).expect("the receipt is readable");
+    let edited = text.replace("\"trade_id\": \"CrossDexArb\"", "\"trade_id\": \"CrossDexArb-edited\"");
+    assert_ne!(edited, text, "the fixture must contain the trade id this test edits");
+    std::fs::write(&receipt_path, edited).expect("write");
+
+    let output = x3c()
+        .arg("replay")
+        .arg(&artifact)
+        .arg(&receipt_path)
+        .output()
+        .expect("x3c replay");
+    let report = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!output.status.success(), "an edited receipt must not replay: {report}");
+    assert!(
+        report.contains("HashMismatch") || report.contains("hash"),
+        "the refusal must be about the receipt's own hash: {report}"
+    );
+}
+
+/// `x3c refund` reports what the program states, and does not announce a transaction it never sent.
+///
+/// Three defects in one command, found by running it: it read only the `Int` literal shape, so a
+/// program saying `timeout 45s` was reported as "Timeout duration: 0s"; it printed
+/// "Refund submitted — transaction pending confirmation" for a submission it has no way to make (no
+/// chain connection, no key — the fabricated evidence AGENTS.md forbids); and it printed the refund's
+/// target as the compiler's `Debug` output (`Literal(String(Symbol("Ethereum.USDC:sender")))`).
+#[test]
+fn refund_reports_the_program_and_claims_nothing() {
+    let fixture = write_fixture(
+        "cli_refund_plan.x3",
+        "intent plan {\n    from ethereum.USDC amount 1_000 receiver 0x1111111111111111111111111111111111111111\n    \
+         to solana.SOL receiver 4Nd1mzi8Y1QYxJt9wZWBYZpG7S4pYkZs6YzD3Vt9aBcD\n    route {\n        bridge x3 \
+         ethereum.USDC -> solana.SOL amount 1_000 receiver 4Nd1mzi8Y1QYxJt9wZWBYZpG7S4pYkZs6YzD3Vt9aBcD\n    }\n    \
+         require slippage <= 50\n    timeout 45s refund ethereum.USDC to sender\n}\n",
+    );
+    let out = x3c().arg("refund").arg(&fixture).output().expect("x3c refund");
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        text.contains("Timeout duration: 45s"),
+        "the duration is the one the program wrote (`45s` is a Duration literal, not an Int): {text}"
+    );
+    assert!(
+        text.contains("ethereum.USDC to sender") && !text.contains("Literal(String(Symbol"),
+        "the target is read by a person, not by a `Debug` impl: {text}"
+    );
+    for claim in ["Refund submitted", "pending confirmation", "Triggering refund"] {
+        assert!(
+            !text.contains(claim),
+            "this command has no chain connection, so it must not claim `{claim}`: {text}"
+        );
+    }
+}
+
+/// `x3c new` writes a project and then tells the reader to run `x3c check src/main.x3`; the
+/// scaffold therefore has to be a program that command accepts. This runs the printed sequence
+/// against a generated project — layout, clean check, build, measured run — so a template that
+/// drifts from the language fails here instead of in the reader's first command. (TICKET-125)
+#[test]
+fn cli_new_writes_a_project_that_passes_its_own_first_command() {
+    let dir = std::env::temp_dir().join(format!("x3c-new-scaffold-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("temp dir");
+
+    let created = x3c()
+        .args(["new", "starter", "--path"])
+        .arg(&dir)
+        .output()
+        .expect("run x3c new");
+    assert!(
+        created.status.success(),
+        "x3c new failed: {}{}",
+        String::from_utf8_lossy(&created.stdout),
+        String::from_utf8_lossy(&created.stderr)
+    );
+
+    let project = dir.join("starter");
+    let main = project.join("src").join("main.x3");
+    let test_target = project.join("tests").join("test_starter.rs");
+    assert!(main.is_file(), "the scaffold must write src/main.x3");
+    assert!(
+        test_target.is_file(),
+        "the scaffold must write the test target it announces"
+    );
+
+    let check = x3c()
+        .args(["check"])
+        .arg(&main)
+        .arg("--deny-warnings")
+        .output()
+        .expect("run x3c check");
+    assert!(
+        check.status.success(),
+        "the generated scaffold does not check clean: {}{}",
+        String::from_utf8_lossy(&check.stdout),
+        String::from_utf8_lossy(&check.stderr)
+    );
+
+    let artifact = dir.join("starter.x3b");
+    let build = x3c()
+        .args(["build"])
+        .arg(&main)
+        .args(["--out"])
+        .arg(&artifact)
+        .output()
+        .expect("run x3c build");
+    assert!(
+        build.status.success(),
+        "the generated scaffold does not build: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let run = x3c()
+        .arg("run")
+        .arg(&artifact)
+        .args(["--measured-slippage-bps", "8"])
+        .output()
+        .expect("run x3c run");
+    assert!(
+        run.status.success(),
+        "the generated scaffold does not run: {}{}",
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr)
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
 }

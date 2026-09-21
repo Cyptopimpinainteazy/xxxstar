@@ -1,0 +1,12 @@
+{
+  "$instruction": "⚠️ DO NOT EDIT DIRECTLY. Use the TODO MCP tools (todo_get_tasks, todo_add_tasks, todo_update_tasks, todo_delete_tasks, todo_clear_category) to ensure live VS Code UI synchronization.",
+  "tasks": [
+    {
+      "id": "17898387571609y4scg",
+      "title": "Review blocked/reverted work in git/scm0/input",
+      "category": "Blocked",
+      "dueDate": null,
+      "completed": false
+    }
+  ]
+}

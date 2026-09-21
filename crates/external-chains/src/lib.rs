@@ -12,7 +12,12 @@
 //! # Cross-Chain Swaps
 //! Use the `router` module for atomic cross-chain swaps via Comit transactions.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// **No `no_std` posture.** This crate said `#![cfg_attr(not(feature = "std"), no_std)]` and then
+// wrote `std::` throughout, so `--no-default-features` failed with 184 errors, every one of them
+// an unresolved `std` — what a path that has never been compiled looks like (TICKET-093). A
+// declaration that cannot be built is a claim rather than a capability, and the honest thing is to
+// stop making it: the crate is `std`, and now says so. `scripts/check-no-default-features.sh`
+// derives the crates it checks from this attribute, so removing it removes the false entry too.
 #![allow(
     dead_code,
     unused_imports,

@@ -30,6 +30,7 @@ be readable, so the three drifts above cannot come back unnoticed.
 """
 
 import glob
+import importlib
 import os
 import sys
 from pathlib import Path
@@ -99,3 +100,124 @@ def test_every_example_the_suite_uses_is_readable_by_this_surface():
             failures.append(f"{os.path.basename(path)}: {error}")
 
     assert not failures, "every example must be readable by this surface:\n" + "\n".join(failures)
+
+
+#: What this surface reads today, and what it refuses **and why**, one entry per file.
+#:
+#: The scope is stated in `cli.py`'s module doc — one `intent` per file, nine guard kinds of the
+#: compiler's eighteen, a stricter address shape. This is that statement turned into a contract:
+#: a file that starts being read, or one that stops, fails here rather than being discovered by
+#: hand. The refusal *code* is part of the entry because a refusal for a different reason is a
+#: different boundary, and the codes are what `cli.py` promises a caller.
+#:
+#: Not a claim that the boundary is right. Two entries here are the compiler accepting something
+#: this surface refuses (`X3_PARSE_RECEIVER`, the address shape — TICKET-091) and three are guard
+#: kinds outside `registry.REQUIRE_KINDS`. The assertion is that the boundary is *known*.
+READS = {
+    "arb_scope.x3",
+    "arb_solana_eth.x3",
+    "intent_fusion.x3",
+    "multi_leg_route.x3",
+    "route_fallback.x3",
+    "simple_swap.x3",
+    "staking_intent.x3",
+    "timeout_refund.x3",
+    "timeout_refund_minimal.x3",
+}
+
+#: The rest are refused for **one** reason now, and it is the stated scope rather than drift: a
+#: file whose subject is a compiler program (a bare `atomic_choice`, `strategy`, `parallel`, …)
+#: has no `intent` to offer this surface. It used to be three reasons — an address shape and a
+#: guard-kind list stricter than the language's, and a `fallback` block that was a route step the
+#: compiler has and this surface did not — and those are gone (TICKET-091). A refusal that is not
+#: this one is a drift and belongs in the table above.
+REFUSES = {
+    "atomic_choice.x3": "X3_PARSE_NO_INTENT",
+    "atomic_swap.x3": "X3_PARSE_NO_INTENT",
+    "events_and_host_calls.x3": "X3_PARSE_NO_INTENT",
+    "flagship_b52.x3": "X3_PARSE_NO_INTENT",
+    "mainnet_safe_swap.x3": "X3_PARSE_NO_INTENT",
+    "objective_routing.x3": "X3_PARSE_NO_INTENT",
+    "opportunity_graph.x3": "X3_PARSE_NO_INTENT",
+    "parallel_dag.x3": "X3_PARSE_NO_INTENT",
+    "strategy_module.x3": "X3_PARSE_NO_INTENT",
+    "trading_core_v1.x3": "X3_PARSE_NO_INTENT",
+    "trading_effects.x3": "X3_PARSE_NO_INTENT",
+}
+
+
+def test_the_accept_refuse_set_is_what_this_surface_reads():
+    """Every example is either read or refused **for the reason recorded here**."""
+    root = Path(__file__).resolve().parents[1]
+    examples = sorted(glob.glob(str(root / "examples" / "*.x3")))
+    assert len(examples) > 10, (
+        f"found {len(examples)} examples under {root / 'examples'}, which is too few to be "
+        "the directory this test thinks it is reading"
+    )
+
+    pinned = set(READS) | set(REFUSES)
+    assert not (set(READS) & set(REFUSES)), "a file cannot be read and refused"
+    unclassified = sorted(os.path.basename(path) for path in examples if os.path.basename(path) not in pinned)
+    assert not unclassified, (
+        "these examples are not in the table below, so nothing says whether this surface is "
+        "supposed to read them. Classify each as read, or as refused with the code it refuses "
+        "with:\n  " + "\n  ".join(unclassified)
+    )
+
+    wrong = []
+    for path in examples:
+        name = os.path.basename(path)
+        expected = "reads" if name in READS else REFUSES[name]
+        try:
+            cli.parse_file(path)
+            outcome = "reads"
+        except cli.X3ParseError as error:
+            outcome = error.code
+        if outcome != expected:
+            wrong.append(f"{name}: expected {expected!r}, got {outcome!r}")
+
+    assert not wrong, (
+        "the boundary this surface draws moved. If that is intended, move the entry with it — "
+        "the numbers are the point, because a file that *starts* being read is as much a change "
+        "as one that stops:\n  " + "\n  ".join(wrong)
+    )
+
+
+def test_the_guard_kind_vocabulary_is_the_compilers():
+    """The guard names this surface knows are the compiler's, not a subset of them.
+
+    This is the drift TICKET-091 is about, and the reason it is a *test* rather than a comment:
+    the surface knew nine of the compiler's eighteen names, so it refused `require route_score >=
+    90` — written by three shipped examples the compiler accepts — as a malformed guard. A
+    hand-maintained list in one language cannot be kept equal to a list in another by care, so the
+    Rust array is read here and compared.
+    """
+    import re
+
+    root = Path(__file__).resolve().parents[1]
+    parser = (root / "compiler" / "src" / "parser.rs").read_text()
+    match = re.search(r"pub const REQUIRE_KIND_NAMES: &\[&str\] = &\[(.*?)\];", parser, re.S)
+    assert match, (
+        "the compiler's guard-kind list was not found in compiler/src/parser.rs — if it moved, "
+        "this test is reading the wrong file and would pass vacuously"
+    )
+    compiler_kinds = set(re.findall(r'"([a-z_]+)"', match.group(1)))
+    assert len(compiler_kinds) > 10, (
+        f"found {len(compiler_kinds)} names, which is too few to be the compiler's list: "
+        f"{sorted(compiler_kinds)}"
+    )
+
+    registry = importlib.import_module("registry")
+    ours = set(registry.REQUIRE_KINDS)
+    # The one name this surface has that the compiler does not, deliberately: it read `proof`
+    # before the compiler called the guard `proof_complete`, and both spellings are accepted so a
+    # program written against either works. It is named here so it cannot grow into a habit.
+    ours_aliases = {"proof"}
+
+    assert ours - ours_aliases == compiler_kinds, (
+        "the guard kinds this surface knows have drifted from the compiler's.\n"
+        f"  only here: {sorted(ours - ours_aliases - compiler_kinds)}\n"
+        f"  only there: {sorted(compiler_kinds - ours)}\n"
+        "A name the compiler has and this surface does not is a guard it refuses that the "
+        "language accepts — which is refusing a shipped example."
+    )

@@ -401,3 +401,192 @@ fn a_percent_in_a_guard_bound_is_a_percentage_and_a_modulo_everywhere_else() {
         "parenthesised, `5 % 6` is still a modulo inside a guard's bound"
     );
 }
+
+/// **A valueless guard stops at every clause, in either order** (TICKET-046's validation).
+///
+/// A guard has to stop where the next clause begins, and it knows where that is because a list
+/// names the words that can begin one. Two of its entries were missing on the first pass —
+/// `amount` and `timeout` — and each cost a round of repair, which is why this is a test over
+/// *every* clause of a body rather than over the two that bit.
+///
+/// Mechanical on purpose: the fixture is a list of clause lines, and for each line the guard is
+/// placed before it and after it. Both sources must lower to the same program, because the two
+/// differ only in where a guard that takes no value sits.
+mod every_clause_stops_a_valueless_guard {
+    /// The clause lines of an `atomic swap` body, one per entry, plus a guard that is written
+    /// where the test says.
+    const SWAP_CLAUSES: &[(&str, &str)] = &[
+        ("amount", "    amount 500"),
+        ("receiver", "    receiver sol.wallet.owner"),
+        ("hashlock", "    hashlock sha256(secret)"),
+        ("timeout", "    timeout source 40m"),
+        ("finality", "    require finality.eth >= 12"),
+    ];
+
+    const INTENT_CLAUSES: &[(&str, &str)] = &[
+        (
+            "from",
+            "    from ethereum.USDC amount 1 receiver 0x1111111111111111111111111111111111111111",
+        ),
+        (
+            "to",
+            "    to solana.SOL receiver 4Nd1mzi8Y1QYxJt9wZWBYZpG7S4pYkZs6YzD3Vt9aBcD",
+        ),
+        (
+            "route",
+            "    route { swap uniswap ethereum.USDC -> ethereum.ETH amount 1 min_output 1 }",
+        ),
+        // The feature set is closed — `allow` refuses anything but `intent_fusion` — so the
+        // fixture uses the one the language has.
+        ("allow", "    allow intent_fusion"),
+        // `use` is a keyword to the lexer, so it does not need an entry in `CLAUSE_WORDS` — a
+        // keyword cannot begin an expression and stops a valueless guard on its own. It is in this
+        // fixture because the arm that reads it was written against the identifier form and no
+        // program could reach it (TICKET-046).
+        ("use", "    use uniswap 1"),
+        ("on", "    on bad_proof slash"),
+        ("timeout", "    timeout 30s refund ethereum.USDC to sender"),
+        ("on_fail", "    on_fail rollback"),
+    ];
+
+    fn swap_source(guard_at: usize) -> String {
+        let mut body = String::new();
+        for (index, (_, line)) in SWAP_CLAUSES.iter().enumerate() {
+            if index == guard_at {
+                body.push_str("    require proof_complete\n");
+            }
+            body.push_str(line);
+            body.push('\n');
+        }
+        if guard_at == SWAP_CLAUSES.len() {
+            body.push_str("    require proof_complete\n");
+        }
+        format!("atomic swap eth.USDC -> sol.SOL {{\n{body}}}\n")
+    }
+
+    fn intent_source(guard_at: usize) -> String {
+        let mut body = String::new();
+        for (index, (_, line)) in INTENT_CLAUSES.iter().enumerate() {
+            if index == guard_at {
+                body.push_str("    require proof_complete\n");
+            }
+            body.push_str(line);
+            body.push('\n');
+        }
+        format!("intent probe {{\n{body}    on_fail rollback\n}}\n")
+    }
+
+    fn ops(source: &str) -> usize {
+        let program = x3_lang_compiler::parser::parse_source(source)
+            .unwrap_or_else(|error| panic!("must parse:\n{source}\n{error}"));
+        x3_lang_compiler::compile_to_ir(&program)
+            .unwrap_or_else(|error| panic!("must lower:\n{source}\n{error:?}"))
+            .operations
+            .len()
+    }
+
+    #[test]
+    fn a_guard_before_any_clause_of_a_swap_body_leaves_the_clause_alone() {
+        // The guard can go anywhere among the clauses; the program is the same one.
+        let baseline = ops(&swap_source(usize::MAX));
+        for index in 0..SWAP_CLAUSES.len() {
+            let with_guard = ops(&swap_source(index));
+            assert_eq!(
+                with_guard,
+                baseline + 1,
+                "a guard before `{}` changed the program: the guard took the clause with it",
+                SWAP_CLAUSES[index].0
+            );
+        }
+    }
+
+    #[test]
+    fn a_guard_before_any_clause_of_an_intent_body_leaves_the_clause_alone() {
+        let baseline = ops(&intent_source(usize::MAX));
+        for index in 0..INTENT_CLAUSES.len() {
+            let with_guard = ops(&intent_source(index));
+            assert_eq!(
+                with_guard,
+                baseline + 1,
+                "a guard before `{}` changed the program: the guard took the clause with it",
+                INTENT_CLAUSES[index].0
+            );
+        }
+    }
+
+    /// Which words these fixtures exercise, so a reader knows what the two tests above do and
+    /// do not cover. The rest of the list — `path`, `allow`, `on`, `proofs`, `min_output`,
+    /// `min_output` is absent deliberately: it begins a clause of a `swap` **step** (inside a route),
+    /// and an `atomic swap` declaration has no such field — writing `min_output` in that body is a
+    /// statement with no effect, which the lowering refuses by name (TICKET-037's fix surfaced it).
+    ///
+    /// `net_output`, `replace`, `leg`, `choose`, `repay`, `borrow`, `balance`, `net_profit` —
+    /// begins clauses in a route, a strategy or a trading body, and reaching them means writing
+    /// a valid fixture for each of those grammars. Named rather than implied: a test that covers
+    /// nine of twenty-two words and says nothing is the shape this ticket exists to complain
+    /// about.
+    #[test]
+    fn the_words_these_fixtures_exercise_are_stated() {
+        let exercised: std::collections::BTreeSet<&str> = SWAP_CLAUSES
+            .iter()
+            .chain(INTENT_CLAUSES.iter())
+            .map(|(word, _)| *word)
+            .collect();
+        assert_eq!(
+            exercised,
+            [
+                "allow", "amount", "finality", "from", "hashlock", "on", "on_fail", "receiver", "route", "timeout",
+                "to", "use"
+            ]
+            .into_iter()
+            .collect::<std::collections::BTreeSet<&str>>(),
+            "the fixtures exercise a different set of words than this test says they do"
+        );
+    }
+}
+
+/// Every word in `CLAUSE_WORDS` is a word the parser dispatches on.
+///
+/// The list is a second statement of the grammar, and the first pass showed what that costs: two
+/// entries were missing (`amount`, `timeout`) and each cost a round. The fixtures above catch a
+/// *missing* word for the bodies they can express, and this catches the other direction — an entry
+/// the grammar has moved past. `balance` was one: listed under "statements and trade bodies that
+/// carry a guard", dispatched by no arm anywhere in the parser, so `require <kind> balance` was
+/// read as a guard with no subject and `balance` as the start of a statement that does not exist.
+///
+/// The list is read out of the source rather than restated here: a copy in the test could drift
+/// from the const the parser actually consults, which is the failure this is meant to prevent.
+#[test]
+fn every_word_in_this_list_begins_a_clause() {
+    use std::collections::BTreeSet;
+    use std::path::PathBuf;
+
+    let source = std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src").join("parser.rs"))
+        .expect("the parser source must be readable");
+
+    let start = source
+        .find("const CLAUSE_WORDS")
+        .expect("the parser must state its clause words");
+    let body = &source[start..];
+    let end = body.find("];").expect("the list must end");
+    let listed: BTreeSet<String> = body[..end]
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .map(|word| word.to_string())
+        .collect();
+    assert!(
+        listed.len() >= 18,
+        "the scan found too few words to be reading the list: {listed:?}"
+    );
+
+    let missing: Vec<&String> = listed
+        .iter()
+        .filter(|word| !source.contains(&format!("s == \"{word}\"")))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "these words stop a guard but begin no clause in the parser: {missing:?} — a lookahead \
+         that stops at a word the grammar has moved past is a guard that loses its subject"
+    );
+}

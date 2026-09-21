@@ -7,11 +7,21 @@
 //! rather than against the formatter's expectations:
 //!
 //!   1. the formatted text parses, and
-//!   2. it compiles to the *same bytecode* as the text it came from.
+//!   2. it compiles to the *same bytecode* as the text it came from, and
+//!   3. its AST is the AST of the text it came from, spans aside.
 //!
-//! The second is what makes this stronger than "the output looks like the input".
-//! A formatter that dropped a clause, reordered one, or read `refund X to Y` as
-//! `rollback` would satisfy a re-parse check and fail this one.
+//! The bytecode check is what makes this stronger than "the output looks like the
+//! input": a formatter that reordered a clause or read `refund X to Y` as `rollback`
+//! would satisfy a re-parse check and fail this one.
+//!
+//! It is not sufficient on its own, and that is measured rather than argued: the
+//! formatter used to drop an `atomic trade`'s `effects [..]` and `guarantees [..]`
+//! declarations, and `trading_effects.x3` compiled to *identical* bytes anyway, because
+//! its body still produced every effect and discharged every guarantee. The deletion was
+//! invisible to this test and visible to the AST — and to the compiler only once the body
+//! stopped keeping the promise (with `repay debt` deleted, the original is refused with two
+//! errors, the formatted file with one). TICKET-127. Hence the third check: the AST is what
+//! a declaration the artifact does not carry still lives in.
 
 use std::path::PathBuf;
 
@@ -20,6 +30,31 @@ use x3_lang_compiler::formatter::X3Formatter;
 
 fn parse(source: &str) -> Result<Program, String> {
     x3_lang_compiler::parser::parse_source(source).map_err(|error| format!("{error}"))
+}
+
+/// The AST as JSON with every `span` removed.
+///
+/// Spans record where the text was and formatting moves text, so they cannot be part of a
+/// round-trip comparison. Everything else can, and has to: a declaration is carried by the AST
+/// even when the artifact does not carry it, so an AST comparison is the only check that sees a
+/// dropped declaration whose obligations the body happens to satisfy.
+fn ast_without_spans(program: &Program) -> serde_json::Value {
+    fn strip(value: serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Object(fields) => serde_json::Value::Object(
+                fields
+                    .into_iter()
+                    .filter(|(name, _)| name != "span")
+                    .map(|(name, value)| (name, strip(value)))
+                    .collect(),
+            ),
+            serde_json::Value::Array(items) => {
+                serde_json::Value::Array(items.into_iter().map(strip).collect())
+            }
+            other => other,
+        }
+    }
+    strip(serde_json::to_value(program).expect("an AST serializes"))
 }
 
 /// Every example in the corpus, as `(file name, source)`.
@@ -103,6 +138,13 @@ fn formatting_an_example_preserves_its_meaning() {
             "{name}: formatting changed the compiled artifact ({} bytes before, {} after)",
             before.len(),
             after.len()
+        );
+        assert_eq!(
+            ast_without_spans(&program),
+            ast_without_spans(&reparsed),
+            "{name}: formatting changed the program, not just its text — a declaration the \
+             artifact does not carry is still a declaration (TICKET-127)\n\
+             --- formatted ---\n{formatted}"
         );
 
         // Formatting what it just wrote has to be a no-op, or the command's
@@ -225,4 +267,245 @@ fn an_invariant_body_is_source_text_and_survives_formatting() {
         x3_lang_compiler::compile_program(&reparsed).expect("compiles"),
         "and mean the same thing"
     );
+}
+
+/// Every `@annotation` the parser accepts survives formatting.
+///
+/// The corpus check above only catches what the corpus contains, and no file in it carried an
+/// annotation — so the formatter could drop every one of them, and did: `format_function` wrote
+/// `async fn …` with nothing above it. `@subscribe(TransferDone)` and `@sponsor` are host calls
+/// (`CALL_HOST` records in the artifact), so formatting those programs silently deleted two
+/// instructions from them.
+///
+/// The spellings are listed here rather than read from `annotations::spelling`, because a list
+/// derived from the thing under test cannot notice a variant the table forgot; the policy test
+/// beside this one already checks that the table and the parser agree.
+#[test]
+fn formatting_preserves_every_annotation_the_parser_accepts() {
+    let spellings = [
+        "@no_heap",
+        "@no_recursion(4)",
+        "@hot",
+        "@audit",
+        "@role(admin)",
+        "@multisig(2, 3)",
+        "@version(1)",
+        "@upgrade_from(0)",
+        "@on_chain",
+        "@off_chain",
+        "@sandbox",
+        "@whitelist(a, b)",
+        "@concurrent",
+        "@scheduled(30)",
+        "@extern",
+        "@payable",
+        "@simd",
+        "@subscribe(TransferDone)",
+        "@sponsor",
+        "@gas_adaptive",
+    ];
+
+    let annotations = |program: &Program| -> String {
+        let item = program.items.first().expect("the fixture declares one item");
+        match &item.node {
+            x3_lang_ast::ast::Item::Function(function) => format!("{:?}", function.annotations),
+            other => panic!("the fixture is a function, found {other:?}"),
+        }
+    };
+
+    for spelling in spellings {
+        let source = format!("{spelling}\nfn probe() {{ }}\n");
+        let program = parse(&source).unwrap_or_else(|error| panic!("{spelling} must parse: {error}"));
+        let formatted = X3Formatter::new().format_program(&program);
+        let reparsed = parse(&formatted).unwrap_or_else(|error| {
+            panic!("{spelling}: the formatter wrote text the parser does not read: {error}\n{formatted}")
+        });
+        assert_eq!(
+            annotations(&program),
+            annotations(&reparsed),
+            "{spelling}: the formatted text must carry the same annotation:\n{formatted}"
+        );
+        assert!(
+            formatted.contains(spelling),
+            "{spelling}: the annotation must be written back, not only preserved in the AST:\n{formatted}"
+        );
+    }
+}
+
+/// A declaration's clauses are what `x3c fmt` is most likely to delete, twice over.
+///
+/// `format_bridge` wrote only the statement body: a bridge declaring a replay-protection nonce guard
+/// and a refund path came back with neither, which is the defect `format_atomic_swap` had already
+/// been fixed for one declaration over. And the *parser* had been throwing half of every refund
+/// clause away — `refund <chain.ASSET> to <receiver>` left `to <receiver>` in the token stream, where
+/// the enclosing body read it as two statements that lower to nothing, so the receiver never reached
+/// the action and the formatter wrote `to;` and `sender;` back out as statements.
+mod clauses_survive_formatting {
+    use super::parse;
+    use x3_lang_ast::ast::{FailureAction, Item, Statement};
+    use x3_lang_compiler::formatter::X3Formatter;
+
+    fn format(source: &str) -> String {
+        let program = parse(source).unwrap_or_else(|error| panic!("must parse: {error}\n{source}"));
+        X3Formatter::new().format_program(&program)
+    }
+
+    #[test]
+    fn a_bridge_keeps_its_guards_and_its_failure_action() {
+        let source = "bridge my_bridge ethereum.USDC to solana.USDC {\n    require nonce unused \
+                      bridge_nonce_1\n    require slippage <= 50\n    on_fail rollback\n}\n";
+        let formatted = format(source);
+        for clause in [
+            "require nonce unused bridge_nonce_1",
+            "require slippage <= 50",
+            "on_fail rollback",
+        ] {
+            assert!(
+                formatted.contains(clause),
+                "`{clause}` must be written back, not deleted: {formatted}"
+            );
+        }
+        // And the bytes agree, which is the claim that matters: the clauses a program states are the
+        // artifact it produces.
+        let before = x3_lang_compiler::compile_source(source).expect("the original compiles");
+        let after = x3_lang_compiler::compile_source(&formatted).expect("the formatted text compiles");
+        assert_eq!(before, after, "formatting must not change the artifact: {formatted}");
+    }
+
+    #[test]
+    fn a_refund_keeps_its_receiver_and_leaves_no_residue() {
+        let source = "bridge my_bridge ethereum.USDC to solana.USDC {\n    on_fail refund \
+                      ethereum.USDC to alice\n}\n";
+        let formatted = format(source);
+        assert!(
+            !formatted.contains("to;") && !formatted.contains("alice;"),
+            "the receiver is part of the clause, not a statement after it: {formatted}"
+        );
+        // The receiver survives: the re-parsed action names `alice`.
+        let reparsed = parse(&formatted).expect("what the formatter writes must parse");
+        let Item::Bridge(bridge) = &reparsed.items[0].node else {
+            panic!("the fixture declares a bridge");
+        };
+        let Some(FailureAction::Refund(expression)) = &bridge.on_fail else {
+            panic!("the bridge states a refund");
+        };
+        let text = format!("{expression:?}");
+        assert!(
+            text.contains("alice"),
+            "the refund must still name the receiver it was written with: {text}"
+        );
+    }
+
+    #[test]
+    fn a_module_body_keeps_its_refund_receiver() {
+        // The same clause in a statement position, which is where the corpus writes it.
+        let source = "strategy S {\n    input ethereum.USDC amount 1_000\n    output ethereum.ETH\n    \
+                      effects [swap]\n    domains [ethereum]\n    risk { max_slippage_bps 50 \
+                      max_total_fee_bps 8 }\n    bounds { max_steps 10 max_gas 200_000 }\n    execute {\n\
+                      \x20       swap uniswap ethereum.USDC -> ethereum.ETH amount 1000 min_output 1\n\
+                      \x20       require slippage <= 50\n        on_fail refund ethereum.USDC to alice\n\
+                      \x20   }\n}\n";
+        let formatted = format(source);
+        assert!(
+            !formatted.contains("to;"),
+            "no half-clause is left as a statement: {formatted}"
+        );
+        let reparsed = parse(&formatted).expect("what the formatter writes must parse");
+        let Item::Strategy(module) = &reparsed.items[0].node else {
+            panic!("the fixture declares a strategy");
+        };
+        let refund = module.body.iter().find_map(|statement| match statement {
+            Statement::OnFail(FailureAction::Refund(expression)) => Some(expression),
+            _ => None,
+        });
+        let text = format!("{:?}", refund.expect("the body states a refund"));
+        assert!(text.contains("alice"), "the receiver must survive: {text}");
+    }
+}
+
+/// An agent is three blocks, and the formatter used to write one.
+///
+/// The grammar reads a context block, then a state block, then the body — the first `{` after the
+/// name is always the context. The writer put the methods into the first block, so `x3c fmt` turned
+/// every agent into text the parser refuses (`context key: expected identifier`). Nothing in the
+/// corpus declares an agent, which is why a round-trip test over the corpus never saw it.
+mod an_agent_survives_formatting {
+    use super::parse;
+    use x3_lang_compiler::formatter::X3Formatter;
+
+    #[test]
+    fn the_formatted_text_parses_and_states_three_blocks() {
+        let source = "agent Trader {\n    venue: \"uniswap\",\n    max_slippage: 50,\n}\n{\n    \
+                      position: i64,\n}\n{\n    fn step() {\n        emit Step(1);\n    }\n}\n";
+        let program = parse(source).expect("an agent parses");
+        let formatted = X3Formatter::new().format_program(&program);
+        assert_eq!(
+            formatted.matches("\n{\n").count(),
+            2,
+            "a context, a state and a body are three blocks: {formatted}"
+        );
+        assert!(
+            formatted.contains("venue: \"uniswap\"") && formatted.contains("position: i64"),
+            "the blocks' content is the declaration: {formatted}"
+        );
+        // Formatting is compared rather than compilation: this fixture's context and state are
+        // *refused* when compiled (`verify_declarations_have_a_reader` — nothing reads them), and a
+        // program the compiler refuses is still one the formatter must not corrupt. Idempotence is the
+        // property: what the first pass writes, the second pass leaves alone.
+        let reparsed = parse(&formatted)
+            .unwrap_or_else(|error| panic!("the formatter wrote text the parser refuses: {error}\n{formatted}"));
+        let twice = X3Formatter::new().format_program(&reparsed);
+        assert_eq!(formatted, twice, "formatting must be idempotent");
+    }
+
+    #[test]
+    fn an_agent_with_empty_blocks_round_trips() {
+        // An empty context is the grammar's braces rather than a claim — the parser reads the first
+        // block as the context, so an agent that declares neither must still write both.
+        let source = "agent Bare {\n}\n{\n}\n{\n    fn step() {\n        emit Step(1);\n    }\n}\n";
+        let program = parse(source).expect("an agent with empty blocks parses");
+        let formatted = X3Formatter::new().format_program(&program);
+        parse(&formatted).unwrap_or_else(|error| panic!("must re-parse: {error}\n{formatted}"));
+    }
+}
+
+/// Generic parameter lists survive formatting.
+///
+/// Like the annotation test above, this is a construct no file in the corpus carries — so the
+/// corpus round-trip could not see it, and the formatter dropped it: `format_function` and
+/// `format_struct` wrote the name and then went straight to `(`, so `fn identity<T>(value: T) -> T`
+/// came back as `fn identity(value: T) -> T`, a signature whose return type names a parameter
+/// nothing declares. Bounds (`<T: Ordered + Sized>`) are part of the same list (TICKET-127).
+mod generics_survive_formatting {
+    use super::{ast_without_spans, parse};
+    use x3_lang_compiler::formatter::X3Formatter;
+
+    const SOURCE: &str = "struct Wrapper<T: Ordered + Sized> {\n    value: T,\n}\n\n\
+                          fn identity<T>(value: T) -> T {\n    return value;\n}\n";
+
+    #[test]
+    fn a_declaration_keeps_its_type_parameters_and_their_bounds() {
+        let program = parse(SOURCE).expect("the fixture must parse");
+        let formatted = X3Formatter::new().format_program(&program);
+        assert!(
+            formatted.contains("struct Wrapper<T: Ordered + Sized>"),
+            "the struct's parameters and bounds must come back:\n{formatted}"
+        );
+        assert!(
+            formatted.contains("fn identity<T>(value: T) -> T"),
+            "the function's parameters must come back:\n{formatted}"
+        );
+
+        let reparsed = parse(&formatted).expect("what the formatter writes must parse");
+        assert_eq!(
+            ast_without_spans(&program),
+            ast_without_spans(&reparsed),
+            "formatting changed the program, not just its text:\n{formatted}"
+        );
+        assert_eq!(
+            X3Formatter::new().format_program(&reparsed),
+            formatted,
+            "formatting is not idempotent"
+        );
+    }
 }

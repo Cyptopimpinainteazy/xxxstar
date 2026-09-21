@@ -1,0 +1,661 @@
+diff --git a/docs/reports/runtime-wasm-hashes.json b/docs/reports/runtime-wasm-hashes.json
+index cac38558f..4bd877508 100644
+--- a/docs/reports/runtime-wasm-hashes.json
++++ b/docs/reports/runtime-wasm-hashes.json
+@@ -5,23 +5,23 @@
+   "srtool": "0.18.4",
+   "rustc": "1.93.0",
+   "recorded_at": "2026-09-19",
+-  "recorded_revision": "5775b1587",
++  "recorded_revision": "f3bc2f2b4",
+   "runtime_version": "x3-chain-11 (x3-chain-1.tx1.au1)",
+   "metadata": "V14",
+   "runtimes": {
+     "compact": {
+-      "size": "8424386",
+-      "set_code": "0x733d6faa7a12face9b6346165d06f5ebe96ddef29c169d50ce9f604c118ced4d",
+-      "authorize_upgrade": "0x4745cb20348fd82585402630fd6460348c668f40088a8b18d7c38b4e375d49ab",
+-      "ipfs": "QmeocZ2WgT2BSv7FMNmWYgR7GfSw5AVkvpPPQ1bX9sAywM",
+-      "blake2_256": "0x47acc8211bf5e787ac1f7e5a937f26e616e3d1a594b2cc1cb35d88fa11991ccf"
++      "size": "8437524",
++      "set_code": "0xcb25ed8c5a789b785de9809366aaa1df19ceb6ec16850fef8a2474a9a0a73738",
++      "authorize_upgrade": "0xada61ed0e4c167cf052e9b9c635452bdd25488f51fd4e9916a56af25b6781f2a",
++      "ipfs": "QmSZCv1djF2YNfJeEruaz16RqL6SLh81MQfWjuiwTmaSA5",
++      "blake2_256": "0xeabb30565606734ee4206d765152196a6e8eb3596948f2d9f7343a711d350194"
+     },
+     "compressed": {
+-      "size": "1442745",
+-      "set_code": "0x9d7e04a43c45f5d887ac8d9b93a614abbecf71af52f7ba4a57ab19bbff4904d1",
+-      "authorize_upgrade": "0xe1c960e5633cdd9e29bf1f7200838a5d261fc8fd148a476acb9293477f87150c",
+-      "ipfs": "QmYLcDxcLaB3MPf3xfSFETi8NFfDz6Y9sMo8UgHyxqvWUU",
+-      "blake2_256": "0x380527faeabbd5e48ff14aba6cf1bf5e888a22b28bdec676a712909ea6e525ed"
++      "size": "1442679",
++      "set_code": "0x0831ed66a50a66d2cc463c7a39e4500880d782e4298b85afdde08ea86e277a3b",
++      "authorize_upgrade": "0xa3f9c2537984051c3716ebd3f282ce57383cc33f803e1a5890d18f7c3eeab993",
++      "ipfs": "QmUs68aGhFNYrsFYQ8A9b5Y37uvaarAJwYoTQz63DcDfGC",
++      "blake2_256": "0x67a2d8be5e25cae48ee09aad4792ba6f33e414331c2154f7db0a780cc02858e9"
+     }
+   }
+ }
+diff --git a/node/src/chain_spec.rs b/node/src/chain_spec.rs
+index d15826f54..a1264ff46 100644
+--- a/node/src/chain_spec.rs
++++ b/node/src/chain_spec.rs
+@@ -12,7 +12,7 @@ use std::{collections::BTreeSet, path::PathBuf};
+ use x3_chain_runtime::{
+     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
+     CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, TreasuryConfig, X3CoinConfig,
+-    X3CrosschainGatewayConfig, WASM_BINARY,
++    X3CrosschainGatewayConfig, X3SettlementEngineConfig, WASM_BINARY,
+ };
+ 
+ /// Chain specification specialized to this runtime's genesis configuration.
+@@ -464,6 +464,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
+         sp_core::H160::zero(),
+         [0u8; 32],
+         X3CrosschainGatewayConfig::dev_defaults(),
++        true,
+     );
+     Ok(ChainSpec::builder(wasm_binary, Default::default())
+         .with_name("X3 Chain Development")
+@@ -508,6 +509,7 @@ pub fn development_config_with_bridge_escrows(
+         evm_escrow_addr,
+         svm_escrow_addr,
+         X3CrosschainGatewayConfig::dev_defaults(),
++        true,
+     );
+ 
+     Ok(ChainSpec::builder(wasm_binary, Default::default())
+@@ -556,6 +558,7 @@ pub fn local_two_validator_config_with_bridge_escrows(
+         evm_escrow_addr,
+         svm_escrow_addr,
+         X3CrosschainGatewayConfig::dev_defaults(),
++        true,
+     );
+ 
+     Ok(ChainSpec::builder(wasm_binary, Default::default())
+@@ -600,6 +603,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
+         sp_core::H160::zero(),
+         [0u8; 32],
+         X3CrosschainGatewayConfig::dev_defaults(),
++        true,
+     );
+     Ok(ChainSpec::builder(wasm_binary, Default::default())
+         .with_name("X3 Chain Local Testnet")
+@@ -645,6 +649,7 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
+         sp_core::H160::zero(),
+         [0u8; 32],
+         X3CrosschainGatewayConfig::dev_defaults(),
++        true,
+     );
+     Ok(ChainSpec::builder(wasm_binary, Default::default())
+         .with_name("X3 Chain Local 3-Validator Testnet")
+@@ -693,6 +698,7 @@ pub fn staging_config() -> Result<ChainSpec, String> {
+         evm_escrow,
+         svm_escrow,
+         X3CrosschainGatewayConfig::testnet_defaults(),
++        false,
+     );
+     Ok(ChainSpec::builder(wasm_binary, Default::default())
+         .with_name("X3 Chain Staging")
+@@ -754,6 +760,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
+         evm_escrow,
+         svm_escrow,
+         X3CrosschainGatewayConfig::testnet_defaults(),
++        false,
+     );
+     Ok(ChainSpec::builder(wasm_binary, Default::default())
+         .with_name("X3 Chain Testnet")
+@@ -812,6 +819,7 @@ pub fn production_config() -> Result<ChainSpec, String> {
+         evm_escrow,
+         svm_escrow,
+         X3CrosschainGatewayConfig::empty(),
++        false,
+     );
+     Ok(ChainSpec::builder(wasm_binary, Default::default())
+         .with_name("X3 Chain Production")
+@@ -882,6 +890,12 @@ fn x3_chain_genesis(
+     evm_escrow_addr: sp_core::H160,
+     svm_escrow_addr: [u8; 32],
+     gateway_config: X3CrosschainGatewayConfig,
++    // Whether this network accepts a cross-domain proof set whose underlying
++    // proof the settlement engine never verified. `true` only for dev/local:
++    // there is no external chain to prove against there. Every network a
++    // validator can join passes `false`, because a terminal refund released
++    // against a self-attested bundle is a fund loss.
++    allow_unattested_cross_domain_proofs: bool,
+ ) -> RuntimeGenesisConfig {
+     let mut endowed: BTreeSet<AccountId> = endowed_accounts.into_iter().collect();
+ 
+@@ -977,6 +991,10 @@ fn x3_chain_genesis(
+         #[cfg(not(feature = "mainnet-rc1"))]
+         x3_flash_loan: Default::default(),
+         x3_crosschain_gateway: gateway_config,
++        x3_settlement_engine: X3SettlementEngineConfig {
++            allow_unattested_cross_domain_proofs,
++            _phantom: core::marker::PhantomData,
++        },
+     }
+ }
+ 
+diff --git a/pallets/x3-settlement-engine/src/lib.rs b/pallets/x3-settlement-engine/src/lib.rs
+index 56568e19d..50dca01d7 100644
+--- a/pallets/x3-settlement-engine/src/lib.rs
++++ b/pallets/x3-settlement-engine/src/lib.rs
+@@ -114,7 +114,7 @@ pub mod pallet {
+     use codec::{Decode, Encode};
+     use frame_support::{
+         pallet_prelude::*,
+-        traits::{Currency, ReservableCurrency, StorageVersion, UnixTime},
++        traits::{BuildGenesisConfig, Currency, ReservableCurrency, StorageVersion, UnixTime},
+     };
+     use frame_system::offchain::SubmitTransaction;
+     use frame_system::pallet_prelude::*;
+@@ -467,11 +467,34 @@ pub mod pallet {
+     /// Keyed by (runtime intent id, domain+operation key) and stores the
+     /// canonical proof hash. Full proof blobs are verified at submission time
+     /// and are not retained in consensus storage.
++    ///
++    /// "Verified at submission time" is `submit_proof`, which enforces the
++    /// chain's confirmation depth and proof type and runs the per-chain verifier
++    /// (BTC SPV, EVM receipt MPT, SVM transaction). A bundle in a
++    /// `CrossDomainProofSet` is a *summary* of such proofs, so
++    /// `submit_cross_domain_proof_set` refuses an external bundle that does not
++    /// match a proof recorded on the escrow leg — unless the chain was
++    /// bootstrapped with `allow_unattested_cross_domain_proofs`, which only the
++    /// dev/local specs do (see the genesis config below).
+     #[pallet::storage]
+     #[pallet::getter(fn verified_cross_domain_proof)]
+     pub type VerifiedCrossDomainProofs<T: Config> =
+         StorageDoubleMap<_, Blake2_128Concat, H256, Blake2_128Concat, H256, H256, OptionQuery>;
+ 
++    /// Whether a cross-domain proof set may be accepted without this pallet
++    /// having verified the proof it summarises.
++    ///
++    /// Set at genesis, because it is a statement about the *network*, not about
++    /// the build: `false` on production, testnet and staging — a terminal
++    /// refund released against a self-attested bundle is a fund loss — and
++    /// `true` only on the dev/local specs, where there is no external chain to
++    /// prove against and the lifecycle tests are exercising the state machine.
++    /// A build-time flag would have made a plain `cargo build --release`
++    /// permissive on mainnet, which is the wrong default for a rule this one.
++    #[pallet::storage]
++    #[pallet::getter(fn allow_unattested_cross_domain_proofs)]
++    pub type AllowUnattestedCrossDomainProofs<T: Config> = StorageValue<_, bool, ValueQuery>;
++
+     /// Adaptor signatures: Maps intent_id → (maker, btc_adaptor_signature, message_digest)
+     ///
+     /// Stored when a maker commits a pre-signature for a BTC atomic swap. The
+@@ -774,6 +797,10 @@ pub mod pallet {
+         CrossDomainProofSetIncomplete,
+         /// Canonical proof bundle does not correspond to any settlement leg.
+         CrossDomainProofDomainMismatch,
++        /// Canonical proof bundle for an external domain does not match any proof
++        /// this pallet has verified (`submit_proof`) for that leg. The bundle's
++        /// own fields cannot make it admissible.
++        CrossDomainProofUnverified,
+ 
+         /// Adaptor signature supplied does not pass cryptographic verification
+         InvalidAdaptorSignature,
+@@ -791,6 +818,25 @@ pub mod pallet {
+     // Hooks
+     // ============================================================================
+ 
++    /// Genesis configuration for the settlement engine.
++    #[pallet::genesis_config]
++    #[derive(frame_support::DefaultNoBound)]
++    pub struct GenesisConfig<T: Config> {
++        /// Accept cross-domain proof sets whose underlying proof this pallet has
++        /// not verified. `false` everywhere a validator can join; `true` on the
++        /// dev/local specs.
++        pub allow_unattested_cross_domain_proofs: bool,
++        #[serde(skip)]
++        pub _phantom: core::marker::PhantomData<T>,
++    }
++
++    #[pallet::genesis_build]
++    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
++        fn build(&self) {
++            AllowUnattestedCrossDomainProofs::<T>::put(self.allow_unattested_cross_domain_proofs);
++        }
++    }
++
+     #[pallet::hooks]
+     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+         fn on_initialize(n: BlockNumberFor<T>) -> Weight {
+@@ -1428,6 +1474,25 @@ pub mod pallet {
+             // Store proof in cache to mark it as submitted
+             ProofCache::<T>::insert(proof_hash, ());
+ 
++            // Record the verified proof on the leg it belongs to. This is the
++            // evidence `submit_cross_domain_proof_set` requires before it will
++            // accept a compact bundle for an external domain: a proof set is a
++            // summary of proofs this pallet checked, not a substitute for
++            // checking them. `EscrowLeg::proof` existed for this and was never
++            // written, which is how a bundle with `execution_evidence:
++            // vec![0xde, 0xad]` could be recorded as an accepted proof.
++            for leg_idx in 0..intent.legs_total {
++                let Some(mut escrow) = EscrowStates::<T>::get(intent_id, leg_idx) else {
++                    continue;
++                };
++                if escrow.chain != chain {
++                    continue;
++                }
++                escrow.proof = Some(proof.clone());
++                EscrowStates::<T>::insert(intent_id, leg_idx, escrow);
++                break;
++            }
++
+             // Update state
+             IntentStates::<T>::insert(intent_id, IntentState::ExecutingExternal);
+ 
+@@ -1601,6 +1666,11 @@ pub mod pallet {
+                     Self::bundle_matches_intent_domain(intent_id, bundle),
+                     Error::<T>::CrossDomainProofDomainMismatch
+                 );
++                // A compact proof hash is admissible only when the proof it
++                // summarises has been verified. `submit_proof` records that proof
++                // on the escrow leg; this refuses a bundle that names a
++                // transaction no verifier has seen.
++                Self::require_verified_external_bundle(intent_id, bundle)?;
+                 let key =
+                     Self::proof_domain_key(&bundle.chain_id, bundle.vm_type, bundle.operation);
+                 let proof_hash = H256::from(bundle.proof_hash);
+@@ -2742,6 +2812,88 @@ pub mod pallet {
+             false
+         }
+ 
++        /// Decode the `0x…` transaction id a proof bundle carries into the
++        /// `H256` the verifying path recorded.
++        ///
++        /// `no_std`: the pallet has no `hex` dependency, and this has one caller
++        /// with one shape (a 32-byte hash, with or without the prefix).
++        fn bundle_tx_hash(tx_id: &str) -> Option<H256> {
++            let digits = tx_id.strip_prefix("0x").unwrap_or(tx_id);
++            if digits.len() != 64 {
++                return None;
++            }
++            let mut out = [0u8; 32];
++            for (i, byte) in out.iter_mut().enumerate() {
++                let pair = digits.get(i * 2..i * 2 + 2)?;
++                *byte = u8::from_str_radix(pair, 16).ok()?;
++            }
++            Some(H256::from(out))
++        }
++
++        /// Does this bundle summarise a proof the pallet has already verified?
++        ///
++        /// The rule, separated from the policy so both postures can be tested
++        /// with one mock runtime: a bundle needs a verified underlying proof
++        /// unless the runtime allows unattested sets, and never for an X3-native
++        /// leg — this chain verifies its own escrow.
++        pub fn bundle_needs_verified_proof(
++            allow_unattested: bool,
++            matched_only_x3_native_legs: bool,
++        ) -> bool {
++            !allow_unattested && !matched_only_x3_native_legs
++        }
++
++        /// Refuse a bundle for an external domain that no verified proof backs.
++        ///
++        /// `submit_cross_domain_proof_set` commits compact proof hashes that gate
++        /// terminal states, so a bundle has to point at a proof `submit_proof`
++        /// checked: same leg (chain + VM), and the transaction id the verifying
++        /// path recorded on that leg. Without this the set was self-attested —
++        /// a caller could name any transaction and `execution_evidence` was only
++        /// checked for being non-empty.
++        fn require_verified_external_bundle(
++            intent_id: H256,
++            bundle: &CrossDomainProofBundle,
++        ) -> DispatchResult {
++            if AllowUnattestedCrossDomainProofs::<T>::get() {
++                return Ok(());
++            }
++            let intent =
++                SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
++
++            let mut matched_external_leg = false;
++            let mut matched_x3_leg = false;
++            let mut verified = false;
++            for leg_idx in 0..intent.legs_total {
++                let Some(escrow) = EscrowStates::<T>::get(intent_id, leg_idx) else {
++                    continue;
++                };
++                let (chain_id, vm_type) = Self::proof_domain_descriptor(escrow.chain);
++                if bundle.chain_id != chain_id || bundle.vm_type != vm_type {
++                    continue;
++                }
++                if escrow.chain == ExternalChainId::X3Native {
++                    matched_x3_leg = true;
++                    continue;
++                }
++                matched_external_leg = true;
++                if let Some(proof) = escrow.proof.as_ref() {
++                    if Self::bundle_tx_hash(&bundle.tx_id) == Some(proof.tx_hash) {
++                        verified = true;
++                    }
++                }
++            }
++
++            if Self::bundle_needs_verified_proof(
++                AllowUnattestedCrossDomainProofs::<T>::get(),
++                matched_x3_leg && !matched_external_leg,
++            ) && !verified
++            {
++                return Err(Error::<T>::CrossDomainProofUnverified.into());
++            }
++            Ok(())
++        }
++
+         fn all_required_operation_proofs(
+             intent_id: H256,
+             intent: &SettlementIntent<AccountIdOf<T>>,
+diff --git a/pallets/x3-settlement-engine/src/mock.rs b/pallets/x3-settlement-engine/src/mock.rs
+index 03de4a1c4..2b8cff9da 100644
+--- a/pallets/x3-settlement-engine/src/mock.rs
++++ b/pallets/x3-settlement-engine/src/mock.rs
+@@ -238,6 +238,11 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
+     ext.execute_with(|| {
+         System::set_block_number(1);
+         Timestamp::set_timestamp(1_000);
++        // Permissive, like a dev/local genesis: the mock has no external chain to
++        // prove against, so the lifecycle tests drive the bookkeeping path. Tests
++        // that exercise the strict rule (the production/testnet posture) set this
++        // to false themselves — see `allow_unattested_cross_domain_proofs_is_false_by_default_in_live_genesis`.
++        crate::AllowUnattestedCrossDomainProofs::<Test>::put(true);
+     });
+     ext
+ }
+diff --git a/pallets/x3-settlement-engine/src/tests.rs b/pallets/x3-settlement-engine/src/tests.rs
+index 8970770ef..2cdec2f30 100644
+--- a/pallets/x3-settlement-engine/src/tests.rs
++++ b/pallets/x3-settlement-engine/src/tests.rs
+@@ -5,9 +5,12 @@ use crate::mock::{RuntimeEvent, RuntimeOrigin};
+ use crate::types::{
+     AssetSpec, BtcBlockHeader, ExternalChainId, IntentState, ProofType, SettlementProof, TokenId,
+ };
+-use crate::{Bonds, BondsByOwner, Pallet, SettlementIntents};
+-use frame_support::{assert_ok, traits::Hooks, BoundedVec};
++use crate::{Bonds, BondsByOwner, Error, Pallet, SettlementIntents};
++use frame_support::{assert_noop, assert_ok, traits::Hooks, BoundedVec};
+ use sp_core::{ed25519, Pair, H256};
++use x3_atomic_swap::{
++    CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType,
++};
+ 
+ /// The height every fixture proof states.
+ ///
+@@ -2959,6 +2962,248 @@ fn adaptor_swap_real_full_lifecycle() {
+     });
+ }
+ 
++/// Render an `H256` the way proof bundles carry a transaction id.
++fn hex32(value: H256) -> String {
++    let mut out = String::from("0x");
++    for byte in value.as_bytes() {
++        out.push_str(&format!("{byte:02x}"));
++    }
++    out
++}
++
++/// A proof bundle that is internally consistent and whose evidence says nothing.
++///
++/// `execution_evidence` is two bytes and `finality_source` names the caller: both
++/// passed validation before this change, which is exactly the gap these tests
++/// pin. `bundle_needs_verified_proof` is the rule that now refuses it on a Live
++/// network.
++fn fabricated_bundle(
++    runtime_intent_id: [u8; 32],
++    chain_id: &str,
++    vm_type: VmType,
++    operation: CrossDomainOperation,
++    tx_id: String,
++) -> CrossDomainProofBundle {
++    let block_hash = format!("0xfabricatedblock{}", &tx_id[2..6.min(tx_id.len())]);
++    let mut bundle = CrossDomainProofBundle {
++        version: CrossDomainProofBundle::VERSION,
++        intent_id: 1,
++        runtime_intent_id,
++        intent_hash: [0x11u8; 32],
++        chain_id: chain_id.into(),
++        vm_type,
++        operation,
++        tx_id: tx_id.clone(),
++        block_number: 1,
++        block_hash: block_hash.clone(),
++        execution_evidence: vec![0xde, 0xad],
++        finality: FinalityProof {
++            chain_id: chain_id.into(),
++            vm_type,
++            tx_id,
++            block_number: 1,
++            block_hash,
++            confirmations: 12,
++            finalized: true,
++            finality_source: "fabricated-by-the-caller".into(),
++            safe_to_reveal_secret: true,
++        },
++        proof_hash: [0u8; 32],
++    };
++    bundle.proof_hash = bundle.compute_hash().expect("self-consistent hash");
++    bundle
++}
++
++/// Create an intent with an Ethereum leg and a Solana leg, both escrowed.
++fn intent_with_two_external_legs() -> H256 {
++    let maker = ALICE;
++    let taker = BOB;
++    let secret_hash = H256::from(sp_io::hashing::sha2_256(
++        H256::from([0x33u8; 32]).as_bytes(),
++    ));
++
++    assert_ok!(Pallet::<Test>::create_intent(
++        RuntimeOrigin::signed(maker),
++        taker,
++        AssetSpec {
++            chain: ExternalChainId::Ethereum,
++            token: TokenId::Native,
++            amount: 1_000,
++        },
++        AssetSpec {
++            chain: ExternalChainId::Solana,
++            token: TokenId::Native,
++            amount: 500,
++        },
++        secret_hash,
++        Some(3_600),
++    ));
++
++    let intent_id = crate::SettlementIntents::<Test>::iter()
++        .find(|(_, intent)| intent.maker == maker && intent.secret_hash == secret_hash)
++        .map(|(id, _)| id)
++        .expect("intent exists");
++
++    assert_ok!(Pallet::<Test>::lock_escrow(
++        RuntimeOrigin::signed(taker),
++        intent_id,
++        0,
++        ExternalChainId::Ethereum,
++        1_000,
++        vec![],
++    ));
++    assert_ok!(Pallet::<Test>::lock_escrow(
++        RuntimeOrigin::signed(maker),
++        intent_id,
++        1,
++        ExternalChainId::Solana,
++        500,
++        vec![],
++    ));
++    intent_id
++}
++
++/// The policy rule, stated so both postures are visible in one place.
++#[test]
++fn the_rule_for_requiring_a_verified_proof_is_explicit() {
++    let mut ext = new_test_ext();
++    ext.execute_with(|| {
++        // Live posture (production/testnet/staging): an external bundle needs a
++        // proof this pallet verified.
++        assert!(Pallet::<Test>::bundle_needs_verified_proof(false, false));
++        // Dev/local posture: the bookkeeping path is exercised without one.
++        assert!(!Pallet::<Test>::bundle_needs_verified_proof(true, false));
++        // An X3-native leg is verified by this chain itself.
++        assert!(!Pallet::<Test>::bundle_needs_verified_proof(false, true));
++    });
++}
++
++/// The production/testnet posture refuses a bundle no verifier backed.
++///
++/// Before this rule the set was self-attested: `submit_proof` verified the
++/// proof and `submit_cross_domain_proof_set` accepted any bundle whose own
++/// fields agreed with each other, so a caller could name a transaction that
++/// never happened, have it recorded as an accepted proof, and reach a terminal
++/// refund against an external leg that never settled.
++#[test]
++fn live_posture_refuses_an_external_bundle_no_verifier_backed() {
++    let mut ext = new_test_ext();
++    ext.execute_with(|| {
++        crate::AllowUnattestedCrossDomainProofs::<Test>::put(false);
++        let intent_id = intent_with_two_external_legs();
++        let runtime_intent_id = intent_id.to_fixed_bytes();
++
++        let set = CrossDomainProofSet {
++            intent_id: 1,
++            runtime_intent_id,
++            intent_hash: [0x11u8; 32],
++            bundles: vec![fabricated_bundle(
++                runtime_intent_id,
++                "ethereum-mainnet",
++                VmType::Evm,
++                CrossDomainOperation::Refund,
++                "0xfabricatedrefund".into(),
++            )],
++        };
++
++        assert_noop!(
++            Pallet::<Test>::submit_cross_domain_proof_set(
++                RuntimeOrigin::signed(ALICE),
++                intent_id,
++                set
++            ),
++            Error::<Test>::CrossDomainProofUnverified
++        );
++    });
++}
++
++/// ...and accepts it once the bundle points at a proof the pallet verified.
++#[test]
++fn a_bundle_matching_the_verified_proof_is_accepted() {
++    let mut ext = new_test_ext();
++    ext.execute_with(|| {
++        crate::AllowUnattestedCrossDomainProofs::<Test>::put(false);
++        let intent_id = intent_with_two_external_legs();
++        let runtime_intent_id = intent_id.to_fixed_bytes();
++
++        // The verifying path: confirmation depth, proof type, and a real
++        // receipts-trie walk against the block's receipts root.
++        let proof = create_evm_receipt_proof();
++        let verified_tx = proof.tx_hash;
++        assert_ok!(Pallet::<Test>::submit_proof(
++            RuntimeOrigin::signed(ALICE),
++            intent_id,
++            ExternalChainId::Ethereum,
++            proof,
++        ));
++
++        // `submit_proof` records the verified proof on the leg it belongs to.
++        let escrow = crate::EscrowStates::<Test>::get(intent_id, 0).expect("ethereum leg");
++        assert_eq!(
++            escrow.proof.as_ref().map(|p| p.tx_hash),
++            Some(verified_tx),
++            "the verified proof must be attached to the escrowed leg"
++        );
++
++        let set = CrossDomainProofSet {
++            intent_id: 1,
++            runtime_intent_id,
++            intent_hash: [0x11u8; 32],
++            bundles: vec![fabricated_bundle(
++                runtime_intent_id,
++                "ethereum-mainnet",
++                VmType::Evm,
++                CrossDomainOperation::Claim,
++                hex32(verified_tx),
++            )],
++        };
++        assert_ok!(Pallet::<Test>::submit_cross_domain_proof_set(
++            RuntimeOrigin::signed(ALICE),
++            intent_id,
++            set
++        ));
++    });
++}
++
++/// A bundle naming the *other* transaction on the same leg is still refused.
++#[test]
++fn a_bundle_naming_a_different_transaction_is_refused() {
++    let mut ext = new_test_ext();
++    ext.execute_with(|| {
++        crate::AllowUnattestedCrossDomainProofs::<Test>::put(false);
++        let intent_id = intent_with_two_external_legs();
++        let runtime_intent_id = intent_id.to_fixed_bytes();
++
++        assert_ok!(Pallet::<Test>::submit_proof(
++            RuntimeOrigin::signed(ALICE),
++            intent_id,
++            ExternalChainId::Ethereum,
++            create_evm_receipt_proof(),
++        ));
++
++        let set = CrossDomainProofSet {
++            intent_id: 1,
++            runtime_intent_id,
++            intent_hash: [0x11u8; 32],
++            bundles: vec![fabricated_bundle(
++                runtime_intent_id,
++                "ethereum-mainnet",
++                VmType::Evm,
++                CrossDomainOperation::Claim,
++                hex32(H256::from([0x99u8; 32])),
++            )],
++        };
++        assert_noop!(
++            Pallet::<Test>::submit_cross_domain_proof_set(
++                RuntimeOrigin::signed(ALICE),
++                intent_id,
++                set
++            ),
++            Error::<Test>::CrossDomainProofUnverified
++        );
++    });
++}
++
+ #[test]
+ fn local_claims_do_not_finalize_without_cross_domain_proof_set() {
+     let mut ext = new_test_ext();
+diff --git a/scripts/mainnet/make-fixture-live-spec.sh b/scripts/mainnet/make-fixture-live-spec.sh
+index 5bd4c8ed1..7687c398f 100755
+--- a/scripts/mainnet/make-fixture-live-spec.sh
++++ b/scripts/mainnet/make-fixture-live-spec.sh
+@@ -195,6 +195,20 @@ assert boot == expected, f"bootNodes mismatch:\n  spec:     {boot}\n  expected:
+ for forbidden in ("Alice", "Bob", "Charlie", "/Alice", "/Bob", "TestnetAlpha", "ValidatorAlpha"):
+     assert forbidden not in raw, f"dev seed marker {forbidden!r} leaked into the {expected_name} genesis"
+ 
++# A validator's network must not accept a cross-domain proof set whose
++# underlying proof nothing verified — that is the parameter that decides whether
++# a terminal refund can be released against a self-attested bundle.
++settlement = (
++    spec.get("genesis", {})
++    .get("runtimeGenesis", {})
++    .get("config", {})
++    .get("x3SettlementEngine", {})
++)
++assert settlement.get("allowUnattestedCrossDomainProofs") is False, (
++    "the Live genesis allows unattested cross-domain proof sets; "
++    f"x3SettlementEngine = {settlement}"
++)
++
+ print(f"[fixture-spec] spec ok: {os.path.getsize(path)} bytes, 3 authorities, {len(boot)} bootnodes")
+ PY
+ 

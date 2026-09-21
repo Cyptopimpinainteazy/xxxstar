@@ -381,17 +381,84 @@ fn parse_address(addr: &str) -> Result<[u8; 20]> {
     Ok(arr)
 }
 
+/// Wei in one token: the unit an amount the command submits is stated in.
+const WEI_DECIMALS: usize = 18;
+
+/// The `amount` argument as wei, exactly.
+///
+/// It was `(amount.parse::<f64>()? * 1e18) as u128`, and the value that executes is this one — the
+/// command submits it unless `--quote-only` — so the float was in the money path: `0.29` is not
+/// representable in binary, and `0.29 * 1e18` is `289999999999999996`, four wei below the amount the
+/// user typed. A user typing `1.000000000000000001` cannot be served at all by an `f64`, and a large
+/// amount loses precision silently (TICKET-094).
+///
+/// The rule is the same one `x3-bridge-adapters`'s `btc_to_satoshi` applies to a node's reply — parse
+/// the text, refuse anything finer than the unit — with 18 decimals instead of 8. The two are not one
+/// function because there is no client-side crate to share one in: `x3-common` is the Substrate-flavoured
+/// one (sp-core, `no_std`), which a JSON-RPC client and a CLI binary should not drag in for a parser.
 fn parse_amount(amount: &str) -> Result<u128> {
-    // Parse as float and convert to wei (18 decimals)
-    let val: f64 = amount.parse().map_err(|_| {
-        crate::error::CliError::InvalidArgument(format!("Invalid amount: {}", amount))
+    let stated = amount.trim();
+    if stated.is_empty() || stated.starts_with('-') || stated.starts_with('+') {
+        return Err(crate::error::CliError::InvalidArgument(format!(
+            "Invalid amount: {amount} (write a positive decimal, e.g. 1.5)"
+        ))
+        .into());
+    }
+    let (whole, fraction) = stated.split_once('.').unwrap_or((stated, ""));
+    let digits_are_decimal = |text: &str| text.chars().all(|digit| digit.is_ascii_digit());
+    if whole.is_empty() || !digits_are_decimal(whole) || !digits_are_decimal(fraction) {
+        return Err(crate::error::CliError::InvalidArgument(format!(
+            "Invalid amount: {amount} (write a plain decimal, e.g. 1.5)"
+        ))
+        .into());
+    }
+    if fraction.len() > WEI_DECIMALS {
+        return Err(crate::error::CliError::InvalidArgument(format!(
+            "Invalid amount: {amount} is finer than a wei, which is the smallest unit a token amount can \
+             be stated in"
+        ))
+        .into());
+    }
+    let mut scaled_fraction = fraction.to_string();
+    while scaled_fraction.len() < WEI_DECIMALS {
+        scaled_fraction.push('0');
+    }
+    let whole: u128 = whole.parse().map_err(|_| {
+        crate::error::CliError::InvalidArgument(format!(
+            "Invalid amount: {amount} is larger than wei holds"
+        ))
     })?;
-    Ok((val * 1e18) as u128)
+    let fraction: u128 = scaled_fraction.parse().map_err(|_| {
+        crate::error::CliError::InvalidArgument(format!(
+            "Invalid amount: {amount} is not a plain decimal"
+        ))
+    })?;
+    whole
+        .checked_mul(10u128.pow(WEI_DECIMALS as u32))
+        .and_then(|wei| wei.checked_add(fraction))
+        .ok_or_else(|| {
+            crate::error::CliError::InvalidArgument(format!(
+                "Invalid amount: {amount} is larger than wei holds"
+            ))
+            .into()
+        })
 }
 
+/// Wei as the token amount it is, to six decimal places, exactly.
+///
+/// It was `format!("{:.6}", amount as f64 / 1e18)`, which prints the nearest `f64` — so a balance of
+/// `1234567890123456789` wei shows as `1.234568` rather than `1.234568`, but one of
+/// `1000000000000000001` shows as `1.000000` and hides a wei that is there. Display rather than a
+/// decision, which is why it is a note rather than a reason to change the output shape.
 fn format_amount(amount: u128) -> String {
-    let val = amount as f64 / 1e18;
-    format!("{:.6}", val)
+    let divisor = 10u128.pow(WEI_DECIMALS as u32);
+    let whole = amount / divisor;
+    let fraction = amount % divisor;
+    let mut rendered = format!("{whole}.{:018}", fraction);
+    while rendered.len() > whole.to_string().len() + 7 && rendered.ends_with('0') {
+        rendered.pop();
+    }
+    rendered
 }
 
 fn get_chain_name(chain_id: u64) -> String {
@@ -445,8 +512,10 @@ fn find_route(from_chain: u64, to_chain: u64) -> Result<Route> {
 }
 
 fn calculate_quote(amount: u128, route: &Route) -> Quote {
-    // 0.5% slippage estimate
-    let output = (amount as f64 * 0.995) as u128;
+    // 0.5% slippage estimate. Integer arithmetic so the figure is the exact 99.5% floored rather than a
+    // float's approximation of it — it is an *estimate* rather than a decision, which is why this is a
+    // one-line change and not a contract: nothing downstream settles on it.
+    let output = amount * 995 / 1000;
 
     Quote {
         input: amount,
@@ -639,4 +708,76 @@ fn get_chain_by_id(chain_id: u64) -> Option<ChainInfo> {
     get_all_chains()
         .into_iter()
         .find(|c| c.chain_id == chain_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_amount_typed_by_a_user_becomes_exact_wei() {
+        // The defect this replaced, measured: `("0.29".parse::<f64>()? * 1e18) as u128` is
+        // `289999999999999996`, four wei below the amount the user typed — and this is the value the
+        // command submits.
+        assert_eq!(parse_amount("0.29").unwrap(), 290_000_000_000_000_000);
+        assert_eq!(parse_amount("1").unwrap(), 1_000_000_000_000_000_000);
+        assert_eq!(parse_amount("1.5").unwrap(), 1_500_000_000_000_000_000);
+        // A wei that an `f64` cannot hold at all.
+        assert_eq!(
+            parse_amount("1.000000000000000001").unwrap(),
+            1_000_000_000_000_000_001
+        );
+        // And an amount whose wei is past `f64`'s 53 bits, exactly: 12,345,678.90123456789 tokens is
+        // 12,345,678,901,234,567,890,000,000 wei, and no `f64` holds that figure.
+        assert_eq!(
+            parse_amount("12345678.90123456789").unwrap(),
+            12_345_678_901_234_567_890_000_000
+        );
+    }
+
+    #[test]
+    fn an_amount_finer_than_a_wei_is_refused_rather_than_rounded() {
+        let error =
+            parse_amount("1.0000000000000000001").expect_err("a sub-wei digit is not statable");
+        assert!(
+            error.to_string().contains("finer than a wei"),
+            "the refusal must say why: {error}"
+        );
+        for bad in ["", "-1", "+1", "1.2.3", "abc", "1e18"] {
+            assert!(parse_amount(bad).is_err(), "{bad:?} is not an amount");
+        }
+    }
+
+    #[test]
+    fn an_amount_is_formatted_from_the_integer() {
+        // Six decimals where there is nothing more to show — the shape this printed before, which is
+        // why the change is invisible for a round amount — and the wei beyond that where there is.
+        assert_eq!(format_amount(1_000_000_000_000_000_000), "1.000000");
+        assert_eq!(format_amount(1_500_000_000_000_000_000), "1.500000");
+        assert_eq!(
+            format_amount(1_234_567_890_123_456_789),
+            "1.234567890123456789"
+        );
+        // The wei an `f64` would have hidden.
+        assert_eq!(
+            format_amount(1_000_000_000_000_000_001),
+            "1.000000000000000001"
+        );
+    }
+
+    #[test]
+    fn a_quote_is_the_exact_estimate_floored() {
+        let route = Route {
+            legs: Vec::new(),
+            total_gas: 50_000,
+            total_time_ms: 6_000,
+        };
+        // 99.5% of one token, exactly: the float's `0.995` is not representable, so the old expression
+        // was a different number for most amounts.
+        let quote = calculate_quote(1_000_000_000_000_000_000, &route);
+        assert_eq!(quote.output, 995_000_000_000_000_000);
+        // And it floors rather than ceils, because it is an estimate of what will come out.
+        let quote = calculate_quote(3, &route);
+        assert_eq!(quote.output, 2);
+    }
 }

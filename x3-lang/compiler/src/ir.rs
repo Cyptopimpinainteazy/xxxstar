@@ -17,6 +17,13 @@ pub use x3_lang_ast::ast::ChoiceCriterion;
 /// Re-exported for the same reason: one definition of what a guard's operator
 /// is, so the AST and the IR cannot disagree about `<=`.
 pub use x3_lang_ast::ast::ComparisonOp;
+/// Re-exported for the same reason again: PHASE 39's settlement shapes are a closed
+/// set, and an IR that could name a shape the AST does not have would be a way for an
+/// unverified claim to reach the artifact.
+pub use x3_lang_ast::ast::SettlementGuarantee;
+/// Re-exported for the same reason once more: a release's act is a closed set shared with the
+/// payload that encodes it, so the IR and the wire format cannot disagree about what a tag means.
+pub use x3_lang_common::capability::ReleaseAct;
 
 /// Root IR program - list of operations to execute in sequence
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +96,21 @@ pub enum Operation {
         chain: String,
         asset: String,
         to: String,
+        /// Which of its three acts this release performs.
+        ///
+        /// A release used to name its claim by asset alone, which made two transfers of one
+        /// asset in one route two claims nobody could tell apart — and the static rules
+        /// refused them for that reason, one route per transfer. A book nets within one
+        /// asset, so that is the normal case rather than a corner: the index is what lets one
+        /// route carry several claims of one asset and still settle as one unit (TICKET-080).
+        ///
+        /// The act is part of the record rather than inferred, and that is load-bearing:
+        /// `no_refund_after_claim` used to keep a lookup to tell a payout from a claim, a range
+        /// check could not be written at all because it read payouts as claims (TICKET-101), and
+        /// a refund's concrete release was indistinguishable from a payout of the same asset,
+        /// which left the builtin invariants false-positiving on well-formed intents
+        /// (TICKET-001).
+        act: ReleaseAct,
     },
 
     // ===== Swap Operations =====
@@ -128,6 +150,10 @@ pub enum Operation {
     /// (TICKET-070).
     Rebalance {
         name: String,
+        /// `chain.ASSET` and what the account holds of it, in the asset's own units, in the
+        /// order written. Empty means the program stated no holdings — a different fact from
+        /// holding nothing, and the one the target alone leaves a host with (TICKET-070).
+        holdings: Vec<(String, u128)>,
         /// `chain.ASSET` and its weight in percent, in the order written.
         weights: Vec<(String, u32)>,
         /// The first `minimize` target's name: the metric an optimizer would rank by.
@@ -183,6 +209,18 @@ pub enum Operation {
     /// Loop (bounded by step count)
     Loop {
         max_iterations: u32,
+        /// What the loop tests before each iteration.
+        ///
+        /// Carried rather than discarded. Lowering used to convert the condition and drop it on
+        /// the floor (`let _cond_ir = …`), so the IR stated a loop with a fixed iteration cap and
+        /// nothing saying what it looped on: `x3c lower` printed a `Loop` that a reader could not
+        /// relate to the `while` the program wrote, and the refusal the verifier and the emitter
+        /// both raise could not name the guard it was refusing (TICKET-098).
+        ///
+        /// It is the same `Condition` an `Operation::If` carries, decided by the same
+        /// `lowering::fold_condition`, because "the compiler knows which way this went" is one
+        /// question about a program and not two.
+        condition: Condition,
         body: Vec<Operation>,
     },
     /// Mark beginning of atomic block (all-or-nothing)
@@ -215,6 +253,33 @@ pub enum Operation {
     RouteFallback {
         /// Venues approved as substitutes, in declaration order.
         approved: Vec<String>,
+    },
+    /// How a declared venue's leg actually settles — spec PHASE 39.
+    ///
+    /// Carried in the artifact because the guarantee is the *assumption the trade
+    /// rests on*, and an assumption only the source states is one a counterparty, an
+    /// auditor or a replayer cannot see. The phase's sentence is "do not claim atomic
+    /// CEX execution unless the external venue exposes enforceable settlement
+    /// semantics", and a claim that does not reach the artifact is exactly the claim
+    /// nobody can check. This is the same rule the finality depth follows
+    /// (TICKET-059) and the same reason the rebalance portfolio travels in
+    /// [`Operation::Rebalance`].
+    ///
+    /// `guarantee` is `None` for a venue that states none, which is a different fact
+    /// from six shapes and is why it is an `Option` rather than a defaulted
+    /// [`SettlementGuarantee::Atomic`]: the compiler *requires* a guarantee of an
+    /// `orderbook` venue and leaves an on-chain venue that states none alone, so
+    /// defaulting here would invent the one claim PHASE 39 introduces this clause to
+    /// stop.
+    ///
+    /// It records; it does not execute. Nothing in the VM acts on a settlement
+    /// guarantee, and pretending otherwise would be the defect this variant exists to
+    /// prevent.
+    VenueSettlement {
+        /// The venue's declared name, as written.
+        venue: String,
+        /// How its leg settles, when the program says.
+        guarantee: Option<SettlementGuarantee>,
     },
     /// The execution plan a `parallel` block produced.
     ///
@@ -319,12 +384,13 @@ pub enum Operation {
         name: String,
         /// The event's payload, keyed by argument name.
         ///
-        /// A `BTreeMap` and not a `HashMap`, because this map reaches the artifact's
-        /// **bytes**: the emitter renders it with `{:?}`, and a `HashMap`'s `Debug` prints
-        /// in iteration order, which for `RandomState` differs between two maps built from
-        /// the same entries in the same process. Measured before the fix: twelve
-        /// identical compiles of one source produced **six** distinct artifacts, and the
-        /// only difference was this field's order
+        /// A `BTreeMap` and not a `HashMap`, because this map's **order** reaches the
+        /// artifact's bytes: the emitter writes it into the `EmitEvent` record in
+        /// iteration order (it used to be rendered with `{:?}` into a hand-written
+        /// payload), and a `HashMap` iterates in an order that for `RandomState` differs
+        /// between two maps built from the same entries in the same process. Measured
+        /// before the fix: twelve identical compiles of one source produced **six**
+        /// distinct artifacts, and the only difference was this field's order
         /// (`{"arg2": …, "arg1": …, "arg0": …}` against `{"arg1": …, "arg2": …, "arg0": …}`).
         /// A `BTreeMap` gives the bytes an order that comes from the program rather than
         /// from a per-instance seed (PHASE 42).
@@ -854,10 +920,135 @@ pub enum Condition {
     },
     /// Boolean expression evaluation
     Expression { expr: String },
+    /// A comparison of a quantity the runtime measured, as an `if` states it.
+    ///
+    /// The only runtime values a `.x3` program can name are the ones a host measures and reports —
+    /// the profit a trade realised, the slippage it moved through, the delta a hedge left open —
+    /// and the VM already holds all three. This variant is that closed set in a branch position;
+    /// it is what lets an `if` be decided at run time when the compiler emits no arithmetic and has
+    /// no immediate-load instruction to put any other condition in a register (TICKET-106).
+    ///
+    /// The comparison is the one the program *wrote*, and the VM has a direction for each quantity
+    /// — a profit floor, a slippage ceiling, a delta ceiling — so the two comparisons a quantity
+    /// supports are its own direction and its negation. [`MeasuredQuantity::supports`] is that rule
+    /// in one place; the emitter refuses anything else rather than inventing a direction.
+    Measured {
+        quantity: MeasuredQuantity,
+        comparison: ComparisonOp,
+        /// The bound, in basis points.
+        threshold_bps: u16,
+    },
     /// Always true
     True,
     /// Always false
     False,
+}
+
+impl Condition {
+    /// How the condition reads, for a diagnostic that has to name the guard it refused.
+    ///
+    /// One renderer for the whole workspace. The verifier and the emitter both refuse a
+    /// construct whose condition they cannot execute, and two renderings of the same condition
+    /// would let the two refusals disagree about what the program said — which is how a reader
+    /// ends up fixing the construct the diagnostic named instead of the one the program wrote.
+    ///
+    /// `Expression` is the source text as written, so a reader sees their own spelling; the
+    /// typed variants are rendered in the shape the language spells them.
+    pub fn describe(&self) -> String {
+        match self {
+            Condition::BalanceGte {
+                chain,
+                asset,
+                account,
+                amount,
+            } => format!("balance({chain}.{asset}, {account}) >= {amount}"),
+            Condition::NonceEq { account, expected } => format!("nonce({account}) == {expected}"),
+            Condition::ProofValid { proof, expected_hash } => format!("verify_proof({proof}, {expected_hash})"),
+            Condition::FinalityPolicy {
+                name,
+                requirement,
+                blocks,
+            } => match blocks {
+                Some(blocks) => format!("finality_policy {name} ({requirement}, {blocks})"),
+                None => format!("finality_policy {name} ({requirement})"),
+            },
+            Condition::Expression { expr } => expr.clone(),
+            Condition::Measured {
+                quantity,
+                comparison,
+                threshold_bps,
+            } => format!("{} {} {}bps", quantity.spelling(), comparison.as_str(), threshold_bps),
+            Condition::True => "true".to_string(),
+            Condition::False => "false".to_string(),
+        }
+    }
+}
+
+/// A quantity a host measures and reports, as this language's guards and branches name it.
+///
+/// Three names, because they are the three the VM holds and the three the language's guards already
+/// bind: `require profit >= 5`, `require slippage <= 50`, `require delta <= 0.01%`. A branch on any
+/// of them is the same comparison in a different position — a guard refuses when it fails, a branch
+/// chooses (TICKET-106).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MeasuredQuantity {
+    /// The profit a trade realised, in basis points of its capital. A guard on it is a **floor**.
+    ProfitBps,
+    /// The slippage a trade moved through, in basis points. A guard on it is a **ceiling**.
+    SlippageBps,
+    /// The residual delta a hedge left open, in basis points of the notional. A **ceiling**.
+    DeltaBps,
+}
+
+impl MeasuredQuantity {
+    /// The word the language spells this quantity with.
+    pub fn spelling(self) -> &'static str {
+        match self {
+            MeasuredQuantity::ProfitBps => "profit",
+            MeasuredQuantity::SlippageBps => "slippage",
+            MeasuredQuantity::DeltaBps => "delta",
+        }
+    }
+
+    /// The quantity a `.x` program's identifier names, if it names one.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "profit" => Some(MeasuredQuantity::ProfitBps),
+            "slippage" => Some(MeasuredQuantity::SlippageBps),
+            "delta" => Some(MeasuredQuantity::DeltaBps),
+            _ => None,
+        }
+    }
+
+    /// The comparison this quantity's own *guard* makes — the direction the VM has a mode for.
+    pub fn guard_comparison(self) -> ComparisonOp {
+        match self {
+            // A profit floor: `require profit >= 5` is the guard, so `>=` is the direction.
+            MeasuredQuantity::ProfitBps => ComparisonOp::GreaterOrEqual,
+            // A ceiling: `require slippage <= 50`, `require delta <= 0.01%`.
+            MeasuredQuantity::SlippageBps | MeasuredQuantity::DeltaBps => ComparisonOp::LessOrEqual,
+        }
+    }
+
+    /// The negation of [`MeasuredQuantity::guard_comparison`] — the other comparison a branch on this
+    /// quantity can make, because a branch needs both a body and the way around it.
+    pub fn complement_comparison(self) -> ComparisonOp {
+        match self.guard_comparison() {
+            ComparisonOp::GreaterOrEqual => ComparisonOp::Less,
+            ComparisonOp::LessOrEqual => ComparisonOp::Greater,
+            other => other,
+        }
+    }
+
+    /// The two comparisons a program may write for this quantity, and what it supports.
+    ///
+    /// `==` and `!=` are not among them: the VM's measured modes compare a quantity against a
+    /// bound, and "the profit was exactly 5bps" is a different instruction this format does not
+    /// have. Refusing them is what stops a program being accepted for a comparison nothing
+    /// executes.
+    pub fn supports(self, comparison: ComparisonOp) -> bool {
+        comparison == self.guard_comparison() || comparison == self.complement_comparison()
+    }
 }
 
 /// Types of require guards (for invariant/correctness checks)
@@ -871,6 +1062,12 @@ pub enum RequireKind {
     BridgeLiquidity,
     /// Check slippage is within tolerance
     SlippageTolerance,
+    /// `require fees <= <bps>` — the ceiling a *body* relies on.
+    ///
+    /// The guard half of the pair whose declaration half is [`Self::FeeCeiling`], the way
+    /// `Finality` and `FinalityExplicit` are two records rather than one: a reader can tell a bound
+    /// the program wrote from a bound its policy states.
+    Fees,
     /// Check profit/gains meet threshold
     ProfitThreshold,
     /// Check finality (confirmations)
@@ -896,6 +1093,15 @@ pub enum RequireKind {
     RefundPath,
     /// Explicit finality check
     FinalityExplicit,
+    /// The fee ceiling a **declaration** states, not a guard the body wrote.
+    ///
+    /// `risk { max_total_fee_bps N }` bounds what a module may spend on fees, and nothing else
+    /// carried it: the slippage ceiling reaches the artifact because the body writes
+    /// `require slippage <= N` (the emitter's `SlippageTolerance`), but the language has no statement
+    /// that writes a fee ceiling, so a runtime reading only the artifact could not tell what the
+    /// module requires. PHASE 7's rule is "risk policy must compile into the artifact", and this is
+    /// the same shape as `FinalityExplicit`: a declaration, recorded with the figure it states.
+    FeeCeiling,
     /// Check VM is supported
     VmSupported,
     /// Mainnet safety check

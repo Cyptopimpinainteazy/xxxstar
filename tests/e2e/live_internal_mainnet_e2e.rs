@@ -6,6 +6,17 @@
 //!
 //! This is a MANDATORY test — it does NOT skip if no node is running.
 //! It boots its own ephemeral node from the local binary.
+//!
+//! **Gated behind the `real-chain` feature**, because that prerequisite is not one
+//! `cargo test --workspace` can supply: before the gate that command ran this suite and it
+//! panicked four times for a missing binary rather than reporting a missing prerequisite
+//! (TICKET-103). Mandatory still means what it says *within* a run — it refuses rather than
+//! skipping — but it is asked for rather than assumed:
+//!
+//! ```text
+//! cargo build -p x3-chain-node            # or set X3_NODE_BIN
+//! cargo test -p e2e_tests --features real-chain --test live_internal_mainnet_e2e -- --nocapture
+//! ```
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::TcpStream;

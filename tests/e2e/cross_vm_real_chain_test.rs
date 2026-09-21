@@ -3,8 +3,19 @@
 //! This test boots an ephemeral x3-chain-node, waits for block production
 //! and finality, then submits signed extrinsics over RPC.
 //!
-//! Run with: cargo test --test cross_vm_real_chain_test -- --nocapture
-//! Requires: the x3-chain-node binary at target/release/x3-chain-node
+//! **Gated behind the `real-chain` feature**, because it needs a built node and
+//! `cargo test --workspace` cannot supply one — before the gate that command aborted here with
+//! six panics instead of naming the missing prerequisite (TICKET-103). Run it on purpose:
+//!
+//! ```text
+//! cargo build -p x3-chain-node            # or set X3_NODE_BIN
+//! cargo test -p e2e_tests --features real-chain --test cross_vm_real_chain_test -- --nocapture
+//! ```
+//!
+//! The binary is looked for in `$CARGO_TARGET_DIR` first and then in the workspace's default
+//! target directory, release before debug. With the feature on and no node anywhere, each test
+//! prints a named reason and passes rather than panicking; `X3_NODE_BIN` set to a path that does
+//! not exist is a failure, because setting it is the ask.
 
 use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
@@ -24,9 +35,49 @@ async fn node_test_lock() -> tokio::sync::MutexGuard<'static, ()> {
         .await
 }
 
-fn node_binary() -> PathBuf {
+/// Where a node binary may be, most preferred first.
+///
+/// Split out from [`node_binary`] so the *search order* is testable without a node on the
+/// machine, and so `CARGO_TARGET_DIR` is honoured: a build into any target directory was
+/// invisible to this suite, which looked only at `<workspace_root>/target/…` and therefore
+/// could not find a binary that had just been built (TICKET-103).
+fn node_candidates(
+    target_dir: Option<&std::path::Path>,
+    workspace_root: &std::path::Path,
+) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(dir) = target_dir {
+        // The directory the build actually used, if it was told to use one. Release first: a
+        // release node is the one these tests are written against.
+        candidates.push(dir.join("release/x3-chain-node"));
+        candidates.push(dir.join("debug/x3-chain-node"));
+    }
+    candidates.push(workspace_root.join("target/release/x3-chain-node"));
+    candidates.push(workspace_root.join("target/debug/x3-chain-node"));
+    candidates
+}
+
+/// The first candidate that exists.
+fn choose(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates.iter().find(|path| path.is_file()).cloned()
+}
+
+/// The node binary these tests drive, or `None` when there is not one.
+///
+/// `None` is not an error: these tests run a real chain, and a developer who has not built a
+/// node has not asked to. `X3_NODE_BIN` **is** an ask — it is set deliberately — so a path that
+/// does not exist is refused rather than skipped past.
+fn node_binary() -> Option<PathBuf> {
     if let Ok(path) = std::env::var("X3_NODE_BIN") {
-        return PathBuf::from(path);
+        let path = PathBuf::from(path);
+        assert!(
+            path.is_file(),
+            "X3_NODE_BIN is set to {} and there is no file there. It was set deliberately, so \
+             this is a failure rather than a skip: point it at a built x3-chain-node, or unset it \
+             and let the search run.",
+            path.display()
+        );
+        return Some(path);
     }
 
     let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -34,28 +85,71 @@ fn node_binary() -> PathBuf {
         .and_then(|path| path.parent())
         .expect("e2e manifest should be nested under the workspace root")
         .to_path_buf();
-    let candidates = [
-        workspace_root.join("target/release/x3-chain-node"),
-        workspace_root.join("target/debug/x3-chain-node"),
-    ];
-    candidates
-        .into_iter()
-        .find(|path| path.is_file())
-        .unwrap_or_else(|| {
-            panic!(
-                "x3-chain-node binary not found; set X3_NODE_BIN or build target/debug/x3-chain-node"
-            )
-        })
+    let target_dir = std::env::var("CARGO_TARGET_DIR").ok().map(PathBuf::from);
+    choose(&node_candidates(target_dir.as_deref(), &workspace_root))
+}
+
+/// Why a real-chain test did not run, naming where it looked.
+///
+/// Printed rather than panicked: six panics told a reader that something was wrong with the
+/// *code*, when the truth was that the suite's prerequisite was absent. A named absence is a
+/// different thing, and it is what this prints.
+fn skip_reason() -> String {
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("e2e manifest should be nested under the workspace root")
+        .to_path_buf();
+    let target_dir = std::env::var("CARGO_TARGET_DIR").ok().map(PathBuf::from);
+    let searched: Vec<String> = node_candidates(target_dir.as_deref(), &workspace_root)
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    format!(
+        "SKIPPED: this suite drives a real chain and no x3-chain-node binary was found. Build one \
+         (`cargo build -p x3-chain-node`) or set X3_NODE_BIN. Searched:\n  {}",
+        searched.join("\n  ")
+    )
 }
 
 #[test]
 fn node_binary_prefers_release_build() {
-    let selected = node_binary();
+    // Built, not found: the preference is asserted against a directory holding both, so this
+    // test runs on a machine with no node at all — which the previous version could not, since
+    // it asserted a suffix of a path it had to find first.
+    let dir = std::env::temp_dir().join(format!("x3-node-choice-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("release")).expect("a release directory");
+    std::fs::create_dir_all(dir.join("debug")).expect("a debug directory");
+    std::fs::write(dir.join("release/x3-chain-node"), b"release").expect("a release binary");
+    std::fs::write(dir.join("debug/x3-chain-node"), b"debug").expect("a debug binary");
+
+    let chosen = choose(&node_candidates(
+        Some(&dir),
+        std::path::Path::new("/nonexistent"),
+    ))
+    .expect("both candidates exist");
     assert!(
-        selected.ends_with("target/release/x3-chain-node"),
+        chosen.ends_with("release/x3-chain-node"),
         "real-chain tests must prefer the validated release node, selected {}",
-        selected.display()
+        chosen.display()
     );
+
+    // And with only a debug build the search still finds it, rather than falling through to the
+    // workspace's default target directory.
+    std::fs::remove_file(dir.join("release/x3-chain-node")).expect("remove the release binary");
+    let chosen = choose(&node_candidates(
+        Some(&dir),
+        std::path::Path::new("/nonexistent"),
+    ))
+    .expect("the debug candidate exists");
+    assert!(
+        chosen.ends_with("debug/x3-chain-node"),
+        "{}",
+        chosen.display()
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// Boot an ephemeral dev node and return a handle that kills it on drop.
@@ -66,8 +160,8 @@ struct EphemeralNode {
 }
 
 impl EphemeralNode {
-    fn start() -> Self {
-        let binary = node_binary();
+    fn start() -> Option<Self> {
+        let binary = node_binary()?;
         let mut child = Command::new(&binary)
             .args([
                 "--dev",
@@ -96,11 +190,11 @@ impl EphemeralNode {
                 line.clear();
             }
         });
-        Self {
+        Some(Self {
             child,
             binary,
             stderr,
-        }
+        })
     }
 
     fn wait_ready(&mut self, timeout: Duration) {
@@ -218,7 +312,10 @@ async fn rpc_call(
 #[tokio::test]
 async fn test_cross_vm_connects() {
     let _test_lock = node_test_lock().await;
-    let mut node = EphemeralNode::start();
+    let Some(mut node) = EphemeralNode::start() else {
+        eprintln!("{}", skip_reason());
+        return;
+    };
     node.wait_ready(Duration::from_secs(30));
 
     let client = reqwest::Client::builder()
@@ -249,7 +346,10 @@ async fn test_cross_vm_connects() {
 #[tokio::test]
 async fn test_cross_vm_rpc_methods_present() {
     let _test_lock = node_test_lock().await;
-    let mut node = EphemeralNode::start();
+    let Some(mut node) = EphemeralNode::start() else {
+        eprintln!("{}", skip_reason());
+        return;
+    };
     node.wait_ready(Duration::from_secs(30));
 
     let client = reqwest::Client::builder()
@@ -276,7 +376,10 @@ async fn test_cross_vm_rpc_methods_present() {
 #[tokio::test]
 async fn test_block_production_and_finality() {
     let _test_lock = node_test_lock().await;
-    let mut node = EphemeralNode::start();
+    let Some(mut node) = EphemeralNode::start() else {
+        eprintln!("{}", skip_reason());
+        return;
+    };
     node.wait_ready(Duration::from_secs(30));
 
     let client = reqwest::Client::builder()
@@ -295,7 +398,10 @@ async fn test_block_production_and_finality() {
 #[tokio::test]
 async fn test_signed_extrinsic_submission() {
     let _test_lock = node_test_lock().await;
-    let mut node = EphemeralNode::start();
+    let Some(mut node) = EphemeralNode::start() else {
+        eprintln!("{}", skip_reason());
+        return;
+    };
     node.wait_ready(Duration::from_secs(30));
 
     let client = reqwest::Client::builder()
@@ -339,7 +445,10 @@ async fn test_signed_extrinsic_submission() {
 #[tokio::test]
 async fn test_web_socket_connection() {
     let _test_lock = node_test_lock().await;
-    let mut node = EphemeralNode::start();
+    let Some(mut node) = EphemeralNode::start() else {
+        eprintln!("{}", skip_reason());
+        return;
+    };
     node.wait_ready(Duration::from_secs(30));
 
     use tokio_tungstenite::connect_async;
