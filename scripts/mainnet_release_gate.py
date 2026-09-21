@@ -440,6 +440,12 @@ TEST_PACKAGES = [
     ("-p", "x3-bridge", []),
     ("-p", "x3-fees", []),
     ("-p", "pallet-x3-slash", []),
+    # The settlement engine was missing from this list while it gained the
+    # cross-domain proof gate, and its test target stopped compiling: `cargo test`
+    # for it is not part of any other stage here, so master went red without this
+    # gate noticing (the workspace clippy gate caught it, which is not part of the
+    # release bar). Every pallet that holds a terminal state belongs here.
+    ("-p", "pallet-x3-settlement-engine", []),
 ]
 
 
