@@ -142,21 +142,32 @@ CFG_TEST_MODULE = re.compile(
 
 
 def test_only_files(roots: list[str]) -> set[str]:
-    """Files that are only compiled under `cfg(test)`, by module declaration.
+    """Files that only exist in test/bench/example build targets.
 
-    A pallet declares its test support as `#[cfg(test)] mod tests;` /
-    `mod mock;` in `lib.rs`, and those files' contents never exist in a
-    production build. Line-level detection cannot see that — it only knows about
-    `#[cfg(test)]` *items* inside a file — so `src/tests.rs` was scanned as
-    production code and its assertions counted as panics reachable in a release
-    node. That is the same mistake the line-oriented predecessor made, one level
-    up, and it fired on this repository's own new tests.
+    Two shapes, both decided by Cargo rather than by anything inside the file:
+
+    * `#[cfg(test)] mod tests;` / `mod mock;` in a crate root — a pallet's
+      out-of-line test support, absent from every production build;
+    * the package's `tests/`, `benches/` and `examples/` directories — Cargo
+      compiles each file there as its own test/bench/example target and never
+      links it into the library or the binary.
+
+    Line-level detection cannot see either one: it only knows about
+    `#[cfg(test)]` *items* inside a file. Missing the first shape counted a
+    pallet's own assertions as production panics, and missing the second counted
+    ~800 more (`runtime/tests/`, `node/tests/`, and every `crates/*/tests/`
+    integration file). Both are the mistake the line-oriented predecessor made,
+    one level up.
     """
     out: set[str] = set()
     for root in roots:
         for dirpath, _dirnames, filenames in os.walk(root):
             if "Cargo.toml" not in filenames:
                 continue
+            for target_dir in ("tests", "benches", "examples"):
+                candidate = os.path.join(dirpath, target_dir)
+                if os.path.isdir(candidate):
+                    out.add(os.path.normpath(candidate))
             for crate_root in ("lib.rs", "main.rs"):
                 path = os.path.join(dirpath, "src", crate_root)
                 if not os.path.exists(path):

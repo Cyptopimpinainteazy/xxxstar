@@ -1,6 +1,6 @@
 # Panic Unwrap Audit
 
-Generated: 2026-09-21T03:05:08Z by scripts/mainnet/panic_unwrap_audit.sh
+Generated: 2026-09-21T04:31:05Z by scripts/mainnet/panic_unwrap_audit.sh
 
 ## Classification
 
@@ -17,9 +17,9 @@ exist in the runtime or in a release node build.
 | --- | --- | --- |
 | runtime-hook | 0 | 0 |
 | pallet-call | 0 | 0 |
-| production | 1330 | 1330 |
+| production | 516 | 516 |
 
-files scanned: 1298
+files scanned: 1299
 
 ## Block-hook panics
 
@@ -27,31 +27,31 @@ None. No panic is reachable from a block hook.
 
 ## Production findings by file
 
--  254  crates/x3-atomic-swap/tests/atomic_swap_integration.rs
--   83  node/tests/x3vm_svm_live.rs
--   77  node/tests/x3vm_evm_live.rs
--   67  node/tests/x3vm_live_lifecycle.rs
--   56  crates/x3-atomic-swap/tests/atomic_swap_chaos.rs
--   51  crates/cross-vm-coordinator/tests/valkey_live.rs
 -   35  pallets/pallet-x3-agent-registry/src/benchmarking.rs
 -   29  pallets/x3-atomic-kernel/src/benchmarking.rs
 -   23  pallets/agent-accounts/src/benchmarking.rs
--   23  crates/cross-vm-coordinator/tests/distributed_chaos.rs
--   19  runtime/tests/fraud_proofs_witness_v1.rs
 -   19  crates/cross-vm-coordinator/src/persistence.rs
--   18  crates/x3-atomic-swap/tests/atlas_htlc_deploy_test.rs
 -   17  pallets/governance/src/benchmarking.rs
 -   17  crates/x3-bridge-adapters/src/lib.rs
--   17  crates/cross-chain-position-manager/tests/integration_tests.rs
 -   16  runtime/src/lib.rs
 -   16  crates/x3-compiler/src/parser.rs
--   16  crates/x3-gateway/tests/loom_mempool_concurrency.rs
 -   14  pallets/treasury/src/benchmarking.rs
 -   14  crates/quantum-swarm/src/quantum/circuit.rs
 -   11  pallets/x3-inventory/src/benchmarking.rs
--   11  crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs
--   11  crates/x3-vm/tests/gpu_integration.rs
 -   10  crates/external-chains/src/evm_rpc.rs
+-   10  crates/x3-bot/src/telemetry.rs
+-   10  crates/x3-rpc/src/wallet_service_rpc.rs
+-   10  crates/cross-vm-coordinator/src/proof_vault.rs
+-    9  crates/x3-dns-server/src/config.rs
+-    8  crates/x3-mobile-sdk/src/biometric_auth_mobile.rs
+-    8  crates/x3-backend/src/lower.rs
+-    7  pallets/pallet-x3-proof-carrying-agent/src/benchmarking.rs
+-    7  pallets/atomic-trade-engine/src/benchmarking.rs
+-    6  crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs
+-    6  crates/cross-vm-coordinator/src/settlement_submission.rs
+-    6  crates/cross-vm-coordinator/src/state_machine.rs
+-    5  runtime/build.rs
+-    5  crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs
 
 ## Verdict
 
