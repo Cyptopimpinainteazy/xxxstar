@@ -897,6 +897,31 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
         route: &GatewayRouteConfig,
         proof: &ProofEnvelope,
     ) -> VerificationResult {
+        // A proof this gateway has already verified by attestation quorum does not
+        // need a second verifier: `verify_quorum` checked each Ed25519 signature
+        // against the set's authorized keys over a statement that binds the proof
+        // id and the source transaction. Only that engine sets these statuses, and
+        // it sets them after verification, so this cannot become a bypass.
+        //
+        // Without it the attested path did the real work and then handed the proof
+        // to the router, whose validator-quorum verifier fails closed by design —
+        // so the one path with a real check could never settle.
+        let verified_by_attestation = matches!(
+            self.attestation_engine.get_attestation_status(proof.proof_id),
+            Some(AttestationStatus::QuorumReached) | Some(AttestationStatus::Verified)
+        );
+        if verified_by_attestation {
+            return VerificationResult {
+                proof_id: proof.proof_id,
+                verified: true,
+                failure_reason: None,
+                chain: proof.source_chain,
+                verified_at_block: Some(self.current_block),
+                strategy: route.verification_level,
+                confidence_bps: 10_000,
+            };
+        }
+
         self.verification_router
             .route_verification_request(VerificationRequest {
                 proof_id: proof.proof_id,
@@ -1045,6 +1070,17 @@ mod tests {
     fn gateway() -> CrosschainGateway<InMemoryGatewayLedger> {
         let mut gateway = CrosschainGateway::new(InMemoryGatewayLedger::default(), 50);
         register_default_verifiers(&mut gateway);
+        gateway.register_external_asset(asset(), [9; 32]);
+        gateway
+            .enable_gateway_route(route(GatewayMode::TestnetLive))
+            .unwrap();
+        gateway
+    }
+
+    /// A gateway with no verifier registered in its router, i.e. the state a
+    /// production deployment is in: nothing in the workspace registers one.
+    fn gateway_without_router_verifiers() -> CrosschainGateway<InMemoryGatewayLedger> {
+        let mut gateway = CrosschainGateway::new(InMemoryGatewayLedger::default(), 50);
         gateway.register_external_asset(asset(), [9; 32]);
         gateway
             .enable_gateway_route(route(GatewayMode::TestnetLive))
@@ -1232,6 +1268,42 @@ mod tests {
             gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
             Err(GatewayError::Attestation(AttestationError::InvalidSignature))
         ));
+    }
+
+    #[test]
+    fn an_attested_deposit_settles_with_no_router_verifier_registered() {
+        // The state a production deployment is in. The attested path's check is
+        // the gateway's own: real Ed25519 signatures over a statement that binds
+        // this proof. Routing an already-verified proof through a registry with no
+        // implementation for the strategy is what made this path unusable.
+        let mut gateway = gateway_without_router_verifiers();
+        gateway.register_validator_set(validator_set());
+        let proof = proof(100, 1);
+        let proof_id = proof.proof_id;
+        let transfer = gateway
+            .submit_attested_deposit_proof([1; 32], proof, 1, attestation(proof_id))
+            .expect("a quorum-verified deposit settles");
+
+        assert_eq!(transfer.status, GatewayTransferStatus::Verified);
+    }
+
+    #[test]
+    fn a_deposit_with_no_attestation_still_fails_closed_without_a_verifier() {
+        // The short-circuit above must not become a way past verification: an
+        // unattested proof on a gateway with no router verifier is refused, and
+        // refused for the missing verifier rather than for a bookkeeping reason.
+        let mut gateway = gateway_without_router_verifiers();
+        let error = gateway
+            .submit_deposit_proof([1; 32], proof(100, 1))
+            .expect_err("an unverified deposit must be refused");
+
+        match error {
+            GatewayError::VerificationFailed(reason) => assert!(
+                reason.contains("no verifier"),
+                "expected the missing verifier to be named, got {reason}"
+            ),
+            other => panic!("expected VerificationFailed, got {other:?}"),
+        }
     }
 
     #[test]
