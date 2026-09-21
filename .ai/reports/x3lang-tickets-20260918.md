@@ -1680,6 +1680,10 @@ Validation: a bridge-only intent with the clause is analysed; without it, the re
 Original text: the fusion minimum-output check is unverifiable for any intent that bridges without a
 swap on the far side, because the language has no `min_receive`.
 
+Progress 2026-09-20: `min_receive` is now a real bridge-step clause at source/AST/formatter level
+(`0d63a3c66`). The remaining half is carrying that floor into `Operation::Bridge` so fusion can read
+it; that IR field is not yet added.
+
 ## TICKET-041 — whole and fractional percentages lex differently — CLOSED
 Type: CLOSED in measurement (2026-09-20) · Subsystem: x3-lang/crates/x3-lexer (shape) + compiler (readers)
 Closed: the token shapes differ and **every reader gives them the same value**, which is the part that
