@@ -8,13 +8,13 @@ use std::collections::HashMap;
 /// Price feed from Pyth
 #[derive(Clone, Debug)]
 pub struct PriceFeed {
-    pub id: String,                     // Pyth price feed ID (e.g., "Crypto.BTC/USD")
-    pub symbol: String,                 // BTC, ETH, SOL, etc.
-    pub price: i64,                     // Price in USD * 10^(decimals)
-    pub decimals: u8,                   // -8 for most feeds
-    pub confidence: u64,                // Confidence interval
-    pub publish_time: u64,              // Unix timestamp
-    pub valid_time: u64,                // How long price is valid
+    pub id: String,        // Pyth price feed ID (e.g., "Crypto.BTC/USD")
+    pub symbol: String,    // BTC, ETH, SOL, etc.
+    pub price: i64,        // Price in USD * 10^(decimals)
+    pub decimals: u8,      // -8 for most feeds
+    pub confidence: u64,   // Confidence interval
+    pub publish_time: u64, // Unix timestamp
+    pub valid_time: u64,   // How long price is valid
     pub prev_publish_time: u64,
     pub prev_price: i64,
 }
@@ -23,8 +23,8 @@ pub struct PriceFeed {
 pub struct PythOracle {
     pub price_feeds: HashMap<String, PriceFeed>,
     pub price_history: HashMap<String, Vec<(u64, i64)>>, // symbol → (timestamp, price)
-    pub heartbeat_interval_secs: u64,   // Update interval (typically 1-5 seconds)
-    pub staleness_threshold_secs: u64,  // Max age of price (e.g., 60 seconds)
+    pub heartbeat_interval_secs: u64,                    // Update interval (typically 1-5 seconds)
+    pub staleness_threshold_secs: u64,                   // Max age of price (e.g., 60 seconds)
 }
 
 impl PythOracle {
@@ -120,10 +120,7 @@ impl PythOracle {
 
     /// Calculate TWAP (Time-Weighted Average Price) over N periods
     pub fn calculate_twap(&self, symbol: &str, periods: usize) -> Result<i64, String> {
-        let history = self
-            .price_history
-            .get(symbol)
-            .ok_or("No price history")?;
+        let history = self.price_history.get(symbol).ok_or("No price history")?;
 
         if history.is_empty() {
             return Err("Empty price history".to_string());
@@ -139,10 +136,7 @@ impl PythOracle {
 
     /// Detect price anomalies (variance detection)
     pub fn is_price_anomaly(&self, symbol: &str, threshold_pct: f64) -> Result<bool, String> {
-        let history = self
-            .price_history
-            .get(symbol)
-            .ok_or("No price history")?;
+        let history = self.price_history.get(symbol).ok_or("No price history")?;
 
         if history.len() < 10 {
             return Ok(false); // Not enough data
@@ -282,7 +276,8 @@ mod tests {
 
         let price = oracle.get_price_decimal("ETH");
         assert!(price.is_ok());
-        assert!(price.unwrap() > 2200.0 && price.unwrap() < 2300.0);
+        let price = price.unwrap();
+        assert!(price > 2200.0 && price < 2300.0);
     }
 
     #[test]
@@ -328,7 +323,13 @@ mod tests {
 
         for i in 0..5 {
             oracle
-                .update_price("SOL", 14_000_000_000i64 + (i * 100_000_000i64), 1_000_000, 1000 + i as u64, 1000 + i as u64)
+                .update_price(
+                    "SOL",
+                    14_000_000_000i64 + (i * 100_000_000i64),
+                    1_000_000,
+                    1000 + i as u64,
+                    1000 + i as u64,
+                )
                 .ok();
         }
 
@@ -357,7 +358,13 @@ mod tests {
 
         for i in 0..10 {
             oracle
-                .update_price("USDC", 100_000_000i64 + (i * 10_000_000i64), 1_000, 1000 + i as u64, 1000 + i as u64)
+                .update_price(
+                    "USDC",
+                    100_000_000i64 + (i * 10_000_000i64),
+                    1_000,
+                    1000 + i as u64,
+                    1000 + i as u64,
+                )
                 .ok();
         }
 
@@ -385,6 +392,7 @@ mod tests {
 
         let change = oracle.get_price_change_pct("BNB");
         assert!(change.is_ok());
-        assert!(change.unwrap() > 8.0 && change.unwrap() < 10.0);
+        let change = change.unwrap();
+        assert!(change > 8.0 && change < 10.0);
     }
 }

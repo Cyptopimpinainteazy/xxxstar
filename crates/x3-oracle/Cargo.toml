@@ -1,0 +1,9 @@
+[package]
+name = "x3-oracle"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Off-chain Pyth price-feed structures used by the X3 oracle boundary"
+
+[dependencies]

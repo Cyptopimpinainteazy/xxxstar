@@ -1731,6 +1731,10 @@ deleted with its reason.
 Validation: `cargo metadata` lists it and `rg` finds a caller, or the crate is gone and the corpus is
 unchanged.
 
+Progress 2026-09-20: `crates/x3-oracle` now has a manifest, is a workspace member, and has unit tests.
+The remaining acceptance item is a production caller for the off-chain Pyth structs; the canonical
+on-chain oracle remains `pallets/x3-oracle`.
+
 ## TICKET-042 — `x3c graph` does not say that a declared objective is being ignored — CLOSED
 Type: CLOSED in `52f79a4b9` (2026-09-19) · Subsystem: x3-lang/crates/x3-tools
 Closed by the second of the ticket's two acceptable answers: `graph` still lists what the

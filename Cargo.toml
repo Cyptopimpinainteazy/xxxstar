@@ -220,6 +220,7 @@ members = [
     "crates/x3-foundry-auditor",
     "crates/x3-foundry-revenue",
     "crates/x3-foundry-indexer",
+    "crates/x3-oracle",
     # X3 Cross-VM Atomic Swap Proof Mode — HTLC hashlocks, timelocks, relayer, scoreboard
     "crates/x3-atomic-swap",
     # Bitcoin vault — threshold multisig vault with SPV proof accounting

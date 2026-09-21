@@ -27840,6 +27840,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-oracle"
+version = "0.1.0"
+
+[[package]]
 name = "x3-orchestra"
 version = "0.1.0"
 dependencies = [
