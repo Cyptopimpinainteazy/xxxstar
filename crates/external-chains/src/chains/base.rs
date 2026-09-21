@@ -29,6 +29,18 @@ pub const MAX_MESSAGES_PER_CALL: usize = 256;
 /// and the reason the field is not derived from the log.
 pub const L1_CHAIN_ID: u64 = 1;
 
+/// The OP-Stack `L2CrossDomainMessenger` predeploy, which emits `SentMessage`.
+///
+/// A constant rather than `config.bridge_contract`: on Base this contract is
+/// part of the chain's genesis (the OP-Stack predeploy at `0x4200…0007`), not
+/// something an operator deploys, and `ChainConfig`'s default bridge address is
+/// derived from a hash — so filtering by config answered an empty queue for a
+/// chain that has messages. The same reasoning as `ARBSYS_ADDRESS` in the
+/// Arbitrum adapter.
+pub const L2_CROSS_DOMAIN_MESSENGER: H160 = H160(hex_literal::hex!(
+    "4200000000000000000000000000000000000007"
+));
+
 /// The canonical OP-Stack message event:
 ///
 /// ```solidity
@@ -265,19 +277,6 @@ impl ChainAdapter for BaseAdapter {
         // reads as "the chain has no pending messages" no matter what it said.
         let url = crate::evm_rpc::url(&self.config);
 
-        // `ChainConfig::default_contracts` derives an address from a hash, so an
-        // unconfigured adapter would filter logs on an address no chain has ever
-        // deployed and return an empty queue — the same lie in a new shape.
-        let placeholder = ChainConfig::for_chain(ChainType::Base).bridge_contract;
-        if self.config.bridge_contract == placeholder {
-            return Err(ExternalChainError::adapter_unimplemented(
-                "base: no messenger contract configured — ChainConfig's default bridge address is \
-                 derived from a hash, not deployed on Base, so a log query against it would \
-                 report an empty queue for a chain that has messages. Set the adapter's \
-                 bridge_contract to the deployed L2CrossDomainMessenger",
-            ));
-        }
-
         let latest = crate::evm_rpc::block_number(&url).await?;
         let confirmations = u64::from(self.config.confirmations);
         // Nothing is final until the chain has that many blocks on top.
@@ -286,11 +285,15 @@ impl ChainAdapter for BaseAdapter {
         };
         let from_block = to_block.saturating_sub(MESSAGE_LOOKBACK_BLOCKS);
 
+        // The emitter is the OP-Stack `L2CrossDomainMessenger` predeploy, so the
+        // filter is that constant — not `config.bridge_contract`, whose default is
+        // a hash-derived placeholder that would make this query answer an empty
+        // queue for a chain that has messages.
         let entries = crate::evm_rpc::logs(
             &url,
             from_block,
             to_block,
-            self.config.bridge_contract,
+            L2_CROSS_DOMAIN_MESSENGER,
             H256::from(sent_message_topic()),
         )
         .await?;
@@ -483,16 +486,12 @@ mod tests {
             adapter.initiate_transfer(transfer).await,
             Err(ExternalChainError::AdapterUnimplemented(_))
         ));
-        assert!(matches!(
-            adapter.receive_messages().await,
-            Err(ExternalChainError::AdapterUnimplemented(_))
-        ));
-        // `receive_messages` now decodes `SentMessage` logs; what it refuses here
-        // is the *unconfigured* case. `ChainConfig::default_contracts` derives the
-        // bridge address from a hash, so this adapter would filter logs on an
-        // address no chain has deployed and report an empty queue. A configured
-        // adapter queries — see `receive_messages_decodes_logs_and_refuses_a_bad_one`
-        // in crates/external-chains/tests/.
+        // `receive_messages` is deliberately *not* asserted here any more: it now
+        // queries the chain, and this adapter's default config points at the real
+        // Base endpoint, so calling it in a unit test would be a network
+        // dependency. Its behaviour — decoding a `SentMessage`, filtering by the
+        // L2CrossDomainMessenger predeploy, refusing a malformed log — is covered
+        // by `crates/external-chains/tests/receive_messages_decodes_logs.rs`.
         assert!(matches!(
             adapter.check_transfer_status(H256::zero()).await,
             Err(ExternalChainError::AdapterUnimplemented(_))

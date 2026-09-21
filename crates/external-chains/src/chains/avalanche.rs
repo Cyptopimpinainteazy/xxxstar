@@ -145,10 +145,30 @@ impl ChainAdapter for AvalancheAdapter {
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        // Refused: an empty list reads as "no Teleporter messages" no matter
-        // what the chain said.
+        // Refused, and not because the event is missing: Avalanche's Teleporter
+        // does emit `TeleporterMessageReceived` here. It does not fit
+        // `ChainMessage`, and each mismatch would have to be resolved by
+        // inventing data:
+        //
+        //   TeleporterMessageReceived(bytes32 indexed teleporterMessageID,
+        //       address sender, address[] destinationAddresses,
+        //       address[] feeTokenAddresses, uint256[] feeAmounts, bytes message)
+        //
+        // * `teleporterMessageID` is 32 bytes; `ChainMessage::nonce` is a u64, and
+        //   truncating an identifier is the kind of quiet loss this crate refuses
+        // * `destinationAddresses` is a list — a message with three recipients
+        //   cannot be represented by one `recipient` field
+        // * fees are per-token arrays, so `value` has no single meaning
+        // * the event states no gas limit and no timestamp
+        //
+        // What this needs is a message type that carries a 32-byte id, a recipient
+        // list and per-token fees; until something consumes such messages (there is
+        // no reader of `ChainMessage` outside the adapters), adding those fields
+        // would be designing blind.
         Err(ExternalChainError::adapter_unimplemented(
-            "avalanche: receive_messages cannot decode TeleporterMessageReceived events yet",
+            "avalanche: TeleporterMessageReceived carries a 32-byte message id, a recipient list \
+             and per-token fees — none of which ChainMessage can hold without losing data \
+             (nonce is u64, recipient is one address, value is one amount)",
         ))
     }
 
