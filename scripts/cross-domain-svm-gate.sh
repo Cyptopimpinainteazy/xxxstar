@@ -20,6 +20,12 @@
 # supplies both.
 #
 # Usage: bash scripts/cross-domain-svm-gate.sh
+#        X3_STRICT_CROSS_DOMAIN_PROOFS=1 bash scripts/cross-domain-svm-gate.sh
+#
+# The environment variable does what it does in the EVM gate: it runs the same
+# lifecycles against a dev spec whose `allowUnattestedCrossDomainProofs` is the
+# value every joinable network uses, and the test reads that policy back from
+# the chain before it starts.
 # Requires: the Solana toolchain (`solana`, `solana-keygen`,
 # `solana-test-validator`, `cargo build-sbf`) on PATH.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -50,13 +56,20 @@ echo "workdir: $WORKDIR"
 
 echo "=== build the SBF program ==="
 ( cd "$SVM_DIR" && cargo build-sbf ) || { echo "Error: cargo build-sbf failed"; exit 1; }
-PROGRAM_SO="$SVM_DIR/target/deploy/x3_atomic_swap.so"
+# `cargo build-sbf` honors `CARGO_TARGET_DIR`, and the local CI redirects it
+# (`docs/local-ci.md`), so the artifact is not always under the program's own
+# `target/`. Looking in only one place makes this gate fail with "missing after
+# build-sbf" on a tree where the build actually succeeded.
+PROGRAM_SO="${CARGO_TARGET_DIR:-$SVM_DIR/target}/deploy/x3_atomic_swap.so"
+[ -f "$PROGRAM_SO" ] || PROGRAM_SO="$SVM_DIR/target/deploy/x3_atomic_swap.so"
 [ -f "$PROGRAM_SO" ] || { echo "Error: $PROGRAM_SO missing after build-sbf"; exit 1; }
 
 echo "=== build x3-svm-broadcast ==="
 ( cd "$SVM_DIR/client" && cargo build --release --bin x3-svm-broadcast ) \
   || { echo "Error: could not build x3-svm-broadcast"; exit 1; }
-BROADCAST_BIN="$SVM_DIR/client/target/release/x3-svm-broadcast"
+BROADCAST_BIN="${CARGO_TARGET_DIR:-$SVM_DIR/client/target}/release/x3-svm-broadcast"
+[ -x "$BROADCAST_BIN" ] || BROADCAST_BIN="$SVM_DIR/client/target/release/x3-svm-broadcast"
+[ -x "$BROADCAST_BIN" ] || { echo "Error: $BROADCAST_BIN missing after the build"; exit 1; }
 [ -x "$BROADCAST_BIN" ] || { echo "Error: $BROADCAST_BIN missing"; exit 1; }
 
 echo "=== start isolated solana-test-validator on $RPC_URL ==="
@@ -106,6 +119,28 @@ cd "$REPO_ROOT"
 env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_svm_live --no-run \
   || { echo "Error: could not build node/tests/x3vm_svm_live.rs"; exit 1; }
 
+if [ -n "${X3_TEST_CHAIN_SPEC:-}" ]; then
+  POSTURE="caller-supplied spec ($X3_TEST_CHAIN_SPEC)"
+else
+  POSTURE="dev (allowUnattestedCrossDomainProofs = true)"
+fi
+if [ "${X3_STRICT_CROSS_DOMAIN_PROOFS:-0}" = "1" ]; then
+  echo "=== strict posture: build a dev spec that refuses unattested proof sets ==="
+  env -u SKIP_WASM_BUILD cargo build -p x3-chain-node --bin x3-chain-node \
+    || { echo "Error: could not build x3-chain-node"; exit 1; }
+  NODE_BIN="${CARGO_TARGET_DIR:-$REPO_ROOT/target}/debug/x3-chain-node"
+  [ -x "$NODE_BIN" ] || { echo "Error: $NODE_BIN not found"; exit 1; }
+  STRICT_DIR="$(mktemp -d)"
+  "$NODE_BIN" build-spec --dev > "$STRICT_DIR/dev.json" 2>/dev/null \
+    || { echo "Error: build-spec --dev failed"; exit 1; }
+  python3 "$REPO_ROOT/scripts/mainnet/strict-cross-domain-spec.py" \
+    "$STRICT_DIR/dev.json" "$STRICT_DIR/strict.json" \
+    || { echo "Error: could not build the strict spec"; exit 1; }
+  export X3_TEST_CHAIN_SPEC="$STRICT_DIR/strict.json"
+  POSTURE="strict ($X3_TEST_CHAIN_SPEC)"
+  echo "cross-domain-svm-gate: posture $POSTURE"
+fi
+
 TESTS=(
   real_x3vm_svm_lock_claim_atomic_lifecycle
   real_x3vm_svm_timeout_refund_atomic_lifecycle
@@ -126,8 +161,8 @@ done
 
 echo
 if [ "$failed" -eq 0 ]; then
-  echo "cross-domain-svm-gate: both X3VM<->SVM lifecycles passed"
+  echo "cross-domain-svm-gate: both X3VM<->SVM lifecycles passed [$POSTURE]"
 else
-  echo "cross-domain-svm-gate: FAILED"
+  echo "cross-domain-svm-gate: FAILED [$POSTURE]"
 fi
 exit "$failed"

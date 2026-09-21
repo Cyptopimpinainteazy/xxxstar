@@ -21,6 +21,15 @@
 # the ignore attribute no longer means "never runs".
 #
 # Usage: bash scripts/cross-domain-evm-gate.sh
+#        X3_STRICT_CROSS_DOMAIN_PROOFS=1 bash scripts/cross-domain-evm-gate.sh
+#
+# Without the environment variable the tests boot the dev chain, whose genesis
+# allows unattested cross-domain proof sets (`allowUnattestedCrossDomainProofs:
+# true`) — a dev-only posture, because there is no external chain to prove
+# against locally. With it, the same two lifecycles run against a dev spec with
+# that one policy flipped to the value every joinable network uses, and the test
+# reads the policy back from the chain before it starts, so a run that silently
+# ignored the spec fails rather than passing as "strict".
 # Requires: foundry (anvil, forge, cast) and openssl on PATH.
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
@@ -77,6 +86,32 @@ ensure_pinned "$EVM_DIR/lib/openzeppelin-contracts" https://github.com/OpenZeppe
 echo "=== build the cross-domain test target ==="
 env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_evm_live --no-run \
   || { echo "Error: could not build node/tests/x3vm_evm_live.rs"; exit 1; }
+
+# Report the posture from whichever spec the run will actually boot with: the
+# caller may set `X3_TEST_CHAIN_SPEC` itself (the test documents it), and a
+# summary that said "dev" while a strict spec was in force would be the same
+# kind of lie this whole path exists to avoid.
+if [ -n "${X3_TEST_CHAIN_SPEC:-}" ]; then
+  POSTURE="caller-supplied spec ($X3_TEST_CHAIN_SPEC)"
+else
+  POSTURE="dev (allowUnattestedCrossDomainProofs = true)"
+fi
+if [ "${X3_STRICT_CROSS_DOMAIN_PROOFS:-0}" = "1" ]; then
+  echo "=== strict posture: build a dev spec that refuses unattested proof sets ==="
+  env -u SKIP_WASM_BUILD cargo build -p x3-chain-node --bin x3-chain-node \
+    || { echo "Error: could not build x3-chain-node"; exit 1; }
+  NODE_BIN="${CARGO_TARGET_DIR:-$REPO_ROOT/target}/debug/x3-chain-node"
+  [ -x "$NODE_BIN" ] || { echo "Error: $NODE_BIN not found"; exit 1; }
+  STRICT_DIR="$(mktemp -d)"
+  "$NODE_BIN" build-spec --dev > "$STRICT_DIR/dev.json" 2>/dev/null \
+    || { echo "Error: build-spec --dev failed"; exit 1; }
+  python3 "$REPO_ROOT/scripts/mainnet/strict-cross-domain-spec.py" \
+    "$STRICT_DIR/dev.json" "$STRICT_DIR/strict.json" \
+    || { echo "Error: could not build the strict spec"; exit 1; }
+  export X3_TEST_CHAIN_SPEC="$STRICT_DIR/strict.json"
+  POSTURE="strict ($X3_TEST_CHAIN_SPEC)"
+  echo "cross-domain-evm-gate: posture $POSTURE"
+fi
 
 echo "=== start isolated anvil on $RPC_URL (chain id $CHAIN_ID) ==="
 anvil --port 18545 --chain-id "$CHAIN_ID" --silent > /tmp/x3-cross-domain-evm-anvil.log 2>&1 &
@@ -136,8 +171,8 @@ done
 
 echo
 if [ "$failed" -eq 0 ]; then
-  echo "cross-domain-evm-gate: both X3VM<->EVM lifecycles passed"
+  echo "cross-domain-evm-gate: both X3VM<->EVM lifecycles passed [$POSTURE]"
 else
-  echo "cross-domain-evm-gate: FAILED"
+  echo "cross-domain-evm-gate: FAILED [$POSTURE]"
 fi
 exit "$failed"

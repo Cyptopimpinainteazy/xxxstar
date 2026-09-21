@@ -337,6 +337,11 @@ GATES_CROSS=(
   "X3-native lifecycles:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
   "cross-domain EVM:bash scripts/cross-domain-evm-gate.sh"
   "cross-domain SVM:bash scripts/cross-domain-svm-gate.sh"
+  # The three gates above boot the dev chain, whose genesis allows unattested
+  # cross-domain proof sets. That is a dev-only posture; this one runs the same
+  # X3VM<->EVM lifecycles against a dev spec with that policy flipped, and the
+  # test refuses to start unless the chain reports the strict value.
+  "cross-domain EVM (strict posture):env X3_STRICT_CROSS_DOMAIN_PROOFS=1 bash scripts/cross-domain-evm-gate.sh"
 )
 
 # Slugs are the `--only`/`--skip` keys, so keep them lowercase: gate names carry
