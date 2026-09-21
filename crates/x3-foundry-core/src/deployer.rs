@@ -25,15 +25,30 @@ pub struct DeploymentManifest {
     pub manifest_hash: String,
 }
 
-/// Information about a deployed contract.
+/// Information about a contract this crate *simulated* deploying.
+///
+/// `simulated` is always `true` here, and it exists because the old shape was
+/// indistinguishable from a real deployment receipt: `deploy_contracts` derived
+/// the address from `sha256(name + source.len() + chain + deployer_key)`, the
+/// transaction hash from `sha256("deploy-<name>-<chain>-<timestamp>")`, a block
+/// number from the wall clock and a gas figure from the source's line count, then
+/// logged `Deployed <name> at 0x… (tx: …)`. Nothing was broadcast and no key was
+/// used. A caller reading `address` had no way to tell.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeployedContractInfo {
     pub name: String,
+    /// Deterministic, derived locally. **Not** an on-chain address.
     pub address: String,
+    /// Derived locally. **Not** a transaction that exists.
     pub tx_hash: String,
+    /// Derived from the wall clock. **Not** a chain height.
     pub block_number: u64,
+    /// Estimated from the source's line count. **Not** measured.
     pub gas_used: u64,
     pub verified: bool,
+    /// Always `true` for this crate's deployer: it simulates and broadcasts
+    /// nothing. A real deployment needs a signer and an RPC endpoint.
+    pub simulated: bool,
 }
 
 /// Deployer handles the deployment of dApps to target chains.
@@ -50,8 +65,19 @@ impl Deployer {
         }
     }
 
-    /// Deploys all smart contracts for the dApp.
-    pub fn deploy_contracts(
+    /// Simulates deploying every contract in `deployment_order`.
+    ///
+    /// It is named `simulate_…` because that is what it does: nothing is signed,
+    /// nothing is broadcast, and every field of the returned
+    /// [`DeployedContractInfo`] is derived locally (see that type). It used to be
+    /// called `deploy_contracts` and to log `Deployed <name> at 0x… (tx: …)`,
+    /// which is how a caller could believe an address on a chain existed. A real
+    /// deployment needs a signer and an RPC endpoint, and belongs behind a
+    /// different name.
+    ///
+    /// Each contract still has to pass `gate_on_audit`, so the audit trail is the
+    /// real part of this path.
+    pub fn simulate_deploy_contracts(
         &self,
         contracts: &HashMap<String, String>,
         deployment_order: &[String],
@@ -87,10 +113,13 @@ impl Deployer {
                 block_number,
                 gas_used,
                 verified: false,
+                // The one field a caller can branch on that says none of the
+                // others came from a chain.
+                simulated: true,
             });
 
             info!(
-                "Deployed {} at {} (tx: {})",
+                "Simulated deployment of {} at {} (no transaction broadcast; tx: {})",
                 contract_name,
                 deployed.last().unwrap().address,
                 tx_hash
@@ -361,7 +390,8 @@ impl CrossChainDeployer {
                     chain
                 ))
             })?;
-            let deployed = deployer.deploy_contracts(contracts, deployment_order, chain)?;
+            let deployed =
+                deployer.simulate_deploy_contracts(contracts, deployment_order, chain)?;
             results.insert(chain.clone(), deployed);
         }
 
@@ -414,11 +444,22 @@ mod tests {
             "pragma solidity ^0.8.20;\ncontract TestToken {}".into(),
         );
         let order = vec!["TestToken".into()];
-        let result = deployer.deploy_contracts(&contracts, &order, "x3-testnet");
+        let result = deployer.simulate_deploy_contracts(&contracts, &order, "x3-testnet");
         assert!(result.is_ok());
         let deployed = result.unwrap();
         assert_eq!(deployed.len(), 1);
         assert!(deployed[0].address.starts_with("0x"));
+        // The receipt says what it is: every field above was derived locally and
+        // nothing was broadcast. This used to be indistinguishable from a real
+        // deployment, which is why `simulated` exists.
+        assert!(
+            deployed[0].simulated,
+            "a simulated deployment must say so in its receipt"
+        );
+        assert!(
+            !deployed[0].verified,
+            "a simulated deployment is not verified on any chain"
+        );
     }
 
     /// `forge` is a first-class repo toolchain requirement (X3-contracts/evm
@@ -445,7 +486,7 @@ mod tests {
             "pragma solidity ^0.8.20;\ncontract BrokenToken {\n    function nope( {\n}".into(),
         );
         let order = vec!["BrokenToken".into()];
-        let result = deployer.deploy_contracts(&contracts, &order, "x3-testnet");
+        let result = deployer.simulate_deploy_contracts(&contracts, &order, "x3-testnet");
         assert!(
             matches!(result, Err(FoundryError::SecurityAuditFailed(_))),
             "expected deployment to be refused for a contract that fails to compile, got {result:?}"
