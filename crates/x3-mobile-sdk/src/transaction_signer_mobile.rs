@@ -1,7 +1,15 @@
 //! Mobile transaction signing
 //!
-//! Handles transaction signing on-device without exposing private keys.
-//! Supports ED25519 and ECDSA signatures.
+//! Signs ED25519 and ECDSA transactions on-device.
+//!
+//! **Where the keys live:** in a `Mutex<HashMap<String, Vec<u8>>>` in this
+//! process, for the lifetime of the signer. Removing an account zeroizes its bytes,
+//! which is the extent of the protection — there is no iOS Keychain, Secure
+//! Enclave or Android KeyStore integration, which is why
+//! [`MobileTransactionSigner::keys_are_platform_backed`] exists and returns
+//! `false`. The previous header said "without exposing private keys", and the
+//! field comment said "stored securely (in production: …)", which is a promise this
+//! code does not keep.
 
 use crate::SdkError;
 use serde::{Deserialize, Serialize};
@@ -72,7 +80,9 @@ pub enum SigningPriority {
 
 /// Mobile transaction signer
 pub struct MobileTransactionSigner {
-    // Private keys stored securely (in production: iOS Secure Enclave / Android KeyStore)
+    // Private keys held in process memory. Removing an account zeroizes its bytes
+    // (`Vec::zeroize` below); nothing here is backed by the iOS Keychain / Secure
+    // Enclave or the Android KeyStore, and `keys_are_platform_backed()` says so.
     private_keys: std::sync::Mutex<std::collections::HashMap<String, Vec<u8>>>,
 
     // Pending signing requests queue
@@ -83,6 +93,14 @@ pub struct MobileTransactionSigner {
 }
 
 impl MobileTransactionSigner {
+    /// Whether the stored keys are protected by the platform's keystore.
+    ///
+    /// Always `false`: the bytes are in this process's heap. A caller that needs a
+    /// device-backed signer must not treat this type as one.
+    pub fn keys_are_platform_backed(&self) -> bool {
+        false
+    }
+
     /// Create new signer
     pub fn new(signing_timeout_seconds: i64) -> Self {
         Self {
@@ -92,7 +110,11 @@ impl MobileTransactionSigner {
         }
     }
 
-    /// Store private key for an account (in production: encrypted in Keystore)
+    /// Store a private key for an account.
+    ///
+    /// Keyed in process memory (see the type), zeroized when removed or replaced.
+    /// The previous comment read "(in production: encrypted in Keystore)", which
+    /// described a component that does not exist.
     pub async fn add_account(
         &self,
         address: &str,
@@ -399,6 +421,18 @@ fn verify_ecdsa_sig(payload: &[u8], signature: &[u8], public_key: &[u8]) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_signer_is_not_platform_backed() {
+        // Keys live in this process's heap and are zeroized on removal. No
+        // Keychain, Secure Enclave or Android KeyStore is involved, whatever the
+        // header used to say.
+        let signer = MobileTransactionSigner::new(120);
+        assert!(
+            !signer.keys_are_platform_backed(),
+            "this signer has no platform keystore behind it"
+        );
+    }
 
     #[test]
     fn test_signing_request_validity() {

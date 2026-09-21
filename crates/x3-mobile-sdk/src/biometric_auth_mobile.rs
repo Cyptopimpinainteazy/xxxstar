@@ -1,7 +1,17 @@
 //! Biometric authentication for mobile wallets
 //!
-//! Supports Face ID, fingerprint, iris, and PIN fallback.
-//! Uses secure enclave storage on iOS and Android KeyStore on Android.
+//! This module is a **salted-template matcher that runs in process memory**. It
+//! does not call Face ID, Touch ID, the Android BiometricPrompt, or any secure
+//! enclave, and it does not store anything in the iOS Keychain or the Android
+//! KeyStore — the header used to claim both, which is why
+//! [`BiometricAuth::uses_platform_secure_storage`] exists and returns `false`.
+//!
+//! What it actually proves: whoever calls [`BiometricAuth::authenticate`] has the
+//! same bytes that [`BiometricAuth::enroll`] was given. The templates are SHA-256
+//! hashes with a per-enrollment salt held in a `Mutex<Vec<…>>`, so a wallet that
+//! gates key access on this is gating it on possession of an in-process value, not
+//! on a biometric. Wiring the platform APIs (and moving the templates into the
+//! Keychain/KeyStore) is what would make that method return `true`.
 
 use crate::SdkError;
 use serde::{Deserialize, Serialize};
@@ -89,6 +99,17 @@ pub struct BiometricAuth {
 }
 
 impl BiometricAuth {
+    /// Whether this authenticator is backed by the platform's secure storage and
+    /// biometric API.
+    ///
+    /// Always `false`: templates live in a `Mutex<Vec<BiometricTemplate>>` in this
+    /// process and the comparison is a hash of caller-supplied bytes. It returns a
+    /// value rather than being a comment so a caller (or a wallet's own release
+    /// checklist) can refuse to treat this as a device-backed authenticator.
+    pub fn uses_platform_secure_storage(&self) -> bool {
+        false
+    }
+
     /// Create new biometric authentication engine
     pub fn new(session_timeout_seconds: i64) -> Self {
         Self {
@@ -315,6 +336,20 @@ fn generate_session_token() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_authenticator_is_not_platform_backed() {
+        // The module header used to claim "secure enclave storage on iOS and
+        // Android KeyStore on Android". Nothing here calls either: templates are
+        // hashes of caller-supplied bytes held in a Mutex, so this pins the honest
+        // capability — a wallet (or a release checklist) can read it rather than
+        // trust a comment.
+        let auth = BiometricAuth::new(300);
+        assert!(
+            !auth.uses_platform_secure_storage(),
+            "this authenticator has no platform secure storage"
+        );
+    }
 
     #[test]
     fn test_biometric_type_display() {
