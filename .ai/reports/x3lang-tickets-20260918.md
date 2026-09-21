@@ -1666,8 +1666,8 @@ Four tests in `compiler/tests/test_inert_statements.rs`.
 Original text: `transfer_proof eth_receipt` written on its own line after a bridge parses as an
 expression statement and does nothing.
 
-## TICKET-038 — a bridge-only intent has no way to state what it delivers — OPEN
-Type: OPEN, language gap · Subsystem: x3-lang/compiler + spec
+## TICKET-038 — a bridge-only intent has no way to state what it delivers — CLOSED
+Type: CLOSED (2026-09-20, `min_receive` carried through source and IR) · Subsystem: x3-lang/compiler + spec
 Reason: the fusion minimum-output check is unverifiable for any intent that bridges without a swap on
 the far side, because the language has no `min_receive`. Measured 2026-09-20: `min_receive` appears
 **0 times** in `compiler/src`, `crates/x3-ast/src` — and 0 times in the spec, so adding the clause would
@@ -1683,6 +1683,9 @@ swap on the far side, because the language has no `min_receive`.
 Progress 2026-09-20: `min_receive` is now a real bridge-step clause at source/AST/formatter level
 (`0d63a3c66`). The remaining half is carrying that floor into `Operation::Bridge` so fusion can read
 it; that IR field is not yet added.
+
+Resolution: `Operation::Bridge` now carries `min_output`, lowering maps `min_receive` into it, and
+fusion reads it. Tests cover a stated bridge minimum and the unverifiable no-minimum shape.
 
 ## TICKET-041 — whole and fractional percentages lex differently — CLOSED
 Type: CLOSED in measurement (2026-09-20) · Subsystem: x3-lang/crates/x3-lexer (shape) + compiler (readers)
