@@ -283,6 +283,12 @@ cherry-pick attempted on a clean master worktree conflicts in `lib.rs` and the e
 and taking the whole tree would revert newer master work such as bridge `min_receive`. This branch is
 **merge-worthy** and must be landed with a focused rebase that keeps the newer master hunks.
 
+Measured blocker 2026-09-21: the branch's `compiler/src/ir.rs` is an older IR tree that removes the
+master re-exports (`ReleaseAct`, `ComparisonOp`, `ChoiceCriterion`) and newer operation variants.
+Cherry-picking the top economic commits with `-X theirs` therefore fails the full `x3-lang` build.
+The focused merge must first reconcile `ir.rs`, then apply the economic policy/commitment changes on
+top of master's current IR.
+
 ### Already-represented runtime branches
 
 - `feat/secret-release-firewall-20260911`
