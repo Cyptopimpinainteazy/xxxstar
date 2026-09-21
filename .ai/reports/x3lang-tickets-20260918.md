@@ -5151,6 +5151,10 @@ has it. Least-landed first: `fix/agent-guard-bip39-allow` (0.0%, 1 line),
 `salvage/x3lang-intent-bridge` (87.5%, inspected — already on master).
 Validation: one measured verdict per tip, recorded in the report above.
 
+Progress 2026-09-21: local-head snapshot appended to
+`.ai/reports/branch-consolidation-20260920.md` — 265 local heads, 214 patch-equivalent and 51 novel
+against current `master`. The one-at-a-time review of the 51 novel heads remains.
+
 ## TICKET-127 — `x3c fmt` deleted declarations and parameter lists — CLOSED
 Type: CLOSED in `bf37dcb14` (2026-09-20) · Subsystem: compiler/src/formatter.rs
 Found by running the command and reading its output against the input (TICKET-124's method).

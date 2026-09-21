@@ -118,6 +118,19 @@ per-branch table below as its work list.
 | 93.6% | 45 | 3821 | 3575 | 18 | `origin/archive/local-20260920/feat/live-secret-release-firewall-20260911` |
 | 93.8% | 20 | 2678 | 2512 | 16 | `origin/finish/x3vm-live-transport-fix` |
 | 94.1% | 3 | 10376 | 9761 | 68 | `origin/archive/stale-x3lang-trading-wip-20260918` |
+
+## Refresh — local heads only, 2026-09-21
+
+Re-ran the patch-equivalence check against current `master` for every local `refs/heads/*`:
+
+```text
+patch_equivalent=214
+novel=51
+```
+
+This is a smaller, local-head snapshot than the origin-wide table above. The 214 patch-equivalent
+branches carry no `git cherry master <branch>` `+` patches; the 51 novel branches still need the
+one-at-a-time `diff -> keep missing capability -> drop the rest` review TICKET-126 prescribes.
 | 94.2% | 56 | 3917 | 3691 | 25 | `origin/archive/local-20260920/finish/x3vm-live-transport` |
 | 94.5% | 5 | 73 | 69 | 5 | `origin/archive/local-20260920/feat/x3-lang-crosschain-integration-20260909` |
 | 94.9% | 21 | 2604 | 2470 | 14 | `origin/archive/local-20260920/finish/x3vm-live-transport-fix` |
