@@ -289,6 +289,13 @@ Cherry-picking the top economic commits with `-X theirs` therefore fails the ful
 The focused merge must first reconcile `ir.rs`, then apply the economic policy/commitment changes on
 top of master's current IR.
 
+Second measured blocker: the branch's `EconomicPolicy` still expects `max_total_cost`,
+`max_price_impact_bps`, `max_mev_leakage_bps`, and a bare `quote_freshness_blocks` field. Master's
+`CompiledTradingPolicy` intentionally removed those unenforced aliases and now carries
+`minimum_net_profit_asset`, `max_oracle_deviation_bps`, and `max_cumulative_loss`. The branch's
+economic layer is therefore stale relative to master and must be rewritten against the current
+policy schema rather than merged directly.
+
 ### Already-represented runtime branches
 
 - `feat/secret-release-firewall-20260911`
