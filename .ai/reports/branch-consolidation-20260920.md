@@ -324,3 +324,7 @@ The remaining heads group as:
 - Runtime/crate (`crates/*`, `pallets/*`): needs targeted hunk review.
 - `docs/grant-readiness-truth-20260908` and `fix-x3lang-python` have no merge base against current
   master and are archive material.
+
+`agents/pasted-text-processing` is **merge-worthy**, not archive: it updates CI/workflows and SVM
+programs plus `scripts/agent_guard.py` allow-list patterns and a PR-supervisor test. It needs a
+focused review to keep only the changes master lacks.
