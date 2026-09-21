@@ -252,3 +252,18 @@ The following are dependency-version branches, not capability branches. They mod
 
 Disposition: review against the current dependency policy and archive unless a specific upgrade is
 still needed. They add no product capability to master.
+
+### Runtime/settlement novel heads
+
+These branches touch live-transport, proof-bundle, coordinator, or settlement files whose key files
+already exist on current `master`:
+
+- `feat/x3vm-durable-recovery-20260911`
+- `finish/x3vm-live-transport`
+- `finish/x3vm-live-transport-fix`
+- `feat/settlement-proofset-gate-20260911`
+- `feat/idempotent-cross-domain-coordinator-20260911`
+- `feat/canonical-cross-domain-proof-bundle-20260911`
+
+Disposition: pre-rewrite or partial lineages; review individual hunks only if a named capability is
+missing from master, otherwise archive.
