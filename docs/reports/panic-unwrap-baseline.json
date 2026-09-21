@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-20T11:46:02Z",
-  "commit": "5775b1587",
+  "generated_at": "2026-09-21T03:05:02Z",
+  "commit": "30b77c4a3",
   "counts": {
     "runtime-hook": 0,
     "pallet-call": 0,
-    "production": 2269
+    "production": 1330
   },
   "files_scanned": 1298,
   "runtime_hooks_allowed": [],
