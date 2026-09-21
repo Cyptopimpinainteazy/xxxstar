@@ -153,7 +153,7 @@ impl FoundryEngine {
             .first()
             .cloned()
             .unwrap_or_else(|| "x3-testnet".to_string());
-        let deployed_contracts = self.deployer.deploy_contracts(
+        let deployed_contracts = self.deployer.simulate_deploy_contracts(
             &contracts.contracts,
             &contracts.deployment_order,
             &target_chain,
