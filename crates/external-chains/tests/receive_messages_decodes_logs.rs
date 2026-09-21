@@ -17,12 +17,13 @@ use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use x3_external_chains::adapter::ChainAdapter;
 use x3_external_chains::chains::arbitrum::{l2_to_l1_tx_topic, ArbitrumAdapter, ARBSYS_ADDRESS};
-use x3_external_chains::chains::base::BaseAdapter;
+use x3_external_chains::chains::base::{BaseAdapter, L2_CROSS_DOMAIN_MESSENGER};
 use x3_external_chains::{ChainConfig, ChainType};
 
-/// The messenger address the adapter is configured with. Not a default: the
-/// derived default is refused on purpose (see the last test).
-const MESSENGER: [u8; 20] = [0x5f; 20];
+/// The OP-Stack messenger predeploy every query must filter on.
+fn messenger() -> H160 {
+    L2_CROSS_DOMAIN_MESSENGER
+}
 
 fn sent_message_topic() -> [u8; 32] {
     keccak_256(b"SentMessage(address,address,uint256,uint256,uint256,bytes)")
@@ -60,7 +61,7 @@ fn log_json(target: H160, sender: H160, message: &[u8], data_override: Option<Ve
         .unwrap_or_else(|| sent_message_data(sender, U256::from(1_000u64), 7, 90_000, message));
     format!(
         r#"{{"address":"0x{}","topics":["0x{}","0x{}"],"data":"0x{}","blockNumber":"0x63","transactionHash":"0x{}","logIndex":"0x0"}}"#,
-        hex::encode(MESSENGER),
+        hex::encode(messenger().as_bytes()),
         hex::encode(sent_message_topic()),
         hex::encode(target_topic),
         hex::encode(&data),
@@ -132,10 +133,9 @@ fn spawn_stub(logs_json: String) -> (String, Arc<Mutex<Vec<String>>>) {
     (url, seen)
 }
 
-fn adapter_for(url: &str, bridge: H160) -> BaseAdapter {
+fn adapter_for(url: &str) -> BaseAdapter {
     let mut config = ChainConfig::for_chain(ChainType::Base);
     config.rpc_url = url.as_bytes().to_vec();
-    config.bridge_contract = bridge;
     config.confirmations = 1;
     BaseAdapter::new(config)
 }
@@ -148,7 +148,7 @@ async fn receive_messages_decodes_a_sent_message_log() {
         "[{}]",
         log_json(target, sender, b"hello from base", None)
     ));
-    let adapter = adapter_for(&url, H160(MESSENGER));
+    let adapter = adapter_for(&url);
 
     let messages = adapter
         .receive_messages()
@@ -175,7 +175,7 @@ async fn receive_messages_decodes_a_sent_message_log() {
         .find(|body| body.contains("eth_getLogs"))
         .expect("the adapter asked for logs");
     assert!(
-        logs_request.contains(&hex::encode(MESSENGER)),
+        logs_request.contains(&hex::encode(messenger().as_bytes())),
         "eth_getLogs must filter by the configured messenger: {logs_request}"
     );
     assert!(
@@ -197,7 +197,7 @@ async fn a_malformed_log_is_refused_rather_than_skipped() {
         "[{}]",
         log_json(H160([0xaa; 20]), H160([0xbb; 20]), b"payload", Some(data))
     ));
-    let adapter = adapter_for(&url, H160(MESSENGER));
+    let adapter = adapter_for(&url);
 
     let result = adapter.receive_messages().await;
     assert!(
@@ -207,21 +207,35 @@ async fn a_malformed_log_is_refused_rather_than_skipped() {
 }
 
 #[tokio::test]
-async fn an_unconfigured_messenger_is_refused_rather_than_queried() {
-    // `ChainConfig::for_chain` derives the bridge address from a hash. Querying
-    // it would return an empty log set for every chain, which reads as "no
-    // messages" — the adapter refuses instead.
+async fn the_query_targets_the_messenger_predeploy_not_the_config() {
+    // `ChainConfig::for_chain` derives its bridge address from a hash, so a query
+    // that filtered on the config would return an empty log set for a chain that
+    // does have messages. The emitter is the OP-Stack predeploy, and that is what
+    // the request must name — whatever the config says.
     let (url, seen) = spawn_stub("[]".to_string());
-    let adapter = adapter_for(
-        &url,
-        ChainConfig::for_chain(ChainType::Base).bridge_contract,
-    );
+    let mut config = ChainConfig::for_chain(ChainType::Base);
+    config.rpc_url = url.as_bytes().to_vec();
+    config.confirmations = 1;
+    config.bridge_contract = H160([0x5f; 20]); // deliberately wrong
+    let adapter = BaseAdapter::new(config);
 
-    let result = adapter.receive_messages().await;
-    assert!(result.is_err(), "an unconfigured messenger must be refused");
+    let messages = adapter
+        .receive_messages()
+        .await
+        .expect("empty is not an error");
+    assert!(messages.is_empty());
+    let requests = seen.lock().unwrap();
+    let logs_request = requests
+        .iter()
+        .find(|body| body.contains("eth_getLogs"))
+        .expect("the adapter asked for logs");
     assert!(
-        seen.lock().unwrap().is_empty(),
-        "the adapter must not query a placeholder address at all"
+        logs_request.contains(&hex::encode(messenger().as_bytes())),
+        "the filter must be the predeploy: {logs_request}"
+    );
+    assert!(
+        !logs_request.contains(&hex::encode([0x5f; 20])),
+        "the filter must not be the configured (wrong) address: {logs_request}"
     );
 }
 
@@ -229,7 +243,7 @@ async fn an_unconfigured_messenger_is_refused_rather_than_queried() {
 async fn a_chain_with_no_logs_answers_with_no_messages() {
     // The honest empty: the query ran, and the chain had nothing.
     let (url, _seen) = spawn_stub("[]".to_string());
-    let adapter = adapter_for(&url, H160(MESSENGER));
+    let adapter = adapter_for(&url);
     let messages = adapter
         .receive_messages()
         .await

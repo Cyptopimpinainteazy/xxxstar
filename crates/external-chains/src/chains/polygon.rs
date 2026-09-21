@@ -143,9 +143,17 @@ impl ChainAdapter for PolygonAdapter {
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {
-        // Refused: an empty list reads as "no StateSync events".
+        // Refused, and the reason is not "not implemented yet": `StateSync` is
+        // emitted by the StateSender contract on **Ethereum**, not on Polygon.
+        // This adapter talks to a Polygon endpoint, where the event does not
+        // exist, so a query here can only ever answer an empty queue — the lie
+        // this method used to tell. Observing a state sync needs an Ethereum-side
+        // watcher whose messages *target* Polygon (`source_chain` 1,
+        // `dest_chain` 137); that is a different adapter from this one.
         Err(ExternalChainError::adapter_unimplemented(
-            "polygon: receive_messages cannot decode StateSync events yet",
+            "polygon: StateSync is emitted on Ethereum by the StateSender, not on Polygon — \
+             this adapter reads Polygon, where the event does not exist. A Polygon-bound message \
+             needs an Ethereum-side watcher, not a decoder here",
         ))
     }
 
