@@ -7,6 +7,7 @@
 pub mod deployer;
 pub mod error;
 pub mod generator;
+pub mod oracle;
 pub mod revenue;
 pub mod security;
 pub mod simulator;
