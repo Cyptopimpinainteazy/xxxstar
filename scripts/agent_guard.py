@@ -50,6 +50,14 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)api-key=(\$|\$\{|<|\[|YOUR_)",
     r"(?i)apiKey=(\$|\$\{|<|\[|sk_x3_test_bootstrap)",
     r"(?i)API_KEY\s*=\s*(process\.env|os\.environ|\$INFRA_API_KEY|\"infra_x+\"|your-secret-api-key)",
+    # The bip39 2.x constructor. The broad rule above (line 32: an assignment to
+    # `mnemonic` of eight or more characters) matches
+    # `let mnemonic = bip39::Mnemonic::parse_in(...)`, which parses a
+    # caller-supplied phrase and hardcodes nothing — it turned this crate's
+    # legitimate constructor call into "secret-like material" and made
+    # `make guard` fail on master. The 1.x entry below stopped matching when the
+    # crate moved to 2.x, which is what left the gap.
+    r"(?i)\bmnemonic\s*[:=]\s*['\"]?bip39::Mnemonic::(parse_in|from_phrase)\(",
     r"(?i)API_KEY\s*=\s*\"?\$\{[A-Z0-9_]+:-\}\"?",
     r"(?i)APIKey\s*=\s*\"infra_x+\"",
     r"(?i)PRIVATE_KEY=\d{16,}",
