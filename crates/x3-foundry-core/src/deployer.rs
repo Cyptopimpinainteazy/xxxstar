@@ -1,11 +1,12 @@
 use crate::error::FoundryError;
+use crate::evm_deploy;
 use crate::types::{DAppType, DeploymentReceipt};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use tracing::{info, warn};
-use x3_foundry_auditor::FoundryAuditor;
+use x3_foundry_auditor::{compile_contract_bytecode, FoundryAuditor};
 
 /// Deployment manifest containing all deployment metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,30 +26,15 @@ pub struct DeploymentManifest {
     pub manifest_hash: String,
 }
 
-/// Information about a contract this crate *simulated* deploying.
-///
-/// `simulated` is always `true` here, and it exists because the old shape was
-/// indistinguishable from a real deployment receipt: `deploy_contracts` derived
-/// the address from `sha256(name + source.len() + chain + deployer_key)`, the
-/// transaction hash from `sha256("deploy-<name>-<chain>-<timestamp>")`, a block
-/// number from the wall clock and a gas figure from the source's line count, then
-/// logged `Deployed <name> at 0x… (tx: …)`. Nothing was broadcast and no key was
-/// used. A caller reading `address` had no way to tell.
+/// Information about a deployed contract.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeployedContractInfo {
     pub name: String,
-    /// Deterministic, derived locally. **Not** an on-chain address.
     pub address: String,
-    /// Derived locally. **Not** a transaction that exists.
     pub tx_hash: String,
-    /// Derived from the wall clock. **Not** a chain height.
     pub block_number: u64,
-    /// Estimated from the source's line count. **Not** measured.
     pub gas_used: u64,
     pub verified: bool,
-    /// Always `true` for this crate's deployer: it simulates and broadcasts
-    /// nothing. A real deployment needs a signer and an RPC endpoint.
-    pub simulated: bool,
 }
 
 /// Deployer handles the deployment of dApps to target chains.
@@ -65,19 +51,19 @@ impl Deployer {
         }
     }
 
-    /// Simulates deploying every contract in `deployment_order`.
+    /// Deploys all smart contracts for the dApp: compiles each with the real
+    /// Solidity compiler, then signs and submits a genuine contract-creation
+    /// transaction to `chain`'s JSON-RPC node and waits for it to be mined.
+    /// Every field on the returned `DeployedContractInfo` comes from the
+    /// node's own transaction receipt.
     ///
-    /// It is named `simulate_…` because that is what it does: nothing is signed,
-    /// nothing is broadcast, and every field of the returned
-    /// [`DeployedContractInfo`] is derived locally (see that type). It used to be
-    /// called `deploy_contracts` and to log `Deployed <name> at 0x… (tx: …)`,
-    /// which is how a caller could believe an address on a chain existed. A real
-    /// deployment needs a signer and an RPC endpoint, and belongs behind a
-    /// different name.
-    ///
-    /// Each contract still has to pass `gate_on_audit`, so the audit trail is the
-    /// real part of this path.
-    pub fn simulate_deploy_contracts(
+    /// `chain` is resolved to an RPC URL via
+    /// [`evm_deploy::resolve_rpc_url`] -- a literal `http(s)://` value is
+    /// used directly (how tests point this at a local `anvil` instance),
+    /// named chains resolve via environment variables. `self.deployer_key`
+    /// must be a real hex-encoded private key; there is no more fallback to
+    /// a simulated address for an invalid one.
+    pub fn deploy_contracts(
         &self,
         contracts: &HashMap<String, String>,
         deployment_order: &[String],
@@ -89,6 +75,16 @@ impl Deployer {
             chain
         );
         let mut deployed = Vec::new();
+        let rpc_url = evm_deploy::resolve_rpc_url(chain);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| {
+                FoundryError::DeploymentFailed(format!(
+                    "failed to start the async runtime this deployment needs: {e}"
+                ))
+            })?;
 
         for contract_name in deployment_order {
             let source = contracts.get(contract_name).ok_or_else(|| {
@@ -100,30 +96,28 @@ impl Deployer {
 
             self.gate_on_audit(contract_name, source)?;
 
-            // Simulate deployment
-            let address = self.simulate_deploy(contract_name, source, chain);
-            let tx_hash = self.compute_tx_hash(contract_name, chain);
-            let block_number = self.simulate_block_number();
-            let gas_used = self.estimate_gas(source);
+            let compiled = compile_contract_bytecode(contract_name, source)
+                .map_err(FoundryError::DeploymentFailed)?;
+
+            let result = runtime.block_on(evm_deploy::deploy_bytecode(
+                &rpc_url,
+                &self.deployer_key,
+                compiled.bytecode,
+            ))?;
+
+            info!(
+                "Deployed {} at {} (tx: {})",
+                contract_name, result.address, result.tx_hash
+            );
 
             deployed.push(DeployedContractInfo {
                 name: contract_name.clone(),
-                address,
-                tx_hash: tx_hash.clone(),
-                block_number,
-                gas_used,
+                address: result.address,
+                tx_hash: result.tx_hash,
+                block_number: result.block_number,
+                gas_used: result.gas_used,
                 verified: false,
-                // The one field a caller can branch on that says none of the
-                // others came from a chain.
-                simulated: true,
             });
-
-            info!(
-                "Simulated deployment of {} at {} (no transaction broadcast; tx: {})",
-                contract_name,
-                deployed.last().unwrap().address,
-                tx_hash
-            );
         }
 
         Ok(deployed)
@@ -316,44 +310,6 @@ impl Deployer {
         info!("Receipt signed: {}", receipt.signature);
     }
 
-    /// Simulates contract deployment (generates a deterministic address).
-    fn simulate_deploy(&self, contract_name: &str, source: &str, chain: &str) -> String {
-        let input = format!(
-            "{}{}{}{}",
-            contract_name,
-            source.len(),
-            chain,
-            self.deployer_key
-        );
-        let mut hasher = Sha256::new();
-        hasher.update(input.as_bytes());
-        let hash = hex::encode(hasher.finalize());
-        format!("0x{}", &hash[..40])
-    }
-
-    /// Computes a deterministic transaction hash.
-    fn compute_tx_hash(&self, contract_name: &str, chain: &str) -> String {
-        let input = format!(
-            "deploy-{}-{}-{}",
-            contract_name,
-            chain,
-            Utc::now().timestamp()
-        );
-        let mut hasher = Sha256::new();
-        hasher.update(input.as_bytes());
-        hex::encode(hasher.finalize())
-    }
-
-    /// Simulates block number.
-    fn simulate_block_number(&self) -> u64 {
-        (Utc::now().timestamp() as u64) % 100_000_000 + 10_000_000
-    }
-
-    /// Estimates gas for contract deployment.
-    fn estimate_gas(&self, source: &str) -> u64 {
-        let lines = source.lines().count() as u64;
-        500_000 + lines * 10_000
-    }
 }
 
 /// CrossChainDeployer handles multi-chain deployment.
@@ -390,8 +346,7 @@ impl CrossChainDeployer {
                     chain
                 ))
             })?;
-            let deployed =
-                deployer.simulate_deploy_contracts(contracts, deployment_order, chain)?;
+            let deployed = deployer.deploy_contracts(contracts, deployment_order, chain)?;
             results.insert(chain.clone(), deployed);
         }
 
@@ -435,33 +390,6 @@ impl Default for CrossChainDeployer {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_deploy_contracts() {
-        let deployer = Deployer::new("test-key".into(), "x3-testnet".into());
-        let mut contracts = HashMap::new();
-        contracts.insert(
-            "TestToken".into(),
-            "pragma solidity ^0.8.20;\ncontract TestToken {}".into(),
-        );
-        let order = vec!["TestToken".into()];
-        let result = deployer.simulate_deploy_contracts(&contracts, &order, "x3-testnet");
-        assert!(result.is_ok());
-        let deployed = result.unwrap();
-        assert_eq!(deployed.len(), 1);
-        assert!(deployed[0].address.starts_with("0x"));
-        // The receipt says what it is: every field above was derived locally and
-        // nothing was broadcast. This used to be indistinguishable from a real
-        // deployment, which is why `simulated` exists.
-        assert!(
-            deployed[0].simulated,
-            "a simulated deployment must say so in its receipt"
-        );
-        assert!(
-            !deployed[0].verified,
-            "a simulated deployment is not verified on any chain"
-        );
-    }
-
     /// `forge` is a first-class repo toolchain requirement (X3-contracts/evm
     /// tests already depend on it); skip rather than hard-fail on a dev
     /// machine that genuinely doesn't have it, instead of pretending the
@@ -471,6 +399,100 @@ mod tests {
             .arg("--version")
             .output()
             .is_ok()
+    }
+
+    fn anvil_available() -> bool {
+        std::process::Command::new("anvil")
+            .arg("--version")
+            .output()
+            .is_ok()
+    }
+
+    /// Now that deployment is real, a placeholder string like `"test-key"`
+    /// is not a valid credential and deployment must fail honestly rather
+    /// than silently succeed with a fabricated address -- this is the
+    /// opposite of what this test asserted before deployment was real, and
+    /// that's the point: the old assertion (`result.is_ok()`) was testing
+    /// simulated behavior, not correct behavior.
+    #[test]
+    fn test_deploy_contracts_with_invalid_key_fails_honestly() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
+        let deployer = Deployer::new("test-key".into(), "x3-testnet".into());
+        let mut contracts = HashMap::new();
+        contracts.insert(
+            "TestToken".into(),
+            "pragma solidity ^0.8.20;\ncontract TestToken {}".into(),
+        );
+        let order = vec!["TestToken".into()];
+        let result = deployer.deploy_contracts(&contracts, &order, "x3-testnet");
+        assert!(
+            matches!(result, Err(FoundryError::DeploymentFailed(_))),
+            "a placeholder string is not a valid private key and must fail, got {result:?}"
+        );
+    }
+
+    /// The one end-to-end proof that deployment is real: spins up a local
+    /// `anvil` node (a real EVM, not a mock of one), deploys a real
+    /// contract to it using anvil's well-known deterministic dev account
+    /// #0 private key, and checks every field on the result against what
+    /// anvil itself reports back -- not against a value this test computed
+    /// independently, since the whole point is that only the node's own
+    /// receipt is trusted.
+    #[test]
+    fn test_deploy_contracts_real_anvil_end_to_end() {
+        if !forge_available() || !anvil_available() {
+            eprintln!("skipping: forge/anvil not on PATH in this environment");
+            return;
+        }
+        // anvil's default mnemonic always derives this as dev account #0;
+        // it is publicly documented and funded only on ephemeral local
+        // chains anvil itself spins up, never a real network.
+        const ANVIL_DEV_KEY_0: &str =
+            "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+
+        let anvil = ethers::utils::Anvil::new().spawn();
+        let deployer = Deployer::new(ANVIL_DEV_KEY_0.into(), anvil.endpoint());
+        let mut contracts = HashMap::new();
+        contracts.insert(
+            "SimpleToken".into(),
+            "pragma solidity ^0.8.20;\ncontract SimpleToken {\n    uint256 public totalSupply;\n}"
+                .into(),
+        );
+        let order = vec!["SimpleToken".into()];
+
+        let result = deployer.deploy_contracts(&contracts, &order, &anvil.endpoint());
+        let deployed =
+            result.expect("real deployment against a real local anvil node must succeed");
+        assert_eq!(deployed.len(), 1);
+
+        let info = &deployed[0];
+        assert_eq!(info.name, "SimpleToken");
+        assert_eq!(
+            info.address.len(),
+            42,
+            "a real EVM address is 0x + 40 hex chars, got {:?}",
+            info.address
+        );
+        assert!(info.address.starts_with("0x"));
+        assert_ne!(
+            info.address, "0x0000000000000000000000000000000000000000",
+            "must be a real deployed address, not a zero placeholder"
+        );
+        assert!(
+            info.tx_hash.starts_with("0x") && info.tx_hash.len() == 66,
+            "a real tx hash is 0x + 64 hex chars, got {:?}",
+            info.tx_hash
+        );
+        assert!(info.block_number > 0, "anvil mines starting from block 1");
+        assert!(
+            info.gas_used > 21_000,
+            "a real contract-creation transaction spends more than the 21000 base cost, got {}",
+            info.gas_used
+        );
+        assert!(!info.verified);
     }
 
     #[test]
@@ -486,7 +508,7 @@ mod tests {
             "pragma solidity ^0.8.20;\ncontract BrokenToken {\n    function nope( {\n}".into(),
         );
         let order = vec!["BrokenToken".into()];
-        let result = deployer.simulate_deploy_contracts(&contracts, &order, "x3-testnet");
+        let result = deployer.deploy_contracts(&contracts, &order, "x3-testnet");
         assert!(
             matches!(result, Err(FoundryError::SecurityAuditFailed(_))),
             "expected deployment to be refused for a contract that fails to compile, got {result:?}"
@@ -501,8 +523,16 @@ mod tests {
         assert!(url.unwrap().contains("x3-app.io"));
     }
 
+    /// `deploy_to_chains` must propagate each per-chain deployer's real
+    /// validation instead of faking success across multiple chains; "key1"/
+    /// "key2" are not valid private keys, so this must fail honestly on the
+    /// first chain it tries, same as the single-deployer case.
     #[test]
-    fn test_cross_chain() {
+    fn test_cross_chain_with_invalid_keys_fails_honestly() {
+        if !forge_available() {
+            eprintln!("skipping: forge not on PATH in this environment");
+            return;
+        }
         let mut cc = CrossChainDeployer::new();
         cc.add_chain(
             "x3-mainnet".into(),
@@ -513,13 +543,70 @@ mod tests {
             Deployer::new("key2".into(), "ethereum".into()),
         );
         let mut contracts = HashMap::new();
-        contracts.insert("Token".into(), "contract Token {}".into());
+        contracts.insert(
+            "Token".into(),
+            "pragma solidity ^0.8.20;\ncontract Token {}".into(),
+        );
         let result = cc.deploy_to_chains(
             &contracts,
             &["Token".into()],
             &["x3-mainnet".into(), "ethereum".into()],
         );
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().len(), 2);
+        assert!(
+            matches!(result, Err(FoundryError::DeploymentFailed(_))),
+            "invalid keys must fail, got {result:?}"
+        );
+    }
+
+    /// `CrossChainDeployer::deploy_to_chains` iterates real deployers, so
+    /// the multi-chain success path gets its own real-anvil proof rather
+    /// than reusing the single-chain test's node: two independent anvil
+    /// instances stand in for "two chains". `deploy_to_chains` uses each
+    /// entry in `chains` both as the deployer-registry lookup key and as
+    /// the literal `chain` argument passed to `deploy_contracts`, so each
+    /// anvil instance's own endpoint URL has to serve as its chain "name"
+    /// here for `resolve_rpc_url` to actually reach it.
+    #[test]
+    fn test_cross_chain_real_anvil_end_to_end() {
+        if !forge_available() || !anvil_available() {
+            eprintln!("skipping: forge/anvil not on PATH in this environment");
+            return;
+        }
+        const ANVIL_DEV_KEY_0: &str =
+            "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+
+        let anvil_a = ethers::utils::Anvil::new().spawn();
+        let anvil_b = ethers::utils::Anvil::new().spawn();
+        let (endpoint_a, endpoint_b) = (anvil_a.endpoint(), anvil_b.endpoint());
+
+        let mut cc = CrossChainDeployer::new();
+        cc.add_chain(
+            endpoint_a.clone(),
+            Deployer::new(ANVIL_DEV_KEY_0.into(), endpoint_a.clone()),
+        );
+        cc.add_chain(
+            endpoint_b.clone(),
+            Deployer::new(ANVIL_DEV_KEY_0.into(), endpoint_b.clone()),
+        );
+
+        let mut contracts = HashMap::new();
+        contracts.insert(
+            "Token".into(),
+            "pragma solidity ^0.8.20;\ncontract Token {}".into(),
+        );
+
+        let result = cc.deploy_to_chains(
+            &contracts,
+            &["Token".into()],
+            &[endpoint_a.clone(), endpoint_b.clone()],
+        );
+        let by_chain = result.expect("real deployment to two local anvil nodes must succeed");
+        assert_eq!(by_chain.len(), 2);
+        for endpoint in [&endpoint_a, &endpoint_b] {
+            let deployed = &by_chain[endpoint];
+            assert_eq!(deployed.len(), 1);
+            assert!(deployed[0].address.starts_with("0x"));
+            assert_eq!(deployed[0].address.len(), 42);
+        }
     }
 }
