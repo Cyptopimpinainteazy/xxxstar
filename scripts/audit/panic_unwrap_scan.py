@@ -136,26 +136,46 @@ def test_line_ranges(lines: list[str]) -> list[tuple[int, int]]:
     return ranges
 
 
-def enclosing_fn(lines: list[str], index: int) -> tuple[str, bool]:
-    """Nearest `fn` declaration above `index`, and whether it is a pallet call."""
-    for k in range(index, -1, -1):
-        code, _ = strip_strings_and_comments(lines[k], False)
-        match = re.search(r"\bfn\s+([A-Za-z0-9_]+)", code)
-        if not match:
-            continue
-        is_call = False
-        for attr in range(k, max(k - 12, -1), -1):
-            attr_code, _ = strip_strings_and_comments(lines[attr], False)
-            if "#[pallet::call" in attr_code:
-                is_call = True
-                break
-            if re.search(r"\bfn\s+[A-Za-z0-9_]+", attr_code) and attr != k:
-                break
-        return match.group(1), is_call
-    return "", False
+CFG_TEST_MODULE = re.compile(
+    r"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*mod\s+([A-Za-z0-9_]+)\s*;"
+)
 
 
-def scan_file(path: os.PathLike[str]) -> list[tuple[int, str]]:
+def test_only_files(roots: list[str]) -> set[str]:
+    """Files that are only compiled under `cfg(test)`, by module declaration.
+
+    A pallet declares its test support as `#[cfg(test)] mod tests;` /
+    `mod mock;` in `lib.rs`, and those files' contents never exist in a
+    production build. Line-level detection cannot see that — it only knows about
+    `#[cfg(test)]` *items* inside a file — so `src/tests.rs` was scanned as
+    production code and its assertions counted as panics reachable in a release
+    node. That is the same mistake the line-oriented predecessor made, one level
+    up, and it fired on this repository's own new tests.
+    """
+    out: set[str] = set()
+    for root in roots:
+        for dirpath, _dirnames, filenames in os.walk(root):
+            if "Cargo.toml" not in filenames:
+                continue
+            for crate_root in ("lib.rs", "main.rs"):
+                path = os.path.join(dirpath, "src", crate_root)
+                if not os.path.exists(path):
+                    continue
+                with open(path, encoding="utf-8", errors="replace") as handle:
+                    text = handle.read()
+                for match in CFG_TEST_MODULE.finditer(text):
+                    name = match.group(1)
+                    out.add(os.path.normpath(os.path.join(dirpath, "src", f"{name}.rs")))
+                    out.add(os.path.normpath(os.path.join(dirpath, "src", name)))
+    return out
+
+
+def scan_file(path: os.PathLike[str], test_only: set[str]) -> list[tuple[int, str]]:
+    normalised = os.path.normpath(str(path))
+    if normalised in test_only or any(
+        normalised.startswith(prefix + os.sep) for prefix in test_only
+    ):
+        return []
     with open(path, encoding="utf-8", errors="replace") as handle:
         lines = handle.read().splitlines()
     ranges = test_line_ranges(lines)
@@ -178,9 +198,29 @@ def scan_file(path: os.PathLike[str]) -> list[tuple[int, str]]:
     return hits
 
 
+def enclosing_fn(lines: list[str], index: int) -> tuple[str, bool]:
+    """Nearest `fn` declaration above `index`, and whether it is a pallet call."""
+    for k in range(index, -1, -1):
+        code, _ = strip_strings_and_comments(lines[k], False)
+        match = re.search(r"\bfn\s+([A-Za-z0-9_]+)", code)
+        if not match:
+            continue
+        is_call = False
+        for attr in range(k, max(k - 12, -1), -1):
+            attr_code, _ = strip_strings_and_comments(lines[attr], False)
+            if "#[pallet::call" in attr_code:
+                is_call = True
+                break
+            if re.search(r"\bfn\s+[A-Za-z0-9_]+", attr_code) and attr != k:
+                break
+        return match.group(1), is_call
+    return "", False
+
+
 def collect(roots: list[str]) -> dict:
     findings = {"runtime-hook": [], "pallet-call": [], "production": []}
     files = 0
+    test_only = test_only_files(roots)
     for root in roots:
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [
@@ -195,7 +235,7 @@ def collect(roots: list[str]) -> dict:
                 files += 1
                 with open(path, encoding="utf-8", errors="replace") as handle:
                     lines = handle.read().splitlines()
-                for line_no, text in scan_file(path):
+                for line_no, text in scan_file(path, test_only):
                     fn_name, is_call = enclosing_fn(lines, line_no - 1)
                     if fn_name in RUNTIME_HOOKS:
                         kind = "runtime-hook"
