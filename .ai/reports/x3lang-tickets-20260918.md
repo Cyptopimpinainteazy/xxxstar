@@ -4958,8 +4958,8 @@ the audit that produced the annotations and the `resources` block. Two defects, 
 Three tests, including the corpus's own statement spelling and an artifact-equality assertion across
 the round trip.
 
-## TICKET-120 — a program may state two failure actions and the parser keeps one silently — OPEN
-Type: OPEN, design decision · Subsystem: x3-lang/compiler (parser)
+## TICKET-120 — a program may state two failure actions and the parser keeps one silently — CLOSED
+Type: CLOSED in `c7c2337ea` (2026-09-20) · Subsystem: x3-lang/compiler (parser)
 Reason: a declaration may state `on_timeout <dur> <action>` and `on_fail <action>` together, and the
 AST holds **one** action for both clauses: `parse_bridge_item`/`parse_atomic_swap_item` do
 `if on_fail.is_none() { on_fail = Some(action) }`, so the first action stated wins and a second,
@@ -4973,6 +4973,11 @@ the phase text. A `#[serde(default)]`-safe field split would let both travel.
 Acceptance criteria: a program stating two different actions is either refused with both named, or
 both reach the artifact; the same action stated twice stays accepted (the formatter writes that).
 Validation: the measured program above, plus a round trip of the accepted case.
+
+Resolution: the parser refuses two different `on_fail`/`on_timeout` actions for the one failure-action
+slot, names both actions and both clauses, and accepts the same action stated twice. Regression tests
+live in `x3-lang/compiler/tests/test_failure_action_slot.rs`; the bridge and `atomic_swap` forms are
+covered.
 
 ## TICKET-121 — an agent is three blocks, and two of them were read by nothing — CLOSED
 Type: CLOSED in `897552791` (2026-09-20), filed and fixed in the same pass · Subsystem: x3-lang/compiler (formatter + semantic)
