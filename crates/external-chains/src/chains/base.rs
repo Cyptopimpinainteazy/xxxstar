@@ -41,6 +41,63 @@ pub const L2_CROSS_DOMAIN_MESSENGER: H160 = H160(hex_literal::hex!(
     "4200000000000000000000000000000000000007"
 ));
 
+/// Headroom over `eth_estimateGas`, in percent, before a send is signed.
+///
+/// State can change between the estimate and inclusion, and a transaction that
+/// runs out of gas is recorded as a failed message — worse than paying a little
+/// for headroom.
+pub const GAS_ESTIMATE_MARGIN_PERCENT: u64 = 25;
+
+/// An EIP-155 signer for this adapter's chain.
+///
+/// Key material stays here and never goes into [`ChainConfig`] (which is
+/// SCALE-encoded, logged and serialised). The crypto is the workspace's single
+/// EIP-155 implementation, in `x3-atomic-swap`'s `ethereum_tx`; this type exists so
+/// an adapter can hold a key without growing a second implementation.
+#[cfg(feature = "std")]
+#[derive(Debug, Clone)]
+pub struct EvmSigner {
+    private_key_hex: String,
+    address: H160,
+}
+
+#[cfg(feature = "std")]
+impl EvmSigner {
+    /// Derive the sender's address from a 32-byte private key (`0x`-prefixed).
+    ///
+    /// A key that does not derive an address is refused here rather than at the
+    /// first send: failing later puts the error somewhere harder to read.
+    pub fn from_private_key(private_key_hex: &str) -> AdapterResult<Self> {
+        let address_hex =
+            x3_atomic_swap::ethereum_tx::Transaction::address_from_private_key(private_key_hex)
+                .map_err(|e| ExternalChainError::internal(&format!("invalid private key: {e}")))?;
+        let bytes = hex::decode(address_hex.trim_start_matches("0x")).map_err(|e| {
+            ExternalChainError::internal(&format!("derived address is not hex: {e}"))
+        })?;
+        if bytes.len() != 20 {
+            return Err(ExternalChainError::internal(&format!(
+                "derived address is {} bytes, not 20",
+                bytes.len()
+            )));
+        }
+        let mut address = [0u8; 20];
+        address.copy_from_slice(&bytes);
+        Ok(Self {
+            private_key_hex: private_key_hex.to_string(),
+            address: H160(address),
+        })
+    }
+
+    /// The address this signer sends from.
+    pub fn address(&self) -> H160 {
+        self.address
+    }
+
+    fn private_key_hex(&self) -> &str {
+        &self.private_key_hex
+    }
+}
+
 /// The canonical OP-Stack message event:
 ///
 /// ```solidity
@@ -60,12 +117,31 @@ pub struct BaseAdapter {
     config: ChainConfig,
     #[allow(dead_code)]
     nonce: u64,
+    /// Present only when the caller supplied a key; `send_message` refuses without
+    /// one rather than returning a hash for a transaction nobody signed.
+    #[cfg(feature = "std")]
+    signer: Option<EvmSigner>,
 }
 
 impl BaseAdapter {
     /// Create new Base adapter
     pub fn new(config: ChainConfig) -> Self {
-        Self { config, nonce: 0 }
+        Self {
+            config,
+            nonce: 0,
+            #[cfg(feature = "std")]
+            signer: None,
+        }
+    }
+
+    /// An adapter that can send, with the key its transactions are signed by.
+    #[cfg(feature = "std")]
+    pub fn with_signer(config: ChainConfig, signer: EvmSigner) -> Self {
+        Self {
+            config,
+            nonce: 0,
+            signer: Some(signer),
+        }
     }
 
     /// Get chain-specific bridge ABI
@@ -259,16 +335,68 @@ impl ChainAdapter for BaseAdapter {
         crate::evm_rpc::token_balance(&crate::evm_rpc::url(&self.config), token, address).await
     }
 
-    async fn send_message(&self, _message: ChainMessage) -> AdapterResult<H256> {
-        // Refused, not simulated. This used to build the sendMessage calldata,
-        // run it through `eth_call` (which changes no state) and return
-        // `message.hash()` as though a transaction had been broadcast — a
-        // caller could not tell that from a real send. Broadcasting one needs a
-        // signed transaction, and this adapter holds no signer.
-        Err(ExternalChainError::adapter_unimplemented(
-            "base: send_message needs a signed L2CrossDomainMessenger transaction and this \
-             adapter has no signer; refusing rather than returning a hash for an unsent message",
-        ))
+    async fn send_message(&self, message: ChainMessage) -> AdapterResult<H256> {
+        #[cfg(not(feature = "std"))]
+        {
+            let _ = message;
+            return Err(ExternalChainError::adapter_unimplemented(
+                "base: send_message needs a signer and this build has no std feature",
+            ));
+        }
+
+        #[cfg(feature = "std")]
+        {
+            // Refused without a signer, not simulated. This used to build the
+            // sendMessage calldata, run it through `eth_call` (which changes no
+            // state) and return `message.hash()` as though a transaction had been
+            // broadcast — a caller could not tell that from a real send.
+            let Some(signer) = self.signer.as_ref() else {
+                return Err(ExternalChainError::adapter_unimplemented(
+                    "base: send_message needs a signed L2CrossDomainMessenger transaction and this \
+                     adapter has no signer; build it with `BaseAdapter::with_signer` rather than \
+                     receiving a hash for an unsent message",
+                ));
+            };
+
+            let url = crate::evm_rpc::url(&self.config);
+            let data =
+                Self::encode_send_message(message.recipient, &message.payload, message.gas_limit);
+
+            // Nonce, price and limit all come from the chain. A guessed nonce
+            // collides with anything already in the mempool from this key, and a
+            // guessed limit is a transaction that may run out of gas.
+            let nonce = crate::evm_rpc::transaction_count(&url, signer.address()).await?;
+            let gas_price = crate::evm_rpc::gas_price(&url).await?;
+            let gas_price: u128 = gas_price.try_into().map_err(|_| {
+                ExternalChainError::rpc_error("eth_gasPrice does not fit in the transaction field")
+            })?;
+            let estimate = crate::evm_rpc::estimate_gas(
+                &url,
+                signer.address(),
+                L2_CROSS_DOMAIN_MESSENGER,
+                &data,
+            )
+            .await?;
+            let gas_limit = estimate + estimate * GAS_ESTIMATE_MARGIN_PERCENT / 100;
+
+            let transaction = x3_atomic_swap::ethereum_tx::Transaction {
+                nonce,
+                gas_price,
+                gas_limit,
+                to: Some(format!(
+                    "0x{}",
+                    hex::encode(L2_CROSS_DOMAIN_MESSENGER.as_bytes())
+                )),
+                value: 0,
+                data: format!("0x{}", hex::encode(&data)),
+                chain_id: self.config.chain_type,
+            };
+            let signed = transaction.sign(signer.private_key_hex()).map_err(|e| {
+                ExternalChainError::internal(&format!("could not sign the transaction: {e}"))
+            })?;
+
+            crate::evm_rpc::send_raw_transaction(&url, &signed).await
+        }
     }
 
     async fn receive_messages(&self) -> AdapterResult<Vec<ChainMessage>> {

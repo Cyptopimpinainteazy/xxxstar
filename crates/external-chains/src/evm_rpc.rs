@@ -363,6 +363,53 @@ pub(crate) async fn logs(
     Ok(entries)
 }
 
+/// `eth_estimateGas` for a call from `from` to `to` carrying `data`.
+///
+/// Asked of the chain rather than assumed: a send signed with a guessed limit is
+/// a transaction that either runs out of gas (and is recorded as failed) or pays
+/// for gas it never used.
+pub(crate) async fn estimate_gas(
+    url: &str,
+    from: H160,
+    to: H160,
+    data: &[u8],
+) -> AdapterResult<u64> {
+    let params = format!(
+        r#"[{{"from":"0x{}","to":"0x{}","value":"0x0","data":"0x{}"}},"latest"]"#,
+        hex::encode(from.as_bytes()),
+        hex::encode(to.as_bytes()),
+        hex::encode(data)
+    );
+    let response = call(url, "eth_estimateGas", &params).await?;
+    parse_hex_u64(&extract_result(&response)?)
+}
+
+/// The account's next nonce, counting transactions the node has seen but not yet
+/// mined (`pending`) — a send built from `latest` collides with anything in the
+/// mempool from the same key.
+pub(crate) async fn transaction_count(url: &str, address: H160) -> AdapterResult<u64> {
+    let params = format!(r#"["0x{}","pending"]"#, hex::encode(address.as_bytes()));
+    let response = call(url, "eth_getTransactionCount", &params).await?;
+    parse_hex_u64(&extract_result(&response)?)
+}
+
+/// Broadcast a signed transaction and return the hash the node assigned it.
+///
+/// `signed` is the `0x…`-prefixed RLP output of the workspace's EIP-155 signer.
+pub(crate) async fn send_raw_transaction(url: &str, signed: &str) -> AdapterResult<H256> {
+    let params = format!(r#"["{}"]"#, signed.trim_start_matches("0x"));
+    let response = call(url, "eth_sendRawTransaction", &params).await?;
+    let result = extract_result(&response)?;
+    let bytes = decode_hex(&result, "eth_sendRawTransaction result")?;
+    if bytes.len() != 32 {
+        return Err(ExternalChainError::rpc_error(&format!(
+            "eth_sendRawTransaction returned {} bytes, not a transaction hash",
+            bytes.len()
+        )));
+    }
+    Ok(H256::from_slice(&bytes))
+}
+
 /// The Unix timestamp of a block, as the chain states it.
 pub(crate) async fn block_timestamp(url: &str, block_number: u64) -> AdapterResult<u64> {
     let params = format!(r#"["0x{block_number:x}",false]"#);
