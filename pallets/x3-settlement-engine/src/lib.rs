@@ -2483,11 +2483,29 @@ pub mod pallet {
                 return false;
             }
 
+            // EIP-2718: a typed receipt is `type || rlp(payload)` — `0x01` for
+            // EIP-2930, `0x02` for EIP-1559, `0x03` for EIP-4844. The type byte
+            // is part of the consensus encoding and stays in `receipt_data`: the
+            // receipts-trie leaf holds the whole thing and `keccak256` over it is
+            // what the proof is checked against. It is skipped only for the
+            // structural check below. Without this, any leg whose transaction was
+            // sent with EIP-1559 — which is every wallet since 2021 — was refused
+            // as malformed before the trie walk ever ran.
+            let body = if x3_verification_router::evm_receipt::TYPED_RECEIPT_TYPES.contains(&rlp[0])
+            {
+                &rlp[1..]
+            } else {
+                rlp
+            };
+            if body.is_empty() {
+                return false;
+            }
+
             // RLP decoding helpers
             // Receipts are RLP-encoded lists with: [status/root, gas_used, logs, contractAddress?]
             // or legacy format: [root, gas_used, logs, contractAddress]
 
-            let first_byte = rlp[0];
+            let first_byte = body[0];
 
             // Check if it's a valid RLP list (0xc0-0xf7 = short list, 0xf8-0xff = long list)
             if first_byte < 0xc0 {
@@ -2499,26 +2517,26 @@ pub mod pallet {
             if first_byte <= 0xf7 {
                 let payload_length = (first_byte as usize) - 0xc0;
                 // Receipt should have at least 3 elements, so payload must be reasonable
-                return payload_length >= 3 && rlp.len() >= (1 + payload_length);
+                return payload_length >= 3 && body.len() >= (1 + payload_length);
             }
 
             // For long lists (0xf8-0xff), next bytes encode the length
             if first_byte == 0xf8 {
                 // Length is 1 byte after the first byte
-                if rlp.len() < 3 {
+                if body.len() < 3 {
                     return false;
                 }
-                let length_byte = rlp[1] as usize;
-                return rlp.len() >= (2 + length_byte);
+                let length_byte = body[1] as usize;
+                return body.len() >= (2 + length_byte);
             }
 
             if first_byte == 0xf9 {
                 // Length is 2 bytes after the first byte
-                if rlp.len() < 4 {
+                if body.len() < 4 {
                     return false;
                 }
-                let length = ((rlp[1] as usize) << 8) | (rlp[2] as usize);
-                return rlp.len() >= (3 + length);
+                let length = ((body[1] as usize) << 8) | (body[2] as usize);
+                return body.len() >= (3 + length);
             }
 
             // For f9+, we're dealing with very large receipts - unlikely but possible
@@ -3465,6 +3483,70 @@ pub mod pallet {
             })?;
             Self::deposit_event(Event::BondSlashed { bond_id });
             Ok(())
+        }
+    }
+
+    /// `is_valid_receipt_rlp` is the structural gate in front of the trie walk,
+    /// and it is private to this module, so its tests live here rather than in
+    /// `crate::tests`.
+    ///
+    /// The gate used to require the first byte to be an RLP list prefix, which is
+    /// exactly what a *typed* receipt (EIP-2718: `type || rlp(payload)`) is not:
+    /// every leg whose transaction was sent with EIP-1559 — every wallet since
+    /// 2021 — was refused as malformed before the walk ever ran.
+    #[cfg(test)]
+    mod receipt_structure {
+        use super::Pallet;
+        use crate::mock::Test;
+
+        #[test]
+        fn a_typed_receipt_is_structurally_valid() {
+            // A short RLP list with a 3-byte payload: `[0x01, 0x02, 0xc0]`.
+            let legacy = [0xc3u8, 0x01, 0x02, 0xc0];
+            assert!(
+                Pallet::<Test>::is_valid_receipt_rlp(&legacy),
+                "a legacy receipt is still accepted"
+            );
+            for type_byte in x3_verification_router::evm_receipt::TYPED_RECEIPT_TYPES {
+                let mut typed = vec![type_byte];
+                typed.extend_from_slice(&legacy);
+                assert!(
+                    Pallet::<Test>::is_valid_receipt_rlp(&typed),
+                    "a 0x{type_byte:02x}-typed receipt is a receipt"
+                );
+            }
+        }
+
+        #[test]
+        fn a_receipt_that_is_not_a_list_is_still_refused() {
+            for (case, bytes) in [
+                ("empty", vec![]),
+                ("empty list", vec![0xc0]),
+                ("type byte with no body", vec![0x02]),
+                ("type byte then a non-list", vec![0x02, 0x01, 0x02, 0x03]),
+                ("truncated body", vec![0x02, 0xc5, 0x01]),
+                ("absurd long-list length", vec![0xfa, 0x01]),
+            ] {
+                assert!(
+                    !Pallet::<Test>::is_valid_receipt_rlp(&bytes),
+                    "{case} must be refused: {bytes:?}"
+                );
+            }
+        }
+
+        #[test]
+        fn the_removed_rule_is_what_refused_a_typed_receipt() {
+            // The gate used to be `if rlp[0] < 0xc0 { return false }` over the raw
+            // bytes, with no notion of a type prefix. A typed receipt's first byte
+            // is its type — `0x02` for EIP-1559 — so it was refused there, before
+            // anything looked at the receipt. Both halves of that are asserted so
+            // the reason this changed is checkable rather than remembered.
+            let typed = [0x02u8, 0xc3, 0x01, 0x02, 0xc0];
+            assert!(typed[0] < 0xc0, "a typed receipt starts with its type byte");
+            assert!(
+                Pallet::<Test>::is_valid_receipt_rlp(&typed),
+                "and the structure after the type byte is what gets checked"
+            );
         }
     }
 }

@@ -224,7 +224,18 @@ impl EvmReceipt {
     /// X3 gateway emits `DepositLocked` (success) and reverts on failure,
     /// so we never accept a pre-Byzantium root-form receipt.
     pub fn decode(rlp: &[u8]) -> Result<Self, EvmReceiptError> {
-        let s = rlp::Rlp::new(rlp);
+        // EIP-2718: a typed receipt is `type || rlp(payload)` — `0x01` for
+        // EIP-2930, `0x02` for EIP-1559, `0x03` for EIP-4844 — and the type byte
+        // is part of the consensus encoding, so it is skipped here rather than
+        // stripped from the bytes the caller keeps (the trie leaf commits to the
+        // whole thing, type byte included). Refusing typed receipts meant this
+        // verifier could only ever accept a leg whose transaction was sent by a
+        // legacy signer; every wallet since 2021 emits `0x02`.
+        let body = match rlp.first() {
+            Some(byte) if TYPED_RECEIPT_TYPES.contains(byte) => &rlp[1..],
+            _ => rlp,
+        };
+        let s = rlp::Rlp::new(body);
         if !s.is_list() {
             return Err(EvmReceiptError::BadReceipt);
         }
@@ -512,6 +523,16 @@ impl Nibbles {
         true
     }
 }
+
+/// The EIP-2718 receipt type bytes this code understands.
+///
+/// A typed receipt is `type || rlp(payload)`: EIP-2930 (`0x01`), EIP-1559
+/// (`0x02`), EIP-4844 (`0x03`) and EIP-7702 (`0x04`). They share the same
+/// payload shape as a legacy receipt — `[status, cumulativeGasUsed, logsBloom,
+/// logs]` — which is all the structural checks look at. The list is explicit
+/// rather than a range so an unknown type is refused instead of walked with
+/// assumptions borrowed from a different one.
+pub const TYPED_RECEIPT_TYPES: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
 
 // ── Receipts-trie construction ─────────────────────────────────────────────
 //
@@ -1439,6 +1460,36 @@ mod tests {
         assert_eq!(
             receipts_trie_proof(&receipts, 2),
             Err(EvmReceiptError::BadProof)
+        );
+    }
+
+    #[test]
+    fn a_typed_receipt_decodes_like_a_legacy_one() {
+        let address = [0xAAu8; 20];
+        let legacy = receipt_with_one_log(address);
+        let decoded = EvmReceipt::decode(&legacy).expect("legacy receipt");
+        assert!(decoded.status);
+        assert_eq!(decoded.logs.len(), 1);
+
+        for type_byte in TYPED_RECEIPT_TYPES {
+            let mut typed = vec![type_byte];
+            typed.extend_from_slice(&legacy);
+            let typed_decoded = EvmReceipt::decode(&typed)
+                .unwrap_or_else(|e| panic!("typed receipt 0x{type_byte:02x} must decode: {e}"));
+            assert_eq!(typed_decoded.status, decoded.status);
+            assert_eq!(typed_decoded.cumulative_gas_used, decoded.cumulative_gas_used);
+            assert_eq!(typed_decoded.logs.len(), decoded.logs.len());
+            assert_eq!(typed_decoded.logs[0].address, decoded.logs[0].address);
+        }
+    }
+
+    #[test]
+    fn a_type_byte_without_a_receipt_body_is_refused() {
+        assert_eq!(EvmReceipt::decode(&[0x02]), Err(EvmReceiptError::BadReceipt));
+        // A type byte followed by something that is not an RLP list.
+        assert_eq!(
+            EvmReceipt::decode(&[0x02, 0x01, 0x02, 0x03]),
+            Err(EvmReceiptError::BadReceipt)
         );
     }
 
