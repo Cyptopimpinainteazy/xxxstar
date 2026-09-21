@@ -20,3 +20,12 @@ x3-proof-envelope = { path = "../x3-proof-envelope" }
 x3-validator-attestation = { path = "../x3-validator-attestation" }
 x3-verification-router = { path = "../x3-verification-router" }
 x3-asset-kernel-types = { path = "../x3-asset-kernel-types", default-features = false, features = ["std"] }
+# The digest every deposit attestation signs. `no_std`-compatible and already in
+# the workspace lockfile (the verification router hashes Solana attestations with
+# the same primitive).
+blake2 = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+# Signing test attestations. The verification itself lives in
+# `x3-validator-attestation`; this is only so the tests can produce signatures.
+ed25519-dalek = { version = "2.1", default-features = false }

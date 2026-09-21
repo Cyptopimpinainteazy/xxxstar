@@ -18,7 +18,7 @@ use x3_gateway_risk_engine::{
 };
 use x3_proof_dispute::{DisputeError, DisputeStatus, DisputeTracker, DisputeWindow};
 use x3_proof_envelope::{ProofEnvelope, ProofId};
-use x3_validator_attestation::ValidatorId;
+use x3_validator_attestation::{Attestation, AttestationSet, ValidatorId};
 use x3_verification_router::{
     ExternalChainId, VerificationRequest, VerificationResult, VerificationRouter,
     VerificationStrategy,
@@ -215,13 +215,34 @@ impl SupplyLedgerGateway for InMemoryGatewayLedger {
 }
 
 /// A registered external validator set used for proof attestation quorum.
+///
+/// Each entry carries the Ed25519 key its attestations are verified against.
+/// The set used to be a list of names, which is why the quorum check could not
+/// verify anything: there was no key to verify a signature with, so a
+/// "signature" was any non-empty byte vector.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Validator {
+    pub id: ValidatorId,
+    pub public_key: [u8; 32],
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatorSet {
     pub set_id: u64,
-    pub validators: Vec<ValidatorId>,
+    pub validators: Vec<Validator>,
     pub threshold: u64,
     pub active_from_block: u64,
     pub active_until_block: u64,
+}
+
+/// One validator's signature over a deposit proof's statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidatorAttestation {
+    pub signer: ValidatorId,
+    /// Ed25519 public key. It has to be one of the set's authorized keys.
+    pub public_key: [u8; 32],
+    /// Ed25519 signature over [`gateway_attestation_statement`].
+    pub signature: Vec<u8>,
 }
 
 /// Signer attestations accompanying an attested deposit proof.
@@ -231,10 +252,38 @@ pub struct GatewayAttestationSet {
     pub source_chain: u64,
     pub source_tx_hash: [u8; 32],
     pub event_hash: [u8; 32],
-    pub signers: Vec<ValidatorId>,
-    pub signatures: Vec<Vec<u8>>,
+    pub attestations: Vec<ValidatorAttestation>,
     pub threshold: u64,
     pub created_at_block: u64,
+}
+
+/// The 32-byte statement every attestation for a deposit proof signs.
+///
+/// `BLAKE2b-256("x3-gateway-deposit-attestation-v1" || proof_id ||
+/// source_chain_le || source_tx_hash || event_hash)`.
+///
+/// It exists as a function so the producer and the verifier cannot disagree
+/// about what was signed — the failure that makes a signature check pass for
+/// the wrong reason. Every field an attestation is *for* is inside the digest,
+/// so a signature cannot be lifted onto another deposit.
+pub fn gateway_attestation_statement(
+    proof_id: &ProofId,
+    source_chain: u64,
+    source_tx_hash: &[u8; 32],
+    event_hash: &[u8; 32],
+) -> [u8; 32] {
+    use blake2::digest::consts::U32;
+    use blake2::{Blake2b, Digest};
+
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(b"x3-gateway-deposit-attestation-v1");
+    hasher.update(proof_id);
+    hasher.update(source_chain.to_le_bytes());
+    hasher.update(source_tx_hash);
+    hasher.update(event_hash);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&hasher.finalize());
+    out
 }
 
 /// Verdict recorded for an attested proof.
@@ -252,6 +301,27 @@ pub enum AttestationError {
     DuplicateValidator,
     WrongEventHash,
     BelowThreshold,
+    /// The set has no key that signed this attestation.
+    UnauthorizedValidator,
+    /// The key or the signature is malformed.
+    MalformedAttestation,
+    /// The signature does not verify over the statement.
+    InvalidSignature,
+}
+
+impl From<x3_validator_attestation::AttestationError> for AttestationError {
+    fn from(error: x3_validator_attestation::AttestationError) -> Self {
+        use x3_validator_attestation::AttestationError as Upstream;
+        match error {
+            Upstream::EmptySignature => AttestationError::EmptySignature,
+            Upstream::DuplicateValidator => AttestationError::DuplicateValidator,
+            Upstream::StatementMismatch => AttestationError::WrongEventHash,
+            Upstream::UnauthorizedValidator => AttestationError::UnauthorizedValidator,
+            Upstream::SignatureVerificationFailed => AttestationError::InvalidSignature,
+            Upstream::InvalidPublicKey
+            | Upstream::InvalidSignatureLength { .. } => AttestationError::MalformedAttestation,
+        }
+    }
 }
 
 /// Tracks registered validator sets and per-proof attestation quorum.
@@ -278,7 +348,21 @@ impl ValidatorAttestationEngine {
         self.statuses.get(&proof_id).copied()
     }
 
-    /// Verify a signer list reaches quorum against the registered set.
+    /// Verify the attestations reach quorum against the registered set.
+    ///
+    /// Every attestation is an Ed25519 signature over
+    /// [`gateway_attestation_statement`] and is checked by
+    /// `x3-validator-attestation`, which also enforces that the signing key is
+    /// one of the set's authorized keys and that no validator is counted twice.
+    ///
+    /// This used to count signers: it checked that the signer's *name* was in the
+    /// set, that the list had no duplicates and that every signature was
+    /// non-empty — and never verified one. `signatures: vec![vec![1], vec![2]]`
+    /// reached quorum, so the quorum a deposit stood on was the caller's claim.
+    ///
+    /// A rejected attestation is an error rather than a vote that quietly does
+    /// not count: a set carrying a bad signature is either misconfigured or
+    /// hostile, and neither should be settled against.
     pub fn verify_quorum(
         &mut self,
         set_id: u64,
@@ -293,27 +377,41 @@ impl ValidatorAttestationEngine {
             .get(&set_id)
             .cloned()
             .ok_or(AttestationError::BelowThreshold)?;
-        if attestation.signers.len() != attestation.signatures.len() {
-            return Err(AttestationError::EmptySignature);
+        if set.validators.is_empty() {
+            // Nothing can be verified against an empty set, so this fails closed
+            // rather than reaching the threshold by arithmetic.
+            return Err(AttestationError::BelowThreshold);
         }
-        let mut signers = HashSet::new();
+
+        let statement = gateway_attestation_statement(
+            &attestation.proof_id,
+            attestation.source_chain,
+            &attestation.source_tx_hash,
+            &attestation.event_hash,
+        );
+        let mut verified = AttestationSet::with_authorized_validators(
+            statement,
+            set.validators.iter().map(|validator| validator.public_key),
+        );
+        for attestation in &attestation.attestations {
+            verified
+                .add_attestation(Attestation {
+                    validator: attestation.signer.clone(),
+                    statement_hash: statement,
+                    public_key: attestation.public_key,
+                    signature: attestation.signature.clone(),
+                    // One per verified validator, never the caller's number: a
+                    // weight carried by the attestation is a weight chosen by the
+                    // party being verified, so a single signature could claim the
+                    // whole threshold. `ValidatorSet::threshold` counts distinct
+                    // authorized validators, which is what this encodes.
+                    weight: 1,
+                })
+                .map_err(AttestationError::from)?;
+        }
+
         let threshold = set.threshold.max(attestation.threshold);
-        for (signer, sig) in attestation
-            .signers
-            .iter()
-            .zip(attestation.signatures.iter())
-        {
-            if sig.is_empty() {
-                return Err(AttestationError::EmptySignature);
-            }
-            if !set.validators.contains(signer) {
-                return Err(AttestationError::DuplicateValidator);
-            }
-            if !signers.insert(signer.0.clone()) {
-                return Err(AttestationError::DuplicateValidator);
-            }
-        }
-        if (signers.len() as u64) < threshold {
+        if !verified.has_quorum(threshold) {
             self.statuses
                 .insert(proof_id, AttestationStatus::BelowThreshold);
             return Err(AttestationError::BelowThreshold);
@@ -457,6 +555,21 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
         ) {
             return Err(GatewayError::VerificationFailed(
                 "route_does_not_accept_validator_quorum".to_string(),
+            ));
+        }
+        // An attestation authorizes *one* deposit. The statement binds the proof
+        // id, the source transaction and the event, so without this check a set of
+        // signatures gathered for one deposit could be presented with a different
+        // envelope: the statement would differ, but only the attestation's own
+        // copy of it is signed, so the mismatch has to be refused here.
+        if attestation.proof_id != proof_envelope.proof_id {
+            return Err(GatewayError::VerificationFailed(
+                "attestation_proof_id_mismatch".to_string(),
+            ));
+        }
+        if attestation.source_tx_hash != proof_envelope.source_tx_hash {
+            return Err(GatewayError::VerificationFailed(
+                "attestation_source_tx_hash_mismatch".to_string(),
             ));
         }
         // Verify quorum before accepting the proven deposit.
@@ -863,12 +976,15 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
     use std::sync::Arc;
     use x3_circuit_breaker::CircuitBreakerScope;
     use x3_external_route_registry::{GatewayMode, X3Domain};
     use x3_gateway_insurance::InsuranceFundStatus;
     use x3_validator_attestation::ValidatorId;
-    use x3_verification_router::{ExternalAssetRef, ValidatorQuorumVerifier, VerificationStrategy};
+    use x3_verification_router::{
+        ExternalAssetRef, VerificationError, VerificationOutcome, VerificationStrategy, Verifier,
+    };
 
     fn asset() -> ExternalAssetRef {
         ExternalAssetRef {
@@ -936,22 +1052,64 @@ mod tests {
         gateway
     }
 
-    /// The production caller supplies a pre-configured verification router with
-    /// verifiers registered for the route strategies. Tests emulate that here so
-    /// deposits on the default ValidatorQuorum route can actually verify.
+    /// Accepts every envelope.
+    ///
+    /// The verification router's own `ValidatorQuorumVerifier` fails closed by
+    /// design (see `docs/reports/SECURITY_BLOCKERS.md`), so registering it here
+    /// made every deposit in this suite fail with "no verifier implemented for
+    /// this strategy" — which is what made these five tests red. What this suite
+    /// covers is the gateway's own bookkeeping: routing, credit, replay, dispute
+    /// windows. Whether a proof is real is the router's job and is tested in
+    /// `x3-verification-router`, and the attested path's signature check is
+    /// covered below against real Ed25519 keys.
+    struct PlumbingVerifier;
+
+    impl Verifier for PlumbingVerifier {
+        fn verify(
+            &self,
+            _proof: &x3_verification_router::ProofEnvelope,
+        ) -> Result<VerificationOutcome, VerificationError> {
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "gateway_plumbing_test",
+                verified_at_height: None,
+            })
+        }
+
+        fn strategy(&self) -> VerificationStrategy {
+            VerificationStrategy::ValidatorQuorum {
+                threshold: 2,
+                total: 3,
+            }
+        }
+    }
+
     fn register_default_verifiers(gateway: &mut CrosschainGateway<InMemoryGatewayLedger>) {
         gateway
             .verification_router
-            .register_verifier(Arc::new(ValidatorQuorumVerifier::new(2, 3)));
+            .register_verifier(Arc::new(PlumbingVerifier));
+    }
+
+    /// Deterministic Ed25519 keys: the attestation statement has to be the same
+    /// one the verifier recomputes, so nothing here may be random.
+    fn signing_key(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; 32])
+    }
+
+    fn validator(seed: u8, name: &str) -> Validator {
+        Validator {
+            id: ValidatorId(name.to_string()),
+            public_key: signing_key(seed).verifying_key().to_bytes(),
+        }
     }
 
     fn validator_set() -> ValidatorSet {
         ValidatorSet {
             set_id: 1,
             validators: vec![
-                ValidatorId("alice".to_string()),
-                ValidatorId("bob".to_string()),
-                ValidatorId("carol".to_string()),
+                validator(1, "alice"),
+                validator(2, "bob"),
+                validator(3, "carol"),
             ],
             threshold: 2,
             active_from_block: 1,
@@ -959,20 +1117,45 @@ mod tests {
         }
     }
 
-    fn attestation(proof_id: ProofId) -> GatewayAttestationSet {
+    /// An attestation set signed by `signers`, over the statement for this proof.
+    fn attestation_signed_by(
+        proof_id: ProofId,
+        signers: &[(u8, &str)],
+    ) -> GatewayAttestationSet {
+        let source_chain = 1u64;
+        let source_tx_hash = [7u8; 32];
+        let event_hash = [6u8; 32];
+        let statement = gateway_attestation_statement(
+            &proof_id,
+            source_chain,
+            &source_tx_hash,
+            &event_hash,
+        );
+        let attestations = signers
+            .iter()
+            .map(|(seed, name)| {
+                let key = signing_key(*seed);
+                ValidatorAttestation {
+                    signer: ValidatorId((*name).to_string()),
+                    public_key: key.verifying_key().to_bytes(),
+                    signature: key.sign(&statement).to_bytes().to_vec(),
+                }
+            })
+            .collect();
         GatewayAttestationSet {
             proof_id,
-            source_chain: 1,
-            source_tx_hash: [7; 32],
-            event_hash: [6; 32],
-            signers: vec![
-                ValidatorId("alice".to_string()),
-                ValidatorId("bob".to_string()),
-            ],
-            signatures: vec![vec![1], vec![2]],
+            source_chain,
+            source_tx_hash,
+            event_hash,
+            attestations,
             threshold: 2,
             created_at_block: 50,
         }
+    }
+
+    /// The common case: alice and bob, the set's first two validators.
+    fn attestation(proof_id: ProofId) -> GatewayAttestationSet {
+        attestation_signed_by(proof_id, &[(1, "alice"), (2, "bob")])
     }
 
     #[test]
@@ -1027,12 +1210,101 @@ mod tests {
         gateway.register_validator_set(validator_set());
         let proof = proof(100, 1);
         let mut attestation = attestation(proof.proof_id);
-        attestation.signers.pop();
-        attestation.signatures.pop();
+        attestation.attestations.pop();
 
         assert!(matches!(
             gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
             Err(GatewayError::Attestation(AttestationError::BelowThreshold))
+        ));
+    }
+
+    #[test]
+    fn a_tampered_attestation_signature_is_refused() {
+        let mut gateway = gateway();
+        gateway.register_validator_set(validator_set());
+        let proof = proof(100, 1);
+        let mut attestation = attestation(proof.proof_id);
+        attestation.attestations[0].signature[0] ^= 0xFF;
+
+        // InvalidSignature, not BelowThreshold: the signature was *checked*, and
+        // this must not pass for the arithmetic reason instead.
+        assert!(matches!(
+            gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
+            Err(GatewayError::Attestation(AttestationError::InvalidSignature))
+        ));
+    }
+
+    #[test]
+    fn an_attestation_from_a_key_the_set_does_not_authorize_is_refused() {
+        let mut gateway = gateway();
+        gateway.register_validator_set(validator_set());
+        let proof = proof(100, 1);
+        // A well-formed signature from a key nobody authorized, presented as
+        // alice's.
+        let mut attestation = attestation_signed_by(proof.proof_id, &[(9, "alice"), (2, "bob")]);
+        attestation.attestations[0].signer = ValidatorId("alice".to_string());
+
+        assert!(matches!(
+            gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
+            Err(GatewayError::Attestation(
+                AttestationError::UnauthorizedValidator
+            ))
+        ));
+    }
+
+    #[test]
+    fn a_signature_over_another_statement_is_refused() {
+        let mut gateway = gateway();
+        gateway.register_validator_set(validator_set());
+        let proof = proof(100, 1);
+        // Correct signers, correct proof id, but the event hash the signatures
+        // were made over is not the one presented: the statement the verifier
+        // recomputes differs, so the signatures cannot verify.
+        let mut attestation = attestation(proof.proof_id);
+        for entry in &mut attestation.attestations {
+            let statement = gateway_attestation_statement(
+                &attestation.proof_id,
+                attestation.source_chain,
+                &attestation.source_tx_hash,
+                &[0xAA; 32],
+            );
+            let key = signing_key(if entry.signer.0 == "alice" { 1 } else { 2 });
+            entry.signature = key.sign(&statement).to_bytes().to_vec();
+        }
+
+        assert!(matches!(
+            gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
+            Err(GatewayError::Attestation(AttestationError::InvalidSignature))
+        ));
+    }
+
+    #[test]
+    fn the_same_validator_cannot_be_counted_twice() {
+        let mut gateway = gateway();
+        gateway.register_validator_set(validator_set());
+        let proof = proof(100, 1);
+        let attestation =
+            attestation_signed_by(proof.proof_id, &[(1, "alice"), (1, "alice")]);
+
+        assert!(matches!(
+            gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
+            Err(GatewayError::Attestation(
+                AttestationError::DuplicateValidator
+            ))
+        ));
+    }
+
+    #[test]
+    fn attestations_for_another_deposit_do_not_authorize_this_one() {
+        let mut gateway = gateway();
+        gateway.register_validator_set(validator_set());
+        // Signatures for one proof, presented with a different envelope.
+        let other = proof(999, 7);
+        let attestation = attestation(other.proof_id);
+
+        assert!(matches!(
+            gateway.submit_attested_deposit_proof([1; 32], proof(100, 1), 1, attestation),
+            Err(GatewayError::VerificationFailed(_))
         ));
     }
 
