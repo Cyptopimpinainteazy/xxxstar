@@ -268,6 +268,10 @@ already exist on current `master`:
 Disposition: pre-rewrite or partial lineages; review individual hunks only if a named capability is
 missing from master, otherwise archive.
 
+`fix/agent-guard-bip39-allow` is already represented on master: the mobile SDK already uses the bip39
+2.x `parse_in`/`to_seed` API, and `scripts/agent_guard.py` already has the corresponding
+`Mnemonic::parse_in` pattern. The branch's only addition is comment wording; archive it.
+
 ### Remaining novel heads by first-file subsystem
 
 The remaining heads group as:
