@@ -297,6 +297,44 @@ def check_shipped_genesis_boots() -> None:
     ok(f"shipped genesis: {summary}")
 
 
+def check_release_artifacts() -> None:
+    """The files a release is made of have to be installable.
+
+    The release pipeline has never executed a step: `v0.4.0-rc.1` is 1,027 commits
+    behind master and the workflow file *at that tag* asked for `ubuntu-latest`,
+    which is billing-locked here, so both runs finished in ~4 seconds with zero
+    steps and the draft release has no assets. Nothing checked that the artifact
+    set is coherent — that the checksum file names the binary, that the tarball
+    extracts to something runnable, or that the installer accepts what the release
+    ships. This stage builds the bundle from the binary stage 2 produced and does
+    exactly that, including refusing a tampered copy.
+    """
+    print("\n── 2e. Release artifacts are installable ──")
+    script = ROOT / "scripts" / "mainnet" / "release-artifacts-gate.sh"
+    if not script.exists():
+        fail(
+            "scripts/mainnet/release-artifacts-gate.sh is missing — nothing checks "
+            "the release bundle"
+        )
+        return
+    result = run(["bash", str(script)], env=node_binary_env())
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("the release artifact bundle is not installable")
+        for line in output.splitlines()[-12:]:
+            print(f"    {line}")
+        return
+    summary = next(
+        (
+            line.split("] ", 1)[1]
+            for line in output.splitlines()
+            if "[artifact-gate] " in line and "PASS" in line
+        ),
+        "release bundle verifies, extracts, runs and installs",
+    )
+    ok(summary)
+
+
 def check_validator_install() -> None:
     """The operator's install path has to work, or nobody can run a validator.
 
@@ -690,6 +728,7 @@ def main() -> int:
     check_chain_runs()
     check_validators_agree()
     check_validator_install()
+    check_release_artifacts()
     check_chain_spec_artifacts()
     check_shipped_genesis_boots()
     check_production_genesis()
