@@ -30,7 +30,7 @@ the permissions the image's `builder` user needs — see that script).
 The second run was a from-scratch rebuild (`runtime/target/srtool` removed
 first), so this is not one artifact reported twice.
 
-The hashes below describe revision `5775b1587`. They are **not** a fixed
+The hashes below describe revision `5ccdebd22`. They are **not** a fixed
 property of the project: any runtime-affecting change produces different WASM,
 which is why `docs/reports/runtime-wasm-hashes.json` names the revision it was
 recorded at, and why `scripts/mainnet_release_gate.py` **rebuilds and compares**
@@ -40,26 +40,26 @@ updating the record in the same change.
 
 Earlier pairs of builds (compact `0x78feb683…`, `0xb1f0348c…`, `0xb1777a09…`) were taken at older
 revision and is kept here only as the record of how this was established; the
-current values are the `0x47acc821…` pair (recorded at `5775b1587`).
+current values are the `0xcb25ed8c…` pair (recorded at `5ccdebd22`).
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,424,386 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,437,524 bytes)**
 
 ```
 Version          : x3-chain-11 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0x733d6faa7a12face9b6346165d06f5ebe96ddef29c169d50ce9f604c118ced4d
+setCode          : 0xcb25ed8c5a789b785de9809366aaa1df19ceb6ec16850fef8a2474a9a0a73738
 authorizeUpgrade : 0x4745cb20348fd82585402630fd6460348c668f40088a8b18d7c38b4e375d49ab
-IPFS             : QmeocZ2WgT2BSv7FMNmWYgR7GfSw5AVkvpPPQ1bX9sAywM
-BLAKE2_256       : 0x47acc8211bf5e787ac1f7e5a937f26e616e3d1a594b2cc1cb35d88fa11991ccf
+IPFS             : QmSZCv1djF2YNfJeEruaz16RqL6SLh81MQfWjuiwTmaSA5
+BLAKE2_256       : 0xeabb30565606734ee4206d765152196a6e8eb3596948f2d9f7343a711d350194
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,442,745 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,442,679 bytes)**
 
 ```
-setCode          : 0x9d7e04a43c45f5d887ac8d9b93a614abbecf71af52f7ba4a57ab19bbff4904d1
+setCode          : 0x0831ed66a50a66d2cc463c7a39e4500880d782e4298b85afdde08ea86e277a3b
 authorizeUpgrade : 0xe1c960e5633cdd9e29bf1f7200838a5d261fc8fd148a476acb9293477f87150c
-IPFS             : QmYLcDxcLaB3MPf3xfSFETi8NFfDz6Y9sMo8UgHyxqvWUU
-BLAKE2_256       : 0x380527faeabbd5e48ff14aba6cf1bf5e888a22b28bdec676a712909ea6e525ed
+IPFS             : QmUs68aGhFNYrsFYQ8A9b5Y37uvaarAJwYoTQz63DcDfGC
+BLAKE2_256       : 0x67a2d8be5e25cae48ee09aad4792ba6f33e414331c2154f7db0a780cc02858e9
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

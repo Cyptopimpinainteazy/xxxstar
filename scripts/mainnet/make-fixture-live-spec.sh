@@ -195,6 +195,20 @@ assert boot == expected, f"bootNodes mismatch:\n  spec:     {boot}\n  expected: 
 for forbidden in ("Alice", "Bob", "Charlie", "/Alice", "/Bob", "TestnetAlpha", "ValidatorAlpha"):
     assert forbidden not in raw, f"dev seed marker {forbidden!r} leaked into the {expected_name} genesis"
 
+# A network a validator can join must not accept a cross-domain proof set whose
+# underlying proof nothing verified: that is the parameter that decides whether a
+# terminal refund can be released against a self-attested bundle.
+settlement = (
+    spec.get("genesis", {})
+    .get("runtimeGenesis", {})
+    .get("config", {})
+    .get("x3SettlementEngine", {})
+)
+assert settlement.get("allowUnattestedCrossDomainProofs") is False, (
+    "the Live genesis allows unattested cross-domain proof sets; "
+    f"x3SettlementEngine = {settlement}"
+)
+
 print(f"[fixture-spec] spec ok: {os.path.getsize(path)} bytes, 3 authorities, {len(boot)} bootnodes")
 PY
 
