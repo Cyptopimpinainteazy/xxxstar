@@ -5159,6 +5159,10 @@ Progress 2026-09-21: x3-lang-specific novel heads were triaged in the same repor
 already-on-master or pre-rewrite, one is unrelated-lineage archive material, and
 `wip/x3lang-preserve-packets-and-arbitrage-20260919` is the remaining large candidate to review.
 
+Progress 2026-09-21: `wip/x3lang-preserve-packets-and-arbitrage-20260919` is also pre-rewrite; its
+`arbitrage.rs` and `opportunity_packet.rs` are already represented by current `compiler/src/arb.rs`
+and `vm/src/opportunity_packet.rs`.
+
 ## TICKET-127 — `x3c fmt` deleted declarations and parameter lists — CLOSED
 Type: CLOSED in `bf37dcb14` (2026-09-20) · Subsystem: compiler/src/formatter.rs
 Found by running the command and reading its output against the input (TICKET-124's method).

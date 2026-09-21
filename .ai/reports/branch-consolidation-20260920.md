@@ -142,8 +142,11 @@ one-at-a-time `diff -> keep missing capability -> drop the rest` review TICKET-1
 - `archive/stale-x3lang-trading-wip-20260918` — stale. Trading Core v1 was later implemented and merged
   through `codex/x3-trading-core-v1`; this branch is the earlier WIP and should remain archived.
 - `fix-x3lang-python` — unrelated lineage with no merge base against master; archive rather than merge.
-- `wip/x3lang-preserve-packets-and-arbitrage-20260919` — still needs review; it is the largest
-  x3-lang branch and may carry novel packet/arbitrage capability not yet on master.
+- `wip/x3lang-preserve-packets-and-arbitrage-20260919` — pre-rewrite spelling. Its new
+  `compiler/src/arbitrage.rs` is the older `arb` plan contract; master's `compiler/src/arb.rs`
+  already implements the same PHASE 37 `ArbDecl`/`ArbPlan` machinery. Its VM
+  `opportunity_packet.rs` and tests already exist on master too. The branch should be archived rather
+  than merged.
 | 94.2% | 56 | 3917 | 3691 | 25 | `origin/archive/local-20260920/finish/x3vm-live-transport` |
 | 94.5% | 5 | 73 | 69 | 5 | `origin/archive/local-20260920/feat/x3-lang-crosschain-integration-20260909` |
 | 94.9% | 21 | 2604 | 2470 | 14 | `origin/archive/local-20260920/finish/x3vm-live-transport-fix` |
