@@ -267,3 +267,13 @@ already exist on current `master`:
 
 Disposition: pre-rewrite or partial lineages; review individual hunks only if a named capability is
 missing from master, otherwise archive.
+
+### Remaining novel heads by first-file subsystem
+
+The remaining heads group as:
+
+- CI/workflow-only (`.github/*`, `.dockerignore`, `.ai/*`, `.serena/*`): configuration and process
+  changes, not product capability.
+- Runtime/crate (`crates/*`, `pallets/*`): needs targeted hunk review.
+- `docs/grant-readiness-truth-20260908` and `fix-x3lang-python` have no merge base against current
+  master and are archive material.
