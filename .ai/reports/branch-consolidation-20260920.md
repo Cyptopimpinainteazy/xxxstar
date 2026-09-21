@@ -296,6 +296,10 @@ Second measured blocker: the branch's `EconomicPolicy` still expects `max_total_
 economic layer is therefore stale relative to master and must be rewritten against the current
 policy schema rather than merged directly.
 
+Resolution: current master already has the newer `x3-lang/vm/src/economic.rs` and
+`x3-lang/vm/tests/economic_types.rs`. The branch's economic-safety-kernel layer is superseded by
+master's evolved schema; no merge is needed for this branch.
+
 ### Already-represented runtime branches
 
 - `feat/secret-release-firewall-20260911`
