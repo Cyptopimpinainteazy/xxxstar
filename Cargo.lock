@@ -27361,6 +27361,7 @@ dependencies = [
  "reqwest 0.12.28",
  "scale-info",
  "serde",
+ "serde_json",
  "sp-core 39.0.0",
  "sp-io 44.0.0",
  "sp-runtime 45.0.0",

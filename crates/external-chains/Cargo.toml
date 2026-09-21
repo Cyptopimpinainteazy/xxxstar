@@ -25,6 +25,9 @@ async-trait = "0.1"
 
 # Serialization
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+# Log and block responses are arrays of objects, which the module's string
+# scanning cannot read safely. `alloc` keeps this available in a no_std build.
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 hex-literal = "0.4"
 
 # Utilities
@@ -56,5 +59,6 @@ std = [
     "x3-evm-integration/std",
     "x3-cross-vm-bridge/std",
     "serde/std",
+    "serde_json/std",
     "log/std",
 ]
