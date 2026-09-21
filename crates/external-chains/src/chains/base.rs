@@ -48,55 +48,10 @@ pub const L2_CROSS_DOMAIN_MESSENGER: H160 = H160(hex_literal::hex!(
 /// for headroom.
 pub const GAS_ESTIMATE_MARGIN_PERCENT: u64 = 25;
 
-/// An EIP-155 signer for this adapter's chain.
-///
-/// Key material stays here and never goes into [`ChainConfig`] (which is
-/// SCALE-encoded, logged and serialised). The crypto is the workspace's single
-/// EIP-155 implementation, in `x3-atomic-swap`'s `ethereum_tx`; this type exists so
-/// an adapter can hold a key without growing a second implementation.
+/// The signer the adapters share; it lives in [`crate::signer`] now that more than
+/// one adapter holds one.
 #[cfg(feature = "std")]
-#[derive(Debug, Clone)]
-pub struct EvmSigner {
-    private_key_hex: String,
-    address: H160,
-}
-
-#[cfg(feature = "std")]
-impl EvmSigner {
-    /// Derive the sender's address from a 32-byte private key (`0x`-prefixed).
-    ///
-    /// A key that does not derive an address is refused here rather than at the
-    /// first send: failing later puts the error somewhere harder to read.
-    pub fn from_private_key(private_key_hex: &str) -> AdapterResult<Self> {
-        let address_hex =
-            x3_atomic_swap::ethereum_tx::Transaction::address_from_private_key(private_key_hex)
-                .map_err(|e| ExternalChainError::internal(&format!("invalid private key: {e}")))?;
-        let bytes = hex::decode(address_hex.trim_start_matches("0x")).map_err(|e| {
-            ExternalChainError::internal(&format!("derived address is not hex: {e}"))
-        })?;
-        if bytes.len() != 20 {
-            return Err(ExternalChainError::internal(&format!(
-                "derived address is {} bytes, not 20",
-                bytes.len()
-            )));
-        }
-        let mut address = [0u8; 20];
-        address.copy_from_slice(&bytes);
-        Ok(Self {
-            private_key_hex: private_key_hex.to_string(),
-            address: H160(address),
-        })
-    }
-
-    /// The address this signer sends from.
-    pub fn address(&self) -> H160 {
-        self.address
-    }
-
-    fn private_key_hex(&self) -> &str {
-        &self.private_key_hex
-    }
-}
+pub use crate::signer::EvmSigner;
 
 /// The canonical OP-Stack message event:
 ///
@@ -391,9 +346,7 @@ impl ChainAdapter for BaseAdapter {
                 data: format!("0x{}", hex::encode(&data)),
                 chain_id: self.config.chain_type,
             };
-            let signed = transaction.sign(signer.private_key_hex()).map_err(|e| {
-                ExternalChainError::internal(&format!("could not sign the transaction: {e}"))
-            })?;
+            let signed = signer.sign_transaction(transaction)?;
 
             crate::evm_rpc::send_raw_transaction(&url, &signed).await
         }
