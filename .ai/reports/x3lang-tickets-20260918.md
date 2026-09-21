@@ -1699,8 +1699,8 @@ measurement above is what would have caught a reader that read one and not the o
 Original text: `70%` is `Int` + `Percent`; `0.5%` is a `Percentage` literal whose value carries a `%`.
 One construct, two token shapes, nothing a reader would predict.
 
-## TICKET-066 — the VM keeps its own MPT verifier — OPEN
-Type: OPEN, decision · Subsystem: x3-lang/vm/src/bridge.rs + crates/x3-verification-router
+## TICKET-066 — the VM keeps its own MPT verifier — CLOSED
+Type: CLOSED (2026-09-20, boundary recorded) · Subsystem: x3-lang/vm/src/bridge.rs + crates/x3-verification-router
 Reason: the workspace has one MPT implementation (`x3-verification-router`'s), used by the relayer and
 by the settlement path; `x3-lang/vm/src/bridge.rs` keeps its own copy because it is a separate
 workspace. Whether the VM should use the router's verifier instead is a dependency decision (the VM
@@ -1708,6 +1708,10 @@ would take a `no_std` dependency on a root crate, which the workspace split exis
 Acceptance criteria: either the VM depends on the router's verifier and its own copy is deleted, or the
 duplication is recorded with the reason it stays.
 Validation: `rg "verify_evm_receipt_proof"` has one implementation, or the entry names two and why.
+
+Resolution: the duplicate stays. `x3-lang/vm/src/bridge.rs` now documents the workspace-split reason:
+the VM deliberately avoids a `no_std` dependency on the root `x3-verification-router`, so the verifier
+is duplicated until that boundary changes.
 
 ## TICKET-088 — a route swap that states no `amount` lowered to zero — CLOSED
 Type: CLOSED in `47e944662` (2026-09-19) · Subsystem: x3-lang/compiler (lowering)
