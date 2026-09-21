@@ -41,7 +41,16 @@ jobs:
       
       - name: 📋 Copy metrics to public
         run: |
-          [ -f proof-score.json ] && cp proof-score.json public/ || true
+          # The repository-root proof-score.json was a fabricated success artifact:
+          # "Good / A- / 0.92" while recording `compile_checks_pass: false` and zero
+          # tests of every kind, because `x3-proof dashboard` used to write a
+          # constant score. It has been deleted, and this step refuses to publish
+          # one if it comes back. Only what publish-dashboard.sh just generated for
+          # this job is served.
+          if [ -f proof-score.json ]; then
+            echo "::error::stale repository-root proof-score.json present; refusing to publish"
+            exit 1
+          fi
           [ -f dashboard/proof-score.json ] && cp dashboard/proof-score.json public/ || true
           ls -lah public/
       
