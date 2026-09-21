@@ -27,6 +27,15 @@ pub struct PythOracle {
     pub staleness_threshold_secs: u64,                   // Max age of price (e.g., 60 seconds)
 }
 
+/// `Default` is `new()`: the two numeric fields carry policy defaults (5s
+/// heartbeat, 60s staleness) rather than zeroes, so a derived `Default` would have
+/// produced an oracle that treats every price as instantly stale.
+impl Default for PythOracle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PythOracle {
     pub fn new() -> Self {
         Self {
@@ -77,7 +86,7 @@ impl PythOracle {
         // Log price
         self.price_history
             .entry(symbol.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((publish_time, price));
 
         // Keep history window (last 1000 prices)
