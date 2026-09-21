@@ -276,6 +276,21 @@ missing from master, otherwise archive.
 carry the measured-slippage state and `X3_SLIPPAGE_ABOVE_CEILING` enforcement. The branch is a
 pre-rewrite/partial spelling of that path and should be archived.
 
+### Already-represented runtime branches
+
+- `feat/secret-release-firewall-20260911`
+- `feat/live-secret-release-firewall-20260911`
+- `finish/x3vm-live-transport`
+- `finish/x3vm-live-transport-fix`
+- `feat/settlement-proofset-gate-20260911`
+- `feat/canonical-cross-domain-proof-bundle-20260911`
+- `test/cross-domain-recovery-matrix-20260911`
+- `test/cross-domain-refund-recovery-20260911`
+
+Their key files (`secret_release.rs`, `x3vm_htlc.rs`, `x3vm_live.rs`, `x3vm_native.rs`, and the
+settlement/coordinator files) already exist on master. These branches are pre-rewrite or partial
+lineages; archive unless a named capability is missing from master.
+
 ### Remaining novel heads by first-file subsystem
 
 The remaining heads group as:
