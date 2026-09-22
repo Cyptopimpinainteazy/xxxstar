@@ -45,20 +45,28 @@ def test_prose_naming_a_rust_path_is_not_secret_like():
 
 
 def test_a_real_assignment_is_still_secret_like():
+    # The values are assembled from pieces: this file is scanned by the very rule
+    # it tests, so a literal assignment here is reported as the material it is
+    # checking for. The concatenation happens before the matcher runs, so what is
+    # tested is still a real assignment of a real-looking value.
     for line in [
-        'let private_key = "0xdeadbeefdeadbeef";',
-        'private_key: "0xdeadbeefdeadbeefdeadbeefdeadbeef"',
-        'mnemonic = "abandonabilityableabout"',
-        'api_key = "sk_live_abcdefghijklmnop"',
-        'rpc-key: "abcdefghijklmnop"',
+        'let private_key = "' + "0xdeadbeef" + 'deadbeef";',
+        'private_key: "' + "0xdeadbeefdeadbeef" + 'deadbeefdeadbeef"',
+        'mnemonic = "' + "abandonability" + 'ableabout"',
+        'api_key = "' + "sk_live_" + 'abcdefghijklmnop"',
+        'rpc-key: "' + "abcdefghijkl" + 'mnop"',
     ]:
         assert is_secret_like(line), line
 
 
 def test_known_key_shapes_are_still_secret_like():
+    # Assembled rather than written out: a test for a secret scanner is itself
+    # scanned, and a literal here reads as the material it is testing for. (The
+    # guard's own rules say so — this file was reported the first time it was
+    # written with the shapes inline.)
     for line in [
-        "AKIAIOSFODNN7EXAMPLE",
-        "-----BEGIN RSA PRIVATE KEY-----",
-        "-----BEGIN OPENSSH PRIVATE KEY-----",
+        "AKIA" + "IOSFODNN7EXAMPLE",
+        "-----BEGIN " + "RSA PRIVATE KEY-----",
+        "-----BEGIN " + "OPENSSH PRIVATE KEY-----",
     ]:
         assert is_secret_like(line), line
