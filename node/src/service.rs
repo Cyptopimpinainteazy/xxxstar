@@ -1990,26 +1990,49 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
     }
 }
 
-/// Runs the finality voter that writes finality certificates to off-chain storage.
+/// Submits an on-chain anchor for each newly finalized block.
 ///
-/// Listens to block finality notifications and produces a deterministic finality
-/// certificate hash for every finalized block:
-/// - If Flash-Finality is active and has a certificate, uses the Flash cert hash.
-/// - Otherwise, derives a cert hash from the GRANDPA-finalized block hash via
-///   `blake2_256(hash)`. This provides non-zero certs for the unsigned extrinsic
-///   path even when Flash-Finality is not running.
+/// Polls the client's finality head and, for every block it has not yet anchored,
+/// submits the unsigned `X3AtomicKernel::record_flash_finality_anchor` with
+/// `cert = blake2_256(finalized_block_hash)`.
 ///
-/// Written to **off-chain local storage** so the `pallet-x3-atomic-kernel` OCW can
-/// attach it to PoAE proofs as finality_cert.
+/// Three things this function does **not** do, each of which the previous version's
+/// comment claimed or implied:
 ///
-/// Key format: `b"x3ff:" (5 bytes) + block_number (8 bytes LE) = 13 bytes`
-/// Value:      `cert_hash (32 bytes)`
+/// * It does not write `b"x3ff:" + block_number` to off-chain local storage. The
+///   Flash-Finality voter (`run_flash_finality_voter`) is what writes that key, and the
+///   pallet's own OCW is what reads it and submits an anchor from it. There are
+///   therefore two submitters, and the pallet keeps whichever anchor arrives first —
+///   see `.ai/reports/atomic-kernel-finalization-authorization-20260922.md` and
+///   TICKET-097, which is where the meaning of that anchor is being decided.
+/// * It does not use the Flash certificate when one exists. It derives its own value
+///   from the block hash, so its anchor and the OCW's anchor are different values for
+///   the same block and only the first to arrive is stored.
+/// * It does not confirm inclusion. `submit_one` returning `Ok` means the transaction
+///   was accepted into the local pool; whether it lands is the pool's and the author's
+///   business. Success below means "submitted", and the log says so.
+///
+/// A block whose anchor is rejected is retried a bounded number of times — because a
+/// duplicate of another validator's anchor (`Already imported`) and a temporarily banned
+/// transaction both look like errors here and only the second is worth retrying — and if
+/// it never lands the cursor advances with an `error!` naming the height, rather than
+/// being dropped silently.
 async fn run_grandpa_finality_anchor(
     client: Arc<FullClient>,
     pool: Arc<crate::atomic_service::AtomicPool>,
 ) {
     log::info!("⚡ GRANDPA finality anchor task started");
     let mut last_finalized_hash = sp_core::H256::zero();
+    // How many times one block's anchor is re-submitted before this task gives up on it.
+    //
+    // The pool rejects a duplicate of an anchor another validator already submitted
+    // (`Already imported`), which is not a failure of ours, and it also refuses a
+    // transaction it has temporarily banned. Retrying a few times separates the two from
+    // "the anchor never landed", and the bound keeps a stuck height from pinning the
+    // cursor forever.
+    const ANCHOR_ATTEMPTS: u32 = 10;
+    let mut pending: Option<(u64, [u8; 32])> = None;
+    let mut attempts: u32 = 0;
     loop {
         let info = client.info();
         log::debug!(
@@ -2020,9 +2043,12 @@ async fn run_grandpa_finality_anchor(
         if info.finalized_number > 0 && info.finalized_hash != last_finalized_hash {
             let number: u64 = info.finalized_number.saturated_into();
             let hash: [u8; 32] = info.finalized_hash.as_ref().try_into().unwrap_or([0u8; 32]);
-            last_finalized_hash = info.finalized_hash;
+            if pending != Some((number, hash)) {
+                pending = Some((number, hash));
+                attempts = 0;
+            }
+
             let cert_hash = sp_core::blake2_256(&hash);
-            log::info!("⚡ [GRANDPA] finality head reached block {number}");
             let call = RuntimeCall::X3AtomicKernel(
                 pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
                     block_num: number,
@@ -2030,7 +2056,8 @@ async fn run_grandpa_finality_anchor(
                 },
             );
             let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
-            if let Err(e) = pool
+            attempts += 1;
+            match pool
                 .submit_one(
                     client.info().best_hash,
                     TransactionSource::Local,
@@ -2038,12 +2065,37 @@ async fn run_grandpa_finality_anchor(
                 )
                 .await
             {
-                log::warn!("failed to anchor GRANDPA cert for block {number}: {e}");
+                Ok(_) => {
+                    // Only now is the anchor really submitted. Advancing the cursor here,
+                    // rather than before the submit, is the difference between "we tried"
+                    // and "it landed": the task used to advance first and then log success
+                    // unconditionally, so a rejected anchor for one block was never retried
+                    // and the log called it anchored.
+                    last_finalized_hash = info.finalized_hash;
+                    pending = None;
+                    log::info!(
+                        "⚡ [GRANDPA] anchor submitted for block {number} → cert_hash=0x{} \
+                         (pool accepted; inclusion is not confirmed here)",
+                        hex::encode(&cert_hash[..8])
+                    );
+                }
+                Err(e) if attempts >= ANCHOR_ATTEMPTS => {
+                    log::error!(
+                        "⚡ [GRANDPA] giving up on the anchor for block {number} after {} \
+                         attempts ({e}); this height has no on-chain finality certificate, \
+                         and it is not being retried",
+                        attempts
+                    );
+                    last_finalized_hash = info.finalized_hash;
+                    pending = None;
+                }
+                Err(e) => {
+                    log::warn!(
+                        "⚡ [GRANDPA] anchor for block {number} not accepted yet \
+                         (attempt {attempts}/{ANCHOR_ATTEMPTS}): {e}"
+                    );
+                }
             }
-            log::info!(
-                "⚡ [GRANDPA] cert anchored for block {number} → cert_hash=0x{}",
-                hex::encode(&cert_hash[..8])
-            );
         }
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
