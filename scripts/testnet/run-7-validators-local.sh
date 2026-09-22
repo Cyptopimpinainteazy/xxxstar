@@ -573,6 +573,14 @@ start_node() {
   if [[ -n "$NODE_DB_CACHE_MIB" ]]; then
     db_args+=(--db-cache "$NODE_DB_CACHE_MIB")
   fi
+  # The state (trie) cache. The node's default is large and it is *not* part of what a
+  # validator operator budgets for explicitly, so it is passed through when set: a
+  # two-hour soak on 2026-09-22 saw each debug node grow ~1.7 GiB, and this is the first
+  # thing to vary when asking whether that is a cache filling or a leak
+  # (`.ai/reports/soak-2h-idle-20260922.md`). `0` disables it.
+  if [[ -n "$NODE_TRIE_CACHE_BYTES" ]]; then
+    db_args+=(--trie-cache-size "$NODE_TRIE_CACHE_BYTES")
+  fi
 
   local nice_args=()
   if [[ -n "$NODE_NICE" ]]; then
