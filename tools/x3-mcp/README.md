@@ -27,6 +27,11 @@ Local MCP server for Codex/VS Code to inspect a running X3 node and execute expl
 | `x3_trace_atomic_swap` | trace one intent from durable proof-ledger evidence |
 | `x3_verify_proof` | require complete verified persisted proof evidence |
 | `x3_verify_receipt` | run X3Lang receipt verification; optional trusted Ed25519 signer map |
+| `x3_inspect_intent` | inspect live node intent RPC capability; fails closed if runtime RPC is not exposed |
+| `x3_atomic_state` | bind atomic-state reporting to live chain evidence |
+| `x3_validator_status` | node health plus author/GRANDPA capability evidence |
+| `x3_consensus_status` | best/finalized heads and GRANDPA round state when exposed |
+| `x3_run_failure_matrix` | existing validator failure drill or atomic negative suite |
 
 ## Install
 
@@ -80,13 +85,11 @@ Do not commit secrets in MCP configuration.
 
 Next phase should bind these to real X3 interfaces:
 
-1. `x3_inspect_intent`
-2. `x3_atomic_state`
-3. `x3_validator_status`
-4. `x3_consensus_status`
-5. `x3_run_failure_matrix`
-6. `x3_compile_x3lang`
-7. `x3_collect_production_evidence`
+1. expose `GovernanceSettlementApi::get_settlement` through node JSON-RPC so `x3_inspect_intent` can return decoded live intent state
+2. expose escrow-leg state through a runtime API/RPC rather than guessed SCALE storage keys
+3. `x3_compile_x3lang`
+4. `x3_collect_production_evidence`
+5. extend the failure matrix with live EVM/SVM/native lifecycle profiles
 
 
 Each must bind to actual X3 interfaces. No fake responses or placeholder success paths.
