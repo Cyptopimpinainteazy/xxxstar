@@ -349,6 +349,31 @@ impl X3RuntimeSigner {
         self.signed_extrinsic(call)
     }
 
+    /// Sign a settlement-engine `submit_proof` call for one external chain.
+    ///
+    /// This is the extrinsic that records the proof itself: `submit_proof`
+    /// verifies a single `SettlementProof` for one chain before anything is
+    /// stored, and it is what a producer feeds —
+    /// `x3_relayer::evm_receipt_proof::prove_evm_receipt` builds the EVM receipt
+    /// inclusion proof for it. The signing is the runtime's: the same
+    /// `SignedExtra` tuple and `SignedPayload` as every other settlement call
+    /// here, with the genesis hash and nonce read from the live node.
+    pub fn sign_submit_proof(
+        &self,
+        runtime_intent_id: H256,
+        chain: ExternalChainId,
+        proof: pallet_x3_settlement_engine::SettlementProof,
+    ) -> Result<String, SwapError> {
+        let call = RuntimeCall::X3SettlementEngine(
+            pallet_x3_settlement_engine::Call::<Runtime>::submit_proof {
+                intent_id: runtime_intent_id,
+                chain,
+                proof,
+            },
+        );
+        self.signed_extrinsic(call)
+    }
+
     /// Convenience native-asset spec for local X3 lifecycle tests/tools.
     pub fn x3_native_asset(amount: u128) -> AssetSpec {
         AssetSpec {
@@ -500,5 +525,45 @@ mod tests {
         signer.bind_intent(7, a).unwrap();
         assert_eq!(signer.runtime_intent_id(7).unwrap(), a);
         assert!(signer.bind_intent(7, b).is_err());
+    }
+
+    /// The `submit_proof` call has to encode as a `RuntimeCall`, which is exactly
+    /// what the relayer's old submission path could not do: it posted a JSON
+    /// payload naming a call that exists in no pallet, and a node answered
+    /// `invalid hex character: {`. Here the call is built through the runtime's
+    /// enum and decoded back, so the shape — pallet index, call index, argument
+    /// order — is the runtime's, not this file's idea of it.
+    #[test]
+    fn the_submit_proof_call_encodes_and_decodes_as_a_runtime_call() {
+        let proof = pallet_x3_settlement_engine::SettlementProof {
+            proof_type: pallet_x3_settlement_engine::ProofType::MerkleTrie,
+            tx_hash: H256([9u8; 32]),
+            block_hash: H256([8u8; 32]),
+            chain_height: Some(100),
+            confirmations: 12,
+            merkle_proof: Default::default(),
+            receipt_data: Default::default(),
+            receipt_index: Some(1),
+            trie_proof: Default::default(),
+        };
+        let call = RuntimeCall::X3SettlementEngine(
+            pallet_x3_settlement_engine::Call::<Runtime>::submit_proof {
+                intent_id: H256([7u8; 32]),
+                chain: ExternalChainId::Ethereum,
+                proof,
+            },
+        );
+
+        let encoded = call.encode();
+        let decoded = RuntimeCall::decode(&mut &encoded[..]).expect("a runtime call decodes");
+        assert_eq!(decoded, call);
+        // And it is the settlement engine's variant, not some other pallet's at
+        // the same index.
+        assert!(matches!(
+            decoded,
+            RuntimeCall::X3SettlementEngine(
+                pallet_x3_settlement_engine::Call::<Runtime>::submit_proof { .. }
+            )
+        ));
     }
 }
