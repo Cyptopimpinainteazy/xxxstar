@@ -228,10 +228,6 @@ impl RpcSubmitter {
         out
     }
 
-
-
-
-
     /// Report which signer produced `validator_pubkey`.
     ///
     /// - When a custody key ID is set: `"custody-service"`.
@@ -272,10 +268,7 @@ impl RpcSubmitter {
             .map(|n| n as u32)
             .ok_or_else(|| anyhow!("No nonce in response"))
     }
-
 }
-
-
 
 #[cfg(test)]
 mod tests {

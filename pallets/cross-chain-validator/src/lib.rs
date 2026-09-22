@@ -741,7 +741,8 @@ pub mod pallet {
             // this pallet stores; for an older height the receipts root is what
             // the proof is checked against, and the other two are left zeroed
             // rather than filled in from something unrelated.
-            let newest = LastEvmHeader::<T>::get().filter(|header| header.block_number == block_number);
+            let newest =
+                LastEvmHeader::<T>::get().filter(|header| header.block_number == block_number);
             Some(x3_verification_router::evm_receipt::AnchoredEvmHeader {
                 number: block_number,
                 receipts_root: receipts_root.0,

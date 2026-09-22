@@ -93,6 +93,19 @@ else
   export PATH="${HOME}/.cargo/bin:${PATH}"
 fi
 
+# `openssl-sys` resolves whatever OpenSSL the package manager advertises first.
+# On this box that is Homebrew's, whose libcrypto references glibc 2.38 symbols
+# the host cannot link against, so any gate whose crates link OpenSSL dies with
+#   rust-lld: error: undefined reference: __isoc23_strtol@GLIBC_2.38
+# and the failure reads like a defect in the change under test. Use the system
+# OpenSSL when the environment has not chosen one and one is installed; a
+# machine that wants its own still sets OPENSSL_DIR and this does nothing.
+if [ -z "${OPENSSL_DIR:-}" ] && [ -f /usr/include/openssl/ssl.h ] && [ -d /usr/lib/x86_64-linux-gnu ]; then
+  export OPENSSL_DIR=/usr
+  export OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  export OPENSSL_INCLUDE_DIR=/usr/include
+fi
+
 RUN_LIVE=0
 RUN_CROSS=0
 RUN_RELEASE=0

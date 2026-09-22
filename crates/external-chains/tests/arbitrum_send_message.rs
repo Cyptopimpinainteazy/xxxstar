@@ -183,7 +183,10 @@ async fn send_message_calls_arbsys_and_broadcasts_a_signed_transaction() {
         ))
     );
 
-    let first = adapter.send_message(sent).await.expect("the send is broadcast");
+    let first = adapter
+        .send_message(sent)
+        .await
+        .expect("the send is broadcast");
     assert_ne!(first, H256::zero(), "a broadcast returns its hash");
 
     // The node has the transaction and mined it. A receipt alone would not say
@@ -194,7 +197,9 @@ async fn send_message_calls_arbsys_and_broadcasts_a_signed_transaction() {
         serde_json::json!([format!("0x{}", hex::encode(first.as_bytes()))]),
     )
     .await;
-    let to = tx["result"]["to"].as_str().expect("the transaction has a `to`");
+    let to = tx["result"]["to"]
+        .as_str()
+        .expect("the transaction has a `to`");
     assert_eq!(
         to.to_lowercase(),
         format!("0x{}", hex::encode(ARBSYS_ADDRESS.as_bytes())),

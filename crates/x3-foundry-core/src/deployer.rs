@@ -309,7 +309,6 @@ impl Deployer {
         receipt.signed_at = Utc::now();
         info!("Receipt signed: {}", receipt.signature);
     }
-
 }
 
 /// CrossChainDeployer handles multi-chain deployment.

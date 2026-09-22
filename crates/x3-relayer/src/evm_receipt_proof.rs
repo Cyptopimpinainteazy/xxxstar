@@ -74,37 +74,36 @@ impl ReceiptInclusion {
     pub fn settlement_proof(
         &self,
     ) -> Result<pallet_x3_settlement_engine::SettlementProof, ProducerError> {
-        use frame_support::{BoundedVec, traits::ConstU32};
+        use frame_support::{traits::ConstU32, BoundedVec};
         use pallet_x3_settlement_engine::SettlementProof;
         use sha3::{Digest, Keccak256};
 
         let receipt_hash: [u8; 32] = Keccak256::digest(&self.receipt_rlp).into();
-        let receipt_data = BoundedVec::<u8, ConstU32<MAX_RECEIPT_DATA_SIZE>>::try_from(
-            self.receipt_rlp.clone(),
-        )
-        .map_err(|_| ProducerError::ProofTooLarge {
-            what: "receipt",
-            size: self.receipt_rlp.len(),
-            limit: MAX_RECEIPT_DATA_SIZE as usize,
-        })?;
-        let trie_proof = BoundedVec::<u8, ConstU32<MAX_TRIE_PROOF_SIZE>>::try_from(
-            self.trie_proof.clone(),
-        )
-        .map_err(|_| ProducerError::ProofTooLarge {
-            what: "inclusion path",
-            size: self.trie_proof.len(),
-            limit: MAX_TRIE_PROOF_SIZE as usize,
-        })?;
+        let receipt_data =
+            BoundedVec::<u8, ConstU32<MAX_RECEIPT_DATA_SIZE>>::try_from(self.receipt_rlp.clone())
+                .map_err(|_| ProducerError::ProofTooLarge {
+                what: "receipt",
+                size: self.receipt_rlp.len(),
+                limit: MAX_RECEIPT_DATA_SIZE as usize,
+            })?;
+        let trie_proof =
+            BoundedVec::<u8, ConstU32<MAX_TRIE_PROOF_SIZE>>::try_from(self.trie_proof.clone())
+                .map_err(|_| ProducerError::ProofTooLarge {
+                    what: "inclusion path",
+                    size: self.trie_proof.len(),
+                    limit: MAX_TRIE_PROOF_SIZE as usize,
+                })?;
         let merkle_proof = BoundedVec::<_, ConstU32<MAX_MERKLE_PROOF_DEPTH>>::try_from(vec![
             sp_core::H256(self.state_root),
             sp_core::H256(self.receipts_root),
         ])
         .map_err(|_| ProducerError::Malformed("two roots always fit".to_string()))?;
-        let confirmations =
-            u32::try_from(self.confirmations).map_err(|_| ProducerError::Malformed(format!(
+        let confirmations = u32::try_from(self.confirmations).map_err(|_| {
+            ProducerError::Malformed(format!(
                 "confirmations {} do not fit in u32",
                 self.confirmations
-            )))?;
+            ))
+        })?;
 
         Ok(SettlementProof {
             proof_type: pallet_x3_settlement_engine::ProofType::MerkleTrie,
@@ -120,7 +119,9 @@ impl ReceiptInclusion {
     }
 }
 
-use pallet_x3_settlement_engine::{MAX_MERKLE_PROOF_DEPTH, MAX_RECEIPT_DATA_SIZE, MAX_TRIE_PROOF_SIZE};
+use pallet_x3_settlement_engine::{
+    MAX_MERKLE_PROOF_DEPTH, MAX_RECEIPT_DATA_SIZE, MAX_TRIE_PROOF_SIZE,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProducerError {
@@ -226,7 +227,10 @@ fn hex32(value: &Value, what: &str) -> Result<[u8; 32], ProducerError> {
 /// RLP-encode a quantity the way the consensus spec does: big-endian with
 /// leading zeros removed, and zero as the empty string.
 fn rlp_quantity(bytes: &[u8]) -> Vec<u8> {
-    let first = bytes.iter().position(|byte| *byte != 0).unwrap_or(bytes.len());
+    let first = bytes
+        .iter()
+        .position(|byte| *byte != 0)
+        .unwrap_or(bytes.len());
     let significant = &bytes[first..];
     let mut stream = rlp::RlpStream::new();
     stream.append(&significant.to_vec());
@@ -315,9 +319,9 @@ pub fn consensus_receipt_rlp(receipt: &Value) -> Result<Vec<u8>, ProducerError> 
     }
 
     let cumulative = hex_quantity_bytes(
-        receipt
-            .get("cumulativeGasUsed")
-            .ok_or_else(|| ProducerError::Malformed("receipt has no cumulativeGasUsed".to_string()))?,
+        receipt.get("cumulativeGasUsed").ok_or_else(|| {
+            ProducerError::Malformed("receipt has no cumulativeGasUsed".to_string())
+        })?,
         "cumulativeGasUsed",
     )?;
     let payload = rlp_list(&[
@@ -376,22 +380,15 @@ pub async fn prove_evm_receipt(
         "blockHash",
     )?;
     let receipt_index = hex_u64(
-        receipt
-            .get("transactionIndex")
-            .ok_or_else(|| ProducerError::Malformed("receipt has no transactionIndex".to_string()))?,
+        receipt.get("transactionIndex").ok_or_else(|| {
+            ProducerError::Malformed("receipt has no transactionIndex".to_string())
+        })?,
         "transactionIndex",
     )?;
 
     // Every receipt in the block, in block order: the trie is over all of them.
     let block_tag = format!("{block_number:#x}");
-    let all = match rpc(
-        &client,
-        rpc_url,
-        "eth_getBlockReceipts",
-        json!([block_tag]),
-    )
-    .await
-    {
+    let all = match rpc(&client, rpc_url, "eth_getBlockReceipts", json!([block_tag])).await {
         Ok(receipts) if receipts.is_array() => receipts.as_array().cloned().unwrap_or_default(),
         _ => {
             // Older nodes have no `eth_getBlockReceipts`: walk the block's
@@ -417,13 +414,8 @@ pub async fn prove_evm_receipt(
                         ProducerError::Malformed("a transaction has no hash".to_string())
                     })?
                     .to_string();
-                receipts.push(rpc(
-                    &client,
-                    rpc_url,
-                    "eth_getTransactionReceipt",
-                    json!([hash]),
-                )
-                .await?);
+                receipts
+                    .push(rpc(&client, rpc_url, "eth_getTransactionReceipt", json!([hash])).await?);
             }
             receipts
         }
@@ -479,8 +471,9 @@ pub async fn prove_evm_receipt(
         });
     }
 
-    let trie_proof = receipts_trie_proof(&receipts, index)
-        .map_err(|e| ProducerError::Malformed(format!("could not build the inclusion path: {e}")))?;
+    let trie_proof = receipts_trie_proof(&receipts, index).map_err(|e| {
+        ProducerError::Malformed(format!("could not build the inclusion path: {e}"))
+    })?;
     // The producer and the verifier are two callers of one convention; check that
     // here rather than discovering it at settlement.
     verify_merkle_patricia_proof(
@@ -672,15 +665,13 @@ mod tests {
             "cumulativeGasUsed is a quantity, not four bytes of hex text"
         );
         assert_eq!(
-            list.at(2).and_then(|v| v.as_val::<Vec<u8>>()).map(|b| b.len()),
+            list.at(2)
+                .and_then(|v| v.as_val::<Vec<u8>>())
+                .map(|b| b.len()),
             Ok(256),
             "the bloom is carried whole"
         );
-        assert_eq!(
-            list.at(3).and_then(|v| v.item_count()),
-            Ok(0),
-            "no logs"
-        );
+        assert_eq!(list.at(3).and_then(|v| v.item_count()), Ok(0), "no logs");
     }
 
     #[test]
@@ -762,8 +753,8 @@ mod tests {
             vec![0xc3, 0x01, 0x02, 0xc0],
             pallet_x3_settlement_engine::MAX_TRIE_PROOF_SIZE as usize + 1,
         )
-            .settlement_proof()
-            .expect_err("past the bound");
+        .settlement_proof()
+        .expect_err("past the bound");
         assert!(matches!(
             error,
             ProducerError::ProofTooLarge {

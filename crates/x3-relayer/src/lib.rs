@@ -1,3 +1,4 @@
+pub mod evm_receipt_proof;
 /// X3 Relayer Service Library
 ///
 /// Provides components for watching EVM and SVM headers, acquiring finalized proofs,
@@ -9,7 +10,6 @@
 /// `submitter`, `watchers`) require the `std` feature.
 #[cfg(feature = "std")]
 pub mod relayer;
-pub mod evm_receipt_proof;
 #[cfg(feature = "std")]
 pub mod submitter;
 pub mod types;
