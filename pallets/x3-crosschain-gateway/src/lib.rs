@@ -1351,25 +1351,31 @@ pub mod pallet {
             }
         }
 
-        fn derive_withdrawal_id(
+        pub(crate) fn derive_withdrawal_id(
             x3_asset_id: X3AssetId,
             recipient: &[u8],
             amount: Balance,
             block: u64,
         ) -> WithdrawalId {
-            let mut out = x3_asset_id;
-            for (idx, byte) in recipient.iter().enumerate() {
-                out[idx % 32] ^= *byte;
-            }
-            for (idx, byte) in amount.to_be_bytes().iter().enumerate() {
-                out[idx] ^= *byte;
-            }
-            // Mix in the block number so two distinct blocks produce
-            // distinct ids.
-            for (idx, byte) in block.to_be_bytes().iter().enumerate() {
-                out[idx] ^= *byte;
-            }
-            out
+            // Domain-separated Blake2b-256, byte for byte the same preimage as
+            // `x3_crosschain_gateway::gateway_withdrawal_id`: the off-chain gateway
+            // derives this id too, and a test below pins that the two agree.
+            //
+            // This used to be XOR mixing (`out[idx % 32] ^= byte`). XOR is
+            // commutative and self-inverse, so a recipient whose bytes repeat at the
+            // same 32-byte slot cancels itself —— `"A" * 64` and `"B" * 64` produced
+            // the same id. This id is the key of `Withdrawals` and the relayer's
+            // processed-withdrawal set, so a collision means one withdrawal is
+            // treated as another.
+            let mut preimage =
+                Vec::with_capacity(43 + x3_asset_id.len() + 8 + recipient.len() + 8 + 8);
+            preimage.extend_from_slice(b"x3-crosschain-gateway-withdrawal-v1");
+            preimage.extend_from_slice(&x3_asset_id);
+            preimage.extend_from_slice(&(recipient.len() as u64).to_le_bytes());
+            preimage.extend_from_slice(recipient);
+            preimage.extend_from_slice(&amount.to_le_bytes());
+            preimage.extend_from_slice(&block.to_le_bytes());
+            sp_io::hashing::blake2_256(&preimage)
         }
 
         fn check_collateral_invariant(x3_asset_id: X3AssetId) -> DispatchResult {

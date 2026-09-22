@@ -12347,6 +12347,7 @@ dependencies = [
  "sp-io 44.0.0",
  "sp-runtime 45.0.0",
  "sp-std 14.0.0",
+ "x3-crosschain-gateway",
  "x3-verification-router",
 ]
 

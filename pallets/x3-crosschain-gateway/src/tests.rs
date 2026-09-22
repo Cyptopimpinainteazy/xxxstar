@@ -45,20 +45,15 @@ fn signing_key(seed: u8) -> ed25519_dalek::SigningKey {
 }
 
 fn expected_withdrawal_id(amount: u128) -> [u8; 32] {
-    // Must mirror the pallet's derive_withdrawal_id exactly: it
-    // mixes x3_asset_id, recipient bytes, amount, and the current
-    // block (which is 1 in new_test_ext).
-    let mut out = [9u8; 32];
-    for (idx, byte) in b"0xRECIPIENT".iter().enumerate() {
-        out[idx % 32] ^= *byte;
-    }
-    for (idx, byte) in amount.to_be_bytes().iter().enumerate() {
-        out[idx] ^= *byte;
-    }
-    for (idx, byte) in 1u64.to_be_bytes().iter().enumerate() {
-        out[idx] ^= *byte;
-    }
-    out
+    // The off-chain gateway derives the same id for the same withdrawal, and the
+    // pallet emits its own in `WithdrawalRequested` and keys `Withdrawals` by it.
+    // Calling the crate's function here is what keeps the two from drifting: this
+    // helper used to repeat the derivation (once as XOR, matching the pallet's XOR
+    // bug) so both sides were wrong in the same way and every assertion passed.
+    //
+    // `new_test_ext` starts at block 1 and the test asset/recipient below are the
+    // ones the callers use.
+    x3_crosschain_gateway::gateway_withdrawal_id([9u8; 32], "0xRECIPIENT", amount, 1)
 }
 
 fn register_and_enable() {
@@ -1478,4 +1473,16 @@ fn an_evm_route_measures_depth_from_the_attested_head_not_the_proof() {
             Error::<Test>::VerificationFailed
         );
     });
+}
+
+#[test]
+fn the_two_derivations_agree() {
+    let pallet_id =
+        crate::pallet::Pallet::<Test>::derive_withdrawal_id([9u8; 32], b"0xRECIPIENT", 1_000, 1);
+    let crate_id = x3_crosschain_gateway::gateway_withdrawal_id([9u8; 32], "0xRECIPIENT", 1_000, 1);
+    assert_eq!(
+        pallet_id, crate_id,
+        "pallet {:?} vs crate {:?}",
+        pallet_id, crate_id
+    );
 }

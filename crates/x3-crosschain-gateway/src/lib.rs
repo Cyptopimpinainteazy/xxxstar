@@ -286,6 +286,40 @@ pub fn gateway_attestation_statement(
     out
 }
 
+/// The id a withdrawal is stored under and de-duplicated by.
+///
+/// Domain-separated Blake2b-256 over every field that identifies the withdrawal,
+/// with the recipient length-prefixed so that `("AB", …)` and `("A", "B", …)` cannot
+/// reach the same preimage.
+///
+/// This used to be XOR mixing — `out[idx % 32] ^= byte`. XOR is commutative and
+/// self-inverse, so a recipient whose bytes repeat at the same 32-byte slot cancels
+/// itself: `"A" * 64` and `"B" * 64` produced the *same* id, as did any pair of
+/// recipients with equal per-slot parity. That id is both the key of the gateway's
+/// withdrawal store and the relayer's processed-withdrawal set, so a collision means
+/// the second withdrawal either overwrites the first record (losing its
+/// burned/released state) or is treated as already released.
+pub fn gateway_withdrawal_id(
+    x3_asset_id: AssetId,
+    recipient: &str,
+    amount: Balance,
+    block: BlockNumber,
+) -> WithdrawalId {
+    use blake2::digest::consts::U32;
+    use blake2::{Blake2b, Digest};
+
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(b"x3-crosschain-gateway-withdrawal-v1");
+    hasher.update(x3_asset_id);
+    hasher.update((recipient.len() as u64).to_le_bytes());
+    hasher.update(recipient.as_bytes());
+    hasher.update(amount.to_le_bytes());
+    hasher.update(block.to_le_bytes());
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&hasher.finalize());
+    out
+}
+
 /// Verdict recorded for an attested proof.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttestationStatus {
@@ -986,17 +1020,7 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
         amount: Balance,
         block: BlockNumber,
     ) -> WithdrawalId {
-        let mut out = asset_id;
-        for (idx, byte) in recipient.as_bytes().iter().enumerate() {
-            out[idx % 32] ^= *byte;
-        }
-        for (idx, byte) in amount.to_be_bytes().iter().enumerate() {
-            out[idx] ^= *byte;
-        }
-        for (idx, byte) in block.to_be_bytes().iter().enumerate() {
-            out[24 + idx] ^= *byte;
-        }
-        out
+        gateway_withdrawal_id(asset_id, recipient, amount, block)
     }
 }
 
@@ -1630,5 +1654,73 @@ mod tests {
                 }
             }
         }
+    }
+    /// The withdrawal id is the store's key and the relayer's processed-set key, so
+    /// two distinct withdrawals must not share one. The derivation used to be XOR
+    /// mixing, which cancels itself: a recipient whose bytes repeat at the same slot
+    /// leaves no trace, so `"A" * 64` and `"B" * 64` produced the same id.
+    #[test]
+    fn recipients_that_collided_under_xor_get_different_withdrawal_ids() {
+        let asset = [9u8; 32];
+
+        // The old derivation, inline, to show what it did with these two recipients.
+        fn old_derive(asset: [u8; 32], recipient: &str, amount: u128, block: u64) -> [u8; 32] {
+            let mut out = asset;
+            for (idx, byte) in recipient.as_bytes().iter().enumerate() {
+                out[idx % 32] ^= *byte;
+            }
+            for (idx, byte) in amount.to_be_bytes().iter().enumerate() {
+                out[idx] ^= *byte;
+            }
+            for (idx, byte) in block.to_be_bytes().iter().enumerate() {
+                out[24 + idx] ^= *byte;
+            }
+            out
+        }
+
+        let a = "A".repeat(64);
+        let b = "B".repeat(64);
+        assert_eq!(
+            old_derive(asset, &a, 1_000, 7),
+            old_derive(asset, &b, 1_000, 7),
+            "the XOR derivation collided for these recipients — that was the defect"
+        );
+        assert_ne!(
+            gateway_withdrawal_id(asset, &a, 1_000, 7),
+            gateway_withdrawal_id(asset, &b, 1_000, 7),
+            "the hashed derivation must not"
+        );
+    }
+
+    #[test]
+    fn every_field_of_a_withdrawal_changes_its_id() {
+        let base = gateway_withdrawal_id([9u8; 32], "5Grwva", 1_000, 7);
+        assert_ne!(
+            base,
+            gateway_withdrawal_id([8u8; 32], "5Grwva", 1_000, 7),
+            "asset"
+        );
+        assert_ne!(
+            base,
+            gateway_withdrawal_id([9u8; 32], "5FHneW", 1_000, 7),
+            "recipient"
+        );
+        assert_ne!(
+            base,
+            gateway_withdrawal_id([9u8; 32], "5Grwva", 1_001, 7),
+            "amount"
+        );
+        assert_ne!(
+            base,
+            gateway_withdrawal_id([9u8; 32], "5Grwva", 1_000, 8),
+            "block"
+        );
+
+        // Length-prefixed, so concatenation-shaped ambiguity cannot collide either.
+        assert_ne!(
+            gateway_withdrawal_id([9u8; 32], "AB", 1_000, 7),
+            gateway_withdrawal_id([9u8; 32], "A", 1_000, 7),
+            "a different recipient of a different length"
+        );
     }
 }
