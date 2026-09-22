@@ -1,3 +1,0 @@
-# Stale Path Sweep (Targeted)
-
-
