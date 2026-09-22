@@ -30,7 +30,8 @@ the permissions the image's `builder` user needs — see that script).
 The second run was a from-scratch rebuild (`runtime/target/srtool` removed
 first), so this is not one artifact reported twice.
 
-The hashes below describe revision `5ccdebd22`. They are **not** a fixed
+The hashes below describe the revision that added the cross-chain-gateway header
+anchor (`EvmHeaderAnchor`), recorded at revision `0508659d5`. They are **not** a fixed
 property of the project: any runtime-affecting change produces different WASM,
 which is why `docs/reports/runtime-wasm-hashes.json` names the revision it was
 recorded at, and why `scripts/mainnet_release_gate.py` **rebuilds and compares**
@@ -40,26 +41,26 @@ updating the record in the same change.
 
 Earlier pairs of builds (compact `0x78feb683…`, `0xb1f0348c…`, `0xb1777a09…`) were taken at older
 revision and is kept here only as the record of how this was established; the
-current values are the `0xcb25ed8c…` pair (recorded at `5ccdebd22`).
+current values are the `0xac13ee1b…` pair (recorded at `0508659d5`).
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,437,524 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,435,073 bytes)**
 
 ```
 Version          : x3-chain-11 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xcb25ed8c5a789b785de9809366aaa1df19ceb6ec16850fef8a2474a9a0a73738
-authorizeUpgrade : 0x4745cb20348fd82585402630fd6460348c668f40088a8b18d7c38b4e375d49ab
-IPFS             : QmSZCv1djF2YNfJeEruaz16RqL6SLh81MQfWjuiwTmaSA5
-BLAKE2_256       : 0xeabb30565606734ee4206d765152196a6e8eb3596948f2d9f7343a711d350194
+setCode          : 0xac13ee1b4d375d257d808cd720253eef0b6f126c34aba35eab0e5ab04fa714aa
+authorizeUpgrade : 0x23312ecb8c081cbbd838e8f8d9f4077bb789ef891dd25d345abfefe3acde8334
+IPFS             : QmVsqseyoMvS7nnpTtuBQ9EBCB113FQfCBXP4XVLQJEyRg
+BLAKE2_256       : 0x12696572aae6cc833630c13a1b7dd141cced8b6934f8d4ab872bf813274a5fc6
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,442,679 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,442,714 bytes)**
 
 ```
-setCode          : 0x0831ed66a50a66d2cc463c7a39e4500880d782e4298b85afdde08ea86e277a3b
-authorizeUpgrade : 0xe1c960e5633cdd9e29bf1f7200838a5d261fc8fd148a476acb9293477f87150c
-IPFS             : QmUs68aGhFNYrsFYQ8A9b5Y37uvaarAJwYoTQz63DcDfGC
-BLAKE2_256       : 0x67a2d8be5e25cae48ee09aad4792ba6f33e414331c2154f7db0a780cc02858e9
+setCode          : 0x9088ef509c3ba8fc720156356bec7997a16a278ca024236ff0f35ac5f400b674
+authorizeUpgrade : 0x626363657411d604831279cb41789351083e9ee0451f7c9d2a8013a23133ec56
+IPFS             : QmS57QuggaLvhZ2h4rJCBWWhthRjoEWSooucR8aZbfzCNg
+BLAKE2_256       : 0x0e6ef363215aaa098770718a85ee7d8f217852efefe6af329bf02915a25f0d88
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

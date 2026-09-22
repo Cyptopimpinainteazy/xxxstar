@@ -67,6 +67,9 @@ pub enum EvmReceiptError {
     BadProof,
     /// The receipt was not included in the asserted receipts root.
     InclusionFailed,
+    /// The header this proof is about is not one the chain has attested, so the
+    /// proof is about a block of the prover's own choosing.
+    UnanchoredHeader,
     /// The receipt did not contain exactly one log.
     WrongLogCount,
     /// The log's first topic did not match the expected event selector.
@@ -103,6 +106,9 @@ impl Display for EvmReceiptError {
             EvmReceiptError::InsufficientConfirmations { have, need } => write!(
                 f,
                 "evm proof: block confirmations {have} below required {need}"
+            ),
+            EvmReceiptError::UnanchoredHeader => f.write_str(
+                "evm proof: the header is not one the chain has attested",
             ),
             EvmReceiptError::WrongChain { expected, got } => {
                 write!(
@@ -845,6 +851,12 @@ impl DecodedProof {
         })
     }
 
+    /// The receipt checks: shape, amount, and inclusion in the header's
+    /// receipts trie.
+    ///
+    /// Confirmation depth is **not** checked here. It has to be measured from
+    /// the chain's attested head, and a `DecodedProof` carries the prover's own
+    /// claim of that head — see [`DecodedProof::validate_against`].
     pub fn validate(&self) -> Result<(), EvmReceiptError> {
         if self.receipt.logs.len() != 1 {
             return Err(EvmReceiptError::WrongLogCount);
@@ -867,13 +879,6 @@ impl DecodedProof {
         if amount != self.expected_amount {
             return Err(EvmReceiptError::BadAmount);
         }
-        let confirmations = self.current_block_number.saturating_sub(self.header.number);
-        if confirmations < self.min_confirmations {
-            return Err(EvmReceiptError::InsufficientConfirmations {
-                have: confirmations,
-                need: self.min_confirmations,
-            });
-        }
         if self.header.number == 0 {
             return Err(EvmReceiptError::BadHeader);
         }
@@ -894,6 +899,45 @@ impl DecodedProof {
             &self.proof,
         )?;
         Ok(())
+    }
+
+    /// Check the proof against the header the *chain* has attested, then
+    /// [`DecodedProof::validate`].
+    ///
+    /// The header in the payload belongs to the prover: `receipts_root` is what
+    /// the walk is checked against and the head height is what the depth was
+    /// measured from. Both are fields of the proof, so on their own they establish
+    /// only that the proof is self-consistent — a prover builds a trie containing
+    /// a receipt they control, names its root, and picks a head height that
+    /// satisfies the threshold. The anchor is what makes the header evidence: the
+    /// root this proof is checked against, and the head its depth is measured
+    /// from, come from the chain's own store.
+    pub fn validate_against(
+        &self,
+        anchor: EvmHeaderAnchorSource,
+    ) -> Result<(), EvmReceiptError> {
+        let Some(anchored) = anchor.anchored(self.header.number) else {
+            return Err(EvmReceiptError::UnanchoredHeader);
+        };
+        if anchored.receipts_root != self.header.receipts_root {
+            return Err(EvmReceiptError::UnanchoredHeader);
+        }
+        let Some(head) = anchor.head() else {
+            return Err(EvmReceiptError::UnanchoredHeader);
+        };
+        if head < anchored.number {
+            // An attested head that predates the header it is meant to bound
+            // cannot measure the depth of anything.
+            return Err(EvmReceiptError::UnanchoredHeader);
+        }
+        let confirmations = head.saturating_sub(self.header.number);
+        if confirmations < self.min_confirmations {
+            return Err(EvmReceiptError::InsufficientConfirmations {
+                have: confirmations,
+                need: self.min_confirmations,
+            });
+        }
+        self.validate()
     }
 }
 
@@ -1040,23 +1084,121 @@ pub fn keccak256_32(input: &[u8]) -> [u8; 32] {
 
 // ── The verifier ───────────────────────────────────────────────────────────
 
+/// The chain's own view of an external EVM header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AnchoredEvmHeader {
+    pub number: u64,
+    /// The receipt root this header commits to — the one a receipt proof must
+    /// walk to.
+    pub receipts_root: [u8; 32],
+    pub state_root: [u8; 32],
+    pub block_hash: [u8; 32],
+}
+
+/// Where a verifier gets the header it is allowed to accept.
+///
+/// Implementors are the chain's own store of attested headers (the validator
+/// pallet on X3, a relayer's attested view off-chain). The verifier never takes
+/// a header from the proof, so this is what decides which blocks a proof may be
+/// about and how deep they have to be.
+pub trait EvmHeaderAnchor {
+    /// The header this chain has attested for `block_number`, if it has one.
+    fn anchored_header(block_number: u64) -> Option<AnchoredEvmHeader>;
+    /// The chain's attested head, for measuring confirmation depth.
+    fn attested_head() -> Option<u64>;
+}
+
+/// [`EvmHeaderAnchor`] as function pointers, so a verifier can hold a chain's
+/// header store without a type parameter or an allocation.
+#[derive(Clone, Copy)]
+pub struct EvmHeaderAnchorFns {
+    pub header: fn(u64) -> Option<AnchoredEvmHeader>,
+    pub head: fn() -> Option<u64>,
+}
+
+impl EvmHeaderAnchorFns {
+    pub fn of<A: EvmHeaderAnchor>() -> Self {
+        Self {
+            header: A::anchored_header,
+            head: A::attested_head,
+        }
+    }
+}
+
+/// The source a verifier resolves its anchor from.
+#[derive(Clone, Copy)]
+pub enum EvmHeaderAnchorSource {
+    /// A chain store, addressed by block number.
+    Store(EvmHeaderAnchorFns),
+    /// One header and the head that contains it, held as data — for a caller
+    /// that obtained the chain's view out of band and wants this proof checked
+    /// against exactly that block.
+    Fixed { header: AnchoredEvmHeader, head: u64 },
+}
+
+impl EvmHeaderAnchorSource {
+    fn anchored(&self, block_number: u64) -> Option<AnchoredEvmHeader> {
+        match self {
+            Self::Store(fns) => (fns.header)(block_number),
+            Self::Fixed { header, .. } => (header.number == block_number).then_some(*header),
+        }
+    }
+
+    fn head(&self) -> Option<u64> {
+        match self {
+            Self::Store(fns) => (fns.head)(),
+            Self::Fixed { head, .. } => Some(*head),
+        }
+    }
+}
+
+/// A source with no attested headers. Every proof is refused — the state to be
+/// in until a real header store is wired in, rather than the one where the
+/// prover supplies the header.
+pub struct NoEvmHeaderAnchor;
+
+impl EvmHeaderAnchor for NoEvmHeaderAnchor {
+    fn anchored_header(_block_number: u64) -> Option<AnchoredEvmHeader> {
+        None
+    }
+
+    fn attested_head() -> Option<u64> {
+        None
+    }
+}
+
 /// Production EVM receipt proof verifier.
 ///
-/// The verifier does not own the chain head — `current_block_number` is
-/// supplied by the caller at verify time because the head is a runtime
-/// concern, not a verifier concern. The minimum confirmations threshold
-/// is part of the verifier's identity (it changes the security model),
-/// so it is held here.
+/// Holds the attestation source it verifies against. There is deliberately no
+/// constructor that omits one: an EVM receipt proof is a claim that a receipt is
+/// in a block's receipts trie, and the whole question is *which block*. The proof
+/// carries a header, so a verifier without an anchor would be checking the claim
+/// against the claimant's own number — it would verify that a receipt the prover
+/// built a trie for is in that trie.
+///
+/// The minimum confirmations threshold is part of the verifier's identity (it
+/// changes the security model), so it is held here too.
 pub struct ProductionEvmReceiptVerifier {
     pub min_confirmations: u64,
     pub selector: [u8; 32],
+    anchor: EvmHeaderAnchorSource,
 }
 
 impl ProductionEvmReceiptVerifier {
-    pub fn new(min_confirmations: u64) -> Self {
+    /// A verifier anchored to the header store `A`.
+    pub fn anchored_by<A: EvmHeaderAnchor>(min_confirmations: u64) -> Self {
+        Self::with_anchor(
+            min_confirmations,
+            EvmHeaderAnchorSource::Store(EvmHeaderAnchorFns::of::<A>()),
+        )
+    }
+
+    /// A verifier anchored to a caller-assembled source.
+    pub fn with_anchor(min_confirmations: u64, anchor: EvmHeaderAnchorSource) -> Self {
         Self {
             min_confirmations,
             selector: deposit_locked_selector(),
+            anchor,
         }
     }
 
@@ -1088,6 +1230,11 @@ impl Verifier for ProductionEvmReceiptVerifier {
         if proof.payload.len() < 48 {
             return Err(VerificationError::MalformedProof);
         }
+        // The wire format still opens with the prover's claimed head height and
+        // its own minimum. The head is read for the format's sake and *not* used
+        // to decide anything: depth is measured from the attestation source. The
+        // prover's minimum is taken only when it raises the bar
+        // (`max(self.min_confirmations)`), never when it lowers it.
         let mut head_bytes = [0u8; 8];
         head_bytes.copy_from_slice(&proof.payload[0..8]);
         let head = u64::from_le_bytes(head_bytes);
@@ -1107,7 +1254,7 @@ impl Verifier for ProductionEvmReceiptVerifier {
         )
         .map_err(|_| VerificationError::MalformedProof)?;
         decoded
-            .validate()
+            .validate_against(self.anchor)
             .map_err(|_| VerificationError::MalformedProof)?;
         Ok(VerificationOutcome {
             accepted: true,
@@ -1235,6 +1382,36 @@ mod tests {
         (root, proof)
     }
 
+    /// The chain's view of the header a fixture built: its receipts root at its
+    /// height, with `head` as the attested head.
+    fn anchor_to(
+        receipts_root: [u8; 32],
+        number: u64,
+        head: u64,
+    ) -> EvmHeaderAnchorSource {
+        EvmHeaderAnchorSource::Fixed {
+            header: AnchoredEvmHeader {
+                number,
+                receipts_root,
+                state_root: [0u8; 32],
+                block_hash: [0u8; 32],
+            },
+            head,
+        }
+    }
+
+    fn anchored_verifier(
+        min_confirmations: u64,
+        receipts_root: [u8; 32],
+        number: u64,
+        head: u64,
+    ) -> ProductionEvmReceiptVerifier {
+        ProductionEvmReceiptVerifier::with_anchor(
+            min_confirmations,
+            anchor_to(receipts_root, number, head),
+        )
+    }
+
     fn envelope_for(
         header_rlp: &[u8],
         receipt_rlp: &[u8],
@@ -1294,10 +1471,66 @@ mod tests {
         let header = header_with_receipts_root(receipts_root, 100);
 
         let envelope = envelope_for(&header, &receipt, &[0x01], &proof, recipient, 120);
-        let outcome = ProductionEvmReceiptVerifier::new(12)
+        let outcome = anchored_verifier(12, receipts_root, 100, 120)
             .verify(&envelope)
             .expect("a receipt in the trie whose root the header carries must verify");
         assert!(outcome.accepted, "{outcome:?}");
+    }
+
+    #[test]
+    fn a_header_the_chain_never_attested_is_refused() {
+        // The provider's own header, a receipt in a trie they built, and a
+        // perfectly valid walk to *their* root. Anchored to a different root —
+        // what the chain actually attested for that height — this must not verify:
+        // the proof would otherwise be about a block of the prover's choosing.
+        let recipient = [0x11u8; 20];
+        let receipt = receipt_with_one_log(recipient);
+        let key = receipt_trie_key(1);
+        let (prover_root, proof) = single_leaf_trie(&key, &receipt);
+        let header = header_with_receipts_root(prover_root, 100);
+        let envelope = envelope_for(&header, &receipt, &[0x01], &proof, recipient, 120);
+
+        let mut attested_root = prover_root;
+        attested_root[0] ^= 0xFF;
+        let anchored = ProductionEvmReceiptVerifier::with_anchor(
+            12,
+            EvmHeaderAnchorSource::Fixed {
+                header: AnchoredEvmHeader {
+                    number: 100,
+                    receipts_root: attested_root,
+                    state_root: [0u8; 32],
+                    block_hash: [0u8; 32],
+                },
+                head: 120,
+            },
+        );
+        assert!(
+            anchored.verify(&envelope).is_err(),
+            "a receipt in the prover's own trie is not a receipt in the chain's block"
+        );
+    }
+
+    #[test]
+    fn the_proof_cannot_choose_its_own_confirmation_depth() {
+        // The envelope claims a head of 1,000,000. The chain's attested head is
+        // 110, so the block is 10 deep and this verifier wants 12. The payload's
+        // number must not be the one that decides.
+        let recipient = [0x11u8; 20];
+        let receipt = receipt_with_one_log(recipient);
+        let key = receipt_trie_key(1);
+        let (receipts_root, proof) = single_leaf_trie(&key, &receipt);
+        let header = header_with_receipts_root(receipts_root, 100);
+        let envelope = envelope_for(&header, &receipt, &[0x01], &proof, recipient, 1_000_000);
+
+        let result = anchored_verifier(12, receipts_root, 100, 110).verify(&envelope);
+        assert!(
+            result.is_err(),
+            "depth comes from the attested head, not from the proof: {result:?}"
+        );
+
+        // And at the attested head it does verify, so the refusal above is about
+        // depth rather than about the anchor being wired wrong.
+        assert!(anchored_verifier(12, receipts_root, 100, 120).verify(&envelope).is_ok());
     }
 
     #[test]
@@ -1316,7 +1549,7 @@ mod tests {
         tampered[last] ^= 0xFF;
 
         let envelope = envelope_for(&header, &receipt, &[0x01], &tampered, recipient, 120);
-        let result = ProductionEvmReceiptVerifier::new(12).verify(&envelope);
+        let result = anchored_verifier(12, receipts_root, 100, 120).verify(&envelope);
         assert!(
             result.is_err(),
             "a node that does not hash to the root must not verify: {result:?}"
@@ -1339,7 +1572,7 @@ mod tests {
 
     #[test]
     fn decode_short_payload_fails() {
-        let r = ProductionEvmReceiptVerifier::new(12).verify(&ProofEnvelope {
+        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(&ProofEnvelope {
             proof_id: [0u8; 32],
             strategy: VerificationStrategy::EvmReceiptProof,
             source_chain: ChainKind::Evm { chain_id: 1 },
@@ -1557,7 +1790,7 @@ mod tests {
 
     #[test]
     fn wrong_chain_kind_fails() {
-        let r = ProductionEvmReceiptVerifier::new(12).verify(&ProofEnvelope {
+        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(&ProofEnvelope {
             proof_id: [0u8; 32],
             strategy: VerificationStrategy::EvmReceiptProof,
             source_chain: ChainKind::Solana,
@@ -1573,7 +1806,7 @@ mod tests {
 
     #[test]
     fn wrong_destination_chain_fails() {
-        let r = ProductionEvmReceiptVerifier::new(12).verify(&ProofEnvelope {
+        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(&ProofEnvelope {
             proof_id: [0u8; 32],
             strategy: VerificationStrategy::EvmReceiptProof,
             source_chain: ChainKind::Evm { chain_id: 1 },
@@ -1608,7 +1841,7 @@ mod tests {
         payload.extend_from_slice(&min.to_le_bytes());
         payload.extend_from_slice(&body);
 
-        let r = ProductionEvmReceiptVerifier::new(12).verify(&ProofEnvelope {
+        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(&ProofEnvelope {
             proof_id: [0u8; 32],
             strategy: VerificationStrategy::EvmReceiptProof,
             source_chain: ChainKind::Evm { chain_id: 1 },

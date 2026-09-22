@@ -2526,6 +2526,11 @@ impl pallet_x3_crosschain_gateway::Config for Runtime {
     type RelayerOrigin = EnsureRootOrHalfCouncil;
     type OperationalOrigin = EnsureRootOrHalfCouncil;
     type DailyLimitWindowBlocks = ConstU32<14_400>;
+    /// The validator pallet's attested headers are what an EVM-receipt route
+    /// verifies against. A route of that kind is only usable for a height that
+    /// pallet has recorded a receipts root for, and its confirmation depth is
+    /// measured from the attested head rather than from the proof.
+    type EvmHeaderAnchor = pallet_cross_chain_validator::Pallet<Runtime>;
 }
 
 // ===== Swarm Pallet Configuration =====

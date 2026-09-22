@@ -11844,6 +11844,7 @@ dependencies = [
  "sp-io 44.0.0",
  "sp-runtime 45.0.0",
  "sp-std 14.0.0",
+ "x3-verification-router",
 ]
 
 [[package]]
@@ -12536,6 +12537,7 @@ dependencies = [
  "frame-system",
  "log",
  "parity-scale-codec",
+ "rlp 0.5.2",
  "scale-info",
  "serde",
  "sp-core 39.0.0",
