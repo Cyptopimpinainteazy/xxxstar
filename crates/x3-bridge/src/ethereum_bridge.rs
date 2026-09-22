@@ -28,6 +28,10 @@ pub struct BridgeDeposit {
     pub depositor: String, // Ethereum address
     pub token: String,     // ERC-20 address
     pub amount: u128,
+    /// Where the wrapped token must be minted on X3. Recorded at lock time, because
+    /// a lock-mint bridge that decides the destination at mint time decides it from
+    /// whatever the caller passes — which is not a property the depositor agreed to.
+    pub x3_recipient: String,
     pub eth_block: u64,
     pub eth_tx_hash: String,
     pub status: DepositStatus,
@@ -168,6 +172,7 @@ impl EthereumBridge {
         depositor: String,
         token_addr: String,
         amount: u128,
+        x3_recipient: String,
         eth_block: u64,
         eth_tx_hash: String,
     ) -> Result<BridgeDeposit, String> {
@@ -175,12 +180,18 @@ impl EthereumBridge {
         if !self.token_registry.contains_key(&token_addr) {
             return Err("Token not registered on bridge".to_string());
         }
+        // An empty destination makes every binding below vacuous: the deposit would
+        // name no recipient and the mint check would compare empty to empty.
+        if x3_recipient.trim().is_empty() {
+            return Err("X3 recipient must not be empty".to_string());
+        }
 
         let deposit = BridgeDeposit {
             id: format!("deposit_{}", self.next_deposit_id),
             depositor,
             token: token_addr.clone(),
             amount,
+            x3_recipient,
             eth_block,
             eth_tx_hash,
             status: DepositStatus::Locked,
@@ -227,12 +238,20 @@ impl EthereumBridge {
             _ => return Err("Deposit not confirmed".to_string()),
         }
 
-        // Create message hash: keccak256(deposit_id || amount || token || recipient)
-        let mut hash = [0u8; 32];
-        let id_bytes = deposit_id.as_bytes();
-        for (i, &byte) in id_bytes.iter().enumerate().take(32) {
-            hash[i] ^= byte;
-        }
+        // keccak256(deposit_id || amount_le || token || x3_recipient).
+        //
+        // This used to be `hash[i] ^= deposit_id.as_bytes()[i]` for the first 32
+        // bytes — no hash function at all, and none of the amount, token or
+        // recipient. Validators were signing a value that binds no economic terms
+        // and is trivially derivable from the deposit id, so a signature collected
+        // for one deposit authorized the same id with any amount, token or
+        // destination. Every field below is part of what the multisig authorizes.
+        let mut preimage = Vec::new();
+        preimage.extend_from_slice(deposit_id.as_bytes());
+        preimage.extend_from_slice(&deposit.amount.to_le_bytes());
+        preimage.extend_from_slice(deposit.token.as_bytes());
+        preimage.extend_from_slice(deposit.x3_recipient.as_bytes());
+        let hash = sp_core::hashing::keccak_256(&preimage);
 
         let message = BridgeMessage {
             id: format!("msg_{}", deposit_id),
@@ -401,6 +420,18 @@ impl EthereumBridge {
             .ok_or("Deposit not found")?
             .clone();
 
+        // The mint's destination is the one the depositor named when locking, not
+        // the one this caller passes. Without this, anyone who can execute a mint
+        // with a valid signature set could send a confirmed deposit to an account of
+        // their choosing — and the signature set does not bind the recipient either
+        // (see `create_bridge_message`), so the signatures would still verify.
+        if x3_recipient != deposit.x3_recipient {
+            return Err(format!(
+                "Mint recipient {} is not the deposit's recorded recipient {}",
+                x3_recipient, deposit.x3_recipient
+            ));
+        }
+
         // Mint wrapped token on X3
         let wrapped_key = format!("{}_{}", deposit.token, x3_recipient);
         self.wrapped_tokens.insert(wrapped_key, deposit.amount);
@@ -516,11 +547,139 @@ mod tests {
             "0xAlice".to_string(),
             "0xUSDC".to_string(),
             1_000_000u128,
+            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
             17_000_000,
             "0xtxhash".to_string(),
         );
 
         assert!(deposit.is_ok());
+    }
+
+    /// The message validators sign has to be a hash of what the mint will do, and
+    /// has to change when any of that changes. It used to be `hash[i] ^= id[i]`: no
+    /// hash function, and none of the amount, token or recipient.
+    #[test]
+    fn bridge_message_hash_covers_the_economic_terms() {
+        let validators: Vec<String> = (0..7).map(|i| format!("0x{:040x}", i)).collect();
+        let mut bridge = EthereumBridge::new_with_test_bypass(validators).unwrap();
+        bridge
+            .register_token(ERC20Token {
+                address: "0xUSDC".to_string(),
+                name: "USDC".to_string(),
+                decimals: 6,
+                total_supply: 1_000_000u128,
+            })
+            .ok();
+
+        let a = bridge
+            .lock_on_ethereum(
+                "0xAlice".to_string(),
+                "0xUSDC".to_string(),
+                1_000_000u128,
+                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
+                17_000_000,
+                "0xtx-a".to_string(),
+            )
+            .unwrap();
+        let b = bridge
+            .lock_on_ethereum(
+                "0xAlice".to_string(),
+                "0xUSDC".to_string(),
+                1_000_000u128,
+                "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty".to_string(),
+                17_000_000,
+                "0xtx-b".to_string(),
+            )
+            .unwrap();
+        let c = bridge
+            .lock_on_ethereum(
+                "0xAlice".to_string(),
+                "0xUSDC".to_string(),
+                2_000_000u128,
+                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
+                17_000_000,
+                "0xtx-c".to_string(),
+            )
+            .unwrap();
+
+        for d in [&a, &b, &c] {
+            bridge.confirm_deposit(&d.id, 17_000_012).ok();
+        }
+
+        let ma = bridge.create_bridge_message(a.id.clone()).unwrap();
+        let mb = bridge.create_bridge_message(b.id.clone()).unwrap();
+        let mc = bridge.create_bridge_message(c.id.clone()).unwrap();
+
+        assert_ne!(
+            ma.message_hash, mb.message_hash,
+            "a different X3 recipient must change what validators sign"
+        );
+        assert_ne!(
+            ma.message_hash, mc.message_hash,
+            "a different amount must change what validators sign"
+        );
+
+        let mut xor = [0u8; 32];
+        for (i, byte) in a.id.as_bytes().iter().enumerate().take(32) {
+            xor[i] ^= byte;
+        }
+        assert_ne!(
+            ma.message_hash, xor,
+            "the message hash must be a hash, not the deposit id XORed into zeros"
+        );
+    }
+
+    /// The mint's destination is the depositor's, not the caller's. Signatures do not
+    /// bind a recipient on their own (they sign `message_hash`), so without this check
+    /// anyone able to execute a mint could name any destination they liked.
+    #[test]
+    fn mint_to_an_account_other_than_the_recorded_recipient_is_refused() {
+        let validators: Vec<String> = (0..7).map(|i| format!("0x{:040x}", i)).collect();
+        let mut bridge = EthereumBridge::new_with_test_bypass(validators).unwrap();
+        bridge
+            .register_token(ERC20Token {
+                address: "0xUSDC".to_string(),
+                name: "USDC".to_string(),
+                decimals: 6,
+                total_supply: 1_000_000u128,
+            })
+            .ok();
+
+        let deposit = bridge
+            .lock_on_ethereum(
+                "0xAlice".to_string(),
+                "0xUSDC".to_string(),
+                1_000_000u128,
+                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
+                17_000_000,
+                "0xtx-min".to_string(),
+            )
+            .unwrap();
+        bridge.confirm_deposit(&deposit.id, 17_000_012).ok();
+        let message = bridge.create_bridge_message(deposit.id.clone()).unwrap();
+        for id in 0..5u32 {
+            bridge.sign_message(&message.id, id, vec![0u8; 65]).ok();
+        }
+
+        let stolen = bridge.execute_mint(
+            &message.id,
+            "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty".to_string(),
+            20,
+        );
+        assert!(
+            stolen.is_err(),
+            "minting to an account the deposit did not name must be refused"
+        );
+
+        let correct = bridge.execute_mint(
+            &message.id,
+            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
+            20,
+        );
+        assert!(
+            correct.is_ok(),
+            "the recorded recipient must still be mintable: {correct:?}"
+        );
     }
 
     #[test]
@@ -542,6 +701,7 @@ mod tests {
                 "0xAlice".to_string(),
                 "0xUSDC".to_string(),
                 1_000_000u128,
+                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
                 17_000_000,
                 "0xtxhash".to_string(),
             )
@@ -569,6 +729,7 @@ mod tests {
                 "0xAlice".to_string(),
                 "0xUSDC".to_string(),
                 1_000_000u128,
+                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
                 17_000_000,
                 "0xtxhash".to_string(),
             )
@@ -598,6 +759,7 @@ mod tests {
                 "0xAlice".to_string(),
                 "0xUSDC".to_string(),
                 1_000_000u128,
+                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
                 17_000_000,
                 "0xtxhash".to_string(),
             )
@@ -632,6 +794,7 @@ mod tests {
                 "0xAlice".to_string(),
                 "0xUSDC".to_string(),
                 1_000_000u128,
+                "0xAlice_X3".to_string(),
                 17_000_000,
                 "0xtxhash".to_string(),
             )
@@ -667,6 +830,7 @@ mod tests {
                 "0xAlice".to_string(),
                 "0xUSDC".to_string(),
                 1_000_000u128,
+                "0xAlice_X3".to_string(),
                 17_000_000,
                 "0xtxhash".to_string(),
             )
@@ -708,6 +872,7 @@ mod tests {
                 "0xAlice".to_string(),
                 "0xUSDC".to_string(),
                 1_000_000u128,
+                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY".to_string(),
                 17_000_000,
                 "0xtxhash".to_string(),
             )
@@ -737,6 +902,7 @@ mod tests {
                 "0xAlice".to_string(),
                 "0xUSDC".to_string(),
                 1_000_000u128,
+                "0xAlice_X3".to_string(),
                 17_000_000,
                 "0xtxhash".to_string(),
             )

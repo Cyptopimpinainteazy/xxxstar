@@ -6671,3 +6671,17 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Wire rotation end-to-end (node schedule → on-chain `ValidatorKeyRegistry` → `session.setKeys`) — the single biggest key-management gap. 2. On-chain session-key onboarding for a new validator. 3. Remaining weak P0: Ethereum bridge adapter (38%) and CEX/ops rows. 4. Consolidate the three SPV implementations. 5. Trusted BTC header bootstrap. 6. Relayer authority decision (owner). 7. Release publish + external audit.
+
+## 2026-09-22 (ninth pass) — the lock-mint bridge signed nothing about the money
+
+### Facts to remember
+- **`crates/x3-bridge/src/ethereum_bridge.rs::create_bridge_message` computed `hash[i] ^= deposit_id.as_bytes()[i]` under a comment claiming `keccak256(deposit_id || amount || token || recipient)`** — no keccak, and none of amount/token/recipient. So the value 5-of-7 signatures authorized was derivable from the deposit id and bound no economics: a signature set for one deposit authorized that id with any amount, token or destination. Now `keccak256(id || amount_le || token || x3_recipient)`.
+- **`BridgeDeposit` had no X3 recipient, and `execute_mint` minted to the caller-supplied `x3_recipient`.** With signatures that did not bind a recipient, that is a theft primitive: anyone executing a mint with a valid set could choose the destination. `lock_on_ethereum` now takes and stores the destination (empty refused) and `execute_mint` requires a match. Negative control: removing the check makes `mint_to_an_account_other_than_the_recorded_recipient_is_refused` fail.
+- The multisig itself is **real** (65-byte sig, secp256k1 recovery, recovered address compared to the registered validator, double-signing refused) — worth remembering so the next audit does not re-suspect it.
+- Three existing tests (`test_execute_mint`, `test_burn_wrapped`, `test_bridge_replay_protection`) minted to `0xAlice_X3` after lock; they now pass `0xAlice_X3` at lock time rather than the binding being softened.
+- `x3-bridge` is **not** in the runtime graph (no pallet/runtime dep) → changing it needs no hash re-attestation; but it IS one of the release gate's critical test suites.
+- `burn_wrapped(x3_account, token, amount)` debits the account passed in and verifies nothing about the caller — a library cannot check an origin, so whatever calls it must; nothing does yet. Recorded as a blocker.
+- Row `X3-XCHAIN-004` (Ethereum bridge adapter) corrected: 65/40/38 → 75/60/45 with real blockers (no caller/not wired, burn authorization, no public-chain run, 5-of-7 key policy = X3-L1-002's gap, no audit).
+
+### Next task seed
+1. Audit the remaining weak P0 rows (claim/GPU/trading subsystems). 2. Wire the lock-mint bridge into a real path, or record it as an unmounted component (canonical-path decision — owner). 3. Add the burn authorization boundary. 4. Wire key rotation end to end. 5. Consolidate the three SPV implementations. 6. Trusted BTC header bootstrap. 7. Relayer authority decision (owner). 8. Release publish + external audit.
