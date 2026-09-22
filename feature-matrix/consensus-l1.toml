@@ -170,16 +170,26 @@ id = "X3-L1-010"
 name = "Bootnode / peer discovery ops"
 subsystem = "consensus_l1"
 source = "master"
-paths = ["docs/reports/FUNCTIONAL_ROADMAP.md"]
-implemented = 35
-tested = 15
-mainnet_ready = 20
+paths = ["scripts/testnet/build-x3-testnet-spec.py", "scripts/mainnet/peer-id-from-ed25519-pubkey.py", "scripts/testnet/run-7-validators-local.sh", "deployment/keys/bootnode-info.txt"]
+implemented = 65
+tested = 45
+mainnet_ready = 35
 priority = "P1"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Roadmap still lists production peer discovery configuration work"]
-evidence = ["docs/reports/FUNCTIONAL_ROADMAP.md", "note: Networking roadmap identifies unfinished bootnode/peer reputation setup"]
+blockers = [
+  "Every bootnode address in the repository is loopback: `deployment/keys/bootnode-info.txt` holds three `/ip4/127.0.0.1/...` entries and the spec builder derives `/ip4/127.0.0.1/tcp/<port>/p2p/<peer>` for each validator — there is no public bootnode host, no DNS name and nothing listening outside this machine",
+  "No peer-reputation, ban-list or long-run connectivity tooling; discovery is the libp2p default plus reserved/bootnode wiring proven on one host",
+  "No monitoring of peer counts or of a bootnode's availability over time",
+]
+# This row cited `docs/reports/FUNCTIONAL_ROADMAP.md` — a roadmap document, not the
+# implementation. Peer identity is real code now: the peer id is derived from each
+# validator's node key by `scripts/mainnet/peer-id-from-ed25519-pubkey.py`, the spec
+# builder writes those ids into `bootNodes`, and the launcher refuses to start unless
+# every node's derived peer id is one of them.
+evidence = ["scripts/testnet/build-x3-testnet-spec.py", "scripts/mainnet/peer-id-from-ed25519-pubkey.py", "scripts/testnet/run-7-validators-local.sh", "note: 2026-09-22 — the spec carries all N derived bootnodes and the launcher preflight requires every node's peer id to be among them ('all 7 launcher peer id(s) are in the spec's 7 bootnode entry(ies)'); the fixture gate `production_genesis_gate.sh` additionally asserts a running node reports the peer id its spec lists"]
+test_evidence = ["scripts/testnet/run-7-validators-local.sh", "scripts/mainnet/production_genesis_gate.sh", "scripts/testnet/validator-failure-drill.sh", "note: measured first-hand 2026-09-22 — seven validators on one host reach six peers each and agree on one chain (killing two keeps finality, killing a third stops it, restarting restores it); the testnet genesis gate asserts 'validator 1 peer id matches the spec's bootnode entry'. What is untested is any of it across hosts."]
 
 [[feature]]
 id = "X3-L1-011"
