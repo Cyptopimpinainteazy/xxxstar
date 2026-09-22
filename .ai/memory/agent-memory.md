@@ -6723,3 +6723,15 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Hosting for a real testnet: validator hosts + one public bootnode with a committed node key + DNS + RPC/faucet/explorer + monitoring, then run `public_testnet_gate.sh --rpc-base-url` and the ceremony verifier against it. 2. Publish a manifest (signed) once there is a tagged build to publish about. 3. Key rotation end-to-end (with the other agent). 4. SPV consolidation. 5. Soak/partition for consensus. 6. Relayer authority decision (owner). 7. External audit.
+
+## 2026-09-22 (thirteenth pass) — a 20-minute soak, and two networks sharing ports
+
+### Facts to remember
+- **`scripts/testnet/consensus-soak.sh`** (opt-in gate `--soak`, also in `--all`; `MINUTES=` to change) boots COUNT validators via `x3_testnet_up.sh` and samples every `INTERVAL` seconds: it fails on a finalized-height stall longer than `STALL_TOLERANCE_SECS` (60), on a validator that dies (nothing restarts a node during a soak — a dead node is a finding), on disagreement at heights 25%/50%/75% of the minimum finalized height, and on RSS growth above `MAX_RSS_GROWTH_MIB` (1024); it writes `soak-report.json` either way.
+- **20-minute run passed**: 4 validators, 1,215s, +4,802 blocks each, peers 3 (min 2 transiently on two nodes), agreement at heights 1273/2546/3819, no stall > 60s, no node lost, RSS growth 480–515 MiB per **debug** node. Twenty minutes cannot distinguish cache from leak — recorded as the remaining blocker rather than called clean.
+- **Port collision found live**: another agent's network (`/tmp/x3-rotation-manual`, the key-rotation work I recommended) was running on 9944–9946 at the same time as the soak, because the launchers hardcoded 30333/9944/9615 + index. Both now take `P2P_BASE`/`RPC_BASE`/`PROM_BASE`, and `build-x3-testnet-spec.py` takes `P2P_BASE` (the spec's bootNodes must name the p2p ports actually used; the RPC base is orthogonal). Verified: `P2P_BASE=31400` → bootNodes on 31400/31401.
+- Multiple agents on one box must set distinct `BASE_DIR`, `LOG_DIR`, `RPC_BASE`, `P2P_BASE`, `PROM_BASE`. A second network silently losing its RPC bind is exactly the failure this prevents.
+- Row `X3-L1-001`: tested 85→88, mainnet-ready 55→60; blockers now name era rotation and the RSS question instead of "nothing runs longer than minutes".
+
+### Next task seed
+1. A *long* soak (hours) to settle RSS growth and exercise era rotation. 2. Hosting for a real testnet (validator hosts, public bootnode, DNS, RPC/faucet/explorer, monitoring). 3. Key rotation end-to-end (other agent — tell it to use distinct ports). 4. SPV consolidation. 5. Partition/clock-skew injection. 6. Relayer authority decision (owner). 7. Release + external audit.

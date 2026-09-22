@@ -110,6 +110,9 @@ f.write("# TESTNET-ONLY master seeds (generated %s). NEVER use on mainnet; not c
 aut = []
 endowed = []
 bootnodes = []
+# The bootnode addresses have to be the p2p ports the launcher will actually listen on
+# (`P2P_BASE`); the *RPC* base is orthogonal and need not match.
+p2p_base = int(os.environ.get("P2P_BASE", "30333"))
 for i in range(1, COUNT + 1):
     master = "0x" + secrets.token_hex(32)
     rec = os.path.join(keysdir, f"validator-{i}.suri")
@@ -133,7 +136,7 @@ for i in range(1, COUNT + 1):
     os.chmod(nodekey_path, 0o600)
     node_pub = public_hex(nodekey, "grandpa")
     peer = peer_id_for(node_pub)
-    bootnodes.append(f"/ip4/127.0.0.1/tcp/{30333 + i - 1}/p2p/{peer}")
+    bootnodes.append(f"/ip4/127.0.0.1/tcp/{p2p_base + i - 1}/p2p/{peer}")
     # The authority's own Aura account is endowed; there is no separate "//acct"
     # derivation to get wrong (the old subkey call derived one, and it is not
     # needed: a validator that holds a bond and an authority key may be one account).

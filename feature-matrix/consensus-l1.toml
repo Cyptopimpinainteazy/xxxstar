@@ -7,17 +7,17 @@ subsystem = "consensus_l1"
 source = "master"
 paths = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh"]
 implemented = 88
-tested = 85
-mainnet_ready = 55
+tested = 88
+mainnet_ready = 60
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "Every validator runs on one host: no independent operators, no geographic or administrative separation, no sustained run",
+  "Every validator runs on one host: no independent operators, no geographic or administrative separation",
   "No slashing, jailing or equivocation evidence from a multi-operator network — those paths have unit coverage only",
   "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
-  "Nothing has run for longer than minutes: no soak, so leaks, memory growth and era rotation are unmeasured",
+  "Twenty minutes is not a duration claim: era rotation is unexercised, and the debug nodes grew ~490–515 MiB of RSS each over the run — cache or leak is not yet distinguishable without a longer soak",
 ]
 # The launcher could not run at all before 2026-09-22: it required `subkey` (not
 # installed, not part of this repo), its default spec was a storage-raw Live file
@@ -27,7 +27,7 @@ blockers = [
 # against the spec's authority sets before starting anything, and gives each node a
 # stable `--node-key`.
 evidence = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh", "note: 2026-09-22 first-hand — the launcher booted three validators on the shipped local3 plain spec (identity keys inserted through the node, no subkey) and all three agreed on finalized height 504 (0x8f1a0eba1bcba88bffe06df76c2df6a9d02616f7dacb58a68c3aed504c5e6222) with two peers each; the release gate's three-validator boots (shipped, production, testnet genesis) pass in the same pipeline"]
-test_evidence = ["scripts/testnet/validator-failure-drill.sh", "scripts/local-network-smoke.sh", "scripts/mainnet/production_genesis_gate.sh", "scripts/testnet/run-7-validators-local.sh", "note: 2026-09-22 first-hand — seven validators on a *Live* testnet spec (seven authorities, bootNodes derived from the per-validator node keys) all authored and finalized, six peers each, and all seven returned the same block hash at height 900 (0x71a9279b…) and height 950 (0x50b771aa…); the failure drill then passed all phases at 7 and at 4 validators: killing a minority keeps finality advancing and the survivors on one chain, killing past a third stops finality (held at 585 for the full 60s window) while authoring continues (head 589 → 760), and restarting the dead validators restores finality on one chain (height 1198); `bash scripts/local-ci.sh --failure --only validator-failure-drill` PASS 358s; three validators on the shipped local3 spec agree on finalized 504; the production/testnet Live genesis gates pass (testnet: finalized 95, peers 2/2/2)"]
+test_evidence = ["scripts/testnet/validator-failure-drill.sh", "scripts/testnet/consensus-soak.sh", "scripts/local-network-smoke.sh", "scripts/mainnet/production_genesis_gate.sh", "scripts/testnet/run-7-validators-local.sh", "note: 2026-09-22 first-hand — seven validators on a *Live* testnet spec all authored and finalized, six peers each, agreeing at heights 900 and 950; the failure drill passed all phases at 7 and at 4 validators (minority down keeps finality, past a third stops it while authoring continues, restart restores one chain), `local-ci --failure` PASS 358s; and a 20-minute soak (`scripts/testnet/consensus-soak.sh`, `local-ci --soak`) held: 1,215 seconds, +4,802 blocks per validator, peers 3 (min 2), the same chain at heights 1273/2546/3819, no stall beyond 60s, no node lost, RSS growth 480–515 MiB per debug node; three validators on the shipped local3 spec agree on finalized 504; the production/testnet Live genesis gates pass"]
 
 [[feature]]
 id = "X3-L1-002"
