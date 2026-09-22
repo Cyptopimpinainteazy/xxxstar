@@ -29,7 +29,14 @@ IGNORE_PREFIXES = (
     "tests/phase_core/security/lib/forge-std/",
 )
 SECRET_PATTERNS = [
-    r"(?i)\b(private[_-]?key|mnemonic|api[_-]?key|rpc[_-]?key)\b\s*[:=]\s*['\"]?[^'\"\s]{8,}",
+    # The separator is `=` or a single `:`, and deliberately not `::`: Rust
+    # path-qualified names are not assignments. `[:=]` matched the first colon of
+    # `Mnemonic::from_phrase`, so any prose or code naming a type and a method
+    # ("the `bip39::Mnemonic::from_phrase` spelling", `Mnemonic::parse_in(`) was
+    # reported as secret-like material and reddened `make guard` for everyone —
+    # the same class of false positive the bip39 allow-list entry below was added
+    # for, one layer up.
+    r"(?i)\b(private[_-]?key|mnemonic|api[_-]?key|rpc[_-]?key)\b\s*(?::(?![=:])|=)\s*['\"]?[^'\"\s]{8,}",
     r"AKIA[0-9A-Z]{16}",
     r"-----BEGIN (EC|RSA|OPENSSH) PRIVATE KEY-----",
 ]
