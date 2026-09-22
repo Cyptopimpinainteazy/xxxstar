@@ -1,117 +1,59 @@
+# X3 GPU acceleration — status, in place of release notes
 
-# SOLANA GPU ACCELERATOR - RELEASE NOTES v1.0.0
+There is no release behind this file.
 
-## Overview
+It announced `solana-gpu-validator-v1.0.tar.gz` (269 MB) containing CUDA kernels (`.cu` + `.ptx`),
+with:
 
-This release brings GPU acceleration to Solana validator operations, achieving unprecedented performance levels on testnet. The implementation focuses on three critical bottlenecks: signature verification, proof-of-history computation, and transaction validation.
+> **Achieved**: 2.75M TPS in lab, 1-5M TPS on testnet (network dependent)
+> **Speedup**: 6,885x improvement from P3 baseline (400 TPS)
+> **Guarantee**: Minimum 100k TPS on Solana testnet
+> **Performance**: 825k signatures/second per GPU
 
-## Performance Achievement
+None of those four lines survives contact with the repository:
 
-- **Testnet Target**: 100,000 TPS minimum
-- **Achieved**: 2.75M TPS in lab, 1-5M TPS on testnet (network dependent)
-- **Speedup**: 6,885x improvement from P3 baseline (400 TPS)
-- **Guarantee**: Minimum 100k TPS on Solana testnet
+| the note said | the repository has |
+| --- | --- |
+| a 269 MB `solana-gpu-validator-v1.0.tar.gz` | no such artifact, and no release asset |
+| `start-validator.sh` | only `scripts/install-validator.sh`, which is a different, real script |
+| "Achieved 2.75M TPS in lab, 1-5M on testnet", "Guarantee 100k TPS" | **no chain-level TPS measurement of any kind** — the repo's own benchmark files record hash rates, not finalized-chain throughput |
+| "825k signatures/second per GPU" | the repo's own `gpu_tps_benchmark_results.json` records `ed25519_gpu_batch_16384 = 113,759/s` and `secp256k1_gpu_batch_4096 = 89,659/s` |
 
-## Key Features
+On top of that, the note's "PoH GPU acceleration: 1.55M hashes/second" is the *CPU* sha256 number
+(`tps_benchmark_results.json`'s `sha256_cpu` = 1,565,073) — a CPU measurement presented as GPU
+acceleration.
 
-### 1. GPU-Accelerated Signature Verification
-- **Technology**: CUDA kernel for batch Ed25519 verification
-- **Performance**: 825k signatures/second per GPU
-- **Architecture**: Efficient batch processing with CPU fallback
-- **Safety**: Constant-time implementation (no timing leaks)
+## What is actually here, and what it is worth
 
-### 2. PoH GPU Acceleration
-- **Technology**: GPU-optimized SHA256 hash chains
-- **Performance**: 1.55M hashes/second
-- **Architecture**: Pipelined hash computation with synchronization
-- **Correctness**: Verified identical to CPU reference
+| thing | state |
+| --- | --- |
+| CUDA kernels | real files: `infra-structure/validator/kernels/{secp256k1_batch,secp256k1_optimized,keccak256_batch}.cu`, with `kernels/build.sh` (which requires `nvcc` and says so when it is missing) |
+| GPU crates | present and building: `crates/x3-gpu-validator-swarm`, `crates/gpu-sig-verifier`, `crates/x3-accel-wgpu`, `crates/confidential-gpu`, `crates/cross-chain-gpu-validator` |
+| benchmark harness | `scripts/gpu/run_swarm_tps_soak_matrix.sh` — a pinned soak that writes JSON to `target/swarm-tps-soak` |
+| benchmark *results* | `infra-structure/validator/benchmarks/{tps,gpu_tps}_benchmark_results.json` exist, but **no script, crate or test in this repository writes either one**, and neither records the host, date, command or GPU it came from |
+| what can be claimed on this host | `GPU_VALIDATOR_HONEST_AUDIT.md`: no GPU compute device (no NVIDIA/AMD PCI device, no `nvidia-smi`/`nvcc`, no CUDA runtime, no usable render node), so no GPU-vs-CPU benchmark is runnable here and **no acceleration claim is made** |
 
-### 3. Transaction Validator GPU
-- **Technology**: GPU-based account verification
-- **Performance**: 1.8M tx/sec validation
-- **Architecture**: Atomic operations for state consistency
-- **Safety**: Full ACID properties maintained
+So the kernels and the harness are real, the numbers are not traceable, and the throughput claims
+are absent. That is the failure mode `feature-matrix/claims-hygiene.toml` row `X3-CLAIM-001` exists
+to catch, and this file was its clearest instance.
 
-## What's Included
+## Unprovenanced artifacts, recorded rather than deleted
 
-```
-solana-gpu-validator-v1.0.tar.gz (269 MB)
-├── solana-validator-runtime/      # GPU-enabled validator binary
-├── gpu-kernels/                   # CUDA kernels (.cu + .ptx)
-├── scripts/                       # Installation automation
-├── configs/                       # Testnet/mainnet configurations
-├── docs/                          # Comprehensive runbooks
-└── docs/root/README.md                      # Quick start guide
-```
+Named here because they assert results nothing here produces:
+`day10-validation-results.json`, `day10-hotfix-results.json` (CPU/GPU checksum parity,
+`"issues_fixed": 3`, 2026-02-08), and the two benchmark result files above. They are TICKET-099 —
+keeping or dropping historical artefacts is the audit trail owner's decision, and deleting a
+number is not the same as explaining it.
 
-## Installation
+## What a release note here would have to contain
 
-```bash
-tar -xzf solana-gpu-validator-v1.0.tar.gz
-cd solana-gpu-validator-v1.0
-./scripts/install-validator.sh
-./scripts/start-validator.sh
-```
+1. A published artifact with a checksum — `install-validator.sh --from-release` verifies one and
+   treats a missing `.sha256` as an error.
+2. A benchmark that ran on real accelerator hardware, with the command, input sizes, hardware and
+   raw output recorded beside the number.
+3. A number the benchmark produced — never a target restated as a result, and never a CPU rate
+   relabelled as GPU acceleration.
 
-## System Requirements
-
-- **GPU**: 3x NVIDIA GeForce GTX 1070+ (CC 6.1+), 8GB VRAM each
-- **CPU**: 16+ cores, 3.0 GHz+
-- **RAM**: 128GB
-- **Storage**: 2.5TB NVMe SSD
-- **Software**: CUDA 11.8+, Ubuntu 20.04+ LTS
-
-## Testing & Validation
-
-- ✅ 26/26 integration tests passing
-- ✅ 1-hour memory stability: 16.67MB growth (< 100MB threshold)
-- ✅ Consensus validation: 100% vote success, 0-1 slot fork distance
-- ✅ Performance regression: 91.6-95.7% of lab baseline
-- ✅ Security audit: APPROVED (10/10 checks passed)
-
-## Known Limitations
-
-- Requires NVIDIA GPU (CUDA 11.8+ compatible)
-- Linux-only (Ubuntu 20.04 LTS recommended)
-- Best performance with CC 6.1+ (GTX 1070, RTX 2060+)
-- GPU clock throttling may occur above 72°C (expected behavior)
-
-## Fallback & Safety
-
-- If GPU fails: CPU-only mode delivers 733k TPS (7.3x testnet target)
-- Automatic fallback: Validator detects GPU errors and switches gracefully
-- No consensus impact: CPU-only path produces identical state
-
-## Documentation
-
-- **[VALIDATOR-RUNBOOK.md](/docs/VALIDATOR-RUNBOOK.md)** - Step-by-step deployment
-- **[TROUBLESHOOTING.md](/docs/TROUBLESHOOTING.md)** - Common issues & solutions
-- **[GPU-REQUIREMENTS.md](/docs/GPU-REQUIREMENTS.md)** - Hardware details
-- **[OPERATIONS-MANUAL.md](/docs/OPERATIONS-MANUAL.md)** - Day-to-day operations
-
-## Support
-
-- GitHub Issues: https://github.com/x3-chain/p4-gpu-accelerators
-- Discord: #p4-gpu-accelerators channel
-- Email: validators@x3-chain.io
-
-## Version History
-
-### v1.0.0 (2026-02-12) - Initial Release
-- GPU acceleration for 3 critical components
-- 2.75M TPS achieved on testnet
-- Full documentation and runbooks
-- Security audit passed
-
-## Credits
-
-Built by the X3 Chain GPU Acceleration Team
-- Architecture: GPU Kernel Team
-- Testing: Validation & QA
-- Deployment: Operations Team
-
----
-
-**Status**: ✅ PRODUCTION READY FOR TESTNET
-**Security**: ✅ AUDIT PASSED
-**Performance**: ✅ 27.5x TARGET EXCEEDED
+Until then the performance figures belong in the proposals that state them as targets
+(`docs/openspec/changes/p4-solana-gpu-acceleration/`), and any document that needs a GPU number
+should say which of the three it is: measured, borrowed, or aspirational.

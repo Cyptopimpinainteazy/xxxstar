@@ -6855,6 +6855,19 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 ### Decisions made this session
 - Wrote the atomic-kernel finding as a **report + ticket (TICKET-097) with three fix options** rather than changing an unsigned security path in a hurry: whether the off-chain worker keeps submitting unsigned (and gains a signature/quorum) or the runtime gains a real finality source is an authorization-model decision, and picking wrong breaks the OCW flow silently.
 - Dropped two readiness scores (`X3-RT-002` 40 → 25, `atomic_kernel` 50 → 35) and the status document with them, because an unauthenticated finalization path is not a 40%-ready core pallet.
+
+## 2026-09-22 (twenty-third pass) — a release note for a release that does not exist
+
+### Facts to remember
+- **`docs/testnet-config/RELEASE-NOTES.md` announced a product**: `solana-gpu-validator-v1.0.tar.gz` (269 MB, CUDA kernels), "Achieved: 2.75M TPS in lab, 1-5M TPS on testnet", "Guarantee: Minimum 100k TPS", "825k signatures/second per GPU". None of it is in the repository — no such artifact, no `start-validator.sh`, and **no chain-level TPS measurement anywhere**.
+- **The traceable figures say the opposite**: `infra-structure/validator/benchmarks/gpu_tps_benchmark_results.json` records `ed25519_gpu_batch_16384 = 113,759/s` and `secp256k1_gpu_batch_4096 = 89,659/s` (not 825k), and the note's "PoH GPU acceleration: 1.55M hashes/second" is the repo's **CPU** `sha256_cpu = 1,565,073` relabelled as GPU work.
+- **Real things in that area** (do not repeat the overreach I made and then corrected): CUDA kernels exist (`infra-structure/validator/kernels/*.cu` + a `build.sh` that requires `nvcc`), GPU crates exist, and `scripts/gpu/run_swarm_tps_soak_matrix.sh` is a real soak harness. I first wrote "no `.cu` file anywhere" — wrong — and fixed it before landing. **Check the negative claim before writing it down.**
+- Four result files have **no producer in the repository**: `infra-structure/validator/benchmarks/{tps,gpu_tps}_benchmark_results.json` and `docs/testnet-config/day10-{validation,hotfix}-results.json`. TICKET-099.
+- Row `X3-CLAIM-001` moved 10/5/5 → 55/25/35; the blocker changed from "remove current-performance wording" (done) to "no GPU benchmark is possible on this host".
+
+### Decisions made this session
+- Rewrote the release note rather than deleting it: the kernels and harness are real, so the honest artifact is one that says which numbers are measured, which are borrowed and which are aspirational.
+- Filed TICKET-099 for the unprovenanced result files instead of deleting them — deleting a number is not the same as explaining it, and the audit trail belongs to the owner.
 ## 2026-09-22 (twentieth pass) — validator key rotation wired end to end (in code)
 
 ### Facts to remember
