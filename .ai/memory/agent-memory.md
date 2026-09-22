@@ -6748,3 +6748,19 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Verify the restarted 2-hour soak (`/tmp/x3-soak120b.log`) and settle the RSS question. 2. Hosting: bootnode host + DNS + RPC/faucet/explorer + monitoring, then `public_testnet_gate.sh --rpc-base-url` and publish a manifest. 3. Key rotation (other agent). 4. SPV consolidation. 5. Partition/clock-skew injection. 6. Relayer authority decision (owner). 7. External audit.
+
+## 2026-09-22 (fifteenth pass) — the stale-audit addendum, and what the other agent should own
+
+### Facts to remember
+- `reports/atomic_crossvm_completion_audit.md` had drifted in the **understating** direction. Its "gateway crate excluded from the build" and "EVM/SVM legs are simulations only" rows are **stale**; its "legacy adapter family still contains stub/mock language" row is **still true** and worth keeping visible, because `evm_htlc.rs`/`bitcoin_htlc.rs` are still compiled into the crate even though nothing on the live path references them. A dated addendum now records all five rows with their current verdict.
+- **`node/src/authority.rs` is a real module (`pub mod authority;` in `node/src/lib.rs`) with `KeyRotationSchedule`, `rotate_keys`, `validators_needing_rotation` and unit tests — and zero callers.** `rg` for callers returns nothing outside the file. The repo already records this in `feature-matrix/consensus-l1.toml` and `TESTNET_GAP_LEDGER.md`; this pass confirmed it first-hand.
+- **`pallets/x3-custody::rotate_validator_key` copies the old key's `rotation_due_at` onto the new key** (`pallets/x3-custody/src/lib.rs`, call_index 3). A rotated key is therefore born already due for rotation — thrash, not a rotation schedule. Its own test at `pallets/x3-custody/src/tests.rs:211` asserts this inheritance as if it were correct.
+- Two remotes: `origin` = `Cyptopimpinainteazy/xxxstar` (the canonical repo, 161 remote refs), `atomicstar` = `Cyptopimpinainteazy/x3-atomic-star`. Always name the remote when fetching/branching; `git branch -r --no-merged origin/master` prints `atomicstar/*` refs too, which reads as if they were local branches.
+- Under this box's load (load avg ~17 while another agent runs networks) `make guard` takes ~5.5 minutes wall. Do not read a slow guard as a hang.
+
+### Decisions made this session
+- Landed the audit addendum as a **docs-only** change on its own branch, so it cannot collide with the runtime/test branches the other agent is pushing.
+- Re-confirmed the handover for the other agent: **validator key rotation end to end** is still the single highest-value, file-disjoint workstream, and it is *partly started but not landed* — `/tmp/x3-rotation-drill` exists but no `feat/*rotation*` branch or PR does. Tell it to use `BASE_DIR=/tmp/x3-rotation-2 RPC_BASE=10044 P2P_BASE=31400 PROM_BASE=19615` so it stops colliding on 9944/30333.
+
+### Canonical paths chosen
+- The addendum is the *only* place that supersedes the old audit's rows; the old text is left intact so the drift is visible rather than silently rewritten.

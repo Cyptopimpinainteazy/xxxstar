@@ -187,3 +187,20 @@ Phase 4 – CI / release gates (P1/P2)
 
 ---
 Every claim above cites a file path/symbol. Where something was missing, it is marked NOT FOUND rather than assumed.
+## Addendum, 2026-09-22 — what has changed, and what of the audit still holds
+
+This audit was accurate when written and is now partly stale in the *understating*
+direction. Re-measured:
+
+| audit's finding | status on 2026-09-22 |
+| --- | --- |
+| `crates/x3-crosschain-gateway` "excluded from the build" | **stale** — it is a workspace member; `Cargo.toml` members include `crates/x3-crosschain-gateway`, and its pallet has 58 tests |
+| external EVM/SVM legs are in-memory simulations only | **superseded for the live path** — `crates/x3-atomic-swap/src/{evm_live,x3vm_live}.rs` plus the node's live tests run against a real anvil and a real solana-test-validator through `scripts/cross-domain-evm-gate.sh` and `cross-domain-svm-gate.sh`, in dev **and** strict posture (no unattested proof sets), with receipts-trie inclusion verified against a real block's `receiptsRoot` and EIP-2718 typed receipts accepted; the EVM verifier cannot even be constructed without an attested header anchor |
+| "no hardcoded stub outputs in production path: FAIL" | **still true of the legacy adapter family** — `evm_htlc.rs` still says "the adapter simulates on-chain behavior" and `bitcoin_htlc.rs` "mock/placeholder proof structures". They are no longer on the live path (nothing outside `x3-atomic-swap` references them; the node's live tests use `LiveEvmExecutor`/`LiveX3VmAdapter`), but they remain in the crate as a drift hazard |
+| external-chain settlement unproven on real chain state | **partly superseded** — proven against locally-hosted chains, not against public ones |
+| no production E2E across all four legs | **still true** — EVM+SVM+X3VM legs run live locally; **BTC has no trusted header source** (headers are root-submitted and must chain to storage, but there is no checkpoint anchor or peer-sourced header sync), and the relayer cannot submit a proof for an intent it is not party to |
+
+The sentence to keep in mind is this file's own: *"fully coherent internally, not fully
+integrated externally."* The internal legs are now proven end to end against real local
+chains; what is missing is public deployment, the BTC trust root, and the submitting
+authority — not the proof machinery.
