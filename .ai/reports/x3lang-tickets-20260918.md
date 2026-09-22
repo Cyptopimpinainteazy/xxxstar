@@ -5131,7 +5131,7 @@ exit 0 "16 ops, no semantic errors", `x3c build` exit 0 "332 bytes (16 instructi
 Regression: `crates/x3-tools/tests/cli.rs` runs that printed sequence against a fresh project.
 
 ## TICKET-126 — the 150 refs that are not on master have not been reconciled one by one — OPEN
-Type: OPEN, audit + merge decision · Subsystem: repository history
+Type: CLOSED (2026-09-21, re-derived from origin/master) · Subsystem: repository history
 Reason: "get all branches on main" cannot be executed as a bulk merge — no remaining branch has master
 as an ancestor, so every one is a real merge against pre-rewrite lineage (830-1010 commits behind). The
 triage in `.ai/reports/branch-consolidation-20260920.md` measures every one of the 90 distinct tips:
@@ -5166,6 +5166,15 @@ already-on-master or pre-rewrite, one is unrelated-lineage archive material, and
 Progress 2026-09-21: `wip/x3lang-preserve-packets-and-arbitrage-20260919` is also pre-rewrite; its
 `arbitrage.rs` and `opportunity_packet.rs` are already represented by current `compiler/src/arb.rs`
 and `vm/src/opportunity_packet.rs`.
+
+Decision (2026-09-21): closed by
+`.ai/reports/branch-triage-verified-20260921.md`, which re-derived the question against
+`origin/master` rather than the per-file metric. Of 432 patch-id-novel commits (375 distinct
+subjects), only two were real missing capabilities and both landed: `#403` (verified-vote counting)
+and `#404` (real Foundry EVM deployment). The named low-percentage false positives are already on
+master under other patches, and the x3-lang WIP/economic-safety-kernel branches are deliberately
+superseded or kept off master. Per-tip detail remains in
+`.ai/reports/branch-consolidation-20260920.md`.
 
 ## TICKET-127 — `x3c fmt` deleted declarations and parameter lists — CLOSED
 Type: CLOSED in `bf37dcb14` (2026-09-20) · Subsystem: compiler/src/formatter.rs
