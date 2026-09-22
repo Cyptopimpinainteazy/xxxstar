@@ -43,3 +43,10 @@ Follow-up attempt (2026-09-22): a fresh `CARGO_TARGET_DIR` build of
 build and failed on the missing `std` target, so the benchmark hang is still
 not isolated. The workspace-level x3-lang gate remains green; this is a root
 benchmark/test-path issue, not x3-lang.
+
+Resolved (2026-09-22): the hang was the `authoring_overhead` benchmark being
+compiled/run by `cargo test --workspace --all-targets`. It is now gated behind
+a `bench` feature in `crates/parallel-proposer/Cargo.toml`
+(`required-features = ["bench"]`), so the workspace test path skips it and
+completes. Run it deliberately with
+`cargo bench -p parallel-proposer --features bench --bench authoring_overhead`.
