@@ -149,8 +149,15 @@ impl Transaction {
             stream.append(&data_bytes);
 
             stream.append(&v);
-            stream.append(&r);
-            stream.append(&s);
+            // `r` and `s` are fixed-width 32-byte big-endian values, but RLP
+            // carries them as *integers*: a leading zero byte is not a canonical
+            // encoding of the value it stands for, and a node that enforces
+            // canonical integers refuses the whole transaction at the RPC
+            // boundary. One signature in ~128 has such a leading zero, which is
+            // why broadcasting used to fail intermittently with
+            // `-32602 Failed to decode transaction`.
+            stream.append(&rlp_integer(r));
+            stream.append(&rlp_integer(s));
 
             let signed_rlp = stream.out().to_vec();
             Ok(format!("0x{}", hex::encode(&signed_rlp)))
@@ -188,6 +195,28 @@ impl Transaction {
     }
 }
 
+/// The bytes RLP carries for a big-endian integer: the value, without leading
+/// zero bytes.
+///
+/// A signature's `r` and `s` are 32-byte fixed-width values. Writing them out
+/// verbatim is well-formed RLP — it is a 32-byte string — but it is not the
+/// canonical *integer* encoding when the first byte is zero, and anvil/reth
+/// reject the transaction at the RPC boundary with
+/// `-32602 Failed to decode transaction`. Encoding the value instead of the
+/// buffer is the whole fix. Zero (which a valid signature never produces here)
+/// is the empty byte string.
+///
+/// `std`-gated with its only caller: a `no_std` build has no signer, and an
+/// unused private function is a `dead_code` error in the runtime's wasm build.
+#[cfg(feature = "std")]
+fn rlp_integer(bytes: &[u8]) -> &[u8] {
+    let start = bytes
+        .iter()
+        .position(|byte| *byte != 0)
+        .unwrap_or(bytes.len());
+    &bytes[start..]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +249,31 @@ mod tests {
         assert_eq!(tx.value, 0);
         assert_eq!(tx.data, "0xdeadbeef");
         assert_eq!(tx.chain_id, 11155111);
+    }
+
+    #[test]
+    fn rlp_integer_drops_leading_zero_bytes_only() {
+        // The case that made broadcasting intermittent: a 32-byte `r` whose first
+        // byte is zero must be carried as the 31-byte value, not as 32 bytes.
+        let mut r = [0u8; 32];
+        r[1..].copy_from_slice(&[0x11u8; 31]);
+        assert_eq!(rlp_integer(&r).len(), 31);
+        assert_eq!(rlp_integer(&r)[0], 0x11);
+
+        // Two leading zeros, and a value that needs none removed.
+        let mut two = [0u8; 32];
+        two[2..].copy_from_slice(&[0x22u8; 30]);
+        assert_eq!(rlp_integer(&two).len(), 30);
+        let full = [0x33u8; 32];
+        assert_eq!(rlp_integer(&full), &full[..]);
+
+        // A single byte below 0x80 keeps its own RLP encoding; stripping must not
+        // turn 0x00 0x05 into an empty string.
+        let small = [0u8, 5];
+        assert_eq!(rlp_integer(&small), &[5u8][..]);
+
+        // Zero is the empty string in RLP. No valid signature produces it, but the
+        // helper must not panic or invent a byte.
+        assert!(rlp_integer(&[0u8; 32]).is_empty());
     }
 }
