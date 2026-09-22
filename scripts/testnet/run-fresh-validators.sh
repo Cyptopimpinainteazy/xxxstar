@@ -2,9 +2,14 @@
 # run-fresh-validators.sh — boot a LOCAL X3 testnet from freshly generated keys.
 #
 # Node 1 = bootnode; nodes 2..N peer to it. Each node is started with X3_DEV_SEED=<its
-# master seed>, which is the ONLY mechanism on this binary that surfaces the Aura+GRANDPA
-# keys to the block-authoring worker (verified 2026-09-04: file-only keystore injection
-# does not drive Aura; service maybe_insert_dev_keys inserts programmatically).
+# master seed>, which inserts the Aura+GRANDPA keys programmatically at startup
+# (`service::maybe_insert_dev_keys`).
+#
+# Re-measured 2026-09-22: this is a convenience, not the only mechanism. A node started
+# with `--validator --force-authoring`, no X3_DEV_SEED, and only the keystore files
+# `scripts/testnet/inject-keystore.sh` writes authored from the first slot (head 9 after
+# ~45s). The older note here claimed keystore injection "does not drive Aura" — that is
+# no longer true, and it was the reason a second, dev-seed-shaped launcher existed.
 #
 # Usage: ./scripts/testnet/run-fresh-validators.sh [count]    (count <= generated su-r files)
 set -euo pipefail

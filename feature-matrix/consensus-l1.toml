@@ -34,16 +34,22 @@ id = "X3-L1-002"
 name = "Validator key management"
 subsystem = "consensus_l1"
 source = "master"
-paths = ["scripts"]
-implemented = 55
-tested = 30
-mainnet_ready = 30
+paths = ["scripts/testnet/inject-keystore.sh", "scripts/harden-validator.sh", "scripts/install-validator.sh", "scripts/generate-bootnode-keys.py", "node/src/authority.rs", "pallets/x3-custody/src/lib.rs"]
+implemented = 75
+tested = 60
+mainnet_ready = 40
 priority = "P0"
 confidence = "medium"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs hardened ceremony, rotation, recovery, and operator runbooks"]
-evidence = ["scripts", "note: Validator startup and chain tooling exist"]
+blockers = [
+  "Key rotation exists twice and is connected zero times: node/src/authority.rs has KeyRotationSchedule/rotate_keys/validators_needing_rotation with unit tests and **no caller anywhere**, and pallets/x3-custody tracks an on-chain ValidatorKeyRegistry with rotation_due_at, but nothing drives one from the other — no end-to-end rotation has ever run",
+  "No tooling registers a new validator's session keys on a running chain (`session.setKeys` is callable in the runtime; nothing calls it), so onboarding means editing genesis or re-running a local launcher",
+  "No key ceremony, backup or recovery runbook, and no HSM/KMS guidance for the operator keys",
+  "No external audit of the key paths",
+]
+evidence = ["scripts/testnet/inject-keystore.sh", "node/src/authority.rs", "pallets/x3-custody/src/lib.rs", "scripts/harden-validator.sh", "note: the node derives and stores keys itself — `keys generate|insert|list|verify` (verify exits non-zero on a mismatch) — and `inject-keystore.sh` now injects through `keys insert` instead of the absent `subkey`, verified 2026-09-22 by writing a keystore and reading it back with `keys list`; keystore-only keys were measured driving Aura authoring with no X3_DEV_SEED (head reached 9 in ~45s), which contradicts the older note in run-fresh-validators.sh"]
+test_evidence = ["scripts/testnet/inject-keystore.sh", "node/src/authority.rs", "pallets/x3-custody/src/tests.rs", "scripts/mainnet/validator_install_gate.sh", "note: unit tests cover SessionKeys derivation and the rotation schedule (should_rotate/schedule_next_rotation/rotate_keys) and the custody registry's rotation_due_at; the release gate's stage 2d exercises the install path (3 cases accepted, 6 refused, nothing written in check mode); key insertion and keystore-backed authoring were verified first-hand on 2026-09-22"]
 
 [[feature]]
 id = "X3-L1-003"
