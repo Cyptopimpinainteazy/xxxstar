@@ -265,6 +265,30 @@ logs `cert anchored for block N` even when the submit failed, and advances its c
 submit, so a rejected anchor for one block is never retried. Its doc comment claims it writes
 off-chain storage; it does not. TICKET-098.
 
+## GAP-GPU-CLAIMS — a release note for a release that does not exist — 2026-09-22
+
+`docs/testnet-config/RELEASE-NOTES.md` announced `solana-gpu-validator-v1.0.tar.gz` (269 MB, CUDA
+kernels), "Achieved: 2.75M TPS in lab, 1-5M TPS on testnet", "Guarantee: Minimum 100k TPS on Solana
+testnet" and "825k signatures/second per GPU". None of it is in this repository: no such artifact,
+no `start-validator.sh`, no chain-level TPS measurement at all — and the one number that *is*
+traceable ("PoH GPU acceleration: 1.55M hashes/second") is the repository's own **CPU** sha256 rate
+from `tps_benchmark_results.json`, relabelled as GPU acceleration. The repository's own
+`gpu_tps_benchmark_results.json` records `ed25519 = 113,759/s` and `secp256k1 = 89,659/s`, not 825k.
+
+The kernels, the crates and the soak harness (`scripts/gpu/run_swarm_tps_soak_matrix.sh`) are real;
+the numbers are not traceable, and the document's name gave them authority. Rewritten to say what
+exists, what is measured and what is a target: `.ai/reports/gpu-claims-hygiene-20260922.md`. Row
+`X3-CLAIM-001` moved 10/5/5 → 55/25/35.
+
+**TICKET-099 — four result files with no producer.** `infra-structure/validator/benchmarks/tps_benchmark_results.json`,
+`…/gpu_tps_benchmark_results.json`, `docs/testnet-config/day10-validation-results.json` and
+`…/day10-hotfix-results.json` assert measurements (including CPU/GPU checksum parity and three
+"issues fixed") that **no script, crate or test in this repository writes**, and none records the
+host, date, command or hardware. Decide per file: re-run it on documented hardware and record the
+command beside the number, move it under an "archive, unverified" path with a header saying so, or
+delete it. Acceptance: no result file in the repository claims a measurement whose producer cannot
+be run.
+
 ## GAP-CI-GATES — `make guard` is not the gate set, and a nested lockfile is stale — 2026-09-22
 
 Running the repository's own CI of record (`scripts/local-ci.sh --testnet`) on merged master, after
