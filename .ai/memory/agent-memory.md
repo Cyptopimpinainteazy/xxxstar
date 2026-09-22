@@ -6868,6 +6868,16 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 ### Decisions made this session
 - Rewrote the release note rather than deleting it: the kernels and harness are real, so the honest artifact is one that says which numbers are measured, which are borrowed and which are aspirational.
 - Filed TICKET-099 for the unprovenanced result files instead of deleting them — deleting a number is not the same as explaining it, and the audit trail belongs to the owner.
+
+## 2026-09-22 (twenty-fourth pass) — two hours on a quiet box, and what the memory bound was measuring
+
+### Facts to remember
+- **The loaded-box soak failure was environmental; the quiet-box run holds.** Same 4 validators, same launcher, 2 hours at load 5–12: one chain throughout, agreement at heights 9089/18178/27267, +36,092 blocks per validator, peers 3, **zero peer bans** (vs 10–16), 4–5 trie-cache lock timeouts (vs 105–419), no stall beyond 60s.
+- **The memory bound failure is real and is mostly a cache.** Default state cache: 690 → ~2,410 MiB over 2h (growth 1,714–1,760 MiB, rates per quarter 22/12/15/8 MiB/min). With `--trie-cache-size 0`: **+227 MiB and flat** (879 → 854 → 873 → 869 MiB) against +432 MiB at the same 15 minutes. `--trie-cache-size` *is* the state cache (`--help`: "Specify the state cache size"); `--db-cache` is the DB block cache.
+- A few hundred MiB over two hours is still unaccounted for, and this is a **debug** build — the release-binary footprint has not been measured. TICKET-100: make the rule `configured cache budget + measured margin`, report the cache size in the harness, and state a validator's memory budget in the runbook.
+- **The launcher now takes `NODE_TRIE_CACHE_BYTES`** (`--trie-cache-size`) alongside `NODE_DB_CACHE_MIB`; `NODE_NICE` also exists. That is how the controlled experiment was run.
+- **`pkill -f -- "<pattern>"` matches the shell running it** when the pattern appears in its own command line — it killed my own `bash -c` (exit 143). Use `pgrep -f "[x]3-chain-node"` or the launcher's pid files (`/tmp/x3-soak*/pids/node-*.pid`).
+- The soak's `KEEP=1` leaves the network running after the verdict; stop it via the pid files.
 ## 2026-09-22 (twentieth pass) — validator key rotation wired end to end (in code)
 
 ### Facts to remember

@@ -7,8 +7,8 @@ subsystem = "consensus_l1"
 source = "master"
 paths = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh"]
 implemented = 88
-tested = 85
-mainnet_ready = 55
+tested = 90
+mainnet_ready = 60
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -17,8 +17,9 @@ blockers = [
   "Every validator runs on one host: no independent operators, no geographic or administrative separation",
   "No slashing, jailing or equivocation evidence from a multi-operator network — those paths have unit coverage only",
   "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
-  "Twenty minutes is not a duration claim: era rotation is unexercised, and the debug nodes grew ~490–515 MiB of RSS each over the run — cache or leak is not yet distinguishable without a longer soak",
-  "A two-hour run FAILED (2026-09-22): under load ~55–60 from other work on the same box, one validator lost its peers and the chain stopped finalizing at height 27,677. The logs name the mechanism — trie-cache lock timeouts from minute four, dropped imports, a missed Aura slot, then peers banning the lagging validator for 'Same block request multiple times' (10–16 bans per node), which converts a lag into a partition. Liveness, not safety: no node ever finalized two conflicting chains. Needs a re-run on an idle box to separate load from defect, see `.ai/reports/soak-2h-failure-20260922.md`",
+  "Era rotation is unexercised",
+  "Two hours on a quiet box now holds — one chain, agreement at three heights, +36,092 blocks per validator, peers 3 throughout, zero peer bans, no stall beyond 60s (`.ai/reports/soak-2h-idle-20260922.md`) — so the earlier failure was load-induced: a starved validator falls behind, repeats one block request, and the peer set bans it out, which turns a lag into a partition. What that experiment does **not** show is whether a loaded validator can recover, and nothing throttles a node that is behind its own import queue",
+  "The two-hour run fails a memory bound, and the bound is measuring a cache: growth is 1,714–1,760 MiB per node over two hours with the default state cache, against +227 MiB and flat with `--trie-cache-size 0`. So it is dominated by configured cache memory, not by an unbounded leak — but a few hundred MiB over two hours is still unaccounted for on a **debug** build, and no release-binary run has been made. TICKET-100 (make the rule `configured cache + measured margin`, and state a validator's memory budget in the runbook)",
 ]
 # The launcher could not run at all before 2026-09-22: it required `subkey` (not
 # installed, not part of this repo), its default spec was a storage-raw Live file

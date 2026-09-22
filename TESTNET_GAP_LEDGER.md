@@ -317,3 +317,37 @@ workspace's lockfile had drifted from its manifest. Regenerated with
 `cargo update --offline --workspace` in `crates/x3-sidecar` (the registry cache had everything;
 nothing was downloaded) and verified with the gate's own command:
 `SKIP_WASM_BUILD=1 cargo check --locked --all-targets` → finished clean in 2m20s.
+
+## GAP-SOAK-2H — RESOLVED (load), and a memory bound that was measuring a cache — 2026-09-22
+
+The two-hour soak failed earlier today at load 55–62 (peers lost, finality stalled, 10–16 peer bans
+per node). Re-run unchanged on a **quiet box** (load 5–12):
+
+```
+[soak] PASS: all 4 validators agree on the same chain at heights 9089, 18178, 27267
+[soak]   rpc 12044: height 259 -> 36351 (+36092), peers 3 (min 3), rss growth 1714.3 MiB
+[soak] FAIL: a node grew 1760.4 MiB, above the 1024.0 MiB bound
+```
+
+**Consensus held for two hours**: one chain, agreement at three heights, +36,092 blocks per
+validator, peers 3 throughout, **zero peer bans** (against 10–16), 4–5 trie-cache lock timeouts
+(against 105–419), no stall beyond 60s. The earlier failure was the machine, and TICKET-094's first
+question is answered: a starved validator falls behind, repeats one block request, and the peer set
+bans it out — a feedback loop that begins with CPU contention, not with consensus.
+
+The memory bound is real and separate, and it survives the quiet box. A controlled run with the
+state cache disabled (`NODE_TRIE_CACHE_BYTES=0`, a passthrough added to the launcher in this
+change) plateaus at **+227 MiB and flat**, against **+432 MiB and still climbing** at the same
+15 minutes with the default cache. So the growth is dominated by `--trie-cache-size` filling to its
+default, i.e. by *configured* memory, not by an unbounded leak.
+
+Evidence and the arithmetic that is still unaccounted for: `.ai/reports/soak-2h-idle-20260922.md`.
+
+**TICKET-100 — make the soak's memory rule mean something.** It fails on growth above 1 GiB, and a
+node with a ≥1 GiB state cache crosses that by filling a cache the operator configured. Two runs
+settle it: (a) two hours with the cache disabled — the pipeline margin over the same window; (b) two
+hours with the **release** binary and default caches — the production footprint. Then the rule
+becomes `configured cache budget + measured margin`, the harness reports which cache size it ran
+with, and the operator runbook states a validator's memory budget explicitly. Acceptance: a
+two-hour run of a release validator passes or fails on a number that is about the node, not about
+its cache configuration.
