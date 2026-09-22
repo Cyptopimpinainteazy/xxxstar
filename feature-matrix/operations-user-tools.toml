@@ -5,24 +5,27 @@ id = "X3-OPS-001"
 name = "Genesis ceremony tooling"
 subsystem = "operations_user_tools"
 source = "master"
-paths = ["scripts/mainnet/genesis_ceremony.sh"]
-implemented = 75
-tested = 45
-mainnet_ready = 35
+paths = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh"]
+implemented = 85
+tested = 65
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
   "The mainnet ceremony itself has not been run: `genesis_ceremony.sh` requires a tagged release commit and srtool, and no tag exists",
-  "No ceremony record is published for anyone to verify a launch against (spec sha256, genesis hash, authority set, escrow addresses, spec_version)",
+  "The ceremony record exists but is only produced and checked locally: nothing publishes a signed manifest, and the recorded node binary is a debug build",
+  "The recorded launch is loopback (four validators on one host) and its bootnodes are /ip4/127.0.0.1/... entries",
 ]
-# The *local* half of a ceremony is exercised today: `build-x3-testnet-spec.py` derives
-# fresh authorities, writes per-validator seeds and node keys, derives bootNodes from
-# them, builds a plain Live spec, asserts it carries every bootnode, and prints the
-# launch command; `x3_testnet_up.sh` resolves that spec and refuses a raw Live one. What
-# is missing is the tagged-commit, mainnet-preset half with published artifacts.
-evidence = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/testnet/x3_testnet_up.sh", "note: `genesis_ceremony.sh` (15.6 kB) is real and deliberately halts on anything not production-grade: tagged commit, srtool-only WASM, mainnet preset, artifact sha256s, summary report; the local builder/launcher path above is the testnet-shaped rehearsal of the same steps and was exercised 2026-09-22 (4-authority Live spec booted through `x3_testnet_up.sh`, one chain at heights 1000 and 1050)"]
+# The rehearsal of the whole ceremony now runs, and it produces the artifact a launch
+# can be verified against: `testnet-ceremony.py record` writes the spec sha256 (and
+# size), the node binary sha256, the chain name/id/type, the genesis hash the network
+# reports, the runtime version, the authority sets from the spec, and every validator's
+# peer id and finalized height; `verify` re-checks all of it against a running network,
+# one line per check. `--testnet` runs the drill: build spec → boot four validators →
+# record → verify → tamper with a copy → require the verifier to reject it.
+evidence = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh", "scripts/testnet/build-x3-testnet-spec.py", "note: 2026-09-22 first-hand — the drill records `X3 Chain Testnet` (Live, id x3_chain_testnet) with genesis 0xa1005528d8d6ec35693e37f8d72a85408067aabeca8fa7f8a6379184628000ad, spec sha256 a3cc9e39719fe017…, 4 aura / 4 grandpa authorities and every validator's peer id + finalized height (273 at record time, 3 peers each); `verify` passes every check against the live network and fails a manifest whose genesis hash was tampered with. `genesis_ceremony.sh` (15.6 kB) remains the mainnet, tagged-commit half"]
 
 [[feature]]
 id = "X3-OPS-002"
@@ -45,9 +48,9 @@ id = "X3-OPS-003"
 name = "Public testnet gate"
 subsystem = "operations_user_tools"
 source = "master"
-paths = ["scripts/mainnet/public_testnet_gate.sh"]
-implemented = 65
-tested = 45
+paths = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh"]
+implemented = 75
+tested = 60
 mainnet_ready = 45
 priority = "P0"
 confidence = "high"
@@ -57,8 +60,9 @@ blockers = [
   "There is no public testnet to gate: measured 2026-09-22 — `rpc.testnet.x3-chain.io`, `faucet.testnet.x3-chain.io` and `bootnode.testnet.x3-chain.io` do not resolve (from a host whose DNS reaches github.com), `gh run list --workflow testnet-deploy.yml` is empty, and every step of docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md is unchecked",
   "No hosting, DNS, TLS or monitoring is provisioned, so the gate has nothing to point at; its default is `http://localhost:9933`",
   "The gate is RPC-only: it cannot see whether the network is *independently* operated, which is the property a public testnet exists to demonstrate",
+  "Both gates have only ever run against loopback networks on one host",
 ]
-evidence = ["scripts/mainnet/public_testnet_gate.sh", "docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md", "docs/root/README.md", "note: 25.6 kB RPC gate that checks system_health, GRANDPA authorities, bridge storage and block height against `--rpc-base-url`; the README has been corrected from advertising the endpoints as live to \"not deployed, intended\", with the measurements"]
+evidence = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/local-ci.sh", "docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md", "note: two runnable gates now exist — 25.6 kB RPC gate that checks system_health, GRANDPA authorities, bridge storage and block height against `--rpc-base-url`, and the ceremony verifier that checks a running network against a recorded manifest (genesis hash, spec sha256, runtime version, authority set, peer ids, finality) and has been seen to reject a tampered manifest; `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` PASS 290s. The README no longer advertises the endpoints as live."]
 
 [[feature]]
 id = "X3-OPS-004"

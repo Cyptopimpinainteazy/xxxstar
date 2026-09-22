@@ -6711,3 +6711,15 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Key rotation end-to-end (handed to a second agent). 2. Publish a ceremony record for a local launch (spec sha256 + genesis hash + authorities + escrow + spec_version) and gate it. 3. Hosting: one public bootnode with a committed node key + DNS + RPC + faucet, then `public_testnet_gate.sh --rpc-base-url`. 4. SPV consolidation. 5. Remaining weak P0 rows (claims/MEV/trading). 6. Relayer authority decision (owner). 7. Release publish + external audit.
+
+## 2026-09-22 (twelfth pass) — a launch you can verify against a record
+
+### Facts to remember
+- **`scripts/testnet/testnet-ceremony.py record|verify`** records what was launched (spec path+sha256+size, node binary sha256, chain name/id/type, genesis hash from the network, runtime version, authority sets from the spec, every validator's peer id / peers / finalized height) and verifies a running network against it, one line per check. `scripts/testnet/testnet-ceremony-drill.sh` builds a spec, boots 4 validators, records, verifies, tampers a copy and requires rejection. Gate: **`bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` → PASS 290s** (new `--testnet` set, also in `--all`).
+- First recorded manifest: `X3 Chain Testnet` (Live, `x3_chain_testnet`), genesis `0xa1005528d8d6ec35693e37f8d72a85408067aabeca8fa7f8a6379184628000ad`, spec sha256 `a3cc9e39719fe017…` (17,243,738 bytes), 4 aura / 4 grandpa, four distinct `12D3Koo…` peer ids with 3 peers each, finalized 273.
+- **Two harness fixes it forced**: `wait_for_rpc` in the launcher is 180s now (60s was too short for a cold debug node reading a 17 MB spec on a back-to-back run); and `pgrep … | wc -l` under `set -o pipefail` aborts a script *after* successful cleanup when nothing matches — swallow the status (same trap as in validator-failure-drill.sh).
+- **`python3 scripts/feature_matrix.py check` can fail by *traceback*** (a TOML parse error: "Cannot overwrite a value"), in which case grepping for `^ERROR` shows 0 and looks like a pass. Always check the exit status / tail, not just the ERROR count. My `paths = [...]` patches twice matched the context line and left a duplicate key.
+- Rows: `X3-OPS-001` 75/45/35 → **85/65/45** (local rehearsal produces + verifies a record; mainnet tagged ceremony and publication remain); `X3-OPS-003` 65/45/45 → **75/60/45** (two runnable gates, still no public testnet).
+
+### Next task seed
+1. Hosting for a real testnet: validator hosts + one public bootnode with a committed node key + DNS + RPC/faucet/explorer + monitoring, then run `public_testnet_gate.sh --rpc-base-url` and the ceremony verifier against it. 2. Publish a manifest (signed) once there is a tagged build to publish about. 3. Key rotation end-to-end (with the other agent). 4. SPV consolidation. 5. Soak/partition for consensus. 6. Relayer authority decision (owner). 7. External audit.
