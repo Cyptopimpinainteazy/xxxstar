@@ -107,9 +107,9 @@ impl Display for EvmReceiptError {
                 f,
                 "evm proof: block confirmations {have} below required {need}"
             ),
-            EvmReceiptError::UnanchoredHeader => f.write_str(
-                "evm proof: the header is not one the chain has attested",
-            ),
+            EvmReceiptError::UnanchoredHeader => {
+                f.write_str("evm proof: the header is not one the chain has attested")
+            }
             EvmReceiptError::WrongChain { expected, got } => {
                 write!(
                     f,
@@ -636,8 +636,7 @@ fn build_node(entries: &[(Vec<u8>, Vec<u8>)]) -> Option<TrieNode> {
                 });
             }
 
-            let mut children: [Option<Box<TrieNode>>; 16] =
-                core::array::from_fn(|_| Option::None);
+            let mut children: [Option<Box<TrieNode>>; 16] = core::array::from_fn(|_| Option::None);
             let mut value: Option<Vec<u8>> = Option::None;
             for (key, entry_value) in entries {
                 let Some(first) = key.first().copied() else {
@@ -713,12 +712,7 @@ fn entries_for(receipts: &[Vec<u8>]) -> Vec<(Vec<u8>, Vec<u8>)> {
     receipts
         .iter()
         .enumerate()
-        .map(|(index, receipt)| {
-            (
-                nibbles(&receipt_trie_key(index as u64)),
-                receipt.clone(),
-            )
-        })
+        .map(|(index, receipt)| (nibbles(&receipt_trie_key(index as u64)), receipt.clone()))
         .collect()
 }
 
@@ -912,10 +906,7 @@ impl DecodedProof {
     /// satisfies the threshold. The anchor is what makes the header evidence: the
     /// root this proof is checked against, and the head its depth is measured
     /// from, come from the chain's own store.
-    pub fn validate_against(
-        &self,
-        anchor: EvmHeaderAnchorSource,
-    ) -> Result<(), EvmReceiptError> {
+    pub fn validate_against(&self, anchor: EvmHeaderAnchorSource) -> Result<(), EvmReceiptError> {
         let Some(anchored) = anchor.anchored(self.header.number) else {
             return Err(EvmReceiptError::UnanchoredHeader);
         };
@@ -1133,7 +1124,10 @@ pub enum EvmHeaderAnchorSource {
     /// One header and the head that contains it, held as data — for a caller
     /// that obtained the chain's view out of band and wants this proof checked
     /// against exactly that block.
-    Fixed { header: AnchoredEvmHeader, head: u64 },
+    Fixed {
+        header: AnchoredEvmHeader,
+        head: u64,
+    },
 }
 
 impl EvmHeaderAnchorSource {
@@ -1384,11 +1378,7 @@ mod tests {
 
     /// The chain's view of the header a fixture built: its receipts root at its
     /// height, with `head` as the attested head.
-    fn anchor_to(
-        receipts_root: [u8; 32],
-        number: u64,
-        head: u64,
-    ) -> EvmHeaderAnchorSource {
+    fn anchor_to(receipts_root: [u8; 32], number: u64, head: u64) -> EvmHeaderAnchorSource {
         EvmHeaderAnchorSource::Fixed {
             header: AnchoredEvmHeader {
                 number,
@@ -1530,7 +1520,9 @@ mod tests {
 
         // And at the attested head it does verify, so the refusal above is about
         // depth rather than about the anchor being wired wrong.
-        assert!(anchored_verifier(12, receipts_root, 100, 120).verify(&envelope).is_ok());
+        assert!(anchored_verifier(12, receipts_root, 100, 120)
+            .verify(&envelope)
+            .is_ok());
     }
 
     #[test]
@@ -1572,17 +1564,19 @@ mod tests {
 
     #[test]
     fn decode_short_payload_fails() {
-        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(&ProofEnvelope {
-            proof_id: [0u8; 32],
-            strategy: VerificationStrategy::EvmReceiptProof,
-            source_chain: ChainKind::Evm { chain_id: 1 },
-            destination_chain: ChainKind::X3,
-            payload: vec![0; 4],
-            expected_asset_id: [0u8; 32],
-            expected_amount: 0,
-            expected_sender: Vec::new(),
-            expected_recipient: vec![0u8; 20],
-        });
+        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(
+            &ProofEnvelope {
+                proof_id: [0u8; 32],
+                strategy: VerificationStrategy::EvmReceiptProof,
+                source_chain: ChainKind::Evm { chain_id: 1 },
+                destination_chain: ChainKind::X3,
+                payload: vec![0; 4],
+                expected_asset_id: [0u8; 32],
+                expected_amount: 0,
+                expected_sender: Vec::new(),
+                expected_recipient: vec![0u8; 20],
+            },
+        );
         assert!(matches!(r, Err(VerificationError::MalformedProof)));
     }
 
@@ -1710,7 +1704,10 @@ mod tests {
             let typed_decoded = EvmReceipt::decode(&typed)
                 .unwrap_or_else(|e| panic!("typed receipt 0x{type_byte:02x} must decode: {e}"));
             assert_eq!(typed_decoded.status, decoded.status);
-            assert_eq!(typed_decoded.cumulative_gas_used, decoded.cumulative_gas_used);
+            assert_eq!(
+                typed_decoded.cumulative_gas_used,
+                decoded.cumulative_gas_used
+            );
             assert_eq!(typed_decoded.logs.len(), decoded.logs.len());
             assert_eq!(typed_decoded.logs[0].address, decoded.logs[0].address);
         }
@@ -1718,7 +1715,10 @@ mod tests {
 
     #[test]
     fn a_type_byte_without_a_receipt_body_is_refused() {
-        assert_eq!(EvmReceipt::decode(&[0x02]), Err(EvmReceiptError::BadReceipt));
+        assert_eq!(
+            EvmReceipt::decode(&[0x02]),
+            Err(EvmReceiptError::BadReceipt)
+        );
         // A type byte followed by something that is not an RLP list.
         assert_eq!(
             EvmReceipt::decode(&[0x02, 0x01, 0x02, 0x03]),
@@ -1790,33 +1790,37 @@ mod tests {
 
     #[test]
     fn wrong_chain_kind_fails() {
-        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(&ProofEnvelope {
-            proof_id: [0u8; 32],
-            strategy: VerificationStrategy::EvmReceiptProof,
-            source_chain: ChainKind::Solana,
-            destination_chain: ChainKind::X3,
-            payload: vec![0; 64],
-            expected_asset_id: [0u8; 32],
-            expected_amount: 0,
-            expected_sender: Vec::new(),
-            expected_recipient: vec![0u8; 20],
-        });
+        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(
+            &ProofEnvelope {
+                proof_id: [0u8; 32],
+                strategy: VerificationStrategy::EvmReceiptProof,
+                source_chain: ChainKind::Solana,
+                destination_chain: ChainKind::X3,
+                payload: vec![0; 64],
+                expected_asset_id: [0u8; 32],
+                expected_amount: 0,
+                expected_sender: Vec::new(),
+                expected_recipient: vec![0u8; 20],
+            },
+        );
         assert!(matches!(r, Err(VerificationError::UnsupportedChain)));
     }
 
     #[test]
     fn wrong_destination_chain_fails() {
-        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(&ProofEnvelope {
-            proof_id: [0u8; 32],
-            strategy: VerificationStrategy::EvmReceiptProof,
-            source_chain: ChainKind::Evm { chain_id: 1 },
-            destination_chain: ChainKind::Evm { chain_id: 2 },
-            payload: vec![0; 64],
-            expected_asset_id: [0u8; 32],
-            expected_amount: 0,
-            expected_sender: Vec::new(),
-            expected_recipient: vec![0u8; 20],
-        });
+        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(
+            &ProofEnvelope {
+                proof_id: [0u8; 32],
+                strategy: VerificationStrategy::EvmReceiptProof,
+                source_chain: ChainKind::Evm { chain_id: 1 },
+                destination_chain: ChainKind::Evm { chain_id: 2 },
+                payload: vec![0; 64],
+                expected_asset_id: [0u8; 32],
+                expected_amount: 0,
+                expected_sender: Vec::new(),
+                expected_recipient: vec![0u8; 20],
+            },
+        );
         assert!(matches!(r, Err(VerificationError::UnsupportedChain)));
     }
 
@@ -1841,17 +1845,19 @@ mod tests {
         payload.extend_from_slice(&min.to_le_bytes());
         payload.extend_from_slice(&body);
 
-        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(&ProofEnvelope {
-            proof_id: [0u8; 32],
-            strategy: VerificationStrategy::EvmReceiptProof,
-            source_chain: ChainKind::Evm { chain_id: 1 },
-            destination_chain: ChainKind::X3,
-            payload,
-            expected_asset_id: [0u8; 32],
-            expected_amount: 0,
-            expected_sender: Vec::new(),
-            expected_recipient: vec![0u8; 20],
-        });
+        let r = ProductionEvmReceiptVerifier::anchored_by::<NoEvmHeaderAnchor>(12).verify(
+            &ProofEnvelope {
+                proof_id: [0u8; 32],
+                strategy: VerificationStrategy::EvmReceiptProof,
+                source_chain: ChainKind::Evm { chain_id: 1 },
+                destination_chain: ChainKind::X3,
+                payload,
+                expected_asset_id: [0u8; 32],
+                expected_amount: 0,
+                expected_sender: Vec::new(),
+                expected_recipient: vec![0u8; 20],
+            },
+        );
         assert!(matches!(r, Err(VerificationError::MalformedProof)));
     }
 }

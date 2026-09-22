@@ -1280,11 +1280,10 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::EvmReceiptProof => {
-                    let v: Arc<dyn Verifier> = Arc::new(
-                        ProductionEvmReceiptVerifier::anchored_by::<T::EvmHeaderAnchor>(
-                            route.finality_requirement,
-                        ),
-                    );
+                    let v: Arc<dyn Verifier> =
+                        Arc::new(ProductionEvmReceiptVerifier::anchored_by::<
+                            T::EvmHeaderAnchor,
+                        >(route.finality_requirement));
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::SolanaFinalizedProof => {

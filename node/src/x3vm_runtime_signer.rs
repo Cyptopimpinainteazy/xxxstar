@@ -390,13 +390,14 @@ impl X3RuntimeSigner {
         let length_bound = u32::try_from(call.encoded_size()).map_err(|_| {
             SwapError::Internal("the proposed call does not fit in a council proposal".into())
         })?;
-        let council_call = RuntimeCall::Council(
-            pallet_collective::Call::<Runtime, CouncilCollective>::propose {
-                threshold,
-                proposal: Box::new(call),
-                length_bound,
-            },
-        );
+        let council_call = RuntimeCall::Council(pallet_collective::Call::<
+            Runtime,
+            CouncilCollective,
+        >::propose {
+            threshold,
+            proposal: Box::new(call),
+            length_bound,
+        });
         self.signed_extrinsic(council_call)
     }
 

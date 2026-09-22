@@ -293,7 +293,7 @@ pub fn valid_proof_payload() -> BoundedVec<u8, ConstU32<4096>> {
 /// that root at that height (or does not, to prove the route refuses).
 pub fn evm_deposit_payload(amount: u128) -> (BoundedVec<u8, ConstU32<4096>>, [u8; 32], u64, u64) {
     use x3_verification_router::evm_receipt::{
-        encode_proof_payload, receipt_trie_key, deposit_locked_selector,
+        deposit_locked_selector, encode_proof_payload, receipt_trie_key,
     };
 
     let contract = [0xaa; 20]; // `evm_route().contract_address`
@@ -305,11 +305,7 @@ pub fn evm_deposit_payload(amount: u128) -> (BoundedVec<u8, ConstU32<4096>>, [u8
         rlp_bytes(&log_data),
     ]);
     // Post-Byzantium receipt: [status, cumulative_gas_used, logs].
-    let receipt = rlp_list(&[
-        rlp_bytes(&[0x01]),
-        rlp_bytes(&[0x00]),
-        rlp_list(&[log]),
-    ]);
+    let receipt = rlp_list(&[rlp_bytes(&[0x01]), rlp_bytes(&[0x00]), rlp_list(&[log])]);
 
     let key = receipt_trie_key(1);
     let leaf = rlp_list(&[rlp_bytes(&compact_leaf_path(&key)), rlp_bytes(&receipt)]);

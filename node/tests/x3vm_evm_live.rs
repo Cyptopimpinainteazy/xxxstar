@@ -790,7 +790,10 @@ fn real_evm_header_attestation_populates_the_verifiers_anchor() {
             "value": "0x1",
         })],
     );
-    let sent = sent.as_str().expect("anvil accepted the transaction").to_string();
+    let sent = sent
+        .as_str()
+        .expect("anvil accepted the transaction")
+        .to_string();
 
     // Anvil returns the hash before the block exists, so wait for the receipt and
     // take the block *it* names rather than "latest" — otherwise the test can read
@@ -833,12 +836,9 @@ fn real_evm_header_attestation_populates_the_verifiers_anchor() {
     assert_ne!(block_number, 0, "anvil has produced at least one block");
     assert_ne!(receipts_root, H256::zero(), "a header commits to a root");
 
-    let alice = X3RuntimeSigner::from_uri(
-        String::from("x3-local"),
-        X3_RPC.into(),
-        &dev_uri("Alice"),
-    )
-    .expect("X3 signer");
+    let alice =
+        X3RuntimeSigner::from_uri(String::from("x3-local"), X3_RPC.into(), &dev_uri("Alice"))
+            .expect("X3 signer");
 
     // Before anything is attested there is no anchor, so an external proof is
     // refused for lack of one rather than checked against itself.
@@ -945,12 +945,9 @@ fn real_evm_receipt_proof_is_accepted_against_the_attested_header() {
     let _x3 = spawn_x3_node();
     wait_x3_rpc(Duration::from_secs(180));
 
-    let alice = X3RuntimeSigner::from_uri(
-        String::from("x3-local"),
-        X3_RPC.into(),
-        &dev_uri("Alice"),
-    )
-    .expect("X3 signer");
+    let alice =
+        X3RuntimeSigner::from_uri(String::from("x3-local"), X3_RPC.into(), &dev_uri("Alice"))
+            .expect("X3 signer");
 
     // 1. A transaction in a real EVM block, and the inclusion proof for it.
     let tx_hash = anvil_transaction();

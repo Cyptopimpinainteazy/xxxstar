@@ -318,8 +318,9 @@ impl From<x3_validator_attestation::AttestationError> for AttestationError {
             Upstream::StatementMismatch => AttestationError::WrongEventHash,
             Upstream::UnauthorizedValidator => AttestationError::UnauthorizedValidator,
             Upstream::SignatureVerificationFailed => AttestationError::InvalidSignature,
-            Upstream::InvalidPublicKey
-            | Upstream::InvalidSignatureLength { .. } => AttestationError::MalformedAttestation,
+            Upstream::InvalidPublicKey | Upstream::InvalidSignatureLength { .. } => {
+                AttestationError::MalformedAttestation
+            }
         }
     }
 }
@@ -907,7 +908,8 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
         // to the router, whose validator-quorum verifier fails closed by design —
         // so the one path with a real check could never settle.
         let verified_by_attestation = matches!(
-            self.attestation_engine.get_attestation_status(proof.proof_id),
+            self.attestation_engine
+                .get_attestation_status(proof.proof_id),
             Some(AttestationStatus::QuorumReached) | Some(AttestationStatus::Verified)
         );
         if verified_by_attestation {
@@ -1154,19 +1156,12 @@ mod tests {
     }
 
     /// An attestation set signed by `signers`, over the statement for this proof.
-    fn attestation_signed_by(
-        proof_id: ProofId,
-        signers: &[(u8, &str)],
-    ) -> GatewayAttestationSet {
+    fn attestation_signed_by(proof_id: ProofId, signers: &[(u8, &str)]) -> GatewayAttestationSet {
         let source_chain = 1u64;
         let source_tx_hash = [7u8; 32];
         let event_hash = [6u8; 32];
-        let statement = gateway_attestation_statement(
-            &proof_id,
-            source_chain,
-            &source_tx_hash,
-            &event_hash,
-        );
+        let statement =
+            gateway_attestation_statement(&proof_id, source_chain, &source_tx_hash, &event_hash);
         let attestations = signers
             .iter()
             .map(|(seed, name)| {
@@ -1266,7 +1261,9 @@ mod tests {
         // this must not pass for the arithmetic reason instead.
         assert!(matches!(
             gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
-            Err(GatewayError::Attestation(AttestationError::InvalidSignature))
+            Err(GatewayError::Attestation(
+                AttestationError::InvalidSignature
+            ))
         ));
     }
 
@@ -1346,7 +1343,9 @@ mod tests {
 
         assert!(matches!(
             gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
-            Err(GatewayError::Attestation(AttestationError::InvalidSignature))
+            Err(GatewayError::Attestation(
+                AttestationError::InvalidSignature
+            ))
         ));
     }
 
@@ -1355,8 +1354,7 @@ mod tests {
         let mut gateway = gateway();
         gateway.register_validator_set(validator_set());
         let proof = proof(100, 1);
-        let attestation =
-            attestation_signed_by(proof.proof_id, &[(1, "alice"), (1, "alice")]);
+        let attestation = attestation_signed_by(proof.proof_id, &[(1, "alice"), (1, "alice")]);
 
         assert!(matches!(
             gateway.submit_attested_deposit_proof([1; 32], proof, 1, attestation),
