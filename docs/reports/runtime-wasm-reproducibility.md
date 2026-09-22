@@ -30,18 +30,27 @@ the permissions the image's `builder` user needs — see that script).
 The second run was a from-scratch rebuild (`runtime/target/srtool` removed
 first), so this is not one artifact reported twice.
 
-The hashes below describe the revision that added the cross-chain-gateway header
-anchor (`EvmHeaderAnchor`), recorded at revision `deab51f7f`. They are **not** a fixed
-property of the project: any runtime-affecting change produces different WASM,
-which is why `docs/reports/runtime-wasm-hashes.json` names the revision it was
-recorded at, and why `scripts/mainnet_release_gate.py` **rebuilds and compares**
-rather than trusting the file. Cutting a release means rebuilding from the
-revision being released, confirming two builds of *that* revision agree, and
-updating the record in the same change.
+The values below were first established at `deab51f7f`, the revision that added
+the cross-chain-gateway header anchor (`EvmHeaderAnchor`), and re-attested at
+`04fb44907`, the merge of the minimal-RLP EVM signature fix
+(`crates/x3-atomic-swap/src/ethereum_tx.rs`). **The two attestations produced the
+same bytes** — that fix lives behind `std` and is never instantiated by the
+runtime — and the record moved only its `recorded_revision`. That is the intended
+behaviour: a revision that a mainnet governance motion attests to has to be named,
+even when the value it carries does not change.
 
-Earlier pairs of builds (compact `0x78feb683…`, `0xb1f0348c…`, `0xb1777a09…`) were taken at older
-revision and is kept here only as the record of how this was established; the
-current values are the `0xac13ee1b…` pair (recorded at `deab51f7f`).
+They are **not** a fixed property of the project: any runtime-affecting change
+produces different WASM, which is why `docs/reports/runtime-wasm-hashes.json`
+names the revision it was recorded at, and why
+`scripts/mainnet_release_gate.py` **rebuilds and compares** rather than trusting
+the file. Cutting a release means rebuilding from the revision being released,
+confirming two builds of *that* revision agree, and updating the record in the
+same change.
+
+Earlier pairs of builds (compact `0x78feb683…`, `0xb1f0348c…`, `0xb1777a09…`) were
+taken at older revisions and are kept here only as the record of how this was
+established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
+other values below.
 
 **Compact (`x3_chain_runtime.compact.wasm`, 8,435,073 bytes)**
 
