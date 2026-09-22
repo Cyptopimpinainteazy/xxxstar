@@ -160,6 +160,11 @@ TESTS=(
   # anvil actually produced. Without it "the verifier is anchored" was a claim
   # about code paths no chain had run.
   real_evm_header_attestation_populates_the_verifiers_anchor
+  # The whole EVM settlement path at once: attest a real block, produce the
+  # receipt proof from a real transaction, and have the settlement engine verify
+  # and record it. Each link has its own test; this is the one that shows they
+  # compose on a chain.
+  real_evm_receipt_proof_is_accepted_against_the_attested_header
 )
 
 failed=0

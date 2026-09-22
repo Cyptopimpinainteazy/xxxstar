@@ -892,3 +892,172 @@ fn real_evm_header_attestation_populates_the_verifiers_anchor() {
         "the anchor's per-height root and its head describe the same attested block"
     );
 }
+
+/// Send one transaction to anvil and return its hash once it is mined.
+fn anvil_transaction() -> String {
+    let sent = evm_call(
+        "eth_sendTransaction",
+        vec![serde_json::json!({
+            "from": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+            "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "value": "0x1",
+        })],
+    );
+    let hash = sent
+        .as_str()
+        .expect("anvil accepted the transaction")
+        .to_string();
+
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline {
+        let receipt = evm_call(
+            "eth_getTransactionReceipt",
+            vec![Value::String(hash.clone())],
+        );
+        if receipt.is_object() {
+            return hash;
+        }
+        thread::sleep(Duration::from_millis(200));
+    }
+    panic!("the transaction was never mined");
+}
+
+fn produced_inclusion(tx_hash: &str) -> x3_relayer::evm_receipt_proof::ReceiptInclusion {
+    tokio::runtime::Runtime::new()
+        .expect("a tokio runtime for the producer")
+        .block_on(x3_relayer::evm_receipt_proof::prove_evm_receipt(
+            EVM_RPC, tx_hash,
+        ))
+        .expect("the producer builds an inclusion proof")
+}
+
+/// The whole EVM settlement path on a live chain: a real block is attested, a
+/// proof produced from a real receipt is accepted against it, and the engine
+/// records the verified proof on the intent's Ethereum leg.
+///
+/// Each piece had its own test; this is the one that shows they compose. It would
+/// have failed at three different points before this session's changes: the MPT
+/// walk could not verify a real block, the verifier took its header from the
+/// proof, and nothing produced a proof at all.
+#[test]
+#[ignore = "boots a node and needs a running anvil; the EVM gate supplies both"]
+fn real_evm_receipt_proof_is_accepted_against_the_attested_header() {
+    let _x3 = spawn_x3_node();
+    wait_x3_rpc(Duration::from_secs(180));
+
+    let alice = X3RuntimeSigner::from_uri(
+        String::from("x3-local"),
+        X3_RPC.into(),
+        &dev_uri("Alice"),
+    )
+    .expect("X3 signer");
+
+    // 1. A transaction in a real EVM block, and the inclusion proof for it.
+    let tx_hash = anvil_transaction();
+    let inclusion = produced_inclusion(&tx_hash);
+    let block_number = inclusion.block_number;
+    assert_eq!(
+        inclusion.confirmations, 0,
+        "the producer read the head right after the block was mined"
+    );
+
+    // 2. Enroll this signer as a header submitter, and attest that block: the
+    //    receipt proof is only evidence if the chain has attested its header.
+    let enroll = alice
+        .sign_enroll_header_submitters(vec![alice.account()])
+        .expect("sign the council proposal");
+    assert!(!submit_x3(&enroll).is_empty());
+    let enrol_block = wait_x3_finalized(&enroll, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&alice, &enrol_block, &enroll);
+
+    let attest = alice
+        .sign_validate_evm_header(
+            block_number,
+            H256(inclusion.block_hash),
+            H256(inclusion.state_root),
+            H256(inclusion.receipts_root),
+            inclusion.receipts_root.to_vec(),
+        )
+        .expect("sign the header attestation");
+    assert!(!submit_x3(&attest).is_empty());
+    let attest_block = wait_x3_finalized(&attest, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&alice, &attest_block, &attest);
+
+    // 3. Ethereum's finality config wants 12 confirmations, so give the block
+    //    depth and re-produce: the count the engine checks is the one the
+    //    producer read from the chain.
+    evm_call("anvil_mine", vec![Value::String("0xd".into())]);
+    let inclusion = produced_inclusion(&tx_hash);
+    assert_eq!(
+        inclusion.block_number, block_number,
+        "the same block, now buried"
+    );
+    assert!(
+        inclusion.confirmations >= 12,
+        "mined past Ethereum's confirmation requirement, got {}",
+        inclusion.confirmations
+    );
+    let proof = inclusion
+        .settlement_proof()
+        .expect("the inclusion adapts into the engine's proof");
+
+    // 4. An intent with an Ethereum leg, both legs locked: the engine accepts a
+    //    proof only for a funded intent.
+    let preimage = [0x77u8; 32];
+    let hashlock = sp_core::hashing::sha2_256(&preimage);
+    let prepared = alice
+        .prepare_create_intent(
+            dev_account("Bob"),
+            X3RuntimeSigner::x3_native_asset(1_000_000),
+            pallet_x3_settlement_engine::AssetSpec {
+                chain: pallet_x3_settlement_engine::ExternalChainId::Ethereum,
+                token: pallet_x3_settlement_engine::TokenId::Native,
+                amount: 1_000_000,
+            },
+            H256::from(hashlock),
+            Some(300),
+        )
+        .expect("prepare the intent");
+    assert!(!submit_x3(&prepared.signed_extrinsic).is_empty());
+    let created_block = wait_x3_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&alice, &created_block, &prepared.signed_extrinsic);
+    let created_hash = H256::from_slice(
+        &hex::decode(created_block.trim_start_matches("0x")).expect("decode finalized head"),
+    );
+    let runtime_intent_id = alice
+        .resolve_intent_id(&prepared, created_hash)
+        .expect("resolve the on-chain intent id");
+
+    for (leg_index, chain, escrow_data) in [
+        (
+            0u32,
+            pallet_x3_settlement_engine::ExternalChainId::X3Native,
+            b"x3-native-leg0".to_vec(),
+        ),
+        (
+            1u32,
+            pallet_x3_settlement_engine::ExternalChainId::Ethereum,
+            b"ethereum-leg1".to_vec(),
+        ),
+    ] {
+        let lock = alice
+            .sign_lock_escrow_leg(runtime_intent_id, leg_index, chain, 1_000_000, escrow_data)
+            .expect("sign the escrow leg");
+        assert!(!submit_x3(&lock).is_empty());
+        let block = wait_x3_finalized(&lock, Duration::from_secs(180));
+        assert_x3_dispatch_succeeded(&alice, &block, &lock);
+    }
+
+    // 5. The engine verifies the proof against the attested header and walks the
+    //    receipt to the attested root. Acceptance means all of it held.
+    let submit = alice
+        .sign_submit_proof(
+            runtime_intent_id,
+            pallet_x3_settlement_engine::ExternalChainId::Ethereum,
+            proof,
+        )
+        .expect("sign the proof submission");
+    assert!(!submit_x3(&submit).is_empty());
+    let submit_block = wait_x3_finalized(&submit, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&alice, &submit_block, &submit);
+}

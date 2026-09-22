@@ -26598,6 +26598,7 @@ dependencies = [
  "x3-gpu-validator-swarm",
  "x3-poh-generator",
  "x3-proof-dispute",
+ "x3-relayer",
  "x3-rpc",
  "x3-validator-attestation",
  "x3-verification-router",
