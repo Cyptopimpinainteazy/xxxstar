@@ -15,6 +15,11 @@ codec = { package = "parity-scale-codec", version = "3.6.5", default-features = 
 scale-info = { version = "2.11.1", default-features = false, features = ["derive"] }
 
 frame-support = { workspace = true, default-features = false }
+# `sp_io::hashing::blake2_256` is the standard Blake2b-256 the off-chain gateway
+# derives withdrawal ids with. `frame_support::Hashable::blake2_256` is NOT the same
+# function in this build — measured: it returns a different digest for "abc" than
+# `sp_io::hashing::blake2_256` and standard Blake2b-256 both do.
+sp-io = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
@@ -26,8 +31,12 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 log = { workspace = true, default-features = false }
 
 [dev-dependencies]
-sp-io = { workspace = true, features = ["std"] }
 sp-core = { workspace = true, features = ["std"] }
+# The off-chain gateway derives the same withdrawal id this pallet emits and keys its
+# store by, so the tests assert the two derivations agree by calling the crate. The
+# pallet's test helper used to repeat the derivation instead — and when the pallet's
+# copy and this one were both XOR, every assertion passed while both were wrong.
+x3-crosschain-gateway = { path = "../../crates/x3-crosschain-gateway" }
 # The pallet's own tests exercise the verification plumbing with structural
 # proofs (see `deposit_proof_validator_quorum_works` and friends). The stub
 # verifiers fail closed unless `test-verifier` is on, and production builds must
@@ -47,6 +56,7 @@ std = [
   "codec/std",
   "scale-info/std",
   "frame-support/std",
+  "sp-io/std",
   "frame-system/std",
   "sp-std/std",
   "sp-runtime/std",

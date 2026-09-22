@@ -47,9 +47,24 @@ X3 Chain is a next-generation Layer-1 blockchain purpose-built to host dual virt
 - ⚠️ **Dual-VM Adapters (EVM/SVM):** Using mock executors for testnet; real Frontier/SVM execution integration in development
 - 🚧 **Governance:** Sudo remains enabled for development; governance pallet integration **NOT YET IMPLEMENTED**
 
-**Testnet RPC**: `http://rpc.testnet.x3-chain.io:9933`  
-**Faucet**: `https://faucet.testnet.x3-chain.io`  
-**See**: `docs/reports/TESTNET_ANNOUNCEMENT.md` for details
+**Testnet: not deployed.** These are the intended endpoints, not live ones — as of
+2026-09-22 `rpc.testnet.x3-chain.io`, `faucet.testnet.x3-chain.io` and
+`bootnode.testnet.x3-chain.io` do not resolve (checked from a host whose DNS reaches
+github.com), the `testnet-deploy` workflow has never run, and every step of
+`docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md` — validator VMs, RPC VMs, bootnode,
+monitoring, DNS, firewall — is still unchecked.
+
+What does run today is a **local** testnet: `scripts/testnet/build-x3-testnet-spec.py`
+builds a Live spec with freshly derived authorities and bootnodes, and
+`scripts/testnet/run-7-validators-local.sh` boots it — seven validators finalizing
+and agreeing on one chain (verified 2026-09-22), with
+`scripts/testnet/validator-failure-drill.sh` covering minority failure, a missing
+supermajority and recovery.
+
+**Intended testnet RPC**: `http://rpc.testnet.x3-chain.io:9933` (planned)
+**Intended faucet**: `https://faucet.testnet.x3-chain.io` (planned)
+**See**: `docs/reports/TESTNET_ANNOUNCEMENT.md` for details, and
+`docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md` for what remains
 
 ---
 
