@@ -65,8 +65,13 @@ jobs:
 
       - name: Generate weight benchmarks
         run: |
+          # `--chain` takes one of the node's built-in ids or a path. `x3-local3-raw`
+          # is the name of a file in `chain-specs/`, so passing it as an id made the
+          # node look for a file of that name and exit 1 ("Failed to read chain spec
+          # file x3-local3-raw"). Benchmarks run against the built-in three-validator
+          # chain, which is the spec the local network gates use.
           ./target/release/x3-chain-node benchmark pallet \
-            --chain x3-local3-raw \
+            --chain local3 \
             --wasm-execution=compiled \
             --pallet pallet-x3-cross-vm-router \
             --extrinsic "*" \
@@ -76,7 +81,7 @@ jobs:
             2>&1 | tee bench-router.txt
 
           ./target/release/x3-chain-node benchmark pallet \
-            --chain x3-local3-raw \
+            --chain local3 \
             --wasm-execution=compiled \
             --pallet pallet-x3-supply-ledger \
             --extrinsic "*" \
@@ -86,7 +91,7 @@ jobs:
             2>&1 | tee bench-ledger.txt
 
           ./target/release/x3-chain-node benchmark pallet \
-            --chain x3-local3-raw \
+            --chain local3 \
             --wasm-execution=compiled \
             --pallet pallet-x3-dex \
             --extrinsic "*" \
