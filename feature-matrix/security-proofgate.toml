@@ -1,10 +1,11 @@
 # Security / ProofGate feature matrix fragment.
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-SEC-001"
 name = "Reproducible srtool runtime build"
 subsystem = "security_proofgate"
-source = "open_pr"
+source = "master"
 paths = [".github/workflows/production-gate.yml"]
 implemented = 85
 tested = 55
@@ -14,14 +15,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["New exact-head workflow has not completed green yet"]
-evidence = [".github/workflows/production-gate.yml", "note: Branch hardening builds runtime with scripts/run-srtool.sh and records hashes"]
-open_prs = [166]
+evidence = [".github/workflows/production-gate.yml", "note: Branch hardening builds runtime with scripts/run-srtool.sh and records hashes", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-SEC-002"
 name = "Runtime artifact hash evidence"
 subsystem = "security_proofgate"
-source = "open_pr"
+source = "master"
 paths = [".github/workflows/production-gate.yml"]
 implemented = 85
 tested = 55
@@ -31,8 +32,7 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending exact-head Actions proof"]
-evidence = [".github/workflows/production-gate.yml", "note: Branch records commit, BLAKE2-256, SHA-256, WASM size/path"]
-open_prs = [166]
+evidence = [".github/workflows/production-gate.yml", "note: Branch records commit, BLAKE2-256, SHA-256, WASM size/path", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
 id = "X3-SEC-003"
@@ -51,10 +51,11 @@ blockers = ["Must remain aligned with actual production build artifacts"]
 evidence = ["scripts/mainnet_release_gate.py", "note: Checks docs, builds, specs, critical tests, srtool prerequisites, secrets"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-SEC-004"
 name = "Production gate"
 subsystem = "security_proofgate"
-source = "open_pr"
+source = "master"
 paths = [".github/workflows/production-gate.yml"]
 implemented = 88
 tested = 75
@@ -64,8 +65,7 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["srtool hardening is on #166 branch, not master yet"]
-evidence = [".github/workflows/production-gate.yml", "note: Runs guard/tests/release build/audit/node build/mainnet check"]
-open_prs = [166]
+evidence = [".github/workflows/production-gate.yml", "note: Runs guard/tests/release build/audit/node build/mainnet check", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
 id = "X3-SEC-005"
