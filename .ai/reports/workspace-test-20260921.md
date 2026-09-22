@@ -37,3 +37,9 @@ default workspace target directory: cached artifacts were built with rustc
 1.98.1 while the active toolchain is 1.90.0, producing `E0514`/`E0614` errors
 before the tests ran. The hang therefore remains unisolated until a fresh
 `CARGO_TARGET_DIR` build is used for that single crate.
+
+Follow-up attempt (2026-09-22): a fresh `CARGO_TARGET_DIR` build of
+`parallel-proposer` without `SKIP_WASM_BUILD=1` still reached the runtime WASM
+build and failed on the missing `std` target, so the benchmark hang is still
+not isolated. The workspace-level x3-lang gate remains green; this is a root
+benchmark/test-path issue, not x3-lang.
