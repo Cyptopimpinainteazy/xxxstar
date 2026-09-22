@@ -24,6 +24,9 @@ Local MCP server for Codex/VS Code to inspect a running X3 node and execute expl
 | `x3_run_readiness_gate` | focused/tests/local-ci verification |
 | `x3_run_atomic_tests` | real x3-atomic-swap tests |
 | `x3_collect_evidence` | repository + live-node evidence bundle |
+| `x3_trace_atomic_swap` | trace one intent from durable proof-ledger evidence |
+| `x3_verify_proof` | require complete verified persisted proof evidence |
+| `x3_verify_receipt` | run the real X3Lang receipt verifier; never implies signer trust |
 
 ## Install
 
@@ -40,6 +43,7 @@ Set the local node and repo:
 ```bash
 export X3_RPC_URL=http://127.0.0.1:9944
 export X3_REPO_ROOT="$PWD"
+export X3_PROOF_LEDGER="$PWD/audit-artifacts/x3vm-proof-ledger.json"
 ```
 
 ## Codex
@@ -78,13 +82,11 @@ Next phase should bind these to real X3 interfaces:
 
 1. `x3_inspect_intent`
 2. `x3_atomic_state`
-3. `x3_trace_atomic_swap`
-4. `x3_verify_proof`
-5. `x3_verify_receipt`
-6. `x3_validator_status`
-7. `x3_consensus_status`
-8. `x3_run_failure_matrix`
-9. `x3_compile_x3lang`
-10. `x3_collect_production_evidence`
+3. `x3_validator_status`
+4. `x3_consensus_status`
+5. `x3_run_failure_matrix`
+6. `x3_compile_x3lang`
+7. `x3_collect_production_evidence`
+8. trusted-key receipt verification exposed through a non-fixture X3Lang CLI/API
 
 Each must bind to actual X3 interfaces. No fake responses or placeholder success paths.
