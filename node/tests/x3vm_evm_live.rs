@@ -733,3 +733,162 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
         .claim(local_id, preimage)
         .expect_err("X3 claim after finalized refund must fail");
 }
+
+/// The cross-chain-validator storage key for one attested EVM merkle root.
+fn evm_merkle_root_key(block_number: u64) -> String {
+    let mut key =
+        frame_support::storage::storage_prefix(b"CrossChainValidator", b"EvmMerkleRoots").to_vec();
+    let encoded = block_number.encode();
+    key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
+    key.extend_from_slice(&encoded);
+    format!("0x{}", hex::encode(key))
+}
+
+fn storage_at(key: &str) -> Option<Vec<u8>> {
+    let mut rpc = RpcClient::new(X3_RPC.into(), 0);
+    let value = rpc
+        .call("state_getStorage", vec![Value::String(key.to_string())])
+        .expect("state_getStorage")
+        .result?;
+    let raw = value.as_str().expect("storage hex");
+    Some(hex::decode(raw.trim_start_matches("0x")).expect("decode storage hex"))
+}
+
+fn h256_field(header: &Value, field: &str) -> H256 {
+    let raw = header[field]
+        .as_str()
+        .unwrap_or_else(|| panic!("{field} is not a hex string"));
+    let bytes = hex::decode(raw.trim_start_matches("0x")).expect("hex");
+    H256::from_slice(&bytes)
+}
+
+/// The anchor the EVM receipt verifier reads, populated through the real path.
+///
+/// `ProductionEvmReceiptVerifier` refuses to verify against a header the proof
+/// carries; it asks the chain which header it has attested. Nothing had shown
+/// that a live chain can *populate* that store, and the path is not obvious: this
+/// genesis configures no sudo key and `set_authorized_submitters` needs Root or
+/// half the council, so the reachable route is a council motion whose threshold
+/// is one (pallet-collective executes those immediately).
+///
+/// The header attested here is a block anvil actually produced — its number,
+/// hash, state root and receipts root are read from the node, not invented.
+#[test]
+#[ignore = "boots a node and needs a running anvil; the EVM gate supplies both"]
+fn real_evm_header_attestation_populates_the_verifiers_anchor() {
+    let _x3 = spawn_x3_node();
+    wait_x3_rpc(Duration::from_secs(180));
+
+    // A real EVM block from the chain the gate is running — one that actually
+    // carries a receipt, so the attestation is about a block with contents rather
+    // than anvil's empty genesis.
+    let sent = evm_call(
+        "eth_sendTransaction",
+        vec![serde_json::json!({
+            "from": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+            "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "value": "0x1",
+        })],
+    );
+    let sent = sent.as_str().expect("anvil accepted the transaction").to_string();
+
+    // Anvil returns the hash before the block exists, so wait for the receipt and
+    // take the block *it* names rather than "latest" — otherwise the test can read
+    // the empty genesis block.
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let mined = loop {
+        let receipt = evm_call(
+            "eth_getTransactionReceipt",
+            vec![Value::String(sent.clone())],
+        );
+        if receipt.is_object() {
+            break receipt;
+        }
+        assert!(Instant::now() < deadline, "the transaction was never mined");
+        thread::sleep(Duration::from_millis(200));
+    };
+    let header = evm_call(
+        "eth_getBlockByNumber",
+        vec![
+            Value::String(
+                mined["blockNumber"]
+                    .as_str()
+                    .expect("the receipt names its block")
+                    .to_string(),
+            ),
+            Value::Bool(false),
+        ],
+    );
+    let block_number = u64::from_str_radix(
+        header["number"]
+            .as_str()
+            .expect("the block has a number")
+            .trim_start_matches("0x"),
+        16,
+    )
+    .expect("a hex block number");
+    let block_hash = h256_field(&header, "hash");
+    let state_root = h256_field(&header, "stateRoot");
+    let receipts_root = h256_field(&header, "receiptsRoot");
+    assert_ne!(block_number, 0, "anvil has produced at least one block");
+    assert_ne!(receipts_root, H256::zero(), "a header commits to a root");
+
+    let alice = X3RuntimeSigner::from_uri(
+        String::from("x3-local"),
+        X3_RPC.into(),
+        &dev_uri("Alice"),
+    )
+    .expect("X3 signer");
+
+    // Before anything is attested there is no anchor, so an external proof is
+    // refused for lack of one rather than checked against itself.
+    assert!(
+        storage_at(&evm_merkle_root_key(block_number)).is_none(),
+        "nothing is attested yet"
+    );
+
+    // 1. Enroll this signer as an external-header submitter, through the council.
+    let enroll = alice
+        .sign_enroll_header_submitters(vec![alice.account()])
+        .expect("sign the council proposal");
+    assert!(!submit_x3(&enroll).is_empty());
+    let enrol_block = wait_x3_finalized(&enroll, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&alice, &enrol_block, &enroll);
+
+    // 2. Attest the real block's receipts root. One leaf — the root itself — is
+    //    the proof that this root is over the leaves submitted.
+    let attest = alice
+        .sign_validate_evm_header(
+            block_number,
+            block_hash,
+            state_root,
+            receipts_root,
+            receipts_root.as_bytes().to_vec(),
+        )
+        .expect("sign the header attestation");
+    assert!(!submit_x3(&attest).is_empty());
+    let attest_block = wait_x3_finalized(&attest, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&alice, &attest_block, &attest);
+
+    // 3. The store the anchor reads now answers with that header.
+    let stored_root = storage_at(&evm_merkle_root_key(block_number))
+        .expect("the attested root is stored for its height");
+    assert_eq!(
+        H256::from_slice(&stored_root),
+        receipts_root,
+        "the height answers with the block's receipts root, which is what a receipt proof must walk to"
+    );
+
+    let last_key = frame_support::storage::storage_prefix(b"CrossChainValidator", b"LastEvmHeader");
+    let stored = storage_at(&format!("0x{}", hex::encode(last_key)))
+        .expect("the attested header is the newest one");
+    let header_info = pallet_cross_chain_validator::EvmHeaderInfo::decode(&mut &stored[..])
+        .expect("EvmHeaderInfo decodes");
+    assert_eq!(header_info.block_number, block_number);
+    assert_eq!(header_info.block_hash, block_hash);
+    assert_eq!(header_info.state_root, state_root);
+    assert_eq!(
+        header_info.merkle_root, receipts_root,
+        "the anchor's per-height root and its head describe the same attested block"
+    );
+}

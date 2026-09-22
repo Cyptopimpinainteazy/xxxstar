@@ -26535,6 +26535,7 @@ dependencies = [
  "pallet-agent-memory",
  "pallet-atomic-trade-engine",
  "pallet-collective",
+ "pallet-cross-chain-validator",
  "pallet-evm",
  "pallet-evolution-core",
  "pallet-transaction-payment",
