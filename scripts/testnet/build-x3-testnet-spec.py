@@ -110,6 +110,21 @@ f.write("# TESTNET-ONLY master seeds (generated %s). NEVER use on mainnet; not c
 aut = []
 endowed = []
 bootnodes = []
+# A public testnet's validators dial a bootnode they do not run: publish that address in
+# the spec with `PUBLIC_BOOTNODES` (comma-separated multiaddrs, e.g.
+# `/dns4/bootnode.example/tcp/30333/p2p/12D3Koo…`). Without it the spec carries the
+# derived loopback entries, which are what a single-host local network needs.
+public_bootnodes = [
+    entry.strip()
+    for entry in os.environ.get("PUBLIC_BOOTNODES", "").split(",")
+    if entry.strip()
+]
+if public_bootnodes:
+    for entry in public_bootnodes:
+        if "/p2p/" not in entry or not entry.startswith(("/dns", "/ip4", "/ip6")):
+            raise SystemExit(
+                f"PUBLIC_BOOTNODES entry {entry!r} is not a /dns…|/ip4… multiaddr with /p2p/<peer id>"
+            )
 # The bootnode addresses have to be the p2p ports the launcher will actually listen on
 # (`P2P_BASE`); the *RPC* base is orthogonal and need not match.
 p2p_base = int(os.environ.get("P2P_BASE", "30333"))
@@ -136,7 +151,8 @@ for i in range(1, COUNT + 1):
     os.chmod(nodekey_path, 0o600)
     node_pub = public_hex(nodekey, "grandpa")
     peer = peer_id_for(node_pub)
-    bootnodes.append(f"/ip4/127.0.0.1/tcp/{p2p_base + i - 1}/p2p/{peer}")
+    if not public_bootnodes:
+        bootnodes.append(f"/ip4/127.0.0.1/tcp/{p2p_base + i - 1}/p2p/{peer}")
     # The authority's own Aura account is endowed; there is no separate "//acct"
     # derivation to get wrong (the old subkey call derived one, and it is not
     # needed: a validator that holds a bond and an authority key may be one account).
@@ -146,6 +162,9 @@ for i in range(1, COUNT + 1):
 f.close()
 os.chmod(suri_log, 0o600)
 print(f"[keys] {COUNT} master seeds -> {keysdir} (SURIs NOT committed)")
+if public_bootnodes:
+    bootnodes = public_bootnodes
+    print(f"[spec] using {len(bootnodes)} published bootnode(s) from PUBLIC_BOOTNODES")
 
 authf = os.path.join(outdir, "authorities.json")
 endf = os.path.join(outdir, "endowed.json")
@@ -215,12 +234,14 @@ if not spec_boot:
     sys.exit(1)
 if missing:
     sys.stderr.write(
-        f"[spec] {name} is missing {len(missing)} of the {len(bootnodes)} derived "
-        f"bootnode entries, e.g. {missing[0]}\n"
+        f"[spec] {name} is missing {len(missing)} of the {len(bootnodes)} bootnode "
+        f"entries it was built for, e.g. {missing[0]}\n"
     )
     sys.exit(1)
-print(f"[spec] {name} carries all {len(bootnodes)} derived bootnodes "
-      f"(peer ids match the node keys beside the seeds)")
+print(
+    f"[spec] {name} carries all {len(bootnodes)} bootnode entry(ies) "
+    f"({'published addresses from PUBLIC_BOOTNODES' if public_bootnodes else 'peer ids derived from the node keys beside the seeds'})"
+)
 print(f"[spec] launch it with:")
 print(
     "  COUNT=%d CHAIN_SPEC=%s NODE_BIN=%s "
