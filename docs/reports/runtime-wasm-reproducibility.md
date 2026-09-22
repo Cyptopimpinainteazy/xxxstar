@@ -33,14 +33,21 @@ first), so this is not one artifact reported twice.
 The values below were first established at `deab51f7f`, the revision that added
 the cross-chain-gateway header anchor (`EvmHeaderAnchor`), re-attested unchanged at
 `04fb44907` (the minimal-RLP EVM signature fix, which lives behind `std` and is
-never instantiated by the runtime), and **re-attested with different bytes at
-`5e0f86760`**: that revision fixes the Bitcoin header path — proof of work is
-checked over Bitcoin's 80 wire bytes instead of the SCALE encoding of a struct
-carrying a non-wire `height` field, and negative, overflowing and zero targets are
-rejected as Bitcoin rejects them — and bumps `spec_version` to 12. The runtime
-bytes changed, which is the intended behaviour: a revision that a mainnet
-governance motion attests to has to be named, and the hash has to describe the
-artifact that revision builds.
+never instantiated by the runtime), and then **re-attested twice with different
+bytes**:
+
+* `5e0f86760` — the Bitcoin header path: proof of work is checked over Bitcoin's 80
+  wire bytes instead of the SCALE encoding of a struct carrying a non-wire `height`
+  field, negative/overflowing/zero targets are rejected as Bitcoin rejects them, and
+  `spec_version` moves to 12.
+* `9fe02ac37` — the cross-chain gateway derives withdrawal ids with
+  domain-separated Blake2b-256 instead of XOR mixing, which collided (`"A" * 64` and
+  `"B" * 64` produced the same id, and that id keys both the pallet's `Withdrawals`
+  map and the relayer's processed set), and `spec_version` moves to 13.
+
+Bytes changing is the intended behaviour: a revision that a mainnet governance
+motion attests to has to be named, and the hash has to describe the artifact that
+revision builds.
 
 `recorded_at` and the top-level `runtime_version` are now written by
 `./scripts/update-runtime-hashes.sh` from the same srtool block the hashes come
@@ -62,24 +69,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,433,833 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,426,935 bytes)**
 
 ```
-Version          : x3-chain-12 (x3-chain-1.tx1.au1)
+Version          : x3-chain-13 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xba54025879f965ba59045c86790e68d17a305751dd4fd58dd24f72811e0b32a4
-authorizeUpgrade : 0x19eedc53456633712b4c7e7b0228a8a746c5f3ba06f4b2021b40148a38b6c868
-IPFS             : QmZASRxZoEgy4mrJeKpULzEPmyX84JUfdnSPcAnCCc3oJL
-BLAKE2_256       : 0xbbb17006c0948307a775e8d3779e5a25a232deb4dce5ef8c3a17b1c70377ce61
+setCode          : 0xd998dae29f7608357622ef37ee527cd31e00ea7bb10e0121d56872e17ebf492c
+authorizeUpgrade : 0x91814730dc970cf52cc42765c933c108eaa0656d223ddfaa9923a4947d419a5a
+IPFS             : QmSBXVCK52s1RUcasXSYmnMuAda7qsGWNDantshhbFEB59
+BLAKE2_256       : 0x871c8feb70f6068a1ba9a98e1a49e23b48e5c895ea7bf0a393c7274fa5490c63
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,444,249 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,444,353 bytes)**
 
 ```
-setCode          : 0x9328da7077d22aaaa00a544282946fe8819d3d388c4bdc327a60cd19388b35de
-authorizeUpgrade : 0xa9c8a93d620b4b44fb5b20751ea9100a06fdc9dc90f0d5eb90f644b50cfc92d3
-IPFS             : QmZNZoHVHkvFRUrUCWhFfb8QfT3rsn7qeeLeAwbMgxzzmr
-BLAKE2_256       : 0x0c36f055f2904497f2770d3eed5c2ac3fe48b67f1ec0f1aa3f23eb101d8a37a8
+setCode          : 0xeac27a0153d54d4c4a44b4d5aa1aabfd075abb9039bbde88efa6dac8f6f7bb48
+authorizeUpgrade : 0x0a1803da86c99dbafdb7abff4ca6442e5476b5f91a6ddb6fa7fd752359cd5a58
+IPFS             : Qmb3Mg778EfaX6fj25pzVompH8grdrsxKbPwUcxWRXtsaY
+BLAKE2_256       : 0x5a8200f4890d1630dfc2394f6119058a9159c56c545aa2fb8a896e8d5067f5e2
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

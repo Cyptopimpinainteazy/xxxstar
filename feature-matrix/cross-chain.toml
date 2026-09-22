@@ -168,16 +168,26 @@ id = "X3-XCHAIN-008"
 name = "General external gateway"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-gateway"]
-implemented = 70
-tested = 55
-mainnet_ready = 65
+paths = ["crates/x3-crosschain-gateway/src/lib.rs", "pallets/x3-crosschain-gateway/src/lib.rs", "pallets/x3-crosschain-gateway/src/tests.rs"]
+implemented = 80
+tested = 75
+mainnet_ready = 70
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["External bridge activation remains governance-guarded"]
-evidence = ["crates/x3-gateway", "note: FEATURE_REGISTRY atomic_gateway = 65%"]
+blockers = [
+  "External bridge activation remains governance-guarded: the pallet's own note, and routes must be registered and enabled before anything moves",
+  "Nothing has run against a public external chain; the verification router's EVM/SVM verifiers are exercised against anvil and solana-test-validator in local gates",
+  "The withdrawal-id change (XOR → Blake2b) takes effect for new withdrawals only after this runtime is deployed (`spec_version` 13)",
+  "No external audit of the gateway crate or pallet",
+]
+# This row used to cite `crates/x3-gateway`, which is the REST/GraphQL API service for
+# indexed data — it contains no gateway logic, and neither the gateway crate nor the
+# gateway pallet appeared anywhere in this matrix. That is how a protocol defect in
+# the withdrawal id survived: the readiness records never pointed at the code.
+evidence = ["crates/x3-crosschain-gateway/src/lib.rs", "pallets/x3-crosschain-gateway/src/lib.rs", "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, and refuses unregistered/disabled routes; the off-chain crate mirrors the lifecycle with a circuit breaker, insurance and risk engine"]
+test_evidence = ["pallets/x3-crosschain-gateway/src/tests.rs", "crates/x3-crosschain-gateway/src/lib.rs", "note: 2026-09-22 — 58 pallet tests and 20 crate tests pass, including the state-machine invariant fuzz, the release-proof quorum/double-release/wrong-chain rejections, `the_two_derivations_agree` (pallet and off-chain gateway derive the same withdrawal id) and `recipients_that_collided_under_xor_get_different_withdrawal_ids` (the old XOR derivation collided for two different recipients; the hashed one does not)"]
 registry_feature = "atomic_gateway"
 
 [[feature]]

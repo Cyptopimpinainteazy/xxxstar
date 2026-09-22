@@ -6685,3 +6685,16 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Audit the remaining weak P0 rows (claim/GPU/trading subsystems). 2. Wire the lock-mint bridge into a real path, or record it as an unmounted component (canonical-path decision — owner). 3. Add the burn authorization boundary. 4. Wire key rotation end to end. 5. Consolidate the three SPV implementations. 6. Trusted BTC header bootstrap. 7. Relayer authority decision (owner). 8. Release publish + external audit.
+
+## 2026-09-22 (tenth pass) — the gateway's withdrawal id was XOR, not a hash
+
+### Facts to remember
+- **`derive_withdrawal_id` XORed its inputs in both copies** — the pallet's `request_withdrawal` (extrinsic, call_index 5, so *runtime* code) and `crates/x3-crosschain-gateway`: `out[idx % 32] ^= recipient_byte; out[idx] ^= amount_byte; out[idx] ^= block_byte`. XOR is commutative and self-inverse, so bytes repeating at the same slot cancel: `"A"*64` and `"B"*64 derive the **same** id (asserted in a test). The id keys the pallet's `Withdrawals` map, is emitted in `WithdrawalRequested`, and keys the relayer's `processed` map (`crates/x3-relayer/src/main.rs`) — so a collision means one withdrawal is treated as another.
+- Fixed with one derivation: `blake2_256("x3-crosschain-gateway-withdrawal-v1" || asset_id || len(recipient) as u64 LE || recipient || amount as u128 LE || block as u64 LE)`, defined in `x3_crosschain_gateway::gateway_withdrawal_id` and mirrored in the pallet with `sp_io::hashing::blake2_256`. `spec_version` 12 → 13 (new ids differ; stored ids are untouched).
+- **`frame_support::Hashable::blake2_256` is NOT Substrate blake2_256 in this build.** Measured on `b"abc"`: `Hashable` → `b9f1f266942f471d…`; `sp_io::hashing::blake2_256` and standard Blake2b-256 → `bddd813c63423972…`. Use `sp_io::hashing::blake2_256` when the digest must match the off-chain implementation (the crate uses `blake2::Blake2b::<U32>`, which matches the standard).
+- The pallet's test helper `expected_withdrawal_id` used to *repeat* the derivation (also XOR) — that is why 47 tests passed while both sides were wrong. It now calls the crate's function, and `the_two_derivations_agree` pins pallet ⇔ off-chain agreement. Pallet: 58 tests pass; crate: 20 pass.
+- **`X3-XCHAIN-008 "General external gateway"` cited `crates/x3-gateway`** — the REST/GraphQL indexer service — and neither the gateway crate nor the gateway pallet appeared in the matrix at all. Same mis-mapping as the BTC row earlier: the readiness records pointed away from the code, which is how the defect survived. Row now cites both, 70/55/65 → 80/75/70.
+- `pallets/x3-crosschain-gateway` gained `sp-io` as a production dependency (`default-features = false`, `sp-io/std` in the std feature) and `x3-crosschain-gateway` as a dev-dependency for the agreement test.
+
+### Next task seed
+1. Same sweep for other XOR/"hash" derivations that gate replay or dedup. 2. Wire key rotation end to end. 3. Consolidate the three SPV implementations. 4. Trusted BTC header bootstrap. 5. Remaining weak P0 rows (claims/GPU/trading). 6. Relayer authority decision (owner). 7. Release publish + external audit.
