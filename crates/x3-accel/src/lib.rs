@@ -138,7 +138,7 @@ impl AccelBackend for CpuBackend {
             .map(|input| {
                 let hash = keccak_hash::keccak(input);
                 let mut output = [0u8; 32];
-                output.copy_from_slice(&hash);
+                output.copy_from_slice(hash.as_bytes());
                 output
             })
             .collect())

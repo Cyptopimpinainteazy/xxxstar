@@ -145,7 +145,7 @@ pub fn keccak256(data: &[u8]) -> HashOutput {
 
     let hash = keccak(data);
     let mut output = [0u8; 32];
-    output.copy_from_slice(&hash);
+    output.copy_from_slice(hash.as_bytes());
     HashOutput(output)
 }
 
