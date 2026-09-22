@@ -1,10 +1,12 @@
 use crate::{
     cli::{
         AtomicSwapSubcommand, Cli, ComitSubcommand, Commands, InspectSubcommand, KeysSubcommand,
+        ValidatorSubcommand,
     },
     service,
 };
 use clap::Parser;
+use codec::{Decode, Encode};
 #[cfg(feature = "runtime-benchmarks")]
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
 use log::{error, info, warn};
@@ -859,6 +861,15 @@ pub fn run() -> CliResult<()> {
                 }
             }
         }
+        Some(Commands::Validator(cmd)) => match &cmd.command {
+            ValidatorSubcommand::Rotate {
+                rpc_url,
+                suri,
+                aura_seed,
+                grandpa_seed,
+                submit,
+            } => run_validator_rotate(rpc_url, suri, aura_seed, grandpa_seed, *submit),
+        },
         Some(Commands::Inspect(cmd)) => {
             match &cmd.command {
                 InspectSubcommand::Account {
@@ -1292,6 +1303,150 @@ fn make_rpc_call(
         .get("result")
         .cloned()
         .ok_or_else(|| "No result in response".to_string())
+}
+
+/// `validator rotate`: read the on-chain registry, refuse unregistered accounts,
+/// derive fresh session keys, and build (optionally submit) `session.set_keys`.
+fn run_validator_rotate(
+    rpc_url: &str,
+    suri: &str,
+    aura_seed: &str,
+    grandpa_seed: &str,
+    submit: bool,
+) -> CliResult<()> {
+    use sp_core::crypto::Ss58Codec;
+
+    let operator = crate::validator_rotation::OperatorKey::from_uri(suri)?;
+    let account = operator.account();
+    let account_ss58 = account.to_ss58check();
+
+    // The on-chain custody registry is the single source of truth. A null
+    // `ValidatorKeyRegistry` entry means the account is not a registered
+    // validator, and rotation must be refused rather than guessed.
+    let registry_key = crate::validator_rotation::validator_key_registry_storage_key(&account);
+    let registry_raw = make_rpc_call(
+        rpc_url,
+        "state_getStorage",
+        serde_json::json!([format!("0x{}", hex::encode(&registry_key))]),
+    )?;
+
+    let record: Option<pallet_x3_custody::ValidatorKeyRecord<x3_chain_runtime::BlockNumber>> =
+        decode_storage_hex(&registry_raw)?;
+    let record = record.ok_or_else(|| {
+        format!("account {account_ss58} is not a registered validator (no custody registry entry)")
+    })?;
+    if !record.active {
+        return Err(format!(
+            "account {account_ss58} is registered but its validator key is inactive"
+        )
+        .into());
+    }
+
+    let schedule_key = crate::validator_rotation::key_rotation_schedule_storage_key(&account);
+    let schedule_raw = make_rpc_call(
+        rpc_url,
+        "state_getStorage",
+        serde_json::json!([format!("0x{}", hex::encode(&schedule_key))]),
+    )?;
+    let due_at: Option<x3_chain_runtime::BlockNumber> = decode_storage_hex(&schedule_raw)?;
+
+    let genesis_hash = decode_h256(&make_rpc_call(
+        rpc_url,
+        "chain_getBlockHash",
+        serde_json::json!([0]),
+    )?)?;
+    let current_block = current_block_number(rpc_url)?;
+    let nonce = decode_u32(&make_rpc_call(
+        rpc_url,
+        "system_accountNextIndex",
+        serde_json::json!([account_ss58]),
+    )?)?;
+
+    let keys = crate::validator_rotation::session_keys(aura_seed, grandpa_seed)?;
+    let aura_ss58 = public_to_ss58(keys.aura.as_ref())?;
+    let grandpa_ss58 = public_to_ss58(keys.grandpa.as_ref())?;
+    let extrinsic = operator.set_keys(keys, genesis_hash, nonce)?;
+    let tx_hex = format!("0x{}", hex::encode(extrinsic.encode()));
+
+    let next_due = current_block.saturating_add(x3_chain_runtime::CustodyKeyRotationPeriod::get());
+
+    println!("operator:      {account_ss58}");
+    println!("aura:          {aura_ss58}");
+    println!("grandpa:       {grandpa_ss58}");
+    println!("current block: {current_block}");
+    println!(
+        "current due:   {}",
+        due_at.map_or("unset".to_string(), |b| b.to_string())
+    );
+    println!("next due:      {next_due}");
+
+    if submit {
+        let tx_hash = make_rpc_call(
+            rpc_url,
+            "author_submitExtrinsic",
+            serde_json::json!([tx_hex]),
+        )?;
+        println!(
+            "submitted:     {}",
+            tx_hash.as_str().unwrap_or("<non-string>")
+        );
+    } else {
+        println!("session.set_keys extrinsic (unsigned-encoded, submit with --submit):");
+        println!("{tx_hex}");
+    }
+
+    Ok(())
+}
+
+fn decode_storage_hex<T: codec::Decode>(value: &serde_json::Value) -> Result<Option<T>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let hex_str = value
+        .as_str()
+        .ok_or_else(|| "state_getStorage returned a non-string value".to_string())?;
+    let bytes = decode_hex_bytes(hex_str)?;
+    T::decode(&mut &bytes[..])
+        .map(Some)
+        .map_err(|e| format!("failed to decode storage value: {e}"))
+}
+
+fn decode_h256(value: &serde_json::Value) -> Result<sp_core::H256, String> {
+    let hex_str = value
+        .as_str()
+        .ok_or_else(|| "expected a hex string result".to_string())?;
+    let bytes = decode_hex_bytes(hex_str)?;
+    if bytes.len() != 32 {
+        return Err(format!("expected a 32-byte hash, got {}", bytes.len()));
+    }
+    Ok(sp_core::H256::from_slice(&bytes))
+}
+
+fn decode_u32(value: &serde_json::Value) -> Result<u32, String> {
+    match value {
+        serde_json::Value::Number(n) => n
+            .as_u64()
+            .map(|v| v as u32)
+            .ok_or_else(|| "nonce/index is not an unsigned integer".to_string()),
+        serde_json::Value::String(s) => {
+            let bytes = decode_hex_bytes(s)?;
+            u32::decode(&mut &bytes[..]).map_err(|e| format!("failed to decode u32: {e}"))
+        }
+        _ => Err("expected a number or hex string".to_string()),
+    }
+}
+
+fn current_block_number(rpc_url: &str) -> Result<u32, String> {
+    let header = make_rpc_call(rpc_url, "chain_getHeader", serde_json::json!([]))?;
+    let number = header
+        .get("number")
+        .ok_or_else(|| "chain_getHeader returned no block number".to_string())?;
+    decode_u32(number)
+}
+
+fn decode_hex_bytes(hex_str: &str) -> Result<Vec<u8>, String> {
+    let hex_str = hex_str.trim_start_matches("0x").trim_start_matches("0X");
+    hex::decode(hex_str).map_err(|e| format!("invalid hex: {e}"))
 }
 
 // ── Asset enumeration ───────────────────────────────────────────────────────

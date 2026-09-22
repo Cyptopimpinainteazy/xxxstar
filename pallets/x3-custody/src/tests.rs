@@ -21,6 +21,7 @@
 //! 18. check_signer_authorized extrinsic returns Err for inactive signer
 //! 19. ValidatorSigning role rejected for Operational tier (KeyRoleNotAllowedForTier)
 //! 20. ValidatorSigning accepted for non-Operational tiers
+//! 21. rotate_validator_key — late rotation grants a fresh, future due block
 
 use crate::{
     mock::{new_test_ext, RuntimeOrigin, System, Test, X3Custody},
@@ -208,11 +209,44 @@ fn test_rotate_validator_key_works() {
             "old key schedule removed"
         );
 
-        // New key active, inherits rotation_due_at
+        // New key active, granted a fresh full rotation period from the
+        // current block (1 + KeyRotationPeriod::get() = 101).
         let new_record = ValidatorKeyRegistry::<Test>::get(BOB).expect("new record must be stored");
         assert!(new_record.active);
-        assert_eq!(new_record.rotation_due_at, 5000_u64);
-        assert_eq!(KeyRotationSchedule::<Test>::get(BOB), Some(5000_u64));
+        assert_eq!(new_record.rotation_due_at, 101_u64);
+        assert_eq!(new_record.registered_at, 1_u64);
+        assert_eq!(KeyRotationSchedule::<Test>::get(BOB), Some(101_u64));
+    });
+}
+
+// ── 21. rotate_validator_key — late rotation resets the due clock ──────────────
+
+#[test]
+fn test_rotate_validator_key_late_rotation_gets_fresh_due() {
+    new_test_ext().execute_with(|| {
+        // Register a key whose due block (10) is about to pass.
+        assert_ok!(X3Custody::register_validator_key(
+            RuntimeOrigin::root(),
+            ALICE,
+            10_u64,
+        ));
+
+        // Advance well past the due block, then rotate late.
+        System::set_block_number(250);
+
+        assert_ok!(X3Custody::rotate_validator_key(
+            RuntimeOrigin::root(),
+            ALICE,
+            BOB,
+        ));
+
+        let new_record = ValidatorKeyRegistry::<Test>::get(BOB).expect("new record must be stored");
+        assert!(new_record.active);
+        // A fresh full period from the current block (250 + 100), never the
+        // already-overdue 10.
+        assert_eq!(new_record.rotation_due_at, 350_u64);
+        assert_eq!(new_record.registered_at, 250_u64);
+        assert_eq!(KeyRotationSchedule::<Test>::get(BOB), Some(350_u64));
     });
 }
 

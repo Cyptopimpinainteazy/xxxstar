@@ -67,6 +67,10 @@ bytes**:
   message carries the `file:line` it was written at, so where a line sits is part of the
   artifact. Nothing about the format of a change is invisible to this gate, which is the
   point of measuring bytes rather than intentions.
+* `d471adfec4` — validator key rotation is wired to the on-chain custody registry:
+  `pallet_x3_custody` gains `KeyRotationPeriod` and `rotate_validator_key` grants
+  `current_block + period` instead of inheriting an overdue due block; the node gains
+  the `validator rotate` operator command. `spec_version` moves to 16.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -92,24 +96,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,466,821 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,468,737 bytes)**
 
 ```
-Version          : x3-chain-15 (x3-chain-1.tx1.au1)
+Version          : x3-chain-16 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xe31136b98d3be43cfe19436b7373ee8b7c58e29cf7cd75bc4763f1189372a8d9
-authorizeUpgrade : 0x64b5bf040701c81e25ad6833ba8afba588106456be07bc495038c10b65fe2a63
-IPFS             : QmVPW8iFgGdqV1XSkcbNiQ4siiddw7wAGoAkkAvBMUU7Yv
-BLAKE2_256       : 0x75528fd1054e1b1f04d754efa2e9115e312bbaefe96cb44a84d780dd84ac10c4
+setCode          : 0x0ce1a9dea6c42f0d65dba7a7819a65d47d77398e8992c97363d4c6bc9d4937fe
+authorizeUpgrade : 0x3af49b82f5a002f757794e7a66f4468894bfb38b4e0b19e65e0d0389dfc73b58
+IPFS             : QmNR3RSp9upQvqC9SaTyEfb4BpnDTqHsG21P2YBgo2CXCk
+BLAKE2_256       : 0x3548491d3931ec95725edb01218c6b7787aeb8c9a741d846f9dddc19e68b2fce
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,453,327 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,455,902 bytes)**
 
 ```
-setCode          : 0x51e116c6bbf3c5650fbbb5510108155aabceed55f042fae5af2847c468b2b154
-authorizeUpgrade : 0xeb3d99312afb0b6d381f9c4a55f05834a5b7ff874f54bd5d98c6c74ddc441e17
-IPFS             : QmZiistfBj7KzoR5WiHTLJ35d1TpLUftmGJwXXTWotuGsT
-BLAKE2_256       : 0xd0850066f5a59d6cac0d8083f19147949ae2714ad64ec0c3f1480896033928de
+setCode          : 0x8b953d190964ac7186a0830a928e12aab4e8ed6b76069e38cc554f47669b551f
+authorizeUpgrade : 0x4bd62920d5e2fae0d29e15b4ee1bfd84f36838a9bab277722e735ba4b29e5d54
+IPFS             : QmNhLMFbtsZTYLnHC4nenFeyXwcX5HRPvuZR67Mun56rbS
+BLAKE2_256       : 0xefe057ec25a6a25cdd06e9b9047cc555ce2452f35c3411add02f409d9908c0f5
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the
