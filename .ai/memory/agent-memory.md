@@ -6630,3 +6630,17 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Finish the Live seven-validator path (node keys + TESTNET_BOOTNODES in the spec builder; launcher prefers fixture node keys) — then run 7 and record it. 2. Audit `X3-L1-002` validator key management (30%) the same way. 3. Remaining weak P0 rows: relayer framework 35%, Ethereum bridge adapter 38%. 4. Consolidate the three SPV implementations. 5. Trusted BTC header bootstrap. 6. Relayer authority decision (owner). 7. Release publish + external audit.
+
+## 2026-09-22 (sixth pass) — seven validators on a Live testnet spec
+
+### Facts to remember
+- **A Live chain spec must carry ≥1 `bootNodes` entry or the node refuses to start** (`Error: Input("Live chain spec requires at least one bootnode")`). The entry needs the peer id derived from the node identity, so the spec has to be built with the node keys in hand. `build-spec --chain <file>` does *not* catch this — it loads a bootnode-less Live spec fine — so a builder's "the node can load it" self-check is not enough; assert `bootNodes` non-empty and equal to the derived set.
+- Peer id derivation now lives in `scripts/mainnet/peer-id-from-ed25519-pubkey.py` (base58btc of `0x00 0x24 || 0x08 0x01 0x12 0x20 || ed25519 pub`; `12D3Koo…`, 44–46 chars after the prefix). `make-fixture-live-spec.sh`'s inline copy was replaced with a call to it; the testnet genesis gate (which asserts a running node reports the spec's bootnode peer id) passes, which is the regression check for that refactor.
+- `build-x3-testnet-spec.py` now writes `validator-keys/validator-<n>.nodekey` (0600), derives each peer id from it, sets `TESTNET_BOOTNODES` for `build-spec`, and asserts the written spec carries all N entries.
+- `run-7-validators-local.sh`: `--node-key` prefers `$KEYS_DIR/validator-<n>.nodekey`; the preflight verifies each derived peer id ∈ spec bootNodes (exit 5); the sanitizer only empties `bootNodes` for **raw** specs (it used to empty it always, which is fatal for a plain Live spec).
+- **Verified first-hand**: `build-x3-testnet-spec.py 7` then `COUNT=7 CHAIN_SPEC=…/fresh/x3-testnet-plain.json run-7-validators-local.sh` → 7 × ready, 6 peers each, all seven returning the same hash at height 900 (`0x71a9279b…`) and height 950 (`0x50b771aa…`). The 3-validator local3 run agreed on finalized 504. Testnet genesis gate: finalized 95, peers 2/2/2.
+- When comparing multi-validator agreement, compare `chain_getBlockHash(<height>)` across nodes — each node's `chain_getFinalizedHead` pointer lags differently under load (7 debug nodes on one box: heights differed by up to 5).
+- Node identity can be derived predictably without extra tools: `keys generate --key-type grandpa --seed <32-byte hex secret> --output hex` gives the ed25519 public key for that secret, which is what `--node-key <secret>` produces at runtime. `--seed` needs the `0x` prefix for raw hex; a bare 64-hex string silently yields nothing.
+
+### Next task seed
+1. Independence and duration for `X3-L1-001`: multi-machine run, failure injection (partition, restart, clock skew), slashing/jailing paths exercised by a real network. 2. Audit `X3-L1-002` validator key management (30%). 3. Remaining weak P0 rows: relayer framework 35%, Ethereum bridge adapter 38%. 4. Consolidate the three SPV implementations. 5. Trusted BTC header bootstrap. 6. Relayer authority decision (owner). 7. Release publish + external audit.
