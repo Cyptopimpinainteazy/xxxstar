@@ -6893,3 +6893,12 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Run `local-ci --rotation` against a booted dev/testnet node and record the due-block-before/after. 2. Key ceremony/backup/recovery runbook. 3. External audit of the key paths.
+
+## 2026-09-22 (twenty-fifth pass) — twenty-eight rows cited five PRs, none of them open
+### Facts to remember
+- Every `open_prs` citation in `feature-matrix/*.toml` was checked against GitHub: **#129 merged 2026-09-18, #135 CLOSED (never merged), #162 merged 2026-09-13, #163 merged 2026-09-17, #166 merged 2026-09-17**. Not one was open.
+- `scripts/feature_matrix.py` warns *"feature includes open PR work and is not master capability"* for **any** row with `open_prs` set, so the matrix claimed seventeen shipped capabilities were not on master, and eleven rows rested on a PR that never merged. All 28 corrected: `source = "master"` (or `research` for the one with no on-master evidence), `open_prs` dropped, and a dated note in `evidence` naming the PR and merge date.
+- **X3-MEV-002** ("Private transaction submission controls") went to `source = "research"`: the only on-master candidate is `crates/confidential-gpu`'s `execute_private_tx`, which is private *execution*, not private *submission*.
+- **New evidence found while checking:** the compiler carries `max_price_impact` (`x3-lang/compiler/src/trading_semantic.rs`, `trading_lowering.rs`) and the VM enforces price-impact and MEV-leakage ceilings, failing closed when the host reports nothing (`x3-lang/vm/tests/trading_execution.rs`: `price_impact_ceiling_is_enforced_when_host_reports_it`, `price_impact_ceiling_fails_closed_when_host_reports_nothing`, `mev_leakage_ceiling_is_enforced_when_host_reports_it`). X3-MEV-003 30 → 45 and X3-MEV-006 35 → 45 on that; ordering is still not guaranteed, so X3-MEV-008 stays the fair-ordering row.
+- `scripts/mainnet_release_gate.py` **does exist** (31 KB at `scripts/` root, not under `scripts/mainnet/`) — I briefly thought it was missing from a wrong path.
+- TICKET-101: the thirteen merged-PR rows' *scores* still predate their merges. Provenance is fixed; measurement is the remaining audit.

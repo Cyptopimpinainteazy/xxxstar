@@ -351,3 +351,42 @@ becomes `configured cache budget + measured margin`, the harness reports which c
 with, and the operator runbook states a validator's memory budget explicitly. Acceptance: a
 two-hour run of a release validator passes or fails on a number that is about the node, not about
 its cache configuration.
+
+## GAP-MATRIX-PROVENANCE — twenty-eight rows cited five PRs, none of them open — 2026-09-22
+
+Every row whose `open_prs` field pointed at PR #129, #135, #162, #163 or #166 was checked against
+GitHub:
+
+| PR | state | rows citing it |
+| --- | --- | --- |
+| #129 | merged 2026-09-18 | X3-LANG-004/008/009/010 |
+| #135 | **closed, never merged** | X3-LANG-001/002/003/005/006/007, X3-MEV-002/003/004/005/006 |
+| #162 | merged 2026-09-13 | X3-XCHAIN-013/018/019/020/021 |
+| #163 | merged 2026-09-17 | same five cross-chain rows |
+| #166 | merged 2026-09-17 | X3-XCHAIN-010/014/015/016/017, X3-SEC-001/002/004 |
+
+`feature_matrix.py` emits *"feature includes open PR work and is not master capability"* for any row
+with `open_prs` set, so the matrix was telling a reader that seventeen shipped capabilities were not
+on master — and that eleven rows rested on a PR that was closed without merging. Those warnings are
+gone; the field now carries provenance instead of a stale intent.
+
+What changed: `source = "master"` for the merged-PR rows (the code is on master — verified by
+provenance for the cross-chain and security rows, and by reading the tree for the language rows),
+`open_prs` dropped, and each row carries a dated note in `evidence` naming the PR and the merge
+date. The scores in those rows were recorded while the work was still in a PR, so they are
+**conservative**, not wrong.
+
+Two rows were re-measured rather than re-labelled, because there was new evidence: the compiler
+carries a `max_price_impact` policy and the VM enforces price-impact and MEV-leakage ceilings,
+failing closed when the host reports nothing (`x3-lang/vm/tests/trading_execution.rs`). X3-MEV-003
+30 → 45 and X3-MEV-006 35 → 45, with blockers that say what the evidence does and does not cover.
+
+X3-MEV-002 (private transaction submission controls) is the one row set to `source = "research"`:
+the only on-master candidate is `crates/confidential-gpu`'s `execute_private_tx`, which is private
+*execution*, not private *submission*, so the capability is not established.
+
+**TICKET-101 — re-measure the thirteen rows whose scores predate their merge.** Provenance is fixed;
+measurement is not. Each row's `evidence` now names its PR and merge date, so this is a bounded
+audit: read the merged PR, re-derive `implemented`/`tested`/`mainnet_ready` from what is on master
+today, and lower as readily as raise. Acceptance: no row cites a PR that is closed, and every row's
+score is dated relative to the code it describes.

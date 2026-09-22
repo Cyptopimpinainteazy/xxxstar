@@ -208,10 +208,11 @@ blockers = ["Needs Byzantine provider and partition tests"]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Quorum types exported and used by security logic"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-010"
 name = "Cross-domain semantic idempotency"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
 implemented = 88
 tested = 82
@@ -221,9 +222,8 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Strengthened exact-head production gate still pending"]
-evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 persists operation journal; duplicate identical evidence becomes no-op"]
+evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 persists operation journal; duplicate identical evidence becomes no-op", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [166]
 
 [[feature]]
 id = "X3-XCHAIN-011"
@@ -259,10 +259,11 @@ blockers = ["Needs live heterogeneous provider evidence"]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Secret-release design rejects rpc_quorum_agreed=false"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-013"
 name = "Secret-release firewall"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 85
 tested = 78
@@ -272,14 +273,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Must land firewall and unforgeable permit together"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability"]
-open_prs = [162, 163]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-014"
 name = "Coordinator restart recovery"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
 implemented = 88
 tested = 82
@@ -289,15 +290,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Needs real process/network restart drill"]
-evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 adversarial restart test"]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 adversarial restart test", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [166]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-015"
 name = "Split-write crash recovery"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
 implemented = 88
 tested = 82
@@ -307,15 +308,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Needs merge plus long-running persistence fault injection"]
-evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 tests exact persistence crash window"]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 tests exact persistence crash window", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [166]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-016"
 name = "Conflicting retry rejection"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
 implemented = 90
 tested = 85
@@ -325,15 +326,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending production-gate proof"]
-evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 returns IdempotencyConflict for mismatched evidence"]
+evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 returns IdempotencyConflict for mismatched evidence", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
-open_prs = [166]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-017"
 name = "Cross-session secret ownership"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
 implemented = 90
 tested = 85
@@ -343,15 +344,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending production-gate proof"]
-evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: secret hash -> owning session id"]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: secret hash -> owning session id", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
-open_prs = [166]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-018"
 name = "Secret-release domain binding"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
@@ -361,15 +362,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs checks chain-id and VM binding"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs checks chain-id and VM binding", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [162, 163]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-019"
 name = "Secret-release proof reuse rejection"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
@@ -379,15 +380,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [162, 163]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-020"
 name = "Secret-release refund rejection"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
@@ -397,15 +398,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs rejects refunded destination evidence"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs rejects refunded destination evidence", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [162, 163]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-021"
 name = "Secret-release tx/block binding"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
@@ -415,9 +416,8 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs binds the finality proof to the exact lock tx and block"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs binds the finality proof to the exact lock tx and block", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [162, 163]
 
 [[feature]]
 id = "X3-XCHAIN-022"

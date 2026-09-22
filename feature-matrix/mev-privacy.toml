@@ -17,10 +17,11 @@ blockers = ["Needs threat model covering relayers, finality delays, and ordering
 evidence = ["crates/cross-vm-coordinator", "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; no on-master evidence found for this capability, so it is recorded as research until TICKET-101 measures it
 id = "X3-MEV-002"
 name = "Private transaction submission controls"
 subsystem = "mev_privacy"
-source = "open_pr"
+source = "research"
 paths = ["x3-lang/compiler"]
 implemented = 45
 tested = 20
@@ -30,31 +31,34 @@ confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = ["Trading Core hardening still requires private-submission enforcement"]
-evidence = ["x3-lang/compiler", "note: One of verified Trading Core v1 gaps"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: One of verified Trading Core v1 gaps", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; no on-master evidence found for this capability, so it is recorded as research until TICKET-101 measures it"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/trading_semantic.rs (max_price_impact policy), x3-lang/vm/tests/trading_execution.rs
 id = "X3-MEV-003"
 name = "Costs-before-profit evaluation"
 subsystem = "mev_privacy"
-source = "open_pr"
-paths = ["x3-lang/compiler"]
-implemented = 50
-tested = 25
-mainnet_ready = 30
+source = "master"
+paths = ["x3-lang/compiler", "x3-lang/vm"]
+implemented = 65
+tested = 45
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Must prevent false-profit execution paths"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 hardening item"]
-open_prs = [135]
+blockers = [
+  "Measured on master 2026-09-22: the compiler carries a `max_price_impact` policy (`x3-lang/compiler/src/trading_semantic.rs`, `trading_lowering.rs`) and the VM enforces price-impact and MEV-leakage ceilings against host-reported measurements, failing closed when the host reports nothing (`x3-lang/vm/tests/trading_execution.rs`: `price_impact_ceiling_is_enforced_when_host_reports_it`, `price_impact_ceiling_fails_closed_when_host_reports_nothing`, `mev_leakage_ceiling_is_enforced_when_host_reports_it`)",
+  "What that does not establish: the ceilings are only as good as the host's reported risk, and no run has measured them against a real venue or on a network — the tests drive a host double",
+]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 hardening item", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/trading_semantic.rs (max_price_impact policy), x3-lang/vm/tests/trading_execution.rs"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/executor.rs (snapshot/rollback path)
 id = "X3-MEV-004"
 name = "Transactional host rollback"
 subsystem = "mev_privacy"
-source = "open_pr"
+source = "master"
 paths = ["x3-lang/compiler"]
 implemented = 50
 tested = 25
@@ -64,14 +68,14 @@ confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = ["Rollback semantics not yet fully proven"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 hardening item"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 hardening item", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/executor.rs (snapshot/rollback path)"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/executor.rs (gas_limit enforcement)
 id = "X3-MEV-005"
 name = "Gas / economic execution limits"
 subsystem = "mev_privacy"
-source = "open_pr"
+source = "master"
 paths = ["x3-lang/compiler"]
 implemented = 55
 tested = 30
@@ -81,14 +85,14 @@ confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = ["Hardening branch must enforce gas and capability versions"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap list"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap list", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/executor.rs (gas_limit enforcement)"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/tests/trading_execution.rs (price-impact and MEV ceilings, fail-closed)
 id = "X3-MEV-006"
 name = "MEV-resistant architecture"
 subsystem = "mev_privacy"
-source = "open_pr"
+source = "master"
 paths = ["pallets/private-execution"]
 implemented = 45
 tested = 25
@@ -98,8 +102,7 @@ confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = ["No complete formal MEV threat model; do not claim MEV-proof"]
-evidence = ["pallets/private-execution", "note: Private execution and trading controls exist, but fair-ordering/encrypted mempool proof is incomplete"]
-open_prs = [135]
+evidence = ["pallets/private-execution", "note: Private execution and trading controls exist, but fair-ordering/encrypted mempool proof is incomplete", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/tests/trading_execution.rs (price-impact and MEV ceilings, fail-closed)"]
 
 [[feature]]
 id = "X3-MEV-007"
