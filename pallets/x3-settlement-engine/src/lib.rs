@@ -105,6 +105,23 @@ mod benchmarking;
 pub use types::*;
 pub use weights::WeightInfo;
 
+/// Bitcoin's difficulty-adjustment interval, in blocks.
+///
+/// Every 2016 blocks Bitcoin recomputes the target from the previous window's
+/// timestamps; between adjustments `nBits` is copied from the parent verbatim.
+/// A header that changes `nBits` off-interval is not a header Bitcoin would accept.
+pub const BTC_RETARGET_INTERVAL_BLOCKS: u64 = 2016;
+
+/// How many ancestors Bitcoin's median-time-past rule reads (Bitcoin Core: 11).
+pub const BTC_MEDIAN_TIME_SPAN_BLOCKS: usize = 11;
+
+/// How much Bitcoin's retarget may move the target in one adjustment.
+///
+/// Bitcoin clamps a retarget to a factor of 4 in either direction; the pallet
+/// enforces the bound rather than the arithmetic, because the arithmetic needs the
+/// 2016-block timestamp window, which is not stored on this chain.
+pub const BTC_RETARGET_MAX_FACTOR: u16 = 4;
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
@@ -199,6 +216,18 @@ pub mod pallet {
         /// Minimum BTC confirmation depth.
         #[pallet::constant]
         type MinBtcConfirmations: Get<u32>;
+
+        /// Bitcoin's `powLimit` for the network this chain tracks, as compact
+        /// `nBits` (Bitcoin Core's `chainparams.powLimit`).
+        ///
+        /// Mainnet and testnet both use `0x1d00ffff`; regtest uses `0x207fffff`.
+        /// The pallet refuses any header — anchor or extension — whose target is
+        /// easier than this limit, which is what stops "anchor a header with a
+        /// trivial target, then extend the cheap chain" from being a move at all.
+        /// A header below the limit is not a header Bitcoin's own nodes would have
+        /// accepted (`CheckProofOfWork`), so refusing it costs nothing real.
+        #[pallet::constant]
+        type BtcPoWLimitBits: Get<u32>;
 
         /// Challenge period for optimistic settlements (in blocks).
         #[pallet::constant]
@@ -322,6 +351,33 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn btc_best_height)]
     pub type BtcBestHeight<T: Config> = StorageValue<_, u64, ValueQuery>;
+
+    /// Heights this chain has committed to as Bitcoin checkpoints: `height` → block hash.
+    ///
+    /// This is the SPV trust root. A header chain is only worth anything to this
+    /// pallet if it starts somewhere, and a checkpoint asserted by this chain's
+    /// governance is that somewhere: an auditable, on-chain statement that "Bitcoin
+    /// block H has hash X". Everything above it is then earned by proof of work
+    /// under Bitcoin's difficulty rules rather than asserted by a submitter.
+    ///
+    /// The anchor is a commitment, not a setting: the first hash recorded for a
+    /// height wins and no later call may replace it, so an anchored height cannot
+    /// be re-pointed at a different branch.
+    #[pallet::storage]
+    #[pallet::getter(fn btc_checkpoints)]
+    pub type BtcCheckpoints<T: Config> =
+        StorageMap<_, Twox64Concat, u64, H256, OptionQuery>;
+
+    /// The pallet's own record for every header it admitted: block hash → record.
+    ///
+    /// `BtcHeaders` stores the wire header as submitted; this stores what the pallet
+    /// *derived* — the height the parent link implies, and whether the header sits on
+    /// a checkpoint-anchored chain. SPV evidence is only accepted from headers whose
+    /// record says `anchored`.
+    #[pallet::storage]
+    #[pallet::getter(fn btc_header_meta)]
+    pub type BtcHeaderMetaStore<T: Config> =
+        StorageMap<_, Blake2_128Concat, H256, BtcHeaderMeta, OptionQuery>;
 
     // ========================================================================
     // Collateral / Bonds
@@ -640,6 +696,20 @@ pub mod pallet {
             amount_sats: u64,
         },
 
+        /// This chain committed to a Bitcoin checkpoint: the SPV trust root.
+        ///
+        /// Published so the commitment is auditable off-chain: anyone can check the
+        /// hash against a Bitcoin node and see exactly which branch the chain's SPV
+        /// evidence hangs from.
+        BtcCheckpointAnchored { height: u64, block_hash: H256 },
+
+        /// A Bitcoin header was admitted onto an anchored chain.
+        BtcHeaderAdmitted {
+            block_hash: H256,
+            height: u64,
+            anchored: bool,
+        },
+
         /// Atomic lock timed out and executor slashed
         /// [intent_id, executor_id, amount_slashed]
         AtomicLockTimeoutSlashed {
@@ -745,6 +815,27 @@ pub mod pallet {
         InsufficientBtcConfirmations,
         /// Invalid BTC proof
         InvalidBtcProof,
+        /// The header's target is easier than this network's proof-of-work limit,
+        /// so Bitcoin's own nodes would have refused it (`CheckProofOfWork`).
+        BtcPowLimitExceeded,
+        /// The header's parent is not in storage, so the chain cannot be linked.
+        BtcParentMissing,
+        /// The header's parent is stored but is not on a checkpoint-anchored chain.
+        BtcParentNotAnchored,
+        /// The header claims a height that is not its parent's height plus one.
+        BtcHeightNotContiguous,
+        /// The header carries neither a checkpoint anchor (`height == 0` used to be
+        /// enough on its own) nor a link to a header already admitted.
+        BtcChainNotAnchored,
+        /// The header's `nBits` does not follow Bitcoin's difficulty rules for its height.
+        BtcDifficultyMismatch,
+        /// The header's timestamp is not after the median time of its ancestors.
+        BtcTimestampTooOld,
+        /// A checkpoint for this height is already anchored, and to a different hash.
+        BtcCheckpointConflict,
+        /// No header on a checkpoint-anchored chain matches this block hash, so the
+        /// proof has no trusted header behind it.
+        BtcHeaderNotAnchored,
         /// External chain not supported
         UnsupportedChain,
         /// Invariant violation detected
@@ -1798,18 +1889,37 @@ pub mod pallet {
                 Error::<T>::NotAuthorized
             );
 
-            // Verify merkle proof
+            // The header behind this proof has to be one this chain already holds on
+            // a checkpoint-anchored chain.
+            //
+            // This used to be an insert: the caller's header went straight into
+            // `BtcHeaders` with no proof-of-work check, no parent link and no height
+            // check, so a party to the intent could hand the pallet a header it had
+            // just made up — with any `nBits` it liked — and the merkle proof would
+            // verify against that fabricated root. The header now has to have been
+            // admitted through `btc_admit_header` first (by `submit_btc_header`,
+            // which is root-gated), which is what makes the merkle root it checks
+            // against a root the chain chose rather than one the proof chose.
+            let block_hash = Self::compute_btc_block_hash(&block_header);
+            let meta = BtcHeaderMetaStore::<T>::get(block_hash)
+                .ok_or(Error::<T>::BtcHeaderNotAnchored)?;
+            ensure!(meta.anchored, Error::<T>::BtcHeaderNotAnchored);
+            ensure!(
+                block_header.height == meta.height,
+                Error::<T>::BtcHeightNotContiguous
+            );
+            let stored_header =
+                BtcHeaders::<T>::get(block_hash).ok_or(Error::<T>::BtcHeaderNotAnchored)?;
+
+            // Verify merkle proof against the stored header's root.
             let is_valid =
-                Self::verify_btc_merkle_proof(&btc_txid, tx_index, &merkle_proof, &block_header)?;
+                Self::verify_btc_merkle_proof(&btc_txid, tx_index, &merkle_proof, &stored_header)?;
             ensure!(is_valid, Error::<T>::InvalidBtcProof);
 
-            // Store/update block header
-            let block_hash = Self::compute_btc_block_hash(&block_header);
-            BtcHeaders::<T>::insert(block_hash, block_header.clone());
-
-            // Calculate confirmations
+            // Confirmations come from the height the chain derived from the parent
+            // link, not from the `height` field the caller's header carried.
             let best_height = BtcBestHeight::<T>::get();
-            let confirmations = best_height.saturating_sub(block_header.height) + 1;
+            let confirmations = best_height.saturating_sub(meta.height) + 1;
 
             ensure!(
                 confirmations >= T::MinBtcConfirmations::get() as u64,
@@ -1845,35 +1955,70 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Anchor a Bitcoin checkpoint: the trust root the SPV path depends on.
+        ///
+        /// Root (this chain's governance) states that Bitcoin block `header.height`
+        /// has hash `compute_btc_block_hash(header)`. That assertion is published in
+        /// an event, so anyone can check it against a Bitcoin node and see which
+        /// branch this chain's SPV evidence hangs from.
+        ///
+        /// The anchor is a **commitment, not a setting**: the first hash recorded for
+        /// a height wins, and a later call offering a different hash for the same
+        /// height is refused (`BtcCheckpointConflict`). Nothing re-points an anchored
+        /// height at another branch.
+        ///
+        /// Two properties make the anchor worth something:
+        ///   * the anchored header's own target must be inside the network's
+        ///     `powLimit`, so its `nBits` is a real Bitcoin difficulty and not one the
+        ///     caller picked to make mining cheap;
+        ///   * every header above it must chain to it under Bitcoin's difficulty and
+        ///     timestamp rules, so the work above the anchor has to be earned.
+        #[pallet::call_index(34)]
+        #[pallet::weight(T::SettlementWeightInfo::anchor_btc_checkpoint())]
+        pub fn anchor_btc_checkpoint(
+            origin: OriginFor<T>,
+            header: BtcBlockHeader,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            ensure!(Self::verify_btc_pow(&header)?, Error::<T>::InvalidBtcProof);
+            Self::ensure_btc_target_within_pow_limit(header.bits)?;
+
+            let block_hash = Self::compute_btc_block_hash(&header);
+            match BtcCheckpoints::<T>::get(header.height) {
+                Some(existing) => ensure!(
+                    existing == block_hash,
+                    Error::<T>::BtcCheckpointConflict
+                ),
+                None => {
+                    BtcCheckpoints::<T>::insert(header.height, block_hash);
+                    Self::deposit_event(Event::BtcCheckpointAnchored {
+                        height: header.height,
+                        block_hash,
+                    });
+                }
+            }
+
+            Self::btc_admit_header(&header, true)?;
+            Ok(())
+        }
+
         /// Submit BTC block header (for SPV)
         ///
         /// Restricted to privileged origin to prevent arbitrary accounts from
         /// pushing invalid/competing header branches into local state.
+        ///
+        /// The header must link to one already admitted (`btc_admit_header`): it must
+        /// be its parent's height plus one, keep Bitcoin's `nBits` for its height,
+        /// post-date the median of its ancestors, and sit inside the network's
+        /// `powLimit`. A caller can no longer start a chain — only
+        /// [`Call::anchor_btc_checkpoint`] does that, and only at a height and hash
+        /// this chain has committed to.
         #[pallet::call_index(11)]
         #[pallet::weight(T::SettlementWeightInfo::update_btc_block_header())]
         pub fn submit_btc_header(origin: OriginFor<T>, header: BtcBlockHeader) -> DispatchResult {
             ensure_root(origin)?;
-
-            // Verify proof of work
-            let is_valid = Self::verify_btc_pow(&header)?;
-            ensure!(is_valid, Error::<T>::InvalidBtcProof);
-
-            // Verify chain connection
-            let prev_exists = BtcHeaders::<T>::contains_key(header.prev_block_hash);
-            ensure!(
-                prev_exists || header.height == 0,
-                Error::<T>::InvalidBtcProof
-            );
-
-            // Store header
-            let block_hash = Self::compute_btc_block_hash(&header);
-            BtcHeaders::<T>::insert(block_hash, header.clone());
-
-            // Update best height if higher
-            if header.height > BtcBestHeight::<T>::get() {
-                BtcBestHeight::<T>::put(header.height);
-            }
-
+            Self::btc_admit_header(&header, false)?;
             Ok(())
         }
 
@@ -3228,6 +3373,15 @@ pub mod pallet {
                 return Ok(false);
             }
 
+            // The header has to be one this chain holds on a checkpoint-anchored
+            // chain, at the height the chain derived. Otherwise the "SPV" check is
+            // against a header the submitter wrote, with an `nBits` the submitter
+            // chose, and the merkle root proves inclusion in nobody's block.
+            match BtcHeaderMetaStore::<T>::get(computed_block_hash) {
+                Some(meta) if meta.anchored && meta.height == header.height => {}
+                _ => return Ok(false),
+            }
+
             // Build the gateway's BtcSpvProof and run the verified path.
             let spv = BtcSpvProof {
                 tx_bytes,
@@ -3239,7 +3393,7 @@ pub mod pallet {
             Ok(spv.verify())
         }
 
-        fn verify_btc_merkle_proof(
+        pub(crate) fn verify_btc_merkle_proof(
             txid: &H256,
             tx_index: u32,
             proof: &[H256],
@@ -3296,7 +3450,7 @@ pub mod pallet {
         /// to return `true` for `size > 32` with the comment "target is larger than
         /// 256 bits, so any hash passes", which accepts a header with no proof of
         /// work at all from anyone who can submit one.
-        fn btc_target_le(bits: u32) -> Option<[u8; 32]> {
+        pub(crate) fn btc_target_le(bits: u32) -> Option<[u8; 32]> {
             let size = (bits >> 24) as usize;
             let word = bits & 0x007f_ffff;
 
@@ -3323,7 +3477,7 @@ pub mod pallet {
         }
 
         /// `hash <= target`, both read as 256-bit little-endian numbers.
-        fn btc_hash_meets_target(hash: &[u8], target: &[u8; 32]) -> bool {
+        pub(crate) fn btc_hash_meets_target(hash: &[u8], target: &[u8; 32]) -> bool {
             for i in (0..32).rev() {
                 if hash[i] < target[i] {
                     return true;
@@ -3335,13 +3489,172 @@ pub mod pallet {
             true
         }
 
-        fn verify_btc_pow(header: &BtcBlockHeader) -> Result<bool, DispatchError> {
+        pub(crate) fn verify_btc_pow(header: &BtcBlockHeader) -> Result<bool, DispatchError> {
             let target = match Self::btc_target_le(header.bits) {
                 Some(target) => target,
                 None => return Ok(false),
             };
             let block_hash = Self::compute_btc_block_hash(header);
             Ok(Self::btc_hash_meets_target(block_hash.as_bytes(), &target))
+        }
+
+        /// The proof-of-work limit this network tracks, decoded to little-endian bytes.
+        ///
+        /// Bitcoin calls this `powLimit`: the *easiest* target any header may carry.
+        pub(crate) fn btc_pow_limit() -> Option<[u8; 32]> {
+            Self::btc_target_le(T::BtcPoWLimitBits::get())
+        }
+
+        /// Refuse a header whose target is easier than the network's `powLimit`.
+        ///
+        /// `btc_target_le` answers "is this a target at all"; this answers "is this a
+        /// target Bitcoin would have allowed". Without it, `nBits` is a number the
+        /// submitter chooses, and a submitter who chooses a trivial target can mine a
+        /// "valid" header in one hash — which is exactly how a chain gets fabricated
+        /// on top of an anchor that carries no work.
+        pub(crate) fn ensure_btc_target_within_pow_limit(bits: u32) -> DispatchResult {
+            let target = Self::btc_target_le(bits).ok_or(Error::<T>::InvalidBtcProof)?;
+            let limit = Self::btc_pow_limit().ok_or(Error::<T>::BtcPowLimitExceeded)?;
+            ensure!(
+                Self::btc_hash_meets_target(&target, &limit),
+                Error::<T>::BtcPowLimitExceeded
+            );
+            Ok(())
+        }
+
+        /// `value * factor`, saturating at 2^256 − 1 (little-endian bytes).
+        pub(crate) fn btc_saturating_mul(value: &[u8; 32], factor: u16) -> [u8; 32] {
+            let mut out = [0u8; 32];
+            let mut carry: u32 = 0;
+            for (i, byte) in value.iter().enumerate() {
+                let v = (*byte as u32) * (factor as u32) + carry;
+                out[i] = (v & 0xff) as u8;
+                carry = v >> 8;
+            }
+            if carry != 0 {
+                return [0xff; 32];
+            }
+            out
+        }
+
+        /// Bitcoin's median-time-past: the median of the previous up-to-11 block
+        /// timestamps. A block's own timestamp must be strictly greater.
+        ///
+        /// Zero when the parent has no stored ancestors, which happens only for the
+        /// anchored checkpoint itself — and it is not asked about its own timestamp.
+        pub(crate) fn btc_median_time_past(parent_hash: &H256) -> u32 {
+            let mut stamps: Vec<u32> = Vec::new();
+            let mut cursor = *parent_hash;
+            for _ in 0..BTC_MEDIAN_TIME_SPAN_BLOCKS {
+                let Some(header) = BtcHeaders::<T>::get(cursor) else {
+                    break;
+                };
+                stamps.push(header.timestamp);
+                match BtcHeaderMetaStore::<T>::get(cursor) {
+                    Some(meta) if meta.height > 0 => cursor = header.prev_block_hash,
+                    _ => break,
+                }
+            }
+            if stamps.is_empty() {
+                return 0;
+            }
+            stamps.sort_unstable();
+            stamps[stamps.len() / 2]
+        }
+
+        /// Bitcoin's `nBits` rule for the block at `child_height`, given its parent.
+        ///
+        /// Off a retarget boundary the target is copied verbatim. On one, Bitcoin
+        /// recomputes it from the last 2016 blocks' timestamps — a window this chain
+        /// does not store — so the pallet enforces the bound every honest retarget
+        /// satisfies (a change of at most a factor of 4) and refuses the rest. The
+        /// point is not to re-derive Bitcoin's difficulty but to make "drop the
+        /// difficulty and mine a cheap branch" impossible on an anchored chain.
+        pub(crate) fn btc_bits_follow_parent(parent_bits: u32, parent_height: u64, bits: u32) -> bool {
+            let child_height = parent_height.saturating_add(1);
+            if !child_height.is_multiple_of(BTC_RETARGET_INTERVAL_BLOCKS) {
+                return bits == parent_bits;
+            }
+            let (Some(parent_target), Some(target)) =
+                (Self::btc_target_le(parent_bits), Self::btc_target_le(bits))
+            else {
+                return false;
+            };
+            let ceiling = Self::btc_saturating_mul(&parent_target, BTC_RETARGET_MAX_FACTOR);
+            let floor = Self::btc_saturating_mul(&target, BTC_RETARGET_MAX_FACTOR);
+            Self::btc_hash_meets_target(&target, &ceiling)
+                && Self::btc_hash_meets_target(&parent_target, &floor)
+        }
+
+        /// Admit a Bitcoin header into the pallet's chain view; the only door in.
+        ///
+        /// Returns `(block_hash, derived_height, anchored)`.
+        ///
+        /// A header used to enter this pallet two ways. `submit_btc_header` allowed
+        /// `height == 0` with no parent for anyone who could call it, so a chain
+        /// could start anywhere, with any `nBits`; and `submit_btc_proof` inserted
+        /// the header its proof carried with **no proof-of-work check at all**, so a
+        /// party to an intent could choose the header that paid them out. Both are
+        /// this function now, and it answers the questions that were missing: is the
+        /// parent ours, is the height contiguous with it, is the target inside the
+        /// network's limit and the parent's difficulty, is the timestamp after the
+        /// median of its ancestors, and does the chain reach a checkpoint this chain
+        /// has committed to.
+        ///
+        /// `allow_anchor` is true only for [`Call::anchor_btc_checkpoint`]; every
+        /// other caller must link to a header already admitted.
+        pub(crate) fn btc_admit_header(
+            header: &BtcBlockHeader,
+            allow_anchor: bool,
+        ) -> Result<(H256, u64, bool), DispatchError> {
+            ensure!(Self::verify_btc_pow(header)?, Error::<T>::InvalidBtcProof);
+            Self::ensure_btc_target_within_pow_limit(header.bits)?;
+
+            let block_hash = Self::compute_btc_block_hash(header);
+
+            let (height, anchored) =
+                if let Some(parent) = BtcHeaderMetaStore::<T>::get(header.prev_block_hash) {
+                    ensure!(parent.anchored, Error::<T>::BtcParentNotAnchored);
+                    ensure!(
+                        header.height == parent.height.saturating_add(1),
+                        Error::<T>::BtcHeightNotContiguous
+                    );
+                    let parent_header = BtcHeaders::<T>::get(header.prev_block_hash)
+                        .ok_or(Error::<T>::BtcParentMissing)?;
+                    ensure!(
+                        Self::btc_bits_follow_parent(parent_header.bits, parent.height, header.bits),
+                        Error::<T>::BtcDifficultyMismatch
+                    );
+                    ensure!(
+                        header.timestamp > Self::btc_median_time_past(&header.prev_block_hash),
+                        Error::<T>::BtcTimestampTooOld
+                    );
+                    (parent.height.saturating_add(1), true)
+                } else {
+                    ensure!(allow_anchor, Error::<T>::BtcParentMissing);
+                    let pinned =
+                        BtcCheckpoints::<T>::get(header.height).ok_or(Error::<T>::BtcChainNotAnchored)?;
+                    ensure!(pinned == block_hash, Error::<T>::BtcChainNotAnchored);
+                    (header.height, true)
+                };
+
+            BtcHeaders::<T>::insert(block_hash, header.clone());
+            BtcHeaderMetaStore::<T>::insert(
+                block_hash,
+                BtcHeaderMeta {
+                    height,
+                    anchored,
+                },
+            );
+            if height > BtcBestHeight::<T>::get() {
+                BtcBestHeight::<T>::put(height);
+            }
+            Self::deposit_event(Event::BtcHeaderAdmitted {
+                block_hash,
+                height,
+                anchored,
+            });
+            Ok((block_hash, height, anchored))
         }
 
         /// The 80 bytes Bitcoin hashes: version, previous block hash, merkle root,
@@ -3354,7 +3667,7 @@ pub mod pallet {
         /// and the resulting value is not the block's hash. Every proof-of-work
         /// comparison built on it compared a number unrelated to the block against
         /// the target.
-        fn btc_header_wire_bytes(header: &BtcBlockHeader) -> [u8; 80] {
+        pub(crate) fn btc_header_wire_bytes(header: &BtcBlockHeader) -> [u8; 80] {
             let mut out = [0u8; 80];
             out[0..4].copy_from_slice(&header.version.to_le_bytes());
             out[4..36].copy_from_slice(header.prev_block_hash.as_bytes());
@@ -3366,7 +3679,7 @@ pub mod pallet {
         }
 
         /// Compute the Bitcoin block hash: double SHA-256 over the 80 header bytes.
-        fn compute_btc_block_hash(header: &BtcBlockHeader) -> H256 {
+        pub(crate) fn compute_btc_block_hash(header: &BtcBlockHeader) -> H256 {
             let first_hash = sp_io::hashing::sha2_256(&Self::btc_header_wire_bytes(header));
             H256::from(sp_io::hashing::sha2_256(&first_hash))
         }

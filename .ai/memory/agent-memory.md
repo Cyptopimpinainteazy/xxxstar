@@ -6764,3 +6764,22 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Canonical paths chosen
 - The addendum is the *only* place that supersedes the old audit's rows; the old text is left intact so the drift is visible rather than silently rewritten.
+
+## 2026-09-22 (sixteenth pass) — the BTC SPV trust root, and `rg -rn` is not `rg -n`
+
+### Facts to remember
+- **`rg -rn "pattern"` is `--replace n`**: it rewrites every match to the letter `n` in the output. Two sessions in a row read records through it and concluded the repo said things like `<code>session.n</code>` and "no n anchor". Use `rg -n` (or `grep -n`). This is the single most expensive small mistake in this repo's history.
+- **The BTC SPV path had two open doors, not "no bootstrap".** `submit_btc_header` accepted `height == 0` with no parent at all, and `nBits` is written by the submitter, so a chain could be started for one hash; `submit_btc_proof` inserted the caller's header with **no PoW check of any kind** and then computed `confirmations` from the caller's own `height`. Both are now `btc_admit_header`, and `verify_btc_proof`'s 2026-09-22 hashing fix had only made the *hash* honest, not the trust question. Fixed: spec_version 14, `anchor_btc_checkpoint` (call_index 34), `BtcCheckpoints`, `BtcHeaderMetaStore`, `BtcPoWLimitBits`.
+- **`cargo test -p pallet-x3-settlement-engine` = 144 + 23 passed** after the change; `--features runtime-benchmarks` compiles now (it did **not** on master: the `submit_proof` bench's `SettlementProof` was missing `receipt_index`/`trie_proof`).
+- **A benchmark cannot mine mainnet difficulty.** `submit_btc_header`/`anchor_btc_checkpoint` are deliberately unbenchmarked with fixed weights; the old bench only passed because it accepted a caller-chosen `nBits`. Do not "restore" it.
+- **Test-network `powLimit` must be regtest (0x207fffff)** or every BTC fixture would need ~2^32 hashes. The mock uses it; the runtime uses `0x1d00ffff` except under `feature = "dev"`.
+- `#[cfg]` on associated types inside `impl ... for Runtime` works, which is how the runtime picks the pow limit per feature (`dev` vs everything else).
+- Another agent landed **PR #451** (x3-lang price-impact/MEV ceilings) while this was in flight; master moved to `157701ac3e`. **PR #450 (`feat/x3-mcp-server`) is an explicit DRAFT** by a third agent — do not merge it on sight.
+
+### Decisions made this session
+- The anchor is **governance state, not a compiled constant**: no real Bitcoin checkpoint hashes could be verified offline, and shipping invented ones would be a fabricated trust root. Write-once-per-height storage plus an event makes the commitment auditable and un-movable.
+- BTC header helpers were made `pub(crate)` so the rules that no fixture can reach (the retarget boundary needs mainnet difficulty) can be stated directly as unit assertions instead of being left untested.
+- Split the work: the anchor landed as its own change with the runtime re-attested, rather than piling it onto the docs addendum PR.
+
+### Canonical paths chosen
+- `pallets/x3-settlement-engine/src/lib.rs` is the only place a BTC header may enter the chain's view (`btc_admit_header`). Any future header source (relayer, bridge, off-chain worker) must call it, not `BtcHeaders::insert`.

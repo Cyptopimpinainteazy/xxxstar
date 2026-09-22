@@ -163,6 +163,10 @@ impl pallet_x3_settlement_engine::Config for Test {
     type MaxPendingIntents = frame_support::traits::ConstU32<10>;
     type DefaultSettlementTimeout = frame_support::traits::ConstU64<60>;
     type MinBtcConfirmations = frame_support::traits::ConstU32<1>;
+    // Bitcoin's regtest `powLimit`. A test cannot mine a mainnet-difficulty header,
+    // and the regtest limit is Bitcoin's own answer to "which limit may a chain that
+    // mines its own headers use"; production runtimes carry `0x1d00ffff`.
+    type BtcPoWLimitBits = frame_support::traits::ConstU32<0x207f_ffff>;
     type ChallengePeriod = frame_support::traits::ConstU64<10>;
     type SettlementTimeoutBlocks = frame_support::traits::ConstU64<28800>; // ~24 hours at 3s blocks
     type SettlementFeeBps = SettlementFeeBps;

@@ -332,7 +332,20 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // this hash, so headers stored by an earlier version would be filed under a
     // different key. No migration is needed: every deployed chain has an empty
     // `BtcHeaders` map (the BTC path is not live on any network yet).
-    spec_version: 13,
+    //
+    // 14: the BTC SPV path has a trust root. New storage: `BtcCheckpoints`
+    // (height → committed hash, the anchor) and `BtcHeaderMetaStore` (block hash →
+    // the height the parent link implies and whether the header is on an anchored
+    // chain). New call `anchor_btc_checkpoint` (root). `submit_btc_header` no longer
+    // accepts `height == 0` with no parent, refuses headers whose target is easier
+    // than the network's `powLimit`, requires the parent's height plus one and
+    // Bitcoin's `nBits` for that height, and both SPV entry points now require the
+    // header to be on a checkpoint-anchored chain. No migration is needed: the new
+    // maps start empty and every deployed chain has an empty `BtcHeaders` map (the
+    // BTC path is not live on any network yet). Anchoring a checkpoint is an
+    // operator action, and until one is anchored this chain settles no BTC proofs —
+    // which is the point: an unanchored header proves nothing.
+    spec_version: 14,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -2505,6 +2518,16 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type MaxPendingIntents = MaxPendingIntents;
     type DefaultSettlementTimeout = DefaultSettlementTimeout;
     type MinBtcConfirmations = MinBtcConfirmations;
+    /// Bitcoin's `powLimit` for the network this build tracks.
+    ///
+    /// A local dev chain has to be able to anchor a header it just mined, so the dev
+    /// runtime uses regtest's limit. Every other build — testnet and the mainnet RC —
+    /// uses mainnet's `0x1d00ffff`, which is what makes the anchor carry real work:
+    /// a header easier than that limit is one Bitcoin itself would have refused.
+    #[cfg(feature = "dev")]
+    type BtcPoWLimitBits = frame_support::traits::ConstU32<0x207f_ffff>;
+    #[cfg(not(feature = "dev"))]
+    type BtcPoWLimitBits = frame_support::traits::ConstU32<0x1d00_ffff>;
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
     type CrossChainValidator = RuntimeCrossChainValidator;

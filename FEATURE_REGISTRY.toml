@@ -113,12 +113,24 @@ required_tests = [
   "btc_settlement_proof_two_tx_block_with_merkle_path",
   "btc_settlement_proof_naming_a_different_block_is_refused",
   "btc_spv_proof_direct_round_trip",
+  # The trust root (spec_version 14). The first of these is the reproduction: the
+  # raw SPV verifier accepts the forged block, the pallet refuses it, and it is
+  # accepted only once the header is genuinely anchored.
+  "the_raw_spv_verifier_accepts_the_fixture_the_pallet_refuses",
+  "a_btc_header_chain_cannot_start_without_a_checkpoint",
+  "a_bitcoin_proof_cannot_use_a_header_this_chain_never_admitted",
+  "a_btc_checkpoint_height_cannot_be_re_pointed",
+  "a_btc_extension_must_be_contiguous_with_its_parent",
+  "a_btc_extension_cannot_change_difficulty_off_a_retarget_boundary",
+  "a_btc_extension_must_postdate_the_median_of_its_ancestors",
+  "submit_btc_proof_refuses_a_header_that_was_never_admitted",
+  "the_retarget_bound_bites_exactly_at_a_factor_of_four",
 ]
 proof_report = "reports/btc_gateway_report.md"
 readiness_score = 45
 blockers = [
   "No live Bitcoin run at all — not regtest, not testnet, not mainnet; the deposit/withdrawal path has never moved a coin",
-  "Headers are submitted by root and must chain to a header already in storage: there is no checkpoint anchor and no peer-sourced header sync, so bootstrapping the chain of headers is an operator action with no trusted source behind it",
+  "The header chain bootstraps from a governance-anchored checkpoint as of spec_version 14 (`anchor_btc_checkpoint`; `BtcCheckpoints` + `BtcHeaderMetaStore`), and SPV evidence is accepted only from headers on an anchored chain — but no chain has anchored one yet and there is no peer-sourced header sync, so anchoring and header pushing are both manual operator acts",
   "No BTC signer quorum: withdrawals have no production multi-signer policy",
   "BTC mainnet disabled by feature flag",
   "No external audit of the gateway, the vault or the header check",
