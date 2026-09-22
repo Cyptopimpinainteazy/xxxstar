@@ -353,7 +353,13 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // root of trust already in its spec, instead of waiting for a root call.
     // `BtcBlockHeader` gains serde so a spec (which is JSON) can carry it; that is the
     // spec's shape only, never the proof path, which still hashes the 80 wire bytes.
-    spec_version: 15,
+    // 16: validator key rotation is wired to the on-chain custody registry.
+    // `pallet_x3_custody` gains a `KeyRotationPeriod` constant, and
+    // `rotate_validator_key` now grants `current_block + period` instead of
+    // inheriting an overdue due block; the node gains the `validator rotate`
+    // operator command. No storage migration: the constant is metadata-only and
+    // the due-block semantics change is confined to the rotation extrinsic.
+    spec_version: 16,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
