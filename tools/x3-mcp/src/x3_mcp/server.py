@@ -269,30 +269,33 @@ def x3_verify_proof(intent_id: int, proof_kind: str, ledger_path: str = "") -> d
 
 @mcp.tool()
 def x3_verify_receipt(receipt_path: str, trusted_key_specs: str = "") -> dict[str, Any]:
-    """Verify an X3Lang economic receipt with the repository's real x3c verifier.
+    """Verify an X3Lang receipt, optionally requiring trusted signer attestation.
 
-    Structural/hash/economic replay uses `x3c receipt verify`. If trusted keys
-    are required by the caller, use x3c's trusted-verification surface when it
-    is added; this MCP refuses to pretend structural verification establishes
-    signer trust.
+    trusted_key_specs is a comma-separated list of KEY_ID=64_HEX_PUBLIC_KEY.
+    When supplied, x3c verifies the receipt against the caller's trust map; the
+    public key embedded in the receipt is never sufficient by itself.
     """
     path = _inside_repo(Path(receipt_path))
     if not path.is_file():
         raise RuntimeError(f"receipt not found: {path}")
-    if trusted_key_specs.strip():
-        raise RuntimeError(
-            "trusted receipt-key verification is not exposed by x3c receipt verify; "
-            "refusing to downgrade trusted verification to structural verification"
-        )
     manifest = REPO_ROOT / "x3-lang" / "Cargo.toml"
-    result = _run([
+    argv = [
         "cargo", "run", "--quiet", "--manifest-path", str(manifest),
         "-p", "x3-tools", "--bin", "x3c", "--", "receipt", "verify", str(path),
-    ])
+    ]
+    trusted = [spec.strip() for spec in trusted_key_specs.split(",") if spec.strip()]
+    for spec in trusted:
+        argv.extend(["--trusted", spec])
+    result = _run(argv)
     return {
         "receipt_path": str(path),
         "verified": result["ok"],
-        "scope": "receipt hash + structural/economic invariants; signer trust not established",
+        "trusted_attestation_required": bool(trusted),
+        "scope": (
+            "receipt hash + economic invariants + trusted signer attestation"
+            if trusted else
+            "receipt hash + structural/economic invariants; signer trust not requested"
+        ),
         "command": result,
     }
 
