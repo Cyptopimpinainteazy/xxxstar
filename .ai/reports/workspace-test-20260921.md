@@ -29,3 +29,11 @@ fmt), recorded in `x3lang-current-green-20260921.md`.
 Run only `parallel-proposer` benches/tests with a timeout to isolate the
 non-terminating test, then either bound it or exclude it from the workspace
 test path if it is a long-running benchmark rather than a correctness test.
+
+## Isolation attempt (2026-09-22)
+
+`cargo test -p parallel-proposer --all-targets` could not be isolated in the
+default workspace target directory: cached artifacts were built with rustc
+1.98.1 while the active toolchain is 1.90.0, producing `E0514`/`E0614` errors
+before the tests ran. The hang therefore remains unisolated until a fresh
+`CARGO_TARGET_DIR` build is used for that single crate.
