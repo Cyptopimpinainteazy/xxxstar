@@ -30,6 +30,8 @@ sp-core = { workspace = true }
 x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
 x3-finality-oracle = { path = "../x3-finality-oracle" }
 x3-verification-router = { path = "../x3-verification-router" }
+# RLP for the consensus encoding of a receipt — the leaf a receipts trie holds.
+rlp = { version = "0.5", default-features = false }
 x3-validator-attestation = { path = "../x3-validator-attestation" }
 x3-proof-dispute = { path = "../x3-proof-dispute" }
 x3-gateway-risk-engine = { path = "../x3-gateway-risk-engine" }

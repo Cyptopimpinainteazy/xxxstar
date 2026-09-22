@@ -9,6 +9,7 @@
 /// `submitter`, `watchers`) require the `std` feature.
 #[cfg(feature = "std")]
 pub mod relayer;
+pub mod evm_receipt_proof;
 #[cfg(feature = "std")]
 pub mod submitter;
 pub mod types;
