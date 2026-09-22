@@ -63,3 +63,15 @@ tempfile = "3"
 # `core2 0.4.0` (yanked from crates.io). Same local copy as the root uses.
 [patch.crates-io]
 core2 = { path = "../../patches/core2" }
+
+# `x3-rpc` -> polkadot-sdk pulls sc-executor-wasmtime v0.43.0 (stable2512),
+# which pins wasmtime "^35.0.0" — within the vulnerable range for
+# GHSA-jhxm-h53p-jm7w and GHSA-xx5w-cvp6-jv83 (aarch64 sandbox escape,
+# Cranelift and Winch). Same fix the root workspace already applies.
+# sp-wasm-interface's own "wasmtime" feature also needs its matching local
+# patch: stock v24.0.0 calls wasmtime::Caller/IntoFunc/WasmTy, which moved
+# between wasmtime 35 and 36 — without this patch the crate fails to build
+# once wasmtime is bumped (the same conflict noted in the root Cargo.toml).
+[patch."https://github.com/paritytech/polkadot-sdk"]
+sc-executor-wasmtime = { path = "../../patches/sc-executor-wasmtime" }
+sp-wasm-interface = { path = "../../patches/sp-wasm-interface" }

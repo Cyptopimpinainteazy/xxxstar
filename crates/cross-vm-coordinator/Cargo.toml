@@ -47,3 +47,18 @@ canonical-proofs = ["x3-atomic-swap", "codec"]
 # Enable signed on-chain transaction submission for all three VM adapters.
 # Without this flag the adapters use simulation/dry-run paths only.
 real-signing = []
+
+# This is a nested workspace (see [workspace] in the root Cargo.toml's local-ci
+# gate comments) so it does not inherit the root's [patch.crates-io] table.
+# Upstream sc-executor-wasmtime v0.43.0 (stable2512) pins wasmtime "^35.0.0",
+# which is within the vulnerable range for GHSA-jhxm-h53p-jm7w and
+# GHSA-xx5w-cvp6-jv83 (aarch64 sandbox escape, Cranelift and Winch). Same fix
+# the root workspace already applies via patches/sc-executor-wasmtime.
+# The `offchain` feature pulls sp-core/sc-client-api -> stock sp-wasm-interface
+# v24.0.0 (wasmtime feature enabled), a second independent path to the same
+# vulnerable wasmtime — needs its own matching local patch or `cargo build
+# --features offchain` still links the vulnerable version even though the
+# default build doesn't.
+[patch."https://github.com/paritytech/polkadot-sdk"]
+sc-executor-wasmtime = { path = "../../patches/sc-executor-wasmtime" }
+sp-wasm-interface = { path = "../../patches/sp-wasm-interface" }
