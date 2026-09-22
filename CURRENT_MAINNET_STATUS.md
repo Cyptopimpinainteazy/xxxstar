@@ -9,7 +9,7 @@
 
 ```
 Atomic Router (pallets/x3-cross-vm-router)        ████████░░  88%  LIVE_TESTNET — All 8 invariants passing, CI gate wired
-Atomic Kernel (pallets/x3-atomic-kernel)           ████░░░░░░  40%  LIVE_TESTNET — EconomicHalt guard is real code, but its 9 previously-claimed invariant tests were fictional (CRITICAL-TOK-1, 2026-09-06 audit); real tests not yet written
+Atomic Kernel (pallets/x3-atomic-kernel)           ███░░░░░░░  35%  LIVE_TESTNET — EconomicHalt guard is real code, but its 9 previously-claimed invariant tests were fictional (CRITICAL-TOK-1, 2026-09-06 audit) and bundle finalization is unauthorized with a self-satisfying finality gate (TICKET-097, 2026-09-22)
 AXE DEX (pallets/x3-dex)                           ███████░░░  75%  GUARDED_TESTNET — EconomicHalt runtime gate, CI wired
 X3 Forge (pallets/x3-token-factory)                ███████░░░  75%  GUARDED_TESTNET — EconomicHalt runtime gate, CI wired
 Atomic Lock (pallets/x3-atomic-kernel)             ██████░░░░  68%  LIVE_TESTNET — CI gate wired via atomic_kernel
@@ -25,7 +25,7 @@ Repo Scanner Agent (scripts/swarm)                 ██░░░░░░░�
 Tauri OS (apps/tauri-os)                           █░░░░░░░░░  15%  GUARDED_TESTNET — Dead buttons report, Tauri wiring pending
 ```
 
-**Average readiness: ~54%** — 19 features are currently tracked. Eight aspirational/fictional rows were purged on 2026-09-05; `atomic_kernel` was corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 because its required tests were fictional. Core consensus features are at guarded-testnet, not mainnet, maturity.
+**Average readiness: ~54%** — 19 features are currently tracked. Eight aspirational/fictional rows were purged on 2026-09-05; `atomic_kernel` was corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 because its required tests were fictional, and to 35% on 2026-09-22 because bundle finalization is not authorized and its finality gate compares the caller's input with the caller's earlier input (TICKET-097). Core consensus features are at guarded-testnet, not mainnet, maturity.
 
 ### 2026-09-07 Atomic lifecycle live evidence
 
