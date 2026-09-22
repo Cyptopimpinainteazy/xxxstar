@@ -26,7 +26,7 @@ Local MCP server for Codex/VS Code to inspect a running X3 node and execute expl
 | `x3_collect_evidence` | repository + live-node evidence bundle |
 | `x3_trace_atomic_swap` | trace one intent from durable proof-ledger evidence |
 | `x3_verify_proof` | require complete verified persisted proof evidence |
-| `x3_verify_receipt` | run the real X3Lang receipt verifier; never implies signer trust |
+| `x3_verify_receipt` | run X3Lang receipt verification; optional trusted Ed25519 signer map |
 
 ## Install
 
@@ -87,6 +87,6 @@ Next phase should bind these to real X3 interfaces:
 5. `x3_run_failure_matrix`
 6. `x3_compile_x3lang`
 7. `x3_collect_production_evidence`
-8. trusted-key receipt verification exposed through a non-fixture X3Lang CLI/API
+
 
 Each must bind to actual X3 interfaces. No fake responses or placeholder success paths.
