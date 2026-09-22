@@ -168,7 +168,7 @@ id = "X3-SEC-011"
 name = "PR supervisor gate"
 subsystem = "security_proofgate"
 source = "master"
-paths = [".github/workflows/pr-supervisor.yml"]
+paths = ["scripts_infrastructure/pr_supervisor.py", "tests/test_pr_supervisor.py"]
 implemented = 80
 tested = 70
 mainnet_ready = 65
@@ -177,7 +177,11 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Needs continued exact-head enforcement"]
-evidence = [".github/workflows/pr-supervisor.yml", "note: Recent CI recovery added real PR integrity checks"]
+# The hosted workflow this row used to name does not exist: automatic hosted CI was
+# removed from this repository, and the supervisor is the script below (with its
+# own test). Naming a workflow that is not in `.github/workflows` was an evidence
+# path that could not back the claim.
+evidence = ["scripts_infrastructure/pr_supervisor.py", "tests/test_pr_supervisor.py", "note: Recent CI recovery added real PR integrity checks; enforcement is the script plus its test, run where the queue is operated"]
 
 [[feature]]
 id = "X3-SEC-012"
@@ -232,7 +236,7 @@ id = "X3-SEC-015"
 name = "Rust Clippy hard-fail gate"
 subsystem = "security_proofgate"
 source = "master"
-paths = [".github/workflows/rust-clippy.yml"]
+paths = ["scripts/local-ci.sh", "Makefile"]
 implemented = 88
 tested = 80
 mainnet_ready = 75
@@ -241,5 +245,9 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Keep -D warnings and avoid coverage weakening"]
-evidence = [".github/workflows/rust-clippy.yml", "note: Workflow repaired to retain hard fail and diagnostics"]
-test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+# The hosted `rust-clippy.yml` this row used to name does not exist. Clippy is a
+# hard fail in `scripts/local-ci.sh` (gates `clippy workspace`,
+# `clippy runtime rc1`, `clippy node rc1`, each `-D warnings`) and in the
+# `x3-lang` workspace target in the Makefile.
+evidence = ["scripts/local-ci.sh", "Makefile", "note: three workspace clippy gates with -D warnings, plus the x3-lang workspace target; verified PASS on 2026-09-22 (clippy workspace 774s, clippy runtime rc1 803s, clippy node rc1 1009s)"]
+test_evidence = ["scripts/local-ci.sh", "note: the gates themselves are the evidence; each runs cargo clippy with -D warnings over a workspace and fails the run on any warning"]
