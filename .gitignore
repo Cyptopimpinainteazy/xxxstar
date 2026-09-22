@@ -184,7 +184,10 @@ apps/x3-desktop/dist/
 /Bash tool output*
 *.tsbuildinfo
 
-# Local editor/agent tool configuration (not shared project config)
-/.cursor/
-/.gemini/
-/.todo
+# Local editor/agent tool configuration (not shared project config).
+# Not root-anchored: these have turned up nested under other directories too
+# (e.g. docs/reports/.cursor/, docs/reports/.ai-todo/) from accidental copies.
+.cursor/
+.gemini/
+.todo
+.ai-todo/
