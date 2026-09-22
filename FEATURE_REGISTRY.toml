@@ -328,6 +328,18 @@ dangerous_paths = ["pallets/x3-wrapped", "runtime", "bridge authority", "council
 mode = "SIM_TESTNET"
 crate_or_service = "X3-contracts/svm/programs/x3_htlc"
 tauri_app = ""
+# This row describes a tree nothing else references: no script, workflow or crate
+# in the repo builds or runs `X3-contracts/svm/programs/x3_htlc`. The SVM HTLC
+# that IS on the live cross-VM path is `programs/svm/x3_atomic_swap`, which
+# `scripts/cross-domain-svm-gate.sh` builds with `cargo build-sbf`, deploys to a
+# real `solana-test-validator`, and exercises end to end — and which
+# `programs/svm/x3_atomic_swap/test-live-lifecycle.sh` pins with 15 assertions
+# (0 failed, 2026-09-22) including the wrong-preimage, double-claim,
+# refund-before-timeout and wrong-authority rejections. See the matrix rows
+# X3-XVM-005 / X3-XVM-009 / X3-XVM-015 and the `svm_atomic_swap_htlc` row below.
+#
+# The score here stays low on purpose: it is a statement about THIS tree, which
+# still has no localnet lifecycle for itself.
 # Verified 2026-09-11: `cargo test -p x3_htlc` = 7/7 passing (commit
 # 66da1221d added this coverage; 173fcec2b made it CI-enforced via
 # .github/workflows/svm-htlc.yml). Confirmed NOT called from
@@ -349,6 +361,51 @@ blockers = [
   "Not wired into any live cross-VM route — no caller in the atomic router or cross-vm-coordinator yet"
 ]
 dangerous_paths = ["X3-contracts/svm/programs/x3_htlc", "SVM domain", "timelock logic"]
+
+[svm_atomic_swap_htlc]
+mode = "LIVE_TESTNET"
+crate_or_service = "programs/svm/x3_atomic_swap"
+tauri_app = ""
+# The SVM HTLC that is actually on the cross-VM path, and was previously missing
+# from this registry entirely (the only SVM HTLC row pointed at the unreferenced
+# tree above).
+#
+# Verified 2026-09-22, first-hand this session:
+#   * `bash programs/svm/x3_atomic_swap/test-live-lifecycle.sh` (the
+#     `SVM contract lifecycle` local-ci gate) — PASS 191s, **15 assertions,
+#     0 failed**, against a real `solana-test-validator` with the program built by
+#     `cargo build-sbf` and deployed: lock, claim with the correct preimage, and
+#     refund after timeout all move the locked lamports and set the on-chain
+#     flags; claim with a wrong preimage, a second claim, a refund before the
+#     timelock, and a refund from an account that is not the refund authority are
+#     all rejected. PDA state is read over raw `getAccountInfo` with manual
+#     byte-offset decoding, so the client library cannot mask a program bug.
+#   * `X3_STRICT_CROSS_DOMAIN_PROOFS=1 bash scripts/cross-domain-svm-gate.sh` —
+#     "both X3VM<->SVM lifecycles passed [strict]": X3VM lock + SVM HTLC
+#     lock/claim and timeout/refund against the same deployed program, with the
+#     strict (no unattested proof sets) posture enforced by the chain itself.
+required_tests = [
+  "test_hash_verification",
+  "test_canonical_pda_validation_accepts_only_matching_swap_id",
+  "test_canonical_pda_bump_reconstructs_address",
+  "test_deserialize_rejects_short_buffer",
+  "test-live-lifecycle.sh::lock_and_claim_move_the_locked_lamports",
+  "test-live-lifecycle.sh::wrong_preimage_double_claim_refund_early_and_wrong_authority_are_rejected",
+]
+proof_report = ""
+# Coarse product readiness, not a route score: real program, real deployed-program
+# lifecycle in CI, and a CI gate that runs it. Held below 80 because nothing has
+# been deployed to devnet or mainnet, no external audit exists, and the relayer
+# that would submit settlement proofs still cannot (the settlement engine requires
+# the intent party — `NotAuthorized` otherwise — so the submitting authority is an
+# open decision).
+readiness_score = 70
+blockers = [
+  "Deployed to a local validator only — no devnet or mainnet deployment has been performed",
+  "No external audit of the program",
+  "No production submitter: pallets/x3-settlement-engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused and the authority path is undecided",
+]
+dangerous_paths = ["programs/svm/x3_atomic_swap", "SVM domain", "hashlock and timelock logic", "PDA authority checks"]
 
 # ── Score adjustments 2026-06-17 ──
 # atomic_kernel:  75→85  (6 tests verified passing, EconomicHalt gate wired)

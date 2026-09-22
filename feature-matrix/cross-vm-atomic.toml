@@ -69,17 +69,21 @@ id = "X3-XVM-005"
 name = "EVM → SVM route"
 subsystem = "cross_vm_atomic"
 source = "master"
-paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+paths = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh"]
 implemented = 90
-tested = 80
+tested = 88
 mainnet_ready = 78
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs full network-level external execution proof"]
-evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Six internal route invariant suite"]
-test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+blockers = [
+  "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
+  "A production relayer cannot submit the proof yet: pallets/x3-settlement-engine requires the intent party (who == intent.maker || who == intent.taker, NotAuthorized otherwise), so the submitting authority is an open decision",
+  "No external audit of the SVM program or of this route",
+]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "note: network-level external execution proof added 2026-09-22 — solana-test-validator + cargo build-sbf + the deployed SBF program, in dev and in strict posture (X3_STRICT_CROSS_DOMAIN_PROOFS=1, which refuses to start unless the chain reports the strict value)"]
+test_evidence = ["node/tests/x3vm_svm_live.rs", "scripts/cross-domain-svm-gate.sh", "programs/svm/x3_atomic_swap/test-live-lifecycle.sh", "note: real_x3vm_svm_lock_claim_atomic_lifecycle and real_x3vm_svm_timeout_refund_atomic_lifecycle run against the booted validator; test-live-lifecycle.sh is 15 assertions, 0 failed on 2026-09-22, reading PDA state over raw JSON-RPC — wrong-preimage claim, double-claim, refund-before-timeout and refund-by-wrong-authority all rejected, claim and refund move the locked lamports"]
 
 [[feature]]
 id = "X3-XVM-006"
@@ -136,17 +140,21 @@ id = "X3-XVM-009"
 name = "SVM → EVM route"
 subsystem = "cross_vm_atomic"
 source = "master"
-paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+paths = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh"]
 implemented = 90
-tested = 80
+tested = 88
 mainnet_ready = 78
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs full network-level external execution proof"]
-evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Six internal route invariant suite"]
-test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+blockers = [
+  "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
+  "A production relayer cannot submit the proof yet: pallets/x3-settlement-engine requires the intent party (who == intent.maker || who == intent.taker, NotAuthorized otherwise), so the submitting authority is an open decision",
+  "No external audit of the SVM program or of this route",
+]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "note: network-level external execution proof added 2026-09-22 — the same validator-backed lifecycle that covers EVM → SVM, run in dev and strict posture; the SVM program is the one the gate builds with cargo build-sbf and deploys"]
+test_evidence = ["node/tests/x3vm_svm_live.rs", "scripts/cross-domain-svm-gate.sh", "programs/svm/x3_atomic_swap/test-live-lifecycle.sh", "note: the reverse direction of the same validator-backed lifecycle (15 assertions, 0 failed on 2026-09-22)"]
 
 [[feature]]
 id = "X3-XVM-010"
@@ -238,17 +246,21 @@ id = "X3-XVM-015"
 name = "X3 → SVM route"
 subsystem = "cross_vm_atomic"
 source = "master"
-paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+paths = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh"]
 implemented = 92
-tested = 82
+tested = 90
 mainnet_ready = 82
 priority = "P1"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["External boundary proof remains separate"]
-evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+blockers = [
+  "The X3-side lock and the SVM-side lock are both exercised end to end against a real validator, but nothing has been deployed to devnet or mainnet",
+  "A production relayer cannot submit the settlement proof yet: the settlement engine requires the intent party, so the submitting authority is an open decision",
+  "No external audit",
+]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "note: the external boundary this row called separate is now exercised — X3VM lock + SVM HTLC lock/claim/refund against solana-test-validator with the deployed program, in dev and strict posture (2026-09-22)"]
+test_evidence = ["node/tests/x3vm_svm_live.rs", "scripts/cross-domain-svm-gate.sh", "scripts/local-ci.sh", "note: gates cross-domain-svm and cross-domain-svm-(strict-posture) both PASS on 2026-09-22"]
 
 [[feature]]
 id = "X3-XVM-016"

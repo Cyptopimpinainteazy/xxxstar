@@ -201,6 +201,14 @@ GATES_FAST=(
   "invariant registry:python3 scripts/check-invariant-registry.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
+  # `scripts/feature_matrix.py check` validates the granular readiness manifest:
+  # every declared path and evidence path has to exist, scores have to respect the
+  # per-priority caps, and the enums have to hold. It takes a tenth of a second and
+  # was in no gate list, so it had drifted into four errors: two matrix rows cited
+  # hosted workflows (`.github/workflows/pr-supervisor.yml`,
+  # `.github/workflows/rust-clippy.yml`) that this repository does not contain. A
+  # readiness manifest nothing validates is a claim, not a record.
+  "feature matrix check:python3 scripts/feature_matrix.py check"
   # `make mainnet-check` stage 6b rebuilds the runtime and fails when it no
   # longer matches `docs/reports/runtime-wasm-hashes.json`. That is ten minutes
   # into a release, and runtime changes have landed without the record three
