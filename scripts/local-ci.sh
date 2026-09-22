@@ -349,7 +349,10 @@ GATES_DEEP=(
 GATES_CROSS=(
   "X3-native lifecycles:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
   "cross-domain EVM:bash scripts/cross-domain-evm-gate.sh"
-  "cross-domain SVM:bash scripts/cross-domain-svm-gate.sh"
+  # Same reason as the `SVM contract lifecycle` gate above: this one also runs
+  # `cargo build-sbf`, which shells out to `cargo +1.89.0-sbpf-solana-v1.54` and
+  # therefore needs the rustup shim ahead of the pinned toolchain directory.
+  "cross-domain SVM:env PATH=\"$HOME/.cargo/bin:$PATH\" bash scripts/cross-domain-svm-gate.sh"
   # The three gates above boot the dev chain, whose genesis allows unattested
   # cross-domain proof sets. That is a dev-only posture; this one runs the same
   # X3VM<->EVM lifecycles against a dev spec with that policy flipped, and the
