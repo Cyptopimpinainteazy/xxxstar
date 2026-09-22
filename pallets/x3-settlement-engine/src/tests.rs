@@ -2291,6 +2291,201 @@ fn btc_htlc_p2sh_address_derivation_is_deterministic() {
 }
 
 #[test]
+fn btc_block_hash_is_double_sha256_over_the_eighty_wire_bytes() {
+    // The header the pallet stores carries a `height` field that is not part of a
+    // Bitcoin header. Hashing the SCALE encoding of the struct — which is what
+    // this used to do — hashes eight bytes no Bitcoin block has. The test states
+    // the wire layout itself and requires the pallet to agree with it: the pallet's
+    // hash is only observable through the key it files a header under, so the
+    // header is submitted and the key read back.
+    let header = mine_btc_header(BtcBlockHeader {
+        version: 0x0000_0002,
+        prev_block_hash: H256::repeat_byte(0x11),
+        merkle_root: H256::repeat_byte(0x22),
+        timestamp: 0x1122_3344,
+        // An easy but valid target, so the nonce walk is short; `height: 0` is the
+        // genesis case, which needs no predecessor in storage.
+        bits: 0x2100_ffff,
+        nonce: 0,
+        height: 0,
+    });
+    let expected = H256::from(btc_wire_hash(&header));
+
+    new_test_ext().execute_with(|| {
+        Pallet::<Test>::submit_btc_header(RuntimeOrigin::root(), header.clone())
+            .expect("a mined header is accepted");
+        let stored = crate::BtcHeaders::<Test>::iter_keys()
+            .next()
+            .expect("the header was stored under the pallet's own hash");
+        assert_eq!(
+            stored, expected,
+            "the pallet must file a header under Bitcoin's hash of its 80 wire bytes"
+        );
+    });
+
+    // And that hash must not be the hash of the SCALE encoding, which is what
+    // made every proof-of-work comparison meaningless.
+    let scale_encoding = codec::Encode::encode(&header);
+    let scale_hash = H256::from(sp_io::hashing::sha2_256(&sp_io::hashing::sha2_256(
+        &scale_encoding,
+    )));
+    assert_ne!(
+        expected, scale_hash,
+        "the wire header and the SCALE struct are different objects"
+    );
+}
+
+/// Mine a header for `bits` by walking the nonce, using the test's own copy of
+/// Bitcoin's target rule. Returns the header and the target it met.
+fn mine_btc_header(mut header: BtcBlockHeader) -> BtcBlockHeader {
+    for nonce in 0..5_000_000u32 {
+        header.nonce = nonce;
+        let hash = btc_wire_hash(&header);
+        if btc_meets_target(&hash, header.bits) {
+            return header;
+        }
+    }
+    panic!("no proof-of-work header found for these bits");
+}
+
+fn btc_wire_hash(header: &BtcBlockHeader) -> [u8; 32] {
+    let mut wire = [0u8; 80];
+    wire[0..4].copy_from_slice(&header.version.to_le_bytes());
+    wire[4..36].copy_from_slice(header.prev_block_hash.as_bytes());
+    wire[36..68].copy_from_slice(header.merkle_root.as_bytes());
+    wire[68..72].copy_from_slice(&header.timestamp.to_le_bytes());
+    wire[72..76].copy_from_slice(&header.bits.to_le_bytes());
+    wire[76..80].copy_from_slice(&header.nonce.to_le_bytes());
+    sp_io::hashing::sha2_256(&sp_io::hashing::sha2_256(&wire))
+}
+
+/// Bitcoin's `SetCompact` plus the `CheckProofOfWork` rejections, written out
+/// here so the fixture's notion of "meets the target" is not the pallet's.
+fn btc_meets_target(hash: &[u8; 32], bits: u32) -> bool {
+    let size = (bits >> 24) as usize;
+    let word = bits & 0x007f_ffff;
+    if bits & 0x0080_0000 != 0 || word == 0 || size > 34 || (size == 34 && word > 0xff) {
+        return false;
+    }
+    let mut target = [0u8; 32];
+    if size <= 3 {
+        target[0..4].copy_from_slice(&(word >> (8 * (3 - size))).to_le_bytes());
+    } else {
+        let shift = size - 3;
+        for (i, byte) in word.to_le_bytes().iter().enumerate() {
+            if shift + i < 32 {
+                target[shift + i] = *byte;
+            }
+        }
+    }
+    for i in (0..32).rev() {
+        if hash[i] < target[i] {
+            return true;
+        }
+        if hash[i] > target[i] {
+            return false;
+        }
+    }
+    true
+}
+
+#[test]
+fn btc_submit_header_accepts_a_header_that_meets_its_target() {
+    // An easy but valid target (Bitcoin allows an exponent of 33 while the value
+    // still fits in 256 bits), so the fixture is mined in a handful of hashes.
+    let header = BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::zero(),
+        merkle_root: H256::repeat_byte(0x33),
+        timestamp: 1_700_000_000,
+        bits: 0x2100_ffff,
+        nonce: 0,
+        height: 0,
+    };
+    let mined = mine_btc_header(header);
+    assert!(
+        btc_meets_target(&btc_wire_hash(&mined), mined.bits),
+        "the fixture is mined against the target the test itself computes"
+    );
+
+    new_test_ext().execute_with(|| {
+        assert!(
+            Pallet::<Test>::submit_btc_header(RuntimeOrigin::root(), mined.clone()).is_ok(),
+            "a header that meets its target is accepted"
+        );
+    });
+}
+
+#[test]
+fn btc_submit_header_refuses_targets_bitcoin_refuses() {
+    // `size > 32` used to return true with the comment "any hash passes", which
+    // accepts a header with no proof of work at all. Bitcoin rejects it.
+    let overflowed = BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::zero(),
+        merkle_root: H256::repeat_byte(0x44),
+        timestamp: 1_700_000_000,
+        bits: 0xff7f_ffff,
+        nonce: 0,
+        height: 0,
+    };
+    // Mantissa high bit set: Bitcoin calls this a negative target.
+    let negative = BtcBlockHeader {
+        bits: 0x1f80_0000,
+        ..overflowed.clone()
+    };
+    // Zero target.
+    let zero = BtcBlockHeader {
+        bits: 0x0000_0000,
+        ..overflowed.clone()
+    };
+
+    new_test_ext().execute_with(|| {
+        for (label, header) in [
+            ("overflowing target", overflowed),
+            ("negative target", negative),
+            ("zero target", zero),
+        ] {
+            assert!(
+                Pallet::<Test>::submit_btc_header(RuntimeOrigin::root(), header).is_err(),
+                "{label} must be refused"
+            );
+        }
+    });
+}
+
+#[test]
+fn btc_submit_header_refuses_a_header_that_misses_its_target() {
+    // Same block, mainnet-ish difficulty: almost every nonce misses. Pick one
+    // that misses, so the assertion is about the target and not about luck.
+    let mut header = BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::zero(),
+        merkle_root: H256::repeat_byte(0x55),
+        timestamp: 1_700_000_000,
+        bits: 0x1d00_ffff,
+        nonce: 0,
+        height: 0,
+    };
+    let mut found = None;
+    for nonce in 0..64u32 {
+        header.nonce = nonce;
+        if !btc_meets_target(&btc_wire_hash(&header), header.bits) {
+            found = Some(header.clone());
+            break;
+        }
+    }
+    let missing = found.expect("some nonce of this block must miss mainnet difficulty");
+
+    new_test_ext().execute_with(|| {
+        assert!(
+            Pallet::<Test>::submit_btc_header(RuntimeOrigin::root(), missing).is_err(),
+            "a header whose hash is above the target is refused"
+        );
+    });
+}
+
+#[test]
 fn btc_settlement_proof_single_tx_passes_verify_proof() {
     // Single-tx block: merkle_root == txid, empty merkle path.
     // This is the minimal valid SPV case.
@@ -2315,10 +2510,9 @@ fn btc_settlement_proof_single_tx_passes_verify_proof() {
     receipt_data.extend_from_slice(&header_bytes);
     receipt_data.extend_from_slice(&tx_bytes);
 
-    // block_hash field isn't strictly enforced by the SPV verifier (the
-    // merkle_root is what matters), but we set it to something non-zero so
-    // a future strict-mode check can be added without breaking this test.
-    let block_hash = H256::repeat_byte(0xDD);
+    // The proof names a block and carries its header, so the two have to be the
+    // same block: `block_hash` must be Bitcoin's hash of that header.
+    let block_hash = H256::from(btc_wire_hash(&header));
 
     let proof = SettlementProof {
         proof_type: ProofType::BitcoinSpv,
@@ -2343,6 +2537,49 @@ fn btc_settlement_proof_single_tx_passes_verify_proof() {
         // BitcoinTestnet should share the same verifier path
         let result_testnet = Pallet::<Test>::verify_proof(&ExternalChainId::BitcoinTestnet, &proof);
         assert_eq!(result_testnet, Ok(true));
+    });
+}
+
+#[test]
+fn btc_settlement_proof_naming_a_different_block_is_refused() {
+    // Same shape as the accepting test, except the proof claims a block the
+    // header it carries is not. The merkle root inside the header would still
+    // check out, which is exactly why the binding has to be enforced.
+    let tx_bytes: Vec<u8> = b"fictional-raw-bitcoin-tx".to_vec();
+    let txid = H256::from(double_sha256(&tx_bytes));
+    let header = BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::repeat_byte(0xEE),
+        merkle_root: txid,
+        timestamp: 1_700_000_000,
+        bits: 0x207f_ffff,
+        nonce: 0,
+        height: 100,
+    };
+    let header_bytes = codec::Encode::encode(&header);
+    let mut receipt_data: Vec<u8> = Vec::new();
+    receipt_data.extend_from_slice(&0u32.to_le_bytes());
+    receipt_data.extend_from_slice(&header_bytes);
+    receipt_data.extend_from_slice(&tx_bytes);
+
+    let proof = SettlementProof {
+        proof_type: ProofType::BitcoinSpv,
+        tx_hash: txid,
+        block_hash: H256::repeat_byte(0xDD),
+        confirmations: 6,
+        chain_height: Some(100),
+        merkle_proof: BoundedVec::default(),
+        receipt_data: BoundedVec::try_from(receipt_data).expect("receipt_data within bound"),
+        receipt_index: None,
+        trie_proof: None,
+    };
+
+    new_test_ext().execute_with(|| {
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(false),
+            "a proof whose block_hash is not the hash of the header it carries must be refused"
+        );
     });
 }
 
@@ -2438,7 +2675,8 @@ fn btc_settlement_proof_two_tx_block_with_merkle_path() {
     let proof = SettlementProof {
         proof_type: ProofType::BitcoinSpv,
         tx_hash: txid1,
-        block_hash: H256::repeat_byte(0xAB),
+        // The proof has to name the block whose header it carries.
+        block_hash: H256::from(btc_wire_hash(&header)),
         confirmations: 6,
         chain_height: Some(200),
         merkle_proof: BoundedVec::try_from(merkle_path).unwrap(),
@@ -3481,7 +3719,9 @@ fn a_btc_proof_whose_stated_height_disagrees_with_its_header_is_refused() {
     let base = SettlementProof {
         proof_type: ProofType::BitcoinSpv,
         tx_hash: txid,
-        block_hash: H256::repeat_byte(0xDD),
+        // The proof has to name the block whose header it carries: this fixture is
+        // about the height agreement, and the binding is checked before it.
+        block_hash: H256::from(btc_wire_hash(&header)),
         chain_height: Some(100),
         confirmations: 6,
         merkle_proof: BoundedVec::default(),

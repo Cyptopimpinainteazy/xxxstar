@@ -319,7 +319,14 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // v11: the settlement engine refuses EVM/SVM external settlement proofs by
     // default — nothing binds the receipt to the header it is checked against
     // (TICKET-063). No storage migration.
-    spec_version: 11,
+    // 12: the BTC header path hashes Bitcoin's 80 wire bytes instead of the SCALE
+    // encoding of `BtcBlockHeader` (which carried a non-wire `height` field), and
+    // `verify_btc_pow` now applies Bitcoin's `CheckProofOfWork` rejections for
+    // negative, overflowing and zero targets. Storage keys in `BtcHeaders` are
+    // this hash, so headers stored by an earlier version would be filed under a
+    // different key. No migration is needed: every deployed chain has an empty
+    // `BtcHeaders` map (the BTC path is not live on any network yet).
+    spec_version: 12,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
