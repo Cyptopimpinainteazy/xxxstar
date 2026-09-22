@@ -6799,3 +6799,18 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Used a **real node's data** instead of a better hand-written fixture. The rows said "no live Bitcoin run of any kind" and the honest fix was to change that fact, not the wording.
 - Kept the capture script in `scripts/btc/` and the JSON in `.ai/reports/` so the fixture can be reproduced and re-verified rather than trusted.
 - Did not claim testnet readiness from a regtest run; the row now says exactly what is real (regtest) and what is not (testnet, mainnet, any coin movement).
+
+## 2026-09-22 (eighteenth pass) — the two-hour soak FAILED, and the peer set is why it mattered
+
+### Facts to remember
+- **The 2-hour soak failed**: `[soak] FAIL: rpc 12046 has not finalized since 1790099493 (27677 at height)`. Twenty minutes passed the same day; two hours did not. `X3-L1-001` dropped tested 88→85, mainnet_ready 60→55.
+- **The failure mechanism, read off the logs** (`/tmp/x3-soak120/logs/node-*.log`): trie-cache lock timeouts from minute four (105–419/node) → `State already discarded` / `block has an unknown parent` (14–252/node) → a missed Aura slot (`Creating inherent data took more time…`) → the lagging validator repeats block requests → **peers ban it** (`Same block request multiple times. Banned, disconnecting.`, 10–16 bans per node) → it loses peers → its view diverges (`Potential long-range attack: block not in finalized chain`) → it re-finalises *backwards* (27111 after 27136) → finality stalls.
+- **This is liveness, not safety.** No node finalised two conflicting chains in the whole run.
+- **The trigger was an over-subscribed box**: `load average 55–62` with four *debug* nodes at 1.3–1.6 GiB RSS plus other agents' work. Debug nodes are the wrong unit for a duration claim.
+- **The defect candidate is the ban policy**: banning a peer for asking for the same block repeatedly *is* banning a peer for being behind. Ten to sixteen bans per node means the peer set degrades itself rather than healing. TICKET-094.
+- Evidence file: `.ai/reports/soak-2h-failure-20260922.md`; ledger entry GAP-SOAK-2H.
+- **Pallet documentation is part of the runtime metadata, therefore part of the WASM**: a doc-comment-only change to a pallet still moves `runtime-wasm-hashes.json`. `check-runtime-hash-freshness.py` watches the whole dependency graph, not a "runtime files" list. Two more srtool cycles were needed for doc comments.
+
+### Decisions made this session
+- Recorded the soak as a FAILURE and dropped the row's score rather than describing it as "a long soak is still pending". The previous row's own words were "twenty minutes is not a duration claim"; the claim was tested and did not hold.
+- Wrote the re-run precondition into the ticket: **idle box first** (to eliminate load), then reproduce under deliberate contention. Without the idle run, "environment" and "defect" are not separable, and guessing which one it is would be the same mistake as the earlier over-claim.
