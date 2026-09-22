@@ -6698,3 +6698,16 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Same sweep for other XOR/"hash" derivations that gate replay or dedup. 2. Wire key rotation end to end. 3. Consolidate the three SPV implementations. 4. Trusted BTC header bootstrap. 5. Remaining weak P0 rows (claims/GPU/trading). 6. Relayer authority decision (owner). 7. Release publish + external audit.
+
+## 2026-09-22 (eleventh pass) — testnet bring-up: one path, and it starts
+
+### Facts to remember
+- **`scripts/testnet/x3_testnet_up.sh` is now a wrapper** over `run-7-validators-local.sh`: it resolves a built node, refuses a raw Live spec with a message, builds a plain spec if none exists (via `build-x3-testnet-spec.py`), and delegates with its CLI intact. Before that it was the third launcher and the worst: `subkey` required (not installed), storage-raw Live default (node refuses), `--unsafe-force-node-key-generation` (unstable peer ids → a spec's bootNodes can never match).
+- **Verified through it**: 4 validators on a generated 4-authority Live spec, all agreeing on `0x5e85c483…` at height 1000 and `0x58687622…` at height 1050.
+- **`TESTNET_GAP_LEDGER.md` re-measured**: GAP-CLI-1 CLOSED (delegation + verified boot + raw refusal), GAP-SPEC-1 CLOSED (generated plain spec is the default; builder asserts every derived bootnode; launcher preflight enforces authority + peer-id membership), **GAP-AUTH-1 CORRECTED** — keystore-only keys DO author (head 9 in ~45 s, no `X3_DEV_SEED`); its "works as designed / deferred" disposition rested on a 2026-09-04 premise that no longer holds.
+- **Testnet reality (measured 2026-09-22)**: `rpc/faucet/bootnode.testnet.x3-chain.io` do not resolve (host reaches github.com fine); `gh run list --workflow testnet-deploy.yml` is empty; every step of `docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md` is unchecked; `deployment/keys/bootnode-info.txt` is three loopback addresses. `docs/root/README.md` no longer presents those endpoints as live.
+- Rows: `X3-L1-010` 35/15/20 → 65/45/35 (path was a roadmap doc; now the peer-id helper + spec builder + launcher + bootnode file); `X3-OPS-001`/`X3-OPS-003` evidence sharpened, scores unchanged (no tagged ceremony; no public testnet to gate).
+- `scripts/mainnet/genesis_ceremony.sh` (15.6 kB) is real and strict: tagged commit + srtool-only WASM + mainnet preset + artifact hashes + summary. `scripts/mainnet/public_testnet_gate.sh` (25.6 kB) is an RPC gate over `--rpc-base-url` (health, GRANDPA authorities, bridges, height) — it needs a live endpoint, which does not exist.
+
+### Next task seed
+1. Key rotation end-to-end (handed to a second agent). 2. Publish a ceremony record for a local launch (spec sha256 + genesis hash + authorities + escrow + spec_version) and gate it. 3. Hosting: one public bootnode with a committed node key + DNS + RPC + faucet, then `public_testnet_gate.sh --rpc-base-url`. 4. SPV consolidation. 5. Remaining weak P0 rows (claims/MEV/trading). 6. Relayer authority decision (owner). 7. Release publish + external audit.

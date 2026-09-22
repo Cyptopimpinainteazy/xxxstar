@@ -7,9 +7,9 @@ tree treated as untrusted until reproduced. Severity labels as head note.
 
 | ID | Sev | Area | Description | Root cause | Evidence |
 |----|-----|------|-------------|-----------|----------|
-| GAP-CLI-1 | P1 | launch harness | `scripts/testnet/x3_testnet_up.sh` uses flags the current binary rejects (`--ws-port`, `--ws-external`, `--execution=NativeElseWasm`) and lacks forced node-key => first boot NetworkKeyNotFound. FIXED in place (edited script), re-verify under fresh review. | CLI surface drift vs doc'd harness. | bash -n clean after edit; single/7-node boots from the pattern now succeed. |
-| GAP-SPEC-1 | P0 | chain-spec generation | Stale dev-seed raw spec (deployment/chain-specs/x3-testnet-raw.json older, id x3_testnet_v1) is invalid: runtime LoadSpec rejects Live raw (no runtimeGenesis.config) OR missing Aura authorities. Correct path is env-gated `--chain=testnet` build-spec with fresh keys (plain, not --raw, because node file-validator rejects raw Live) + per-validator X3_DEV_SEED. | Live raw genesis cannot satisfy node-side structural validator; Aura requires real authority keys not dev seeds for live. | see TESTNET_VERIFICATION.md § multi-validator + fresh-key. |
-| GAP-AUTH-1 | P0 | node authoring | File-only keystore injection (standard substrate) does NOT drive Aura block authoring on this binary; needs programmatic insert via X3_DEV_SEED (service maybe_insert_dev_keys / insert_dev_keys_with_seed). Aura authorities ARE in block-0 storage. | Custom service; key discoverable only via maybe_insert_dev_keys path. | Single-node authored only after X3_DEV_SEED set (root-caused via A/B + storage read). |
+| GAP-CLI-1 | P1 | launch harness | **CLOSED 2026-09-22.** `scripts/testnet/x3_testnet_up.sh` still required `subkey` (not installed, not part of this repo), defaulted to the storage-raw Live spec the node refuses, and started nodes with `--unsafe-force-node-key-generation` (so a spec's bootNodes could never name a stable peer id). It is now a thin wrapper: it resolves a *plain* spec (building one with `build-x3-testnet-spec.py` if needed), refuses a raw one with a clear message, and delegates to `run-7-validators-local.sh`, which owns key insertion, the authority/bootnode preflight and stable per-node `--node-key` files. | One launcher to keep correct instead of three copies drifting. | Booted 4 validators through the wrapper on a generated 4-authority Live spec: all four finalizing, agreeing on `0x5e85c483…` at height 1000 and `0x58687622…` at height 1050; the wrapper refuses `deployment/chain-specs/x3-testnet-raw.json` with "raw Live spec; the node refuses to load one". |
+| GAP-SPEC-1 | P0 | chain-spec generation | **CLOSED 2026-09-22.** The default path is now a generated *plain* Live spec: `build-x3-testnet-spec.py` derives fresh authorities, writes per-validator seeds + node keys, derives `bootNodes` from those node keys (a Live spec with none cannot start a node), asserts the written spec carries every entry, and prints the launch command; `run-7-validators-local.sh` refuses to start unless every session key is an authority in the spec *and* every node's peer id is one of its bootNodes. | Live raw genesis cannot satisfy the node-side structural validator. | `x3-testnet-plain.json carries all N derived bootnodes`; the wrapper's raw-spec refusal; the 4-validator boot above. |
+| GAP-AUTH-1 | P0 | node authoring | **CORRECTED 2026-09-22 — the premise no longer holds.** File-only keystore injection *does* drive Aura on this binary: a single node started with `--validator --force-authoring`, the keystore files written by `inject-keystore.sh` (which now goes through `keys insert`), and **no** `X3_DEV_SEED`, authored from the first slot (head reached 9 in ~45 s). `X3_DEV_SEED` remains a convenience for local runs, not the only mechanism, and nothing about it needs changing. | The 2026-09-04 measurement predates the current keystore/CLI path. | Re-measured 2026-09-22; `scripts/testnet/run-fresh-validators.sh`'s comment claiming the opposite is corrected in place. |
 
 ## Confirmed solid (for the record)
 - Runtime GRANDPA consensus + tx finality correctness IS clean WHEN a connected majority forms: 7/7 identical finalized heads observed (net4), 2000/2000 remarks finalized at 110.6 finTPS / 0 lost, canonical head identical on all 7 under load.
@@ -36,10 +36,21 @@ two finalized branches).
 id is missing'); nodes reach peers=6/6.
 - GAP-BOOT-1 (boot-order race): simultaneous reserved starts converge — no solo-lead ordering needed.
 
-## Still open / honest bound
-- GAP-CLI-1, GAP-SPEC-1, GAP-AUTH-1 remain OPEN (table above) — bring-up/spec/author harness gaps,
-separate from P2P topology; the mesh proof rides on the now-known-good plain-spec + X3_DEV_SEED
-authoring + fixed node-key pattern.
+## Status update (2026-09-22)
+- GAP-CLI-1 CLOSED, GAP-SPEC-1 CLOSED, GAP-AUTH-1 CORRECTED (table above) — the bring-up, spec and
+authoring paths are all exercised end to end today: build a plain Live spec with fresh authorities and
+derived bootnodes, launch it, get finality and agreement, kill and restart validators, rotate nothing
+yet (see the note on key rotation below).
+- **What is still open is not a harness gap: nothing is deployed.** `rpc.testnet.x3-chain.io`,
+`faucet.testnet.x3-chain.io` and `bootnode.testnet.x3-chain.io` do not resolve (checked 2026-09-22 from
+a host whose DNS reaches github.com), `testnet-deploy.yml` has never run (`gh run list --workflow` is
+empty), every step of `docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md` is unchecked, and the only bootnode
+list in the repository (`deployment/keys/bootnode-info.txt`) is three loopback addresses. All of the
+local evidence in this ledger is loopback evidence.
+- Key rotation is implemented twice (`node/src/authority.rs` rotation manager with tests and no caller;
+`pallets/x3-custody` `ValidatorKeyRegistry` with `rotation_due_at`, read by nothing) and wired zero
+times; nothing calls `session.setKeys`. That is the next bring-up gap, and it is independent of the
+topology work.
 
 ## GAP disposition (2026-09-04) — harness gaps are PATTERN-CLOSED, not source defects
 Re-examined after SEC-v1 purge + memory-search fix. Honest re-classification of the three open
