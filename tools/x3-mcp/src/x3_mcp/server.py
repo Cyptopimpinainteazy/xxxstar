@@ -20,6 +20,7 @@ mcp = FastMCP("x3")
 REPO_ROOT = Path(os.environ.get("X3_REPO_ROOT", Path(__file__).resolve().parents[3])).resolve()
 RPC_URL = os.environ.get("X3_RPC_URL", "http://127.0.0.1:9944")
 COMMAND_TIMEOUT = int(os.environ.get("X3_MCP_COMMAND_TIMEOUT", "900"))
+PROOF_LEDGER = Path(os.environ.get("X3_PROOF_LEDGER", REPO_ROOT / "audit-artifacts" / "x3vm-proof-ledger.json")).resolve()
 
 
 def _rpc(method: str, params: list[Any] | None = None) -> Any:
@@ -162,6 +163,138 @@ def x3_collect_evidence() -> dict[str, Any]:
     except Exception as exc:
         evidence["chain"] = {"ok": False, "error": str(exc)}
     return evidence
+
+
+def _inside_repo(path: Path) -> Path:
+    resolved = path.resolve()
+    if resolved != REPO_ROOT and REPO_ROOT not in resolved.parents:
+        raise ValueError(f"path escapes X3 repository: {resolved}")
+    return resolved
+
+
+def _read_json(path: Path) -> Any:
+    path = _inside_repo(path)
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"evidence file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"invalid JSON evidence in {path}: {exc}") from exc
+
+
+def _intent_records(ledger: dict[str, Any], intent_id: int) -> list[dict[str, Any]]:
+    records = ledger.get("records")
+    if not isinstance(records, list):
+        raise RuntimeError("proof ledger has no records array")
+    return [r for r in records if isinstance(r, dict) and r.get("intent_id") == intent_id]
+
+
+@mcp.tool()
+def x3_trace_atomic_swap(intent_id: int, ledger_path: str = "") -> dict[str, Any]:
+    """Trace one intent from the durable X3 atomic-swap proof ledger.
+
+    This does not infer missing lifecycle steps. It returns only persisted
+    records/entries and reports missing success/refund evidence explicitly.
+    """
+    if intent_id < 0:
+        raise ValueError("intent_id must be non-negative")
+    path = Path(ledger_path) if ledger_path else PROOF_LEDGER
+    ledger = _read_json(path)
+    records = _intent_records(ledger, intent_id)
+    if not records:
+        raise RuntimeError(f"no persisted proof records for intent {intent_id}")
+
+    entries = [e for r in records for e in r.get("entries", []) if isinstance(e, dict)]
+    kinds = {
+        str(e.get("proof_kind"))
+        for e in entries
+        if e.get("verified") is True and e.get("proof_kind") is not None
+    }
+    # serde's externally visible enum names are intentionally accepted as
+    # evidence labels; no absent step is synthesized.
+    success_required = {
+        "SourceLock", "DestinationLock", "HashlockMatch", "TimeoutOrderValid",
+        "FinalityVerified", "SecretReveal", "Claim", "Score",
+    }
+    refund_required = {
+        "SourceLock", "DestinationLock", "TimeoutOrderValid", "Refund", "Score",
+    }
+    return {
+        "intent_id": intent_id,
+        "ledger_path": str(_inside_repo(path)),
+        "records": records,
+        "verified_kinds": sorted(kinds),
+        "success_missing": sorted(success_required - kinds),
+        "refund_missing": sorted(refund_required - kinds),
+        "ledger_final_status": ledger.get("final_status"),
+    }
+
+
+@mcp.tool()
+def x3_verify_proof(intent_id: int, proof_kind: str, ledger_path: str = "") -> dict[str, Any]:
+    """Verify that exact persisted proof evidence exists for an intent.
+
+    The MCP server does not cryptographically bless arbitrary bytes. It checks
+    the durable ledger written by X3 and requires a verified entry with a tx
+    hash, block number and non-empty raw proof data.
+    """
+    if intent_id < 0:
+        raise ValueError("intent_id must be non-negative")
+    path = Path(ledger_path) if ledger_path else PROOF_LEDGER
+    ledger = _read_json(path)
+    records = _intent_records(ledger, intent_id)
+    matches = []
+    for record in records:
+        for entry in record.get("entries", []):
+            if not isinstance(entry, dict) or str(entry.get("proof_kind")) != proof_kind:
+                continue
+            complete = (
+                entry.get("verified") is True
+                and bool(entry.get("tx_hash"))
+                and entry.get("block_number") is not None
+                and bool(entry.get("data"))
+            )
+            matches.append({"complete": complete, "entry": entry})
+    if not matches:
+        raise RuntimeError(f"no {proof_kind} proof for intent {intent_id}")
+    if not any(m["complete"] for m in matches):
+        raise RuntimeError(f"{proof_kind} evidence for intent {intent_id} is incomplete or unverified")
+    return {
+        "intent_id": intent_id,
+        "proof_kind": proof_kind,
+        "verified": True,
+        "evidence": [m["entry"] for m in matches if m["complete"]],
+    }
+
+
+@mcp.tool()
+def x3_verify_receipt(receipt_path: str, trusted_key_specs: str = "") -> dict[str, Any]:
+    """Verify an X3Lang economic receipt with the repository's real x3c verifier.
+
+    Structural/hash/economic replay uses `x3c receipt verify`. If trusted keys
+    are required by the caller, use x3c's trusted-verification surface when it
+    is added; this MCP refuses to pretend structural verification establishes
+    signer trust.
+    """
+    path = _inside_repo(Path(receipt_path))
+    if not path.is_file():
+        raise RuntimeError(f"receipt not found: {path}")
+    if trusted_key_specs.strip():
+        raise RuntimeError(
+            "trusted receipt-key verification is not exposed by x3c receipt verify; "
+            "refusing to downgrade trusted verification to structural verification"
+        )
+    manifest = REPO_ROOT / "x3-lang" / "Cargo.toml"
+    result = _run([
+        "cargo", "run", "--quiet", "--manifest-path", str(manifest),
+        "-p", "x3-tools", "--bin", "x3c", "--", "receipt", "verify", str(path),
+    ])
+    return {
+        "receipt_path": str(path),
+        "verified": result["ok"],
+        "scope": "receipt hash + structural/economic invariants; signer trust not established",
+        "command": result,
+    }
 
 
 def main() -> None:
