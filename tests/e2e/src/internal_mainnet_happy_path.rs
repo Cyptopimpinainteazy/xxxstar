@@ -12,7 +12,7 @@
 //! Detailed status and limitations: `docs/testing/internal-mainnet-happy-path-e2e.md`.
 
 #[cfg(test)]
-use crate::TestResult;
+use e2e_tests::TestResult;
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]

@@ -16,11 +16,6 @@ pub mod deterministic_integration_tests;
 pub mod wait_for_rpc;
 
 // Re-export utility modules for easier access in tests
-/// Internal mainnet happy path E2E tests
-/// Tests critical flows: asset transfer, swap, refund, halt/restart, replay protection
-#[path = "internal_mainnet_happy_path.rs"]
-pub mod internal_mainnet_happy_path;
-
 #[cfg(feature = "full_e2e")]
 pub use utils::assertions::*;
 #[cfg(feature = "full_e2e")]
