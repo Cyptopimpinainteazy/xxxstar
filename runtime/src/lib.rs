@@ -345,7 +345,15 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // BTC path is not live on any network yet). Anchoring a checkpoint is an
     // operator action, and until one is anchored this chain settles no BTC proofs —
     // which is the point: an unanchored header proves nothing.
-    spec_version: 14,
+    // 15: the SPV trust root can be pinned in genesis. `X3SettlementEngine`'s
+    // `GenesisConfig` gains `btc_checkpoints` (a list of Bitcoin headers): each one is
+    // validated as genesis is built — proof of work under this network's `powLimit`, no
+    // two entries at one height — and then pins `(height, hash)` in `BtcCheckpoints` and
+    // admits the header onto the anchored chain. A testnet can therefore start with the
+    // root of trust already in its spec, instead of waiting for a root call.
+    // `BtcBlockHeader` gains serde so a spec (which is JSON) can carry it; that is the
+    // spec's shape only, never the proof path, which still hashes the 80 wire bytes.
+    spec_version: 15,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,

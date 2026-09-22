@@ -364,6 +364,13 @@ GATES_FAILURE=(
 # then tampers with a copy and requires the verifier to reject it.
 GATES_TESTNET=(
   "testnet ceremony drill:bash scripts/testnet/testnet-ceremony-drill.sh"
+  # The other half of "a testnet can be brought up": a chain that starts with its Bitcoin
+  # trust root already pinned. Builds a spec carrying a real regtest header (captured from
+  # a Bitcoin node by `scripts/btc/capture-regtest-spv.py`), boots a node from it, reads
+  # `BtcCheckpoints` / `BtcHeaderMetaStore` / `BtcBestHeight` back over RPC, requires the
+  # chain to keep authoring, and requires a spec whose checkpoint is not a mined header to
+  # be refused. Needs `--features dev`: only that runtime's `powLimit` is regtest's.
+  "btc checkpoint genesis:bash scripts/testnet/btc-checkpoint-drill.sh"
 )
 
 # Consensus has to last, not just start. This boots four validators and samples them on

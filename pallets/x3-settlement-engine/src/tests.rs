@@ -4508,3 +4508,109 @@ fn a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored() {
         );
     });
 }
+/// Genesis pins the SPV trust root, so a chain can be born anchored.
+///
+/// The alternative — anchor only by root call — means a fresh testnet settles no BTC
+/// proofs until somebody submits one. These tests state what the spec has to contain
+/// and what a spec that lies about it gets.
+#[test]
+fn genesis_pins_a_bitcoin_checkpoint_and_admits_its_header() {
+    let (_, txid, header) = forged_btc_block_for_test();
+    assert_eq!(header.merkle_root, txid);
+
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        // The chain the mock builds starts with no anchor at all.
+        assert_eq!(crate::BtcCheckpoints::<Test>::get(header.height), None);
+        assert_eq!(crate::BtcBestHeight::<Test>::get(), 0);
+    });
+
+    crate::mock::new_test_ext_with_btc_checkpoints(vec![header.clone()]).execute_with(|| {
+        let block_hash = Pallet::<Test>::compute_btc_block_hash(&header);
+        assert_eq!(
+            crate::BtcCheckpoints::<Test>::get(header.height),
+            Some(block_hash),
+            "the spec's height pins the header's hash"
+        );
+        let meta = crate::BtcHeaderMetaStore::<Test>::get(block_hash)
+            .expect("the header is admitted, not just pinned");
+        assert_eq!(meta.height, header.height);
+        assert!(meta.anchored, "and it is anchored, which is what SPV evidence needs");
+        assert_eq!(crate::BtcBestHeight::<Test>::get(), header.height);
+        assert_eq!(
+            crate::BtcHeaders::<Test>::get(block_hash).map(|h| h.merkle_root),
+            Some(txid),
+            "the header itself is stored, so a proof naming it has a root to check"
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "does not satisfy its own proof-of-work target")]
+fn genesis_refuses_a_checkpoint_that_is_not_a_real_bitcoin_block() {
+    // A header whose `nBits` says mainnet difficulty but whose hash is nowhere near it:
+    // the shape of a checkpoint someone typed rather than one a node produced.
+    let header = BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::repeat_byte(0x01),
+        merkle_root: H256::repeat_byte(0x02),
+        timestamp: 1_700_000_000,
+        bits: 0x1d00_ffff,
+        nonce: 0,
+        height: 800_000,
+    };
+    assert!(
+        !btc_meets_target(&btc_wire_hash(&header), header.bits),
+        "the fixture is not a mined header, so this test is about the refusal"
+    );
+    drop(crate::mock::new_test_ext_with_btc_checkpoints(vec![header]));
+}
+
+#[test]
+#[should_panic(expected = "easier target than this network's powLimit")]
+fn genesis_refuses_a_checkpoint_easier_than_the_networks_pow_limit() {
+    // A mined header — but at a target Bitcoin would never have allowed. Someone who
+    // picked their own `nBits` can mine a header in one hash, which is the whole
+    // reason the limit exists.
+    let header = mine_btc_header(BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::repeat_byte(0x03),
+        merkle_root: H256::repeat_byte(0x04),
+        timestamp: 1_700_000_000,
+        bits: 0x2100_ffff,
+        nonce: 0,
+        height: 800_000,
+    });
+    drop(crate::mock::new_test_ext_with_btc_checkpoints(vec![header]));
+}
+
+#[test]
+#[should_panic(expected = "two genesis BTC checkpoints claim height")]
+fn genesis_refuses_two_checkpoints_at_one_height() {
+    // A height pins one hash. Two entries at 800_000 would make the trust root depend
+    // on the order the spec happens to list them in.
+    let first = mine_btc_header(BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::repeat_byte(0x05),
+        merkle_root: H256::repeat_byte(0x06),
+        timestamp: 1_700_000_000,
+        bits: 0x207f_ffff,
+        nonce: 0,
+        height: 800_000,
+    });
+    let second = mine_btc_header(BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::repeat_byte(0x07),
+        merkle_root: H256::repeat_byte(0x08),
+        timestamp: 1_700_000_000,
+        bits: 0x207f_ffff,
+        nonce: 0,
+        height: 800_000,
+    });
+    assert_ne!(
+        Pallet::<Test>::compute_btc_block_hash(&first),
+        Pallet::<Test>::compute_btc_block_hash(&second),
+        "two different blocks, one height"
+    );
+    drop(crate::mock::new_test_ext_with_btc_checkpoints(vec![first, second]));
+}

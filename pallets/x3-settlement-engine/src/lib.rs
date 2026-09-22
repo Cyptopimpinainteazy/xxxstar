@@ -917,6 +917,26 @@ pub mod pallet {
         /// not verified. `false` everywhere a validator can join; `true` on the
         /// dev/local specs.
         pub allow_unattested_cross_domain_proofs: bool,
+        /// Bitcoin headers this chain is **born** committed to.
+        ///
+        /// The same thing [`Call::anchor_btc_checkpoint`] does, done in the spec
+        /// instead of by a root call: each entry pins `(height, hash)` in
+        /// `BtcCheckpoints` and admits the header onto the anchored chain, so a dev
+        /// or test network starts with its SPV trust root already in place.
+        ///
+        /// The alternative was worse. Anchoring only by extrinsic means a chain that
+        /// has not yet received a root call settles no BTC proofs at all, so bringing
+        /// BTC up on a testnet is a manual step that can be forgotten or done by
+        /// whoever holds the key first. A checkpoint in the spec is published with the
+        /// chain, reviewed in the same diff as the chain id, and identical for everyone
+        /// who joins from that spec.
+        ///
+        /// Every entry is validated as the genesis state is built: proof of work under
+        /// this network's `powLimit`, and no two entries at one height. A spec carrying
+        /// a header Bitcoin itself would refuse must not launch, so a bad entry panics
+        /// with a message naming the header and the reason, rather than starting a chain
+        /// whose root of trust is a lie.
+        pub btc_checkpoints: Vec<BtcBlockHeader>,
         #[serde(skip)]
         pub _phantom: core::marker::PhantomData<T>,
     }
@@ -925,6 +945,46 @@ pub mod pallet {
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
             AllowUnattestedCrossDomainProofs::<T>::put(self.allow_unattested_cross_domain_proofs);
+
+            for header in &self.btc_checkpoints {
+                let block_hash = Pallet::<T>::compute_btc_block_hash(header);
+
+                assert!(
+                    Pallet::<T>::verify_btc_pow(header).unwrap_or(false),
+                    "genesis BTC checkpoint {} at height {} does not satisfy its own \
+                     proof-of-work target, so it is not a Bitcoin block",
+                    block_hash,
+                    header.height,
+                );
+                assert!(
+                    Pallet::<T>::ensure_btc_target_within_pow_limit(header.bits).is_ok(),
+                    "genesis BTC checkpoint {} at height {} carries nBits {:#010x}, an \
+                     easier target than this network's powLimit; Bitcoin would have \
+                     refused that header",
+                    block_hash,
+                    header.height,
+                    header.bits,
+                );
+                assert!(
+                    !BtcCheckpoints::<T>::contains_key(header.height),
+                    "two genesis BTC checkpoints claim height {}; a height pins one \
+                     hash, so the spec has to choose one",
+                    header.height,
+                );
+
+                BtcCheckpoints::<T>::insert(header.height, block_hash);
+                BtcHeaders::<T>::insert(block_hash, header.clone());
+                BtcHeaderMetaStore::<T>::insert(
+                    block_hash,
+                    BtcHeaderMeta {
+                        height: header.height,
+                        anchored: true,
+                    },
+                );
+                if header.height > BtcBestHeight::<T>::get() {
+                    BtcBestHeight::<T>::put(header.height);
+                }
+            }
         }
     }
 

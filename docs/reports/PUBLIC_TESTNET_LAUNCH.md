@@ -63,6 +63,46 @@ It writes, into `deployment/chain-specs/fresh/generated/` (gitignored):
 Keep the 0600 permissions, back both sets up, and never commit them
 (`deployment/chain-specs/fresh/.gitignore` covers that path).
 
+### Pinning Bitcoin's checkpoint (the SPV trust root)
+
+The settlement engine accepts BTC evidence only from a header on a **checkpoint-anchored**
+chain, and until one exists it refuses every BTC proof — correct, and useless for a testnet
+unless the anchor is part of the launch. Two ways to set it, and the second is the one to
+use for a network:
+
+```bash
+# Option A — a root call after the chain is live (requires a runtime with `Sudo`):
+#   sudo.sudo(x3SettlementEngine.anchorBtcCheckpoint(header))
+#   Write-once per height: it will not re-point an anchored height at another branch.
+
+# Option B — pin it in the spec, so the chain is born anchored:
+X3_BTC_CHECKPOINTS="<80-byte header hex>@<height>" \
+X3_NODE_BIN=target/release/x3-chain-node \
+python3 scripts/testnet/build-x3-testnet-spec.py <validator-count>
+```
+
+`X3_BTC_CHECKPOINTS` is a comma-separated list of `<header hex>@<height>` (a Bitcoin header
+does not carry its own height — a node knows it from where the header sits in the chain).
+The generated spec's `genesis.runtimeGenesis.config.x3SettlementEngine.btcCheckpoints`
+carries it, which means **the commitment is reviewable in the same diff as the chain id**,
+identical for everyone who joins from that spec, and not something a key holder can change
+later. The pallet validates every entry as genesis is built: a header that does not satisfy
+its own proof of work, or whose `nBits` is easier than this network's `powLimit`, or a second
+entry at an already-claimed height, makes the node **refuse to start** rather than launch a
+chain whose root of trust is a lie.
+
+Choose the header from the network you are tracking. A regtest header (`0x207fffff`) only
+anchors on a chain built with `--features dev`, because that is the only runtime whose
+`powLimit` is regtest's; testnet and mainnet specs use `0x1d00ffff` and need a header from
+that network. Get one with `scripts/btc/capture-regtest-spv.py` (regtest) or any Bitcoin
+RPC (`getblockheader <hash> false`), and check it against a second source before shipping it:
+the spec makes this chain *believe* that hash, so a wrong one is a wrong chain.
+
+`scripts/testnet/btc-checkpoint-drill.sh` is the gate for this: it pins a real captured
+header, boots a node, reads `BtcCheckpoints` / `BtcHeaderMetaStore` / `BtcBestHeight` back
+over RPC, requires the chain to keep authoring, and requires a spec whose checkpoint is not
+a mined header to be refused. Run it after changing anything here.
+
 ## 4. Start each validator
 
 On the host that will run validator *n*: copy the spec, its `validator-n.suri` and
