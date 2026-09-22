@@ -58,3 +58,9 @@ the embedded runtime WASM blob that the skip flag intentionally omits:
 `full_node_http_rpc_...`. Those are environment-induced by the skip flag, not
 x3-lang failures. A true full pass requires the canonical `cargo test
 --workspace` without `SKIP_WASM_BUILD=1`.
+
+Canonical attempt (2026-09-22) without `SKIP_WASM_BUILD`: the runtime WASM
+build fails while resolving `crypto-common v0.1.6` for `wasm32v1-none`
+(`can't find crate for std`). The workspace patch is `crypto-common v0.1.7`,
+and the isolated wbuild sub-manifest did not inherit the patch set. This is a
+runtime WASM build-environment issue, not an x3-lang code failure.
