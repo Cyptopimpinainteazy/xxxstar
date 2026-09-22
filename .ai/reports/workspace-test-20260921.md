@@ -64,3 +64,9 @@ build fails while resolving `crypto-common v0.1.6` for `wasm32v1-none`
 (`can't find crate for std`). The workspace patch is `crypto-common v0.1.7`,
 and the isolated wbuild sub-manifest did not inherit the patch set. This is a
 runtime WASM build-environment issue, not an x3-lang code failure.
+
+Second canonical attempt with `WASM_BUILD_WORKSPACE_HINT` set: the WASM build
+inherited the patches and the full suite ran much farther. The only observed
+failure was `x3-external-chains::arbitrum_send_message`, which requires a local
+Ethereum RPC at `127.0.0.1:18947` that was not running in this invocation —
+again environment/test-harness, not x3-lang.
