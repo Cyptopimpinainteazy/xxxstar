@@ -35,6 +35,13 @@ KEYS_DIR="${KEYS_DIR:-$ROOT_DIR/deployment/chain-specs/fresh/generated/validator
 # per validator, stable across runs so a Live spec's bootnode entries stay valid
 # (`build-x3-testnet-spec.py` derives the same file into the spec).
 NODE_KEYS_DIR="${NODE_KEYS_DIR:-$BASE_DIR/node-keys}"
+# Two networks on one box must not fight over ports. 9944/30333/9615 are what the rest
+# of the tooling expects, so they stay the defaults — but a second network (another
+# agent, a soak beside a drill) has to be able to move them, and until these were
+# overridable two runs would silently share ports and one side would lose its RPC.
+P2P_BASE="${P2P_BASE:-30333}"
+RPC_BASE="${RPC_BASE:-9944}"
+PROM_BASE="${PROM_BASE:-9615}"
 COUNT="${COUNT:-7}"
 LISTEN_IP="${LISTEN_IP:-127.0.0.1}"
 PROMETHEUS="${PROMETHEUS:-0}"
@@ -485,9 +492,9 @@ start_node() {
   local i="$1"
   local bootnode="${2:-}"
 
-  local p2p_port=$((30333 + i - 1))
-  local rpc_port=$((9944 + i - 1))
-  local prom_port=$((9615 + i - 1))
+  local p2p_port=$((P2P_BASE + i - 1))
+  local rpc_port=$((RPC_BASE + i - 1))
+  local prom_port=$((PROM_BASE + i - 1))
   local base_path="${BASE_DIR}/node-${i}"
   local name="x3-testnet-node-$(printf '%02d' "$i")"
   local dev_seed="${SEEDS[$((i-1))]}"
@@ -610,7 +617,7 @@ peer_id=""
 for _ in $(seq 1 60); do
   peer_id="$(curl -s -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","id":1,"method":"system_localPeerId","params":[]}' \
-    "http://127.0.0.1:9944" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("result",""))' 2>/dev/null || true)"
+    "http://127.0.0.1:${RPC_BASE}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("result",""))' 2>/dev/null || true)"
   if [[ -n "$peer_id" ]]; then
     break
   fi
@@ -622,7 +629,7 @@ if [[ -z "$peer_id" ]]; then
   exit 1
 fi
 
-BOOTNODE="/ip4/${LISTEN_IP}/tcp/30333/p2p/${peer_id}"
+BOOTNODE="/ip4/${LISTEN_IP}/tcp/${P2P_BASE}/p2p/${peer_id}"
 echo "Bootnode: ${BOOTNODE}"
 
 if [[ "$ONLY_INDEX" != "0" ]]; then
