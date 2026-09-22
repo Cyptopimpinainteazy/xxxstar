@@ -5,16 +5,28 @@ id = "X3-L1-001"
 name = "Multi-validator authority network"
 subsystem = "consensus_l1"
 source = "master"
-paths = ["scripts/testnet/run-7-validators-local.sh"]
-implemented = 55
-tested = 25
-mainnet_ready = 25
+paths = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh"]
+implemented = 70
+tested = 55
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["No sustained independent-validator production evidence"]
-evidence = ["scripts/testnet/run-7-validators-local.sh", "note: Scripts exist; repo status explicitly lists multi-validator testing as missing"]
+blockers = [
+  "Every validator runs on one host: no independent operators, no geographic or administrative separation, no sustained run",
+  "The 7-validator launcher boots the shipped local3 chain (3 authorities, verified) but a 7-authority *Live* testnet still needs the spec builder to pin per-node libp2p identities into the spec's bootNodes; the launcher supplies --node-key per node but cannot add bootNodes to a spec it consumes",
+  "No slashing, jailing or equivocation evidence from a multi-operator network — those paths have unit coverage only",
+]
+# The launcher could not run at all before 2026-09-22: it required `subkey` (not
+# installed, not part of this repo), its default spec was a storage-raw Live file
+# the node's loader refuses, and nodes exited with `NetworkKeyNotFound` because
+# nothing supplied a libp2p identity. It now derives keys with the node itself,
+# reads the seed files `build-x3-testnet-spec.py` writes, checks every launcher key
+# against the spec's authority sets before starting anything, and gives each node a
+# stable `--node-key`.
+evidence = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh", "note: 2026-09-22 first-hand — the launcher booted three validators on the shipped local3 plain spec (identity keys inserted through the node, no subkey) and all three agreed on finalized height 504 (0x8f1a0eba1bcba88bffe06df76c2df6a9d02616f7dacb58a68c3aed504c5e6222) with two peers each; the release gate's three-validator boots (shipped, production, testnet genesis) pass in the same pipeline"]
+test_evidence = ["scripts/local-network-smoke.sh", "scripts/mainnet/production_genesis_gate.sh", "scripts/testnet/run-7-validators-local.sh", "note: three validators authoring and finalizing with agreed hashes is asserted by local-network-smoke (release gate stage 3c) and by the production/testnet Live genesis gates (3b/3d); the launcher run above is the same property through the 7-validator tool, which now fails before start if any launcher key is not an authority in the spec"]
 
 [[feature]]
 id = "X3-L1-002"

@@ -10,7 +10,6 @@ CHAIN_SPEC_DEFAULT="$ROOT_DIR/deployment/chain-specs/x3-testnet-raw.json"
 CHAIN_SPEC_PLAIN_DEFAULT="$ROOT_DIR/deployment/chain-specs/x3-testnet-plain.json"
 BASE_DIR_DEFAULT="$HOME/.local/share/x3/testnet-local"
 LOG_DIR_DEFAULT="$ROOT_DIR/logs/testnet"
-SUBKEY_BIN_DEFAULT="${SUBKEY_BIN_DEFAULT:-/home/lojak/.cargo/bin/subkey}"
 
 NODE_BIN="${NODE_BIN:-$NODE_BIN_DEFAULT}"
 CHAIN_SPEC="${CHAIN_SPEC:-$CHAIN_SPEC_DEFAULT}"
@@ -20,6 +19,17 @@ LOG_DIR="${LOG_DIR:-$LOG_DIR_DEFAULT}"
 PID_DIR="${PID_DIR:-}"
 CHAIN_SPEC_RUN="${CHAIN_SPEC_RUN:-}"
 KEYSTORE_PASSWORD_FILE="${KEYSTORE_PASSWORD_FILE:-}"
+# Per-validator seeds written by `scripts/testnet/build-x3-testnet-spec.py`. A spec
+# built from fresh keys and nodes started from the built-in dev seeds is a network
+# whose authorities hold none of its keys: it starts, and authors nothing. Prefer
+# the seed files whenever they are there.
+KEYS_DIR="${KEYS_DIR:-$ROOT_DIR/deployment/chain-specs/fresh/validator-keys}"
+# A node needs a libp2p identity. Without `--node-key` (or a pre-existing
+# `network/secret_ed25519` under the base path) this node build exits with
+# `NetworkKeyNotFound`, which is why the launcher could not start anything. One key
+# per validator, stable across runs so a Live spec's bootnode entries stay valid
+# (`build-x3-testnet-spec.py` derives the same file into the spec).
+NODE_KEYS_DIR="${NODE_KEYS_DIR:-$BASE_DIR/node-keys}"
 COUNT="${COUNT:-7}"
 LISTEN_IP="${LISTEN_IP:-127.0.0.1}"
 PROMETHEUS="${PROMETHEUS:-0}"
@@ -28,15 +38,19 @@ NO_TELEMETRY="${NO_TELEMETRY:-1}"
 DISABLE_LOG_COLOR="${DISABLE_LOG_COLOR:-1}"
 NODE_NICE="${NODE_NICE:-}"
 NODE_DB_CACHE_MIB="${NODE_DB_CACHE_MIB:-}"
-SUBKEY_BIN="${SUBKEY_BIN:-$SUBKEY_BIN_DEFAULT}"
 
 WIPE_BASE_DIR=0
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [--wipe] [--base-dir PATH] [--chain-spec PATH] [--node-bin PATH] [--log-dir PATH]
+Usage: $(basename "$0") [--wipe] [--base-dir PATH] [--chain-spec PATH] [--node-bin PATH] [--log-dir PATH] [--keys-dir PATH]
 
 Testnet-only local 7-validator launcher.
+
+Key material: if ${KEYS_DIR} holds `validator-<n>.suri` files (written by
+`scripts/testnet/build-x3-testnet-spec.py`), those seeds are used and each is
+checked against the spec's authority sets. Otherwise the built-in dev seeds are
+used, which only matches a spec built from them.
 
 Options:
   --wipe              Stop existing nodes (via PID files) and wipe base dir before starting.
@@ -44,6 +58,7 @@ Options:
   --chain-spec PATH   Override CHAIN_SPEC (default: ${CHAIN_SPEC_DEFAULT})
   --node-bin PATH     Override NODE_BIN (default: ${NODE_BIN_DEFAULT})
   --log-dir PATH      Override LOG_DIR (default: ${LOG_DIR_DEFAULT})
+  --keys-dir PATH     Override KEYS_DIR (default: ${KEYS_DIR})
   -h, --help          Show this help.
 EOF
 }
@@ -68,6 +83,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --log-dir)
       LOG_DIR="${2:-}"
+      shift 2
+      ;;
+    --keys-dir)
+      KEYS_DIR="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -129,14 +148,11 @@ if [[ ! -x "$NODE_BIN" ]]; then
   exit 1
 fi
 
-if ! command -v "$SUBKEY_BIN" >/dev/null 2>&1; then
-  if command -v subkey >/dev/null 2>&1; then
-    SUBKEY_BIN="$(command -v subkey)"
-  else
-    echo "subkey not found in PATH and SUBKEY_BIN is not executable: $SUBKEY_BIN"
-    exit 1
-  fi
-fi
+# Key insertion uses the node binary itself (`keys insert` / `keys list`, which
+# open a `LocalKeystore` and write the same `<key-type-hex><public-key-hex>` files
+# this launcher used to hand-write after asking `subkey` for the public key). That
+# removes a hard dependency on a tool that is not installed on the build boxes and
+# is not part of this repository — the launcher could not run at all without it.
 
 if [[ ! -f "$CHAIN_SPEC" ]]; then
   echo "Chain spec not found: $CHAIN_SPEC"
@@ -217,6 +233,33 @@ DEV_SEEDS=(
   "//One"
 )
 
+# Which keys the nodes are started with. `SEEDS` is what `start_node` uses; the
+# built-in dev seeds are only correct for a spec whose authorities were built from
+# them. `build-x3-testnet-spec.py` writes one `validator-<n>.suri` per validator
+# and a spec whose authorities come from those, so read them when present.
+SEEDS=("${DEV_SEEDS[@]}")
+SEEDS_SOURCE="built-in dev seeds (${DEV_SEEDS[0]} …)"
+if [[ -f "${KEYS_DIR}/validator-1.suri" ]]; then
+  loaded_seeds=()
+  for i in $(seq 1 "$COUNT"); do
+    seed_file="${KEYS_DIR}/validator-${i}.suri"
+    if [[ ! -s "$seed_file" ]]; then
+      echo "Missing or empty ${seed_file}; run scripts/testnet/build-x3-testnet-spec.py ${COUNT} first, or pass --keys-dir"
+      exit 1
+    fi
+    # `build-x3-testnet-spec.py` writes `seed=`/`aura=`/`grandpa=` lines (hex key
+    # material, not a SURI). Take the `seed=` value; a file that is a single SURI
+    # line is still accepted, so either format works.
+    seed_value="$(grep -m1 '^seed=' "$seed_file" | cut -d= -f2- || true)"
+    if [[ -z "$seed_value" ]]; then
+      seed_value="$(head -1 "$seed_file")"
+    fi
+    loaded_seeds+=("$seed_value")
+  done
+  SEEDS=("${loaded_seeds[@]}")
+  SEEDS_SOURCE="${KEYS_DIR}/validator-*.suri"
+fi
+
 CHAIN_ID="$(CHAIN_SPEC_RUN="$CHAIN_SPEC_RUN" python3 - <<'PY'
 import json
 import os
@@ -235,7 +278,26 @@ fi
 # bootability + authority-consistency preflight (rollback-safe; override with
 # ALLOW_RAW_LIVE=1 and/or SKIP_SPEC_AUTHORITY_CHECK=1).
 if [[ "${ALLOW_RAW_LIVE:-0}" != "1" ]]; then
-  CHECK="$CHAIN_SPEC_RUN" python3 - <<'PY'
+  # Derive each seed's public keys with the node itself, so the preflight can check
+  # the keys the launch will use against the authorities the spec actually names.
+  # A spec built from fresh keys plus nodes started from dev seeds launches and
+  # authors nothing; that has to fail here, not look like a slow network.
+  LAUNCHER_AURA=""
+  LAUNCHER_GRANDPA=""
+  for seed in "${SEEDS[@]}"; do
+    derived_aura="$("$NODE_BIN" keys generate --key-type aura --seed "$seed" --output ss58 2>/dev/null | tail -1)"
+    derived_grandpa="$("$NODE_BIN" keys generate --key-type grandpa --seed "$seed" --output ss58 2>/dev/null | tail -1)"
+    if [[ -z "$derived_aura" || -z "$derived_grandpa" ]]; then
+      echo "Could not derive Aura/GRANDPA keys from a validator seed with ${NODE_BIN}"
+      exit 1
+    fi
+    LAUNCHER_AURA+="${derived_aura}"$'\n'
+    LAUNCHER_GRANDPA+="${derived_grandpa}"$'\n'
+  done
+
+  CHECK="$CHAIN_SPEC_RUN" EXPECTED_AUTHORITIES="${#SEEDS[@]}" \
+    LAUNCHER_AURA="$LAUNCHER_AURA" LAUNCHER_GRANDPA="$LAUNCHER_GRANDPA" \
+    SEEDS_SOURCE="$SEEDS_SOURCE" python3 - <<'PY'
 import json, os, sys
 from pathlib import Path
 p = Path(os.environ["CHECK"])
@@ -255,15 +317,34 @@ if str(spec.get("chainType", "")).lower() == "live":
               "launcher's 7 dev seeds (see start_node comment). To force the raw path use "
               "ALLOW_RAW_LIVE=1 (node error then surfaces directly).")
         sys.exit(2)
-    dev = 7  # DEV_SEEDS length (Alice..One)
+    dev = int(os.environ.get("EXPECTED_AUTHORITIES", "7"))
     na = len(cfg.get("aura", {}).get("authorities", []))
     ng = len(cfg.get("grandpa", {}).get("authorities", []))
     if (na != dev or ng != dev) and os.environ.get("SKIP_SPEC_AUTHORITY_CHECK") != "1":
         print(f"[validate] FAIL: spec Aura authorities={na}, Grandpa authorities={ng} "
-              f"but launcher DEV_SEEDS count={dev}. They must match to author+finalize.")
+              f"but the launcher will start {dev} validator(s). They must match to "
+              f"author+finalize.")
         sys.exit(3)
-    print(f"[validate] ok: plain Live spec Aura={na} Grandpa={ng} == launcher DEV_SEEDS="
-          f"{dev}; authority sets consistent.")
+
+    launcher_aura = [x for x in os.environ.get("LAUNCHER_AURA", "").splitlines() if x]
+    launcher_grandpa = [x for x in os.environ.get("LAUNCHER_GRANDPA", "").splitlines() if x]
+    spec_aura = set(cfg.get("aura", {}).get("authorities", []))
+    spec_grandpa = {
+        (e[0] if isinstance(e, list) else e)
+        for e in cfg.get("grandpa", {}).get("authorities", [])
+    }
+    missing_aura = [a for a in launcher_aura if a not in spec_aura]
+    missing_grandpa = [g for g in launcher_grandpa if g not in spec_grandpa]
+    if (missing_aura or missing_grandpa) and os.environ.get("SKIP_SPEC_AUTHORITY_CHECK") != "1":
+        print(f"[validate] FAIL: {len(missing_aura)} launcher Aura key(s) and "
+              f"{len(missing_grandpa)} GRANDPA key(s) are not authorities in this spec, "
+              f"e.g. {missing_aura[:1] + missing_grandpa[:1]}")
+        print("  The nodes would start and author nothing. Start from the seeds the "
+              "spec was built from (--keys-dir) or rebuild the spec from these seeds.")
+        sys.exit(4)
+    print(f"[validate] ok: plain Live spec Aura={na} Grandpa={ng}; every launcher key "
+          f"(Aura {len(launcher_aura)}, GRANDPA {len(launcher_grandpa)}) is in the "
+          f"authority sets (seeds from {os.environ.get('SEEDS_SOURCE', '?')}).")
 sys.exit(0)
 PY
   rc=$?
@@ -290,38 +371,16 @@ insert_keys() {
 
   mkdir -p "$keystore_dir"
 
-  local aura_pub
-  local gran_pub
-  aura_pub=$("$SUBKEY_BIN" inspect --scheme sr25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
-  gran_pub=$("$SUBKEY_BIN" inspect --scheme ed25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
-
-  if [[ -z "$aura_pub" || -z "$gran_pub" ]]; then
-    echo "Failed to derive public keys for ${suri}"
-    exit 1
-  fi
-
-  local aura_file="61757261${aura_pub#0x}"
-  local gran_file="6772616e${gran_pub#0x}"
-
-  SURI="$suri" OUT="$keystore_dir/$aura_file" python3 - <<'PY'
-import json
-import os
-from pathlib import Path
-
-path = Path(os.environ["OUT"])
-path.write_text(json.dumps(os.environ["SURI"]))
-path.chmod(0o600)
-PY
-
-  SURI="$suri" OUT="$keystore_dir/$gran_file" python3 - <<'PY'
-import json
-import os
-from pathlib import Path
-
-path = Path(os.environ["OUT"])
-path.write_text(json.dumps(os.environ["SURI"]))
-path.chmod(0o600)
-PY
+  local key_type
+  for key_type in aura grandpa; do
+    if ! "$NODE_BIN" keys insert \
+      --key-type "$key_type" \
+      --seed "$suri" \
+      --keystore-path "$keystore_dir" >/dev/null; then
+      echo "Failed to insert the ${key_type} key for ${suri} into ${keystore_dir}"
+      exit 1
+    fi
+  done
 }
 
 validate_keys() {
@@ -329,18 +388,16 @@ validate_keys() {
   local suri="$2"
   local keystore_dir="${base_path}/chains/${CHAIN_ID}/keystore"
 
-  local aura_pub
-  local gran_pub
-  aura_pub=$("$SUBKEY_BIN" inspect --scheme sr25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
-  gran_pub=$("$SUBKEY_BIN" inspect --scheme ed25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
+  local listed
+  listed="$("$NODE_BIN" keys list --keystore-path "$keystore_dir" 2>/dev/null || true)"
 
-  local aura_file="${keystore_dir}/61757261${aura_pub#0x}"
-  local gran_file="${keystore_dir}/6772616e${gran_pub#0x}"
-
-  if [[ ! -s "$aura_file" || ! -s "$gran_file" ]]; then
-    echo "Missing keystore files for ${suri} in ${keystore_dir}"
-    exit 1
-  fi
+  local key_type
+  for key_type in aura grandpa; do
+    if ! grep -q "^${key_type}: " <<<"$listed"; then
+      echo "Keystore ${keystore_dir} has no ${key_type} key for ${suri} after insert"
+      exit 1
+    fi
+  done
 }
 
 wait_for_rpc() {
@@ -366,7 +423,7 @@ start_node() {
   local prom_port=$((9615 + i - 1))
   local base_path="${BASE_DIR}/node-${i}"
   local name="x3-testnet-node-$(printf '%02d' "$i")"
-  local dev_seed="${DEV_SEEDS[$((i-1))]}"
+  local dev_seed="${SEEDS[$((i-1))]}"
   local log_file="${LOG_DIR}/node-${i}.log"
 
   mkdir -p "$base_path"
@@ -433,6 +490,18 @@ start_node() {
     nice_args=(nice -n "$NODE_NICE")
   fi
 
+  # libp2p identity for this node: `--node-key` takes 32 bytes of hex. The key is
+  # generated once per base dir and reused, so the peer id a Live spec lists for
+  # this validator keeps pointing at it across restarts.
+  local node_key_file="${NODE_KEYS_DIR}/node-${i}.key"
+  mkdir -p "$NODE_KEYS_DIR"
+  if [[ ! -s "$node_key_file" ]]; then
+    python3 -c "import secrets; print(secrets.token_hex(32))" > "$node_key_file"
+    chmod 600 "$node_key_file"
+  fi
+  local node_key
+  node_key="$(tr -d '[:space:]' < "$node_key_file")"
+
   # export X3_DEV_SEED so service.maybe_insert_dev_keys() inserts Aura(sr25519) +
   # GRANDPA(ed25519) from <<dev_seed>> (the fork's authoring driver, see comment above).
   nohup "${env_args[@]}" "${nice_args[@]}" "$NODE_BIN" \
@@ -450,6 +519,7 @@ start_node() {
     --validator \
     --force-authoring \
     --allow-private-ip \
+    --node-key "$node_key" \
     "${boot_args[@]}" \
     > "$log_file" 2>&1 &
 
