@@ -6783,3 +6783,19 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Canonical paths chosen
 - `pallets/x3-settlement-engine/src/lib.rs` is the only place a BTC header may enter the chain's view (`btc_admit_header`). Any future header source (relayer, bridge, off-chain worker) must call it, not `BtcHeaders::insert`.
+
+## 2026-09-22 (seventeenth pass) — the first live Bitcoin run, and a segwit trap
+
+### Facts to remember
+- **Bitcoin Core v28.1.0 is installed at `/tmp/btc-core/bitcoin-28.1/bin/`** (downloaded from bitcoincore.org, verified against the published `SHA256SUMS`) with a running regtest node at `/tmp/btc-regtest` (RPC 18443, wallet `x3`). Nothing else on this box speaks Bitcoin; there is no bitcoind package and no Bitcoin docker image.
+- **A segwit transaction's raw bytes hash to its wtxid, not its txid.** `getrawtransaction` returns marker+flag+witness; the txid covers none of it. The pallet checks `tx_hash == dsha(tx_bytes)` and walks the merkle path over *txids*, so **SPV proofs must carry the witness-stripped serialization**. Found because the first real-data test failed; now pinned by tests and by `submit_btc_proof`'s doc. Real: 222 raw bytes vs 113 stripped, `wtxid 73eb7ff9…` vs `txid 91cbaa84…`.
+- **`scripts/btc/capture-regtest-spv.py`** captures header + merkle path + txid + both serializations from a live node, and refuses to print anything the node disagrees with (checks its own merkle root against `merkleroot` and its own header hash against the block hash). Artifact: `.ai/reports/btc-regtest-capture-20260922.json`.
+- Regtest's `powLimit` is `0x207fffff` — the same value the dev runtime uses, so **a regtest header can be anchored on a dev chain and on nothing else**. Testnet/mainnet need a header from those networks (`0x1d00ffff`).
+- `cargo test -p pallet-x3-settlement-engine` = **148 + 23 passed** with the four real-data tests.
+- **Another agent shares this working directory.** It checked out its own branch mid-session (`feat/x3-mcp-server`), which moved HEAD under a `git commit --amend` I was running; my `git add` + `--amend` landed my two doc files inside *their* commit. Repaired with `reset --soft <parent>` + unstage + `commit -C`, and all further work moved to the `/tmp/x3-btc-anchor` worktree. **Never assume a single writer in `xxxstar-main`; check `git branch --show-current` before every commit, and prefer a worktree.**
+- `.git` is read-only to the sandbox, so worktree operations (fetch/checkout/commit) need `require_escalated`.
+
+### Decisions made this session
+- Used a **real node's data** instead of a better hand-written fixture. The rows said "no live Bitcoin run of any kind" and the honest fix was to change that fact, not the wording.
+- Kept the capture script in `scripts/btc/` and the JSON in `.ai/reports/` so the fixture can be reproduced and re-verified rather than trusted.
+- Did not claim testnet readiness from a regtest run; the row now says exactly what is real (regtest) and what is not (testnet, mainnet, any coin movement).
