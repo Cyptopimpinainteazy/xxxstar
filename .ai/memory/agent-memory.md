@@ -6829,3 +6829,9 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Put the checkpoint in **genesis, not only in a root call**: a testnet should publish its root of trust with its chain id, and "the first person to hold the key anchors it" is not a launch procedure.
 - Made the genesis refusals **panic with the reason** rather than starting a chain with a bad anchor; the drill asserts the message, so a silent acceptance would fail the gate.
 - Bumped `spec_version` for a genesis-config change even though no storage migration is implied: the metadata and the WASM both moved.
+
+### Facts to remember (twentieth pass)
+- **`make guard` is three guards. `scripts/local-ci.sh` is the gate set.** A change passed `make guard`, readiness consistency and the feature matrix, and still failed `cargo fmt --check` (import ordering, two wraps) and `cargo clippy --workspace --all-targets -- -D warnings` (`s.len() % 2 == 0` → `is_multiple_of`). Run `local-ci` before claiming a change is verified; it took ~55 minutes under load but found both.
+- **Formatting moves the runtime bytes.** `cargo fmt` re-wrapped lines in the pallet and the compact artifact went 8,466,819 → 8,466,821 bytes, because an `assert!` message carries its `file:line`. So even a style fix needs a re-attestation (two more srtool cycles).
+- `local-ci` failures that were **pre-existing**: `nested workspaces` — `crates/x3-sidecar/Cargo.lock` is stale against its manifest and `--locked` refuses to update it. TICKET-096. The other 27 gates pass on merged master, including `testnet ceremony drill` (277s) and the new `btc checkpoint genesis` (180s).
+- `local-ci` writes per-gate logs under `.ai/runlogs/local-ci-<stamp>-<gate>.log` plus a summary JSON; read the log before assuming a failure is yours.

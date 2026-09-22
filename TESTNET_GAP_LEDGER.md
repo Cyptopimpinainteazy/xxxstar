@@ -220,3 +220,30 @@ dev`**. This is what the first version of the drill caught, by failing.
 **Still open:** no public network has a checkpoint pinned, nothing pushes headers after the anchor
 (a bonded header relayer does not exist), and the header source is still an operator copying a hash
 by hand. Those are TICKET-095.
+
+## GAP-CI-GATES — `make guard` is not the gate set, and a nested lockfile is stale — 2026-09-22
+
+Running the repository's own CI of record (`scripts/local-ci.sh --testnet`) on merged master, after
+a change that had passed `make guard`, readiness consistency and the feature matrix:
+
+```
+format check                       FAIL   8
+clippy workspace                   FAIL   864
+nested workspaces                  FAIL   19
+... 26 other gates PASS, including the new "btc checkpoint genesis" (180s)
+```
+
+Two of the three were that change's own: `cargo fmt --check` (import ordering and two wraps) and one
+clippy lint (`s.len() % 2 == 0` where this workspace uses `is_multiple_of`). Both are fixed. The
+lesson is mechanical and worth stating plainly: **`make guard` runs three guards (agent, stub,
+test-cheat); `scripts/local-ci.sh` is the set that includes `cargo fmt --check` and
+`cargo clippy --workspace --all-targets -- -D warnings`.** A change is not verified because the
+guards pass.
+
+**TICKET-096 — `crates/x3-sidecar/Cargo.lock` is out of date.** `local-ci`'s nested-workspaces gate
+fails with `error: the lock file crates/x3-sidecar/Cargo.lock needs to be updated but --locked was
+passed`. It is not new and not related to the change above: the nested workspace's lockfile no longer
+matches its manifest. Either regenerate it (`cargo update --offline` inside `crates/x3-sidecar`,
+which needs the registry cache to satisfy every requirement) and commit it, or drop `--locked` for
+that one gate with a note saying why. Acceptance: `local-ci`'s nested-workspaces gate passes on a
+clean checkout without network access.
