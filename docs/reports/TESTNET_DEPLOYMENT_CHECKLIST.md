@@ -1,5 +1,12 @@
 # X3 Chain Testnet v1 - Deployment Checklist
 
+# Superseded in part (2026-09-22): the steps that now have tooling live in
+# `docs/reports/PUBLIC_TESTNET_LAUNCH.md` — bootnode identity, spec build with published
+# bootnodes, per-host validator start, ceremony record/verify, and the gates. This file
+# remains the infrastructure checklist (hosts, DNS, TLS, monitoring, faucet, explorer),
+# and its boxes are still unchecked: nothing here has been provisioned.
+
+
 **Use this checklist to track testnet deployment progress.**
 
 ---

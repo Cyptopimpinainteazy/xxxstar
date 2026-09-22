@@ -35,6 +35,13 @@ KEYS_DIR="${KEYS_DIR:-$ROOT_DIR/deployment/chain-specs/fresh/generated/validator
 # per validator, stable across runs so a Live spec's bootnode entries stay valid
 # (`build-x3-testnet-spec.py` derives the same file into the spec).
 NODE_KEYS_DIR="${NODE_KEYS_DIR:-$BASE_DIR/node-keys}"
+# Multi-host launches: the spec's bootNodes name a bootnode the validators do not run
+# (`PUBLIC_BOOTNODES`), so requiring each local validator's peer id to be one of those
+# entries is wrong there — that check exists to stop a *single-host* network that could
+# never find itself. Set `SKIP_BOOTNODE_MEMBERSHIP_CHECK=1` for that case; the authority
+# check stays on either way, because a validator whose session key is not an authority
+# authors nothing wherever it runs.
+SKIP_BOOTNODE_MEMBERSHIP_CHECK="${SKIP_BOOTNODE_MEMBERSHIP_CHECK:-0}"
 # Two networks on one box must not fight over ports. 9944/30333/9615 are what the rest
 # of the tooling expects, so they stay the defaults — but a second network (another
 # agent, a soak beside a drill) has to be able to move them, and until these were
@@ -405,16 +412,24 @@ if str(spec.get("chainType", "")).lower() == "live":
     spec_boot = spec.get("bootNodes") or []
     listed = {b.rsplit("/p2p/", 1)[-1] for b in spec_boot}
     unknown = [p for p in node_keys if p not in listed]
-    if (not listed or unknown) and os.environ.get("SKIP_SPEC_AUTHORITY_CHECK") != "1":
+    skip_boot = os.environ.get("SKIP_BOOTNODE_MEMBERSHIP_CHECK", "0") == "1"
+    if skip_boot:
+        print(f"[validate] bootnode membership check skipped (SKIP_BOOTNODE_MEMBERSHIP_CHECK=1): "
+              f"this spec lists {len(listed)} published bootnode(s), which are expected to be "
+              f"hosts these validators dial rather than each other.")
+    elif (not listed or unknown) and os.environ.get("SKIP_SPEC_AUTHORITY_CHECK") != "1":
         print(f"[validate] FAIL: this spec lists {len(listed)} bootnode peer id(s) and "
               f"{len(unknown)} of the {len(node_keys)} nodes this launcher will start "
               f"are not among them, e.g. {unknown[:1]}")
         print("  The nodes would start and never find each other. Rebuild the spec "
               "with scripts/testnet/build-x3-testnet-spec.py, which writes the node "
               "keys beside the seeds and derives bootNodes from them.")
+        print("  For a multi-host launch whose spec names a published bootnode, set "
+              "SKIP_BOOTNODE_MEMBERSHIP_CHECK=1.")
         sys.exit(5)
-    print(f"[validate] ok: all {len(node_keys)} launcher peer id(s) are in the "
-          f"spec's {len(listed)} bootnode entry(ies).")
+    else:
+        print(f"[validate] ok: all {len(node_keys)} launcher peer id(s) are in the "
+              f"spec's {len(listed)} bootnode entry(ies).")
 sys.exit(0)
 PY
   rc=$?

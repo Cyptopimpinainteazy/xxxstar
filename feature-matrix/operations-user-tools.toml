@@ -48,9 +48,9 @@ id = "X3-OPS-003"
 name = "Public testnet gate"
 subsystem = "operations_user_tools"
 source = "master"
-paths = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh"]
-implemented = 75
-tested = 60
+paths = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh", "docs/reports/PUBLIC_TESTNET_LAUNCH.md"]
+implemented = 80
+tested = 65
 mainnet_ready = 45
 priority = "P0"
 confidence = "high"
@@ -62,7 +62,7 @@ blockers = [
   "The gate is RPC-only: it cannot see whether the network is *independently* operated, which is the property a public testnet exists to demonstrate",
   "Both gates have only ever run against loopback networks on one host",
 ]
-evidence = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/local-ci.sh", "docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md", "note: two runnable gates now exist — 25.6 kB RPC gate that checks system_health, GRANDPA authorities, bridge storage and block height against `--rpc-base-url`, and the ceremony verifier that checks a running network against a recorded manifest (genesis hash, spec sha256, runtime version, authority set, peer ids, finality) and has been seen to reject a tampered manifest; `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` PASS 290s. The README no longer advertises the endpoints as live."]
+evidence = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/local-ci.sh", "docs/reports/PUBLIC_TESTNET_LAUNCH.md", "note: two runnable gates — the 25.6 kB RPC gate (system_health, GRANDPA authorities, bridge storage, block height over `--rpc-base-url`) and the ceremony verifier (genesis hash, spec sha256, runtime version, authority set, peer ids, finality; seen to reject a tampered manifest) — plus a spec builder that takes published `PUBLIC_BOOTNODES` and a bootnode identity tool, so the operator path up to 'point the gate at a hosted endpoint' is written down and exercised; `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` PASS 290s"]
 
 [[feature]]
 id = "X3-OPS-004"

@@ -6735,3 +6735,16 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. A *long* soak (hours) to settle RSS growth and exercise era rotation. 2. Hosting for a real testnet (validator hosts, public bootnode, DNS, RPC/faucet/explorer, monitoring). 3. Key rotation end-to-end (other agent — tell it to use distinct ports). 4. SPV consolidation. 5. Partition/clock-skew injection. 6. Relayer authority decision (owner). 7. Release + external audit.
+
+## 2026-09-22 (fourteenth pass) — public launch kit; and never edit a running script
+
+### Facts to remember
+- **`scripts/testnet/public-node-id.sh`**: creates (0600, gitignored `deployment/keys/bootnode.nodekey`) or reuses a bootnode identity, derives its peer id with the same helper the spec builder uses, and prints the `/dns4/<host>/tcp/<port>/p2p/<peer>` address to publish. Same key → same peer id across runs (verified).
+- **`PUBLIC_BOOTNODES=/dns4/…/p2p/…`** (comma-separated) makes `build-x3-testnet-spec.py` use those published addresses as the spec's `bootNodes` instead of the derived loopback entries; verified a spec carrying exactly the published address.
+- **`SKIP_BOOTNODE_MEMBERSHIP_CHECK=1`** in the launcher is the multi-host case: the spec's bootnode is a host validators dial, not one of them, so the "every node's peer id is a bootnode" check is wrong there. The *authority* check stays on always. Verified: 3 validators started from a published-bootnode spec on their own ports, authority check enforced, bootnode check explicitly skipped (and they still meshed via the launcher's CLI bootnode).
+- **`docs/reports/PUBLIC_TESTNET_LAUNCH.md`** is the operator runbook (identity → spec → per-host start → ceremony record/verify → gates) and `TESTNET_DEPLOYMENT_CHECKLIST.md` now points at it; that checklist is the still-unchecked infrastructure half (168 boxes).
+- **Never edit a bash script while an instance of it is running.** The 2-hour soak died with `line 650: syntax error near unexpected token 'do'` because I patched `run-7-validators-local.sh` while the soak's launcher was still executing it: bash reads scripts incrementally, so its file offset landed mid-statement. Nodes were left running until the soak's cleanup fired; the soak was restarted (`/tmp/x3-soak120b.log`, isolated ports 12044/32400).
+- Ports: the other agent restarted as `/tmp/x3-rotation-drill` but still on default 9944/30333; my runs now use 12044/32400 (soak) and 13044/33400 (public-bootnode test) so we do not collide.
+
+### Next task seed
+1. Verify the restarted 2-hour soak (`/tmp/x3-soak120b.log`) and settle the RSS question. 2. Hosting: bootnode host + DNS + RPC/faucet/explorer + monitoring, then `public_testnet_gate.sh --rpc-base-url` and publish a manifest. 3. Key rotation (other agent). 4. SPV consolidation. 5. Partition/clock-skew injection. 6. Relayer authority decision (owner). 7. External audit.
