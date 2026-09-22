@@ -31,7 +31,7 @@ The second run was a from-scratch rebuild (`runtime/target/srtool` removed
 first), so this is not one artifact reported twice.
 
 The hashes below describe the revision that added the cross-chain-gateway header
-anchor (`EvmHeaderAnchor`), recorded at revision `a5492e6aa`. They are **not** a fixed
+anchor (`EvmHeaderAnchor`), recorded at revision `0508659d5`. They are **not** a fixed
 property of the project: any runtime-affecting change produces different WASM,
 which is why `docs/reports/runtime-wasm-hashes.json` names the revision it was
 recorded at, and why `scripts/mainnet_release_gate.py` **rebuilds and compares**
@@ -41,7 +41,7 @@ updating the record in the same change.
 
 Earlier pairs of builds (compact `0x78feb683…`, `0xb1f0348c…`, `0xb1777a09…`) were taken at older
 revision and is kept here only as the record of how this was established; the
-current values are the `0xac13ee1b…` pair (recorded at `a5492e6aa`).
+current values are the `0xac13ee1b…` pair (recorded at `0508659d5`).
 
 **Compact (`x3_chain_runtime.compact.wasm`, 8,435,073 bytes)**
 
