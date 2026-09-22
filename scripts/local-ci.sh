@@ -12,6 +12,7 @@
 #   scripts/local-ci.sh --release       # + the release gate (make mainnet-check)
 #   scripts/local-ci.sh --variants      # + the runtime migration dry-run for all six variants
 #   scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
+#   scripts/local-ci.sh --failure       # + the validator failure drill (boots and kills validators)
 #   scripts/local-ci.sh --deep          # + the whole workspace test suite (slow, ~5-15 min)
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
@@ -112,6 +113,7 @@ RUN_RELEASE=0
 RUN_VARIANTS=0
 RUN_DEEP=0
 RUN_LOOM=0
+RUN_FAILURE=0
 RUN_PREPUSH=0
 LIST_ONLY=0
 DRY_RUN=0
@@ -130,8 +132,9 @@ while [ "$#" -gt 0 ]; do
     --cross) RUN_LIVE=1; RUN_CROSS=1 ;;
     --release) RUN_RELEASE=1 ;;
     --variants) RUN_VARIANTS=1 ;;
+    --failure) RUN_FAILURE=1 ;;
     --deep) RUN_DEEP=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FAILURE=1 ;;
     --loom) RUN_LOOM=1 ;;
     --pre-push) RUN_PREPUSH=1 ;;
     --list) LIST_ONLY=1 ;;
@@ -338,6 +341,16 @@ GATES_LOOM=(
   "loom concurrency tests:bash scripts/run-loom-tests.sh"
 )
 
+# What the consensus network does when validators die. Opt-in and separate from
+# `--live` because it boots four to seven validators, kills a minority and then a
+# supermajority-breaking number, and restarts them: finality must continue in the
+# first case, must stop in the second (that is the safety property, and a chain
+# that keeps finalizing below 2/3 has none), and must resume afterwards. Ten to
+# fifteen minutes and seven processes, so it does not belong in a default run.
+GATES_FAILURE=(
+  "validator failure drill:bash scripts/testnet/validator-failure-drill.sh"
+)
+
 # The broadest automated signal the repository has: every test target in every
 # workspace member. SLOW (thousands of tests), so it is opt-in rather than part
 # of the default set. No SKIP_WASM_BUILD: x3-chain-node's service tests boot a
@@ -391,6 +404,9 @@ describe_all() {
   printf '  - %s\n' "${GATES_VARIANTS[@]%%:*}"
   echo "loom gates (--loom, also implied by --all):"
   printf '  - %s\n' "${GATES_LOOM[@]%%:*}"
+  echo
+  echo "failure drills (--failure, also implied by --all):"
+  printf '  - %s\n' "${GATES_FAILURE[@]%%:*}"
   echo "deep gates (--deep, also implied by --all):"
   printf '  - %s\n' "${GATES_DEEP[@]%%:*}"
   echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast"
@@ -452,6 +468,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_CROSS" = 1 ] && for spec in "${GATES_CROSS[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_VARIANTS" = 1 ] && for spec in "${GATES_VARIANTS[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_RELEASE" = 1 ] && for spec in "${GATES_RELEASE[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_FAILURE" = 1 ] && for spec in "${GATES_FAILURE[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_LOOM" = 1 ] && for spec in "${GATES_LOOM[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_DEEP" = 1 ] && for spec in "${GATES_DEEP[@]}"; do SELECTED+=("$spec"); done
 
@@ -570,7 +587,7 @@ export CARGO_TERM_COLOR=never
   echo "local-ci $STAMP"
   echo "root=$ROOT"
   echo "branch=$BRANCH head=$HEAD_SHA tree=$DIRTY"
-  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM jobs=$JOBS cargo_jobs=$CARGO_JOBS"
+  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM failure=$RUN_FAILURE jobs=$JOBS cargo_jobs=$CARGO_JOBS"
 } >"$LOG"
 
 # run_gate <name> <slug> <command> — one process per gate so the parent keeps the

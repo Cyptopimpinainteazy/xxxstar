@@ -6644,3 +6644,17 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Independence and duration for `X3-L1-001`: multi-machine run, failure injection (partition, restart, clock skew), slashing/jailing paths exercised by a real network. 2. Audit `X3-L1-002` validator key management (30%). 3. Remaining weak P0 rows: relayer framework 35%, Ethereum bridge adapter 38%. 4. Consolidate the three SPV implementations. 5. Trusted BTC header bootstrap. 6. Relayer authority decision (owner). 7. Release publish + external audit.
+
+## 2026-09-22 (seventh pass) — failure injection: minority keeps finality, a missing supermajority stops it
+
+### Facts to remember
+- **`scripts/testnet/validator-failure-drill.sh`** (new, opt-in gate `--failure`, `PASS validator failure drill 358s` at COUNT=4): boots N validators, kills `max(1,(N-1)/3)` (still a supermajority) and requires finality to **continue**; kills one more and requires finality to **stop** while authoring continues (the safety property — sampled after a full 60s `STALL_WINDOW`, not at the first quiet poll); restarts the dead ones and requires one chain; then asserts no validator process is left. Kill count is derived so `--count` alone can't produce a half-drill, and the guard refuses combinations that would.
+- Verified: 7 validators — finality continued (570→583) with 2 down, **stopped at 585 for 60s while head went 589→760** with 3 down, all 7 back on one chain at 1198. 4 validators — same shape, complete run with "no validator processes left". 7-validator spec+run also produced identical hashes at heights 900/950 across all seven.
+- **Two harness bugs the drill found in itself**: (1) `--only <i>` restarts rewrote `node-1.pid`, so a pid-file kill missed the live node 1 (it kept ports 9944/30333 for the next run) — both the drill's cleanup and the launcher's `stop_nodes` now also `pkill -f -- "--base-path <BASE_DIR>/node-"`; (2) `pgrep … | wc -l` under `set -o pipefail` returns 1 when nothing matches, so `LEFT="$(running_nodes)"` under `set -e` aborted the script silently — zero matches is the success case, swallow the status.
+- **`build-x3-testnet-spec.py` no longer overwrites a tracked fixture**: `deployment/chain-specs/fresh/*.json` is shared by the `run-fresh-*`/mesh tooling, and overwriting it left a dirty tree plus a spec whose authorities matched the new seeds while the committed fixture still looked authoritative (the launcher's preflight then refused the pair — correctly). It writes to the ignored `fresh/generated/` and prints the exact launch command.
+- `run-7-validators-local.sh` gained `--only <n>` (restart one validator from its existing base dir; Live specs carry the bootnodes, so it rejoins on its own) and its `KEYS_DIR` default now follows the builder's output dir.
+- local-ci gained the `--failure` opt-in set (also in `--all`), listed under "failure drills".
+- Reminder: with ≥1/3 of authorities down, GRANDPA finality *stops* while Aura keeps authoring — that asymmetry is the drill's safety assertion, and a chain that kept finalizing at 4/7 would be the bug.
+
+### Next task seed
+1. Independence/duration for X3-L1-001: multi-machine, partitions, clock skew, soak (hours), slashing/jailing under a real network. 2. Audit X3-L1-002 validator key management (30%). 3. Remaining weak P0 rows: relayer framework 35%, Ethereum bridge adapter 38%. 4. Consolidate the three SPV implementations. 5. Trusted BTC header bootstrap. 6. Relayer authority decision (owner). 7. Release publish + external audit.
