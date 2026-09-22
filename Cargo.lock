@@ -27218,6 +27218,8 @@ dependencies = [
 name = "x3-crosschain-gateway"
 version = "0.1.0"
 dependencies = [
+ "blake2 0.10.6",
+ "ed25519-dalek 2.2.0",
  "x3-asset-kernel-types",
  "x3-circuit-breaker",
  "x3-external-route-registry",
