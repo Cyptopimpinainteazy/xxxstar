@@ -182,3 +182,9 @@ apps/x3-desktop/dist/
 /target-noexist-probe/
 /apps/dashboard/dist/
 /Bash tool output*
+*.tsbuildinfo
+
+# Local editor/agent tool configuration (not shared project config)
+/.cursor/
+/.gemini/
+/.todo
