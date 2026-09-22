@@ -1,8 +1,0 @@
-
-fn main() -> i64 {
-    let original = 42;
-    let copy1 = original;
-    let copy2 = copy1;
-    let copy3 = copy2;
-    return copy3;
-}
