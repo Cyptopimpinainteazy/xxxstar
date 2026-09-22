@@ -181,6 +181,7 @@ members = [
     "crates/x3-security-events",       # <- pallets/atomic-trade-engine, pallets/x3-invariants, runtime
     "crates/x3-universal-contracts",   # <- tests/e2e/Cargo.toml
     "crates/x3-validator-attestation", # <- node/Cargo.toml
+    "crates/x3-runtime-signer",        # <- node/Cargo.toml, crates/x3-relayer
     "crates/x3-verification-router",   # <- node/Cargo.toml
     "crates/x3-circuit-breaker",       # <- crosschain-gateway, pallets
     "crates/x3-external-route-registry", # <- crosschain-gateway, pallets

@@ -98,23 +98,30 @@ impl RpcSubmitter {
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
         Err(anyhow!(
-            "no runtime-aware signer in this pipeline: `author_submitExtrinsic` takes a \
-             hex-encoded SCALE extrinsic, and this used to post a JSON payload naming \
-             `x3Verifier.submitEvmProof`, which is not a runtime call in this workspace. \
-             Signing a real extrinsic needs the runtime's `SignedExtra` and call encoding \
-             (node/src/x3vm_runtime_signer.rs), and the settlement engine is the pallet that \
-             records a verified external proof (`submit_proof`). Configured signing \
-             authority: {label}. Refusing rather than reporting a submission that cannot be \
-             accepted."
+            "this pipeline cannot submit a proof with its own key. The settlement engine records \
+             an external proof through `submit_proof` / `submit_cross_domain_proof_set`, and both \
+             require `who == intent.maker || who == intent.taker` \
+             (pallets/x3-settlement-engine/src/lib.rs:1420 and :1656), so a third-party relayer \
+             signature is rejected with `NotAuthorized`. The signer that builds those calls is no \
+             longer the missing piece: it is the `x3-runtime-signer` crate (`sign_submit_proof`, \
+             `prepare_cross_domain_proof_set`), shared with the node, which is the piece this \
+             pipeline was waiting on. What is still missing is the authority path — either the \
+             intent party signs the submission and this \
+             pipeline only transports it, or the pallet grows a delegation an operator can be \
+             authorized for — and that is a security decision rather than a code detail. \
+             Configured signing authority: {label}. Refusing rather than reporting a submission \
+             that would be rejected on chain."
         ))
     }
 
     pub async fn submit_svm_proof(&self, proof: SvmProof) -> Result<String> {
         let _ = proof;
         Err(anyhow!(
-            "no runtime-aware signer in this pipeline: see `submit_evm_proof`. The SVM proof \
-             this used to post was a JSON payload, not a hex-encoded SCALE extrinsic, so no \
-             node could accept it."
+            "the SVM leg is refused for the same reason as the EVM leg: the proof this pipeline \
+             used to post was a JSON payload rather than a hex-encoded SCALE extrinsic, and the \
+             settlement engine accepts a proof only from the intent's maker or taker \
+             (`NotAuthorized` otherwise). Signing is available from the `x3-runtime-signer` crate; \
+             what is undecided is who is authorized to submit."
         ))
     }
 
@@ -369,21 +376,26 @@ mod tests {
             proof_nonce: 7,
         };
 
-        // Submitting requires a hex-encoded SCALE extrinsic signed with the
-        // runtime's `SignedExtra`; this pipeline has no runtime-aware signer, so
-        // it refuses rather than posting a JSON payload a node cannot decode.
+        // Submitting means signing a runtime extrinsic with the intent party's
+        // key — `submit_proof` requires `who == intent.maker || who ==
+        // intent.taker` — and this pipeline holds no such key, so it refuses
+        // rather than posting a payload a node cannot accept.
         let error = submitter
             .submit_evm_proof(proof)
             .await
-            .expect_err("no runtime-aware signer");
+            .expect_err("no authorized signing key for the intent");
         let message = error.to_string();
         assert!(
-            message.contains("hex-encoded SCALE extrinsic"),
-            "the refusal must say what is missing, got: {message}"
+            message.contains("intent.maker"),
+            "the refusal must name the origin rule it cannot satisfy, got: {message}"
         );
         assert!(
-            message.contains("node/src/x3vm_runtime_signer.rs"),
-            "and where the real signer is, got: {message}"
+            message.contains("x3-runtime-signer"),
+            "and say where the real signer now lives, got: {message}"
+        );
+        assert!(
+            message.contains("NotAuthorized"),
+            "and name the on-chain error a third-party signature produces, got: {message}"
         );
     }
 

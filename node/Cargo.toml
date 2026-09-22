@@ -26,6 +26,7 @@ x3-bridge-adapters = { path = "../crates/x3-bridge-adapters" }
 x3-rpc = { path = "../crates/x3-rpc" }
 x3-atomic-trade = { path = "../crates/x3-atomic-trade" }
 x3-atomic-swap = { path = "../crates/x3-atomic-swap", features = ["std"] }
+x3-runtime-signer = { path = "../crates/x3-runtime-signer" }
 atomic-swap-orchestrator = { path = "../crates/atomic-swap-orchestrator" }
 x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge" }
 x3-vm = { path = "../crates/x3-vm" }

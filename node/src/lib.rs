@@ -52,7 +52,11 @@ pub mod atomic_gateway;
 pub mod atomic_service;
 
 /// Concrete signer for X3SettlementEngine live lock/claim/refund extrinsics.
-pub mod x3vm_runtime_signer;
+///
+/// The implementation lives in the `x3-runtime-signer` crate so the relayer can
+/// sign the same runtime calls; this re-export keeps the path the node's own
+/// tests and `atomic_gateway` have always used.
+pub use x3_runtime_signer as x3vm_runtime_signer;
 
 /// Flash Finality network bridge and gossip message handling.
 pub mod flash_finality;
