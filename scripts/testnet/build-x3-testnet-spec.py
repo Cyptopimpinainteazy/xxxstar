@@ -48,7 +48,14 @@ COUNT = int(sys.argv[1]) if len(sys.argv) > 1 else 7
 # still accepted so existing callers keep working.
 make_raw = "--raw" in sys.argv
 COUNT = max(1, min(COUNT, 12))
-outdir = os.path.join(ROOT, "deployment", "chain-specs", "fresh")
+# Its own directory, ignored by git. `deployment/chain-specs/fresh/*.json` is a
+# tracked fixture shared by the `run-fresh-*` / mesh tooling, and this script used to
+# overwrite it along with `authorities.json` and friends — leaving a dirty tree and,
+# worse, a spec whose authorities matched the *new* seeds while the committed fixture
+# still looked authoritative. `OUT_DIR` overrides.
+outdir = os.environ.get("OUT_DIR") or os.path.join(
+    ROOT, "deployment", "chain-specs", "fresh", "generated"
+)
 keysdir = os.path.join(outdir, "validator-keys")
 os.makedirs(keysdir, exist_ok=True)
 
@@ -211,6 +218,12 @@ if missing:
     sys.exit(1)
 print(f"[spec] {name} carries all {len(bootnodes)} derived bootnodes "
       f"(peer ids match the node keys beside the seeds)")
+print(f"[spec] launch it with:")
+print(
+    "  COUNT=%d CHAIN_SPEC=%s NODE_BIN=%s "
+    "bash scripts/testnet/run-7-validators-local.sh"
+    % (COUNT, outfile, NODE)
+)
 
 if make_raw:
     print(

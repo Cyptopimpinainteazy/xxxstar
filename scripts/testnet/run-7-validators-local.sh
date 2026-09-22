@@ -19,11 +19,16 @@ LOG_DIR="${LOG_DIR:-$LOG_DIR_DEFAULT}"
 PID_DIR="${PID_DIR:-}"
 CHAIN_SPEC_RUN="${CHAIN_SPEC_RUN:-}"
 KEYSTORE_PASSWORD_FILE="${KEYSTORE_PASSWORD_FILE:-}"
+# `--only <n>` starts exactly one validator from an existing base dir and exits.
+# That is how a node is brought back after a failure without touching its peers:
+# the base path, keystore and node key are already there, and a Live spec carries
+# the bootnodes, so it rejoins on its own.
+ONLY_INDEX="${ONLY_INDEX:-0}"
 # Per-validator seeds written by `scripts/testnet/build-x3-testnet-spec.py`. A spec
 # built from fresh keys and nodes started from the built-in dev seeds is a network
 # whose authorities hold none of its keys: it starts, and authors nothing. Prefer
 # the seed files whenever they are there.
-KEYS_DIR="${KEYS_DIR:-$ROOT_DIR/deployment/chain-specs/fresh/validator-keys}"
+KEYS_DIR="${KEYS_DIR:-$ROOT_DIR/deployment/chain-specs/fresh/generated/validator-keys}"
 # A node needs a libp2p identity. Without `--node-key` (or a pre-existing
 # `network/secret_ed25519` under the base path) this node build exits with
 # `NetworkKeyNotFound`, which is why the launcher could not start anything. One key
@@ -89,6 +94,10 @@ while [[ $# -gt 0 ]]; do
       KEYS_DIR="${2:-}"
       shift 2
       ;;
+    --only)
+      ONLY_INDEX="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -123,6 +132,10 @@ stop_nodes() {
       kill "$pid" 2>/dev/null || true
     fi
   done
+
+  # A pid file can be stale (a `--only` restart rewrites one), so the pid-file kill
+  # above can miss the process actually holding the ports. Sweep by base path too.
+  pkill -f -- "--base-path ${BASE_DIR}/node-" 2>/dev/null || true
 
   sleep 1
 }
@@ -607,6 +620,17 @@ fi
 
 BOOTNODE="/ip4/${LISTEN_IP}/tcp/30333/p2p/${peer_id}"
 echo "Bootnode: ${BOOTNODE}"
+
+if [[ "$ONLY_INDEX" != "0" ]]; then
+  if ! [[ "$ONLY_INDEX" =~ ^[0-9]+$ ]] || [[ "$ONLY_INDEX" -lt 1 ]] || [[ "$ONLY_INDEX" -gt "$COUNT" ]]; then
+    echo "--only takes a validator index between 1 and ${COUNT} (got: ${ONLY_INDEX})"
+    exit 2
+  fi
+  echo "Starting only node ${ONLY_INDEX} (restart path; peers keep running)"
+  start_node "$ONLY_INDEX" "$BOOTNODE"
+  echo "Node ${ONLY_INDEX} is back."
+  exit 0
+fi
 
 for i in $(seq 2 "$COUNT"); do
   echo "Starting node ${i}..."
