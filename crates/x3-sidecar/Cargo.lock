@@ -7837,6 +7837,7 @@ dependencies = [
  "parity-scale-codec",
  "scale-info",
  "serde",
+ "sp-io 44.0.0",
  "sp-runtime 45.0.0",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "x3-verification-router",

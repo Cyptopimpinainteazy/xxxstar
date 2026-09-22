@@ -6835,6 +6835,12 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - **Formatting moves the runtime bytes.** `cargo fmt` re-wrapped lines in the pallet and the compact artifact went 8,466,819 → 8,466,821 bytes, because an `assert!` message carries its `file:line`. So even a style fix needs a re-attestation (two more srtool cycles).
 - `local-ci` failures that were **pre-existing**: `nested workspaces` — `crates/x3-sidecar/Cargo.lock` is stale against its manifest and `--locked` refuses to update it. TICKET-096. The other 27 gates pass on merged master, including `testnet ceremony drill` (277s) and the new `btc checkpoint genesis` (180s).
 - `local-ci` writes per-gate logs under `.ai/runlogs/local-ci-<stamp>-<gate>.log` plus a summary JSON; read the log before assuming a failure is yours.
+
+### Facts to remember (twenty-first pass)
+- **TICKET-096 closed**: `crates/x3-sidecar/Cargo.lock` regenerated offline (`cargo update --offline --workspace` in that directory; nothing downloaded) — the nested-workspaces gate's own command, `SKIP_WASM_BUILD=1 cargo check --locked --all-targets`, now finishes clean. Verify the three previously failing gates individually after fixing them: `cargo fmt --all --check` (clean), `cargo clippy --workspace --all-targets -- -D warnings` (clean), nested sidecar check (clean).
+- **A merge of two attested revisions is a third revision.** Both the key-rotation change (`d471adfec4`, spec_version 16) and mine (`269d611d96`, spec_version 15) had their own records; merging them required a fresh two-build attestation at the merge commit (`93d97edd34`). The runtime record is one artifact for one revision — never resolve that file by picking a side.
+- The other agent did the **validator key rotation** work: `pallet_x3_custody` gained `KeyRotationPeriod`, `rotate_validator_key` now grants `current_block + period` (fixing the thrash I described), and the node gained a `validator rotate` operator command. My rotation recommendation is therefore done by them, not by me.
+- `local-ci` default+testnet run costs ~55 minutes under load ~16–30 and wrote `.ai/runlogs/local-ci-20260922T190339Z-summary.json` with per-gate logs.
 ## 2026-09-22 (twentieth pass) — validator key rotation wired end to end (in code)
 
 ### Facts to remember
