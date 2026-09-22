@@ -7,8 +7,8 @@ subsystem = "consensus_l1"
 source = "master"
 paths = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh"]
 implemented = 88
-tested = 88
-mainnet_ready = 60
+tested = 85
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -18,6 +18,7 @@ blockers = [
   "No slashing, jailing or equivocation evidence from a multi-operator network — those paths have unit coverage only",
   "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
   "Twenty minutes is not a duration claim: era rotation is unexercised, and the debug nodes grew ~490–515 MiB of RSS each over the run — cache or leak is not yet distinguishable without a longer soak",
+  "A two-hour run FAILED (2026-09-22): under load ~55–60 from other work on the same box, one validator lost its peers and the chain stopped finalizing at height 27,677. The logs name the mechanism — trie-cache lock timeouts from minute four, dropped imports, a missed Aura slot, then peers banning the lagging validator for 'Same block request multiple times' (10–16 bans per node), which converts a lag into a partition. Liveness, not safety: no node ever finalized two conflicting chains. Needs a re-run on an idle box to separate load from defect, see `.ai/reports/soak-2h-failure-20260922.md`",
 ]
 # The launcher could not run at all before 2026-09-22: it required `subkey` (not
 # installed, not part of this repo), its default spec was a storage-raw Live file

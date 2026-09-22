@@ -150,3 +150,37 @@ merkle math.
 the BTC path is fail-closed until an operator does. `anchor_btc_checkpoint` takes a root
 origin; the ceremony for choosing and publishing that hash is an operator runbook item, and
 nothing pushes headers after the anchor (a bonded header relayer is not written).
+
+## GAP-SOAK-2H — a two-hour run fails, and the peer set is what turns a lag into a partition — 2026-09-22
+
+The twenty-minute soak passed. The two-hour run did not:
+
+```
+[soak] FAIL: rpc 12046 has not finalized since 1790099493 (27677 at height)
+```
+
+Every node's log shows the same sequence, and it is not subtle. Four minutes in, the first
+`Timeout while trying to acquire a write lock for the shared trie cache` (105–419 per node over
+two hours); then `State already discarded` and `block has an unknown parent` (14–252 per node);
+then `Creating inherent data took more time than we had left for slot …` — a missed Aura slot.
+An hour in, node 3 is banned for `Same block request multiple times`, which is what a validator
+that has fallen behind does. It loses its peers, its view diverges from finality
+(`Potential long-range attack: block not in finalized chain`), and it re-finalises *backwards*
+(`Re-finalized block #… (27111) … current best finalized is #27136`). At the end all four nodes sit
+at one height with node 3 at zero peers.
+
+The trigger was an over-subscribed box (`load average 55–62`: four debug nodes at 1.3–1.6 GiB each,
+plus other agents' networks and builds). The **defect candidate** is the response: 10–16 peer bans
+per node means the peer set punishes slowness and degrades itself instead of healing, so a lag
+becomes a partition. That is worth chasing regardless of what the machine was doing.
+
+Two-hour run, 4 validators, one host — liveness, not safety: no node ever finalised two
+conflicting chains. Evidence, with the log excerpts and counts: `.ai/reports/soak-2h-failure-20260922.md`.
+
+**TICKET-094 — a lagging validator must not be banned out of the network.** Reproduce on an idle
+box with the same launcher for two hours and confirm the run passes; if it does, re-run it under
+deliberate CPU contention (`stress-ng --cpu $(nproc)`) to reproduce deterministically. Then look at
+the repeated-block-request reputation path in the sync protocol, where a peer that asks for the same
+block while behind should be slowed rather than disconnected, and at what holds the trie-cache write
+lock during block import. Acceptance: on a contended box, a validator that falls behind keeps at
+least one peer, catches up, and finality does not stall.
