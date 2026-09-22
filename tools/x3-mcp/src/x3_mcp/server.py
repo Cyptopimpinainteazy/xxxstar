@@ -112,6 +112,8 @@ def x3_rpc(method: str, params_json: str = "[]") -> dict[str, Any]:
         "state_queryStorageAt",
         "rpc_methods",
         "grandpa_roundState",
+        "x3_getIntentSnapshot",
+        "x3_settlementStatus",
     }
     if method not in allowed:
         raise ValueError(f"RPC method is not allow-listed: {method}")
@@ -324,53 +326,25 @@ def _storage_prefix(pallet: str, item: str) -> str:
 
 @mcp.tool()
 def x3_inspect_intent(intent_id: str) -> dict[str, Any]:
-    """Inspect a settlement intent through the node's runtime RPC surface.
-
-    The current runtime declares GovernanceSettlementApi but does not wire a
-    custom JSON-RPC endpoint for get_settlement. Until that is exposed, return
-    live capability evidence and fail closed rather than derive SCALE storage
-    keys incorrectly.
-    """
+    """Return the canonical live settlement intent/state/escrow snapshot."""
     intent_id = _hex32(intent_id, "intent_id")
-    methods = _rpc("rpc_methods")
-    available = methods.get("methods", []) if isinstance(methods, dict) else []
-    candidates = [
-        m for m in available
-        if "settlement" in m.lower() or "intent" in m.lower()
-    ]
-    if not candidates:
-        raise RuntimeError(
-            "live node exposes no settlement/intent JSON-RPC method; "
-            "GovernanceSettlementApi is declared in the pallet but is not "
-            "currently surfaced through node RPC"
-        )
-    return {"intent_id": intent_id, "available_runtime_methods": sorted(candidates)}
+    snapshot = _rpc("x3_getIntentSnapshot", [intent_id])
+    if snapshot is None:
+        raise RuntimeError(f"settlement intent not found: {intent_id}")
+    return {"intent_id": intent_id, "snapshot": snapshot}
 
 
 @mcp.tool()
 def x3_atomic_state(intent_id: str) -> dict[str, Any]:
-    """Return live atomic-settlement capability evidence for one intent.
-
-    Refuses to report escrow/intent state until the runtime API is reachable
-    from node RPC; this prevents guessed storage keys or stale ledger evidence
-    from being mislabeled as live chain state.
-    """
-    intent_id = _hex32(intent_id, "intent_id")
-    health = x3_chain_health()
-    try:
-        intent = x3_inspect_intent(intent_id)
-    except Exception as exc:
-        return {
-            "intent_id": intent_id,
-            "live_chain": health,
-            "state_available": False,
-            "error": str(exc),
-        }
+    """Return live atomic intent state plus settlement-engine aggregate status."""
+    intent = x3_inspect_intent(intent_id)
+    status = _rpc("x3_settlementStatus")
     return {
-        "intent_id": intent_id,
-        "live_chain": health,
+        "intent_id": intent["intent_id"],
+        "snapshot": intent["snapshot"],
+        "settlement_status": status,
+        "chain": x3_chain_health(),
         "state_available": True,
-        "intent": intent,
     }
 
 
