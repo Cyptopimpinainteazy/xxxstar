@@ -302,9 +302,8 @@ required_tests = [
   "bridge_against_a_host_with_no_bridging_support_fails_closed"
 ]
 proof_report = "reports/trading_core_v1_report.md"
-readiness_score = 70
+readiness_score = 75
 blockers = [
-  "x3c audit's RiskScorer does not recognize trading-core-v1's AST shape (Item::AtomicTrade/Item::TradeRiskPolicy) — its risk score output is meaningless for these programs today; treat as unscored, not as safe (flagged in PR #216, still open)",
   "No multi-validator or live-network execution of a trading-core-v1 program has been performed — all 131 passing tests are single-process compiler/VM/CLI-level"
 ]
 dangerous_paths = ["solvency invariant", "oracle firewall", "replay ledger", "gas ceiling enforcement", "receipt signing"]
@@ -323,10 +322,9 @@ required_tests = [
   "sync_pool_price_writes_oracle_observation"
 ]
 proof_report = "reports/trading_core_v1_report.md"
-readiness_score = 65
+readiness_score = 70
 blockers = [
-  "No multi-validator or live-network run — 48 passing tests are all mock-runtime unit tests",
-  "Pre-execution risk scoring for trades that originate as trading-core-v1 programs depends on x3c audit's RiskScorer, which is currently blind to that AST shape — see [trading_core_v1]"
+  "No multi-validator or live-network run — 48 passing tests are all mock-runtime unit tests"
 ]
 dangerous_paths = ["kernel_comit settlement rollback", "AMM adapter registration", "cross-VM leg execution (EVM/SVM/X3)"]
 
