@@ -71,6 +71,12 @@ bytes**:
   `pallet_x3_custody` gains `KeyRotationPeriod` and `rotate_validator_key` grants
   `current_block + period` instead of inheriting an overdue due block; the node gains
   the `validator rotate` operator command. `spec_version` moves to 16.
+* `93d97edd34` — the merge of the formatting fix with that key-rotation change. Both
+  revisions were attested separately and neither record described the other's tree, which
+  is what a single record for a single artifact means: at any moment the file describes
+  **the revision it names**, and a merge of two attested revisions is a third revision
+  that has to be rebuilt. Two from-scratch builds of the merge agree, and the compact
+  artifact is 8,468,726 bytes.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -96,24 +102,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,468,737 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,468,726 bytes)**
 
 ```
 Version          : x3-chain-16 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0x0ce1a9dea6c42f0d65dba7a7819a65d47d77398e8992c97363d4c6bc9d4937fe
-authorizeUpgrade : 0x3af49b82f5a002f757794e7a66f4468894bfb38b4e0b19e65e0d0389dfc73b58
-IPFS             : QmNR3RSp9upQvqC9SaTyEfb4BpnDTqHsG21P2YBgo2CXCk
-BLAKE2_256       : 0x3548491d3931ec95725edb01218c6b7787aeb8c9a741d846f9dddc19e68b2fce
+setCode          : 0xdcd424e52f32a679cb060a9aec71dcda3342e72d610da12ef281f4736ce9c7dd
+authorizeUpgrade : 0x1451fd5c76abaf121053c9b8435a8f0acef437df1af794f6af7c8cadde5af259
+IPFS             : QmYig4dt8HvR59FSkEc4nv5nj68qJuZzXN8sj6xyeBorZa
+BLAKE2_256       : 0xf079acbbfa7d03b8a876eed58720e4a84e2baa2e73ef469e64329652f444042c
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,455,902 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,455,729 bytes)**
 
 ```
-setCode          : 0x8b953d190964ac7186a0830a928e12aab4e8ed6b76069e38cc554f47669b551f
-authorizeUpgrade : 0x4bd62920d5e2fae0d29e15b4ee1bfd84f36838a9bab277722e735ba4b29e5d54
-IPFS             : QmNhLMFbtsZTYLnHC4nenFeyXwcX5HRPvuZR67Mun56rbS
-BLAKE2_256       : 0xefe057ec25a6a25cdd06e9b9047cc555ce2452f35c3411add02f409d9908c0f5
+setCode          : 0xd36082394c552b5b1ddaf91772a10ce5ec2c19f0f5ebae0f49552aecb4660639
+authorizeUpgrade : 0x0b39af4470c3fb64bfcd76a4de2a5119d05324f2343eb86f27fa23efb76b41bf
+IPFS             : QmURPTtrYwnvuFakk6mmcTxg23UDmPeTAYwWBNsStSEGqY
+BLAKE2_256       : 0x0843205b1cf1e68f5eca9c1bbbff856e6a3fb65910763c90d9570ca9b5ee5a7e
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the
