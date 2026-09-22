@@ -240,10 +240,10 @@ test-cheat); `scripts/local-ci.sh` is the set that includes `cargo fmt --check` 
 `cargo clippy --workspace --all-targets -- -D warnings`.** A change is not verified because the
 guards pass.
 
-**TICKET-096 — `crates/x3-sidecar/Cargo.lock` is out of date.** `local-ci`'s nested-workspaces gate
-fails with `error: the lock file crates/x3-sidecar/Cargo.lock needs to be updated but --locked was
-passed`. It is not new and not related to the change above: the nested workspace's lockfile no longer
-matches its manifest. Either regenerate it (`cargo update --offline` inside `crates/x3-sidecar`,
-which needs the registry cache to satisfy every requirement) and commit it, or drop `--locked` for
-that one gate with a note saying why. Acceptance: `local-ci`'s nested-workspaces gate passes on a
-clean checkout without network access.
+**TICKET-096 — CLOSED. `crates/x3-sidecar/Cargo.lock` was out of date.** `local-ci`'s
+nested-workspaces gate failed with `error: the lock file crates/x3-sidecar/Cargo.lock needs to be
+updated but --locked was passed`. Not new and not related to the change above: the nested
+workspace's lockfile had drifted from its manifest. Regenerated with
+`cargo update --offline --workspace` in `crates/x3-sidecar` (the registry cache had everything;
+nothing was downloaded) and verified with the gate's own command:
+`SKIP_WASM_BUILD=1 cargo check --locked --all-targets` → finished clean in 2m20s.
