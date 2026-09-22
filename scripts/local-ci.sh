@@ -358,6 +358,12 @@ GATES_CROSS=(
   # X3VM<->EVM lifecycles against a dev spec with that policy flipped, and the
   # test refuses to start unless the chain reports the strict value.
   "cross-domain EVM (strict posture):env X3_STRICT_CROSS_DOMAIN_PROOFS=1 bash scripts/cross-domain-evm-gate.sh"
+  # The SVM twin of the gate above, and it was missing: `cross-domain-svm-gate.sh`
+  # has honoured `X3_STRICT_CROSS_DOMAIN_PROOFS` since it was written, but nothing
+  # in this list ever set it, so the SVM leg was only ever proven in the dev
+  # posture that allows unattested proof sets. Same posture, same refusal-to-start
+  # check as the EVM gate.
+  "cross-domain SVM (strict posture):env X3_STRICT_CROSS_DOMAIN_PROOFS=1 PATH=\"$HOME/.cargo/bin:$PATH\" bash scripts/cross-domain-svm-gate.sh"
 )
 
 # Slugs are the `--only`/`--skip` keys, so keep them lowercase: gate names carry

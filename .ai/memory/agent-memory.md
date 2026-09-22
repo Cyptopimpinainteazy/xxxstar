@@ -3953,6 +3953,406 @@ writes `fixture.json` {spec, seeds, peers, bootnodes, authorities}; the boot gat
 5. 2,269 production `unwrap()/expect()` sites outside block hooks, now ratcheted so they cannot grow.
 6. External security audit — the one item no gate can substitute for.
 
+## 2026-09-20/21 (fourth pass) — the funds hole is closed; master is green; master `4fd3c6838`
+
+### The finding and the fix (#389)
+
+The cross-domain settlement gate was **self-attested**. `submit_proof` verifies (confirmation depth,
+proof type, per-chain verifier, replay cache); `submit_cross_domain_proof_set` — the only writer of
+`VerifiedCrossDomainProofs` and the thing that gates `Finalized`/`Refunded` — checked only internal
+consistency. Reproduced in the pallet harness: two bundles with `execution_evidence: vec![0xde, 0xad]`
+and `finality_source: "fabricated-by-the-caller"` were accepted and the intent reached `Refunded`.
+
+Fixed by requiring an external bundle to match a proof `submit_proof` recorded on the escrow leg
+(`EscrowLeg::proof` existed and was never written). Policy is **genesis state**
+(`AllowUnattestedCrossDomainProofs`): `false` for production/testnet/staging, `true` for dev/local.
+A compile-time feature was tried first and rejected — a plain `cargo build --release` would have been
+permissive on mainnet. Verified in generated genesis: dev `True`, testnet `False`, and
+`make-fixture-live-spec.sh` now asserts the Live value is `False` (checked both ways).
+
+### The ratchet caught the repository's own tests (#390)
+
+Master's release gate failed 4b with `production panics/unwraps grew: 2269 -> 2272`, and the three
+sites were **my new tests** in `pallets/x3-settlement-engine/src/tests.rs`. The scanner knew about
+`#[cfg(test)]` items *inside* a file but not about out-of-line test modules
+(`#[cfg(test)] mod tests;` in `lib.rs`), so `src/tests.rs` / `src/mock.rs` were scanned as
+production. Fixed by reading each crate root and following those declarations:
+
+    production findings: 2272 -> 1330   (942 were in cfg(test)-only files)
+
+Baseline re-recorded at 1330. **Lesson: when a ratchet fires, check whether it is measuring what it
+claims before changing code** — and a count inflated by tests is how a gate gets ignored.
+
+### Verified state of master (`4fd3c6838`)
+
+Full release gate: **PASS, all 14 stages** — 2b chain runs, 2c validators agree, 2d install path,
+3 artifacts, 3c shipped genesis boots (3 validators), 3b production genesis, 3d testnet genesis,
+4 six runtime/pallet suites, 4b panic ratchet `runtime-hook=0 pallet-call=0 production=1330`,
+5 runtime variants, 6b srtool compact `0xeabb3056…` / compressed `0x67a2d8be…` match the record,
+7 secrets. Both cross-domain gates pass on master too: X3VM↔EVM 65.9s, X3VM↔SVM 78.0s.
+
+### The branch backlog, classified (read-only, `git cherry` per branch)
+
+85 local branches carry commits off master:
+
+- **34 have every patch already in master** (patch-equivalent) — safe to delete.
+- **51 carry at least one patch master does not have** — need review. Notable:
+  `feat/live-secret-release-firewall-20260911` (13), `finish/x3vm-live-transport` (9),
+  `feat/settlement-proofset-gate-20260911` (7, blocked on a product decision — see the earlier note),
+  `feat/canonical-cross-domain-proof-bundle-20260911` and `…pre-rebase-20260917` (3 each, preserved
+  after an upstream force-rebase), `docs/grant-readiness-truth-20260908` (31), `archive/*` (archival
+  by name), plus 14 dependabot bumps at 1 patch each.
+
+Do **not** blind-merge these: several are known-blocked or archival, and the content may already be
+superseded. The repo's merge-queue process (`scripts/batch-runner.sh`, `.ai/merge-queue.md`) is the
+path, with `git cherry` used to drop the 34 first.
+
+### Traps worth keeping
+
+- **`update-runtime-hashes.sh` writes HEAD, and it builds the working tree.** Recording a hash from a
+  dirty tree labels it with the *previous* commit. Commit the runtime change first, then re-attest (or
+  fix the revision line afterwards and say so) — that is what #389 did.
+- The script's "replace these in the doc" list misses the prose `current values are the 0x… pair`
+  sentence and byte counts that drift independently; grep for every old value after a re-attestation.
+- `/tmp/x3-gov` is based on an old commit line; branches authored there lack later master files (e.g.
+  `scripts/cross-domain-*-gate.sh`). `git merge origin/master` before running gates that need them.
+- The runtime's dependency closure can be read with `runtime_graph_dirs()` from
+  `scripts/check-runtime-hash-freshness.py` — that is how to check whether a parallel agent's merge
+  invalidates a recorded hash (none of the crates they touched are in it).
+
+## 2026-09-21 (fifth pass) — the release pipeline never ran; master green at 15 stages; `82564a979`
+
+### The finding (#391)
+
+`v0.4.0-rc.1` is **1,027 commits behind master** (tag commit 2026-06-10), and the workflow file *at
+that tag* asked for `ubuntu-latest` — billing-locked here — so both release runs finished in ~4
+seconds with **zero steps**:
+
+    gh run list --workflow=release-provenance.yml
+    failure  v0.4.0-rc.1  push  35389195496  4s  2026-09-18
+    failure  v0.4.0-rc.1  push  27312410591  4s  2026-06-10
+    gh api .../actions/runners  ->  x3star1 online idle, x3star2 online idle
+
+`steps: 0` is the signature of a job that was never scheduled. The workflow on master does target the
+self-hosted runners, but `workflow_dispatch` uses the workflow file at the dispatched ref and uploads
+to `github.ref_name` — dispatching on master would try to create a release called `master`. Hence the
+empty draft and `install-validator.sh --from-release` having nothing to fetch.
+
+### What landed
+
+- `scripts/mainnet/build-release-artifacts.sh <tag>` — binary, `x3-chain-node.sha256` (the file the
+  installer fetches), runtime wasm + `.gz`, SBOM when `cargo-cyclonedx` exists, optional genesis,
+  `MANIFEST.txt` (commit/toolchain/sizes/digests), `.tar.gz`, self-verified, and it prints the
+  `gh release upload` line.
+- `scripts/mainnet/release-artifacts-gate.sh` = release-gate **stage 2e**: bundle built → checksums
+  verify → manifest names HEAD → tarball extracts and the binary runs → `install-validator.sh --check`
+  accepts the bundled binary with the bundled digest → a tampered copy is rejected by the release
+  checksum file and by the installer (`sha256 mismatch`).
+- Runbook Option A now documents producing + publishing instead of only saying nothing is published.
+
+**Trap that cost a run:** the first tamper assertion verified a file against a digest computed from
+that same file — which always passes and would have "passed" forever. Verify against the *release*
+checksum file. Same family as every other false green in this repo: an assertion that cannot fail.
+
+### Master state (`82564a979`)
+
+Full release gate **PASS, 15 stages** — 2b chain runs, 2c validators agree, 2d install path, 2e
+release bundle, 3 artifacts, 3c shipped genesis boots, 3b production genesis (h30), 3d testnet
+genesis (h31), 4 six suites, 4b ratchet 0/0/1330, 5 runtime variants, 6b srtool `0xeabb3056…` /
+`0x67a2d8be…` match, 7 secrets. Cross-domain gates on master: X3VM↔EVM 65.9s, X3VM↔SVM 78.0s.
+
+### Still open, in priority order
+
+1. **Publish a release** — mechanics are now verified; it needs a coordinator decision (and a *new*
+   tag at a committed master commit; `v0.4.0-rc.1` is 1,027 commits stale).
+2. **External L2 message delivery** — `crates/external-chains` reads real chains and still refuses
+   `send_message` / `receive_messages` / `finalize_transfer`. Biggest functional gap.
+3. **Strict-posture cross-domain lifecycle** — the live gates run on a dev chain, whose genesis is
+   permissive by design; proving the strict path end to end needs the tests to produce genuine
+   external proofs (EVM receipt MPT, SVM tx, BTC SPV).
+4. **Branch backlog** — 34 branches are patch-equivalent to master (safe to delete); 51 carry work
+   master does not have (see the previous entry for the notable ones).
+5. External security audit — nothing in this repo substitutes for it.
+
+## 2026-09-21 (sixth pass) — L2 message decoding; two master-red incidents caused and fixed; `65306adb4`
+
+### #392 — Base decodes its message logs
+
+`BaseAdapter::receive_messages` was one of the refusals that needs **no signer**, so it was the
+tractable half of the external-chains gap: it used to run `eth_getLogs`, discard the logs and return
+`Ok(vec![])`. It now decodes the OP-Stack event it was named for:
+
+    SentMessage(address indexed target, address sender, uint256 value,
+                uint256 messageNonce, uint256 gasLimit, bytes message)
+
+- `evm_rpc::logs()` / `block_timestamp()` / `LogEntry` (all fields required — a defaulted block number
+  or topic is a message the relayer acts on but the chain never emitted). Log responses are arrays of
+  objects, which the module's string scanning cannot read, so **`serde_json` (alloc) is now a
+  dependency**.
+- Decoder takes every field from the log; wrong signature, missing indexed target, short head, shifted
+  offset, overrunning length are all refused.
+- Two refusals stay for honest reasons: the default `bridge_contract` is **derived from a hash**, so an
+  unconfigured adapter would filter on an address no chain deployed and report an empty queue
+  (refuses, makes no request); and a batch over `MAX_MESSAGES_PER_CALL` is refused, not truncated.
+- Evidence: 81 lib + 6 + 4 integration tests, 0 failed. The integration tests use a loopback JSON-RPC
+  stub and assert the `eth_getLogs` request filtered by messenger address, topic **and** a bounded
+  range. **Those tests need `require_escalated`** — the sandbox blocks the stub's `TcpListener::bind`.
+- Still refused: `send_message`/`initiate_transfer` (need a signer), `check_transfer_status` (needs
+  destination relay state), and Arbitrum/Polygon/Avalanche `receive_messages` (different event shapes).
+
+### #393 — I broke master's settlement test target and the bar did not notice
+
+#389 left `mock.rs` declaring the first-draft `type AllowUnattestedCrossDomainProofs = ConstBool<true>`
+(the policy moved to genesis storage) and `tests.rs` carrying four new tests without their imports, so
+`cargo test -p pallet-x3-settlement-engine` could not build — while the "15 stages green" run I
+reported passed, because **stage 4's suite list did not include the settlement engine**. `clippy
+workspace` (a fast-set gate, not part of the release bar) found it.
+
+Fixed both, and added `pallet-x3-settlement-engine` to `TEST_PACKAGES`. **Lesson: check that the suite
+list covers what the change touched; a green run of the wrong suites is the same false green as an
+assertion that cannot fail.**
+
+### #394 — the ratchet was counting test targets
+
+It then failed 4b with `1330 -> 1338`, and the eight sites were the new integration test file.
+Checking the set: **809 of 1338** "production" findings were under `tests/` directories
+(`runtime/tests/`, `node/tests/`, every `crates/*/tests/`). Cargo compiles those as their own targets;
+none can run in a release node. The scanner now excludes a package's `tests/`, `benches/`, `examples/`
+directories as well as `#[cfg(test)] mod NAME;` files:
+
+    production findings: 1338 -> 516      runtime-hook 0, pallet-call 0
+
+Third widening of the same classifier (items → out-of-line test modules → test targets); the recurring
+mistake was deciding from file contents/name instead of from how Cargo builds it.
+
+### Master state (`65306adb4`)
+
+Full release gate **PASS in one run**, all stages: 2b/2c/2d/2e, 3/3b/3c/3d, 4 (now seven suites
+including the settlement engine), 4b `0/0/516`, 5, 6/6b (`0xeabb3056…` / `0x67a2d8be…` match), 7.
+
+### Next
+
+1. Arbitrum / Polygon / Avalanche `receive_messages` decoders (`L2ToL1Tx`, `StateSync`,
+   `TeleporterMessageReceived`) — the same shape as #392, one chain at a time.
+2. Publish a release (mechanics verified in #391; needs a coordinator decision and a fresh tag).
+3. Strict-posture cross-domain lifecycle end to end.
+4. Branch backlog: 34 patch-equivalent (safe to delete), 51 with novel patches.
+5. External audit.
+
+## 2026-09-21 (ninth pass) — the archival branches DO hold unlanded work; and the proof grade was fabricated
+
+The user asked "you sure we don't have any good work on those archival branches" after I skipped them by
+name. **They were right and I was not.** Measured, not assumed:
+
+### The backlog, measured two ways
+
+- `git cherry` (patch-id equivalence): 34 branches have every patch already in master; 51 carry
+  novel patch-ids. **Patch-ids are too strict** — the same content landing by another commit shows as
+  novel, e.g. `feat: export native X3 node transport` on several 2026-09-11 branches when master
+  exports it.
+- line presence (does the added line appear anywhere in master's copy of that file): the archival-
+  prefixed branches are **not** all archival. `wip/x3lang-preserve-packets-and-arbitrage-20260919`
+  53% present (1014 lines missing), `wip/chatgpt-mainnet-attestation-20260918` **15%** (946 missing),
+  `archive/pr126-pre-master-rewrite-20260909` 13% (269 missing), `docs/grant-readiness-truth` 5%.
+  The heuristic has false positives (a reformatted variant is "missing") — `pr_supervisor.py` looked
+  missing from `archive/pr126-*` and is in master.
+- Artifact: `.ai/reports/branch-triage-20260921.md` (local).
+
+### What the archived branch was pointing at: a live fabrication (#397)
+
+`wip/chatgpt-mainnet-attestation-20260918` carried a guard whose comment called the root
+`proof-score.json` *"a fabricated success artifact (claimed grade A- / 0.92 with zero recorded test
+evidence)"*. Following it found the source:
+
+    proof-forge/src/dashboard/mod.rs::generate_dashboard(_workspace, output_file, ...) {
+        let mut dashboard = Dashboard::new();
+        dashboard.set_score(0.92);      // ← every dashboard, every workspace
+
+The same JSON recorded `compile_checks_pass: false`, every test counter `0`, `wiring_verified: false`,
+`areas_proven: []`. `scripts/publish-dashboard.sh` then invented a **second** set (0.94/"A-"/20 modules
+/per-module `VERIFIED` in an 18-row CSV), **logged a pass when the generator failed**, swallowed the
+build's exit status with `| tail -3`, and reused an existing release binary instead of rebuilding (the
+same anti-pattern as the release gate that never built its binary — it republished `A-` from a stale
+binary after the generator was fixed). Three committed artifacts carried the lie, including the
+published copy: `proof-score.json`, `public/proof-score.json`, `public/module-scores.csv`.
+
+Fixed: honest `Unverified / 0.0 / "Not assessed"` + a `reason` field, workspace existence required,
+score computation explicitly not invented (it needs `Registry::record_result`, and nothing persists a
+registry); publisher derives every published number from the generated JSON; all three artifacts
+deleted; `deploy-dashboard.yml` refuses a root `proof-score.json` if it returns; two new tests pin the
+dashboard's honesty and the missing-workspace refusal.
+
+### #398 — master's lint gate was red from someone else's merge
+
+`clippy workspace` failed on `crates/x3-oracle/src/pyth_oracle.rs` (missing `Default`, `or_insert_with`)
+after `3781d034a feat(oracle): make x3-oracle a tested workspace member` put the crate in the
+workspace. Fixed; `clippy workspace` PASS (367s). Master `7583a4ca7`.
+
+### Still unlanded, by measurement (not by name)
+
+1. `wip/x3lang-preserve-packets-and-arbitrage-20260919` — a 699-line
+   `x3-lang/compiler/src/arbitrage.rs` + tests; its commit says *"kept off master on purpose"*: the
+   declaration is decided but no artifact is emitted for it. A product decision, not a merge.
+2. `t5/fix-annotations-20260522-1458` / `your-task-branch` (88% present, 296 lines missing),
+   `ci/master-lineage-gates-20260908` (121 missing), `pr-181-check` (56),
+   `fix/production-gate-prerequisites` (50), `fix/svm-htlc-native-custody` (50) — each needs its
+   missing lines read, not the whole branch merged.
+3. `docs/grant-readiness-truth-20260908` (5% present) — old docs, likely superseded in substance.
+
+### Lesson
+
+**Do not classify a branch by its name.** Measure it, and treat the measurement as a filter for
+reading, not as a verdict — `pr_supervisor.py` was in master; the "archival" branch held the pointer to
+a live fabrication.
+
+## 2026-09-21 (tenth pass) — read the backlog line by line; one more live fabrication; `0bbe9a3d0`
+
+### What the 51 novel branches actually contain (after reading ~16 by hand)
+
+The line-presence heuristic is mostly **false positives**: wording changes, import lists, workflow
+variant, or the same code master already has. Checked individually and found already in master:
+
+    fix/agent-guard-bip39-allow          → master has #341's fix; the "missing" lines are comments
+    salvage/x3lang-intent-bridge         → master's x3-lang/numeric.py already has the isfinite guard
+    feat/x3vm-durable-recovery           → master's x3vm_htlc has from_recovery_snapshot + validation
+    feat/secret-release-firewall         → master has the firewall (#163), different shape
+    add-slippage                         → import-list differences only
+    ops/drain-actions-queue / merge/*    → a hosted-CI queue-drain workflow (moot: hosted CI is dead)
+    t5/fix-annotations / your-task-branch → imports + a parallel-proposer shard loop master has
+    ci/master-lineage-gates, pr-181      → workflow YAML variants and branch-protection docs
+
+**Two hold real unlanded work:**
+
+1. `codex/x3-economic-safety-kernel` — master's `x3-lang/compiler/src/ir.rs` *documents* that
+   `max_total_cost` is hardcoded and `max_price_impact_bps`/`max_mev_leakage_bps` are set equal to
+   `max_slippage_bps`. The branch adds the real fields (2 patches, ~3.6 k lines). A trading-safety
+   feature: needs a product decision, not a merge.
+2. `fix/foundry-real-evm-deploy` — master has no `evm_deploy` / `compile_contract_bytecode`; the branch
+   adds a real deployment path (`forge build --json` creation bytecode + ethers).
+
+### #399 — following (2) found a live fabrication on master
+
+`crates/x3-foundry-core/src/deployer.rs` invented every field of a deployment receipt and logged it as
+one:
+
+    address       = sha256(name + source.len() + chain + deployer_key)
+    tx_hash       = sha256("deploy-<name>-<chain>-<now>")
+    block_number  = wall clock
+    gas_used      = 500_000 + lines * 10_000
+    info!("Deployed {} at {} (tx: {})", …)
+
+`DeployedContractInfo` had no field saying so (`verified: false` reads as "not yet verified on an
+explorer"), and there are no consumers outside the crate. Fixed by renaming to
+`simulate_deploy_contracts`, adding `simulated: bool` (always true) with each field documented as
+derived locally, an honest log line, and a test asserting `simulated`/`!verified`. `gate_on_audit`
+(which really does refuse a contract that does not compile) stays.
+
+### Master state
+
+`clippy workspace` **PASS** (585s) on `0bbe9a3d0`; `cargo test -p x3-foundry-core` 48 passed.
+
+### Same class, twice in two passes
+
+The proof dashboard (#397) and the foundry deployer (#399) are the same defect: a shipped artifact that
+reports success nobody produced. Both were reachable from the backlog reading. **When reading an old
+branch, ask what the branch says was wrong — `wip/chatgpt-mainnet-attestation` and
+`fix/foundry-real-evm-deploy` each named a live lie on master.**
+
+## 2026-09-21 (eighth pass) — Base works unconfigured; the last two refusals say why; `7bb5fe2f3`
+
+### #396 — emitters are predeploys; the remaining refusals are not TODOs
+
+**Base.** `receive_messages` filtered `eth_getLogs` by `config.bridge_contract`, whose default is
+hash-derived — so an out-of-the-box adapter queried an address no chain deployed and answered an empty
+queue for a chain that has messages. The emitter is the OP-Stack `L2CrossDomainMessenger` **predeploy**
+(`0x4200…0007`), part of genesis, not something an operator deploys, so the filter is that constant
+now (the ArbSys shape). The integration test proves the request names the predeploy *even when*
+`bridge_contract` is set to a wrong address, and that the wrong address is absent from the request.
+
+**Polygon's refusal was mislabelled a TODO.** `StateSync` is emitted by the StateSender on **Ethereum**,
+not on Polygon; this adapter reads a Polygon endpoint, where the event does not exist. A query here can
+only ever answer an empty queue — the lie the method used to tell. Observing one needs an Ethereum-side
+watcher whose messages *target* Polygon: a different component, not a decoder here.
+
+**Avalanche's is a genuine shape mismatch**, and the error now lists it: `teleporterMessageID` is 32
+bytes against a `u64` nonce; `destinationAddresses` is a list against a single `recipient`; fees are
+per-token arrays so `value` has no single meaning; and the event states no gas limit or timestamp.
+Since **nothing outside these adapters reads `ChainMessage`** (`grep` over the crate is empty), adding
+those fields now would be designing blind — the requirement is stated instead of guessed.
+
+### Chain scoreboard after this
+
+    Base (SentMessage)         decodes — predeploy filter, no config needed
+    Arbitrum (L2ToL1Tx)        decodes — ArbSys constant
+    Polygon (StateSync)        refuses — event lives on Ethereum, not on this adapter's chain
+    Avalanche (Teleporter…)    refuses — cannot be represented without losing data
+    BNB                        refuses (untouched)
+
+### Verified on master
+
+`cargo test -p x3-external-chains` 87 lib + 6 + 6 integration, 0 failed; `clippy workspace` **PASS**
+(576s); panic ratchet `0/0/516`.
+
+### Next
+
+1. **Sending is still the gap.** Every adapter refuses `send_message` / `initiate_transfer` (no signer)
+   and `check_transfer_status` (needs destination relay state). Reading two chains' messages is not a
+   bridge.
+2. Publish a release (mechanics verified in #391; needs a coordinator decision + a fresh tag).
+3. Strict-posture cross-domain lifecycle — the *first* gate is unit-proven; an end-to-end run needs a
+   registered external header and a proof bound to it (TICKET-063's binding), which is relayer work.
+4. Branch backlog: 34 patch-equivalent (safe to delete), 51 with novel patches.
+5. External audit.
+
+## 2026-09-21 (seventh pass) — Arbitrum decodes too; 2 of 4 chains; `9f16ac461`
+
+### #395 — `L2ToL1Tx`, filtered by ArbSys
+
+The second chain decoder, and the cleanest of the four: the event carries everything a message needs
+including `timestamp`, and its emitter is a **system predeploy** (`ArbSys`, `0x…64`), not a deployable
+contract.
+
+    event L2ToL1Tx(address caller, address indexed destination, uint256 indexed hash,
+                   uint256 indexed position, uint256 arbBlockNum, uint256 ethBlockNum,
+                   uint256 timestamp, uint256 callvalue, bytes data);
+
+- The filter is the **`ARBSYS_ADDRESS` constant**, not `config.bridge_contract`. That is deliberately
+  different from the Base adapter: for this event the emitter is part of the chain, so a configurable
+  filter is a way to answer "no messages" for a chain that has them.
+- Two fields are named in the docs and pinned in tests instead of guessed: `nonce` is the outbox
+  `position`, and `gas_limit` is 0 **because the event states none** — a consumer must not read that
+  zero as a limit the chain chose.
+- Tests: 6 decoder units (wrong signature, missing indexed fields, short head, shifted offset,
+  overrunning length all refused) + 2 stub integration tests (full decode; request filtered by ArbSys,
+  topic and bounded range; truncated log is an error). Crate suite now 87 lib + 6 + 6 integration.
+- `adapters_refuse_unimplemented_operations.rs` now **skips Base and Arbitrum** in the
+  "must not answer the message queue" loop, because their default configs point at real mainnet
+  endpoints and because the property is proven more strongly for them by the stub tests. Polygon,
+  Avalanche and BNB still refuse and are still asserted.
+
+### Chain decoder scoreboard
+
+    Base (SentMessage)          decodes   needs a configured messenger address (default is hash-derived)
+    Arbitrum (L2ToL1Tx)         decodes   ArbSys constant, no config needed
+    Polygon (StateSync)         refuses
+    Avalanche (Teleporter…)     refuses
+    BNB                         refuses
+
+### Verified after merge
+
+`clippy workspace` on master — **PASS** (619s; it builds every target including the new test files, and
+it is the gate that caught the #393 regression). Panic ratchet `0/0/516`; the new test code is
+correctly excluded as test targets, which is #394 working.
+
+### Next
+
+1. Polygon `StateSync` and Avalanche `TeleporterMessageReceived` decoders (Polygon's carries no
+   sender/value/timestamp — the mapping has to be stated, not invented; Avalanche's has array fields).
+2. Publish a release (mechanics verified in #391; needs a coordinator decision plus a fresh tag).
+3. Strict-posture cross-domain lifecycle end to end.
+4. Branch backlog: 34 patch-equivalent (safe to delete), 51 with novel patches.
+5. External audit.
+
 ---
 
 ## Round 79 — 2026-09-20 — a claim names its lock, so a book settles as one unit (TICKET-080 CLOSED)
@@ -5505,3 +5905,656 @@ No code this turn; two **verification** artifacts, which is what the ledger need
 - Instrument note: `--out`/`-o` vs positional arguments differ per command, and a wrong invocation (exit 2
   from clap) reads exactly like a failing check if you do not capture the exit code separately from a
   pipe. Use `${PIPESTATUS[0]}`, not `$?`, after a pipe.
+
+## 2026-09-22 (producer turn) — the receipt proof is now produced, and two guard traps closed
+
+Merged `#416` / `5faa23f27` and `#419` / `df1a40936`. **Another agent is pushing to master concurrently**
+(`#417` deps, `#418` branch reconciliation, plus `docs(workspace)` commits and the e2e fix) — always
+`git fetch` and rebase before running gates, and expect the base to move mid-turn.
+
+### `#419` — `prove_evm_receipt` in `crates/x3-relayer/src/evm_receipt_proof.rs`
+
+`submit_proof` had no reachable caller outside the pallet's tests: the verifier existed, the producer did
+not. The producer fetches a block's receipts in order, encodes each in **consensus** form (EIP-2718 type
+byte included), builds the trie, and returns `ReceiptInclusion { block_number, block_hash, state_root,
+receipts_root, receipt_index, receipt_rlp, trie_proof, confirmations }`. It refuses to guess a root (the
+trie root must equal the *header's* `receiptsRoot` or it errors naming both), and it verifies its own
+path with `verify_merkle_patricia_proof` before returning.
+
+Traps found while writing it:
+
+- **A hex quantity is not a byte string.** `status: "0x1"` fails `hex::decode` ("odd number of digits");
+  quantities (`status`, `cumulativeGasUsed`) need pad-to-even decoding.
+- **anvil reports every receipt as type 2**, even for `eth_sendTransaction` with `type: "0x0"`. Legacy
+  shapes therefore belong in unit tests, not chain tests.
+- `eth_getBlockReceipts` exists on anvil; keep a fallback that walks the block's transactions.
+- Anvil-backed tests need **distinct ports per test** (tests run in parallel) and `require_escalated`
+  here, because localhost sockets are blocked in the sandbox.
+
+### `#416` — the guard's secret scan treated a Rust path as an assignment
+
+`make guard` was red on master: `\b(mnemonic|private_key|…)\b\s*[:=]\s*['\"]?[^'\"\s]{8,}` matched the
+first colon of `Mnemonic::from_phrase`, so prose or code naming a type and a method was reported as
+"secret-like material". The separator is now `(?::(?![=:])|=)`. `tests/test_agent_guard.py` covers both
+sides (prose and paths are not secret-like; five assignment shapes and the AKIA/PEM patterns still are).
+
+### The follow-up trap: a test for the scanner is scanned by it
+
+`tests/test_agent_guard.py` reddened the guard for its own fixtures — twice, in two batches (the PEM/AKIA
+literals, then the assignment literals). Anything secret-shaped in a tracked file must be **assembled
+from pieces**, never written literally: `"sk_live_" + "abc…"`, `"-----BEGIN " + "RSA PRIVATE KEY-----"`.
+
+### Next
+
+1. Adapt `ReceiptInclusion` → the pallet's `SettlementProof` (thin; needs a client that depends on the
+   pallet — `crates/x3-crosschain-intent` already does) and submit it.
+2. A header source for `x3_relayer`'s EVM verifier (it uses `NoEvmHeaderAnchor`, so it fails closed).
+3. `LastEvmHeader` is a single slot; only heights with a recorded root are provable — design pass due.
+
+## 2026-09-22 (submission turn) — the relayer posted JSON where an extrinsic was required
+
+Merged `#422` / `df8f7d885`. Chasing "who submits the proof" found the submission path was fabricated.
+
+### The defect, with the live evidence
+
+- `RpcSubmitter::submit_evm_proof` / `submit_svm_proof` built a **JSON** payload
+  (`{"pallet":"x3Verifier","call":"submitEvmProof",…}`) and posted it to `author_submitExtrinsic`.
+  Against a dev node: `-32602 Invalid params: invalid hex character: {`. A hex string that is not an
+  extrinsic gets `1040 Could not decode OpaqueExtrinsic.0`.
+- `submitEvmProof` exists nowhere else: `pallet-x3-verifier`'s calls are register_executor, submit_job,
+  submit_receipt, dispute_receipt, toggle_verification, deactivate_executor.
+- Two other builders in the file were unreachable and malformed: call data was a bare `3u8` (call index,
+  **no pallet index**), the signature covered zeroed genesis/block hashes and none of the runtime's signed
+  extensions, and the signer fell back to `//Alice`.
+
+### The fix
+
+- Submit methods refuse, naming the requirement (runtime-aware signer: `SignedExtra` + call encoding) and
+  the configured signing authority. The four fabricated builders, `encode_deposit_proof` and
+  `build_signed_extrinsic` are deleted (~400 lines), and the test that pinned the JSON shape now asserts
+  the refusal.
+- `X3RuntimeSigner::sign_submit_proof(intent_id, chain, proof)` (node) is the real builder for the
+  settlement engine's `submit_proof`. Its unit test encodes the call and decodes it back through
+  `RuntimeCall`, which is the check the JSON could never pass.
+
+### The design question this leaves (needs the owner's call)
+
+The relayer's EVM pipeline is `EvmProof { source_domain, block_hash, state_root, finalized_block,
+proof_nonce }` — no intent — while the settlement engine's `submit_proof` is per-intent
+(`SettlementProof`). So "the relayer submits the proof" has to be decided: does the pipeline attest headers
+for the validator pallet (an anchor), submit a settlement proof for an intent it tracks, or something else?
+Until that is decided the pipeline verifies and refuses. Enabling it afterwards needs a client that can
+encode the runtime's calls, i.e. the node's `X3RuntimeSigner` extracted into a library crate the relayer
+can depend on (`node/src/` is a binary).
+
+### Environment notes from this turn
+
+- A dev node binary from an earlier worktree is at `/tmp/x3-strict-target/debug/x3-chain-node` — handy for
+  RPC-behaviour checks without a fresh 5-minute build. Run it in a session (foreground) and poll; a
+  backgrounded `( … & )` dies with the shell. Kill with `pkill -f "x3-chain-nod[e]"` (the bracket stops
+  the pattern matching the calling shell).
+- `cargo test -p x3-chain-node --lib` needs `WASM_BUILD_TOOLCHAIN`/`WASM_BUILD_WORKSPACE_HINT` and network.
+
+## 2026-09-22 (adapter turn) — produced inclusion → the engine's proof
+
+Merged `#423` / `1af5f0c0c`. The last piece of the chain that does not need the open design decision.
+
+`ReceiptInclusion::settlement_proof()` maps a produced inclusion into
+`pallet_x3_settlement_engine::SettlementProof`, with the traps stated where they happen:
+
+- **`tx_hash` is the *receipt's* hash** (`keccak256(receipt_data)`), not the transaction hash. The engine
+  requires `keccak256(receipt_data) == proof.tx_hash` and its comment claims the two "are the same in
+  Ethereum"; they are not. The transaction hash stays a lookup key.
+- `merkle_proof` = `[state_root, receipts_root]`, in the order the engine reads them; fewer than two roots
+  is refused before anything else.
+- `chain_height`/`receipt_index` are `Some` (the engine refuses unstated ones — TICKET-061/063).
+- `MAX_RECEIPT_DATA_SIZE` is 1024 and `MAX_TRIE_PROOF_SIZE` 2048: an oversize receipt is an error naming
+  size and limit, never a truncation. A receipt with many logs can reach 1024.
+
+Tests: one asserts every engine precondition in a single place with its reason; one covers both oversize
+cases; the anvil-backed test adapts a real block's proof and checks the receipt hash and root order.
+
+### Worktree hygiene lesson
+
+In `/tmp/x3-submit` I committed onto `fix/relayer-real-submission` (already merged) instead of a new
+branch, so the push failed with "src refspec … does not match any". Fix: `git checkout -b <new>`, then
+`git branch -f <old> <old-merged-tip>`. Check `git branch --show-current` before committing when a
+worktree has already had a PR merged from it.
+
+### Next (in order)
+
+1. **Strict-posture end-to-end, EVM leg**: boot the node with the strict spec, attest an anvil block's
+   receipts root in the validator pallet (needs `set_authorized_submitters` via Root and
+   `validate_evm_header` with a single-leaf proof whose leaf *is* the receipts root), submit the proof with
+   `X3RuntimeSigner::sign_submit_proof`, then assert an external bundle is refused without it and accepted
+   with it. Everything needed now exists.
+2. Decide the relayer's on-chain action shape (`EvmProof` has no intent) before it can submit.
+3. Extract `X3RuntimeSigner` into a library crate so a relayer can sign runtime calls at all.
+
+## 2026-09-22 (anchor-live turn) — a live chain really does populate the verifier's anchor
+
+Merged `#424` / `17d1a6053`. Until this, "the verifier is anchored" (#415) was a claim about code paths no
+chain had run: the anchor was unit-tested against a mock store.
+
+### The path, which is not the obvious one
+
+This genesis configures **no sudo key** (the dev spec has no `sudo` section, so `pallet_sudo`'s `Key` is
+unset and sudo calls fail), and `set_authorized_submitters` needs `AdminOrigin` = Root or half the council,
+which no signed account is. The reachable route is a **council proposal with threshold 1**:
+`pallet_collective::propose` takes the fast path `do_propose_execute` when `threshold < 2`, so one member's
+proposal *is* the execution — one extrinsic, no vote, no close. Council members on dev: Alice, Bob.
+
+New `X3RuntimeSigner` methods: `sign_council_propose(call, threshold)` (length bound from the call's own
+encoding), `sign_enroll_header_submitters(submitters)`, and
+`sign_validate_evm_header(number, hash, state_root, receipts_root, proof)`.
+
+### The proof, and how the test fails if it lies
+
+`real_evm_header_attestation_populates_the_verifiers_anchor` (in `node/tests/x3vm_evm_live.rs`, added to the
+EVM gate) boots a node against a running anvil and asserts, in order: the anchor's store is empty; a council
+proposal enrolls the signer (dispatch success, not "no error"); the block attested is one anvil actually
+produced; and `EvmMerkleRoots[number] == that block's receiptsRoot` while `LastEvmHeader` holds the same
+block — the two values the anchor reads, with the stored `EvmHeaderInfo` decoded.
+
+Traps hit while writing it:
+
+- **A fresh anvil has only block 0.** The test must send a transaction first, or it attests an empty block.
+- **anvil returns the tx hash before the block exists.** Reading `latest` immediately is a race; wait for
+  `eth_getTransactionReceipt` and use the block *it* names. This is what the first two runs failed on.
+- Single-leaf Merkle: the validator pallet's `merkle_root_of([leaf]) == leaf`, so a real receipts root is
+  attested with `proof = receipts_root.to_vec()` and `merkle_root = receipts_root`.
+
+### Next (the last step of the strict-posture run)
+
+An intent must be FullyFunded/ExecutingExternal for `submit_proof`, and the engine checks
+`proof.confirmations >= ChainFinality(chain)` — while the anchor's header check compares against
+`LastEvmHeader`. So the sequence is: attest block N, mine k more anvil blocks with `anvil_mine`
+(`k >= confirmations_required`), then submit the produced+adapted proof for N with `confirmations = k`.
+Then the bundle: refused without the recorded proof, accepted with it.
+
+## 2026-09-22 (composed-path turn) — the whole EVM settlement path ran on a live chain
+
+Merged `#425` / `558ddcca3`. The strongest evidence of the session, and it passed on the first run.
+
+`real_evm_receipt_proof_is_accepted_against_the_attested_header` (node/tests/x3vm_evm_live.rs, in the EVM
+gate) does, against a live node and a running anvil:
+
+1. mines a transaction, has `x3_relayer::evm_receipt_proof::prove_evm_receipt` build the inclusion
+   (confirmations 0, read from the head);
+2. enrols the signer by council motion and attests that block's receipts root;
+3. mines past Ethereum's **12** confirmations and re-produces, so the depth the engine checks is one the
+   producer read rather than asserted;
+4. creates an intent with an X3-native and an Ethereum leg and locks both legs (the engine accepts a proof
+   only for a funded intent: `FullyFunded | ExecutingExternal`);
+5. `sign_submit_proof(intent_id, Ethereum, adapted_proof)` is **accepted** — proof type, depth, the header
+   *against the attested one*, and the receipt walk to the attested root all held. Asserted by dispatch
+   success.
+
+It fails at three distinct points against the code as it was when this session started: the MPT walk
+refused every real block (#410), the verifier took its header from the proof (#415), and nothing produced
+a proof (#419/#423).
+
+### Worktree lesson, repeated
+
+For the second time I committed onto a branch whose PR had already merged, and the push failed with "src
+refspec does not match any". Fix: `git checkout -b <next>`, `git branch -f <merged-branch> <its-merged-tip>`.
+**Do this immediately after a merge, before writing code, not after the failed push.**
+
+### The one remaining step (bundle gate), with its trap
+
+`CrossDomainProofSet` + `CrossDomainProofBundle` for the Ethereum domain, submitted before the proof is
+recorded (expect refusal) and after (expect acceptance). The trap: `require_verified_external_bundle`
+compares `bundle_tx_hash(bundle.tx_id)` with the stored `proof.tx_hash`, and for EVM that stored value is
+**`keccak256(receipt_data)`**, not the transaction hash — so the bundle's `tx_id` must be the receipt hash
+or a correct proof looks unverified. The `CrossDomainProofBundle.tx_id` field has no doc saying so, and
+`crates/x3-atomic-swap` is in the runtime graph, so documenting it there needs a hash re-attestation —
+batch it with other runtime-graph changes.
+
+Also needed for that test: an `AtomicIntent` (client type) whose hash matches the on-chain intent — the
+lifecycle test's `atomic_intent(local_id, preimage)` helper is the pattern, and my intent's asset pair
+(X3-native + Ethereum) differs from its (X3-native + X3-native), so the helper needs generalising or the
+intent does.
+
+## 2026-09-21 (later) — master's guard was red; mobile SDK claimed enclave storage; `57a9e0124`
+
+### Reading the backlog line by line changed three verdicts
+
+- `codex/x3-economic-safety-kernel` is **not salvageable**: master *deliberately removed* those ceilings —
+  its own comment says they were "removed here rather than left unenforced … read only by
+  `EconomicPolicy::validate_not_weaker_than`, which compared each one against a copy of itself". The
+  branch re-adds ceilings the host boundary cannot supply evidence for.
+- `fix/foundry-real-evm-deploy` is real → led to #399.
+- `fix/agent-guard-bip39-allow` is **not** superseded → led to #400. I had dismissed it a pass earlier.
+
+### #400 — `make guard` was red on master
+
+`[agent_guard] blocked: secret-like material detected` on `mobile_wallet_core.rs:138-140`. Two causes:
+
+1. parallel merge `f07ee5a62` added a broad rule — any assignment to a `mnemonic`/`private_key`-like
+   name of eight or more characters. `let mnemonic = bip39::Mnemonic::parse_in(...)` matches it, and so
+   does prose (`Mnemonic::parse_in` supplies `[:=]` via the `::`).
+2. the existing allow entry covered the **1.x** constructor, which the crate no longer calls.
+
+Fixed with a precise allow for the constructor call plus rewording the two comments that tripped it —
+the guard stays strict rather than learning to ignore prose.
+
+**Trap:** the guard scans `git ls-files`, so a *tracked* file under `.ai/reports/` can fail the gate for
+everyone. Keep prose there free of patterns like `Type::method` after an `=`/`:`.
+
+### #401 — two security claims the code does not keep (same class as #397/#399)
+
+- `biometric_auth_mobile` claimed "secure enclave storage on iOS and Android KeyStore" and Face ID /
+  fingerprint / iris / PIN. It hashes **caller-supplied bytes** into a `Mutex<Vec<BiometricTemplate>>`:
+  possession of an in-process value, not a biometric.
+- `transaction_signer_mobile` claimed signing "without exposing private keys" with keys "stored securely
+  (in production: … KeyStore)". Keys are a `Mutex<HashMap<String, Vec<u8>>>` on the heap; removal
+  zeroizes (real) and there is no Keychain/enclave/KeyStore call in the crate.
+
+Both now expose the fact as a value — `uses_platform_secure_storage()` and `keys_are_platform_backed()`,
+`false`, documented with what would make them true, each pinned by a test.
+
+### Master state and the scan worth repeating
+
+`make guard` → three oks; `clippy workspace` **PASS** (552s); `cargo test -p x3-mobile-sdk` 69 passed.
+
+```
+rg -n "fn (simulate|mock|fake|demo)_" ...
+rg -n 'info!\(|println!\(' | grep -iE "deployed|published|verified|settled|completed|success"
+```
+
+Three fabrications in three passes came from that class, two of them named by what an old branch said
+was wrong. The remaining hits were legitimate (`simulate_trade_path`, dry-run APIs, metrics logs).
+
+## 2026-09-21 (later still) — external-chains can SEND: Base broadcasts a real transaction; `ec241c258`
+
+The biggest functional gap was that every adapter refused to send ("no signer"). Base now sends, and the
+test proves it on a chain.
+
+### How it is built (`#402`)
+
+```
+nonce      eth_getTransactionCount(..., "pending")   ← `latest` collides with the mempool
+gas_price  eth_gasPrice
+gas_limit  eth_estimateGas + GAS_ESTIMATE_MARGIN_PERCENT (25)
+calldata   sendMessage(address,bytes,uint32) to L2_CROSS_DOMAIN_MESSENGER (0x4200…0007)
+signing    x3-atomic-swap::ethereum_tx (the workspace's ONE EIP-155 implementation),
+           added to external-chains as an optional std-only dependency — no second signer
+broadcast  eth_sendRawTransaction → the hash the node assigned
+```
+
+`BaseAdapter::new()` still refuses to send; `with_signer(config, EvmSigner)` is the one that can.
+`EvmSigner::from_private_key` derives and checks the address up front, and key material never enters
+`ChainConfig` (SCALE-encoded, logged, serialised). `evm_rpc` gained `transaction_count`,
+`estimate_gas`, `send_raw_transaction` (the last refuses a result that is not a 32-byte hash).
+
+### Evidence (a real chain, twice) — `tests/send_message_broadcasts.rs`
+
+Spawns `anvil`; asserts: signer address == derived address; send returns a non-zero hash;
+`get_transaction_receipt` returns a **mined** transaction with `success == true` in a real block; pending
+nonce goes **0 → 1 → 2** across two sends (so the nonce is read from the chain); an adapter built with
+`new()` refuses to send. Requires `anvil` on PATH, the same requirement as the EVM lifecycle gate.
+
+### External-chains scoreboard after this
+
+    Base      receive ✔ (predeploy filter)   send ✔ (signed, anvil-proven)   transfer ✗  status ✗
+    Arbitrum  receive ✔ (ArbSys)             send ✗                          transfer ✗  status ✗
+    Polygon   receive ✗ (StateSync is on Ethereum, not on this adapter's chain)
+    Avalanche receive ✗ (TeleporterMessageReceived cannot be represented without losing data)
+    BNB       ✗
+
+### Master state
+
+`cargo test -p x3-external-chains` 87 lib + 6 + 6 + 2 = **101 passed** on master; `clippy workspace`
+**PASS** (533s).
+
+### Next
+
+1. The same signer for Arbitrum (its `send_message` builds a `sendL2Message` calldata already).
+2. `initiate_transfer` (a deposit path) and `check_transfer_status` (destination relay state) — the two
+   refusals that remain on Base.
+3. Strict-posture cross-domain lifecycle end to end; publishing a release; external audit.
+
+## 2026-09-21 — re-verifying "is there good work on the archival branches?" — two real gaps, both landed
+
+The earlier triage classified branches by comparing added lines against **the same file** on master, which
+is wrong in both directions. This round re-did it three ways and the answer changed.
+
+### Method that actually settles it
+
+1. Patch-id equivalence across every remote branch (901 non-merge commits on master, 817 commits
+   reachable from branches but not master, 432 with a patch-id absent from master).
+2. Global content test: master's whole tree reduced to 2.7M unique normalised lines, then each branch's
+   added lines checked against that set (not against the same file).
+3. Read the code. **Patch-id inequality is not evidence of missing work** — `3873420c0` (x3-pq "fails
+   closed") has no equivalent patch on master and yet master's `x3-pq` already fails closed; the private
+   mempool hardening, the SVM native-custody payout, the EVM receipt verification and the whole trading
+   core (`ReceiptReplayLedger`, `max_cumulative_loss`, `simulate_atomic`) are all on master under
+   different patches. Conversely a branch can carry real work under a name that sounds stale.
+
+### Landed this round
+
+- `#403` / `eb7f36130` — **`on_vote` accepted votes with no verified proposal.** `on_new_block` sets
+  `round.block_hash` before it knows whether it can build a signed proposal, and `produce_certificate`
+  reads only `block_hash` + votes, so enough votes for that hash produced a finality certificate for a
+  round this node never proposed or accepted a proposal for. Reproduced by running the salvaged test
+  against unmodified master: `test_votes_without_a_proposal_never_reach_quorum` — `cert2` was `Some`,
+  test FAILED. After the fix: 19 passed.
+- `#404` / `88020532a` — `x3-foundry-core` deploys for real. `#399` had only renamed the fabrication to
+  `simulate_deploy_contracts`; this replays the unlanded `fix/foundry-real-evm-deploy` work onto current
+  master (`ethers` + new `evm_deploy.rs`, receipts straight from the node). Reconciliation cost: master's
+  `simulate_…` rename conflicts in `deployer.rs` (took the real path), the caller in `lib.rs` had to be
+  renamed, and the PR's `PythOracle::default` hunk had to be **dropped** because master landed it in
+  `5ceeea2b3` and the auto-merge produced a duplicate `impl Default`. Proof: check + clippy clean,
+  29 auditor + 52 core tests, including real-anvil end-to-end deployment.
+
+### Deliberately off master (do not "salvage" these again)
+
+- the x3-lang WIP branches (`wip/x3lang-preserve-packets-and-arbitrage-20260919`,
+  `wip/x3lang-arb-graph-filter-20260919`, `archive/stale-x3lang-trading-wip-20260918`): master's
+  `arb.rs` is the *newer* PHASE 37 (it has `venue_standings`; the branches are missing it), and the
+  branch-only `arbitrage.rs` is a **second** PHASE 37 — duplicate work, named as such by the commit that
+  preserved it (`1bfaa5243`, "kept off master on purpose");
+- `codex/x3-economic-safety-kernel` — master removed those ceilings on purpose;
+- `preserve/*` and `archive/local-20260920/*` are snapshots *behind* master (`+0/-756` style diffs), not
+  ahead of it. Every `+0/-N` result means the branch is master-minus-N-lines.
+
+### Standing traps
+
+- `git diff master branch` (two-dot) is dominated by files master deleted since; the per-file line test
+  flags older versions of lines master has in better form. Neither is evidence on its own.
+- Local `master` in the main worktree is still **8 ahead / 10 behind** origin. The code commit among
+  those eight (`a4f63684c`) is now on origin as `1e5ef77e6`; the rest are doc/evidence commits and the
+  bip39 guard fix that landed as `#400`.
+
+## 2026-09-21 (later still) — two more landed: Arbitrum can send, and the cross-domain gates run in mainnet's posture
+
+### `#405` / `93d87358f` — Arbitrum sends via `ArbSys.sendTxToL1`
+
+`signer::EvmSigner` moved out of `chains::base` into the shared `crate::signer`; `with_signer` is the only
+constructor that can send, `new()` still refuses. `encode_send_tx_to_l1` is the `sendTxToL1(address,bytes)`
+shape (two head words + bytes tail), the selector is derived with keccak-256, and
+`tests/arbitrum_send_message.rs` proves it against anvil: the selector pinned to `cast sig` =
+`0x928c169a`, the calldata checked word by word, and the accepted transaction read back from the node
+(`to` = ArbSys `0x…64`, `input` = the encoded call). Nonce 0 → 1 → 2 across two sends.
+
+Remember: `cargo test -p x3-external-chains` needs `OPENSSL_DIR=/usr OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
+OPENSSL_INCLUDE_DIR=/usr/include`, or the linker picks up Homebrew's OpenSSL and dies on `__isoc23_strtol`.
+
+### `#406` / `c6ccdcd50` — the cross-domain gates now run the posture mainnet uses
+
+`AllowUnattestedCrossDomainProofs` is genesis state: `true` on dev/local, `false` everywhere a validator
+can join. Both live cross-domain gates booted the dev chain, so the *only* end-to-end proof of the
+cross-domain leg ran under the policy production never uses.
+
+`X3_STRICT_CROSS_DOMAIN_PROOFS=1` now builds a dev spec with that one field flipped, and the harness reads
+`X3SettlementEngine.AllowUnattestedCrossDomainProofs` over `state_getStorage` and requires `0x00` *before*
+the lifecycle starts — so a run that ignored the spec fails rather than passing as "strict". Negative
+control (point it at the permissive spec) fails with `the chain reports 0x01`; strict EVM and strict SVM
+both pass. `scripts/local-ci.sh` runs the strict EVM gate.
+
+Two gate-path bugs fell out of it: under a redirected `CARGO_TARGET_DIR` the SVM gate looked for the
+program `.so` and the broadcaster binary only under the program's own `target/` and reported a successful
+build as "missing after build-sbf".
+
+**Build trap:** the nested substrate wasm build needs
+`RUSTUP_TOOLCHAIN=1.90.0-x86_64-unknown-linux-gnu WASM_BUILD_TOOLCHAIN=1.90.0-x86_64-unknown-linux-gnu
+WASM_BUILD_WORKSPACE_HINT=<worktree>` when `CARGO_TARGET_DIR` points outside the worktree, or it resolves
+the default toolchain, finds no `wasm32v1-none` std, and dies in `crypto-common`.
+
+### Open on this path
+
+1. **The strict run does not exercise the external-leg rule.** Both lifecycles submit X3-native bundles,
+   which never require a verified proof. `require_verified_external_bundle` is unit-proven, but no live
+   component produces its input: an EVM proof needs a receipt MPT proof against a root an authorized
+   submitter of `pallet-cross-chain-validator` stored. On mainnet an EVM/SVM leg therefore settles on the
+   attester set, not an independent light client.
+2. **Intermittent `-32602: Failed to decode transaction` from anvil on the EVM lock** — 2 failures in 13
+   strict runs, 0 in 6 dev runs, none reproduced after the diagnostic landed. The RPC error now carries
+   the request it answered, truncated; that is what the next occurrence needs.
+
+## 2026-09-21 (last of the session) — the EVM receipt path could not verify a real block at all
+
+Merged `#410` / `7e5924309` and `#411` / `a89dc63f3`. This started as "build the missing proof producer"
+and turned into three defects found in order, each one hidden by the one above it.
+
+### The producer
+
+`x3-verification-router::evm_receipt` now has `receipts_trie_root(&[Vec<u8>])` and
+`receipts_trie_proof(receipts, index)`, beside the verifier so the two cannot drift into different key
+conventions. Recursive MPT over `rlp(index)` keys, hex-prefix paths, children hashed when their RLP is
+>= 32 bytes. `EMPTY_RECEIPTS_TRIE_ROOT` included.
+
+### Defect 1 — the walk refused every multi-transaction block
+
+`verify_merkle_patricia_proof` required a branch node to be the **last** proof node (`if i != last ->
+BadProof`). A receipts path is branch → … → leaf, so every real proof was refused; only a one-receipt
+block (a single leaf at the root) ever passed. Found by pointing the producer at a real anvil block.
+
+### Defect 2 — leaf vs extension read the wrong bit
+
+The hex-prefix flag is `2 * leaf + odd`. The walk used `first_nibble & 1`, the odd/even bit, so a leaf
+whose remaining path had an odd nibble count was walked as an extension. Keys are `rlp(index)` (always an
+even nibble count), so this only shows on leaves at an odd depth — which is most leaves once a block has
+more than one transaction.
+
+**The fixture is what found both.** `crates/x3-verification-router/tests/data/anvil_block1_receipts.hex`
+is `debug_getRawReceipts` from a real anvil block (3 legacy transfers). The decisive assertion is
+`receipts_trie_root(fixture) == header receiptsRoot`.
+
+### Defect 3 — typed receipts were refused before the walk
+
+Both `pallet-x3-settlement-engine::is_valid_receipt_rlp` and the router's `EvmReceipt::decode` required an
+RLP list prefix on the raw bytes; a typed receipt is `type || rlp(payload)`, so every EIP-1559 leg was
+refused as malformed. The type byte stays in `receipt_data` (the leaf holds it and keccak covers it) and
+is skipped only structurally. `TYPED_RECEIPT_TYPES = [0x01, 0x02, 0x03, 0x04]` lives in the router and
+both verifiers use it; an unknown type is refused rather than walked with another type's assumptions.
+
+### What is left on this path (in order)
+
+1. **A client-side producer**: fetch a block, RLP-encode receipts in consensus form, fill
+   `receipt_index` / `trie_proof` / `merkle_proof` and submit `submit_proof`. The trie logic exists; the
+   RPC-to-`SettlementProof` glue does not.
+2. **The trust root is the attester set**: `RuntimeCrossChainValidator` -> `verify_settlement_evm_header`
+   compares against `LastEvmHeader`, one stored header written by an `AuthorizedSubmitters` account. The
+   inclusion is now cryptographically verified; the header is an attestation.
+3. **`LastEvmHeader` is a single slot**, so only the most recently attested block's receipts are provable,
+   and `proof.confirmations` is caller-supplied rather than derived from a chain head. Needs a design pass.
+4. `cargo test -p x3-crosschain-gateway` fails 5 tests on master (and after these fixes), all
+   `VerificationFailed("no verifier implemented for this strategy: failing closed")` — the test router
+   registers no verifier for the strategy its envelopes declare, so the gateway credit path is untested.
+
+### Worktree hygiene for next time
+
+- The receipts-trie worktree is `/tmp/x3-receipts` (branches `feat/evm-receipt-proofs`,
+  `fix/typed-evm-receipts`, both merged), target dir `/tmp/x3-receipts-target`.
+- `cargo clippy --workspace --all-targets -- -D warnings` on this repo takes ~7 min and is worth it: it
+  caught `manual_range_patterns` in the pallet and `manual_is_multiple_of` in a test.
+- `.ai/reports/` files are untracked evidence; `make guard` scans `git ls-files`, so untracked files here
+  cannot red the gate for everyone (the PR #400 lesson).
+
+## 2026-09-21 (gateway turn) — the deposit gateway verified no signatures, then refused its own work
+
+Merged `#412` / `abd7df40b` and `#413` / `a5492e6aa`. Both in `crates/x3-crosschain-gateway`, one file.
+
+### `#412` — `verify_quorum` counted names, never a signature
+
+`ValidatorAttestationEngine::verify_quorum` checked that a signer's *name* was in the set, that the
+list had no duplicates and that each signature was non-empty — and never verified one.
+`signatures: vec![vec![1], vec![2]]` reached quorum. The model could not have done better:
+`ValidatorSet.validators` was `Vec<ValidatorId>` (names), so there was no key to verify against.
+
+- `Validator { id, public_key }`; `ValidatorSet.validators: Vec<Validator>`.
+- `ValidatorAttestation { signer, public_key, signature }`; `GatewayAttestationSet.attestations`
+  replaces the parallel `signers`/`signatures` vectors that could disagree in length.
+- `gateway_attestation_statement(proof_id, source_chain, source_tx_hash, event_hash)` — one
+  definition of the signed digest (`BLAKE2b-256("x3-gateway-deposit-attestation-v1" || …)`), so a
+  producer and the verifier cannot disagree about what was signed.
+- `verify_quorum` delegates to `x3-validator-attestation::AttestationSet::with_authorized_validators`
+  (already a dependency, does `verify_strict` Ed25519 + authorized-key binding + counts once).
+- **Weight is 1 per verified validator, never the caller's number** — a weight carried by the
+  attestation is chosen by the party being verified.
+- `submit_attested_deposit_proof` refuses an attestation whose proof id or source tx is not the
+  envelope's.
+
+The five `x3-crosschain-gateway` tests that were red on master were red because the suite registered
+the router's `ValidatorQuorumVerifier`, which fails closed by design. The suite now registers a
+test-local accepting verifier (this suite is about bookkeeping) and tests the attested path with
+real Ed25519 keys. 16 passed (was 11/5).
+
+### `#413` — the attested path could never settle
+
+After `#412` the attested path verified real signatures and then handed the proof to the router,
+whose validator-quorum verifier fails closed — and nothing in the workspace registers a verifier
+there outside tests, so the gate it failed is unsatisfiable. `verify_deposit_proof` now
+short-circuits when the gateway's own engine already recorded `QuorumReached`/`Verified` for that
+proof id. Tests: an attested deposit settles with an empty router, and an unattested one on the same
+gateway is still refused *naming the missing verifier*. 18 passed.
+
+### Next on this path, in order
+
+1. **Anchoring the gateway's EVM path.** `ProductionEvmReceiptVerifier` reads the header *and* the
+   head height (`current_block_number`) out of the proof payload, so registering it for
+   `EvmReceiptProof` routes would accept a receipt inside a trie the prover built, at a height the
+   prover chose. Do not register it until it takes an anchor (expected `receipts_root`/height, or a
+   callback into the attested store). See `.ai/reports/evm-header-anchor-gap-20260921.md`. The
+   on-chain settlement path does anchor (`LastEvmHeader` before the walk).
+2. The client-side `SettlementProof` producer (from the previous turn's list).
+3. `cargo clippy --workspace --all-targets -- -D warnings` takes ~7 min here and is worth it.
+   `no_stub_guard` flags the words TODO/FIXME/stub/placeholder in tracked files — avoid them in
+   comments and names.
+
+## 2026-09-22 (anchor turn) — the EVM receipt verifier no longer takes its header from the proof
+
+Merged `#415` / `6254443cf`. This closes the hole the previous turn identified and refused to paper over.
+
+`ProductionEvmReceiptVerifier` read `receipts_root` *and* `current_block_number` out of the proof
+payload, so a prover built a trie containing a receipt they controlled, named its root, and picked a head
+height that satisfied the threshold. Reachable on chain: the gateway pallet registers that verifier for
+`EvmReceiptProof` routes and builds the envelope from the submitted payload.
+
+- `EvmHeaderAnchor` trait (`anchored_header(number)`, `attested_head()`) + `EvmHeaderAnchorSource`
+  (`Store(fns)` | `Fixed { header, head }`) + `NoEvmHeaderAnchor`.
+- `ProductionEvmReceiptVerifier::new` is **gone**; `anchored_by::<A>(min)` / `with_anchor(min, source)`.
+- `validate_against(source)` checks the payload root against the attested root and measures depth from
+  the attested head. `validate()` no longer checks depth at all (it cannot: depth is not in the proof).
+- `pallet-cross-chain-validator` implements the trait over `EvmMerkleRoots` (per-height receipts root,
+  written by an authorized submitter) and `LastEvmHeader` (head).
+- Runtime: `type EvmHeaderAnchor = pallet_cross_chain_validator::Pallet<Runtime>` in the gateway pallet's
+  Config. Relayer: `NoEvmHeaderAnchor` (no source yet → EVM proofs fail closed).
+
+### Runtime hash re-attestation — the exact procedure that works
+
+Any change to a crate in the runtime's graph needs the record to move or
+`scripts/check-runtime-hash-freshness.py` reds (exit 1). What worked:
+
+1. `./scripts/update-runtime-hashes.sh` — two srtool builds in Docker (`paritytech/srtool:1.93.0-0.18.4`),
+   ~25 min, refuses to write unless the two agree. Needs `docker` (available here).
+2. It prints the replacements for `docs/reports/runtime-wasm-reproducibility.md`, but **its list is
+   incomplete**: it omits the prose revision and the `authorizeUpgrade` values when the doc drifted from
+   the record. Update the doc from `runtime-wasm-hashes.json`, not from the printed list.
+3. Commit the code (including the record). Then run the script **again** so `recorded_revision` names the
+   commit those hashes came from, and commit that label fix separately — amending instead would change
+   the commit the record names.
+
+New values at `0508659d5`: compact 8435073 bytes / `0x12696572…`, compressed 1442714 bytes / `0x0e6ef363…`.
+
+### Next
+
+1. The client-side `SettlementProof` producer (fetch block → consensus-encode receipts → trie proof →
+   `submit_proof`). The trie logic exists in the router; the RPC-to-proof glue does not.
+2. A relayer header source (it currently fails closed).
+3. `LastEvmHeader` is one slot, so only heights with a recorded root are provable — design pass due.
+
+## 2026-09-22 (bundle-gate turn) — the EVM settlement path is proven end to end, both postures
+
+Merged `#424`, `#425`, `#426` (`17d1a6053`, `558ddcca3`, `006cb5720`). Chain of evidence, all live:
+
+1. `real_evm_header_attestation_populates_the_verifiers_anchor` — council motion (threshold 1 executes
+   immediately; no sudo key on this genesis) enrolls the first header submitter, and a **real anvil
+   block's** receipts root is attested; `EvmMerkleRoots[number]` and `LastEvmHeader` answer with it.
+2. `real_evm_receipt_proof_is_accepted_against_the_attested_header` — producer builds the inclusion from a
+   real receipt, 12+ confirmations mined, an intent with an Ethereum leg is funded, and `submit_proof` is
+   **accepted** (depth, header-against-the-attested-one, and the receipt walk all held).
+3. The same test now proves the **bundle gate both ways**: refused before the proof
+   (`CrossDomainProofUnverified`), accepted after; and refused even after the proof when the bundle's
+   `tx_id` is the *transaction* hash instead of the **receipt** hash `submit_proof` stored.
+
+Both postures pass, dev and strict (`X3_STRICT_CROSS_DOMAIN_PROOFS=1`), all four EVM-gate tests.
+
+### Traps worth keeping
+
+- **The runtime carries no pallet error messages.** `ExtrinsicFailed: Module(ModuleError { index: 31,
+  error: [40, 0, 0, 0], message: None })` — pallet 31 is the settlement engine and error index 40 is
+  `CrossDomainProofUnverified`. Assert on that pair, not on a string. (Count variants from the pallet's
+  declaration order; the pallet declares no explicit `#[codec(index)]`.)
+- **Assertions that only hold under one posture must branch on the posture.** The dev genesis allows
+  unattested proof sets, so the "refused" halves are strict-only; the test reads
+  `X3SettlementEngine.AllowUnattestedCrossDomainProofs` and asserts what its posture requires.
+- **`FinalityProof.chain_id` must equal the bundle's domain** (`"ethereum-mainnet"`), not the executor's
+  label (`"ethereum-anvil"`) — client-side `bundle.verify` refuses otherwise with "finality domain does not
+  match execution domain".
+- **A fresh anvil returns the tx hash before the block exists**: wait for the receipt, use the block it
+  names.
+
+### Next (in order)
+
+1. **Document `CrossDomainProofBundle.tx_id`**: for an EVM domain it is the receipt hash, not the
+   transaction hash. `crates/x3-atomic-swap` is in the runtime graph, so batch it with a re-attestation.
+2. Decide the relayer's on-chain action shape (its `EvmProof` has no intent).
+3. Extract `X3RuntimeSigner` into a library crate so a relayer can sign runtime calls.
+4. Base/Arbitrum `initiate_transfer` / `check_transfer_status`; the anvil `-32602` flake; release.
+
+## 2026-09-22 (release-gate turn) — the full release gate passes on current master
+
+`python3 scripts/mainnet_release_gate.py` on a clean worktree at `006cb5720`: **PASS**, every stage.
+Evidence file: `.ai/reports/mainnet-release-gate-20260922.md`.
+
+Stages in the tail: 2d install path (3 accepted / 6 refused) · 2e release bundle verifies, extracts,
+runs · 3/3b/3c/3d genesis artifacts, shipped (height 8), production (28), testnet (29) · 4 all seven
+suites · **4b panic ratchet `0/0/515` against a baseline of `0/0/516`** (one better than baseline) · 5
+migration dry-run for every `construct_runtime!` variant · 6 srtool + docker + no `SKIP_WASM_BUILD` · 6b
+**rebuilt hashes match the record** (`0x12696572…` / `0x0e6ef363…`) · 7 no secrets. Stages 2/2b/2c are
+covered by the all-or-nothing verdict.
+
+### Practical notes
+
+- The gate honours `CARGO_TARGET_DIR` and always rebuilds the release artifacts, so give it a dedicated
+  dir: a release build of the node + runtime is ~32G. **The disk hit 97% during this run** (81G free); I
+  removed my own `/tmp/x3-release-target` and the worktree's `runtime/target/srtool` (36G) afterwards, and
+  the box is back to ~117G. Watch `df` before long builds — this environment has repeatedly lost toolchain
+  files and target-dir files mid-build under disk pressure.
+- The srtool stage needs ~10 minutes and the final `6b` compare is what ties every runtime-affecting change
+  back to the hash record.
+
+### What it does not cover
+
+The cross-domain paths: the EVM/SVM lifecycles, the anchor test and the bundle-gate test run through
+`scripts/cross-domain-evm-gate.sh` and the X3-native lifecycle (`local-ci.sh --cross`), not this gate. Both
+were run separately this session and pass in dev and strict posture.
+
+### Awaiting a user decision
+
+Publishing a release: the pipeline's readiness definition now holds on master, so the remaining step is a
+fresh tag at a committed revision. Version, visibility and timing are the owner's call.
+
+## 2026-09-22 — The archival pile, measured (and two defects pulled out of it)
+
+### Facts to remember
+- `origin/master` moved from `1ed282487` to `46e65d215` (#428) to `f1f857922` (#429) this turn. Another agent pushes concurrently; fetch and rebase before every gate.
+- 142 remote branches are not merged into master. Measured (not named): **68 are patch-equivalent** (same patch-id already in master); **49 change only files master already has identically or has since rewritten**; **19 touch a file whose branch content master never took**, and one of those (`wip/consolidation-20260917/main`) is 581 of the 679 file-changes, dominated by committed build output (`site/_next/**`, `apps/*/out/**`, `dist/**`).
+- Symbol sweep over the 74 non-patch-equivalent branches: **138 added Rust symbols (fn/struct/enum/trait/const) exist nowhere on master, across 27 branches** — nearly all test-function names for superseded designs, or whole-tree snapshots. Master's symbol set was built once with `git grep -h -E "^\s*(pub )?(async )?(unsafe )?(fn|struct|enum|trait|const|static) " origin/master -- '*.rs'` (118,594 lines) — reuse it instead of grepping per name.
+- Every critical-path candidate was checked and is *present on master in an equal-or-stricter form*: the second `arb` impl (master's `arb.rs` names it superseded, TICKET-076, and carried over `venue_standings`), coordinator replay tracking (`save_used_secret_claims`), proof-bundle emptiness/intent binding (`proof_bundle.rs:174`), `intent_bridge` (master returns `Result<Option<u128>>` where the branch had `unwrap_or(0)`), the economic halt gate + halt-capable mock (`pallets/x3-atomic-kernel/src/lib.rs:750`, `Error::EconomicHaltActive`), refund terminality (42/47/53 refund refs in the three `node/tests/x3vm_*` live tests).
+- Scripts for future passes: `/tmp/x3-archival-scan.sh` (patch-id + file buckets), `scan2.sh` (missing vs contested), `scan3.sh` (added lines absent from master). Report: `.ai/reports/archival-branch-inventory-20260922.md`.
+- Rejected with reasons, do not re-litigate: `primitive-types 0.12.2→0.13.1` (master's lock already carries 0.13.1 from elsewhere — real but unverified), `k256 0.13→0.14` (four crates pin `k256 0.13.4`, one exactly — splits a crypto version), dependabot workflow bumps (master pins a mix of v3/v4/v5), `queue-drain.yml` (ops tool pinned to PRs 130/181), `CONTRIBUTING.md` (asserts the Python pipeline is "the authoritative MVP surface" — drifted), `crates/confidential-gpu/Cargo.lock` (that crate is a root-workspace member, so a nested lock is wrong), the 7-crate June prototype (master has `x3-lang/**` and `crates/x3-lsp/**`), `scripts/x3-proof-check.sh` dropping `|| true` (**cosmetic** — `run_check` counts FAIL itself and the summary exits 1).
+
+### Defects pulled out of the pile and landed
+- **#428** (a) `--chain x3-local3-raw` is not a chain id: `load_spec` resolves ids from a fixed list and treats anything else as a path, so the *filename* was looked up as a file of that name → `Error: Input("Failed to read chain spec file x3-local3-raw: ...")`, exit 1. Four sites: `docs/Zombienet-template.toml` (`[relaychain] chain`, loaded by `tests/zombienet/finality-smoke.zndsl`), `.github/workflows/zombienet-integration.yml:61`, and three `benchmark pallet` calls in `frame-benchmarking.yml`. Proven: `--chain local3 --raw` → exit 0, 17,214,398 bytes; `--chain chain-specs/x3-local3-current-raw.json --raw` → exit 0. (b) `cargo test -p x3-parser --test golden` is a race by construction: `generate_golden_fixtures` writes the fixture files and `test_golden_fixtures` reads them, same binary, parallel threads. **Reproduced: 2 failures in 15 runs on master, the loser reading `right: ""`.** Generator is now `#[ignore]`d (regenerate with `-- --ignored generate_golden_fixtures`); 15/15 plain runs pass; `make guard` clean.
+- **#429** `cross-domain SVM` was red for a reason unrelated to SVM: `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54`, and `local-ci.sh` puts the pinned toolchain dir in front of the rustup shim, so the `+toolchain` directive died with `no such command: +1.89.0-sbpf-solana-v1.54`. Same `env PATH="$HOME/.cargo/bin:$PATH"` prefix the `SVM contract lifecycle` gate already had. Result: **`PASS cross-domain SVM 1039s`**, `local-ci: all gates passed`.
+
+### Working notes
+- Reproducing a *flake* is cheap and decisive: run the single test 15 times in a loop and grep for `test result: ok`; the empty-file failure is unmistakable (`right: ""`).
+- `gh pr merge <n> --merge --delete-branch` then `git fetch origin --prune` in the main repo is the merge loop; PR checks show noise (`recurseml/analysis` fails with "Error occurred during analysis", cubic pending) while GitGuardian passes — `mergeStateStatus: UNSTABLE` still merges.
+- Worktree git writes need escalation (`Unable to create .../index.lock: Read-only file system`); `git worktree add /tmp/x3-salvage -b <branch> origin/master` is the clean way to land a small fix without disturbing a running gate in another worktree.
+
+### Next task seed
+The pile is closed as far as measurement can take it. Remaining unlanded work is the already-known list: document `CrossDomainProofBundle.tx_id` (EVM = receipt hash), decide the relayer's on-chain action shape (its `EvmProof` has no intent while `submit_proof` is per-intent — owner's call), extract `X3RuntimeSigner` out of `node/src` into a library crate, the SVM-leg strict-posture run, the anvil `-32602` flake, and the 34+ patch-equivalent branches still sitting on origin.

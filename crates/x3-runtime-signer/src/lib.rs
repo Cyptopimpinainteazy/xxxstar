@@ -6,6 +6,24 @@
 //! hash and account nonce, and signs the X3 settlement-engine calls with sr25519.
 //! Local atomic-swap `u64` intent ids are never guessed into runtime ids: callers
 //! must explicitly bind them to the real `H256` produced by `create_intent`.
+//!
+//! ## Why this is a library and not a node module
+//!
+//! A Substrate signed extrinsic is a *consensus object*: the payload is
+//! `RuntimeCall ++ SignedExtra-as-encoded ++ additional-signed`, so the signature
+//! is only valid against the exact `SignedExtra` tuple the runtime declares, in
+//! its exact order. Anything that needs to submit a runtime call — the node's
+//! atomic gateway, the live lifecycle tests, the relayer — has to sign with that
+//! layout or the extrinsic is rejected (or, worse, decodes as a different call).
+//! Keeping one implementation in a crate they all depend on is what stops a second
+//! hand-rolled encoder from existing: `crates/x3-relayer` used to carry one that
+//! signed `era ++ nonce ++ tip ++ [0u8; 32] ++ [0u8; 32]` with a `//Alice`
+//! fallback key. That payload omits `spec_version`, `tx_version`, the real genesis
+//! hash, `CheckWeight`, the invariant gate and the agent-law gate, so it could
+//! never have verified against this runtime.
+//!
+//! The node re-exports this crate as `x3_chain_node::x3vm_runtime_signer`, which is
+//! the path its live tests and `atomic_gateway` already use.
 
 use codec::{Decode, Encode};
 use frame_support::storage::storage_prefix;

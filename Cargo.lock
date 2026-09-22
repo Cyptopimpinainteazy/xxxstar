@@ -26600,6 +26600,7 @@ dependencies = [
  "x3-proof-dispute",
  "x3-relayer",
  "x3-rpc",
+ "x3-runtime-signer",
  "x3-validator-attestation",
  "x3-verification-router",
  "x3-vm",
@@ -27772,6 +27773,27 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+]
+
+[[package]]
+name = "x3-runtime-signer"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "hex",
+ "pallet-collective",
+ "pallet-cross-chain-validator",
+ "pallet-transaction-payment",
+ "pallet-x3-agent-law",
+ "pallet-x3-invariants",
+ "pallet-x3-settlement-engine",
+ "parity-scale-codec",
+ "serde_json",
+ "sp-core 39.0.0",
+ "sp-runtime 45.0.0",
+ "x3-atomic-swap",
+ "x3-chain-runtime",
 ]
 
 [[package]]

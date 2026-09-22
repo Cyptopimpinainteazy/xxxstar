@@ -1,0 +1,33 @@
+[package]
+name = "x3-runtime-signer"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Runtime-aware sr25519 signer for X3 settlement-engine extrinsics, shared by the node and the relayer."
+
+[lib]
+name = "x3_runtime_signer"
+path = "src/lib.rs"
+
+[dependencies]
+# The runtime whose `RuntimeCall`/`SignedExtra` layout the signature must match.
+# Signing a runtime call is only correct against the runtime's own types, so this
+# crate compiles the runtime types rather than restating their order.
+x3-chain-runtime = { path = "../../runtime", features = ["std"] }
+pallet-x3-settlement-engine = { path = "../../pallets/x3-settlement-engine", default-features = false, features = ["std"] }
+pallet-x3-agent-law = { path = "../../pallets/x3-agent-law", default-features = false, features = ["std"] }
+pallet-x3-invariants = { path = "../../pallets/x3-invariants", default-features = false, features = ["std"] }
+# The council motion path (`sign_council_propose`) and the EVM header-submitter
+# enrollment (`set_authorized_submitters`) both sign runtime calls, so their call
+# types have to be in scope here exactly as they are in the node.
+pallet-collective = { workspace = true, default-features = false, features = ["std"] }
+pallet-cross-chain-validator = { path = "../../pallets/cross-chain-validator", default-features = false, features = ["std"] }
+pallet-transaction-payment = { workspace = true, default-features = false, features = ["std"] }
+frame-system = { workspace = true, default-features = false, features = ["std"] }
+frame-support = { workspace = true, default-features = false, features = ["std"] }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+x3-atomic-swap = { path = "../x3-atomic-swap", features = ["std"] }
+codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive"] }
+hex = "0.4"
+serde_json = "1.0"
