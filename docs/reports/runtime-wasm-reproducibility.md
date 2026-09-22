@@ -62,6 +62,10 @@ bytes**:
   admitted onto the anchored chain, so a testnet can start with the root of trust in its
   spec. `BtcBlockHeader` gains serde for the spec's benefit only. `spec_version` moves to
   15.
+* `d471adfec4` — validator key rotation is wired to the on-chain custody registry:
+  `pallet_x3_custody` gains `KeyRotationPeriod` and `rotate_validator_key` grants
+  `current_block + period` instead of inheriting an overdue due block; the node gains
+  the `validator rotate` operator command. `spec_version` moves to 16.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -87,24 +91,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,466,819 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,468,737 bytes)**
 
 ```
-Version          : x3-chain-15 (x3-chain-1.tx1.au1)
+Version          : x3-chain-16 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0x93f6983a9be4dbb527b27f7c10f0788d0a723181e12c1b3869134511a9905db5
-authorizeUpgrade : 0x107acb8c8ced8cedc84103a98662fd4c687907a8181971c759b76d47c9fd8d8e
-IPFS             : QmU6KuphWMrmQvSsPFMjRhKisLMfWTKbzpaMfa5Ywa8geG
-BLAKE2_256       : 0x624db79f1603a25d890554c9623695b7f913045476859afb881a402346fea55d
+setCode          : 0x0ce1a9dea6c42f0d65dba7a7819a65d47d77398e8992c97363d4c6bc9d4937fe
+authorizeUpgrade : 0x3af49b82f5a002f757794e7a66f4468894bfb38b4e0b19e65e0d0389dfc73b58
+IPFS             : QmNR3RSp9upQvqC9SaTyEfb4BpnDTqHsG21P2YBgo2CXCk
+BLAKE2_256       : 0x3548491d3931ec95725edb01218c6b7787aeb8c9a741d846f9dddc19e68b2fce
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,453,542 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,455,902 bytes)**
 
 ```
-setCode          : 0x775549914c2b9d5ceebb451807beb70563337f39434e1afabcc0a61c8194b101
-authorizeUpgrade : 0xf1eedd5edb9dbf9c5baf51b79ceec39de3516d788c15da6508bff8d7c66207a7
-IPFS             : QmPNZpzBZgK46J4JM8nUc8KtzmCzFrNWdL5DBHuFzizbFf
-BLAKE2_256       : 0xce5e635bc4b7ef848dd25748c087f459fffac3b9c490d998defc40a51e2bd6aa
+setCode          : 0x8b953d190964ac7186a0830a928e12aab4e8ed6b76069e38cc554f47669b551f
+authorizeUpgrade : 0x4bd62920d5e2fae0d29e15b4ee1bfd84f36838a9bab277722e735ba4b29e5d54
+IPFS             : QmNhLMFbtsZTYLnHC4nenFeyXwcX5HRPvuZR67Mun56rbS
+BLAKE2_256       : 0xefe057ec25a6a25cdd06e9b9047cc555ce2452f35c3411add02f409d9908c0f5
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

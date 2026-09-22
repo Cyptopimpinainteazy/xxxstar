@@ -51,6 +51,8 @@ parameter_types! {
     pub const MaxSignersPerVault: u32 = 4;
     pub const MaxVaultsPerSigner: u32 = 8;
     pub const MaxPoliciesPerTier: u32 = 4;
+    /// Key rotation period used by the rotation-semantics tests.
+    pub const KeyRotationPeriod: u64 = 100;
 }
 
 impl pallet_x3_custody::Config for Test {
@@ -61,6 +63,7 @@ impl pallet_x3_custody::Config for Test {
     type MaxSignersPerVault = MaxSignersPerVault;
     type MaxVaultsPerSigner = MaxVaultsPerSigner;
     type MaxPoliciesPerTier = MaxPoliciesPerTier;
+    type KeyRotationPeriod = KeyRotationPeriod;
 }
 
 /// Build clean test externalities with block number initialised to 1.

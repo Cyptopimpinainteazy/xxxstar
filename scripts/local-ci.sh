@@ -15,6 +15,7 @@
 #   scripts/local-ci.sh --failure       # + the validator failure drill (boots and kills validators)
 #   scripts/local-ci.sh --testnet       # + the testnet ceremony drill (records and verifies a launch)
 #   scripts/local-ci.sh --soak          # + a 10-minute consensus soak (MINUTES= to change it)
+#   scripts/local-ci.sh --rotation      # + the validator key rotation drill
 #   scripts/local-ci.sh --deep          # + the whole workspace test suite (slow, ~5-15 min)
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
@@ -118,6 +119,7 @@ RUN_LOOM=0
 RUN_FAILURE=0
 RUN_TESTNET=0
 RUN_SOAK=0
+RUN_ROTATION=0
 RUN_PREPUSH=0
 LIST_ONLY=0
 DRY_RUN=0
@@ -139,8 +141,9 @@ while [ "$#" -gt 0 ]; do
     --failure) RUN_FAILURE=1 ;;
     --testnet) RUN_TESTNET=1 ;;
     --soak) RUN_SOAK=1 ;;
+    --rotation) RUN_ROTATION=1 ;;
     --deep) RUN_DEEP=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
     --loom) RUN_LOOM=1 ;;
     --pre-push) RUN_PREPUSH=1 ;;
     --list) LIST_ONLY=1 ;;
@@ -382,6 +385,15 @@ GATES_SOAK=(
   "consensus soak:bash scripts/testnet/consensus-soak.sh"
 )
 
+# Validator key rotation is operator-driven, and the on-chain custody registry is
+# the single source of truth. This drills the `validator rotate` command against a
+# live node: an unregistered account must be refused, and a registered account must
+# produce a signed `session.set_keys` extrinsic and a next-due block. It never
+# submits unless the drill itself is passed `--submit`.
+GATES_ROTATION=(
+  "validator rotation drill:bash scripts/testnet/validator-rotation-drill.sh"
+)
+
 # The broadest automated signal the repository has: every test target in every
 # workspace member. SLOW (thousands of tests), so it is opt-in rather than part
 # of the default set. No SKIP_WASM_BUILD: x3-chain-node's service tests boot a
@@ -444,6 +456,9 @@ describe_all() {
   echo
   echo "soak (--soak, also implied by --all; MINUTES= to change the window):"
   printf '  - %s\n' "${GATES_SOAK[@]%%:*}"
+  echo
+  echo "validator key rotation (--rotation, also implied by --all):"
+  printf '  - %s\n' "${GATES_ROTATION[@]%%:*}"
   echo "deep gates (--deep, also implied by --all):"
   printf '  - %s\n' "${GATES_DEEP[@]%%:*}"
   echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast"
@@ -508,6 +523,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_FAILURE" = 1 ] && for spec in "${GATES_FAILURE[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_TESTNET" = 1 ] && for spec in "${GATES_TESTNET[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_SOAK" = 1 ] && for spec in "${GATES_SOAK[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_ROTATION" = 1 ] && for spec in "${GATES_ROTATION[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_LOOM" = 1 ] && for spec in "${GATES_LOOM[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_DEEP" = 1 ] && for spec in "${GATES_DEEP[@]}"; do SELECTED+=("$spec"); done
 
@@ -626,7 +642,7 @@ export CARGO_TERM_COLOR=never
   echo "local-ci $STAMP"
   echo "root=$ROOT"
   echo "branch=$BRANCH head=$HEAD_SHA tree=$DIRTY"
-  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM failure=$RUN_FAILURE testnet=$RUN_TESTNET soak=$RUN_SOAK jobs=$JOBS cargo_jobs=$CARGO_JOBS"
+  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM failure=$RUN_FAILURE testnet=$RUN_TESTNET soak=$RUN_SOAK rotation=$RUN_ROTATION jobs=$JOBS cargo_jobs=$CARGO_JOBS"
 } >"$LOG"
 
 # run_gate <name> <slug> <command> — one process per gate so the parent keeps the

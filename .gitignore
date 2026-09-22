@@ -184,6 +184,10 @@ apps/x3-desktop/dist/
 /Bash tool output*
 *.tsbuildinfo
 
+# Reproducible srtool build reports (transient output; the canonical record is
+# docs/reports/runtime-wasm-hashes.json).
+/.srtool-reports/
+
 # Local editor/agent tool configuration (not shared project config).
 # Not root-anchored: these have turned up nested under other directories too
 # (e.g. docs/reports/.cursor/, docs/reports/.ai-todo/) from accidental copies.

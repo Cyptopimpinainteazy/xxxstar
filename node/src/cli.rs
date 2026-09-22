@@ -202,8 +202,55 @@ pub enum Commands {
     Comit(ComitCmd),
     /// Key management commands for validator and account keys.
     Keys(KeysCmd),
+    /// Validator key rotation commands driven by the on-chain registry.
+    Validator(ValidatorCmd),
     /// Inspect canonical ledger and chain state.
     Inspect(InspectCmd),
+}
+
+/// Validator key rotation commands.
+///
+/// The on-chain `pallet_x3_custody` registry is the single source of truth for
+/// which accounts are registered validators and when their next rotation is
+/// due. These commands read that registry, refuse unregistered accounts, and
+/// build the signed `session.set_keys` extrinsic that announces a fresh key.
+#[derive(Debug, Args)]
+pub struct ValidatorCmd {
+    /// The validator subcommand to execute.
+    #[command(subcommand)]
+    pub command: ValidatorSubcommand,
+}
+
+/// Validator subcommands.
+#[derive(Debug, Subcommand)]
+pub enum ValidatorSubcommand {
+    /// Rotate a registered validator's session keys.
+    ///
+    /// Reads the operator's due block from the on-chain registry, refuses an
+    /// unregistered account, derives the new Aura/GRANDPA keys, and prints the
+    /// signed `session.set_keys` extrinsic (and, with `--submit`, sends it to
+    /// the node). Operator-driven only: there is no unattended rotation.
+    Rotate {
+        /// RPC endpoint URL.
+        #[arg(long, default_value = "http://127.0.0.1:9944")]
+        rpc_url: String,
+
+        /// Operator account SURI that signs the `session.set_keys` call.
+        #[arg(long, value_name = "SURI")]
+        suri: String,
+
+        /// Seed for the new Aura (sr25519) session key.
+        #[arg(long, value_name = "SURI")]
+        aura_seed: String,
+
+        /// Seed for the new GRANDPA (ed25519) session key.
+        #[arg(long, value_name = "SURI")]
+        grandpa_seed: String,
+
+        /// Submit the signed extrinsic instead of only printing it.
+        #[arg(long, default_value_t = false)]
+        submit: bool,
+    },
 }
 
 /// Comit transaction CLI commands for dual-VM execution.

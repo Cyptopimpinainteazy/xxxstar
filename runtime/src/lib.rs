@@ -353,7 +353,13 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // root of trust already in its spec, instead of waiting for a root call.
     // `BtcBlockHeader` gains serde so a spec (which is JSON) can carry it; that is the
     // spec's shape only, never the proof path, which still hashes the 80 wire bytes.
-    spec_version: 15,
+    // 16: validator key rotation is wired to the on-chain custody registry.
+    // `pallet_x3_custody` gains a `KeyRotationPeriod` constant, and
+    // `rotate_validator_key` now grants `current_block + period` instead of
+    // inheriting an overdue due block; the node gains the `validator rotate`
+    // operator command. No storage migration: the constant is metadata-only and
+    // the due-block semantics change is confined to the rotation extrinsic.
+    spec_version: 16,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -2932,6 +2938,12 @@ parameter_types! {
     pub const CustodyMaxSignersPerVault: u32 = 16;
     pub const CustodyMaxVaultsPerSigner: u32 = 32;
     pub const CustodyMaxPoliciesPerTier: u32 = 8;
+    /// Validator key rotation period: 7 days at the 200ms block target
+    /// (7 * 24 * 60 * 60 * 1000 / 200 = 3_024_000 blocks). A successful
+    /// rotation always grants a fresh full period, measured from the block in
+    /// which the rotation landed, so a late rotation never produces a key that
+    /// is already overdue.
+    pub const CustodyKeyRotationPeriod: BlockNumber = 3_024_000;
 }
 
 impl pallet_x3_custody::Config for Runtime {
@@ -2940,6 +2952,7 @@ impl pallet_x3_custody::Config for Runtime {
     type MaxSignersPerVault = CustodyMaxSignersPerVault;
     type MaxVaultsPerSigner = CustodyMaxVaultsPerSigner;
     type MaxPoliciesPerTier = CustodyMaxPoliciesPerTier;
+    type KeyRotationPeriod = CustodyKeyRotationPeriod;
 }
 
 // ===== X3 Reconciliation Configuration (Phase 5) =====
