@@ -44,6 +44,13 @@ bytes**:
   domain-separated Blake2b-256 instead of XOR mixing, which collided (`"A" * 64` and
   `"B" * 64` produced the same id, and that id keys both the pallet's `Withdrawals`
   map and the relayer's processed set), and `spec_version` moves to 13.
+* `93fe86c9bd` — the BTC SPV path gets a trust root: `anchor_btc_checkpoint`
+  (root) commits this chain to a Bitcoin height/hash in write-once
+  `BtcCheckpoints`, `BtcPoWLimitBits` carries Bitcoin's per-network `powLimit`, the
+  single admission path `btc_admit_header` derives heights from the parent link and
+  enforces Bitcoin's `nBits` and median-time-past rules, and both SPV entry points
+  accept evidence only from a checkpoint-anchored chain. New storage and a new call,
+  so `spec_version` moves to 14.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -69,24 +76,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,426,935 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,455,427 bytes)**
 
 ```
-Version          : x3-chain-13 (x3-chain-1.tx1.au1)
+Version          : x3-chain-14 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xd998dae29f7608357622ef37ee527cd31e00ea7bb10e0121d56872e17ebf492c
-authorizeUpgrade : 0x91814730dc970cf52cc42765c933c108eaa0656d223ddfaa9923a4947d419a5a
-IPFS             : QmSBXVCK52s1RUcasXSYmnMuAda7qsGWNDantshhbFEB59
-BLAKE2_256       : 0x871c8feb70f6068a1ba9a98e1a49e23b48e5c895ea7bf0a393c7274fa5490c63
+setCode          : 0xf0cbbb0b8dba62600ccf0dec653f0b7e24f4498c47f726b6b9607aea11d38b31
+authorizeUpgrade : 0xb2a8861166df66b1ea04ef7790740e46120cd30179c7f161565136a58273461a
+IPFS             : QmZaAAumj2tgXWWTzkLMLtSQJrhGZfT2JoeVFqAHE9bJiy
+BLAKE2_256       : 0x69d7d27ea6d08e4ac31ff1f6c3b37b3fad7fba7ee7ba0a027846186a55e4b371
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,444,353 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,449,514 bytes)**
 
 ```
-setCode          : 0xeac27a0153d54d4c4a44b4d5aa1aabfd075abb9039bbde88efa6dac8f6f7bb48
-authorizeUpgrade : 0x0a1803da86c99dbafdb7abff4ca6442e5476b5f91a6ddb6fa7fd752359cd5a58
-IPFS             : Qmb3Mg778EfaX6fj25pzVompH8grdrsxKbPwUcxWRXtsaY
-BLAKE2_256       : 0x5a8200f4890d1630dfc2394f6119058a9159c56c545aa2fb8a896e8d5067f5e2
+setCode          : 0x71fdbe2d38bccf23511619a9180958767f68d65eb8235637ce7c6dec6ce61f79
+authorizeUpgrade : 0x76008fb4f77201a29fa430225efd8beb721da94c8aad3ae94f2f9a2464eaa26a
+IPFS             : QmfSj6zPjumqUYDv5RWpY6Mc9ggPGWcVkpEDpuQZbNDVvP
+BLAKE2_256       : 0x37bc5eae2782e49ff50592e9dfe2643e00e006ef3cd40ea5ab33b2f389b55ec0
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the
