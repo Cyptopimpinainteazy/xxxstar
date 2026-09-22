@@ -221,6 +221,50 @@ dev`**. This is what the first version of the drill caught, by failing.
 (a bonded header relayer does not exist), and the header source is still an operator copying a hash
 by hand. Those are TICKET-095.
 
+## GAP-ATOMIC-AUTH — bundle finalization is unauthorized, and its finality gate is self-satisfying — 2026-09-22
+
+Found by reading `pallets/x3-atomic-kernel` after the soak's log showed
+`failed to anchor GRANDPA cert for block 149: Transaction pool error: Transaction temporarily Banned`
+within two minutes of boot. The log line led to the anchor, and the anchor led to the authorization
+model. Evidence and code references: `.ai/reports/atomic-kernel-finalization-authorization-20260922.md`.
+
+Two unsigned calls, two false claims:
+
+* `record_flash_finality_anchor` (unsigned) stores **the first non-zero cert for a height**, with no
+  binding to the block, to a certificate, or to an authority. `do_finalize_bundle` then accepts a
+  finalization when `finality_cert == FinalityCertAnchors[block]` — a comparison of the caller's
+  input against the caller's earlier input. The comment saying this "prevent[s] submission of
+  fabricated cert hashes" is the opposite of what the code does.
+* `submit_finalization_result` (unsigned) reads only the bundle's status and that an executor is
+  assigned — never who is calling, because an unsigned call has no caller. The `ValidateUnsigned`
+  comment claiming this "prevents anonymous peers from finalizing bundles they never claimed" is
+  true only of *assignment*. Any bundle in `Executing` can be finalized by anyone, which marks it
+  `Finalized` with a proof nobody produced and permanently blocks the honest result
+  (`ProofAlreadyExists`).
+
+The dispatch path is also weaker than the validation path: `do_finalize_bundle` accepts
+`BundleStatus::Pending`, which `ValidateUnsigned` rejects. A block author includes unsigned
+extrinsics without the pool's validation, so the weaker check is the one that holds.
+
+No fund path in this repository releases value on `BundleFinalized`, so the impact today is bundle
+integrity and liveness rather than a drain — but it is a P0 core-pallet claim and `X3-RT-002` drops
+from 40 to 25 on it. There is also no test for `submit_finalization_result` anywhere.
+
+**TICKET-097 — authorize bundle finalization.** Pick one: (a) require the assigned executor's
+signature on the result (and adjust the off-chain worker's submission path); (b) give the runtime a
+real finality source — a signed finalized-head tracker or a verified GRANDPA justification — so
+`finality_cert` is not a value the caller chooses; or (c) both. Independently: enforce the documented
+invariants in *dispatch*, not only in `ValidateUnsigned` (reject `Pending`, reject a second
+finalization in one place), and add the missing tests — an anonymous caller must not be able to
+finalize a bundle assigned to somebody else, and a certificate for an unfinalized block must not be
+anchorable. Acceptance: a test proves each refusal, and the two comments quoted above are either
+true or gone.
+
+Related, smaller, and fixed by the same reading: `node/src/service.rs`'s `run_grandpa_finality_anchor`
+logs `cert anchored for block N` even when the submit failed, and advances its cursor before the
+submit, so a rejected anchor for one block is never retried. Its doc comment claims it writes
+off-chain storage; it does not. TICKET-098.
+
 ## GAP-CI-GATES — `make guard` is not the gate set, and a nested lockfile is stale — 2026-09-22
 
 Running the repository's own CI of record (`scripts/local-ci.sh --testnet`) on merged master, after

@@ -25,12 +25,15 @@ source = "master"
 paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
 implemented = 75
 tested = 35
-mainnet_ready = 40
+mainnet_ready = 25
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
-claim_risk = false
-blockers = ["Nine previously claimed invariant tests were removed as fictional; real invariant suite needed"]
+claim_risk = true
+blockers = [
+  "**Bundle finalization is not authorized and its finality gate is self-satisfying** (2026-09-22): `record_flash_finality_anchor` is unsigned and stores the first non-zero cert for a height with no binding to the block or to any authority, while `do_finalize_bundle` accepts a result when `finality_cert == FinalityCertAnchors[block]` — the caller's input compared against the caller's earlier input. `submit_finalization_result` is unsigned too, so any account can finalize any bundle that is `Executing`, permanently blocking the honest executor's result. `do_finalize_bundle` also accepts `Pending`, which `ValidateUnsigned` rejects. No test covers the call at all. Evidence: `.ai/reports/atomic-kernel-finalization-authorization-20260922.md`; TICKET-097",
+  "Nine previously claimed invariant tests were removed as fictional; real invariant suite needed",
+]
 evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: FEATURE_REGISTRY corrected readiness to 40%"]
 registry_feature = "atomic_kernel"
 
