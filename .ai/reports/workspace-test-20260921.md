@@ -50,3 +50,11 @@ a `bench` feature in `crates/parallel-proposer/Cargo.toml`
 (`required-features = ["bench"]`), so the workspace test path skips it and
 completes. Run it deliberately with
 `cargo bench -p parallel-proposer --features bench --bench authoring_overhead`.
+
+Full rerun (2026-09-22) with the benchmark gated off: the hang is gone, but
+with `SKIP_WASM_BUILD=1` two `x3-chain-node` tests fail because they require
+the embedded runtime WASM blob that the skip flag intentionally omits:
+`default_keystore_path_matches_the_layout_a_running_node_uses` and
+`full_node_http_rpc_...`. Those are environment-induced by the skip flag, not
+x3-lang failures. A true full pass requires the canonical `cargo test
+--workspace` without `SKIP_WASM_BUILD=1`.
