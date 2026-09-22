@@ -49,6 +49,79 @@ pub struct ReceiptInclusion {
     pub confirmations: u64,
 }
 
+impl ReceiptInclusion {
+    /// The settlement engine's proof for this inclusion.
+    ///
+    /// The mapping is not free: the engine checks each of these before it looks
+    /// at anything else, and a proof that misses one is refused for a reason that
+    /// reads like a verification failure.
+    ///
+    /// - **`tx_hash` is the *receipt's* hash**, `keccak256(receipt_data)`, not the
+    ///   transaction hash. The engine's EVM path requires
+    ///   `keccak256(receipt_data) == proof.tx_hash` and its comment says the two
+    ///   "are the same in Ethereum" — they are not (a receipt and its
+    ///   transaction are different objects), so the field carries the receipt
+    ///   hash here. The transaction hash is what the *caller* used to find the
+    ///   receipt; it is not part of the proof.
+    /// - `merkle_proof` carries the two roots the header is matched against, in
+    ///   the order the engine reads them: `state_root` first, then the root the
+    ///   receipt is walked to (`receipts_root`).
+    /// - `chain_height` and `receipt_index` are `Some`: the engine refuses a
+    ///   proof that does not state them, because both used to be derivable from
+    ///   data the prover chose.
+    /// - the two byte vectors are bounded by the pallet, and a receipt wider than
+    ///   `MAX_RECEIPT_DATA_SIZE` is an error here rather than a truncated proof.
+    pub fn settlement_proof(
+        &self,
+    ) -> Result<pallet_x3_settlement_engine::SettlementProof, ProducerError> {
+        use frame_support::{BoundedVec, traits::ConstU32};
+        use pallet_x3_settlement_engine::SettlementProof;
+        use sha3::{Digest, Keccak256};
+
+        let receipt_hash: [u8; 32] = Keccak256::digest(&self.receipt_rlp).into();
+        let receipt_data = BoundedVec::<u8, ConstU32<MAX_RECEIPT_DATA_SIZE>>::try_from(
+            self.receipt_rlp.clone(),
+        )
+        .map_err(|_| ProducerError::ProofTooLarge {
+            what: "receipt",
+            size: self.receipt_rlp.len(),
+            limit: MAX_RECEIPT_DATA_SIZE as usize,
+        })?;
+        let trie_proof = BoundedVec::<u8, ConstU32<MAX_TRIE_PROOF_SIZE>>::try_from(
+            self.trie_proof.clone(),
+        )
+        .map_err(|_| ProducerError::ProofTooLarge {
+            what: "inclusion path",
+            size: self.trie_proof.len(),
+            limit: MAX_TRIE_PROOF_SIZE as usize,
+        })?;
+        let merkle_proof = BoundedVec::<_, ConstU32<MAX_MERKLE_PROOF_DEPTH>>::try_from(vec![
+            sp_core::H256(self.state_root),
+            sp_core::H256(self.receipts_root),
+        ])
+        .map_err(|_| ProducerError::Malformed("two roots always fit".to_string()))?;
+        let confirmations =
+            u32::try_from(self.confirmations).map_err(|_| ProducerError::Malformed(format!(
+                "confirmations {} do not fit in u32",
+                self.confirmations
+            )))?;
+
+        Ok(SettlementProof {
+            proof_type: pallet_x3_settlement_engine::ProofType::MerkleTrie,
+            tx_hash: sp_core::H256(receipt_hash),
+            block_hash: sp_core::H256(self.block_hash),
+            chain_height: Some(self.block_number),
+            confirmations,
+            merkle_proof,
+            receipt_data,
+            receipt_index: Some(self.receipt_index),
+            trie_proof: Some(trie_proof),
+        })
+    }
+}
+
+use pallet_x3_settlement_engine::{MAX_MERKLE_PROOF_DEPTH, MAX_RECEIPT_DATA_SIZE, MAX_TRIE_PROOF_SIZE};
+
 #[derive(Debug, thiserror::Error)]
 pub enum ProducerError {
     #[error("rpc {method} failed: {message}")]
@@ -67,6 +140,12 @@ pub enum ProducerError {
     RootMismatch { header: [u8; 32], built: [u8; 32] },
     #[error("the proof this module built does not verify against the header's root")]
     SelfCheckFailed,
+    #[error("the {what} is {size} bytes, past the settlement engine's {limit}")]
+    ProofTooLarge {
+        what: &'static str,
+        size: usize,
+        limit: usize,
+    },
 }
 
 async fn rpc(
@@ -536,6 +615,27 @@ mod tests {
             ),
             Ok(())
         );
+
+        // And it adapts into the settlement engine's proof, on real bytes.
+        let proof = inclusion
+            .settlement_proof()
+            .expect("a real inclusion adapts");
+        assert_eq!(
+            proof.tx_hash.0,
+            <sha3::Keccak256 as sha3::Digest>::digest(&inclusion.receipt_rlp).as_slice(),
+            "the engine's tx_hash check is over the receipt"
+        );
+        assert_eq!(proof.chain_height, Some(inclusion.block_number));
+        assert_eq!(proof.receipt_index, Some(inclusion.receipt_index));
+        assert_eq!(
+            proof.merkle_proof.as_slice(),
+            [
+                sp_core::H256(inclusion.state_root),
+                sp_core::H256(inclusion.receipts_root)
+            ]
+            .as_slice(),
+            "state root first, then the root the receipt is walked to"
+        );
     }
 
     fn receipt_json(kind: Option<&str>) -> Value {
@@ -594,6 +694,83 @@ mod tests {
             assert_eq!(list.item_count(), Ok(4));
             assert_eq!(list.at(0).and_then(|v| v.as_val::<u8>()), Ok(1));
         }
+    }
+
+    fn inclusion(receipt_rlp: Vec<u8>, trie_proof_len: usize) -> ReceiptInclusion {
+        ReceiptInclusion {
+            block_number: 100,
+            block_hash: [3u8; 32],
+            state_root: [2u8; 32],
+            receipts_root: [4u8; 32],
+            receipt_index: 1,
+            receipt_rlp,
+            trie_proof: vec![0xAB; trie_proof_len],
+            confirmations: 12,
+        }
+    }
+
+    #[test]
+    fn the_adapters_proof_satisfies_every_check_the_engine_makes() {
+        // The settlement engine's EVM path checks these before the walk, and each
+        // one has a reason to fail loudly rather than look like a bad proof:
+        let inclusion = inclusion(vec![0xc3, 0x01, 0x02, 0xc0], 64);
+        let proof = inclusion.settlement_proof().expect("adapts");
+
+        // `proof_type` must be one the EVM arm accepts.
+        assert!(matches!(
+            proof.proof_type,
+            pallet_x3_settlement_engine::ProofType::MerkleTrie
+        ));
+        // `receipt_data` must be non-empty and structurally a receipt: a list
+        // prefix, or an EIP-2718 type byte followed by one.
+        assert!(!proof.receipt_data.is_empty());
+        assert!(proof.receipt_data[0] >= 0xc0);
+        // `tx_hash` must be the receipt's own hash — the field name is the
+        // engine's, the value is keccak over the receipt bytes.
+        assert_eq!(
+            proof.tx_hash.0,
+            <sha3::Keccak256 as sha3::Digest>::digest(&inclusion.receipt_rlp).as_slice()
+        );
+        // Confirmations must be at least one, and the height and index must be
+        // stated: the engine refuses a proof that leaves either as `None`.
+        assert!(proof.confirmations >= 1);
+        assert!(proof.chain_height.is_some());
+        assert!(proof.receipt_index.is_some());
+        // Both roots, in the order the engine reads them.
+        assert_eq!(proof.merkle_proof.len(), 2);
+        assert_eq!(proof.merkle_proof[0], sp_core::H256([2u8; 32]));
+        assert_eq!(proof.merkle_proof[1], sp_core::H256([4u8; 32]));
+        // And the inclusion path travels with it.
+        assert_eq!(proof.trie_proof.as_ref().map(|path| path.len()), Some(64));
+    }
+
+    #[test]
+    fn a_receipt_wider_than_the_engine_accepts_is_an_error_not_a_truncation() {
+        let too_wide = vec![0xc0; pallet_x3_settlement_engine::MAX_RECEIPT_DATA_SIZE as usize + 1];
+        let error = inclusion(too_wide, 64)
+            .settlement_proof()
+            .expect_err("past the bound");
+        assert!(matches!(
+            error,
+            ProducerError::ProofTooLarge {
+                what: "receipt",
+                ..
+            }
+        ));
+
+        let error = inclusion(
+            vec![0xc3, 0x01, 0x02, 0xc0],
+            pallet_x3_settlement_engine::MAX_TRIE_PROOF_SIZE as usize + 1,
+        )
+            .settlement_proof()
+            .expect_err("past the bound");
+        assert!(matches!(
+            error,
+            ProducerError::ProofTooLarge {
+                what: "inclusion path",
+                ..
+            }
+        ));
     }
 
     #[tokio::test]

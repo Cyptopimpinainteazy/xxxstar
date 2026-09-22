@@ -32,6 +32,10 @@ x3-finality-oracle = { path = "../x3-finality-oracle" }
 x3-verification-router = { path = "../x3-verification-router" }
 # RLP for the consensus encoding of a receipt — the leaf a receipts trie holds.
 rlp = { version = "0.5", default-features = false }
+# The settlement engine's proof type, which is what a produced proof has to
+# become. Types only: this crate never builds a runtime call.
+pallet-x3-settlement-engine = { path = "../../pallets/x3-settlement-engine", default-features = false, features = ["std"] }
+frame-support = { workspace = true, features = ["std"] }
 x3-validator-attestation = { path = "../x3-validator-attestation" }
 x3-proof-dispute = { path = "../x3-proof-dispute" }
 x3-gateway-risk-engine = { path = "../x3-gateway-risk-engine" }
