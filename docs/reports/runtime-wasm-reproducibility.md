@@ -51,6 +51,12 @@ bytes**:
   enforces Bitcoin's `nBits` and median-time-past rules, and both SPV entry points
   accept evidence only from a checkpoint-anchored chain. New storage and a new call,
   so `spec_version` moves to 14.
+* `e74bb199f9` — the BTC tests now run on data a real Bitcoin Core v28.1.0 regtest
+  node produced (header, merkle path and a confirmed transaction), and the SPV entry
+  points document which transaction serialization they take. `spec_version` is
+  unchanged at 14: **the bytes still move**, because pallet documentation is part of
+  the runtime metadata, and metadata is in the WASM. That is the reason this gate
+  watches the whole dependency graph rather than a hand-kept list of "runtime files".
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -76,24 +82,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,455,427 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,456,248 bytes)**
 
 ```
 Version          : x3-chain-14 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xf0cbbb0b8dba62600ccf0dec653f0b7e24f4498c47f726b6b9607aea11d38b31
-authorizeUpgrade : 0xb2a8861166df66b1ea04ef7790740e46120cd30179c7f161565136a58273461a
-IPFS             : QmZaAAumj2tgXWWTzkLMLtSQJrhGZfT2JoeVFqAHE9bJiy
-BLAKE2_256       : 0x69d7d27ea6d08e4ac31ff1f6c3b37b3fad7fba7ee7ba0a027846186a55e4b371
+setCode          : 0x5513646fae6177d06f1bbf0c8331c6edf357dace025391b6e56eea66566f870b
+authorizeUpgrade : 0xfa813889751349ed521edfef33fcee526bccffd72ed6ef71506a73c76b7a41e2
+IPFS             : QmZdnPkqPWtncHY1oDTHqM4mQmUk7LTSQnSpMLJ8pjUJnF
+BLAKE2_256       : 0x65a114997691f5c2d02ed38427c76cf726094ce00728178c5e9d052fd1a9fcd4
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,449,514 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,449,722 bytes)**
 
 ```
-setCode          : 0x71fdbe2d38bccf23511619a9180958767f68d65eb8235637ce7c6dec6ce61f79
-authorizeUpgrade : 0x76008fb4f77201a29fa430225efd8beb721da94c8aad3ae94f2f9a2464eaa26a
-IPFS             : QmfSj6zPjumqUYDv5RWpY6Mc9ggPGWcVkpEDpuQZbNDVvP
-BLAKE2_256       : 0x37bc5eae2782e49ff50592e9dfe2643e00e006ef3cd40ea5ab33b2f389b55ec0
+setCode          : 0x47c9a97f47eac09cb4aac08a6f48a6fad0be6162464fd45b6505757223e68722
+authorizeUpgrade : 0xcd1a80950ac5f9324bd719d50e942f82c07597be7e5b4cab32b779ec3dcb8f29
+IPFS             : QmNsAaHtjMksUDupT8pqdYADAGMjJ4cK5EGJJ88micNeCG
+BLAKE2_256       : 0x1b56ee67ad1732c034745a41c2a2fba32e95106fed325151ebe8e9bc6f396b5b
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

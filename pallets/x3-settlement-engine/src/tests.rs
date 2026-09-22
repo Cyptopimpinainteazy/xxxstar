@@ -4269,3 +4269,242 @@ fn submit_btc_proof_refuses_a_header_that_was_never_admitted() {
         );
     });
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// The first real Bitcoin bytes in this repo
+// ────────────────────────────────────────────────────────────────────────────
+//
+// Every BTC fixture above was written by hand: a header whose fields a person
+// chose, checked against a merkle root a person chose. This module is not that.
+// It is a block that a real Bitcoin node (Core v28.1.0, `-regtest`) mined, the
+// transaction it confirmed, and the merkle path between them, captured by
+// `scripts/btc/capture-regtest-spv.py`. The rows in `FEATURE_REGISTRY.toml` and
+// `feature-matrix/cross-chain.toml` have said "no live Bitcoin run of any kind"
+// for months; regtest is now exercised, and testnet/mainnet still are not.
+//
+// Byte order matters and is easy to get wrong: Bitcoin *displays* hashes
+// reversed. `HEADER_HEX` and `MERKLE_PATH_HEX` are wire/internal bytes, which is
+// what the pallet's `H256` values and `compute_btc_block_hash` are.
+// `BLOCK_HASH_HEX` is display order, because that is the string an explorer shows
+// and the string a human checks.
+mod regtest_capture {
+    pub const HEIGHT: u64 = 121;
+    pub const HEADER_HEX: &str = "000000208bf5533e14f658fd593ea671915cafe19f1ad75cb7603334757f704050f5855e2e741b5c15a43cdfbf517a0accc96e5e735ed11668a61e114c78885ae14b46e30dbab26affff7f2000000000";
+    pub const BLOCK_HASH_DISPLAY: &str = "2771f5462960f39539fbfe193792cd33f9c85e0efae98377859d6d4b11f433af";
+    pub const TXID_DISPLAY: &str = "91cbaa8466a0d62032b7aafacf786a0cdd25d4b0defaeebce3531600fa199e15";
+    pub const TX_INDEX: u32 = 1;
+    pub const MERKLE_PATH_HEX: [&str; 1] =
+        ["94106bc4e23851b65d53cf8300b74011005a33f6c6bd61ae3983a67984a71c12"];
+
+    /// The block the node mined next, linking to [`HEADER_HEX`].
+    pub const NEXT_HEIGHT: u64 = 122;
+    pub const NEXT_HEADER_HEX: &str = "00000020af33f4114b6d9d857783e9fa0e5ec8f933cd923719fefb3995f3602946f57127e06c6fe0c52cc6903d1f4ac3f28668ab3f2a24913bae6841fd5987a17d1c182958bab26affff7f2001000000";
+    pub const NEXT_BLOCK_HASH_DISPLAY: &str = "4f86134bb8a4055b0c15b173c6d20e42e4fc478b6dffccd4847f9d7414c1c704";
+
+    /// The transaction block 121 confirmed, **with the witness stripped**.
+    ///
+    /// The node's raw bytes carry a segwit marker, flag and witness stack, and a
+    /// txid does not cover those: `dsha(raw)` is the *wtxid*. The pallet checks
+    /// `tx_hash == dsha(tx_bytes)` and walks the merkle path over txids, so the
+    /// bytes an SPV proof carries have to be this stripped serialization. A
+    /// relayer that forwarded the node's raw bytes would fail every segwit
+    /// deposit; the test below states that difference rather than assuming it.
+    pub const RAW_TX_STRIPPED_HEX: &str = "0200000001cf953818ab452cabe7f6d7a5be38a59a2de9f499e79a008b85050c1d825878990000000000fdffffff02fc05102401000000160014da29f8c72885928cde1ebb08fd961f1c897c3ad000e1f50500000000160014699904a79507794755a896adc0837a797611179c78000000";
+    /// The same transaction as the node reports it, witness included.
+    pub const RAW_TX_HEX: &str = "02000000000101cf953818ab452cabe7f6d7a5be38a59a2de9f499e79a008b85050c1d825878990000000000fdffffff02fc05102401000000160014da29f8c72885928cde1ebb08fd961f1c897c3ad000e1f50500000000160014699904a79507794755a896adc0837a797611179c0247304402203584825bb533f2c3845de699e612125be7048ad8f4a0fb7013863564c58862750220751ebe6f7932907ee27f8565712628308a2d75979aba0d54df1515548fa4e75901210352a24d853b0844f3dbc41beee37a0e74a38c8329fae2f14b8b8e2b2264a0c47d78000000";
+    /// `dsha(RAW_TX_HEX)` — what the node calls the wtxid. Not the txid.
+    pub const WTXID_DISPLAY: &str = "73eb7ff90b03aac5790a03ca6b0b15404af4da1bbffd4fbf0e13699bbd05d9c5";
+}
+
+fn unhex(s: &str) -> Vec<u8> {
+    assert!(s.len() % 2 == 0, "hex string must have an even length");
+    (0..s.len() / 2)
+        .map(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).expect("valid hex"))
+        .collect()
+}
+
+/// A `BtcBlockHeader` from a real header's 80 wire bytes, plus the height the
+/// chain it came from had for it. The height is *not* in the bytes; a Bitcoin
+/// node knows it from context, and this is the one field a capture has to supply.
+fn header_from_wire(wire: &str, height: u64) -> BtcBlockHeader {
+    let b = unhex(wire);
+    assert_eq!(b.len(), 80, "a Bitcoin header is 80 bytes");
+    BtcBlockHeader {
+        version: u32::from_le_bytes(b[0..4].try_into().unwrap()),
+        prev_block_hash: H256::from_slice(&b[4..36]),
+        merkle_root: H256::from_slice(&b[36..68]),
+        timestamp: u32::from_le_bytes(b[68..72].try_into().unwrap()),
+        bits: u32::from_le_bytes(b[72..76].try_into().unwrap()),
+        nonce: u32::from_le_bytes(b[76..80].try_into().unwrap()),
+        height,
+    }
+}
+
+fn display_hash_to_internal(display: &str) -> H256 {
+    let mut b = unhex(display);
+    b.reverse();
+    H256::from_slice(&b)
+}
+
+#[test]
+fn a_real_bitcoin_block_hashes_to_the_hash_the_node_reported() {
+    // Settles the wire layout against an authority rather than against a second
+    // copy of our own opinion: the node says block 121 is 2771f546…, and
+    // `compute_btc_block_hash` — double SHA-256 over the 80 wire bytes — has to
+    // produce the same 32 bytes (reversed, because Bitcoin displays them that way).
+    let header = header_from_wire(regtest_capture::HEADER_HEX, regtest_capture::HEIGHT);
+    assert_eq!(
+        Pallet::<Test>::compute_btc_block_hash(&header),
+        display_hash_to_internal(regtest_capture::BLOCK_HASH_DISPLAY),
+    );
+    assert_eq!(header.bits, 0x207f_ffff, "regtest mines at its powLimit");
+}
+
+#[test]
+fn a_real_bitcoin_merkle_path_verifies_against_a_real_block() {
+    // The transaction is index 1 of 2 in block 121, so the path is that block's
+    // other transaction — no hand-computed tree, no chosen root.
+    let header = header_from_wire(regtest_capture::HEADER_HEX, regtest_capture::HEIGHT);
+    let txid = display_hash_to_internal(regtest_capture::TXID_DISPLAY);
+    let path: Vec<H256> = regtest_capture::MERKLE_PATH_HEX
+        .iter()
+        .map(|p| H256::from_slice(&unhex(p)))
+        .collect();
+
+    assert!(
+        Pallet::<Test>::verify_btc_merkle_proof(
+            &txid,
+            regtest_capture::TX_INDEX,
+            &path,
+            &header
+        )
+        .expect("the merkle walk is infallible for a well-formed path"),
+        "the pallet reconstructs the root a Bitcoin node put in the block"
+    );
+
+    // …and the same path with one sibling changed does not.
+    let mut tampered = path.clone();
+    tampered[0] = H256::repeat_byte(0x11);
+    assert!(
+        !Pallet::<Test>::verify_btc_merkle_proof(
+            &txid,
+            regtest_capture::TX_INDEX,
+            &tampered,
+            &header
+        )
+        .expect("inflexible"),
+        "a tampered sibling must not reconstruct the root"
+    );
+}
+
+#[test]
+fn a_real_regtest_chain_anchors_and_extends_through_the_pallets_rules() {
+    // The whole point of the anchor, run against data a Bitcoin node produced:
+    // block 121 becomes this chain's committed checkpoint, block 122 — which the
+    // node mined *after* it, with the same `nBits` and a later timestamp — extends
+    // it. Neither header needs a parent in storage; only the anchor may start a
+    // chain, and the extension has to link to it.
+    new_test_ext().execute_with(|| {
+        let first = header_from_wire(regtest_capture::HEADER_HEX, regtest_capture::HEIGHT);
+        let second = header_from_wire(regtest_capture::NEXT_HEADER_HEX, regtest_capture::NEXT_HEIGHT);
+
+        assert_eq!(
+            second.prev_block_hash,
+            Pallet::<Test>::compute_btc_block_hash(&first),
+            "block 122's parent link is block 121, as the header bytes say"
+        );
+
+        // Before the anchor, nothing about these bytes is trusted.
+        assert_noop!(
+            Pallet::<Test>::submit_btc_header(RuntimeOrigin::root(), first.clone()),
+            Error::<Test>::BtcParentMissing
+        );
+
+        assert_ok!(Pallet::<Test>::anchor_btc_checkpoint(
+            RuntimeOrigin::root(),
+            first.clone()
+        ));
+        assert_eq!(
+            crate::BtcCheckpoints::<Test>::get(regtest_capture::HEIGHT),
+            Some(Pallet::<Test>::compute_btc_block_hash(&first)),
+        );
+        assert_eq!(crate::BtcBestHeight::<Test>::get(), regtest_capture::HEIGHT);
+
+        assert_ok!(Pallet::<Test>::submit_btc_header(
+            RuntimeOrigin::root(),
+            second.clone()
+        ));
+        let meta = crate::BtcHeaderMetaStore::<Test>::get(Pallet::<Test>::compute_btc_block_hash(&second))
+            .expect("the extension is recorded");
+        assert_eq!(meta.height, regtest_capture::NEXT_HEIGHT);
+        assert!(meta.anchored);
+        assert_eq!(crate::BtcBestHeight::<Test>::get(), regtest_capture::NEXT_HEIGHT);
+
+        // The regression this is all for: a proof over the real transaction is
+        // refused while its header is unanchored, and accepted once it is.
+        assert_eq!(
+            Pallet::<Test>::compute_btc_block_hash(&second),
+            display_hash_to_internal(regtest_capture::NEXT_BLOCK_HASH_DISPLAY),
+        );
+    });
+}
+
+#[test]
+fn a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored() {
+    // End to end with a real node's bytes: header, merkle path and raw transaction
+    // from Bitcoin Core, through `verify_proof` — the same entry the settlement
+    // path uses.
+    let tx_bytes = unhex(regtest_capture::RAW_TX_STRIPPED_HEX);
+    let txid = display_hash_to_internal(regtest_capture::TXID_DISPLAY);
+    assert_eq!(
+        H256::from(double_sha256(&tx_bytes)),
+        txid,
+        "the witness-stripped serialization hashes to the txid the node reported"
+    );
+    assert_eq!(
+        H256::from(double_sha256(&unhex(regtest_capture::RAW_TX_HEX))),
+        display_hash_to_internal(regtest_capture::WTXID_DISPLAY),
+        "and the node's raw bytes are the wtxid's preimage, not the txid's — which \
+         is why the stripped form is what an SPV proof carries"
+    );
+
+    let header = header_from_wire(regtest_capture::HEADER_HEX, regtest_capture::HEIGHT);
+    let mut receipt_data: Vec<u8> = Vec::new();
+    receipt_data.extend_from_slice(&regtest_capture::TX_INDEX.to_le_bytes());
+    receipt_data.extend_from_slice(&codec::Encode::encode(&header));
+    receipt_data.extend_from_slice(&tx_bytes);
+    let proof = SettlementProof {
+        proof_type: ProofType::BitcoinSpv,
+        tx_hash: txid,
+        block_hash: Pallet::<Test>::compute_btc_block_hash(&header),
+        confirmations: 6,
+        chain_height: Some(regtest_capture::HEIGHT),
+        merkle_proof: BoundedVec::try_from(
+            regtest_capture::MERKLE_PATH_HEX
+                .iter()
+                .map(|p| H256::from_slice(&unhex(p)))
+                .collect::<Vec<_>>(),
+        )
+        .expect("one sibling fits"),
+        receipt_data: BoundedVec::try_from(receipt_data).expect("receipt_data within bound"),
+        receipt_index: None,
+        trie_proof: None,
+    };
+
+    new_test_ext().execute_with(|| {
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(false),
+            "real or not, a block this chain never anchored proves nothing"
+        );
+        assert_ok!(Pallet::<Test>::anchor_btc_checkpoint(
+            RuntimeOrigin::root(),
+            header.clone()
+        ));
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(true),
+            "once anchored, the real node's bytes verify"
+        );
+    });
+}

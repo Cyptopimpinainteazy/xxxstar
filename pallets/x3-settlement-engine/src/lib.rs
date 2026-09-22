@@ -1863,7 +1863,20 @@ pub mod pallet {
         // BTC ATOMIC GATEWAY
         // ────────────────────────────────────────────────────────────────────
 
-        /// Submit BTC SPV proof for UTXO verification
+        /// Submit BTC SPV proof for UTXO verification.
+        ///
+        /// `btc_txid` is the transaction's **txid**: the double SHA-256 of its
+        /// non-witness serialization, which is what a block's merkle root is built
+        /// from. For a segwit transaction that is *not* the hash of the bytes a node
+        /// returns from `getrawtransaction` — those carry the marker, flag and
+        /// witness stack and hash to the wtxid instead. Whatever assembles this call
+        /// has to hand over the txid, and the merkle path over txids; the test
+        /// `a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored`
+        /// pins the difference on a transaction a real node mined.
+        ///
+        /// `block_header` must already be on a checkpoint-anchored chain (admitted by
+        /// `submit_btc_header` after `anchor_btc_checkpoint`); this call no longer
+        /// admits headers of its own.
         #[pallet::call_index(10)]
         #[pallet::weight(T::SettlementWeightInfo::verify_btc_proof())]
         #[allow(clippy::too_many_arguments)]
@@ -3311,7 +3324,11 @@ pub mod pallet {
         ///   [4..]     = SCALE-encoded BtcBlockHeader followed by raw tx bytes
         ///
         /// `proof.merkle_proof` carries the merkle path (H256 siblings).
-        /// `proof.tx_hash` must equal the double-SHA256 of the tx bytes.
+        /// `proof.tx_hash` must equal the double-SHA256 of the tx bytes — which
+        /// means the tx bytes have to be the **non-witness serialization**, since a
+        /// txid does not cover the witness. A segwit transaction's raw bytes hash to
+        /// its wtxid, so a proof carrying them is refused here rather than settling
+        /// against a value that is not the txid (see the regtest capture tests).
         /// `proof.block_hash` must equal the double-SHA256 of the block header.
         fn verify_btc_settlement_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
             use crate::btc_gateway::BtcSpvProof;

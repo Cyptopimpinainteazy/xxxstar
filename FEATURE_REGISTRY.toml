@@ -125,11 +125,18 @@ required_tests = [
   "a_btc_extension_must_postdate_the_median_of_its_ancestors",
   "submit_btc_proof_refuses_a_header_that_was_never_admitted",
   "the_retarget_bound_bites_exactly_at_a_factor_of_four",
+  # Data a real Bitcoin node produced (Core v28.1.0, regtest; see
+  # scripts/btc/capture-regtest-spv.py). Everything else in this list is a
+  # hand-written fixture.
+  "a_real_bitcoin_block_hashes_to_the_hash_the_node_reported",
+  "a_real_bitcoin_merkle_path_verifies_against_a_real_block",
+  "a_real_regtest_chain_anchors_and_extends_through_the_pallets_rules",
+  "a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored",
 ]
 proof_report = "reports/btc_gateway_report.md"
 readiness_score = 45
 blockers = [
-  "No live Bitcoin run at all — not regtest, not testnet, not mainnet; the deposit/withdrawal path has never moved a coin",
+  "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, but nothing has run against testnet or mainnet and the deposit/withdrawal path has never moved a coin",
   "The header chain bootstraps from a governance-anchored checkpoint as of spec_version 14 (`anchor_btc_checkpoint`; `BtcCheckpoints` + `BtcHeaderMetaStore`), and SPV evidence is accepted only from headers on an anchored chain — but no chain has anchored one yet and there is no peer-sourced header sync, so anchoring and header pushing are both manual operator acts",
   "No BTC signer quorum: withdrawals have no production multi-signer policy",
   "BTC mainnet disabled by feature flag",

@@ -6,15 +6,15 @@ name = "BTC Fortress gateway"
 subsystem = "cross_chain"
 source = "master"
 paths = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs"]
-implemented = 70
-tested = 70
+implemented = 75
+tested = 80
 mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "No live Bitcoin run of any kind — not regtest, not testnet, not mainnet; the deposit/withdrawal path has never moved a coin",
+  "Regtest is now real, testnet and mainnet are not: a live Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`, `.ai/reports/btc-regtest-capture-20260922.json`), but no coin has ever moved on a network anyone else can see, and no header from testnet or mainnet has been anchored",
   "The trust root exists but is unset on every chain: `anchor_btc_checkpoint` (root) commits to a height/hash and the SPV paths accept evidence only from headers on an anchored chain, but no chain in the repo has anchored a checkpoint, and there is still no peer-sourced header sync — anchoring is a manual operator act",
   "Nothing pushes headers: `submit_btc_header` is root-only and there is no header relayer with a bond, so keeping the chain near Bitcoin's tip is an operator job",
   "No BTC signer quorum for withdrawals",
@@ -28,7 +28,7 @@ blockers = [
 # (deposits, withdrawals, PSBTs, header-chain verification) and the bridge's HTLC
 # and SPV modules.
 evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22 with the named tests below"]
-test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "crates/x3-bitcoin-vault/src/lib.rs", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, and the eight anchor negative controls: a chain cannot start without a checkpoint, a proof cannot use an unadmitted header, an anchored height cannot be re-pointed, extensions must be contiguous, cannot change difficulty off a retarget boundary, must postdate the median of their ancestors, `submit_btc_proof` refuses an unadmitted header, and the retarget clamp bites at exactly 4x) and the vault's 23 tests including header-chain linkage and tampered-signature rejection; `cargo test -p pallet-x3-settlement-engine` = 144 + 23 passed, `cargo test -p x3-bitcoin-vault --lib` = 23 passed on 2026-09-22"]
+test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, and four tests over data a real Bitcoin Core v28.1.0 regtest node produced — its block 121 header hashes to the hash the node reported, its merkle path reconstructs its root and a tampered sibling does not, blocks 121/122 anchor and extend through the pallet's rules, and a real transaction's proof is refused until its block is anchored and accepted after) plus the vault's 23 tests including header-chain linkage and tampered-signature rejection; `cargo test -p pallet-x3-settlement-engine` = 148 + 23 passed, `cargo test -p x3-bitcoin-vault --lib` = 23 passed on 2026-09-22"]
 registry_feature = "btc_fortress_gateway"
 
 [[feature]]
@@ -45,7 +45,7 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "No live Bitcoin run: the script builder, the merkle walk and the header chain are exercised against fixtures, never against a chain",
+  "No live Bitcoin run beyond regtest: the script builder, the merkle walk and the header chain are now exercised against a real regtest node's blocks (block 121's header, its merkle path and a confirmed transaction), but never against testnet or mainnet",
   "The header chain the SPV check reads now bootstraps from a governance-anchored checkpoint (`anchor_btc_checkpoint`, spec_version 14) and extends only under Bitcoin's height/difficulty/timestamp rules, but no chain has anchored one yet, so the path is fail-closed and unexercised end to end",
   "No signer quorum for withdrawals; no external audit",
   "Three SPV implementations exist — this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` — and only the pallet's is on the runtime path; they agree on the wire layout after the 2026-09-22 fix, but consolidating them would remove a standing drift risk",
