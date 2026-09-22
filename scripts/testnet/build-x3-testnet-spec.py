@@ -72,12 +72,37 @@ def public_ss58(suri, key_type):
     return out
 
 
+def public_hex(suri, key_type):
+    """The public key for `suri` in hex, with the node's own CLI (`--output hex`)."""
+    out = subprocess.run([NODE, "keys", "generate", "--key-type", key_type,
+                          "--seed", suri, "--output", "hex"],
+                         capture_output=True, text=True, check=True).stdout.strip()
+    if not re.fullmatch(r"0x[0-9a-f]{64}", out):
+        raise RuntimeError(
+            f"{NODE} keys generate ({key_type}, hex) returned {out[:60]!r}, not a "
+            "32-byte hex public key"
+        )
+    return out
+
+
+def peer_id_for(pubkey_hex):
+    """libp2p peer id for an ed25519 public key (one implementation, in scripts/mainnet)."""
+    helper = os.path.join(ROOT, "scripts", "mainnet", "peer-id-from-ed25519-pubkey.py")
+    out = subprocess.run(["python3", helper, pubkey_hex],
+                         capture_output=True, text=True, check=True).stdout.strip()
+    # ed25519 identity multihash → base58btc: `12D3Koo` plus 44–46 characters.
+    if not re.fullmatch(r"12D3Koo[1-9A-HJ-NP-Za-km-z]{44,46}", out):
+        raise RuntimeError(f"peer id helper returned {out[:60]!r}, not a peer id")
+    return out
+
+
 suri_log = os.path.join(keysdir, "suris.txt")
 f = open(suri_log, "w")
 f.write("# TESTNET-ONLY master seeds (generated %s). NEVER use on mainnet; not committed.\n"
         % datetime.datetime.utcnow())
 aut = []
 endowed = []
+bootnodes = []
 for i in range(1, COUNT + 1):
     master = "0x" + secrets.token_hex(32)
     rec = os.path.join(keysdir, f"validator-{i}.suri")
@@ -89,6 +114,19 @@ for i in range(1, COUNT + 1):
     f.write(f"validator-{i} = {master}\n")
     aura = public_ss58(master, "aura")     # sr25519 — Aura authority
     gran = public_ss58(master, "grandpa")  # ed25519 — GRANDPA authority
+    # Network identity: one 32-byte secret per validator, written beside the seed so
+    # the launcher can start each node with the `--node-key` its spec's bootNodes
+    # entry was derived from. The node needs *some* identity — without one it exits
+    # with `NetworkKeyNotFound` — and a Live spec needs at least one bootnode whose
+    # peer id is therefore known before the node starts.
+    nodekey_path = os.path.join(keysdir, f"validator-{i}.nodekey")
+    nodekey = "0x" + secrets.token_hex(32)
+    with open(nodekey_path, "w") as nf:
+        nf.write(nodekey + "\n")
+    os.chmod(nodekey_path, 0o600)
+    node_pub = public_hex(nodekey, "grandpa")
+    peer = peer_id_for(node_pub)
+    bootnodes.append(f"/ip4/127.0.0.1/tcp/{30333 + i - 1}/p2p/{peer}")
     # The authority's own Aura account is endowed; there is no separate "//acct"
     # derivation to get wrong (the old subkey call derived one, and it is not
     # needed: a validator that holds a bond and an authority key may be one account).
@@ -115,6 +153,11 @@ env["X3_TESTNET_COUNCIL_MEMBERS"] = json.dumps(endowed[: max(2, COUNT // 3)])
 env["X3_TESTNET_TREASURY_SIGNERS"] = json.dumps(endowed[: max(2, COUNT // 3)])
 env["X3_EVM_ESCROW_ADDR"] = "0x" + "11" * 20
 env["X3_SVM_ESCROW_ADDR"] = "0x" + "22" * 32
+# A Live spec with no bootNodes cannot start a node at all:
+#   Error: Input("Live chain spec requires at least one bootnode")
+# The entries have to be the peer ids of the identities the launcher will start,
+# so they are derived here from each validator's node key before the spec exists.
+env["TESTNET_BOOTNODES"] = ",".join(bootnodes)
 cmd = [NODE, "build-spec", "--chain=testnet", "--disable-log-color"]
 if make_raw:
     cmd.append("--raw")
@@ -146,6 +189,28 @@ if check.returncode != 0:
     )
     sys.exit(1)
 print(f"[spec] {name} loads in the node (build-spec --chain {name} -> ok)")
+
+# The loader above accepts a spec with no bootNodes; the node's *validator* startup
+# does not. Assert the form the launcher actually needs, and that every entry is one
+# of the peer ids this run derived — a bootnode list naming some other identity is a
+# network that never connects.
+written = json.loads(open(outfile).read())
+spec_boot = written.get("bootNodes") or []
+missing = [b for b in bootnodes if b not in spec_boot]
+if not spec_boot:
+    sys.stderr.write(
+        f"[spec] {name} has no bootNodes: a validator started from it exits with "
+        'Error: Input("Live chain spec requires at least one bootnode")\n'
+    )
+    sys.exit(1)
+if missing:
+    sys.stderr.write(
+        f"[spec] {name} is missing {len(missing)} of the {len(bootnodes)} derived "
+        f"bootnode entries, e.g. {missing[0]}\n"
+    )
+    sys.exit(1)
+print(f"[spec] {name} carries all {len(bootnodes)} derived bootnodes "
+      f"(peer ids match the node keys beside the seeds)")
 
 if make_raw:
     print(

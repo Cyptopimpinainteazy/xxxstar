@@ -91,30 +91,13 @@ require_key_output() {
   fi
 }
 
-# libp2p peer id for an ed25519 node key: base58btc(0x00 0x24 || protobuf(ed25519 pub)).
-# The node's network identity is the ed25519 key built from the same 32 bytes, so
-# this is the peer id the node reports — and the boot gate asserts exactly that.
+# libp2p peer id for an ed25519 node key. The derivation lives in one place now
+# (scripts/mainnet/peer-id-from-ed25519-pubkey.py) because the testnet spec builder
+# needs the same value to write `bootNodes`; the node's network identity is the
+# ed25519 key built from the same 32 bytes, so this is the peer id it reports — and
+# the boot gate asserts exactly that.
 peer_id_for() {
-  python3 - "$1" <<'PY'
-import sys
-ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-def b58(data: bytes) -> str:
-    n = int.from_bytes(data, "big")
-    out = ""
-    while n:
-        n, r = divmod(n, 58)
-        out = ALPHABET[r] + out
-    pad = 0
-    for byte in data:
-        if byte == 0:
-            pad += 1
-        else:
-            break
-    return "1" * pad + out
-pub = bytes.fromhex(sys.argv[1].removeprefix("0x"))
-assert len(pub) == 32, "ed25519 public key must be 32 bytes"
-print(b58(bytes([0x00, 0x24, 0x08, 0x01, 0x12, 0x20]) + pub))
-PY
+  python3 "$ROOT/scripts/mainnet/peer-id-from-ed25519-pubkey.py" "$1"
 }
 
 info "deriving three authority keypairs from fixture seeds"
