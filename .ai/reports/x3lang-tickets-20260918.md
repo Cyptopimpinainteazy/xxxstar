@@ -890,7 +890,7 @@ the module until it is real.
 Validation: `cargo check -p x3-lang-compiler` plus the module's own tests.
 
 ## TICKET-016 — Re-add price-impact and MEV-leakage ceilings as real features
-Type: DEFERRED (needs host evidence **and** a format decision) · Subsystem: x3-lang/compiler + vm
+Type: PARTIAL (policy-level landed in #451; source-level guards remain) · Subsystem: x3-lang/compiler + vm
 Blocker re-measured (2026-09-20), because half of it changed since the entry was written. The
 *mechanism* for a host-reported quantity exists now — `REQUIRE_COMPARE_MEASURED_*`, the
 `CAPABILITY_REPLY_MEASURED_TAG` reply, and the CLI's `--measured-*-bps` — so a price-impact ceiling
@@ -903,6 +903,12 @@ would be enforceable the moment a host reports the figure. The two things still 
    third *measured* quantity needs a wider field or a re-allocation, which is a format decision
    rather than a patch.
 Both are recorded so the next attempt starts from the measured state rather than the entry's.
+Progress (2026-09-22): policy-level `max_price_impact_bps` /
+`max_mev_leakage_bps` now flow through the trading policy AST/parser/formatter/
+semantic/IR/VM and are enforced at execution and receipt replay. The host
+boundary exposes `price_impact()` / `mev_leakage()` returning named
+measurements. Source-level `require price_impact <= N` /
+`require mev_leakage <= N` still needs a wider measured-unit encoding.
 Reason: `max_price_impact_bps` and `max_mev_leakage_bps` were deleted in
 round 3 rather than enforced, because no host evidence exists for either figure.
 Re-adding them as ceilings without evidence would repeat the fabrication that
