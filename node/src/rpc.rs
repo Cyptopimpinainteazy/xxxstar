@@ -15,6 +15,7 @@ use frame_support::storage::storage_prefix;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
 use pallet_x3_atomic_kernel::BundleRollbackReason;
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
+use pallet_x3_settlement_engine::runtime_api::GovernanceSettlementApi;
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sc_client_api::{BlockBackend, StorageProvider};
 use sc_transaction_pool_api::TransactionPool;
