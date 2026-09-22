@@ -4656,6 +4656,64 @@ impl_runtime_apis! {
         }
     }
 
+    impl pallet_x3_settlement_engine::runtime_api::GovernanceSettlementApi<Block, AccountId, Balance, BlockNumber> for Runtime {
+        fn settlement_status() -> pallet_x3_settlement_engine::runtime_api::SettlementStatusResponse {
+            let mut pending = 0u32;
+            let mut completed = 0u64;
+            let mut refunded = 0u64;
+            let mut total_locked = 0u128;
+            for (intent_id, intent) in pallet_x3_settlement_engine::SettlementIntents::<Runtime>::iter() {
+                match pallet_x3_settlement_engine::IntentStates::<Runtime>::get(intent_id) {
+                    pallet_x3_settlement_engine::IntentState::Finalized => completed = completed.saturating_add(1),
+                    pallet_x3_settlement_engine::IntentState::Refunded => refunded = refunded.saturating_add(1),
+                    _ => pending = pending.saturating_add(1),
+                }
+                for leg in pallet_x3_settlement_engine::EscrowStates::<Runtime>::iter_prefix(intent_id).map(|(_, leg)| leg) {
+                    if matches!(leg.state, pallet_x3_settlement_engine::EscrowLegState::Locked) {
+                        total_locked = total_locked.saturating_add(leg.amount);
+                    }
+                }
+                let _ = intent;
+            }
+            pallet_x3_settlement_engine::runtime_api::SettlementStatusResponse {
+                engine_enabled: true,
+                pending_transfers: pending,
+                completed_transfers: completed,
+                refunded_transfers: refunded,
+                total_locked,
+            }
+        }
+
+        fn get_settlement(_transfer_id: sp_core::H256) -> Option<pallet_x3_settlement_engine::runtime_api::SettlementResponse<AccountId, Balance, BlockNumber>> {
+            None
+        }
+
+        fn get_intent_snapshot(intent_id: sp_core::H256) -> Option<pallet_x3_settlement_engine::runtime_api::IntentSnapshot<AccountId>> {
+            let intent = pallet_x3_settlement_engine::SettlementIntents::<Runtime>::get(intent_id)?;
+            let state = pallet_x3_settlement_engine::IntentStates::<Runtime>::get(intent_id);
+            let escrows = pallet_x3_settlement_engine::EscrowStates::<Runtime>::iter_prefix(intent_id)
+                .map(|(_, leg)| leg)
+                .collect();
+            Some(pallet_x3_settlement_engine::runtime_api::IntentSnapshot { intent, state, escrows })
+        }
+
+        fn get_account_pending_settlements(_account: AccountId) -> Vec<pallet_x3_settlement_engine::runtime_api::SettlementResponse<AccountId, Balance, BlockNumber>> {
+            Vec::new()
+        }
+
+        fn get_pending_settlements_with_timeout(_current_block: BlockNumber, _window_blocks: BlockNumber) -> Vec<pallet_x3_settlement_engine::runtime_api::PendingSettlement<AccountId>> {
+            Vec::new()
+        }
+
+        fn is_settlement_enabled() -> bool { true }
+
+        fn get_total_locked_amount() -> Balance {
+            pallet_x3_settlement_engine::EscrowStates::<Runtime>::iter()
+                .filter_map(|(_, _, leg)| matches!(leg.state, pallet_x3_settlement_engine::EscrowLegState::Locked).then_some(leg.amount))
+                .fold(0u128, u128::saturating_add)
+        }
+    }
+
     impl pallet_x3_domain_registry::runtime_api::X3DomainRegistryApi<Block, AccountId> for Runtime {
         fn get_records(domain: Vec<u8>) -> Vec<pallet_x3_domain_registry::runtime_api::X3DnsRecordResponse> {
             pallet_x3_domain_registry::Pallet::<Runtime>::runtime_get_records(domain)
