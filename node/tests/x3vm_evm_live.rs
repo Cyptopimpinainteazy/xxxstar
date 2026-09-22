@@ -1001,8 +1001,13 @@ fn real_evm_receipt_proof_is_accepted_against_the_attested_header() {
         .settlement_proof()
         .expect("the inclusion adapts into the engine's proof");
 
+    // Captured before the proof is moved into the submission below: the bundle's
+    // tx_id has to be the identity the engine recorded.
+    let proof_tx_hash = proof.tx_hash;
+
     // 4. An intent with an Ethereum leg, both legs locked: the engine accepts a
     //    proof only for a funded intent.
+    let local_id = 2002u64;
     let preimage = [0x77u8; 32];
     let hashlock = sp_core::hashing::sha2_256(&preimage);
     let prepared = alice
@@ -1048,7 +1053,44 @@ fn real_evm_receipt_proof_is_accepted_against_the_attested_header() {
         assert_x3_dispatch_succeeded(&alice, &block, &lock);
     }
 
-    // 5. The engine verifies the proof against the attested header and walks the
+    // 5. The bundle gate, first half: a compact bundle summarises proofs this
+    //    pallet checked, so with nothing recorded for the Ethereum domain it must
+    //    be refused — and refused for *that* reason, not for a state guard.
+    let client_intent = atomic_intent(local_id, preimage);
+    let block_hash_hex = format!("0x{}", hex::encode(inclusion.block_hash));
+    let early_set = evm_claim_set(
+        &client_intent,
+        runtime_intent_id,
+        format!("0x{}", hex::encode(proof.tx_hash.0)),
+        block_number,
+        block_hash_hex.clone(),
+        inclusion.receipt_rlp.clone(),
+        inclusion.confirmations,
+    );
+    let early_signed = alice
+        .prepare_cross_domain_proof_set(runtime_intent_id, early_set)
+        .expect("sign the early proof set");
+    assert!(!submit_x3(&early_signed).is_empty());
+    let early_block = wait_x3_finalized(&early_signed, Duration::from_secs(180));
+    if unattested_cross_domain_proofs_allowed() {
+        // Dev posture: this chain's genesis allows a proof set with nothing
+        // verified behind it, so the bundle is accepted here. That is the flag
+        // the strict run flips — see `scripts/cross-domain-evm-gate.sh` and
+        // `X3_STRICT_CROSS_DOMAIN_PROOFS=1`.
+        assert_x3_dispatch_succeeded(&alice, &early_block, &early_signed);
+    } else {
+        let early_error = x3_dispatch_error(&alice, &early_block, &early_signed);
+        // Pallet 31 is the settlement engine, and its error index 40 is
+        // `CrossDomainProofUnverified` (the runtime carries no error messages, so
+        // the code is what identifies it).
+        assert!(
+            early_error.contains("index: 31, error: [40, 0, 0, 0]"),
+            "under the strict posture a bundle for an external domain with no verified \
+             proof must be refused by `CrossDomainProofUnverified`, got: {early_error}"
+        );
+    }
+
+    // 6. The engine verifies the proof against the attested header and walks the
     //    receipt to the attested root. Acceptance means all of it held.
     let submit = alice
         .sign_submit_proof(
@@ -1060,4 +1102,124 @@ fn real_evm_receipt_proof_is_accepted_against_the_attested_header() {
     assert!(!submit_x3(&submit).is_empty());
     let submit_block = wait_x3_finalized(&submit, Duration::from_secs(180));
     assert_x3_dispatch_succeeded(&alice, &submit_block, &submit);
+
+    // 7. The second half: with the proof recorded, the same bundle is accepted —
+    //    and the *identity* matters. `submit_proof` stores `keccak256(receipt_data)`
+    //    in the field named `tx_hash`, so a bundle naming the EVM transaction hash
+    //    is refused even though the proof is verified.
+    let wrong_identity = evm_claim_set(
+        &client_intent,
+        runtime_intent_id,
+        tx_hash.clone(),
+        block_number,
+        block_hash_hex.clone(),
+        inclusion.receipt_rlp.clone(),
+        inclusion.confirmations,
+    );
+    let wrong_signed = alice
+        .prepare_cross_domain_proof_set(runtime_intent_id, wrong_identity)
+        .expect("sign the set naming the transaction hash");
+    assert!(!submit_x3(&wrong_signed).is_empty());
+    let wrong_block = wait_x3_finalized(&wrong_signed, Duration::from_secs(180));
+    if unattested_cross_domain_proofs_allowed() {
+        // Permissive posture: nothing is required, so the identity cannot matter
+        // either. This is the half the strict run is for.
+        assert_x3_dispatch_succeeded(&alice, &wrong_block, &wrong_signed);
+    } else {
+        let wrong_error = x3_dispatch_error(&alice, &wrong_block, &wrong_signed);
+        assert!(
+            wrong_error.contains("index: 31, error: [40, 0, 0, 0]"),
+            "the bundle's tx_id has to be the identity submit_proof recorded (the receipt \
+             hash): naming the transaction hash leaves the bundle unverified, got: {wrong_error}"
+        );
+    }
+
+    let accepted_set = evm_claim_set(
+        &client_intent,
+        runtime_intent_id,
+        format!("0x{}", hex::encode(proof_tx_hash.0)),
+        block_number,
+        block_hash_hex,
+        inclusion.receipt_rlp.clone(),
+        inclusion.confirmations,
+    );
+    let accepted_signed = alice
+        .prepare_cross_domain_proof_set(runtime_intent_id, accepted_set)
+        .expect("sign the accepted proof set");
+    assert!(!submit_x3(&accepted_signed).is_empty());
+    let accepted_block = wait_x3_finalized(&accepted_signed, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&alice, &accepted_block, &accepted_signed);
+}
+
+/// The dispatch error of a finalized extrinsic, as text.
+fn x3_dispatch_error(signer: &X3RuntimeSigner, block_hash: &str, signed: &str) -> String {
+    let mut rpc = RpcClient::new(X3_RPC.into(), 0);
+    let index = x3_extrinsic_index_in_block(&mut rpc, block_hash, signed)
+        .expect("signed extrinsic is present in the block that included it");
+    signer
+        .verify_finalized_dispatch(block_hash, index)
+        .expect_err("the dispatch failed")
+        .to_string()
+}
+
+/// A canonical Claim bundle for the intent's Ethereum domain, as a proof set.
+///
+/// `tx_id` is the identity `submit_proof` recorded for the domain — see the
+/// caller, where the receipt hash and the transaction hash are deliberately
+/// tried against each other.
+#[allow(clippy::too_many_arguments)]
+fn evm_claim_set(
+    intent: &AtomicIntent,
+    runtime_intent_id: H256,
+    tx_id: String,
+    block_number: u64,
+    block_hash: String,
+    evidence: Vec<u8>,
+    confirmations: u64,
+) -> CrossDomainProofSet {
+    let mut set = CrossDomainProofSet::new(intent, runtime_intent_id.to_fixed_bytes());
+    let bundle = CrossDomainProofBundle::new(
+        intent,
+        runtime_intent_id.to_fixed_bytes(),
+        String::from("ethereum-mainnet"),
+        VmType::Evm,
+        CrossDomainOperation::Claim,
+        tx_id.clone(),
+        block_number,
+        block_hash.clone(),
+        evidence,
+        FinalityProof {
+            // The finality observation's domain must be the *bundle's* execution
+            // domain, not the name the executor uses for the chain it talked to.
+            chain_id: String::from("ethereum-mainnet"),
+            vm_type: VmType::Evm,
+            tx_id,
+            block_number,
+            block_hash,
+            confirmations,
+            finalized: true,
+            finality_source: String::from("anvil"),
+            safe_to_reveal_secret: false,
+        },
+    )
+    .expect("canonical EVM claim bundle");
+    set.push_verified(intent, bundle)
+        .expect("the bundle is verified against the intent");
+    set
+}
+
+/// Whether this chain's settlement engine accepts a cross-domain proof set with
+/// nothing verified behind it — genesis state, `true` only on dev/local.
+fn unattested_cross_domain_proofs_allowed() -> bool {
+    let key = format!(
+        "0x{}",
+        hex::encode(frame_support::storage::storage_prefix(
+            b"X3SettlementEngine",
+            b"AllowUnattestedCrossDomainProofs"
+        ))
+    );
+    match storage_at(&key) {
+        Some(bytes) => bytes.first() == Some(&1u8),
+        None => false,
+    }
 }
