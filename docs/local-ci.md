@@ -253,6 +253,36 @@ code stopped compiling" without re-deriving it by hand. Just re-run the gate;
 do not read a `BLOCKED (environment)` gate as evidence the change under test
 is broken, and do not merge or revert based on it.
 
+### A shared target dir written by a *different* rustc
+
+The same shared `$ROOT/target` has a second way to produce a red that is not
+about the code. This workspace pins 1.90.0 in `rust-toolchain.toml`, but
+`stable` is also installed on this box, so a single command run without the
+pin leaves tens of GB of artifacts built by (currently) 1.98.1. The pinned
+compiler then cannot link against them, and cargo says so in one line buried
+under a cascade of inference errors in crates nobody touched:
+
+```
+error[E0514]: found crate `smallvec` compiled by an incompatible version of rustc
+  = help: please recompile that crate using this compiler (rustc 1.90.0 ...)
+```
+
+Two clippy gates were read as code failures for an hour because of this. One
+of them (`clippy workspace`) was a genuinely mid-edit snapshot of the change
+being written at the time; the other (`clippy runtime rc1`) was purely the
+toolchain mix — both pass with a target dir built by the pinned toolchain
+(`clippy runtime rc1` in 521s, `clippy workspace` in 1382s).
+`scripts/local-ci.sh` now classifies that shape as
+`BLOCKED (toolchain-mix)`, and the line it prints carries the remedy:
+
+```bash
+CARGO_TARGET_DIR=/tmp/x3-target-190 bash scripts/local-ci.sh   # dedicated dir, pinned toolchain
+```
+
+Prefer a dedicated directory over `cargo clean` on the shared one: the shared
+directory is warm for whoever built it, and foreign artifacts are only a
+problem for the compiler that did not write them.
+
 ### The quieter failure mode: a shared `CARGO_TARGET_DIR` across revisions
 
 Passing an external `CARGO_TARGET_DIR` (rather than each worktree's own

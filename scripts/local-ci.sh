@@ -595,6 +595,18 @@ run_gate() {
       && grep -qE "No such file or directory \(os error 2\)" "$gate_log"; then
       status=BLOCKED
       reason=environment
+    # The shared `$ROOT/target` is written by whatever toolchain ran last. This
+    # workspace pins 1.90.0 (rust-toolchain.toml) but `stable` is also installed
+    # here, so a single command run without the pin leaves ~50G of artifacts that
+    # the pinned compiler refuses to link against: cargo then reports
+    # "found crate `x` compiled by an incompatible version of rustc" (plus a
+    # cascade of inference errors in *crates nobody changed*). Nothing about the
+    # code failed; the target dir is the problem, and the remedy is a dedicated
+    # one. This cost an hour of misreading two clippy gates as code failures —
+    # classify it instead.
+    elif grep -qE "compiled by an incompatible version of rustc|please recompile that crate using this compiler" "$gate_log"; then
+      status=BLOCKED
+      reason=toolchain-mix
     else
       status=FAIL
     fi
@@ -605,6 +617,9 @@ run_gate() {
   # One short line per gate: atomic appends, so parallel gates cannot interleave.
   if [ "$status" = "PASS" ]; then
     printf 'PASS %-34s %ss\n' "$name" "$((end - start))" | tee -a "$LOG"
+  elif [ "$status" = "BLOCKED" ] && [ "$reason" = "toolchain-mix" ]; then
+    printf 'BLOCKED %-31s %ss — the shared target dir holds artifacts from another rustc; rerun with CARGO_TARGET_DIR=<dedicated dir> (%s)\n' \
+      "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
   elif [ "$status" = "BLOCKED" ] && [ "$reason" = "environment" ]; then
     printf 'BLOCKED %-31s %ss — this box lost rustc/cargo or a target-dir file mid-build; not a code diagnostic (%s)\n' \
       "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
