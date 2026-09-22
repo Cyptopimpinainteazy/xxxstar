@@ -23,8 +23,8 @@ use x3_atomic_swap::{
     AtomicIntent, ChainId, CrossDomainProofSet, RpcClient, SwapError, X3ExtrinsicSigner,
 };
 use x3_chain_runtime::{
-    AccountId, Address, Runtime, RuntimeCall, RuntimeEvent, Signature, SignedExtra, SignedPayload,
-    UncheckedExtrinsic, VERSION,
+    AccountId, Address, CouncilCollective, Runtime, RuntimeCall, RuntimeEvent, Signature,
+    SignedExtra, SignedPayload, UncheckedExtrinsic, VERSION,
 };
 
 /// A signed create-intent transaction. The runtime intent id CANNOT be known
@@ -368,6 +368,79 @@ impl X3RuntimeSigner {
             pallet_x3_settlement_engine::Call::<Runtime>::submit_proof {
                 intent_id: runtime_intent_id,
                 chain,
+                proof,
+            },
+        );
+        self.signed_extrinsic(call)
+    }
+
+    /// Propose a runtime call to the council, executing it in the same extrinsic
+    /// when `threshold < 2`.
+    ///
+    /// `pallet_collective::propose` takes the fast path (`do_propose_execute`) for
+    /// a threshold below two, so one member's proposal *is* the execution. That is
+    /// how a chain whose administrative origin is Root-or-half-council bootstraps
+    /// itself: this genesis configures no sudo key, and a signed account cannot be
+    /// Root, so the council motion is the reachable path.
+    pub fn sign_council_propose(
+        &self,
+        call: RuntimeCall,
+        threshold: u32,
+    ) -> Result<String, SwapError> {
+        let length_bound = u32::try_from(call.encoded_size()).map_err(|_| {
+            SwapError::Internal("the proposed call does not fit in a council proposal".into())
+        })?;
+        let council_call = RuntimeCall::Council(
+            pallet_collective::Call::<Runtime, CouncilCollective>::propose {
+                threshold,
+                proposal: Box::new(call),
+                length_bound,
+            },
+        );
+        self.signed_extrinsic(council_call)
+    }
+
+    /// Enroll external-header submitters, through the council.
+    ///
+    /// `set_authorized_submitters` requires `AdminOrigin` — Root or half the
+    /// council on this runtime — and no signed account is either. The proposal
+    /// above is the piece that reaches it.
+    pub fn sign_enroll_header_submitters(
+        &self,
+        submitters: Vec<AccountId>,
+    ) -> Result<String, SwapError> {
+        let call = RuntimeCall::CrossChainValidator(
+            pallet_cross_chain_validator::Call::<Runtime>::set_authorized_submitters {
+                new_submitters: submitters,
+            },
+        );
+        // Threshold 1 executes immediately; the runtime's admin origin accepts a
+        // half-council majority and this council has two members.
+        self.sign_council_propose(call, 1)
+    }
+
+    /// Attest one external EVM header to the cross-chain validator pallet.
+    ///
+    /// `proof` is that pallet's flat-Merkle proof over the leaves hashing to
+    /// `receipts_root`. The settlement engine settles a block against the header
+    /// whose `merkle_root` is that block's **receipts root**, so a single leaf —
+    /// the root itself — is the honest proof of "this is the root over the leaves
+    /// I submitted". Without this attestation the verifier's anchor answers
+    /// nothing and every external proof is refused.
+    pub fn sign_validate_evm_header(
+        &self,
+        block_number: u64,
+        block_hash: H256,
+        state_root: H256,
+        receipts_root: H256,
+        proof: Vec<u8>,
+    ) -> Result<String, SwapError> {
+        let call = RuntimeCall::CrossChainValidator(
+            pallet_cross_chain_validator::Call::<Runtime>::validate_evm_header {
+                block_number,
+                block_hash,
+                state_root,
+                merkle_root: receipts_root,
                 proof,
             },
         );

@@ -154,6 +154,12 @@ export X3_TEST_EVM_CLAIMANT_KEY="$CLAIMANT_KEY"
 TESTS=(
   real_x3vm_evm_lock_claim_atomic_lifecycle
   real_x3vm_evm_timeout_refund_atomic_lifecycle
+  # Not a lifecycle: it proves the *anchor* the EVM receipt verifier reads can be
+  # populated on a live chain — the council motion that enrolls the first header
+  # submitter (this genesis configures no sudo key), and an attestation of a block
+  # anvil actually produced. Without it "the verifier is anchored" was a claim
+  # about code paths no chain had run.
+  real_evm_header_attestation_populates_the_verifiers_anchor
 )
 
 failed=0
