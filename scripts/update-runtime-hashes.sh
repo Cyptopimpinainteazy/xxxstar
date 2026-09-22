@@ -54,6 +54,7 @@ build_once >"$OUT2_FILE" 2>&1
 
 OUT1_FILE="$OUT1_FILE" OUT2_FILE="$OUT2_FILE" RECORD="$RECORD" ROOT="$ROOT" \
 CHECK_ONLY="$CHECK_ONLY" python3 - <<'PY'
+import datetime
 import importlib.util
 import json
 import os
@@ -79,7 +80,11 @@ if not first or not second:
     print("[runtime-hashes] could not read a hash block from a build", file=sys.stderr)
     sys.exit(1)
 
-fields = ("size", "set_code", "authorize_upgrade", "ipfs", "blake2_256")
+# `version` and `metadata` come out of the same srtool block as the hashes, and
+# they are compared between the two builds and written into the record: a record
+# whose top-level `runtime_version` drifts behind the wasm it describes is the
+# same kind of stale claim as a hash that no longer matches.
+fields = ("size", "set_code", "authorize_upgrade", "ipfs", "blake2_256", "version", "metadata")
 disagreements = [
     f"{runtime}.{field}: build1={first.get(runtime, {}).get(field)} "
     f"build2={second.get(runtime, {}).get(field)}"
@@ -103,6 +108,18 @@ previous = record.get("recorded_revision")
 previous_runtimes = record.get("runtimes", {})
 record["recorded_revision"] = revision
 record["runtimes"] = {k: {f: first[k][f] for f in fields} for k in sorted(first)}
+
+# The top-level fields describe the same artifact as the hashes. `runtime_version`
+# and `recorded_at` used to be carried over from whatever the record said before,
+# which left the record claiming "x3-chain-11" for a wasm that reports
+# "x3-chain-12" after the BTC proof-of-work fix bumped the spec version.
+compact_version = first.get("compact", {}).get("version")
+if not compact_version:
+    print("[runtime-hashes] srtool reported no Version line; refusing to leave the "
+          "record's runtime_version stale", file=sys.stderr)
+    sys.exit(1)
+record["runtime_version"] = compact_version
+record["recorded_at"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
 print(f"[runtime-hashes] two builds of {revision} agree ({previous} -> {revision})")
 for runtime in sorted(first):

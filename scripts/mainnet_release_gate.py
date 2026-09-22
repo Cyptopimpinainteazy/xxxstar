@@ -585,6 +585,14 @@ def _srtool_values(output: str) -> dict[str, dict[str, str]]:
         "authorize_upgrade": "authorizeUpgrade",
         "ipfs": "IPFS",
         "blake2_256": "BLAKE2_256",
+        # The runtime's own version and metadata version are in the same block the
+        # hashes come from. The record's top-level `runtime_version` used to be
+        # carried over untouched by every re-attestation, so after a `spec_version`
+        # bump the record described the previous artifact (recorded "x3-chain-11"
+        # for a wasm that reports "x3-chain-12"). Parsing them here lets stage 6b
+        # compare them and `update-runtime-hashes.sh` write them.
+        "version": "Version",
+        "metadata": "Metadata",
     }
     found: dict[str, dict[str, str]] = {}
     current: str | None = None

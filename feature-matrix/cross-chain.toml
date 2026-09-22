@@ -5,16 +5,29 @@ id = "X3-XCHAIN-001"
 name = "BTC Fortress gateway"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-gateway"]
-implemented = 50
-tested = 25
-mainnet_ready = 25
+paths = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs"]
+implemented = 70
+tested = 60
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["SIM_TESTNET only; signer quorum and withdrawal broadcast pending"]
-evidence = ["crates/x3-gateway", "note: FEATURE_REGISTRY btc_fortress_gateway = 25%"]
+blockers = [
+  "No live Bitcoin run of any kind — not regtest, not testnet, not mainnet; the deposit/withdrawal path has never moved a coin",
+  "Header bootstrap has no trusted source: `submit_btc_header` is root-only and requires each header to chain to one already in storage, but there is no checkpoint anchor and no peer-sourced header sync",
+  "No BTC signer quorum for withdrawals",
+  "BTC mainnet disabled by feature flag; no external audit",
+]
+# `crates/x3-gateway` used to be this row's only path. It is the REST/GraphQL API
+# service for indexed data and contains no Bitcoin code beyond importing an HTLC
+# type in one handler. The on-chain BTC path is the settlement engine's
+# `btc_gateway` module (scripts, addresses, SPV proof, adaptor signatures), the
+# header chain and proof-of-work check beside it, `crates/x3-bitcoin-vault`
+# (deposits, withdrawals, PSBTs, header-chain verification) and the bridge's HTLC
+# and SPV modules.
+evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22 with the named tests below"]
+test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "crates/x3-bitcoin-vault/src/lib.rs", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding) and the vault's 23 tests including header-chain linkage and tampered-signature rejection; `cargo test -p pallet-x3-settlement-engine --lib` = 135 passed, `cargo test -p x3-bitcoin-vault --lib` = 23 passed on 2026-09-22"]
 registry_feature = "btc_fortress_gateway"
 
 [[feature]]
@@ -22,16 +35,28 @@ id = "X3-XCHAIN-002"
 name = "Bitcoin HTLC script logic"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-bridge/src/bitcoin_htlc.rs"]
-implemented = 70
-tested = 40
-mainnet_ready = 25
+paths = ["crates/x3-bridge/src/bitcoin_htlc.rs", "pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-crosschain-intent/src/proof/btc.rs"]
+implemented = 85
+tested = 75
+mainnet_ready = 40
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Mainnet proof verification and signer quorum not production-ready"]
-evidence = ["crates/x3-bridge/src/bitcoin_htlc.rs", "note: Audit says BTC script logic is real but proof verification was placeholder"]
+blockers = [
+  "No live Bitcoin run: the script builder, the merkle walk and the header chain are exercised against fixtures, never against a chain",
+  "The header chain the SPV check reads has no trusted bootstrap (root-submitted, chained to storage, no checkpoint anchor)",
+  "No signer quorum for withdrawals; no external audit",
+  "Three SPV implementations exist — this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` — and only the pallet's is on the runtime path; they agree on the wire layout after the 2026-09-22 fix, but consolidating them would remove a standing drift risk",
+]
+# The old note said "proof verification was placeholder". Half true, and the wrong
+# half mattered: the txid and merkle checks were real, but the proof-of-work check
+# hashed the SCALE encoding of a struct carrying a non-wire `height` field, so the
+# value compared against the target was not the block's hash — and a target that
+# overflowed 256 bits returned "any hash passes". Fixed 2026-09-22 (wire header +
+# Bitcoin's CheckProofOfWork rejections); the tests below are the reproduction.
+evidence = ["crates/x3-bridge/src/bitcoin_htlc.rs", "pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-crosschain-intent/src/proof/btc.rs", "note: HTLC script/address derivation, double-SHA256 merkle path over the tx index, and proof-of-work over Bitcoin's 80 wire bytes with negative/overflow/zero targets rejected"]
+test_evidence = ["crates/x3-bridge/src/bitcoin_htlc.rs", "pallets/x3-settlement-engine/src/tests.rs", "note: btc_htlc_redeem_script_has_correct_opcodes, btc_htlc_p2sh_address_derivation_is_deterministic, btc_settlement_proof_two_tx_block_with_merkle_path (+ wrong sibling refused), btc_settlement_proof_naming_a_different_block_is_refused, btc_submit_header_refuses_targets_bitcoin_refuses, btc_submit_header_refuses_a_header_that_misses_its_target; 135 pallet tests pass"]
 
 [[feature]]
 id = "X3-XCHAIN-003"

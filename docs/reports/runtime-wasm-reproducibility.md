@@ -31,13 +31,23 @@ The second run was a from-scratch rebuild (`runtime/target/srtool` removed
 first), so this is not one artifact reported twice.
 
 The values below were first established at `deab51f7f`, the revision that added
-the cross-chain-gateway header anchor (`EvmHeaderAnchor`), and re-attested at
-`04fb44907`, the merge of the minimal-RLP EVM signature fix
-(`crates/x3-atomic-swap/src/ethereum_tx.rs`). **The two attestations produced the
-same bytes** — that fix lives behind `std` and is never instantiated by the
-runtime — and the record moved only its `recorded_revision`. That is the intended
-behaviour: a revision that a mainnet governance motion attests to has to be named,
-even when the value it carries does not change.
+the cross-chain-gateway header anchor (`EvmHeaderAnchor`), re-attested unchanged at
+`04fb44907` (the minimal-RLP EVM signature fix, which lives behind `std` and is
+never instantiated by the runtime), and **re-attested with different bytes at
+`5e0f86760`**: that revision fixes the Bitcoin header path — proof of work is
+checked over Bitcoin's 80 wire bytes instead of the SCALE encoding of a struct
+carrying a non-wire `height` field, and negative, overflowing and zero targets are
+rejected as Bitcoin rejects them — and bumps `spec_version` to 12. The runtime
+bytes changed, which is the intended behaviour: a revision that a mainnet
+governance motion attests to has to be named, and the hash has to describe the
+artifact that revision builds.
+
+`recorded_at` and the top-level `runtime_version` are now written by
+`./scripts/update-runtime-hashes.sh` from the same srtool block the hashes come
+from (each runtime block also carries its own `version`/`metadata`, and stage 6b
+compares them). Until 2026-09-22 those fields were carried over untouched: the
+record described `x3-chain-11` for a wasm that reported `x3-chain-12`, and nothing
+noticed.
 
 They are **not** a fixed property of the project: any runtime-affecting change
 produces different WASM, which is why `docs/reports/runtime-wasm-hashes.json`
@@ -52,24 +62,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,435,073 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,433,833 bytes)**
 
 ```
-Version          : x3-chain-11 (x3-chain-1.tx1.au1)
+Version          : x3-chain-12 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xac13ee1b4d375d257d808cd720253eef0b6f126c34aba35eab0e5ab04fa714aa
-authorizeUpgrade : 0x23312ecb8c081cbbd838e8f8d9f4077bb789ef891dd25d345abfefe3acde8334
-IPFS             : QmVsqseyoMvS7nnpTtuBQ9EBCB113FQfCBXP4XVLQJEyRg
-BLAKE2_256       : 0x12696572aae6cc833630c13a1b7dd141cced8b6934f8d4ab872bf813274a5fc6
+setCode          : 0xba54025879f965ba59045c86790e68d17a305751dd4fd58dd24f72811e0b32a4
+authorizeUpgrade : 0x19eedc53456633712b4c7e7b0228a8a746c5f3ba06f4b2021b40148a38b6c868
+IPFS             : QmZASRxZoEgy4mrJeKpULzEPmyX84JUfdnSPcAnCCc3oJL
+BLAKE2_256       : 0xbbb17006c0948307a775e8d3779e5a25a232deb4dce5ef8c3a17b1c70377ce61
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,442,714 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,444,249 bytes)**
 
 ```
-setCode          : 0x9088ef509c3ba8fc720156356bec7997a16a278ca024236ff0f35ac5f400b674
-authorizeUpgrade : 0x626363657411d604831279cb41789351083e9ee0451f7c9d2a8013a23133ec56
-IPFS             : QmS57QuggaLvhZ2h4rJCBWWhthRjoEWSooucR8aZbfzCNg
-BLAKE2_256       : 0x0e6ef363215aaa098770718a85ee7d8f217852efefe6af329bf02915a25f0d88
+setCode          : 0x9328da7077d22aaaa00a544282946fe8819d3d388c4bdc327a60cd19388b35de
+authorizeUpgrade : 0xa9c8a93d620b4b44fb5b20751ea9100a06fdc9dc90f0d5eb90f644b50cfc92d3
+IPFS             : QmZNZoHVHkvFRUrUCWhFfb8QfT3rsn7qeeLeAwbMgxzzmr
+BLAKE2_256       : 0x0c36f055f2904497f2770d3eed5c2ac3fe48b67f1ec0f1aa3f23eb101d8a37a8
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

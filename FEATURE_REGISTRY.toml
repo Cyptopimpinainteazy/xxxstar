@@ -95,17 +95,33 @@ dangerous_paths = ["external bridges", "gateway enablement", "audit gate"]
 
 [btc_fortress_gateway]
 mode = "SIM_TESTNET"
-crate_or_service = "crates/x3-gateway"
+crate_or_service = "pallets/x3-settlement-engine"
 tauri_app = "BTCGateway"
+# The path used to be `crates/x3-gateway`, which is the REST/GraphQL API service
+# for indexed data — it contains no Bitcoin code beyond an HTLC type import in one
+# handler. The BTC fortress is the on-chain path: `btc_gateway.rs` (scripts,
+# P2SH/P2WSH addresses, SPV proof, adaptor signatures) plus the header chain and
+# PoW check in `lib.rs`, with `crates/x3-bitcoin-vault` (23 tests, including
+# header-chain linkage and tampered-signature rejection) and
+# `crates/x3-bridge/src/{bitcoin_htlc,btc_spv}.rs` around it.
 # CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names
 # previously listed here existed as real tests anywhere under crates/x3-gateway.
-required_tests = []
+required_tests = [
+  "btc_submit_header_refuses_targets_bitcoin_refuses",
+  "btc_block_hash_is_double_sha256_over_the_eighty_wire_bytes",
+  "btc_submit_header_refuses_a_header_that_misses_its_target",
+  "btc_settlement_proof_two_tx_block_with_merkle_path",
+  "btc_settlement_proof_naming_a_different_block_is_refused",
+  "btc_spv_proof_direct_round_trip",
+]
 proof_report = "reports/btc_gateway_report.md"
-readiness_score = 25
+readiness_score = 45
 blockers = [
-  "required_tests (btc_regtest_deposit_detected, btc_requires_confirmations, btc_xbtc_mint_updates_kernel_accounting, btc_mainnet_disabled_by_feature_flag) were fictional — see CRITICAL-TOK-1; write real tests before re-adding them",
-  "SIM_TESTNET only — regtest Bitcoin, not mainnet",
-  "BTC mainnet disabled by feature flag; no real BTC signer quorum"
+  "No live Bitcoin run at all — not regtest, not testnet, not mainnet; the deposit/withdrawal path has never moved a coin",
+  "Headers are submitted by root and must chain to a header already in storage: there is no checkpoint anchor and no peer-sourced header sync, so bootstrapping the chain of headers is an operator action with no trusted source behind it",
+  "No BTC signer quorum: withdrawals have no production multi-signer policy",
+  "BTC mainnet disabled by feature flag",
+  "No external audit of the gateway, the vault or the header check",
 ]
 dangerous_paths = ["btc mainnet", "withdrawal broadcast", "signer quorum"]
 
@@ -389,9 +405,20 @@ required_tests = [
   "test_canonical_pda_validation_accepts_only_matching_swap_id",
   "test_canonical_pda_bump_reconstructs_address",
   "test_deserialize_rejects_short_buffer",
-  "test-live-lifecycle.sh::lock_and_claim_move_the_locked_lamports",
-  "test-live-lifecycle.sh::wrong_preimage_double_claim_refund_early_and_wrong_authority_are_rejected",
+  "test_htlc_account_roundtrip",
+  "test_create_htlc_params_unpack",
 ]
+# The deployed-program assertions are not test functions, so they belong here
+# rather than in `required_tests` (which the readiness gate resolves to `fn`
+# definitions under `crate_or_service`):
+#   * `test-live-lifecycle.sh` — 15 assertions, 0 failed on 2026-09-22, against a
+#     real `solana-test-validator` with the program built by `cargo build-sbf` and
+#     deployed: lock, correct-preimage claim and post-timeout refund all move the
+#     locked lamports and set the on-chain flags; wrong-preimage claim, double
+#     claim, early refund and wrong-authority refund are all rejected; PDA state is
+#     read over raw `getAccountInfo` with manual byte-offset decoding.
+#   * `scripts/cross-domain-svm-gate.sh` — both X3VM<->SVM lifecycles pass in dev
+#     and in strict posture (`X3_STRICT_CROSS_DOMAIN_PROOFS=1`).
 proof_report = ""
 # Coarse product readiness, not a route score: real program, real deployed-program
 # lifecycle in CI, and a CI gate that runs it. Held below 80 because nothing has

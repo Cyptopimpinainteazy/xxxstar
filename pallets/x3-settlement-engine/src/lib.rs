@@ -3219,19 +3219,14 @@ pub mod pallet {
                 return Ok(false);
             }
 
-            // Sanity: block_hash must match the double-SHA256 of the block header.
-            // (Header is 80 bytes on the wire; we approximate via SCALE bytes here
-            // which is sufficient for the merkle check. Strict wire-format check is
-            // done by `submit_btc_header` via `verify_btc_pow`.)
-            let block_hash_matches = {
-                let first = sp_io::hashing::sha2_256(&codec::Encode::encode(&header));
-                H256::from(sp_io::hashing::sha2_256(&first)) == proof.block_hash
-            };
-            // We do not require strict block_hash equality here because the proof
-            // may carry a header whose SCALE and wire encodings differ in field
-            // ordering; merkle_root is the field that matters for SPV and is
-            // identical between encodings.
-            let _ = block_hash_matches;
+            // The proof names a block; the header it carries has to be that block.
+            // This is Bitcoin's block hash — double SHA-256 over the 80 wire bytes —
+            // and it must equal the hash the proof claims, or the merkle root being
+            // checked belongs to a block nobody asked about.
+            let computed_block_hash = Self::compute_btc_block_hash(&header);
+            if computed_block_hash != proof.block_hash {
+                return Ok(false);
+            }
 
             // Build the gateway's BtcSpvProof and run the verified path.
             let spv = BtcSpvProof {
@@ -3290,76 +3285,89 @@ pub mod pallet {
         /// - Next 3 bytes: mantissa (coefficient)
         /// - Target = mantissa * 256^(exponent - 3)
         ///
-        /// A valid block hash must be <= target (compared numerically)
-        fn verify_btc_pow(header: &BtcBlockHeader) -> Result<bool, DispatchError> {
-            // Compute the block hash (double SHA256)
-            let block_hash = Self::compute_btc_block_hash(header);
+        /// A valid block hash must be <= target, compared numerically.
+        ///
+        /// The decoded target is returned little-endian so it can be compared with
+        /// the raw hash, which Bitcoin also treats as a little-endian number.
+        ///
+        /// A target that does not fit in 256 bits is **rejected**, not treated as
+        /// "any hash passes". Bitcoin's `CheckProofOfWork` fails a negative target
+        /// (mantissa high bit set), an overflowing one, and a zero one; this used
+        /// to return `true` for `size > 32` with the comment "target is larger than
+        /// 256 bits, so any hash passes", which accepts a header with no proof of
+        /// work at all from anyone who can submit one.
+        fn btc_target_le(bits: u32) -> Option<[u8; 32]> {
+            let size = (bits >> 24) as usize;
+            let word = bits & 0x007f_ffff;
 
-            // Decode nBits to get the target difficulty
-            let bits = header.bits;
-            let size = bits >> 24;
-            let word = bits & 0x00FFFFFF;
+            if bits & 0x0080_0000 != 0 || word == 0 {
+                return None;
+            }
+            if size > 34 || (size == 34 && word > 0xff) {
+                return None;
+            }
 
-            // Compute the target as a 256-bit value
-            // Using the compact encoding: target = word * 256^(size - 3)
             let mut target = [0u8; 32];
-
-            // Validate size
-            if size > 32 {
-                // Target is larger than 256 bits, so any hash passes
-                // This shouldn't happen in practice but is technically valid
-                return Ok(true);
-            }
-
-            if size == 0 {
-                // Invalid target (zero size)
-                return Ok(false);
-            }
-
-            // Decode the mantissa (3 bytes)
-            let mut mantissa = [0u8; 3];
-            mantissa[0] = ((word >> 16) & 0xFF) as u8;
-            mantissa[1] = ((word >> 8) & 0xFF) as u8;
-            mantissa[2] = (word & 0xFF) as u8;
-
-            // Place mantissa in target, shifted by (size - 3) bytes
-            let shift = if size > 3 { (size - 3) as usize } else { 0 };
-            for (i, &byte) in mantissa.iter().enumerate() {
-                if shift + i < 32 {
-                    target[shift + i] = byte;
+            if size <= 3 {
+                let shifted = word >> (8 * (3 - size));
+                target[0..4].copy_from_slice(&shifted.to_le_bytes());
+            } else {
+                let shift = size - 3;
+                for (i, byte) in word.to_le_bytes().iter().enumerate() {
+                    if shift + i < 32 {
+                        target[shift + i] = *byte;
+                    }
                 }
             }
-
-            // For the first significant byte, we might need to shift if size < 3
-            if size < 3 {
-                let _right_shift = 3 - size;
-                // This is complex to do correctly, so for now we'll be conservative
-                // In practice, size is always >= 3 on mainnet
-                return Ok(false);
-            }
-
-            // Compare: hash must be <= target
-            // Both are in little-endian format (Bitcoin's wire format)
-            let hash_bytes = block_hash.as_bytes();
-
-            // Compare byte by byte from most significant to least significant
-            for i in (0..32).rev() {
-                if hash_bytes[i] < target[i] {
-                    return Ok(true);
-                } else if hash_bytes[i] > target[i] {
-                    return Ok(false);
-                }
-            }
-
-            // Equal to target is valid
-            Ok(true)
+            Some(target)
         }
 
-        /// Compute BTC block hash (double SHA256)
+        /// `hash <= target`, both read as 256-bit little-endian numbers.
+        fn btc_hash_meets_target(hash: &[u8], target: &[u8; 32]) -> bool {
+            for i in (0..32).rev() {
+                if hash[i] < target[i] {
+                    return true;
+                }
+                if hash[i] > target[i] {
+                    return false;
+                }
+            }
+            true
+        }
+
+        fn verify_btc_pow(header: &BtcBlockHeader) -> Result<bool, DispatchError> {
+            let target = match Self::btc_target_le(header.bits) {
+                Some(target) => target,
+                None => return Ok(false),
+            };
+            let block_hash = Self::compute_btc_block_hash(header);
+            Ok(Self::btc_hash_meets_target(block_hash.as_bytes(), &target))
+        }
+
+        /// The 80 bytes Bitcoin hashes: version, previous block hash, merkle root,
+        /// timestamp, target bits and nonce, in Bitcoin's little-endian wire order.
+        ///
+        /// [`BtcBlockHeader`] carries a `height` field that is **not** part of a
+        /// Bitcoin header — it exists so the pallet can store a height beside the
+        /// header. Hashing the SCALE encoding of the struct, which is what this
+        /// used to do, therefore hashes an eight-byte suffix no Bitcoin block has,
+        /// and the resulting value is not the block's hash. Every proof-of-work
+        /// comparison built on it compared a number unrelated to the block against
+        /// the target.
+        fn btc_header_wire_bytes(header: &BtcBlockHeader) -> [u8; 80] {
+            let mut out = [0u8; 80];
+            out[0..4].copy_from_slice(&header.version.to_le_bytes());
+            out[4..36].copy_from_slice(header.prev_block_hash.as_bytes());
+            out[36..68].copy_from_slice(header.merkle_root.as_bytes());
+            out[68..72].copy_from_slice(&header.timestamp.to_le_bytes());
+            out[72..76].copy_from_slice(&header.bits.to_le_bytes());
+            out[76..80].copy_from_slice(&header.nonce.to_le_bytes());
+            out
+        }
+
+        /// Compute the Bitcoin block hash: double SHA-256 over the 80 header bytes.
         fn compute_btc_block_hash(header: &BtcBlockHeader) -> H256 {
-            // Serialize header and double hash
-            let data = header.encode();
-            let first_hash = sp_io::hashing::sha2_256(&data);
+            let first_hash = sp_io::hashing::sha2_256(&Self::btc_header_wire_bytes(header));
             H256::from(sp_io::hashing::sha2_256(&first_hash))
         }
 
