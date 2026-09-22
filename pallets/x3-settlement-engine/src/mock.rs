@@ -250,3 +250,38 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     });
     ext
 }
+
+/// Externalities whose settlement-engine genesis pins these Bitcoin checkpoints.
+///
+/// Unlike [`new_test_ext`], this runs the pallet's own `BuildGenesisConfig` rather than
+/// setting storage by hand, so what is under test is the genesis path a chain spec
+/// actually takes — including its refusals, which panic.
+pub fn new_test_ext_with_btc_checkpoints(
+    headers: sp_std::vec::Vec<crate::types::BtcBlockHeader>,
+) -> sp_io::TestExternalities {
+    let mut t = frame_system::GenesisConfig::<Test>::default()
+        .build_storage()
+        .unwrap();
+
+    pallet_balances::GenesisConfig::<Test> {
+        balances: vec![(ALICE, 1_000_000), (BOB, 1_000_000)],
+        dev_accounts: None,
+    }
+    .assimilate_storage(&mut t)
+    .unwrap();
+
+    crate::pallet::GenesisConfig::<Test> {
+        allow_unattested_cross_domain_proofs: true,
+        btc_checkpoints: headers,
+        _phantom: core::marker::PhantomData,
+    }
+    .assimilate_storage(&mut t)
+    .unwrap();
+
+    let mut ext = sp_io::TestExternalities::new(t);
+    ext.execute_with(|| {
+        System::set_block_number(1);
+        Timestamp::set_timestamp(1_000);
+    });
+    ext
+}

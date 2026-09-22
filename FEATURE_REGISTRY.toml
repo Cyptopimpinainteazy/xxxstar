@@ -132,12 +132,17 @@ required_tests = [
   "a_real_bitcoin_merkle_path_verifies_against_a_real_block",
   "a_real_regtest_chain_anchors_and_extends_through_the_pallets_rules",
   "a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored",
+  # The trust root in genesis, so a chain can be born anchored (spec_version 15).
+  "genesis_pins_a_bitcoin_checkpoint_and_admits_its_header",
+  "genesis_refuses_a_checkpoint_that_is_not_a_real_bitcoin_block",
+  "genesis_refuses_a_checkpoint_easier_than_the_networks_pow_limit",
+  "genesis_refuses_two_checkpoints_at_one_height",
 ]
 proof_report = "reports/btc_gateway_report.md"
 readiness_score = 45
 blockers = [
   "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, but nothing has run against testnet or mainnet and the deposit/withdrawal path has never moved a coin",
-  "The header chain bootstraps from a governance-anchored checkpoint as of spec_version 14 (`anchor_btc_checkpoint`; `BtcCheckpoints` + `BtcHeaderMetaStore`), and SPV evidence is accepted only from headers on an anchored chain — but no chain has anchored one yet and there is no peer-sourced header sync, so anchoring and header pushing are both manual operator acts",
+  "The header chain bootstraps from a checkpoint (spec_version 14/15): `anchor_btc_checkpoint` pins one by root call, and a spec can now carry one in genesis (`btc_checkpoints`), so a chain can be born anchored and the live gate proves it (`scripts/testnet/btc-checkpoint-genesis-drill.sh`). No public network has one pinned, and the header still arrives by an operator copying a hash — there is no header source and no peer-sourced sync",
   "No BTC signer quorum: withdrawals have no production multi-signer policy",
   "BTC mainnet disabled by feature flag",
   "No external audit of the gateway, the vault or the header check",

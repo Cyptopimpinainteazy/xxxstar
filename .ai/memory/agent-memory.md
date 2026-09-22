@@ -6814,3 +6814,18 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 ### Decisions made this session
 - Recorded the soak as a FAILURE and dropped the row's score rather than describing it as "a long soak is still pending". The previous row's own words were "twenty minutes is not a duration claim"; the claim was tested and did not hold.
 - Wrote the re-run precondition into the ticket: **idle box first** (to eliminate load), then reproduce under deliberate contention. Without the idle run, "environment" and "defect" are not separable, and guessing which one it is would be the same mistake as the earlier over-claim.
+
+## 2026-09-22 (nineteenth pass) — a chain can be born anchored, and `--chain dev` never was a dev runtime
+
+### Facts to remember
+- **The node had no `dev` feature.** `--chain dev` built a dev *spec* and ran the **default** runtime: no `Sudo`, `powLimit` = mainnet `0x1d00ffff`, so every regtest-difficulty header was refused. Nothing in the repo could make a root call locally. Fixed: `node` feature `dev = ["x3-chain-runtime/dev"]` + the `sudo` genesis field in `chain_spec.rs`, **`cargo build -p x3-chain-node --features dev`**. Expect dev builds at `/tmp/x3-chain-node-dev` to be the ones with `Sudo`.
+- **Genesis now pins the BTC trust root**: `X3SettlementEngine::GenesisConfig.btc_checkpoints` (Vec<BtcBlockHeader>), validated at build (PoW under this network's `powLimit`, no duplicate heights), then `BtcCheckpoints` + `BtcHeaders` + `BtcHeaderMetaStore{anchored}` + `BtcBestHeight`. Env knob `X3_BTC_CHECKPOINTS="<header hex>@<height>[,…]"`; `build-x3-testnet-spec.py` forwards the environment already, so a testnet spec carries it in plain JSON. spec_version 14 → 15.
+- **`a_btc_...`** — no: **the live gate** is `scripts/testnet/btc-checkpoint-drill.sh` (in `GATES_TESTNET`, i.e. `local-ci --testnet`), running `scripts/testnet/btc-checkpoint-genesis-drill.py`, 12/12 checks: key math vs `twox_128("System")`, spec contents, genesis storage (`build-spec --raw`), live RPC storage, block production, and refusal of a lying checkpoint.
+- **A node needs `--node-key <hex seed>`**: this build exits `NetworkKeyNotFound(...)` rather than inventing a libp2p identity. Ports must be escalated (sandbox blocks bind) and the prometheus port must be free.
+- **Storage keys**: `twox_128(pallet) ++ twox_128(item)` for a value, `++ twox_64_concat(encode(key))` for a map with `Twox64Concat`, `++ blake2_128_concat(key)` for `Blake2_128Concat`. Pure-Python xxh64 in the drill is validated against Substrate's known `twox_128("System") = 26aa394eea5630e07c48ae0c9558cef7` before use — a wrong key reads as an empty value, which is indistinguishable from "not set".
+- **I edited the shared tree by mistake** (it was on another agent's branch) and reverted it immediately with `git checkout -- <file>` after confirming the diff was only mine. All work after that happened in `/tmp/x3-btc-genesis`. **Check `git branch --show-current` before editing, not before committing.**
+
+### Decisions made this session
+- Put the checkpoint in **genesis, not only in a root call**: a testnet should publish its root of trust with its chain id, and "the first person to hold the key anchors it" is not a launch procedure.
+- Made the genesis refusals **panic with the reason** rather than starting a chain with a bad anchor; the drill asserts the message, so a silent acceptance would fail the gate.
+- Bumped `spec_version` for a genesis-config change even though no storage migration is implied: the metadata and the WASM both moved.

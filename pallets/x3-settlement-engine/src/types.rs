@@ -4,6 +4,7 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::fmt::Debug;
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_core::H256;
 use sp_std::vec::Vec;
 
@@ -228,8 +229,15 @@ pub struct BtcUtxoState {
 }
 
 /// BTC block header (80 bytes, compact)
+///
+/// `Serialize`/`Deserialize` are for the chain spec, not the runtime: a checkpoint is
+/// pinned in the settlement engine's genesis (`GenesisConfig::btc_checkpoints`), and a
+/// spec is JSON. The wire format the pallet hashes is the 80 bytes below — see
+/// `btc_header_wire_bytes`; serde's shape is the spec's business and never reaches the
+/// proof path.
 #[derive(
     Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
+    Serialize, Deserialize,
 )]
 pub struct BtcBlockHeader {
     /// Block version

@@ -57,6 +57,11 @@ bytes**:
   unchanged at 14: **the bytes still move**, because pallet documentation is part of
   the runtime metadata, and metadata is in the WASM. That is the reason this gate
   watches the whole dependency graph rather than a hand-kept list of "runtime files".
+* `2a4296b630` — the SPV trust root can be pinned in genesis: `X3SettlementEngine`'s
+  `GenesisConfig` carries `btc_checkpoints`, validated as genesis is built and then
+  admitted onto the anchored chain, so a testnet can start with the root of trust in its
+  spec. `BtcBlockHeader` gains serde for the spec's benefit only. `spec_version` moves to
+  15.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -82,24 +87,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,456,248 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,466,819 bytes)**
 
 ```
-Version          : x3-chain-14 (x3-chain-1.tx1.au1)
+Version          : x3-chain-15 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0x5513646fae6177d06f1bbf0c8331c6edf357dace025391b6e56eea66566f870b
-authorizeUpgrade : 0xfa813889751349ed521edfef33fcee526bccffd72ed6ef71506a73c76b7a41e2
-IPFS             : QmZdnPkqPWtncHY1oDTHqM4mQmUk7LTSQnSpMLJ8pjUJnF
-BLAKE2_256       : 0x65a114997691f5c2d02ed38427c76cf726094ce00728178c5e9d052fd1a9fcd4
+setCode          : 0x93f6983a9be4dbb527b27f7c10f0788d0a723181e12c1b3869134511a9905db5
+authorizeUpgrade : 0x107acb8c8ced8cedc84103a98662fd4c687907a8181971c759b76d47c9fd8d8e
+IPFS             : QmU6KuphWMrmQvSsPFMjRhKisLMfWTKbzpaMfa5Ywa8geG
+BLAKE2_256       : 0x624db79f1603a25d890554c9623695b7f913045476859afb881a402346fea55d
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,449,722 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,453,542 bytes)**
 
 ```
-setCode          : 0x47c9a97f47eac09cb4aac08a6f48a6fad0be6162464fd45b6505757223e68722
-authorizeUpgrade : 0xcd1a80950ac5f9324bd719d50e942f82c07597be7e5b4cab32b779ec3dcb8f29
-IPFS             : QmNsAaHtjMksUDupT8pqdYADAGMjJ4cK5EGJJ88micNeCG
-BLAKE2_256       : 0x1b56ee67ad1732c034745a41c2a2fba32e95106fed325151ebe8e9bc6f396b5b
+setCode          : 0x775549914c2b9d5ceebb451807beb70563337f39434e1afabcc0a61c8194b101
+authorizeUpgrade : 0xf1eedd5edb9dbf9c5baf51b79ceec39de3516d788c15da6508bff8d7c66207a7
+IPFS             : QmPNZpzBZgK46J4JM8nUc8KtzmCzFrNWdL5DBHuFzizbFf
+BLAKE2_256       : 0xce5e635bc4b7ef848dd25748c087f459fffac3b9c490d998defc40a51e2bd6aa
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

@@ -184,3 +184,39 @@ the repeated-block-request reputation path in the sync protocol, where a peer th
 block while behind should be slowed rather than disconnected, and at what holds the trie-cache write
 lock during block import. Acceptance: on a contended box, a validator that falls behind keeps at
 least one peer, catches up, and finality does not stall.
+
+## GAP-BTC-ANCHOR-GENESIS — a chain can be born anchored, and `--chain dev` was not a dev runtime — 2026-09-22
+
+The trust root landed in code earlier today (`anchor_btc_checkpoint`, spec_version 14) and left an
+awkward bring-up story: the BTC path is fail-closed until a checkpoint exists, and creating one was
+a root call — a manual step on a testnet, doable only by whoever holds the key first. Closed by
+making the checkpoint part of the **spec**:
+
+- `X3SettlementEngine::GenesisConfig` gained `btc_checkpoints`. Each entry is validated as genesis
+  is built — proof of work under this network's `powLimit`, no two entries at one height — and then
+  pins `(height, hash)` in `BtcCheckpoints` and **admits the header** (`BtcHeaders`,
+  `BtcHeaderMetaStore { height, anchored: true }`, `BtcBestHeight`). A bad entry makes the node
+  refuse to start rather than launch a chain whose root of trust is a lie.
+- `X3_BTC_CHECKPOINTS="<80-byte header hex>@<height>[,<header>@<height>…]"` is how a spec gets one;
+  `scripts/testnet/build-x3-testnet-spec.py` already forwards the environment, and the generated
+  spec carries `btcCheckpoints` in plain JSON beside the rest of the genesis. Verified: a 3-validator
+  testnet spec built with a captured Bitcoin header really does contain it.
+- **Proof it works on a live chain:** `scripts/testnet/btc-checkpoint-genesis-drill.sh` (new
+  `--testnet` gate) pins a real regtest header, boots a node, reads `BtcCheckpoints`,
+  `BtcHeaderMetaStore` and `BtcBestHeight` back out of running storage over RPC, requires the chain
+  to keep authoring blocks, and requires a spec whose checkpoint is not a mined header to be
+  refused. 12/12 checks pass. The storage keys are computed by a reimplemented `twox` that is
+  checked against Substrate's known `twox_128("System")` prefix before the drill uses it, because a
+  wrong key looks exactly like an empty value.
+
+**The discovery on the way:** the node had no `dev` feature. `--chain dev` built a spec called dev,
+ran the **default** runtime — no `Sudo`, and `powLimit` at mainnet's `0x1d00ffff` — and refused
+every regtest-difficulty header. So every local "dev" chain in this repository has been the default
+runtime wearing a dev spec, and any dev-only behaviour (root calls, regtest proof of work) was
+unavailable by construction. Fixed with `node` feature `dev = ["x3-chain-runtime/dev"]` and the
+matching `sudo` genesis field; **build a dev chain with `cargo build -p x3-chain-node --features
+dev`**. This is what the first version of the drill caught, by failing.
+
+**Still open:** no public network has a checkpoint pinned, nothing pushes headers after the anchor
+(a bonded header relayer does not exist), and the header source is still an operator copying a hash
+by hand. Those are TICKET-095.
