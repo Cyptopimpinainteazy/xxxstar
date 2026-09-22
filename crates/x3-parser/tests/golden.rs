@@ -7,7 +7,19 @@ mod golden_fixtures {
 
     /// Generate golden JSON files for all fixture programs.
     /// Run this test to update the golden files when the AST changes.
+    ///
+    /// `#[ignore]` is required. This test *writes* the checked-in fixture files, and
+    /// `test_golden_fixtures` below *reads* them. Both are `#[test]` in the same
+    /// binary, and the default harness runs them on separate threads, so a plain
+    /// `cargo test -p x3-parser --test golden` races `fs::write` against
+    /// `fs::read_to_string`: the reader can open a file the writer has just
+    /// truncated and see `right: ""`. Measured on master, 2 failures in 15 runs
+    /// before this attribute was added.
+    ///
+    /// Regenerate deliberately with
+    /// `cargo test -p x3-parser --test golden -- --ignored generate_golden_fixtures`.
     #[test]
+    #[ignore]
     fn generate_golden_fixtures() {
         let fixture_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
 

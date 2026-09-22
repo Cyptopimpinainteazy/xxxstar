@@ -12,7 +12,12 @@ provider = "native"  # "native" or "kubernetes"
 
 [relaychain]
 default_command = "./target/release/x3-chain-node"
-chain = "x3-local3-raw"
+# `chain` is either one of the node's built-in ids (`dev`, `local`, `local3`,
+# `staging`, `testnet`, `production`) or a path. It used to name the checked-in
+# spec as if it were an id, and no id of that spelling exists: the node falls
+# through to `load_json_spec`, looks for a file called `x3-local3-raw` and dies
+# with `Failed to read chain spec file x3-local3-raw`. It is a path.
+chain = "chain-specs/x3-local3-current-raw.json"
 
 [[relaychain.nodes]]
 name = "alice"

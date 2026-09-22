@@ -58,7 +58,15 @@ jobs:
 
       - name: Generate chain spec for testing
         run: |
-          ./target/release/x3-chain-node build-spec --chain x3-local3-raw --raw > /tmp/x3-test-chain-spec.json
+          # `x3-local3-raw` is a file, not a chain id: the node resolves ids from a
+          # fixed list (`dev`, `local`, `local3`, `staging`, `testnet`,
+          # `production`) and treats anything else as a path. Naming the file as an
+          # id made this step fail with "Failed to read chain spec file
+          # x3-local3-raw". This exercises the checked-in spec the network below
+          # actually runs.
+          ./target/release/x3-chain-node build-spec \
+            --chain chain-specs/x3-local3-current-raw.json \
+            --raw > /tmp/x3-test-chain-spec.json
 
       - name: Run Zombienet smoke tests
         run: |
