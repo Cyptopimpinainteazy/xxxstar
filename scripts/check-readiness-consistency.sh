@@ -113,14 +113,21 @@ flush_required_tests() { # <feature-key> <crate_or_service> <array-body>
   local rs_file_count
   rs_file_count=$(find "$abs_path" -name "*.rs" 2>/dev/null | wc -l)
   [ "$rs_file_count" -gt 0 ] || return 0
-  local test_name
-  while IFS= read -r test_name; do
-    [ -z "$test_name" ] && continue
+  local citation test_name
+  # Whole quoted strings, not just the `[a-zA-Z0-9_]+` runs inside them: a
+  # citation carrying a separator ("script.sh::case", "path/to/file.rs::name")
+  # used to match nothing at all, so it was never checked — an entry could cite a
+  # test nobody wrote and pass. The name that has to exist is the part after the
+  # last `::`; `required_tests` is for `fn` names, so a citation whose tail is not
+  # a function is a violation worth printing.
+  while IFS= read -r citation; do
+    [ -z "$citation" ] && continue
+    test_name="${citation##*::}"
     if ! grep -rqE "fn[[:space:]]+${test_name}[[:space:]]*\(" "$abs_path" --include="*.rs" 2>/dev/null; then
-      echo "  VIOLATION: feature '$key' required_tests cites '$test_name' but no 'fn $test_name' exists under $path"
+      echo "  VIOLATION: feature '$key' required_tests cites '$citation' but no 'fn $test_name' exists under $path"
       TESTS_MISSING=$((TESTS_MISSING + 1))
     fi
-  done < <(printf '%s' "$body" | grep -oE '"[a-zA-Z0-9_]+"' | tr -d '"')
+  done < <(printf '%s' "$body" | grep -oE '"[^"]+"' | tr -d '"')
 }
 
 current_key=""
