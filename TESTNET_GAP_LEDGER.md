@@ -113,3 +113,40 @@ secret may survive in refs/* (refs/original, codex checkpoints) and reflog — m
 all pinning refs + expire reflog + gc --prune=now, then cat-file --batch-all-objects verify.
 
 Working notes: `.testnet-audit/`; evidence: `TESTNET_VERIFICATION.md`; mesh run logs /tmp/x3-mesh-*.
+
+## GAP-BTC-SPV-ROOT — closed in code (spec_version 14), unset on every chain — 2026-09-22
+
+The standing record said "the header chain the SPV check reads has no trusted bootstrap".
+Measured against the code, it was worse than "no bootstrap": `submit_btc_header` accepted any
+header whose `height` was 0 with **no parent at all**, and `nBits` is a field the submitter
+writes — so a chain could be started anywhere, for the price of one hash. `submit_btc_proof`
+was the second door: it inserted the header its argument carried into `BtcHeaders` with **no
+proof-of-work check whatsoever**, so a party to an intent could choose the header whose merkle
+root paid them out. Both are closed:
+
+- **New call `anchor_btc_checkpoint` (root, call_index 34).** Commits this chain to
+  "Bitcoin block H has hash X". `BtcCheckpoints` is write-once per height: a later call
+  offering a different hash for the same height is refused (`BtcCheckpointConflict`), so an
+  anchored height cannot be re-pointed at another branch. The event publishes the commitment
+  so anyone can check it against a Bitcoin node.
+- **`powLimit` is enforced** (`BtcPoWLimitBits`; mainnet/testnet `0x1d00ffff`, dev `0x207fffff`).
+  A target easier than the network's limit is refused, which is what stops an anchor (or an
+  extension) being mined in one hash.
+- **One admission path** (`btc_admit_header`). Heights are derived from the parent link, not
+  read from the header; the parent must be on an anchored chain; the target must be copied
+  verbatim off a retarget boundary and move by at most 4x on one; the timestamp must postdate
+  the median of up to 11 ancestors (Bitcoin's median-time-past).
+- **SPV evidence must be anchored.** Both entry points (`submit_btc_proof` and the external
+  `verify_proof` BTC path) require the header to be on an anchored chain, at the height the
+  chain derived. `confirmations` is computed from that height rather than the caller's claim.
+
+Eight negative controls pin this, including the one that matters most:
+`the_raw_spv_verifier_accepts_the_fixture_the_pallet_refuses` shows the same bytes being
+accepted by the raw SPV verifier (the pre-fix behaviour) and refused by the pallet, then
+accepted once the header is genuinely anchored — so the change is the trust question, not the
+merkle math.
+
+**Still open, and it is not a code gap:** no chain in the repo has anchored a checkpoint, so
+the BTC path is fail-closed until an operator does. `anchor_btc_checkpoint` takes a root
+origin; the ceremony for choosing and publishing that hash is an operator runbook item, and
+nothing pushes headers after the anchor (a bonded header relayer is not written).

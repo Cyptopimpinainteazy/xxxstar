@@ -177,6 +177,15 @@ benchmarks! {
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
         let btc_txid = H256::from_low_u64_be(2);
         let merkle_proof: Vec<H256> = vec![];
+
+        // Setup writes the state the pallet's own admission path would have written.
+        //
+        // It has to: admitting a header requires proof of work under the network's
+        // `powLimit`, and a benchmark run cannot pay mainnet's ~2^32 double-SHA256
+        // per header. Measuring `submit_btc_proof` is still meaningful — what is
+        // being weighed is the merkle walk and the UTXO write, and the header has to
+        // be admitted by `submit_btc_header` *before* a proof naming it can be
+        // submitted at all. What is not being measured is header admission.
         let block_header = BtcBlockHeader {
             version: 1,
             prev_block_hash: H256::from_low_u64_be(0),
@@ -186,6 +195,16 @@ benchmarks! {
             nonce: 0,
             height: 0u64,
         };
+        let block_hash = Pallet::<T>::compute_btc_block_hash(&block_header);
+        BtcCheckpoints::<T>::insert(0u64, block_hash);
+        BtcHeaders::<T>::insert(block_hash, block_header.clone());
+        BtcHeaderMetaStore::<T>::insert(
+            block_hash,
+            crate::types::BtcHeaderMeta {
+                height: 0,
+                anchored: true,
+            },
+        );
         BtcBestHeight::<T>::put(0u64);
 
         let origin = RawOrigin::Signed(maker.clone());
@@ -195,31 +214,15 @@ benchmarks! {
         // depends on external chain state
     }
 
-    submit_btc_header {
-        BtcHeaders::<T>::insert(H256::zero(), BtcBlockHeader {
-            version: 1,
-            prev_block_hash: H256::zero(),
-            merkle_root: H256::zero(),
-            timestamp: 0,
-            bits: 0x21000001,
-            nonce: 0,
-            height: 0,
-        });
-        let header = BtcBlockHeader {
-            version: 1,
-            prev_block_hash: H256::zero(),
-            merkle_root: H256::from_low_u64_be(1),
-            timestamp: 1234567890u32,
-            bits: 0x21000001,
-            nonce: 0,
-            height: 1u64,
-        };
-
-        let origin = RawOrigin::Root;
-    }: _(origin, header)
-    verify {
-        assert_eq!(BtcBestHeight::<T>::get(), 1);
-    }
+    // `submit_btc_header` and `anchor_btc_checkpoint` are deliberately not
+    // benchmarked. Both verify proof of work under the network's `powLimit`, so a
+    // benchmark body cannot produce an accepted input without either paying
+    // mainnet's work per header or being a build where the check does not run. The
+    // previous `submit_btc_header` bench only "passed" because the pallet then
+    // accepted a header whose `nBits` the caller had chosen — that is the defect
+    // this change closes, and a bench that needs it back is not worth keeping.
+    // Their weights are the fixed constants in `weights.rs`, whose hashing term is
+    // the same 3-processor term as `submit_external_proof`.
 
     submit_proof {
         let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
@@ -270,6 +273,12 @@ benchmarks! {
             receipt_data: receipt_data
                 .try_into()
                 .expect("four-byte receipt is within the configured maximum"),
+            // The EVM path reads neither: `receipt_index` is the BTC/SPV position
+            // and `trie_proof` is the Merkle-Patricia path, which this benchmark's
+            // proof deliberately does not carry (it exercises the shape check, and
+            // the proof is refused for exactly that reason).
+            receipt_index: None,
+            trie_proof: None,
         };
 
         let origin = RawOrigin::Signed(maker.clone());
