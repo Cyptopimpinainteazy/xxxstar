@@ -385,8 +385,37 @@ X3-MEV-002 (private transaction submission controls) is the one row set to `sour
 the only on-master candidate is `crates/confidential-gpu`'s `execute_private_tx`, which is private
 *execution*, not private *submission*, so the capability is not established.
 
-**TICKET-101 — re-measure the thirteen rows whose scores predate their merge.** Provenance is fixed;
-measurement is not. Each row's `evidence` now names its PR and merge date, so this is a bounded
-audit: read the merged PR, re-derive `implemented`/`tested`/`mainnet_ready` from what is on master
-today, and lower as readily as raise. Acceptance: no row cites a PR that is closed, and every row's
-score is dated relative to the code it describes.
+**TICKET-101 — re-measure the seventeen rows whose scores predate their merge.** (This ledger first
+said thirteen; recounting the citations gives seventeen — 4 language, 10 cross-chain, 3 security.)
+Provenance is fixed; measurement is not. Each row's `evidence` now names its PR and merge date, so
+this is a bounded audit: read the merged PR, re-derive `implemented`/`tested`/`mainnet_ready` from
+what is on master today, and lower as readily as raise. Acceptance: no row cites a PR that is
+closed, and every row's score is dated relative to the code it describes.
+
+### First pass over TICKET-101 — 2026-09-22
+
+**Five cross-chain rows now name their tests**, which is what their own `test_evidence` asked for
+("exact named tests should be added before score increase"), and `tested` went 82 → 88 on each:
+
+| row | tests named on master |
+| --- | --- |
+| X3-XCHAIN-010 semantic idempotency | `exact_rebind_is_idempotent`, `identical_fast_lock_replay_is_successful_noop_but_conflict_fails`, `duplicate_slow_claim_and_refund_completion_are_idempotent` |
+| X3-XCHAIN-014 coordinator restart recovery | `distributed_fence_survives_authority_restart`, `fast_claim_retry_survives_coordinator_restart` |
+| X3-XCHAIN-016 conflicting retry rejection | `conflicting_concurrent_lock_observations_yield_one_winner_one_conflict`, `terminal_phase_conflicting_with_canonical_evidence_halts`, `identical_fast_lock_replay_is_successful_noop_but_conflict_fails` |
+| X3-XCHAIN-017 cross-session secret ownership | `distributed_secret_registry_allows_same_session_retry_only` |
+| X3-XCHAIN-019 secret-release proof reuse | `release_does_not_reuse_fencing_epoch` |
+
+(`crates/cross-vm-coordinator` holds 133 `#[test]` functions in all.)
+
+**The three security rows were re-measured against reality, and one of their blockers was false.**
+`X3-SEC-004` carried "srtool hardening is on #166 branch, not master yet" — #166 merged 2026-09-17
+and the reproducible-build path is on master. What is actually missing is that the production gate
+has never completed a run: the hosted `production-gate` workflow has **five runs, all cancelled,
+longest 1h34m, none green**, and `scripts/mainnet_release_gate.py` has not been run end to end on a
+release candidate either. `X3-SEC-004` mainnet_ready 72 → 62 on that; `X3-SEC-001`/`002` 60 → 65 with
+the local evidence written down (two from-scratch srtool builds agreeing, five times over five
+revisions this session, plus the freshness gate firing on `local-ci`).
+
+**Still unverified, deliberately untouched:** X3-LANG-004/009/010 and X3-XCHAIN-013/015/018/020/021
+have no named test or file I could confirm on master this pass. Their scores stand until someone
+does, which is the point of the ticket.

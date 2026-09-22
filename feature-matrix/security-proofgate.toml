@@ -8,14 +8,17 @@ subsystem = "security_proofgate"
 source = "master"
 paths = [".github/workflows/production-gate.yml"]
 implemented = 85
-tested = 55
-mainnet_ready = 60
+tested = 70
+mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["New exact-head workflow has not completed green yet"]
-evidence = [".github/workflows/production-gate.yml", "note: Branch hardening builds runtime with scripts/run-srtool.sh and records hashes", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+blockers = [
+  "Measured locally, 2026-09-22: `./scripts/update-runtime-hashes.sh` builds the runtime twice from scratch in the pinned srtool image and refuses to write unless the two builds agree byte for byte. Run three times in one session (`93fe86c9bd`, `e74bb199f9`, `269d611d96`, `93d97edd34`, `2a4296b630`), agreeing every time. What is still missing is reproduction by a party that is not this machine, and an end-to-end `make mainnet-check` on a release candidate",
+  "Hosted `production-gate` workflow has run five times, all `workflow_dispatch`, all cancelled and never green (2026-09-19: 43m50s, 56m57s, 1h29m37s, 1h34m0s, 1h33m11s); the gate of record for this repository is local (`scripts/local-ci.sh`)",
+]
+evidence = ["scripts/run-srtool.sh", "scripts/update-runtime-hashes.sh", "docs/reports/runtime-wasm-hashes.json", ".github/workflows/production-gate.yml", "note: two independent srtool builds per attestation, compared field by field, with the record carrying the runtime version and metadata; PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -25,14 +28,18 @@ subsystem = "security_proofgate"
 source = "master"
 paths = [".github/workflows/production-gate.yml"]
 implemented = 85
-tested = 55
-mainnet_ready = 60
+tested = 70
+mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Pending exact-head Actions proof"]
-evidence = [".github/workflows/production-gate.yml", "note: Branch records commit, BLAKE2-256, SHA-256, WASM size/path", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+blockers = [
+  "`docs/reports/runtime-wasm-hashes.json` records the revision, image digest, compact/compressed sizes, set_code, authorize_upgrade, IPFS CID and BLAKE2-256, plus the runtime version and metadata the artifact reports; `scripts/check-runtime-hash-freshness.py` fails a change that touches the runtime's dependency graph without moving the record, and it is wired into `local-ci` (it fired on this session's runtime changes and passed after each re-attestation)",
+  "Still missing: the release gate's own rebuild-and-compare (stage 6b) has not been run end to end on a release candidate, and no second party has reproduced the artifact",
+  "Hosted `production-gate` workflow has run five times, all `workflow_dispatch`, all cancelled and never green (2026-09-19: 43m50s, 56m57s, 1h29m37s, 1h34m0s, 1h33m11s); the gate of record for this repository is local (`scripts/local-ci.sh`)",
+]
+evidence = ["docs/reports/runtime-wasm-hashes.json", "scripts/check-runtime-hash-freshness.py", "scripts/update-runtime-hashes.sh", ".github/workflows/production-gate.yml", "note: branch records commit, BLAKE2-256, SHA-256, WASM size/path; PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
 id = "X3-SEC-003"
@@ -59,13 +66,16 @@ source = "master"
 paths = [".github/workflows/production-gate.yml"]
 implemented = 88
 tested = 75
-mainnet_ready = 72
+mainnet_ready = 62
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["srtool hardening is on #166 branch, not master yet"]
-evidence = [".github/workflows/production-gate.yml", "note: Runs guard/tests/release build/audit/node build/mainnet check", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+blockers = [
+  "The blocker this row carried — \"srtool hardening is on #166 branch, not master yet\" — is stale: #166 merged 2026-09-17 and the reproducible-build path is on master (`scripts/run-srtool.sh`, `scripts/update-runtime-hashes.sh`)",
+  "What is actually missing: the production gate has never completed a full run. Hosted `production-gate` has five runs, all cancelled, longest 1h34m, none green; `scripts/mainnet_release_gate.py` exists (31 KB) and has not been run end to end on a release candidate either. The local gate set that *does* run is `scripts/local-ci.sh`, green 30/30 on `bae40d46c8` on 2026-09-22 — but it is not this gate",
+]
+evidence = ["scripts/mainnet_release_gate.py", "scripts/local-ci.sh", ".github/workflows/production-gate.yml", "note: runs guard/tests/release build/audit/node build/mainnet check; PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
 id = "X3-SEC-005"

@@ -215,7 +215,7 @@ subsystem = "cross_chain"
 source = "master"
 paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
 implemented = 88
-tested = 82
+tested = 88
 mainnet_ready = 68
 priority = "P0"
 confidence = "high"
@@ -223,7 +223,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Strengthened exact-head production gate still pending"]
 evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 persists operation journal; duplicate identical evidence becomes no-op", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): exact_rebind_is_idempotent (intent_binding.rs), identical_fast_lock_replay_is_successful_noop_but_conflict_fails (state_machine.rs), duplicate_slow_claim_and_refund_completion_are_idempotent (state_machine.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
 id = "X3-XCHAIN-011"
@@ -283,7 +283,7 @@ subsystem = "cross_chain"
 source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
 implemented = 88
-tested = 82
+tested = 88
 mainnet_ready = 70
 priority = "P0"
 confidence = "high"
@@ -291,7 +291,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs real process/network restart drill"]
 evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 adversarial restart test", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): distributed_fence_survives_authority_restart (lease.rs), fast_claim_retry_survives_coordinator_restart (state_machine.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -319,7 +319,7 @@ subsystem = "cross_chain"
 source = "master"
 paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
 implemented = 90
-tested = 85
+tested = 88
 mainnet_ready = 72
 priority = "P0"
 confidence = "high"
@@ -327,7 +327,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Pending production-gate proof"]
 evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 returns IdempotencyConflict for mismatched evidence", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): conflicting_concurrent_lock_observations_yield_one_winner_one_conflict (concurrent.rs), terminal_phase_conflicting_with_canonical_evidence_halts (recovery.rs), identical_fast_lock_replay_is_successful_noop_but_conflict_fails (state_machine.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -337,7 +337,7 @@ subsystem = "cross_chain"
 source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
 implemented = 90
-tested = 85
+tested = 88
 mainnet_ready = 72
 priority = "P0"
 confidence = "high"
@@ -345,7 +345,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Pending production-gate proof"]
 evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: secret hash -> owning session id", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): distributed_secret_registry_allows_same_session_retry_only (lease.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -373,7 +373,7 @@ subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
-tested = 82
+tested = 88
 mainnet_ready = 72
 priority = "P0"
 confidence = "high"
@@ -381,7 +381,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
 evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): release_does_not_reuse_fencing_epoch (lease.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
