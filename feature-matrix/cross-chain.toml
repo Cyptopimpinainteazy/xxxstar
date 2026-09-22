@@ -63,16 +63,26 @@ id = "X3-XCHAIN-003"
 name = "Relayer framework"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-atomic-swap/src/relayer.rs"]
-implemented = 65
-tested = 40
+paths = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/relayer.rs", "crates/x3-relayer/src/watchers", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs"]
+implemented = 70
+tested = 50
 mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Multi-validator relayer quorum incomplete"]
-evidence = ["crates/x3-atomic-swap/src/relayer.rs", "note: Relayer module exists; status docs list quorum blocker"]
+blockers = [
+  "The relayer signs with a single key and says so: `svm_required_signatures: 1` with the comment that quorum enforcement \"belongs at the aggregator layer\" — and no aggregator exists in this workspace, so the production path is one signature",
+  "It cannot submit at all: the settlement engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused (`NotAuthorized`) — the authority path is an open decision",
+  "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
+  "No multi-operator relayer set: quorum is verified on the *verification* side (x3-validator-attestation, x3-bridge supermajority tests) but nothing in this crate produces one",
+]
+# The row used to cite `crates/x3-atomic-swap/src/relayer.rs`, a second watcher
+# implementation used by the node-side swap tests. The production relayer is the
+# `x3-relayer` crate; this points at it now, and at the crates that actually verify
+# attestation quorum.
+evidence = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/watchers/evm.rs", "crates/x3-relayer/src/watchers/svm.rs", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "note: watchers compare confirmations to the configured finality threshold; EVM receipt proofs are produced by crates/x3-relayer/src/evm_receipt_proof.rs and verified through x3-verification-router; the submission path refuses with the origin rule rather than posting a payload no node accepts"]
+test_evidence = ["crates/x3-relayer/src/submitter.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "crates/x3-verification-router/tests", "crates/x3-relayer/src/evm_receipt_proof.rs", "note: `cargo test -p x3-relayer --lib` covers the refusal path, the SVM attestation signature and the quorum check on an acquired proof; the bridge has supermajority threshold tests (exactly-at, one-below, duplicate-signature rejection); the receipt proof producer has an anvil-backed inclusion test"]
 
 [[feature]]
 id = "X3-XCHAIN-004"

@@ -6658,3 +6658,16 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Independence/duration for X3-L1-001: multi-machine, partitions, clock skew, soak (hours), slashing/jailing under a real network. 2. Audit X3-L1-002 validator key management (30%). 3. Remaining weak P0 rows: relayer framework 35%, Ethereum bridge adapter 38%. 4. Consolidate the three SPV implementations. 5. Trusted BTC header bootstrap. 6. Relayer authority decision (owner). 7. Release publish + external audit.
+
+## 2026-09-22 (eighth pass) — validator key management and the relayer row
+
+### Facts to remember
+- **`scripts/testnet/inject-keystore.sh` had the same `subkey` defect the launcher had** (absent tool, hand-written keystore files). Fixed to use `"$NODE_BIN" keys insert --key-type aura|grandpa --seed <secret> --keystore-path <dir>`; it finds a built node itself, prefers the generated spec, and accepts both `aura=/grandpa=` and `seed=` SURI formats. Verified by injecting and reading back with `keys list`.
+- **Keystore-only keys DO drive Aura.** Measured 2026-09-22: one node with `--validator --force-authoring`, keystore files from `keys insert`, no `X3_DEV_SEED`, head reached 9 after ~45s. `run-fresh-validators.sh`'s note ("file-only keystore injection does not drive Aura", 2026-09-04) is stale and has been corrected; the dev-seed path is a convenience, not a requirement.
+- **Key rotation exists twice, connected zero times**: `node/src/authority.rs` has `SessionKeys`, `KeyRotationSchedule`, `should_rotate`, `schedule_next_rotation`, `rotate_keys`, `validators_needing_rotation` + unit tests but **no caller anywhere**; `pallets/x3-custody` has an on-chain `ValidatorKeyRegistry` with `rotation_due_at`, `schedule_rotation`/`rotate` events + tests, unconnected to it. Honest phrasing: implemented twice, never run end to end.
+- **No session-key onboarding tooling**: `session.setKeys` is callable (pallet-session is in the runtime) and nothing calls it — adding a validator to a running network today means editing genesis or relaunching locally.
+- **The relayer row's blocker is accurate**: `crates/x3-relayer/src/submitter.rs` sets `svm_required_signatures: 1` with the comment that quorum "belongs at the aggregator layer", and no aggregator exists here. Quorum *verification* is real (`crates/x3-validator-attestation`, `crates/x3-bridge/src/cross_chain_proofs.rs` supermajority tests) but nothing in the relayer produces one, and submission is refused (party-origin rule). The row now points at `crates/x3-relayer`, not `crates/x3-atomic-swap/src/relayer.rs`.
+- Rows updated: `X3-L1-002` 55/30/30 → 75/60/40 with real paths; `X3-XCHAIN-003` 65/40/35 → 70/50/35 (mainnet-ready unchanged — the blockers are structural).
+
+### Next task seed
+1. Wire rotation end-to-end (node schedule → on-chain `ValidatorKeyRegistry` → `session.setKeys`) — the single biggest key-management gap. 2. On-chain session-key onboarding for a new validator. 3. Remaining weak P0: Ethereum bridge adapter (38%) and CEX/ops rows. 4. Consolidate the three SPV implementations. 5. Trusted BTC header bootstrap. 6. Relayer authority decision (owner). 7. Release publish + external audit.
