@@ -26,7 +26,8 @@
 //! * `CustodyMap` records which signers are authorized for each (chain, asset)
 //!   pair and at which tier.
 //! * `TierThresholds` encodes the minimum number of co-signers per tier.
-//! * Key rotation due dates are tracked in `KeyRotationSchedule`.
+//! * Key rotation due dates are tracked in `ValidatorKeyRegistry` records; there
+//!   is no second schedule map to diverge from the registry.
 
 pub use pallet::*;
 
@@ -206,6 +207,9 @@ pub mod pallet {
         pub initial_tier_thresholds: Vec<Vec<u8>>,
         /// SCALE-encoded (T::AccountId, SignerPolicy) entries.
         pub initial_signer_limits: Vec<Vec<u8>>,
+        /// SCALE-encoded (T::AccountId, rotation_due_at) validator-key entries.
+        #[serde(default)]
+        pub initial_validator_keys: Vec<Vec<u8>>,
         pub _phantom: sp_std::marker::PhantomData<T>,
     }
 
@@ -222,6 +226,19 @@ pub mod pallet {
                 let (signer, policy): (T::AccountId, SignerPolicy) =
                     Decode::decode(&mut &blob[..]).expect("valid SCALE-encoded signer limit");
                 SignerLimits::<T>::insert(signer, policy);
+            }
+            for blob in &self.initial_validator_keys {
+                let (account, rotation_due_at): (T::AccountId, BlockNumberFor<T>) =
+                    Decode::decode(&mut &blob[..]).expect("valid SCALE-encoded validator key");
+                ValidatorKeyRegistry::<T>::insert(
+                    account,
+                    ValidatorKeyRecord {
+                        registered_at: Default::default(),
+                        rotation_due_at,
+                        role: KeyRole::ValidatorSigning,
+                        active: true,
+                    },
+                );
             }
         }
     }
@@ -289,12 +306,6 @@ pub mod pallet {
     pub type SignerLimits<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, SignerPolicy, OptionQuery>;
 
-    /// Block number at which each signer's key rotation becomes mandatory.
-    #[pallet::storage]
-    #[pallet::getter(fn key_rotation_schedule)]
-    pub type KeyRotationSchedule<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, BlockNumberFor<T>, OptionQuery>;
-
     // ── Events ────────────────────────────────────────────────────────────────
 
     #[pallet::event]
@@ -324,6 +335,12 @@ pub mod pallet {
             old_key: T::AccountId,
             new_key: T::AccountId,
         },
+        /// A validator's key rotation due-date was renewed in place, without
+        /// changing which account holds the key.
+        ValidatorKeyRenewed {
+            account: T::AccountId,
+            rotation_due_at: BlockNumberFor<T>,
+        },
         /// A tier signing threshold was set or updated.
         TierThresholdSet {
             tier: AuthorizationTier,
@@ -331,11 +348,6 @@ pub mod pallet {
         },
         /// A per-signer operational limit was set.
         SignerLimitSet { signer: T::AccountId },
-        /// A key rotation due-block was scheduled for a signer.
-        KeyRotationScheduled {
-            signer: T::AccountId,
-            rotation_block: BlockNumberFor<T>,
-        },
         /// A signer was found not to be authorized during a check.
         UnauthorizedSignerDetected {
             chain_id: u32,
@@ -363,6 +375,10 @@ pub mod pallet {
         KeyRoleNotAllowedForTier,
         /// Adding another signer would exceed `MaxSignersPerVault`.
         MaxSignersReached,
+        /// The supplied rotation due-date is not strictly after the current
+        /// block — a rotation or renewal must always move the due-date
+        /// forward, never backward or in place.
+        RotationDueDateNotInFuture,
     }
 
     // ── Extrinsics ────────────────────────────────────────────────────────────
@@ -466,8 +482,6 @@ pub mod pallet {
             };
 
             ValidatorKeyRegistry::<T>::insert(&account, record);
-            KeyRotationSchedule::<T>::insert(&account, rotation_due_at);
-
             Self::deposit_event(Event::ValidatorKeyRegistered {
                 account,
                 rotation_due_at,
@@ -475,7 +489,19 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Rotate a validator key: deactivate `old_key`, activate `new_key`.
+        /// Rotate a validator key to a **different account**: deactivate
+        /// `old_key`, activate `new_key`. This is for genuine account
+        /// succession (e.g. the old account's key material is compromised
+        /// and a new account takes over as that validator) — `session
+        /// .setKeys` never changes which account is the validator, so it
+        /// cannot drive this path. For routine same-account session-key
+        /// rotation, use `renew_validator_key` instead.
+        ///
+        /// The caller supplies `next_due_at` rather than it being inherited
+        /// from `old_key`'s record: reusing the old due-date would leave the
+        /// new key immediately overdue whenever the rotation happens after
+        /// the old key's due-date, which a driver that rotates what is due
+        /// would do on every call, forever.
         ///
         /// `GovernanceOrigin` only. Emits `KeyRotated`.
         #[pallet::call_index(3)]
@@ -484,12 +510,19 @@ pub mod pallet {
             origin: OriginFor<T>,
             old_key: T::AccountId,
             new_key: T::AccountId,
+            next_due_at: BlockNumberFor<T>,
         ) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
 
             let old_record = ValidatorKeyRegistry::<T>::get(&old_key)
                 .filter(|r| r.active)
                 .ok_or(Error::<T>::SignerNotFound)?;
+
+            let current_block = frame_system::Pallet::<T>::block_number();
+            ensure!(
+                next_due_at > current_block,
+                Error::<T>::RotationDueDateNotInFuture
+            );
 
             if let Some(existing_new) = ValidatorKeyRegistry::<T>::get(&new_key) {
                 ensure!(!existing_new.active, Error::<T>::ValidatorKeyConflict);
@@ -501,20 +534,60 @@ pub mod pallet {
                     r.active = false;
                 }
             });
-            KeyRotationSchedule::<T>::remove(&old_key);
-
-            // Register new key, inheriting rotation schedule and role from old
-            let current_block = frame_system::Pallet::<T>::block_number();
+            // Register new key, on the caller-supplied due-date, inheriting role from old
             let new_record = ValidatorKeyRecord {
                 registered_at: current_block,
-                rotation_due_at: old_record.rotation_due_at,
+                rotation_due_at: next_due_at,
                 role: old_record.role,
                 active: true,
             };
             ValidatorKeyRegistry::<T>::insert(&new_key, new_record);
-            KeyRotationSchedule::<T>::insert(&new_key, old_record.rotation_due_at);
-
             Self::deposit_event(Event::KeyRotated { old_key, new_key });
+            Ok(())
+        }
+
+        /// Renew a validator's key rotation due-date **in place**, without
+        /// changing which account holds the key. This is the routine path:
+        /// `session.setKeys` re-signs the same account with new Aura/GRANDPA
+        /// key material, so the registry entry for that account just needs
+        /// its due-date pushed forward. `rotate_validator_key` is for
+        /// genuine account succession, a different, rarer operation.
+        ///
+        /// Refuses if `account` has no active registered key, or if
+        /// `next_due_at` is not strictly after the current block — the
+        /// caller must always say what the next due-date is; this never
+        /// silently picks one.
+        ///
+        /// `OperatorOrigin`. Emits `ValidatorKeyRenewed`.
+        #[pallet::call_index(8)]
+        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        pub fn renew_validator_key(
+            origin: OriginFor<T>,
+            account: T::AccountId,
+            next_due_at: BlockNumberFor<T>,
+        ) -> DispatchResult {
+            T::OperatorOrigin::ensure_origin(origin)?;
+
+            ValidatorKeyRegistry::<T>::get(&account)
+                .filter(|r| r.active)
+                .ok_or(Error::<T>::SignerNotFound)?;
+
+            let current_block = frame_system::Pallet::<T>::block_number();
+            ensure!(
+                next_due_at > current_block,
+                Error::<T>::RotationDueDateNotInFuture
+            );
+
+            ValidatorKeyRegistry::<T>::mutate(&account, |maybe| {
+                if let Some(r) = maybe.as_mut() {
+                    r.registered_at = current_block;
+                    r.rotation_due_at = next_due_at;
+                }
+            });
+            Self::deposit_event(Event::ValidatorKeyRenewed {
+                account,
+                rotation_due_at: next_due_at,
+            });
             Ok(())
         }
 
@@ -551,26 +624,6 @@ pub mod pallet {
 
             SignerLimits::<T>::insert(&signer, policy);
             Self::deposit_event(Event::SignerLimitSet { signer });
-            Ok(())
-        }
-
-        /// Schedule a key rotation due-block for a signer.
-        ///
-        /// `OperatorOrigin`.
-        #[pallet::call_index(6)]
-        #[pallet::weight(Weight::from_parts(5_000, 0))]
-        pub fn set_key_rotation_schedule(
-            origin: OriginFor<T>,
-            signer: T::AccountId,
-            rotation_block: BlockNumberFor<T>,
-        ) -> DispatchResult {
-            T::OperatorOrigin::ensure_origin(origin)?;
-
-            KeyRotationSchedule::<T>::insert(&signer, rotation_block);
-            Self::deposit_event(Event::KeyRotationScheduled {
-                signer,
-                rotation_block,
-            });
             Ok(())
         }
 

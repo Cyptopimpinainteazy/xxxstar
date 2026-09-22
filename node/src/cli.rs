@@ -331,6 +331,62 @@ pub enum KeysSubcommand {
         #[arg(long)]
         seed: String,
     },
+
+    /// Submit the runtime `Session::set_keys` extrinsic for a validator.
+    ///
+    /// The command refuses to submit unless `--account` has an active entry in
+    /// the on-chain `X3Custody::ValidatorKeyRegistry`. The Aura and GRANDPA
+    /// public keys are the keys the operator has already inserted into the
+    /// node keystore with `keys insert`.
+    SetSession {
+        /// Validator account (SS58 or 32-byte hex).
+        #[arg(long)]
+        account: String,
+
+        /// Aura session public key (SS58 or 32-byte hex).
+        #[arg(long)]
+        aura_key: String,
+
+        /// GRANDPA session public key (SS58 or 32-byte hex).
+        #[arg(long)]
+        grandpa_key: String,
+
+        /// Sr25519 secret URI used to sign the `Session::set_keys` extrinsic.
+        #[arg(long)]
+        signer: String,
+
+        /// RPC endpoint URL.
+        #[arg(long, default_value = "http://127.0.0.1:9933")]
+        rpc_url: String,
+    },
+
+    /// Show the on-chain `Session::NextKeys` for a validator account.
+    ///
+    /// This is the post-submit assertion an operator can run after
+    /// `keys set-session`; it reads chain state, not the local keystore.
+    ShowSession {
+        /// Validator account (SS58 or 32-byte hex).
+        #[arg(long)]
+        account: String,
+
+        /// RPC endpoint URL.
+        #[arg(long, default_value = "http://127.0.0.1:9933")]
+        rpc_url: String,
+    },
+
+    /// Show the on-chain `X3Custody::ValidatorKeyRegistry` record for an account.
+    ///
+    /// This is the pre-submit assertion used by the rotation drill and by an
+    /// operator deciding whether a validator is registered and active.
+    ShowRegistry {
+        /// Validator account (SS58 or 32-byte hex).
+        #[arg(long)]
+        account: String,
+
+        /// RPC endpoint URL.
+        #[arg(long, default_value = "http://127.0.0.1:9933")]
+        rpc_url: String,
+    },
 }
 
 /// Inspect CLI commands for querying canonical ledger and chain state.

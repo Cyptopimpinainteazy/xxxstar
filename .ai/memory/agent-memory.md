@@ -6748,3 +6748,25 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Next task seed
 1. Verify the restarted 2-hour soak (`/tmp/x3-soak120b.log`) and settle the RSS question. 2. Hosting: bootnode host + DNS + RPC/faucet/explorer + monitoring, then `public_testnet_gate.sh --rpc-base-url` and publish a manifest. 3. Key rotation (other agent). 4. SPV consolidation. 5. Partition/clock-skew injection. 6. Relayer authority decision (owner). 7. External audit.
+## 2026-09-22 (validator key rotation e2e branch) — registry is the only schedule, and `session.setKeys` is operator tooling now
+
+### Facts to remember
+- **Deleted the duplicate off-chain key-rotation registry**: `node/src/authority.rs` had its own `ValidatorRegistry`, `KeyRotationSchedule`, `should_rotate`/`schedule_next_rotation`/`rotate_keys` and no caller. It is gone; `node/src/lib.rs` no longer exports `authority`.
+- **Removed the second on-chain schedule**: `pallets/x3-custody` no longer has the `KeyRotationSchedule` storage map or `set_key_rotation_schedule` extrinsic. The `ValidatorKeyRegistry.rotation_due_at` field is the only schedule. `register_validator_key`, `rotate_validator_key` and the new `renew_validator_key` all mutate only the registry record.
+- **Late-rotation thrash is fixed**: `rotate_validator_key` now takes `next_due_at` and refuses values not strictly greater than the current block. A driver that rotates what is due no longer copies an already-elapsed due-date onto the replacement key. The routine same-account path is `renew_validator_key`, not `rotate_validator_key`.
+- **`keys set-session` is real operator tooling**: it refuses an account with no active `ValidatorKeyRegistry` record, signs `Session::set_keys` with the existing runtime-aware signer, submits through `author_submitExtrinsic`, and then polls `Session::NextKeys` until the new keys are visible. `keys show-session` and `keys show-registry` expose the post-state without requiring metadata tooling.
+- **`Session::NextKeys` uses `Twox64Concat`, not `Blake2_128Concat`.** The first version of the CLI read it with `blake2_128`, got `null` even though the extrinsic dispatched successfully, and the drill failed. The registry map itself is `Blake2_128Concat`; do not copy one hasher to the other storage map.
+- **Genesis seeds the registry**: `pallet_x3_custody::GenesisConfig` has `initial_validator_keys` (SCALE `(AccountId, rotation_due_at)` tuples, serde default for old specs), and `node/src/chain_spec.rs` populates one entry per Aura authority with `INITIAL_VALIDATOR_KEY_DUE_BLOCKS = 2_628_000`.
+- **Runtime WASM cache trap**: `cargo clean -p x3-chain-runtime` does NOT remove `target/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm`, so build.rs reuses the old blob and live genesis misses the new field while native tests pass. Delete that exact WASM file before the full build when a pallet genesis/storage change must reach a live node.
+- **Drill proof**: `scripts/testnet/validator-rotation-drill.sh` boots 3 generated validators, verifies the active registry entry, inserts fresh Aura/GRANDPA keys, proves an unregistered account is refused, submits `session.setKeys`, and reads the new keys back from `Session::NextKeys`. It is wired into `scripts/local-ci.sh` under `--failure`/`--all`.
+
+### Verified state of the branch
+- `cargo test -p pallet-x3-custody --lib` → 31 passed / 0 failed.
+- `cargo test -p x3-chain-node --lib` (escalated for the live HTTP test's ephemeral port) → 57 passed / 0 failed / 3 ignored.
+- `cargo clippy -p pallet-x3-custody --all-targets -- -D warnings` → clean.
+- `cargo clippy -p x3-chain-node --all-targets -- -D warnings` → clean.
+- `cargo fmt --all -- --check` → clean.
+- `NODE_BIN=target/debug/x3-chain-node bash scripts/testnet/validator-rotation-drill.sh` → all phases PASS.
+
+### Next task seed
+1. Run the drill against independent validator operators, not three processes on one host. 2. Add a ceremony/backup/HSM runbook for the keys this path rotates. 3. Test session boundary authoring after `setKeys` (the drill verifies `NextKeys`, not that the rotated node authors with the new key). 4. External audit of the key path.

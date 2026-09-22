@@ -332,7 +332,7 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // this hash, so headers stored by an earlier version would be filed under a
     // different key. No migration is needed: every deployed chain has an empty
     // `BtcHeaders` map (the BTC path is not live on any network yet).
-    spec_version: 13,
+    spec_version: 14,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,

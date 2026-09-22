@@ -5,12 +5,14 @@ use crate::{
     service,
 };
 use clap::Parser;
+use codec::{Decode, Encode};
 #[cfg(feature = "runtime-benchmarks")]
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
 use log::{error, info, warn};
 use sc_cli::{Error as CliError, Result as CliResult, SubstrateCli};
 #[cfg(feature = "runtime-benchmarks")]
 use x3_chain_runtime::opaque::Block;
+use x3_runtime_signer::{session_set_keys_call, X3RuntimeSigner};
 
 use crate::logging;
 
@@ -36,6 +38,94 @@ fn account_to_hex32(account: &str) -> Result<String, String> {
     let public = sp_runtime::AccountId32::from_ss58check(account)
         .map_err(|e| format!("invalid SS58 address: {e}"))?;
     Ok(format!("0x{}", hex::encode(public.as_ref() as &[u8])))
+}
+
+/// Parse `--account` into the runtime account id bytes.
+fn parse_account32(account: &str) -> Result<sp_runtime::AccountId32, String> {
+    if let Some(hex_part) = account
+        .strip_prefix("0x")
+        .or_else(|| account.strip_prefix("0X"))
+    {
+        let bytes = hex::decode(hex_part).map_err(|e| format!("invalid hex account: {e}"))?;
+        if bytes.len() != 32 {
+            return Err(format!("account hex must be 32 bytes, got {}", bytes.len()));
+        }
+        let mut raw = [0u8; 32];
+        raw.copy_from_slice(&bytes);
+        return Ok(sp_runtime::AccountId32::from(raw));
+    }
+
+    use sp_core::crypto::Ss58Codec;
+    sp_runtime::AccountId32::from_ss58check(account)
+        .map_err(|e| format!("invalid SS58 account: {e}"))
+}
+
+/// The exact storage key for `X3Custody::ValidatorKeyRegistry` at `account`.
+///
+/// The map hashes keys with `Blake2_128Concat`, so the full key is the twox128
+/// pallet/item prefix followed by the 16-byte blake2 hash and then the raw
+/// account bytes. This is the on-chain registry the session-key command reads
+/// before it will submit anything.
+fn validator_registry_storage_key(account: &sp_runtime::AccountId32) -> String {
+    let mut key =
+        frame_support::storage::storage_prefix(b"X3Custody", b"ValidatorKeyRegistry").to_vec();
+    key.extend_from_slice(&sp_core::blake2_128(&account.encode()));
+    key.extend_from_slice(account.as_ref());
+    format!("0x{}", hex::encode(key))
+}
+
+/// Read and SCALE-decode an active validator-key record, if one exists.
+fn query_active_validator_record(
+    rpc_url: &str,
+    account: &sp_runtime::AccountId32,
+) -> Result<Option<pallet_x3_custody::ValidatorKeyRecord<u32>>, String> {
+    let key = validator_registry_storage_key(account);
+    let value = make_rpc_call(rpc_url, "state_getStorage", serde_json::json!([key]))?;
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    let raw = value
+        .as_str()
+        .ok_or_else(|| "ValidatorKeyRegistry storage value was not hex".to_string())?;
+    let bytes = hex::decode(raw.strip_prefix("0x").unwrap_or(raw))
+        .map_err(|e| format!("decode ValidatorKeyRegistry storage hex: {e}"))?;
+    let record = <pallet_x3_custody::ValidatorKeyRecord<u32>>::decode(&mut &bytes[..])
+        .map_err(|e| format!("SCALE decode ValidatorKeyRegistry: {e}"))?;
+    Ok(record.active.then_some(record))
+}
+
+/// The exact storage key for `Session::NextKeys` at `account`.
+fn session_next_keys_storage_key(account: &sp_runtime::AccountId32) -> String {
+    let mut key = frame_support::storage::storage_prefix(b"Session", b"NextKeys").to_vec();
+    key.extend_from_slice(&sp_io::hashing::twox_64(&account.encode()));
+    key.extend_from_slice(account.as_ref());
+    format!("0x{}", hex::encode(key))
+}
+
+/// Read the two 32-byte session keys currently associated with `account`.
+fn query_session_next_keys(
+    rpc_url: &str,
+    account: &sp_runtime::AccountId32,
+) -> Result<Option<(Vec<u8>, Vec<u8>)>, String> {
+    let key = session_next_keys_storage_key(account);
+    let value = make_rpc_call(rpc_url, "state_getStorage", serde_json::json!([key]))?;
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    let raw = value
+        .as_str()
+        .ok_or_else(|| "Session::NextKeys storage value was not hex".to_string())?;
+    let bytes = hex::decode(raw.strip_prefix("0x").unwrap_or(raw))
+        .map_err(|e| format!("decode Session::NextKeys storage hex: {e}"))?;
+    if bytes.len() != 64 {
+        return Err(format!(
+            "Session::NextKeys value must be 64 bytes (aura + grandpa), got {}",
+            bytes.len()
+        ));
+    }
+    Ok(Some((bytes[..32].to_vec(), bytes[32..].to_vec())))
 }
 
 // ── Key management ──────────────────────────────────────────────────────────
@@ -473,7 +563,6 @@ pub fn run() -> CliResult<()> {
                             .into());
                         }
                     }
-
                     Ok(())
                 }
                 AtomicSwapSubcommand::Price {
@@ -854,6 +943,103 @@ pub fn run() -> CliResult<()> {
                             "the secret does not derive the supplied {key_type} public key"
                         )
                         .into());
+                    }
+                    Ok(())
+                }
+                KeysSubcommand::SetSession {
+                    account,
+                    aura_key,
+                    grandpa_key,
+                    signer,
+                    rpc_url,
+                } => {
+                    let account_id = parse_account32(account)?;
+                    let active_record = query_active_validator_record(rpc_url, &account_id)?;
+                    if active_record.is_none() {
+                        return Err(
+                            format!(
+                                "refusing to set session keys: {account} has no active entry in X3Custody::ValidatorKeyRegistry"
+                            )
+                            .into(),
+                        );
+                    }
+
+                    let aura = parse_public_key(aura_key)?;
+                    let grandpa = parse_public_key(grandpa_key)?;
+                    let call = session_set_keys_call(&aura, &grandpa).map_err(|e| e.to_string())?;
+                    let runtime_signer = X3RuntimeSigner::from_uri(
+                        String::from("x3-local"),
+                        rpc_url.clone(),
+                        signer,
+                    )
+                    .map_err(|e| e.to_string())?;
+                    let tx = runtime_signer
+                        .sign_runtime_call(call)
+                        .map_err(|e| e.to_string())?;
+
+                    match make_rpc_call(rpc_url, "author_submitExtrinsic", serde_json::json!([tx]))
+                    {
+                        Ok(tx_hash) => {
+                            println!("submitted session.setKeys");
+                            println!("validator account: {account}");
+                            println!("transaction hash:   {tx_hash}");
+
+                            // Submission is not success. `session.setKeys` can be
+                            // included and then fail in dispatch, so wait until
+                            // `Session::NextKeys` actually carries the new keys.
+                            for _ in 0..60 {
+                                std::thread::sleep(std::time::Duration::from_millis(500));
+                                if let Some((stored_aura, stored_grandpa)) =
+                                    query_session_next_keys(rpc_url, &account_id)?
+                                {
+                                    if stored_aura == aura && stored_grandpa == grandpa {
+                                        println!(
+                                            "verified: Session::NextKeys now carries the new keys"
+                                        );
+                                        return Ok(());
+                                    }
+                                }
+                            }
+                            Err(
+                                "submitted session.setKeys but Session::NextKeys did not update within 30s"
+                                    .into(),
+                            )
+                        }
+                        Err(e) => {
+                            Err(format!("author_submitExtrinsic failed for {account}: {e}").into())
+                        }
+                    }
+                }
+                KeysSubcommand::ShowSession { account, rpc_url } => {
+                    let account_id = parse_account32(account)?;
+                    match query_session_next_keys(rpc_url, &account_id)? {
+                        Some((aura, grandpa)) => {
+                            println!("validator account: {account}");
+                            println!("aura:    {}", public_to_ss58(&aura)?);
+                            println!("grandpa: {}", public_to_ss58(&grandpa)?);
+                        }
+                        None => {
+                            return Err(format!(
+                                "{account} has no Session::NextKeys entry on {rpc_url}"
+                            )
+                            .into());
+                        }
+                    }
+                    Ok(())
+                }
+                KeysSubcommand::ShowRegistry { account, rpc_url } => {
+                    let account_id = parse_account32(account)?;
+                    match query_active_validator_record(rpc_url, &account_id)? {
+                        Some(record) => {
+                            println!("validator account: {account}");
+                            println!("active: true");
+                            println!("rotation_due_at: {}", record.rotation_due_at);
+                            println!("registered_at: {}", record.registered_at);
+                        }
+                        None => {
+                            println!("validator account: {account}");
+                            println!("active: false");
+                        }
                     }
                     Ok(())
                 }

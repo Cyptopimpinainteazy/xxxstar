@@ -251,6 +251,18 @@ impl X3RuntimeSigner {
         Ok(format!("0x{}", hex::encode(xt.encode())))
     }
 
+    /// Sign an arbitrary runtime call with the same consensus-critical payload
+    /// layout used for settlement-engine calls.
+    ///
+    /// This is the narrow escape hatch that makes operator commands such as
+    /// `keys set-session` real: they need to sign `Session::set_keys`, not one
+    /// of the settlement-engine call shapes this crate exposes. Keeping the
+    /// generic signer private would have forced a second hand-rolled encoder,
+    /// which is the failure mode this crate exists to prevent.
+    pub fn sign_runtime_call(&self, call: RuntimeCall) -> Result<String, SwapError> {
+        self.signed_extrinsic(call)
+    }
+
     /// Read `Timestamp::Now` (the `u64` unix-seconds moment set by the
     /// mandatory `pallet_timestamp` inherent) as observed *at* a specific
     /// block. This is the exact same value `T::UnixTime::now()` returns to
@@ -474,6 +486,41 @@ impl X3RuntimeSigner {
             amount,
         }
     }
+}
+
+/// Build the `Session::set_keys` call for the two X3 session key components.
+///
+/// `aura` and `grandpa` are the raw 32-byte public keys the runtime's
+/// `SessionKeys` type expects. The ownership proof is intentionally empty:
+/// `SessionKeys` uses `OpaqueKeys`' default validity implementation, and an
+/// operator still has to insert the corresponding private keys into the node
+/// keystore before the chain will use them.
+pub fn session_set_keys_call(aura: &[u8], grandpa: &[u8]) -> Result<RuntimeCall, SwapError> {
+    if aura.len() != 32 {
+        return Err(SwapError::Internal(format!(
+            "aura session key must be 32 bytes, got {}",
+            aura.len()
+        )));
+    }
+    if grandpa.len() != 32 {
+        return Err(SwapError::Internal(format!(
+            "grandpa session key must be 32 bytes, got {}",
+            grandpa.len()
+        )));
+    }
+
+    let mut encoded = Vec::with_capacity(64);
+    encoded.extend_from_slice(aura);
+    encoded.extend_from_slice(grandpa);
+    let keys = x3_chain_runtime::SessionKeys::decode(&mut &encoded[..])
+        .map_err(|e| SwapError::Internal(format!("decode X3 SessionKeys: {e}")))?;
+
+    Ok(RuntimeCall::Session(
+        pallet_session::Call::<Runtime>::set_keys {
+            keys,
+            proof: Vec::new(),
+        },
+    ))
 }
 
 impl X3ExtrinsicSigner for X3RuntimeSigner {

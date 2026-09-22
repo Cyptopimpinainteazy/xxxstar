@@ -21,6 +21,13 @@ pub type ChainSpec = GenericChainSpec;
 const DEFAULT_PROTOCOL_ID: &str = "x3";
 const X3: u128 = 1_000_000_000_000;
 const ENDOWMENT: u128 = 1_000_000 * X3;
+/// The on-chain key-rotation due-date every genesis authority starts with.
+///
+/// This is a named constant rather than an unexplained `u32::MAX` so operators
+/// can see the policy: local/dev authorities still have an active registry
+/// entry, but are not due for the first year of 6-second blocks. The registry,
+/// not this constant, is what the rotation command checks.
+const INITIAL_VALIDATOR_KEY_DUE_BLOCKS: u32 = 2_628_000;
 
 type AccountPublic = <Signature as Verify>::Signer;
 
@@ -931,6 +938,18 @@ fn x3_chain_genesis(
             AccountId::from(account_bytes)
         })
         .collect();
+    let initial_validator_keys = initial_authorities
+        .iter()
+        .map(|(aura, _)| {
+            let mut account_bytes = [0u8; 32];
+            account_bytes.copy_from_slice(&aura.encode()[..32]);
+            (
+                AccountId::from(account_bytes),
+                INITIAL_VALIDATOR_KEY_DUE_BLOCKS,
+            )
+                .encode()
+        })
+        .collect::<Vec<_>>();
 
     RuntimeGenesisConfig {
         system: Default::default(),
@@ -974,7 +993,12 @@ fn x3_chain_genesis(
         x3_inventory: Default::default(),
         x3_rebalance: Default::default(),
         x3_partner: Default::default(),
-        x3_custody: Default::default(),
+        x3_custody: pallet_x3_custody::GenesisConfig {
+            initial_tier_thresholds: Vec::new(),
+            initial_signer_limits: Vec::new(),
+            initial_validator_keys,
+            _phantom: Default::default(),
+        },
         session: Default::default(),
         #[cfg(feature = "frontier")]
         ethereum: Default::default(),
@@ -1043,7 +1067,9 @@ where
 
 #[cfg(test)]
 mod council_quorum_tests {
-    use super::validate_live_council_quorum_count;
+    use super::*;
+    use sp_runtime::BuildStorage;
+    use x3_chain_runtime::Runtime;
 
     #[test]
     fn live_council_rejects_single_member() {
@@ -1054,5 +1080,46 @@ mod council_quorum_tests {
     fn live_council_accepts_two_or_more_members() {
         assert!(validate_live_council_quorum_count("Testnet network", 2).is_ok());
         assert!(validate_live_council_quorum_count("Production network", 5).is_ok());
+    }
+
+    #[test]
+    fn custody_initial_validator_keys_roundtrip_through_json() {
+        let config = pallet_x3_custody::GenesisConfig::<Runtime> {
+            initial_tier_thresholds: Vec::new(),
+            initial_signer_limits: Vec::new(),
+            initial_validator_keys: vec![vec![1u8; 36]],
+            _phantom: Default::default(),
+        };
+        let json = serde_json::to_value(config).expect("custody genesis serializes");
+        let decoded: pallet_x3_custody::GenesisConfig<Runtime> =
+            serde_json::from_value(json).expect("custody genesis deserializes");
+        assert_eq!(decoded.initial_validator_keys.len(), 1);
+    }
+
+    #[test]
+    fn full_genesis_build_seeds_custody_validator_keys() {
+        let (aura, grandpa) = authority_keys_from_seed("Alice").expect("Alice authority keys");
+        let mut account_bytes = [0u8; 32];
+        account_bytes.copy_from_slice(&aura.encode()[..32]);
+        let account = AccountId::from(account_bytes);
+        let genesis = x3_chain_genesis(
+            vec![(aura, grandpa)],
+            vec![account.clone()],
+            vec![account.clone()],
+            vec![account.clone()],
+            sp_core::H160::from_low_u64_be(1),
+            [1u8; 32],
+            X3CrosschainGatewayConfig::testnet_defaults(),
+            false,
+        );
+
+        let storage = genesis.build_storage().expect("runtime genesis builds");
+        let mut ext: sp_io::TestExternalities = storage.into();
+        ext.execute_with(|| {
+            let record = pallet_x3_custody::ValidatorKeyRegistry::<Runtime>::get(account)
+                .expect("custody validator key must be seeded");
+            assert!(record.active);
+            assert_eq!(record.rotation_due_at, INITIAL_VALIDATOR_KEY_DUE_BLOCKS);
+        });
     }
 }

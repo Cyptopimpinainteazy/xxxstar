@@ -35,9 +35,6 @@ pub mod rpc_middleware;
 /// Phase 5: Network Bootstrapping.
 pub mod network;
 
-/// Phase 6: Validator Setup.
-pub mod authority;
-
 /// Phase 7: Telemetry/Monitoring.
 pub mod metrics;
 

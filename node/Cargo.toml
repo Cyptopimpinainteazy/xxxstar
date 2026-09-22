@@ -55,6 +55,7 @@ serde = { workspace = true }
 serde_json = "1.0"
 reqwest = { version = "0.12", features = ["json"] }
 pallet-x3-wrapped = { path = "../pallets/x3-wrapped", default-features = false, features = ["std"] }
+pallet-x3-custody = { path = "../pallets/x3-custody", default-features = false, features = ["std"] }
 codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive"] }
 x3-common = { path = "../crates/x3-common" }
 jsonrpsee = { workspace = true }

@@ -487,11 +487,12 @@ validate_keys() {
 
 wait_for_rpc() {
   local rpc_port="$1"
-  # 180s, not 60: a cold debug-build node reads a 17 MB spec and a fresh keystore
-  # before it answers RPC, and back-to-back launches (a drill followed by another
-  # drill, say) have taken longer than a minute. The wait is still bounded, and the
-  # message below says which port never answered.
-  for _ in $(seq 1 180); do
+  # 180s by default (a cold debug-build node reads a 17 MB spec and a fresh
+  # keystore before it answers RPC). Callers may override with
+  # RPC_READY_TIMEOUT_SECS when they know a faster bound is appropriate. The
+  # wait is still bounded, and the message below says which port never answered.
+  local timeout="${RPC_READY_TIMEOUT_SECS:-180}"
+  for _ in $(seq 1 "$timeout"); do
     if curl -s -H "Content-Type: application/json" \
       -d '{"jsonrpc":"2.0","id":1,"method":"system_health","params":[]}' \
       "http://127.0.0.1:${rpc_port}" | grep -q '"isSyncing"'; then

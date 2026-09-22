@@ -355,6 +355,7 @@ GATES_LOOM=(
 # fifteen minutes and seven processes, so it does not belong in a default run.
 GATES_FAILURE=(
   "validator failure drill:bash scripts/testnet/validator-failure-drill.sh"
+  "validator rotation drill:bash scripts/testnet/validator-rotation-drill.sh"
 )
 
 # What a published testnet needs beyond "it starts": a record of *what* was launched

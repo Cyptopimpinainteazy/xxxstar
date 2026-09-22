@@ -16,18 +16,28 @@
 //! 13. non-GovernanceOrigin register_validator_key is rejected
 //! 14. MaxSignersPerVault capacity is enforced
 //! 15. set_signer_limit — OperatorOrigin succeeds
-//! 16. set_key_rotation_schedule — OperatorOrigin succeeds
+//! 16. (removed) set_key_rotation_schedule — the due-date now lives only in the
+//!     validator-key registry, so there is no separate schedule to drift
 //! 17. check_signer_authorized extrinsic returns Ok for active signer
 //! 18. check_signer_authorized extrinsic returns Err for inactive signer
 //! 19. ValidatorSigning role rejected for Operational tier (KeyRoleNotAllowedForTier)
 //! 20. ValidatorSigning accepted for non-Operational tiers
+//! 21. rotate_validator_key — next_due_at must be strictly in the future
+//! 22. renew_validator_key — same-account happy path, due-date advances
+//! 23. renew_validator_key — an already-elapsed next_due_at is refused
+//! 24. renew_validator_key — unregistered account is refused
+//! 25. renew_validator_key — inactive (rotated-away) account is refused
+//! 26. renew_validator_key — repeated renewal never thrashes (each call strictly
+//!     advances the due-date, unlike the old rotate_validator_key bug)
 
 use crate::{
     mock::{new_test_ext, RuntimeOrigin, System, Test, X3Custody},
-    pallet::{CustodyMap, KeyRotationSchedule, SignerLimits, ValidatorKeyRegistry},
+    pallet::{CustodyMap, SignerLimits, ValidatorKeyRegistry},
     AuthorizationTier, Error, KeyRole, SignerPolicy,
 };
+use codec::Encode;
 use frame_support::{assert_noop, assert_ok};
+use sp_runtime::BuildStorage;
 
 const ALICE: u64 = 1;
 const BOB: u64 = 2;
@@ -37,6 +47,28 @@ const EVE: u64 = 5;
 
 const CHAIN_ID: u32 = 1;
 const ASSET_ID: u32 = 100;
+
+#[test]
+fn test_genesis_seeds_validator_key_registry() {
+    let mut storage = frame_system::GenesisConfig::<Test>::default()
+        .build_storage()
+        .expect("system genesis builds");
+    crate::pallet::GenesisConfig::<Test> {
+        initial_tier_thresholds: Vec::new(),
+        initial_signer_limits: Vec::new(),
+        initial_validator_keys: vec![(ALICE, 1000_u64).encode()],
+        _phantom: Default::default(),
+    }
+    .assimilate_storage(&mut storage)
+    .expect("custody genesis assimilates");
+
+    let mut ext: sp_io::TestExternalities = storage.into();
+    ext.execute_with(|| {
+        let record = ValidatorKeyRegistry::<Test>::get(ALICE).expect("record must be seeded");
+        assert!(record.active);
+        assert_eq!(record.rotation_due_at, 1000_u64);
+    });
+}
 
 // ── 1. register_signer happy path ────────────────────────────────────────────
 
@@ -158,9 +190,6 @@ fn test_register_validator_key_works() {
         assert!(record.active);
         assert_eq!(record.rotation_due_at, 1000_u64);
         assert!(matches!(record.role, KeyRole::ValidatorSigning));
-
-        let schedule = KeyRotationSchedule::<Test>::get(ALICE);
-        assert_eq!(schedule, Some(1000_u64));
     });
 }
 
@@ -193,26 +222,63 @@ fn test_rotate_validator_key_works() {
             5000_u64,
         ));
 
+        // Rotating after the old due-date, with an explicit new due-date —
+        // this is exactly the case that used to thrash: old due_at=5000 is
+        // already in the past by block 6000, and the old code copied it
+        // onto the new key regardless.
+        System::set_block_number(6000);
         assert_ok!(X3Custody::rotate_validator_key(
             RuntimeOrigin::root(),
             ALICE,
             BOB,
+            7000_u64,
         ));
 
         // Old key deactivated
         let old_record =
             ValidatorKeyRegistry::<Test>::get(ALICE).expect("old record must still exist");
         assert!(!old_record.active, "old key must be inactive");
-        assert!(
-            KeyRotationSchedule::<Test>::get(ALICE).is_none(),
-            "old key schedule removed"
-        );
-
-        // New key active, inherits rotation_due_at
+        // New key active, on the caller-supplied due-date (not the old one)
         let new_record = ValidatorKeyRegistry::<Test>::get(BOB).expect("new record must be stored");
         assert!(new_record.active);
-        assert_eq!(new_record.rotation_due_at, 5000_u64);
-        assert_eq!(KeyRotationSchedule::<Test>::get(BOB), Some(5000_u64));
+        assert_eq!(new_record.rotation_due_at, 7000_u64);
+        assert!(
+            new_record.rotation_due_at > System::block_number(),
+            "the new key must not be immediately overdue"
+        );
+    });
+}
+
+// ── 7b. rotate_validator_key — next_due_at must be in the future ─────────────
+
+#[test]
+fn test_rotate_validator_key_rejects_past_due_date() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(X3Custody::register_validator_key(
+            RuntimeOrigin::root(),
+            ALICE,
+            5000_u64,
+        ));
+        System::set_block_number(6000);
+
+        // next_due_at in the past
+        assert_noop!(
+            X3Custody::rotate_validator_key(RuntimeOrigin::root(), ALICE, BOB, 100_u64),
+            Error::<Test>::RotationDueDateNotInFuture
+        );
+        // next_due_at == current block (not strictly in the future)
+        assert_noop!(
+            X3Custody::rotate_validator_key(RuntimeOrigin::root(), ALICE, BOB, 6000_u64),
+            Error::<Test>::RotationDueDateNotInFuture
+        );
+
+        // Nothing was mutated by the refused calls.
+        let record = ValidatorKeyRegistry::<Test>::get(ALICE).unwrap();
+        assert!(
+            record.active,
+            "old key must remain active after a refused rotation"
+        );
+        assert!(ValidatorKeyRegistry::<Test>::get(BOB).is_none());
     });
 }
 
@@ -222,7 +288,7 @@ fn test_rotate_validator_key_works() {
 fn test_rotate_validator_key_old_not_found() {
     new_test_ext().execute_with(|| {
         assert_noop!(
-            X3Custody::rotate_validator_key(RuntimeOrigin::root(), ALICE, BOB),
+            X3Custody::rotate_validator_key(RuntimeOrigin::root(), ALICE, BOB, 100_u64),
             Error::<Test>::SignerNotFound
         );
     });
@@ -398,21 +464,6 @@ fn test_set_signer_limit_works() {
     });
 }
 
-// ── 16. set_key_rotation_schedule — OperatorOrigin succeeds ──────────────────
-
-#[test]
-fn test_set_key_rotation_schedule_works() {
-    new_test_ext().execute_with(|| {
-        assert_ok!(X3Custody::set_key_rotation_schedule(
-            RuntimeOrigin::signed(ALICE),
-            BOB,
-            9999_u64,
-        ));
-
-        assert_eq!(KeyRotationSchedule::<Test>::get(BOB), Some(9999_u64));
-    });
-}
-
 // ── 17. check_signer_authorized extrinsic — Ok for active signer ─────────────
 
 #[test]
@@ -512,6 +563,7 @@ fn test_key_rotated_event_emitted() {
             RuntimeOrigin::root(),
             ALICE,
             BOB,
+            9000_u64,
         ));
 
         System::assert_has_event(
@@ -570,5 +622,126 @@ fn test_signer_deactivated_event_emitted() {
             }
             .into(),
         );
+    });
+}
+
+// ── renew_validator_key: same-account routine rotation ────────────────────────
+
+#[test]
+fn test_renew_validator_key_works() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(X3Custody::register_validator_key(
+            RuntimeOrigin::root(),
+            ALICE,
+            100_u64,
+        ));
+
+        System::set_block_number(90);
+        assert_ok!(X3Custody::renew_validator_key(
+            RuntimeOrigin::signed(ALICE),
+            ALICE,
+            500_u64,
+        ));
+
+        // Same account — no new registry entry is created, and it is still active.
+        let record = ValidatorKeyRegistry::<Test>::get(ALICE).expect("record must still exist");
+        assert!(record.active, "renewal must not deactivate the account");
+        assert_eq!(record.rotation_due_at, 500_u64);
+        assert_eq!(record.registered_at, 90_u64);
+        System::assert_has_event(
+            crate::pallet::Event::<Test>::ValidatorKeyRenewed {
+                account: ALICE,
+                rotation_due_at: 500_u64,
+            }
+            .into(),
+        );
+    });
+}
+
+#[test]
+fn test_renew_validator_key_already_elapsed_is_refused() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(X3Custody::register_validator_key(
+            RuntimeOrigin::root(),
+            ALICE,
+            100_u64,
+        ));
+
+        // The validator is already well past its due-date (block 200 > due 100) —
+        // renewing to a due-date that is itself already elapsed must be refused,
+        // not silently accepted.
+        System::set_block_number(200);
+        assert_noop!(
+            X3Custody::renew_validator_key(RuntimeOrigin::signed(ALICE), ALICE, 150_u64),
+            Error::<Test>::RotationDueDateNotInFuture
+        );
+        assert_noop!(
+            X3Custody::renew_validator_key(RuntimeOrigin::signed(ALICE), ALICE, 200_u64),
+            Error::<Test>::RotationDueDateNotInFuture
+        );
+
+        // The original (overdue) record is untouched by the refused calls.
+        let record = ValidatorKeyRegistry::<Test>::get(ALICE).unwrap();
+        assert_eq!(record.rotation_due_at, 100_u64);
+    });
+}
+
+#[test]
+fn test_renew_validator_key_unregistered_account_is_refused() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            X3Custody::renew_validator_key(RuntimeOrigin::signed(ALICE), ALICE, 500_u64),
+            Error::<Test>::SignerNotFound
+        );
+    });
+}
+
+#[test]
+fn test_renew_validator_key_inactive_account_is_refused() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(X3Custody::register_validator_key(
+            RuntimeOrigin::root(),
+            ALICE,
+            100_u64,
+        ));
+        // Deactivate ALICE by rotating it away to BOB.
+        System::set_block_number(50);
+        assert_ok!(X3Custody::rotate_validator_key(
+            RuntimeOrigin::root(),
+            ALICE,
+            BOB,
+            200_u64,
+        ));
+
+        assert_noop!(
+            X3Custody::renew_validator_key(RuntimeOrigin::signed(ALICE), ALICE, 300_u64),
+            Error::<Test>::SignerNotFound
+        );
+    });
+}
+
+#[test]
+fn test_renew_validator_key_can_be_called_repeatedly_without_thrash() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(X3Custody::register_validator_key(
+            RuntimeOrigin::root(),
+            ALICE,
+            100_u64,
+        ));
+
+        // Three successive renewals, each strictly advancing the due-date —
+        // this is the routine "operator renews what is due" loop the old
+        // rotate_validator_key thrashed on; renew_validator_key must not.
+        for (now, next_due) in [(90_u64, 200_u64), (190_u64, 300_u64), (290_u64, 400_u64)] {
+            System::set_block_number(now);
+            assert_ok!(X3Custody::renew_validator_key(
+                RuntimeOrigin::signed(ALICE),
+                ALICE,
+                next_due,
+            ));
+            let record = ValidatorKeyRegistry::<Test>::get(ALICE).unwrap();
+            assert_eq!(record.rotation_due_at, next_due);
+            assert!(record.rotation_due_at > System::block_number());
+        }
     });
 }
