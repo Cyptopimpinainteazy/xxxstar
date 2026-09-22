@@ -47,10 +47,12 @@ a host whose DNS reaches github.com), `testnet-deploy.yml` has never run (`gh ru
 empty), every step of `docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md` is unchecked, and the only bootnode
 list in the repository (`deployment/keys/bootnode-info.txt`) is three loopback addresses. All of the
 local evidence in this ledger is loopback evidence.
-- Key rotation is implemented twice (`node/src/authority.rs` rotation manager with tests and no caller;
-`pallets/x3-custody` `ValidatorKeyRegistry` with `rotation_due_at`, read by nothing) and wired zero
-times; nothing calls `session.setKeys`. That is the next bring-up gap, and it is independent of the
-topology work.
+- Key rotation is now wired end to end: the on-chain `pallet_x3_custody` registry
+  (`ValidatorKeyRegistry` + `KeyRotationSchedule`) is the single source of truth, the node's
+  `validator rotate` command reads it and submits `session.setKeys`, and the former in-memory
+  `node/src/authority.rs` rotation manager (which had no caller) was deleted rather than left as a
+  parallel schedule. What remains open is the *live* proof: a rotation on a running 3–4 validator
+  network with finality held across it, which is independent of the topology work.
 
 ## GAP disposition (2026-09-04) — harness gaps are PATTERN-CLOSED, not source defects
 Re-examined after SEC-v1 purge + memory-search fix. Honest re-classification of the three open

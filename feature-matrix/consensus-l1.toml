@@ -35,7 +35,7 @@ id = "X3-L1-002"
 name = "Validator key management"
 subsystem = "consensus_l1"
 source = "master"
-paths = ["scripts/testnet/inject-keystore.sh", "scripts/harden-validator.sh", "scripts/install-validator.sh", "scripts/generate-bootnode-keys.py", "node/src/authority.rs", "node/src/validator_rotation.rs", "scripts/testnet/validator-rotation-drill.sh", "pallets/x3-custody/src/lib.rs"]
+paths = ["scripts/testnet/inject-keystore.sh", "scripts/harden-validator.sh", "scripts/install-validator.sh", "scripts/generate-bootnode-keys.py", "node/src/validator_rotation.rs", "scripts/testnet/validator-rotation-drill.sh", "pallets/x3-custody/src/lib.rs"]
 implemented = 90
 tested = 75
 mainnet_ready = 50
@@ -48,8 +48,8 @@ blockers = [
   "No key ceremony, backup or recovery runbook, and no HSM/KMS guidance for the operator keys",
   "No external audit of the key paths",
 ]
-evidence = ["scripts/testnet/inject-keystore.sh", "node/src/authority.rs", "node/src/validator_rotation.rs", "pallets/x3-custody/src/lib.rs", "scripts/harden-validator.sh", "note: the on-chain `pallet_x3_custody` registry is now the single source of truth — `validator rotate` reads `ValidatorKeyRegistry`/`KeyRotationSchedule`, refuses an unregistered account by name, derives fresh Aura/GRANDPA session keys, and builds a signed `session.set_keys` extrinsic; the pallet's `rotate_validator_key` no longer copies the old due block onto the new key (late rotations now grant a fresh `current_block + KeyRotationPeriod`)"]
-test_evidence = ["scripts/testnet/inject-keystore.sh", "node/src/authority.rs", "node/src/validator_rotation.rs", "pallets/x3-custody/src/tests.rs", "scripts/mainnet/validator_install_gate.sh", "note: `pallet-x3-custody` tests (26) cover the corrected late-rotation semantics and an already-elapsed case; `x3-chain-node` unit tests cover session-key derivation, deterministic set_keys call construction, and the exact `twox_128`/`blake2_128_concat` storage-key encoding; the rotation drill and `local-ci --rotation` gate are wired but have not yet run against a live network"]
+evidence = ["scripts/testnet/inject-keystore.sh", "node/src/validator_rotation.rs", "pallets/x3-custody/src/lib.rs", "scripts/harden-validator.sh", "note: the on-chain `pallet_x3_custody` registry is now the single source of truth — `validator rotate` reads `ValidatorKeyRegistry`/`KeyRotationSchedule`, refuses an unregistered account by name, derives fresh Aura/GRANDPA session keys, and builds a signed `session.set_keys` extrinsic; the pallet's `rotate_validator_key` no longer copies the old due block onto the new key (late rotations now grant a fresh `current_block + KeyRotationPeriod`); the former in-memory `node/src/authority.rs` rotation manager (zero callers) was deleted"]
+test_evidence = ["scripts/testnet/inject-keystore.sh", "node/src/validator_rotation.rs", "pallets/x3-custody/src/tests.rs", "scripts/mainnet/validator_install_gate.sh", "note: `pallet-x3-custody` tests (26) cover the corrected late-rotation semantics and an already-elapsed case; `x3-chain-node` unit tests cover session-key derivation, deterministic set_keys call construction, and the exact `twox_128`/`blake2_128_concat` storage-key encoding; the rotation drill and `local-ci --rotation` gate are wired but have not yet run against a live network"]
 
 [[feature]]
 id = "X3-L1-003"
