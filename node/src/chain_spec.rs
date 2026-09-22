@@ -1,4 +1,5 @@
 use codec::Encode;
+use pallet_x3_settlement_engine::BtcBlockHeader;
 use sc_service::GenericChainSpec;
 use sc_service::{ChainSpec as ServiceChainSpec, ChainType};
 use serde::Deserialize;
@@ -8,7 +9,6 @@ use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::crypto::Ss58Codec;
 use sp_core::{sr25519, Pair, Public, H160};
 use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
-use pallet_x3_settlement_engine::BtcBlockHeader;
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
@@ -912,9 +912,8 @@ fn btc_checkpoints_from_env() -> Vec<BtcBlockHeader> {
             let height: u64 = height.parse().unwrap_or_else(|e| {
                 panic!("X3_BTC_CHECKPOINTS entry {entry:?} has an unreadable height: {e}")
             });
-            let bytes = hex::decode(header_hex).unwrap_or_else(|e| {
-                panic!("X3_BTC_CHECKPOINTS entry {entry:?} is not hex: {e}")
-            });
+            let bytes = hex::decode(header_hex)
+                .unwrap_or_else(|e| panic!("X3_BTC_CHECKPOINTS entry {entry:?} is not hex: {e}"));
             if bytes.len() != 80 {
                 panic!(
                     "X3_BTC_CHECKPOINTS entry {entry:?} is {} bytes; a Bitcoin header is \

@@ -4290,8 +4290,10 @@ fn submit_btc_proof_refuses_a_header_that_was_never_admitted() {
 mod regtest_capture {
     pub const HEIGHT: u64 = 121;
     pub const HEADER_HEX: &str = "000000208bf5533e14f658fd593ea671915cafe19f1ad75cb7603334757f704050f5855e2e741b5c15a43cdfbf517a0accc96e5e735ed11668a61e114c78885ae14b46e30dbab26affff7f2000000000";
-    pub const BLOCK_HASH_DISPLAY: &str = "2771f5462960f39539fbfe193792cd33f9c85e0efae98377859d6d4b11f433af";
-    pub const TXID_DISPLAY: &str = "91cbaa8466a0d62032b7aafacf786a0cdd25d4b0defaeebce3531600fa199e15";
+    pub const BLOCK_HASH_DISPLAY: &str =
+        "2771f5462960f39539fbfe193792cd33f9c85e0efae98377859d6d4b11f433af";
+    pub const TXID_DISPLAY: &str =
+        "91cbaa8466a0d62032b7aafacf786a0cdd25d4b0defaeebce3531600fa199e15";
     pub const TX_INDEX: u32 = 1;
     pub const MERKLE_PATH_HEX: [&str; 1] =
         ["94106bc4e23851b65d53cf8300b74011005a33f6c6bd61ae3983a67984a71c12"];
@@ -4299,7 +4301,8 @@ mod regtest_capture {
     /// The block the node mined next, linking to [`HEADER_HEX`].
     pub const NEXT_HEIGHT: u64 = 122;
     pub const NEXT_HEADER_HEX: &str = "00000020af33f4114b6d9d857783e9fa0e5ec8f933cd923719fefb3995f3602946f57127e06c6fe0c52cc6903d1f4ac3f28668ab3f2a24913bae6841fd5987a17d1c182958bab26affff7f2001000000";
-    pub const NEXT_BLOCK_HASH_DISPLAY: &str = "4f86134bb8a4055b0c15b173c6d20e42e4fc478b6dffccd4847f9d7414c1c704";
+    pub const NEXT_BLOCK_HASH_DISPLAY: &str =
+        "4f86134bb8a4055b0c15b173c6d20e42e4fc478b6dffccd4847f9d7414c1c704";
 
     /// The transaction block 121 confirmed, **with the witness stripped**.
     ///
@@ -4313,11 +4316,15 @@ mod regtest_capture {
     /// The same transaction as the node reports it, witness included.
     pub const RAW_TX_HEX: &str = "02000000000101cf953818ab452cabe7f6d7a5be38a59a2de9f499e79a008b85050c1d825878990000000000fdffffff02fc05102401000000160014da29f8c72885928cde1ebb08fd961f1c897c3ad000e1f50500000000160014699904a79507794755a896adc0837a797611179c0247304402203584825bb533f2c3845de699e612125be7048ad8f4a0fb7013863564c58862750220751ebe6f7932907ee27f8565712628308a2d75979aba0d54df1515548fa4e75901210352a24d853b0844f3dbc41beee37a0e74a38c8329fae2f14b8b8e2b2264a0c47d78000000";
     /// `dsha(RAW_TX_HEX)` — what the node calls the wtxid. Not the txid.
-    pub const WTXID_DISPLAY: &str = "73eb7ff90b03aac5790a03ca6b0b15404af4da1bbffd4fbf0e13699bbd05d9c5";
+    pub const WTXID_DISPLAY: &str =
+        "73eb7ff90b03aac5790a03ca6b0b15404af4da1bbffd4fbf0e13699bbd05d9c5";
 }
 
 fn unhex(s: &str) -> Vec<u8> {
-    assert!(s.len() % 2 == 0, "hex string must have an even length");
+    assert!(
+        s.len().is_multiple_of(2),
+        "hex string must have an even length"
+    );
     (0..s.len() / 2)
         .map(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).expect("valid hex"))
         .collect()
@@ -4372,13 +4379,8 @@ fn a_real_bitcoin_merkle_path_verifies_against_a_real_block() {
         .collect();
 
     assert!(
-        Pallet::<Test>::verify_btc_merkle_proof(
-            &txid,
-            regtest_capture::TX_INDEX,
-            &path,
-            &header
-        )
-        .expect("the merkle walk is infallible for a well-formed path"),
+        Pallet::<Test>::verify_btc_merkle_proof(&txid, regtest_capture::TX_INDEX, &path, &header)
+            .expect("the merkle walk is infallible for a well-formed path"),
         "the pallet reconstructs the root a Bitcoin node put in the block"
     );
 
@@ -4406,7 +4408,10 @@ fn a_real_regtest_chain_anchors_and_extends_through_the_pallets_rules() {
     // chain, and the extension has to link to it.
     new_test_ext().execute_with(|| {
         let first = header_from_wire(regtest_capture::HEADER_HEX, regtest_capture::HEIGHT);
-        let second = header_from_wire(regtest_capture::NEXT_HEADER_HEX, regtest_capture::NEXT_HEIGHT);
+        let second = header_from_wire(
+            regtest_capture::NEXT_HEADER_HEX,
+            regtest_capture::NEXT_HEIGHT,
+        );
 
         assert_eq!(
             second.prev_block_hash,
@@ -4434,11 +4439,15 @@ fn a_real_regtest_chain_anchors_and_extends_through_the_pallets_rules() {
             RuntimeOrigin::root(),
             second.clone()
         ));
-        let meta = crate::BtcHeaderMetaStore::<Test>::get(Pallet::<Test>::compute_btc_block_hash(&second))
-            .expect("the extension is recorded");
+        let meta =
+            crate::BtcHeaderMetaStore::<Test>::get(Pallet::<Test>::compute_btc_block_hash(&second))
+                .expect("the extension is recorded");
         assert_eq!(meta.height, regtest_capture::NEXT_HEIGHT);
         assert!(meta.anchored);
-        assert_eq!(crate::BtcBestHeight::<Test>::get(), regtest_capture::NEXT_HEIGHT);
+        assert_eq!(
+            crate::BtcBestHeight::<Test>::get(),
+            regtest_capture::NEXT_HEIGHT
+        );
 
         // The regression this is all for: a proof over the real transaction is
         // refused while its header is unanchored, and accepted once it is.
@@ -4535,7 +4544,10 @@ fn genesis_pins_a_bitcoin_checkpoint_and_admits_its_header() {
         let meta = crate::BtcHeaderMetaStore::<Test>::get(block_hash)
             .expect("the header is admitted, not just pinned");
         assert_eq!(meta.height, header.height);
-        assert!(meta.anchored, "and it is anchored, which is what SPV evidence needs");
+        assert!(
+            meta.anchored,
+            "and it is anchored, which is what SPV evidence needs"
+        );
         assert_eq!(crate::BtcBestHeight::<Test>::get(), header.height);
         assert_eq!(
             crate::BtcHeaders::<Test>::get(block_hash).map(|h| h.merkle_root),
@@ -4612,5 +4624,7 @@ fn genesis_refuses_two_checkpoints_at_one_height() {
         Pallet::<Test>::compute_btc_block_hash(&second),
         "two different blocks, one height"
     );
-    drop(crate::mock::new_test_ext_with_btc_checkpoints(vec![first, second]));
+    drop(crate::mock::new_test_ext_with_btc_checkpoints(vec![
+        first, second,
+    ]));
 }

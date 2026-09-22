@@ -365,8 +365,7 @@ pub mod pallet {
     /// be re-pointed at a different branch.
     #[pallet::storage]
     #[pallet::getter(fn btc_checkpoints)]
-    pub type BtcCheckpoints<T: Config> =
-        StorageMap<_, Twox64Concat, u64, H256, OptionQuery>;
+    pub type BtcCheckpoints<T: Config> = StorageMap<_, Twox64Concat, u64, H256, OptionQuery>;
 
     /// The pallet's own record for every header it admitted: block hash → record.
     ///
@@ -1974,8 +1973,8 @@ pub mod pallet {
             // which is root-gated), which is what makes the merkle root it checks
             // against a root the chain chose rather than one the proof chose.
             let block_hash = Self::compute_btc_block_hash(&block_header);
-            let meta = BtcHeaderMetaStore::<T>::get(block_hash)
-                .ok_or(Error::<T>::BtcHeaderNotAnchored)?;
+            let meta =
+                BtcHeaderMetaStore::<T>::get(block_hash).ok_or(Error::<T>::BtcHeaderNotAnchored)?;
             ensure!(meta.anchored, Error::<T>::BtcHeaderNotAnchored);
             ensure!(
                 block_header.height == meta.height,
@@ -2059,10 +2058,9 @@ pub mod pallet {
 
             let block_hash = Self::compute_btc_block_hash(&header);
             match BtcCheckpoints::<T>::get(header.height) {
-                Some(existing) => ensure!(
-                    existing == block_hash,
-                    Error::<T>::BtcCheckpointConflict
-                ),
+                Some(existing) => {
+                    ensure!(existing == block_hash, Error::<T>::BtcCheckpointConflict)
+                }
                 None => {
                     BtcCheckpoints::<T>::insert(header.height, block_hash);
                     Self::deposit_event(Event::BtcCheckpointAnchored {
@@ -3647,7 +3645,11 @@ pub mod pallet {
         /// satisfies (a change of at most a factor of 4) and refuses the rest. The
         /// point is not to re-derive Bitcoin's difficulty but to make "drop the
         /// difficulty and mine a cheap branch" impossible on an anchored chain.
-        pub(crate) fn btc_bits_follow_parent(parent_bits: u32, parent_height: u64, bits: u32) -> bool {
+        pub(crate) fn btc_bits_follow_parent(
+            parent_bits: u32,
+            parent_height: u64,
+            bits: u32,
+        ) -> bool {
             let child_height = parent_height.saturating_add(1);
             if !child_height.is_multiple_of(BTC_RETARGET_INTERVAL_BLOCKS) {
                 return bits == parent_bits;
@@ -3689,40 +3691,35 @@ pub mod pallet {
 
             let block_hash = Self::compute_btc_block_hash(header);
 
-            let (height, anchored) =
-                if let Some(parent) = BtcHeaderMetaStore::<T>::get(header.prev_block_hash) {
-                    ensure!(parent.anchored, Error::<T>::BtcParentNotAnchored);
-                    ensure!(
-                        header.height == parent.height.saturating_add(1),
-                        Error::<T>::BtcHeightNotContiguous
-                    );
-                    let parent_header = BtcHeaders::<T>::get(header.prev_block_hash)
-                        .ok_or(Error::<T>::BtcParentMissing)?;
-                    ensure!(
-                        Self::btc_bits_follow_parent(parent_header.bits, parent.height, header.bits),
-                        Error::<T>::BtcDifficultyMismatch
-                    );
-                    ensure!(
-                        header.timestamp > Self::btc_median_time_past(&header.prev_block_hash),
-                        Error::<T>::BtcTimestampTooOld
-                    );
-                    (parent.height.saturating_add(1), true)
-                } else {
-                    ensure!(allow_anchor, Error::<T>::BtcParentMissing);
-                    let pinned =
-                        BtcCheckpoints::<T>::get(header.height).ok_or(Error::<T>::BtcChainNotAnchored)?;
-                    ensure!(pinned == block_hash, Error::<T>::BtcChainNotAnchored);
-                    (header.height, true)
-                };
+            let (height, anchored) = if let Some(parent) =
+                BtcHeaderMetaStore::<T>::get(header.prev_block_hash)
+            {
+                ensure!(parent.anchored, Error::<T>::BtcParentNotAnchored);
+                ensure!(
+                    header.height == parent.height.saturating_add(1),
+                    Error::<T>::BtcHeightNotContiguous
+                );
+                let parent_header = BtcHeaders::<T>::get(header.prev_block_hash)
+                    .ok_or(Error::<T>::BtcParentMissing)?;
+                ensure!(
+                    Self::btc_bits_follow_parent(parent_header.bits, parent.height, header.bits),
+                    Error::<T>::BtcDifficultyMismatch
+                );
+                ensure!(
+                    header.timestamp > Self::btc_median_time_past(&header.prev_block_hash),
+                    Error::<T>::BtcTimestampTooOld
+                );
+                (parent.height.saturating_add(1), true)
+            } else {
+                ensure!(allow_anchor, Error::<T>::BtcParentMissing);
+                let pinned = BtcCheckpoints::<T>::get(header.height)
+                    .ok_or(Error::<T>::BtcChainNotAnchored)?;
+                ensure!(pinned == block_hash, Error::<T>::BtcChainNotAnchored);
+                (header.height, true)
+            };
 
             BtcHeaders::<T>::insert(block_hash, header.clone());
-            BtcHeaderMetaStore::<T>::insert(
-                block_hash,
-                BtcHeaderMeta {
-                    height,
-                    anchored,
-                },
-            );
+            BtcHeaderMetaStore::<T>::insert(block_hash, BtcHeaderMeta { height, anchored });
             if height > BtcBestHeight::<T>::get() {
                 BtcBestHeight::<T>::put(height);
             }

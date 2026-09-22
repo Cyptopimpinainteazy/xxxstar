@@ -236,8 +236,17 @@ pub struct BtcUtxoState {
 /// `btc_header_wire_bytes`; serde's shape is the spec's business and never reaches the
 /// proof path.
 #[derive(
-    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
-    Serialize, Deserialize,
+    Clone,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Debug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
 )]
 pub struct BtcBlockHeader {
     /// Block version
@@ -267,7 +276,9 @@ pub struct BtcBlockHeader {
 /// that merely satisfies its own `bits` proves nothing, because the submitter chose
 /// `bits`. Only a chain rooted at a height/hash this chain has committed to carries
 /// the work that Bitcoin's own difficulty rules accumulated.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 pub struct BtcHeaderMeta {
     /// Height derived from the parent link (never the submitter's claim).
     pub height: u64,
