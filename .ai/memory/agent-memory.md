@@ -6829,3 +6829,18 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Put the checkpoint in **genesis, not only in a root call**: a testnet should publish its root of trust with its chain id, and "the first person to hold the key anchors it" is not a launch procedure.
 - Made the genesis refusals **panic with the reason** rather than starting a chain with a bad anchor; the drill asserts the message, so a silent acceptance would fail the gate.
 - Bumped `spec_version` for a genesis-config change even though no storage migration is implied: the metadata and the WASM both moved.
+## 2026-09-22 (twentieth pass) — validator key rotation wired end to end (in code)
+
+### Facts to remember
+- **`pallets/x3-custody::rotate_validator_key` no longer copies the old key's `rotation_due_at` onto the new key.** It now grants `current_block + KeyRotationPeriod`, and the new `KeyRotationPeriod` pallet constant (7 days = `3_024_000` blocks at the 200ms block target) is the single period source. Added a test for the already-elapsed case (register due 10, advance to 250, rotate → new due 350). `cargo test -p pallet-x3-custody` 26 passed.
+- **`node/src/validator_rotation.rs`** is the new operator path: `OperatorKey` (sr25519 SURI) derives Aura/GRANDPA session keys, builds a signed `session.set_keys` extrinsic (empty proof), and the module encodes the exact `twox_128("X3Custody") ++ twox_128("ValidatorKeyRegistry") ++ blake2_128_concat(account)` storage keys. Node unit tests cover key derivation, deterministic call construction, and storage-key bytes.
+- **`x3-chain-node validator rotate`** (new CLI command) reads the on-chain custody registry, refuses an unregistered account by name, and prints (or `--submit`s) the signed `set_keys` plus the next due block. It is operator-driven only; there is no unattended rotation.
+- **`scripts/testnet/validator-rotation-drill.sh`** + **`local-ci --rotation`** are the opt-in gate (also in `--all`); the drill checks the unregistered-account refusal and the registered happy path against a live node.
+- The sr25519 signature is randomized, so the node's determinism test compares the **call bytes**, not the full extrinsic (two otherwise-identical set_keys extrinsics differ only in their signature).
+- The node links against system OpenSSL: run node/pallet tests with `OPENSSL_DIR=/usr OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu OPENSSL_INCLUDE_DIR=/usr/include`; the Linuxbrew `libcrypto` requires GLIBC_2.38 and fails at link.
+
+### Remaining (honest)
+- The drill has not been run against a live network yet; that is the proof that the signed `session.setKeys` lands and the due block moves. No key ceremony/backup/recovery runbook, no external audit.
+
+### Next task seed
+1. Run `local-ci --rotation` against a booted dev/testnet node and record the due-block-before/after. 2. Key ceremony/backup/recovery runbook. 3. External audit of the key paths.

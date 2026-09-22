@@ -194,6 +194,7 @@ pub mod pallet {
     };
     use frame_support::{pallet_prelude::*, BoundedVec};
     use frame_system::pallet_prelude::*;
+    use sp_runtime::Saturating;
     use sp_std::vec::Vec;
 
     #[pallet::pallet]
@@ -249,6 +250,18 @@ pub mod pallet {
         /// Maximum number of tier-threshold policies that may be stored.
         #[pallet::constant]
         type MaxPoliciesPerTier: Get<u32>;
+
+        /// Block interval after which a rotated validator key becomes due for
+        /// its next rotation.
+        ///
+        /// A successful rotation resets the clock: the new key's
+        /// `rotation_due_at` is `current_block + KeyRotationPeriod`, never the
+        /// old key's due block. This is what makes a *late* rotation (one
+        /// performed after the old key's due block has already passed) land the
+        /// new key with a fresh, future due date instead of one that is already
+        /// overdue — the thrash bug the old inheritance semantics produced.
+        #[pallet::constant]
+        type KeyRotationPeriod: Get<BlockNumberFor<Self>>;
     }
 
     // ── Storage ───────────────────────────────────────────────────────────────
@@ -495,6 +508,8 @@ pub mod pallet {
                 ensure!(!existing_new.active, Error::<T>::ValidatorKeyConflict);
             }
 
+            let current_block = frame_system::Pallet::<T>::block_number();
+
             // Deactivate old key
             ValidatorKeyRegistry::<T>::mutate(&old_key, |maybe| {
                 if let Some(r) = maybe.as_mut() {
@@ -503,16 +518,20 @@ pub mod pallet {
             });
             KeyRotationSchedule::<T>::remove(&old_key);
 
-            // Register new key, inheriting rotation schedule and role from old
-            let current_block = frame_system::Pallet::<T>::block_number();
+            // Register the new key with a fresh, future due block. The previous
+            // implementation copied `old_record.rotation_due_at` verbatim, so a
+            // key rotated after its due block was born already overdue and had
+            // to rotate again immediately. A rotation now always grants a full
+            // `KeyRotationPeriod` measured from the current block.
+            let rotation_due_at = current_block.saturating_add(T::KeyRotationPeriod::get());
             let new_record = ValidatorKeyRecord {
                 registered_at: current_block,
-                rotation_due_at: old_record.rotation_due_at,
+                rotation_due_at,
                 role: old_record.role,
                 active: true,
             };
             ValidatorKeyRegistry::<T>::insert(&new_key, new_record);
-            KeyRotationSchedule::<T>::insert(&new_key, old_record.rotation_due_at);
+            KeyRotationSchedule::<T>::insert(&new_key, rotation_due_at);
 
             Self::deposit_event(Event::KeyRotated { old_key, new_key });
             Ok(())

@@ -2932,6 +2932,12 @@ parameter_types! {
     pub const CustodyMaxSignersPerVault: u32 = 16;
     pub const CustodyMaxVaultsPerSigner: u32 = 32;
     pub const CustodyMaxPoliciesPerTier: u32 = 8;
+    /// Validator key rotation period: 7 days at the 200ms block target
+    /// (7 * 24 * 60 * 60 * 1000 / 200 = 3_024_000 blocks). A successful
+    /// rotation always grants a fresh full period, measured from the block in
+    /// which the rotation landed, so a late rotation never produces a key that
+    /// is already overdue.
+    pub const CustodyKeyRotationPeriod: BlockNumber = 3_024_000;
 }
 
 impl pallet_x3_custody::Config for Runtime {
@@ -2940,6 +2946,7 @@ impl pallet_x3_custody::Config for Runtime {
     type MaxSignersPerVault = CustodyMaxSignersPerVault;
     type MaxVaultsPerSigner = CustodyMaxVaultsPerSigner;
     type MaxPoliciesPerTier = CustodyMaxPoliciesPerTier;
+    type KeyRotationPeriod = CustodyKeyRotationPeriod;
 }
 
 // ===== X3 Reconciliation Configuration (Phase 5) =====

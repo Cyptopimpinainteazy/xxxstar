@@ -66,6 +66,8 @@ pallet-transaction-payment = { workspace = true, default-features = false, featu
 pallet-x3-agent-law = { path = "../pallets/x3-agent-law", default-features = false, features = ["std"] }
 pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false, features = ["std"] }
 pallet-x3-atomic-kernel = { path = "../pallets/x3-atomic-kernel", default-features = false, features = ["std"] }
+pallet-x3-custody = { path = "../pallets/x3-custody", default-features = false, features = ["std"] }
+pallet-session = { workspace = true, default-features = false, features = ["std"] }
 frame-support = { workspace = true, default-features = false, features = ["std"] }
 
 sc-basic-authorship = { workspace = true }
