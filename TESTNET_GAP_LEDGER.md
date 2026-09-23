@@ -460,3 +460,27 @@ revisions this session, plus the freshness gate firing on `local-ci`).
 **Still unverified, deliberately untouched:** X3-LANG-004/009/010 and X3-XCHAIN-013/015/018/020/021
 have no named test or file I could confirm on master this pass. Their scores stand until someone
 does, which is the point of the ticket.
+
+## GAP-TMP-NOT-DURABLE — a `/tmp` sweep cost a two-hour measurement — 2026-09-23
++
++Everything this agent had under `/tmp` was removed between 02:01 and 03:22 UTC: the git worktree the
++work ran from, the cargo target directory, Bitcoin Core and its live regtest chain, three soak
++directories — including the **in-flight** two-hour no-cache run (TICKET-100b) — and the
++`@polkadot/api` install that had just made extrinsic signing possible here. `df` fell from ~1.4 TB
++to 593 GB, so it was a disk-space sweep, not an accident aimed at this work.
++
++**Nothing of value was lost**, because everything was pushed: `origin/master` is `770e13ab08` with
++#466–#475 in it, the srtool images survive at the digest the runtime record names, and the
++repository's own `target/` cut the rebuild to nine minutes. The captured Bitcoin artifacts are
++committed.
++
++The repository already ignores `/.wt-*/` — "git worktrees used by parallel fix agents" — for
++exactly this reason, and this agent was using `/tmp` because it was convenient. **Worktrees, soak
++base directories and build output belong inside the repository (`<repo>/.wt-<name>/`) or another
++durable path, never `/tmp`.** A long measurement must write its samples somewhere that outlives the
++session. Fixed as described: `.wt-agent`, `CARGO_TARGET_DIR=<repo>/target`, soak `BASE_DIR` inside
++the worktree. Evidence: `.ai/reports/tmp-not-durable-20260923.md`.
++
++Separately: the Codex sandbox stopped working for non-escalated commands after the sweep
++(`error building bubblewrap command: mountinfo path is not absolute`), so every command now needs
++escalation. Environment, not repository.
