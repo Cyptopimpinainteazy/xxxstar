@@ -309,7 +309,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs merge plus long-running persistence fault injection"]
 evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 tests exact persistence crash window", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+test_evidence = ["note: persistence round-trip tests exist (inmemory_persistence_roundtrip, inmemory_persistence_load_all, inmemory_used_secrets_roundtrip, inmemory_secret_claim_ownership_roundtrip, offchain_save_load_roundtrip in crates/cross-vm-coordinator/src/persistence.rs), but none injects a fault mid-write — which is what this row is named for, so the blocker stands"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -399,7 +399,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
 evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs rejects refunded destination evidence", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+test_evidence = ["note: exact tests named on master 2026-09-23: test_double_refund_rejected and test_claim_after_refund_rejected (crates/x3-atomic-swap/src/{bitcoin_htlc,cosmwasm_htlc,fuel_htlc}.rs), test_stateful_double_refund_rejected and test_stateful_claim_then_refund_rejected (bitcoin_htlc.rs), test_evm_unauthorized_refund_rejected (evm_htlc.rs) — the refund-rejection family, per VM"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
