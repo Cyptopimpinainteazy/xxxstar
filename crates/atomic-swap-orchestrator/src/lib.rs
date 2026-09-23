@@ -1066,7 +1066,6 @@ mod tests {
             req.bundle_id, pallet_id,
             "FinalizationRequest must carry pallet bundle_id"
         );
-
     }
 
     /// Verify that when `pallet_bundle_id` is `None`, the pipeline falls back to

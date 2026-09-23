@@ -854,11 +854,11 @@ pub fn new_full_with_atomic_gateway<
         match atomic_gateway_uri {
             Some(uri) => {
                 match AtomicGatewayService::new(
-                        &uri,
-                        client.clone(),
-                        transaction_pool.clone(),
-                        observed_certs.clone(),
-                    ) {
+                    &uri,
+                    client.clone(),
+                    transaction_pool.clone(),
+                    observed_certs.clone(),
+                ) {
                     Ok(service) => {
                         let uri_for_log = uri.clone();
                         let (tx, rx) = mpsc::channel::<AtomicGatewayCommand>(64);

@@ -454,10 +454,6 @@ fn test_bundle_leg_encode_decode_roundtrip() {
 // agree exactly with what the AtomicSwapOrchestrator writes to off-chain
 // local storage.  They are pure computation tests — no FRAME mock needed.
 
-
-
-
-
 // ── Flash Finality cert key protocol tests ────────────────────────────────
 
 /// Flash Finality cert key: b"x3ff:" (5) + block_number as LE u64 (8) = 13 bytes.
@@ -1154,7 +1150,13 @@ fn finalize(
     receipt_root: H256,
     cert: H256,
 ) -> frame_support::dispatch::DispatchResult {
-    AtomicKernel::finalize_atomic_bundle(RuntimeOrigin::signed(ALICE), bundle_id, receipt_root, cert, 1)
+    AtomicKernel::finalize_atomic_bundle(
+        RuntimeOrigin::signed(ALICE),
+        bundle_id,
+        receipt_root,
+        cert,
+        1,
+    )
 }
 
 #[test]
@@ -1254,13 +1256,7 @@ fn finalization_has_no_unsigned_entry_point() {
         let root = committed_receipt_root(bundle_id, cert, 1);
 
         assert_noop!(
-            AtomicKernel::finalize_atomic_bundle(
-                RuntimeOrigin::none(),
-                bundle_id,
-                root,
-                cert,
-                1
-            ),
+            AtomicKernel::finalize_atomic_bundle(RuntimeOrigin::none(), bundle_id, root, cert, 1),
             sp_runtime::DispatchError::BadOrigin
         );
         assert_eq!(
