@@ -359,7 +359,15 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // inheriting an overdue due block; the node gains the `validator rotate`
     // operator command. No storage migration: the constant is metadata-only and
     // the due-block semantics change is confined to the rotation extrinsic.
-    spec_version: 16,
+    // 17: the Bitcoin header path can be pushed in batches by an origin the runtime
+    // names. `x3SettlementEngine` gains `submit_btc_headers` (call_index 35, up to
+    // `MAX_BTC_HEADERS_PER_CALL` headers, atomic: a batch refused partway applies
+    // nothing) and the `BtcHeaderOrigin` config item, which this runtime sets to
+    // `EnsureRoot` — root-only, exactly as before, since no header relayer exists yet.
+    // A testnet or mainnet that runs one points that item at the origin it trusts; the
+    // admission rules do not change, because it decides who may speak, never what is
+    // true. No storage migration: one new item, no existing key changes shape.
+    spec_version: 17,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -2542,6 +2550,14 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type BtcPoWLimitBits = frame_support::traits::ConstU32<0x207f_ffff>;
     #[cfg(not(feature = "dev"))]
     type BtcPoWLimitBits = frame_support::traits::ConstU32<0x1d00_ffff>;
+    /// Who may push Bitcoin headers in bulk (`x3SettlementEngine.submitBtcHeaders`).
+    ///
+    /// Root: this chain has no header relayer, and naming an account that does not exist yet
+    /// would be a permission nobody is watching. A network that runs one points this at the
+    /// origin it trusts — `EnsureSignedBy<BtcRelayerAccount, AccountId>`, a multisig, or
+    /// governance — and the receiving rules do not change, because this decides who may
+    /// *speak*, never what is *true* (TICKET-095).
+    type BtcHeaderOrigin = frame_system::EnsureRoot<AccountId>;
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
     type CrossChainValidator = RuntimeCrossChainValidator;

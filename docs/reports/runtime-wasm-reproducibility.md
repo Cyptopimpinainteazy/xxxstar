@@ -77,6 +77,11 @@ bytes**:
   **the revision it names**, and a merge of two attested revisions is a third revision
   that has to be rebuilt. Two from-scratch builds of the merge agree, and the compact
   artifact is 8,468,726 bytes.
+* `e28a0907be` — the Bitcoin header path gains a batch submission
+  (`x3SettlementEngine.submitBtcHeaders`, call_index 35, up to 100 headers per call, atomic so
+  a batch refused partway applies nothing) and a `BtcHeaderOrigin` config item, which this
+  runtime sets to `EnsureRoot`. `spec_version` moves to 17. Two from-scratch builds of
+  `e28a0907be` agree, and the compact artifact is 8,475,400 bytes.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -102,24 +107,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,468,726 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,475,400 bytes)**
 
 ```
-Version          : x3-chain-16 (x3-chain-1.tx1.au1)
+Version          : x3-chain-17 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xdcd424e52f32a679cb060a9aec71dcda3342e72d610da12ef281f4736ce9c7dd
-authorizeUpgrade : 0x1451fd5c76abaf121053c9b8435a8f0acef437df1af794f6af7c8cadde5af259
-IPFS             : QmYig4dt8HvR59FSkEc4nv5nj68qJuZzXN8sj6xyeBorZa
-BLAKE2_256       : 0xf079acbbfa7d03b8a876eed58720e4a84e2baa2e73ef469e64329652f444042c
+setCode          : 0xa3ef63e60f412fabb0208fe085acf68d6e5c045427c6676fc218dc4a07cf0ca6
+authorizeUpgrade : 0xffb34312cb4298982ca1c5cea5b46a50190a3ecfc31d4c08082142e4fd39f010
+IPFS             : QmYMaiBowqkX1kUk2cVCkUVyQVoXDYbpAqrW2vmJcSVfaT
+BLAKE2_256       : 0xd0635518f27a9bcc4a39ee066de5d45bdaaa1628ba9ae4861ee4bed1adeefc8c
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,455,729 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,454,329 bytes)**
 
 ```
-setCode          : 0xd36082394c552b5b1ddaf91772a10ce5ec2c19f0f5ebae0f49552aecb4660639
-authorizeUpgrade : 0x0b39af4470c3fb64bfcd76a4de2a5119d05324f2343eb86f27fa23efb76b41bf
-IPFS             : QmURPTtrYwnvuFakk6mmcTxg23UDmPeTAYwWBNsStSEGqY
-BLAKE2_256       : 0x0843205b1cf1e68f5eca9c1bbbff856e6a3fb65910763c90d9570ca9b5ee5a7e
+setCode          : 0x33d0641f12a52ae2f25b9b5a425129f75ab9ddfaa082095ccf5321be74145a95
+authorizeUpgrade : 0x048919316a5b4151eb7451ae2d7b56b685ed10a8244c7d53142edf11332ce9e5
+IPFS             : QmWf8QZKdFPxKR3a5ucnFMEuVNChraPoekzLE93Q4o78KG
+BLAKE2_256       : 0x07cad8f9808382b05529c60d24e85bc028528c681c49cda9e8dcf65713b7758a
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

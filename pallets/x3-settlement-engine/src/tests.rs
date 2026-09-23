@@ -4628,3 +4628,145 @@ fn genesis_refuses_two_checkpoints_at_one_height() {
         first, second,
     ]));
 }
+
+// ── Pushing a batch of headers (TICKET-095's receiving end) ───────────────────
+//
+// The chain can be born anchored and it can validate headers; nothing carries new ones from
+// Bitcoin. `submit_btc_headers` is the receiving end a relayer needs — a batch, from an origin
+// the runtime names, with the same admission rules as one-at-a-time submission.
+
+/// A chain of `count` mined headers above `anchor`, each linking to the previous one.
+fn mined_header_chain(anchor: &BtcBlockHeader, count: u64) -> Vec<BtcBlockHeader> {
+    let mut out = Vec::new();
+    let mut prev = anchor.clone();
+    for i in 1..=count {
+        let header = mine_btc_header(BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::from(btc_wire_hash(&prev)),
+            merkle_root: H256::from([i as u8; 32]),
+            timestamp: anchor.timestamp + (600 * i as u32),
+            bits: anchor.bits,
+            nonce: 0,
+            height: anchor.height + i,
+        });
+        out.push(header.clone());
+        prev = header;
+    }
+    out
+}
+
+fn batch_anchor() -> BtcBlockHeader {
+    anchor_btc_checkpoint_for_test(BtcBlockHeader {
+        version: 1,
+        prev_block_hash: H256::repeat_byte(0x51),
+        merkle_root: H256::repeat_byte(0x52),
+        timestamp: 1_700_000_000,
+        bits: 0x207f_ffff,
+        nonce: 0,
+        height: 900_000,
+    })
+}
+
+#[test]
+fn a_header_batch_is_refused_for_an_ordinary_account() {
+    // The mock composes root with one named relayer (BOB). ALICE is neither, so the call is
+    // refused on origin — before any header is looked at.
+    new_test_ext().execute_with(|| {
+        let anchor = batch_anchor();
+        let batch = mined_header_chain(&anchor, 1);
+        assert_noop!(
+            Pallet::<Test>::submit_btc_headers(RuntimeOrigin::signed(ALICE), batch),
+            sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+#[test]
+fn a_header_batch_is_accepted_from_the_configured_relayer_and_from_root() {
+    new_test_ext().execute_with(|| {
+        let anchor = batch_anchor();
+        let batch = mined_header_chain(&anchor, 3);
+        let top = batch.last().expect("three headers").height;
+
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::signed(BOB),
+            batch.clone()
+        ));
+        assert_eq!(crate::BtcBestHeight::<Test>::get(), top);
+        for header in &batch {
+            let meta = crate::BtcHeaderMetaStore::<Test>::get(
+                Pallet::<Test>::compute_btc_block_hash(header),
+            )
+            .expect("every header in the batch is admitted");
+            assert!(meta.anchored);
+            assert_eq!(meta.height, header.height);
+        }
+
+        // One more header, through root, on the same chain.
+        let next = mined_header_chain(batch.last().expect("a tip"), 1);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            next.clone()
+        ));
+        assert_eq!(crate::BtcBestHeight::<Test>::get(), next[0].height);
+    });
+}
+
+#[test]
+fn a_batch_refused_partway_through_changes_nothing() {
+    // Two good headers then one that claims the wrong height. The batch is one storage layer, so
+    // the tip must not move: a relayer's own cursor is what it restarts from, and a partial write
+    // would make that cursor wrong by exactly the headers that landed.
+    new_test_ext().execute_with(|| {
+        let anchor = batch_anchor();
+        let mut batch = mined_header_chain(&anchor, 2);
+        let bad = mine_btc_header(BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::from(btc_wire_hash(batch.last().expect("a tip"))),
+            merkle_root: H256::repeat_byte(0x7f),
+            timestamp: anchor.timestamp + 3_600,
+            bits: anchor.bits,
+            nonce: 0,
+            height: anchor.height + 9, // should be +3
+        });
+        batch.push(bad);
+
+        let before = crate::BtcBestHeight::<Test>::get();
+        assert_noop!(
+            Pallet::<Test>::submit_btc_headers(RuntimeOrigin::signed(BOB), batch.clone()),
+            Error::<Test>::BtcHeightNotContiguous
+        );
+        assert_eq!(
+            crate::BtcBestHeight::<Test>::get(),
+            before,
+            "the two good headers in the batch were rolled back with the bad one"
+        );
+        assert!(
+            crate::BtcHeaderMetaStore::<Test>::get(Pallet::<Test>::compute_btc_block_hash(
+                &batch[0]
+            ))
+            .is_none(),
+            "and none of them is in storage"
+        );
+    });
+}
+
+#[test]
+fn a_batch_larger_than_the_bound_is_refused() {
+    new_test_ext().execute_with(|| {
+        let filler = BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::zero(),
+            merkle_root: H256::zero(),
+            timestamp: 0,
+            bits: 0x207f_ffff,
+            nonce: 0,
+            height: 1,
+        };
+        let batch = vec![filler; crate::MAX_BTC_HEADERS_PER_CALL + 1];
+        assert_noop!(
+            Pallet::<Test>::submit_btc_headers(RuntimeOrigin::root(), batch),
+            Error::<Test>::BtcHeaderBatchTooLarge
+        );
+    });
+}

@@ -122,6 +122,15 @@ pub const BTC_MEDIAN_TIME_SPAN_BLOCKS: usize = 11;
 /// 2016-block timestamp window, which is not stored on this chain.
 pub const BTC_RETARGET_MAX_FACTOR: u16 = 4;
 
+/// Largest batch `submit_btc_headers` accepts, so one call's weight stays bounded.
+///
+/// A header chain that is worth anything is long: a relayer catching up from a checkpoint
+/// months behind has thousands of headers to push, and one header per call would make that a
+/// fee-and-block-space problem rather than a network one. 100 headers is a few hundred bytes
+/// of calldata and a handful of storage writes per header, which is a normal extrinsic; the
+/// caller loops.
+pub const MAX_BTC_HEADERS_PER_CALL: usize = 100;
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
@@ -216,6 +225,24 @@ pub mod pallet {
         /// Minimum BTC confirmation depth.
         #[pallet::constant]
         type MinBtcConfirmations: Get<u32>;
+
+        /// Who may extend the Bitcoin header chain in bulk (`submit_btc_headers`).
+        ///
+        /// The chain runtime sets `EnsureRoot`, which keeps this path exactly as it is
+        /// today: only root extends the chain, and `submit_btc_header` stays root-only. A
+        /// network that runs a header relayer names the origin it trusts instead — a single
+        /// account, a multisig, or governance — and nothing about the rules changes, because
+        /// `BtcHeaderOrigin` decides who may **speak**, never what is **true**: every header
+        /// still has to satisfy Bitcoin's proof of work under this network's `powLimit`, link
+        /// to a header already admitted, carry its parent's `nBits` for its height and postdate
+        /// the median of up to eleven ancestors.
+        ///
+        /// That is why a relayer does not need to be trusted for correctness. It can withhold
+        /// headers (liveness) or push a valid branch that satisfies the rules (which the
+        /// checkpoint and the 4x retarget clamp make expensive), and it cannot mint Bitcoin.
+        /// The economic half — a bond, and slashing for withholding — belongs with the relayer
+        /// it constrains; TICKET-095 is where that lives.
+        type BtcHeaderOrigin: EnsureOrigin<<Self as frame_system::Config>::RuntimeOrigin>;
 
         /// Bitcoin's `powLimit` for the network this chain tracks, as compact
         /// `nBits` (Bitcoin Core's `chainparams.powLimit`).
@@ -832,6 +859,8 @@ pub mod pallet {
         BtcTimestampTooOld,
         /// A checkpoint for this height is already anchored, and to a different hash.
         BtcCheckpointConflict,
+        /// A header batch was longer than [`MAX_BTC_HEADERS_PER_CALL`].
+        BtcHeaderBatchTooLarge,
         /// No header on a checkpoint-anchored chain matches this block hash, so the
         /// proof has no trusted header behind it.
         BtcHeaderNotAnchored,
@@ -2091,6 +2120,42 @@ pub mod pallet {
             ensure_root(origin)?;
             Self::btc_admit_header(&header, false)?;
             Ok(())
+        }
+
+        /// Extend the Bitcoin header chain by a batch, for a relayer or an operator.
+        ///
+        /// The origin is [`Config::BtcHeaderOrigin`] — root in the chain runtime, and whatever a
+        /// network names if it runs a header relayer. Every header goes through the same
+        /// admission rules as `submit_btc_header`: proof of work under this network's
+        /// `powLimit`, a parent that is already on a checkpoint-anchored chain, `height ==
+        /// parent.height + 1`, the parent's `nBits` for its height, and a timestamp after the
+        /// median of up to eleven ancestors.
+        ///
+        /// The batch is atomic. A batch refused at header *k* leaves storage exactly as it was,
+        /// because the alternative is a chain whose tip is a cursor nobody wrote down: the
+        /// caller's own record of what it pushed is what a relayer restarts from, and a partial
+        /// write would make that record wrong by exactly the headers that landed.
+        ///
+        /// Nothing here follows Bitcoin on its own — someone has to run the relayer — and
+        /// nothing here bonds that relayer. See [`Config::BtcHeaderOrigin`].
+        #[pallet::call_index(35)]
+        #[pallet::weight(T::SettlementWeightInfo::submit_btc_headers())]
+        pub fn submit_btc_headers(
+            origin: OriginFor<T>,
+            headers: Vec<BtcBlockHeader>,
+        ) -> DispatchResult {
+            T::BtcHeaderOrigin::ensure_origin(origin)?;
+            ensure!(
+                headers.len() <= MAX_BTC_HEADERS_PER_CALL,
+                Error::<T>::BtcHeaderBatchTooLarge
+            );
+
+            frame_support::storage::with_storage_layer(|| {
+                for header in headers.iter() {
+                    Self::btc_admit_header(header, false)?;
+                }
+                Ok(())
+            })
         }
 
         /// Submit a BTC adaptor pre-signature for an intent.

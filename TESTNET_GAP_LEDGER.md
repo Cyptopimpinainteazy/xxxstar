@@ -223,6 +223,26 @@ dev`**. This is what the first version of the drill caught, by failing.
 (a bonded header relayer does not exist), and the header source is still an operator copying a hash
 by hand. Those are TICKET-095.
 
+### TICKET-095 progress — the receiving end exists (2026-09-22)
+
+`x3SettlementEngine.submitBtcHeaders` (call_index 35, spec_version 17) accepts up to 100 headers per
+call from `Config::BtcHeaderOrigin` — `EnsureRoot` in this runtime, so root-only and unchanged, with
+a network able to point it at a relayer account, a multisig or governance. The batch is atomic, and
+every header still goes through the same admission rules as one-at-a-time submission. Four tests
+cover the origin (an ordinary account refused, root and a designated relayer accepted), the
+rollback of a batch that fails partway, and the size bound.
+
+`scripts/btc/push-headers.mjs` is the sender: it reads headers from a local Bitcoin node, checks
+the chain of them itself, and submits the batch (directly, or through `sudo` on a dev chain).
+
+**What is still missing, in order:** (1) one working signing path — nothing in this repository can
+sign and submit an extrinsic on this host, because no `node_modules` is installed anywhere and the
+repo's JS submission scripts all depend on `@polkadot/api` (`npm ci` in `packages/ts-sdk` is the
+first step, and the same install makes `scripts/testnet/load-remarks-tps.js` runnable, which is the
+TPS harness X3-OPS-005 claims); (2) an end-to-end run of the sender against a dev chain with headers
+from the local regtest node; (3) a bond and slashing for withholding, without which one relayer is
+a single point of failure; (4) pinning a real checkpoint on a public network.
+
 ## GAP-ATOMIC-AUTH — bundle finalization is unauthorized, and its finality gate is self-satisfying — 2026-09-22
 
 Found by reading `pallets/x3-atomic-kernel` after the soak's log showed

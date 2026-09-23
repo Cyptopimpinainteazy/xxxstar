@@ -167,6 +167,7 @@ impl pallet_x3_settlement_engine::Config for Test {
     // and the regtest limit is Bitcoin's own answer to "which limit may a chain that
     // mines its own headers use"; production runtimes carry `0x1d00ffff`.
     type BtcPoWLimitBits = frame_support::traits::ConstU32<0x207f_ffff>;
+    type BtcHeaderOrigin = MockBtcHeaderOrigin;
     type ChallengePeriod = frame_support::traits::ConstU64<10>;
     type SettlementTimeoutBlocks = frame_support::traits::ConstU64<28800>; // ~24 hours at 3s blocks
     type SettlementFeeBps = SettlementFeeBps;
@@ -224,6 +225,30 @@ impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvide
 // Test accounts
 pub const ALICE: u64 = 1;
 pub const BOB: u64 = 2;
+
+/// The accounts this mock treats as header relayers: BOB, and nobody else.
+///
+/// The chain runtime sets `BtcHeaderOrigin = EnsureRoot`, so this path is root-only there.
+/// The mock composes root with a named account so both halves of the semantic are testable:
+/// root is accepted, the designated relayer is accepted, and an ordinary account is refused —
+/// which is the difference between "only root may speak" and "root or a relayer may speak".
+pub struct MockBtcRelayers;
+
+impl frame_support::traits::SortedMembers<u64> for MockBtcRelayers {
+    fn sorted_members() -> sp_std::vec::Vec<u64> {
+        sp_std::vec![BOB]
+    }
+
+    fn contains(who: &u64) -> bool {
+        *who == BOB
+    }
+}
+
+/// Root, or BOB — see [`MockBtcRelayers`].
+pub type MockBtcHeaderOrigin = frame_support::traits::EitherOfDiverse<
+    frame_system::EnsureRoot<u64>,
+    frame_system::EnsureSignedBy<MockBtcRelayers, u64>,
+>;
 
 /// Build test externalities.
 pub fn new_test_ext() -> sp_io::TestExternalities {
