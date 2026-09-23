@@ -4206,9 +4206,14 @@ fn the_retarget_bound_bites_exactly_at_a_factor_of_four() {
 }
 
 #[test]
-fn a_btc_extension_must_postdate_the_median_of_its_ancestors() {
-    // Bitcoin's median-time-past rule. Without it a submitter can date headers
-    // wherever they like, which is what a difficulty rule reads.
+fn a_header_close_to_the_checkpoint_may_share_its_timestamp() {
+    // Bitcoin requires a block to postdate the median of the previous **eleven** blocks, not its
+    // parent. Until eleven ancestors are on this chain that median cannot be computed here, and a
+    // rule that used the parent instead would be strictly stronger than Bitcoin's — it would
+    // refuse real headers, which is a liveness bug in the relayer path rather than conservatism.
+    //
+    // Found by the header-push drill against a real regtest chain: mining several blocks inside
+    // one second gives consecutive blocks the *same* timestamp, and Bitcoin accepts them.
     new_test_ext().execute_with(|| {
         let anchor = anchor_btc_checkpoint_for_test(BtcBlockHeader {
             version: 1,
@@ -4219,14 +4224,66 @@ fn a_btc_extension_must_postdate_the_median_of_its_ancestors() {
             nonce: 0,
             height: 900,
         });
-        let backdated = mine_btc_header(BtcBlockHeader {
+        let same_second = mine_btc_header(BtcBlockHeader {
             version: 1,
             prev_block_hash: H256::from(btc_wire_hash(&anchor)),
             merkle_root: H256::repeat_byte(0x33),
-            timestamp: 1_699_999_999,
+            timestamp: anchor.timestamp,
             bits: anchor.bits,
             nonce: 0,
             height: 901,
+        });
+        assert_ok!(Pallet::<Test>::submit_btc_header(
+            RuntimeOrigin::root(),
+            same_second
+        ));
+    });
+}
+
+#[test]
+fn a_header_below_the_median_of_its_eleven_ancestors_is_refused() {
+    // And once eleven ancestors are on the chain the rule is Bitcoin's, exactly: a header dated
+    // below the median of the previous eleven is refused, so a submitter cannot date headers
+    // wherever they like.
+    new_test_ext().execute_with(|| {
+        let anchor = anchor_btc_checkpoint_for_test(BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::repeat_byte(0x41),
+            merkle_root: H256::repeat_byte(0x42),
+            timestamp: 1_700_000_000,
+            bits: 0x207f_ffff,
+            nonce: 0,
+            height: 900,
+        });
+
+        let mut parent = anchor.clone();
+        for i in 1..=11u32 {
+            let child = mine_btc_header(BtcBlockHeader {
+                version: 1,
+                prev_block_hash: H256::from(btc_wire_hash(&parent)),
+                merkle_root: H256::repeat_byte(0x50 + i as u8),
+                timestamp: anchor.timestamp + (600 * i),
+                bits: anchor.bits,
+                nonce: 0,
+                height: anchor.height + i as u64,
+            });
+            assert_ok!(Pallet::<Test>::submit_btc_header(
+                RuntimeOrigin::root(),
+                child.clone()
+            ));
+            parent = child;
+        }
+
+        // Eleven ancestors are stored (heights 901..911), so the median is the sixth of them —
+        // anchor.timestamp + 3,600. A header dated before that is refused.
+        let backdated = mine_btc_header(BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::from(btc_wire_hash(&parent)),
+            merkle_root: H256::repeat_byte(0x7e),
+            timestamp: anchor.timestamp + 1_000,
+            bits: anchor.bits,
+            nonce: 0,
+            height: anchor.height + 12,
         });
         assert_noop!(
             Pallet::<Test>::submit_btc_header(RuntimeOrigin::root(), backdated),

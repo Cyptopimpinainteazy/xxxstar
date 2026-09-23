@@ -235,6 +235,40 @@ rollback of a batch that fails partway, and the size bound.
 `scripts/btc/push-headers.mjs` is the sender: it reads headers from a local Bitcoin node, checks
 the chain of them itself, and submits the batch (directly, or through `sudo` on a dev chain).
 
+
+### TICKET-095 progress — a real header push, end to end (2026-09-23)
++
++A live dev chain, **born anchored on real Bitcoin regtest header 119**, followed Bitcoin to **125**
++through six headers pushed from a running Bitcoin Core v28.1.0 node:
++
++```
++[push] on-chain btcBestHeight before: 119
++[push] block 120 … through … block 125, each included in a block
++[push] on-chain btcBestHeight after:  125
++[push] header meta at 125: {"height":"125","anchored":true}
++```
++
++and the negative control held — pushing only header 127, whose parent was never admitted, was refused
++with `x3SettlementEngine.BtcParentMissing`.
++
++**The drill found a real defect, and it was mine.** The first attempt refused header 120 with
++`BtcTimestampTooOld`, and the header was legitimate: Bitcoin's median-time-past rule is the median of
++the previous **eleven** blocks, and the pallet was padding that median with the one ancestor it had —
++which is a *higher* number, so it required a header above an anchor to postdate the anchor. A rule
++stricter than the chain it follows refuses real headers, which is a liveness bug in the relayer path.
++`btc_median_time_past` now returns `Option<u32>` (`None` until eleven ancestors are stored; the check
++is skipped, not made stricter) and two tests state both halves. `spec_version` 17 → 18, re-attested.
++
++Two sender bugs were fixed with it: `--from-height`/`--to-height` parsing into keys the script never
++read, and the fact that **`pallet_sudo` reports the inner call's failure in a `Sudid` event while the
++outer extrinsic succeeds** — a refused header looked exactly like an accepted one until the script
++read that event. Evidence: `.ai/reports/btc-header-push-drill-20260923.md`.
++
++**What is still missing:** the steps are a session, not yet `scripts/testnet/btc-header-push-drill.sh`
++(the next step); no public network has a checkpoint or a relayer; the push ran through `sudo` because
++this runtime sets `BtcHeaderOrigin = EnsureRoot`, and a dev spec ships `sudo.key = null`, so an
++operator has to set it; and nothing bonds the relayer against withholding.
+
 **What is still missing, in order:** (1) one working signing path — nothing in this repository can
 sign and submit an extrinsic on this host, because no `node_modules` is installed anywhere and the
 repo's JS submission scripts all depend on `@polkadot/api` (`npm ci` in `packages/ts-sdk` is the

@@ -38,29 +38,38 @@ function polkadot(name) {
 }
 
 function parseArgs(argv) {
+  // Keys normalise to snake_case: `--from-height 120` lands in `args.from_height`. The first
+  // version stored the raw `from-height` key and then read `args.from`, so every run died with
+  // "required" — a reminder that `node --check` proves syntax, not behaviour.
   const args = { ws: 'ws://127.0.0.1:11044', datadir: '/tmp/btc-regtest',
-                 'bitcoin-cli': '/tmp/btc-core/bitcoin-28.1/bin/bitcoin-cli',
-                 from: null, to: null, suri: '//Alice', via: 'sudo', account: null };
+                 bitcoin_cli: '/tmp/btc-core/bitcoin-28.1/bin/bitcoin-cli',
+                 from_height: null, to_height: null, suri: '//Alice', via: 'sudo',
+                 account: null };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (!a.startsWith('--')) throw new Error(`unexpected argument ${a}`);
-    const key = a.slice(2);
+    const key = a.slice(2).replace(/-/g, '_');
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`${a} needs a value`);
     args[key] = value;
     i += 1;
   }
-  if (args.from === null || args.to === null) throw new Error('--from-height and --to-height are required');
+  if (args.from_height === null || args.to_height === null) {
+    throw new Error('--from-height and --to-height are required');
+  }
   return args;
 }
 
 const args = parseArgs(process.argv.slice(2));
-const fromHeight = Number(args.from);
-const toHeight = Number(args.to);
+const fromHeight = Number(args.from_height);
+const toHeight = Number(args.to_height);
+if (!Number.isFinite(fromHeight) || !Number.isFinite(toHeight)) {
+  throw new Error('--from-height and --to-height must be numbers');
+}
 if (!(toHeight >= fromHeight)) throw new Error('--to-height must be >= --from-height');
 
 function bitcoinCli(...argv) {
-  return execFileSync(args['bitcoin-cli'], [`-datadir=${args.datadir}`, ...argv],
+  return execFileSync(args.bitcoin_cli, [`-datadir=${args.datadir}`, ...argv],
                       { encoding: 'utf8' }).trim();
 }
 
@@ -122,13 +131,40 @@ async function main() {
     const call = api.tx.x3SettlementEngine.submitBtcHeader(toRuntimeHeader(header));
     const tx = args.via === 'sudo' ? api.tx.sudo.sudo(call) : call;
     const blockHash = await new Promise((resolve, reject) => {
-      tx.signAndSend(signer, ({ status, dispatchError }) => {
+      tx.signAndSend(signer, ({ status, dispatchError, events }) => {
         if (dispatchError) {
-          const info = dispatchError.isModule
-            ? `${dispatchError.asModule.section}.${dispatchError.asModule.name}`
-            : dispatchError.toString();
+          let info = dispatchError.toString();
+          if (dispatchError.isModule) {
+            try {
+              const d = api.registry.findMetaError(dispatchError.asModule);
+              info = `${d.section}.${d.name}${d.docs.length ? ': ' + d.docs.join(' ') : ''}`;
+            } catch (e) {
+              info = `module ${dispatchError.asModule.index}/${dispatchError.asModule.error} (undecodable: ${e.message})`;
+            }
+          }
           reject(new Error(`block ${header.height} refused: ${info}`));
         } else if (status.isInBlock) {
+          // `pallet_sudo` returns Ok whatever the inner call did — it reports the result in a
+          // `Sudid` event and adds nothing to the outer dispatch result. An outer success
+          // therefore means nothing about the header: read the event, or a refused batch looks
+          // exactly like an accepted one.
+          const sudid = (events || []).find(
+            ({ event }) => event.section === 'sudo' && event.method === 'Sudid');
+          if (sudid) {
+            const inner = sudid.event.data[0];
+            if (inner && inner.isErr) {
+              const err = inner.asErr;
+              let info = err.toString();
+              if (err.isModule) {
+                try {
+                  const d = api.registry.findMetaError(err.asModule);
+                  info = `${d.section}.${d.name}${d.docs.length ? ': ' + d.docs.join(' ') : ''}`;
+                } catch (e) { info = `module ${err.asModule.index}/${err.asModule.error}`; }
+              }
+              reject(new Error(`block ${header.height} refused: ${info}`));
+              return;
+            }
+          }
           resolve(status.asInBlock.toHex());
         }
       }).catch(reject);

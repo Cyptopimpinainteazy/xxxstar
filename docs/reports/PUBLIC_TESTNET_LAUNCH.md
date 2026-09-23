@@ -121,6 +121,14 @@ nothing about the receiving rules changes, because the item decides who may **sp
 an admitted header, carry its parent's `nBits` for its height, and postdate the median of its
 ancestors.
 
+**Measured 2026-09-23:** a dev chain born anchored on real regtest header 119 followed Bitcoin to 125
+through six pushed headers, each recorded `{height, anchored: true}`, and a header whose parent was
+never admitted was refused with `BtcParentMissing`. The drill also caught a real bug in the receiving
+rules — a median-time-past check stricter than Bitcoin's, which refused legitimate headers — so
+`spec_version` is now 18. `.ai/reports/btc-header-push-drill-20260923.md` has the commands and the
+outcome. Note that a dev spec ships `sudo.key = null`: an operator who wants to push through root on a
+dev chain has to name the sudo account in the spec first.
+
 What that means in practice: a Byzantine relayer cannot mint Bitcoin. It can **withhold** headers
 (the chain stops advancing — a liveness problem) or push a branch that satisfies the rules (which
 the checkpoint and the 4× retarget clamp make expensive). The bond and the slashing that price

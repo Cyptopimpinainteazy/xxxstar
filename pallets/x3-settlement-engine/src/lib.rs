@@ -3677,12 +3677,14 @@ pub mod pallet {
             out
         }
 
-        /// Bitcoin's median-time-past: the median of the previous up-to-11 block
-        /// timestamps. A block's own timestamp must be strictly greater.
+        /// Bitcoin's median-time-past: the median of the previous **eleven** block timestamps.
+        /// A block's own timestamp must be strictly greater than that median.
         ///
-        /// Zero when the parent has no stored ancestors, which happens only for the
-        /// anchored checkpoint itself — and it is not asked about its own timestamp.
-        pub(crate) fn btc_median_time_past(parent_hash: &H256) -> u32 {
+        /// `None` when fewer than eleven ancestors are on this chain — which is the case for the
+        /// first eleven headers above a checkpoint — because the median of fewer samples is a
+        /// *different, higher* number than Bitcoin's, and enforcing it would refuse headers
+        /// Bitcoin accepts. See the body.
+        pub(crate) fn btc_median_time_past(parent_hash: &H256) -> Option<u32> {
             let mut stamps: Vec<u32> = Vec::new();
             let mut cursor = *parent_hash;
             for _ in 0..BTC_MEDIAN_TIME_SPAN_BLOCKS {
@@ -3695,11 +3697,24 @@ pub mod pallet {
                     _ => break,
                 }
             }
-            if stamps.is_empty() {
-                return 0;
+            // Bitcoin's rule is the median of the **previous eleven** blocks. A chain that starts
+            // at a checkpoint holds fewer than eleven of them in storage until it has admitted
+            // eleven, and the missing timestamps cannot be recovered — so the answer is `None`
+            // rather than the median of whatever happens to be here.
+            //
+            // That distinction is not pedantry. Taking the median of *fewer* samples, starting
+            // with the parent, produces a number **higher** than Bitcoin's, because the parent is
+            // the newest of the eleven: a block behind an anchor would then have to postdate the
+            // anchor, which Bitcoin does not require — it has to postdate the median of the
+            // previous eleven, and consecutive blocks may share a timestamp. A rule stricter than
+            // the chain it follows refuses real headers, which is a liveness bug in the relayer
+            // path rather than conservatism. The header-push drill found this: a real regtest
+            // chain mined inside one second gives consecutive blocks the same timestamp.
+            if stamps.len() < BTC_MEDIAN_TIME_SPAN_BLOCKS {
+                return None;
             }
             stamps.sort_unstable();
-            stamps[stamps.len() / 2]
+            Some(stamps[stamps.len() / 2])
         }
 
         /// Bitcoin's `nBits` rule for the block at `child_height`, given its parent.
@@ -3770,10 +3785,14 @@ pub mod pallet {
                     Self::btc_bits_follow_parent(parent_header.bits, parent.height, header.bits),
                     Error::<T>::BtcDifficultyMismatch
                 );
-                ensure!(
-                    header.timestamp > Self::btc_median_time_past(&header.prev_block_hash),
-                    Error::<T>::BtcTimestampTooOld
-                );
+                // Checked only once eleven ancestors are on this chain: see
+                // `btc_median_time_past` for why guessing from fewer is worse than skipping.
+                if let Some(median) = Self::btc_median_time_past(&header.prev_block_hash) {
+                    ensure!(
+                        header.timestamp > median,
+                        Error::<T>::BtcTimestampTooOld
+                    );
+                }
                 (parent.height.saturating_add(1), true)
             } else {
                 ensure!(allow_anchor, Error::<T>::BtcParentMissing);
