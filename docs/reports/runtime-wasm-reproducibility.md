@@ -114,6 +114,16 @@ bytes**:
   no longer assign or finalize a bundle. `spec_version` moves to 19 — new storage, two new calls,
   and an origin that answers differently for the same input — so the runtime reports `x3-chain-19`
   and the compact artifact grows to 8,482,706 bytes. Two from-scratch builds agree.
+* `ae4a4c912b` — the unsigned finalization extrinsic is removed. `submit_finalization_result`
+  was `ensure_none`, its off-chain marker had no writer anywhere in the repository, and the
+  certificate it checked was anchored by an equally unsigned call — so a caller planted the value
+  it was about to be checked against and any account could finalize any `Executing` bundle
+  (TICKET-097). Finalization is only the signed `finalize_atomic_bundle` (`X3LangOrigin`) and
+  `finalize_with_settlement` (`SettlementOrigin`) now. One call and one weight entry leave the
+  metadata, `spec_version` moves to 20, and the artifact moves again — compact 8,482,928 bytes
+  (was 8,482,706), compressed 1,459,662 (was 1,458,035) — which makes it the first
+  revision in this list where a *removal* changes the bytes.
+  Two from-scratch builds agree.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -139,24 +149,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,482,706 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,482,928 bytes)**
 
 ```
-Version          : x3-chain-19 (x3-chain-1.tx1.au1)
+Version          : x3-chain-20 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xdb33acb35df196b73607f95a3f767516bab595b703425e0b2a4b5fbffa2e6aa2
-authorizeUpgrade : 0x8f8c917e5ee2d06ad147e0280dbb21f5576ae9fc6a5da41607e05b7776eef306
-IPFS             : QmZ8KcBX5FR6NA2oYn5T9sj79sxgTeWC4C5mVeHvm2nX8K
-BLAKE2_256       : 0x0f5f7779fd262e6fea487d690dede8337e241c075635bf30a9222bfd3814a070
+setCode          : 0xac2e46e9366fa6a31129599faf552dc568157dfc656e52deffea8b7e7b04361c
+authorizeUpgrade : 0x9c2bb5f158a63d5281e0e4948c92e75830e02707c7ebb2455ba9f48888c3d6de
+IPFS             : QmYBepxKZR7wB6RJZE7QdnWqQocmG3bZ9mxLCH9PsauLsk
+BLAKE2_256       : 0xeb9c27c2a89fe1803f4923bf32cc9c3d09124fa3f17b5f04f56bfd5b4db6f390
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,458,035 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,459,662 bytes)**
 
 ```
-setCode          : 0x65d0697f8dd27f70d5f7ddb31d7ef43ac0586a1be91f922cc36fe2155b6076f1
-authorizeUpgrade : 0x1337ef038d051495c02ac92e38f1d4097dc77fc70e7a9d747fbd8b84a88ee841
-IPFS             : QmarVTSYswbScRzDRbKjVU6HDjgHSSsoz84kChJSgWqTU4
-BLAKE2_256       : 0xabf99460d65b33af85d4c33fe010385267e593d9778f2974725c42d0287bd35a
+setCode          : 0x465d6fbc78fdec2652447cb6bd7d57576e53dfc0736d2c04665414fe7fc523a9
+authorizeUpgrade : 0x354782abcad1b712a5edb78bbfb4b7e2adbbeae55692bb25cf6703a947f8e80d
+IPFS             : QmeZCmK1QA7zQ8DiNgTZGSc9ZXc5QmTGT9acA9iNYo1mXm
+BLAKE2_256       : 0x532b70e61d1a95bab79cbff721ffbbbfb652e79283b8f19f5876b64850e0d2de
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

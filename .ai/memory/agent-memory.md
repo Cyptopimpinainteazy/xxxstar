@@ -7057,3 +7057,28 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   scores ten rows a flat 95% for "the crate exists / the spec is in docs / live at
   rpc.testnet.x3-chain.io". That host does not resolve today. `CURRENT_MAINNET_STATUS.md` said ~54% on
   2026-09-05 and documents its own corrections (atomic kernel 85% -> 40% -> 35%).
+
+## 2026-09-23 (thirty-eighth pass) — TICKET-097 closed by deletion, and a flaky pallet suite
+### Facts to remember
+- **`submit_finalization_result` had no producer.** `sp_io::offchain::local_storage_set` appears in
+  exactly one place in this repository (`node/src/service.rs`, writing `x3ff:`); the pallet's
+  `x3fin:` record and the settlement engine's `x3settle:` marker have no writer on any chain in any
+  feature configuration. So the `ensure_none` finalization call was pure attack surface: plant the
+  certificate anchor (also unsigned) and then finalize any `Executing` bundle against it with a
+  self-computed receipt root. Deleted rather than signed — the chain already has two signed entry
+  points (`finalize_atomic_bundle` via `X3LangOrigin`, `finalize_with_settlement` via
+  `SettlementOrigin`) and the node's atomic gateway service has always used the signed one.
+- **The pallet's mock had a process-global economic-halt flag**, which made
+  `cargo test -p pallet-x3-atomic-kernel` fail **2 of 6** whole-suite runs with `EconomicHaltActive`
+  from a test that had nothing to do with halting (the mutex serialised halt tests against each
+  other, not against the other 60 tests). It is a `thread_local` `Cell` now: **0 of 10** runs failed
+  after. Any mock that hides state from the runtime in a `static` has this shape.
+- Careful with mechanical deletions: removing `let mut k = b"x3fin:".to_vec();` left two collision
+  tests using an undefined `k`. Repair the *tests*, then re-run them; `cargo test` caught it at once.
+- **TICKET-107 (new) — the signed path still trusts the unsigned anchor.** `finalize_bundle` in
+  `node/src/atomic_service.rs` finalizes with whatever certificate is in `FinalityCertAnchors[block]`,
+  which any peer can write first, so the honest service can be made to sign a fabricated
+  certificate. The fix is client-side: use the certificate the node's own finality voter observed
+  (the value it writes under `x3ff:`) and treat the anchor as a cross-check.
+- `feature-matrix.py check`, `check-readiness-consistency.sh` and `test_cheat_guard.py` all stay
+  green through a deletion like this; `test_cheat_guard` does *not* police deleted test names.

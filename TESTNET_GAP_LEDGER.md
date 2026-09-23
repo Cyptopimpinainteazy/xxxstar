@@ -340,15 +340,16 @@ signature from the assigned executor (or a committee quorum), or the chain gets 
 (a signed finalized-head tracker, or a verified GRANDPA justification). Both were judged too large to
 guess at without that decision.
 
-**TICKET-097 — authorize bundle finalization.** Pick one: (a) require the assigned executor's
-signature on the result (and adjust the off-chain worker's submission path); (b) give the runtime a
-real finality source — a signed finalized-head tracker or a verified GRANDPA justification — so
-`finality_cert` is not a value the caller chooses; or (c) both. Independently: enforce the documented
-invariants in *dispatch*, not only in `ValidateUnsigned` (reject `Pending`, reject a second
-finalization in one place), and add the missing tests — an anonymous caller must not be able to
-finalize a bundle assigned to somebody else, and a certificate for an unfinalized block must not be
-anchorable. Acceptance: a test proves each refusal, and the two comments quoted above are either
-true or gone.
+**TICKET-097 — CLOSED 2026-09-23.** The unsigned finalization extrinsic was removed rather than
+signed. It had no producer: `sp_io::offchain::local_storage_set` appears once in this repository
+(`node/src/service.rs`, writing `x3ff:`), so neither the pallet's `x3fin:` record nor the settlement
+engine's `x3settle:` marker was ever written by anything, on any chain, in any feature configuration.
+What was left was an `ensure_none` call whose certificate check compared the caller's input with the
+caller's own earlier input. Finalization is now only `finalize_atomic_bundle` (`X3LangOrigin`, a
+genesis-named account since spec 19) and `finalize_with_settlement` (`SettlementOrigin`) — both signed
+— and the four behavioural tests that lived on the removed call now drive the signed one, plus a new
+one showing `RuntimeOrigin::none()` cannot reach finalization at all. Evidence:
+`.ai/reports/unsigned-finalization-removed-20260923.md`. `spec_version` 20.
 
 Related, smaller, and fixed by the same reading: `node/src/service.rs`'s `run_grandpa_finality_anchor`
 logs `cert anchored for block N` even when the submit failed, and advances its cursor before the
@@ -611,11 +612,19 @@ this runtime has never accepted — and both assert `Ok`. They read as coverage 
 and provide none. Acceptance: declare them as targets and repair them against the current origin model,
 or delete them and say so in the commit.
 
-**TICKET-097 is not closed by this.** `submit_finalization_result` is still `ensure_none` and never
-consults `X3LangOrigin`, so an anonymous peer can still anchor a certificate it chooses and finalize
-an `Executing` bundle against it. This ticket removes the *key* that made the authorized path
-anybody's; TICKET-097 is the *unsigned* path, and it still needs the executor's attestation or a real
-finality source.
+**TICKET-097 was closed the same day, by deleting the unsigned path** rather than signing it — its
+off-chain marker had no writer anywhere in the repository, so there was nothing to preserve. See the
+section above and `.ai/reports/unsigned-finalization-removed-20260923.md`. This change removed the
+*key* that made the authorized paths anybody's; that one removed the *unauthenticated* path.
+
+**TICKET-107 — the signed path still trusts an unsigned anchor.** `node/src/atomic_service.rs`'s
+`finalize_bundle` waits for `FinalityCertAnchors[block]` and finalizes with whatever certificate it
+finds there. Anyone can write that anchor first (the call is still `ensure_none`), so an attacker can
+make the honest service sign a fabricated certificate: the bundle ends `Finalized` with a proof no
+voter produced. Client-side and small — the service should finalize with the certificate its own
+finality voter observed (the value it writes under `x3ff:`) and treat the chain's anchor as a
+cross-check, which turns the attack into a bounded liveness failure. Acceptance: a test where a
+planted anchor does not change the certificate the service finalizes with.
 
 ## GAP-DEAD-ENDPOINT-CONFIG — the RPC endpoint tables no code reads — 2026-09-23
 

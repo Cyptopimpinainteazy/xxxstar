@@ -251,7 +251,7 @@ Status:
 
 - `run_flash_finality_voter()` in `node/src/service.rs:2043` now derives a cert hash from GRANDPA-finalized block hash via `blake2_256` when no Flash-Finality cert is available.
 - `build_finalization_request()` in `crates/atomic-swap-orchestrator/src/lib.rs:322` now accepts `finality_cert` as a parameter instead of hardcoding `H256::zero()`.
-- Off-chain storage key `b"x3ff:" + block_number_le` always gets a non-zero cert hash, enabling the unsigned `submit_finalization_result` path.
+- Off-chain storage key `b"x3ff:" + block_number_le` always gets a non-zero cert hash; the pallet OCW anchors it and the atomic gateway service signs `finalize_atomic_bundle` with it. (The unsigned `submit_finalization_result` it used to "enable" was removed on 2026-09-23 — `.ai/reports/unsigned-finalization-removed-20260923.md`.)
 - Pallet OCW doc comments updated to reflect GRANDPA-derived certs.
 
 ## Medium-Priority TODOs / Cleanup

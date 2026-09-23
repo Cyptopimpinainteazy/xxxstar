@@ -447,9 +447,9 @@ impl AtomicSwapOrchestrator {
     /// GRANDPA-derived cert hash under key `b"x3ff:" + block_number_le`.
     ///
     /// Returns `None` if the swap was rolled back or the receipt root is missing
-    /// (i.e. GPU commit did not complete).  The returned request should be
-    /// submitted to the pallet via `submit_finalization_result` (unsigned) or
-    /// `finalize_atomic_bundle` (signed with a funded account).
+    /// (i.e. GPU commit did not complete).  The returned request is submitted to the
+    /// pallet as the signed `finalize_atomic_bundle`, from the account the chain's
+    /// custody registry authorizes for `GatewayRole::X3Lang`.
     ///
     /// # Example
     /// ```rust,ignore
