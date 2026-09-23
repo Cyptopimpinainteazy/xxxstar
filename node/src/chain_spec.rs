@@ -13,7 +13,7 @@ use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
     CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, TreasuryConfig, X3CoinConfig,
-    X3CrosschainGatewayConfig, X3SettlementEngineConfig, WASM_BINARY,
+    X3CrosschainGatewayConfig, X3CustodyConfig, X3SettlementEngineConfig, WASM_BINARY,
 };
 
 /// Chain specification specialized to this runtime's genesis configuration.
@@ -49,20 +49,81 @@ fn dev_evm_endowed_accounts() -> Vec<AccountId> {
         .collect()
 }
 
+/// The **development** x3-lang gateway account: the sr25519 key of the public
+/// phrase `//x3-atomic-gateway`, which is also the node atomic service's default
+/// signing URI.
+///
+/// Dev, local and (below) testnet-oriented specs are the only chains that name it
+/// in the custody gateway registry. A live spec must name its own operator account,
+/// because this seed is in the repository and therefore in everybody's pocket.
+fn dev_x3_lang_gateway_account() -> AccountId {
+    AccountId::new([
+        0x4c, 0x81, 0xd4, 0x16, 0xba, 0xa8, 0xc0, 0xe2, 0xb2, 0xe9, 0x99, 0x77, 0xe4, 0x52, 0x32,
+        0x87, 0xe1, 0x1c, 0xd6, 0xf6, 0x2c, 0xd3, 0x32, 0x8e, 0x4f, 0xb8, 0xd8, 0x23, 0xdd, 0xe6,
+        0x29, 0x35,
+    ])
+}
+
+/// The **development** settlement gateway account (`//x3-settlement-gateway`).
+fn dev_settlement_gateway_account() -> AccountId {
+    AccountId::new([
+        0x46, 0xec, 0x0b, 0x4a, 0x2c, 0x8f, 0x07, 0xe9, 0x5b, 0x63, 0x71, 0x59, 0x8e, 0x7b, 0x3b,
+        0x88, 0xdc, 0x58, 0xc4, 0x58, 0xe1, 0xa5, 0x12, 0x6e, 0x2a, 0x6d, 0x4c, 0xf4, 0xdd, 0xd2,
+        0x27, 0x7f,
+    ])
+}
+
 fn atomic_gateway_endowed_accounts() -> Vec<AccountId> {
-    // Public keys for `//x3-atomic-gateway` and `//x3-settlement-gateway`.
     vec![
-        AccountId::new([
-            0x4c, 0x81, 0xd4, 0x16, 0xba, 0xa8, 0xc0, 0xe2, 0xb2, 0xe9, 0x99, 0x77, 0xe4, 0x52,
-            0x32, 0x87, 0xe1, 0x1c, 0xd6, 0xf6, 0x2c, 0xd3, 0x32, 0x8e, 0x4f, 0xb8, 0xd8, 0x23,
-            0xdd, 0xe6, 0x29, 0x35,
-        ]),
-        AccountId::new([
-            0x46, 0xec, 0x0b, 0x4a, 0x2c, 0x8f, 0x07, 0xe9, 0x5b, 0x63, 0x71, 0x59, 0x8e, 0x7b,
-            0x3b, 0x88, 0xdc, 0x58, 0xc4, 0x58, 0xe1, 0xa5, 0x12, 0x6e, 0x2a, 0x6d, 0x4c, 0xf4,
-            0xdd, 0xd2, 0x27, 0x7f,
-        ]),
+        dev_x3_lang_gateway_account(),
+        dev_settlement_gateway_account(),
     ]
+}
+
+/// The gateway registry a dev/local chain is born with: the two accounts the node's
+/// atomic service already signs with, so `--dev` runs the whole path unchanged.
+fn dev_gateway_genesis() -> (Vec<AccountId>, Vec<AccountId>) {
+    (
+        vec![dev_x3_lang_gateway_account()],
+        vec![dev_settlement_gateway_account()],
+    )
+}
+
+/// The seeds that must never be a live chain's gateway.
+const FORBIDDEN_GATEWAY_SEEDS: &[&str] = &["x3-atomic-gateway", "x3-settlement-gateway"];
+
+/// Refuse a live chain a gateway account whose seed this repository publishes.
+///
+/// This is the guard for the defect it replaces: the runtime used to compile
+/// `//x3-atomic-gateway` and `//x3-settlement-gateway` straight into the origin, so
+/// every chain built from it handed the atomic kernel, the router and settlement to
+/// an account anyone can sign as. The origin is genesis-configured storage now, and
+/// this keeps a live chain from opting back into the same thing by hand.
+fn assert_no_dev_gateway_accounts(var: &str, accounts: &[AccountId]) -> Result<(), String> {
+    for account in accounts {
+        for seed in FORBIDDEN_GATEWAY_SEEDS {
+            if let Ok(seed_account) = get_account_id_from_seed::<sr25519::Public>(seed) {
+                if account == &seed_account {
+                    return Err(format!(
+                        "{var} names the account derived from the public development seed \
+                         //{seed}: it is not a secret, so it cannot authorize a live chain"
+                    ));
+                }
+            }
+        }
+    }
+    assert_no_seed_accounts(accounts)
+}
+
+/// Parse a JSON array of SS58 accounts that will be authorized for a gateway role.
+///
+/// A required, non-empty list, checked against the published dev seeds: a live chain
+/// with no authorized gateway cannot assign or finalize a bundle, and failing here
+/// says so at spec-building time instead of at the first bundle.
+fn parse_gateway_accounts_from_env(var: &str) -> Result<Vec<AccountId>, String> {
+    let accounts = parse_endowed_accounts_from_env(var)?;
+    assert_no_dev_gateway_accounts(var, &accounts)?;
+    Ok(accounts)
 }
 
 #[derive(Debug, Deserialize)]
@@ -457,6 +518,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         get_account_id_from_seed::<sr25519::Public>("Bob")?,
     ];
 
+    let (x3_lang_gateways, settlement_gateways) = dev_gateway_genesis();
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -466,6 +528,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
         [0u8; 32],
         X3CrosschainGatewayConfig::dev_defaults(),
         true,
+        x3_lang_gateways,
+        settlement_gateways,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Development")
@@ -502,6 +566,7 @@ pub fn development_config_with_bridge_escrows(
         get_account_id_from_seed::<sr25519::Public>("Alice")?,
         get_account_id_from_seed::<sr25519::Public>("Bob")?,
     ];
+    let (x3_lang_gateways, settlement_gateways) = dev_gateway_genesis();
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -511,6 +576,8 @@ pub fn development_config_with_bridge_escrows(
         svm_escrow_addr,
         X3CrosschainGatewayConfig::dev_defaults(),
         true,
+        x3_lang_gateways,
+        settlement_gateways,
     );
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
@@ -551,6 +618,7 @@ pub fn local_two_validator_config_with_bridge_escrows(
         get_account_id_from_seed::<sr25519::Public>("Alice")?,
         get_account_id_from_seed::<sr25519::Public>("Bob")?,
     ];
+    let (x3_lang_gateways, settlement_gateways) = dev_gateway_genesis();
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -560,6 +628,8 @@ pub fn local_two_validator_config_with_bridge_escrows(
         svm_escrow_addr,
         X3CrosschainGatewayConfig::dev_defaults(),
         true,
+        x3_lang_gateways,
+        settlement_gateways,
     );
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
@@ -596,6 +666,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         get_account_id_from_seed::<sr25519::Public>("Bob")?,
     ];
 
+    let (x3_lang_gateways, settlement_gateways) = dev_gateway_genesis();
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -605,6 +676,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         [0u8; 32],
         X3CrosschainGatewayConfig::dev_defaults(),
         true,
+        x3_lang_gateways,
+        settlement_gateways,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local Testnet")
@@ -642,6 +715,7 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         get_account_id_from_seed::<sr25519::Public>("Charlie")?,
     ];
 
+    let (x3_lang_gateways, settlement_gateways) = dev_gateway_genesis();
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -651,6 +725,8 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         [0u8; 32],
         X3CrosschainGatewayConfig::dev_defaults(),
         true,
+        x3_lang_gateways,
+        settlement_gateways,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local 3-Validator Testnet")
@@ -691,6 +767,8 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         return Err("Staging network requires non-zero SVM escrow address".to_string());
     }
 
+    let x3_lang_gateways = parse_gateway_accounts_from_env("X3_STAGING_ATOMIC_GATEWAYS")?;
+    let settlement_gateways = parse_gateway_accounts_from_env("X3_STAGING_SETTLEMENT_GATEWAYS")?;
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -700,6 +778,8 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         svm_escrow,
         X3CrosschainGatewayConfig::testnet_defaults(),
         false,
+        x3_lang_gateways,
+        settlement_gateways,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Staging")
@@ -753,6 +833,8 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
         return Err("Testnet network requires non-zero SVM escrow address".to_string());
     }
 
+    let x3_lang_gateways = parse_gateway_accounts_from_env("X3_TESTNET_ATOMIC_GATEWAYS")?;
+    let settlement_gateways = parse_gateway_accounts_from_env("X3_TESTNET_SETTLEMENT_GATEWAYS")?;
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -762,6 +844,8 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
         svm_escrow,
         X3CrosschainGatewayConfig::testnet_defaults(),
         false,
+        x3_lang_gateways,
+        settlement_gateways,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Testnet")
@@ -812,6 +896,8 @@ pub fn production_config() -> Result<ChainSpec, String> {
         return Err("Production network requires non-zero SVM escrow address".to_string());
     }
 
+    let x3_lang_gateways = parse_gateway_accounts_from_env("X3_PRODUCTION_ATOMIC_GATEWAYS")?;
+    let settlement_gateways = parse_gateway_accounts_from_env("X3_PRODUCTION_SETTLEMENT_GATEWAYS")?;
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -821,6 +907,8 @@ pub fn production_config() -> Result<ChainSpec, String> {
         svm_escrow,
         X3CrosschainGatewayConfig::empty(),
         false,
+        x3_lang_gateways,
+        settlement_gateways,
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Production")
@@ -948,6 +1036,11 @@ fn x3_chain_genesis(
     // validator can join passes `false`, because a terminal refund released
     // against a self-attested bundle is a fund loss.
     allow_unattested_cross_domain_proofs: bool,
+    // Accounts the custody registry authorizes for the privileged gateway roles.
+    // Dev chains pass [`dev_gateway_genesis`]; a live chain passes what its
+    // operator named in the environment, and is refused the published dev seeds.
+    x3_lang_gateways: Vec<AccountId>,
+    settlement_gateways: Vec<AccountId>,
 ) -> RuntimeGenesisConfig {
     let mut endowed: BTreeSet<AccountId> = endowed_accounts.into_iter().collect();
 
@@ -1037,7 +1130,11 @@ fn x3_chain_genesis(
         x3_inventory: Default::default(),
         x3_rebalance: Default::default(),
         x3_partner: Default::default(),
-        x3_custody: Default::default(),
+        x3_custody: X3CustodyConfig {
+            x3_lang_gateways,
+            settlement_gateways,
+            ..Default::default()
+        },
         session: Default::default(),
         #[cfg(feature = "frontier")]
         ethereum: Default::default(),
@@ -1109,6 +1206,53 @@ where
         .into();
 
     Ok(public)
+}
+
+#[cfg(test)]
+mod gateway_origin_tests {
+    use super::{
+        assert_no_dev_gateway_accounts, dev_gateway_genesis, dev_settlement_gateway_account,
+        dev_x3_lang_gateway_account, get_account_id_from_seed,
+    };
+    use sp_core::sr25519;
+
+    /// The two dev gateway accounts are the accounts of the phrases the repository
+    /// publishes, which is why a live chain must not name them.
+    #[test]
+    fn dev_gateway_accounts_are_the_published_seeds() {
+        assert_eq!(
+            dev_x3_lang_gateway_account(),
+            get_account_id_from_seed::<sr25519::Public>("x3-atomic-gateway").unwrap()
+        );
+        assert_eq!(
+            dev_settlement_gateway_account(),
+            get_account_id_from_seed::<sr25519::Public>("x3-settlement-gateway").unwrap()
+        );
+    }
+
+    #[test]
+    fn a_live_chain_is_refused_the_dev_gateway_accounts() {
+        let (x3_lang, settlement) = dev_gateway_genesis();
+        assert!(assert_no_dev_gateway_accounts("X3_PRODUCTION_ATOMIC_GATEWAYS", &x3_lang).is_err());
+        assert!(
+            assert_no_dev_gateway_accounts("X3_PRODUCTION_SETTLEMENT_GATEWAYS", &settlement)
+                .is_err()
+        );
+    }
+
+    /// The generic forbidden-seed list still applies: `//Alice` is not a gateway.
+    #[test]
+    fn a_well_known_dev_account_is_not_an_acceptable_gateway() {
+        let alice = vec![get_account_id_from_seed::<sr25519::Public>("Alice").unwrap()];
+        assert!(assert_no_dev_gateway_accounts("X3_TESTNET_ATOMIC_GATEWAYS", &alice).is_err());
+    }
+
+    #[test]
+    fn an_operator_account_is_accepted() {
+        let operator =
+            vec![get_account_id_from_seed::<sr25519::Public>("X3OperatorGateway").unwrap()];
+        assert!(assert_no_dev_gateway_accounts("X3_TESTNET_ATOMIC_GATEWAYS", &operator).is_ok());
+    }
 }
 
 #[cfg(test)]

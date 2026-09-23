@@ -110,6 +110,20 @@ load_testnet_authorities_from_keys() {
     export X3_TESTNET_TREASURY_SIGNERS="$aura_accounts"
   fi
 
+  # The atomic kernel's privileged origins are genesis-configured now
+  # (GAP-GATEWAY-ORIGIN), so the readiness gate has to name them. It uses the first
+  # two validator accounts rather than a published dev phrase, which the spec writer
+  # refuses outright; a real operator points `--x3-gateway-uri` at its own account.
+  if [[ -z "${X3_TESTNET_ATOMIC_GATEWAYS:-}" || -z "${X3_TESTNET_SETTLEMENT_GATEWAYS:-}" ]]; then
+    local first_aura second_aura
+    first_aura="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])[0])' "$aura_accounts" 2>/dev/null || true)"
+    second_aura="$(python3 -c 'import json,sys; a=json.loads(sys.argv[1]); print(a[1] if len(a) > 1 else a[0])' "$aura_accounts" 2>/dev/null || true)"
+    if [[ -n "$first_aura" && -n "$second_aura" ]]; then
+      [[ -n "${X3_TESTNET_ATOMIC_GATEWAYS:-}" ]] || export X3_TESTNET_ATOMIC_GATEWAYS="[\"$first_aura\"]"
+      [[ -n "${X3_TESTNET_SETTLEMENT_GATEWAYS:-}" ]] || export X3_TESTNET_SETTLEMENT_GATEWAYS="[\"$second_aura\"]"
+    fi
+  fi
+
   if [[ -z "${X3_EVM_ESCROW_ADDR:-}" ]]; then
     export X3_EVM_ESCROW_ADDR="0xdead000000000000000000000000000000000001"
   fi
