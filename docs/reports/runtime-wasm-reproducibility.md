@@ -81,7 +81,12 @@ bytes**:
   (`x3SettlementEngine.submitBtcHeaders`, call_index 35, up to 100 headers per call, atomic so
   a batch refused partway applies nothing) and a `BtcHeaderOrigin` config item, which this
   runtime sets to `EnsureRoot`. `spec_version` moves to 17. Two from-scratch builds of
-  `e28a0907be` agree, and the compact artifact is 8,475,400 bytes.
+  `e28a0907be` agree, and the compact artifact was 8,475,400 bytes at that revision.
+* `a7878e933e` — the BTC median-time-past rule stops being stricter than Bitcoin's: with fewer than
+  eleven ancestors (the first headers above a checkpoint) the median is not computable from stored
+  history, so the check is skipped instead of using the parent as a stand-in, which refused real
+  headers. `spec_version` moves to 18. Two from-scratch builds of `a7878e933e` agree, and the compact
+  artifact is 8,474,849 bytes.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -107,24 +112,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,475,400 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,474,849 bytes)**
 
 ```
-Version          : x3-chain-17 (x3-chain-1.tx1.au1)
+Version          : x3-chain-18 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xa3ef63e60f412fabb0208fe085acf68d6e5c045427c6676fc218dc4a07cf0ca6
-authorizeUpgrade : 0xffb34312cb4298982ca1c5cea5b46a50190a3ecfc31d4c08082142e4fd39f010
-IPFS             : QmYMaiBowqkX1kUk2cVCkUVyQVoXDYbpAqrW2vmJcSVfaT
-BLAKE2_256       : 0xd0635518f27a9bcc4a39ee066de5d45bdaaa1628ba9ae4861ee4bed1adeefc8c
+setCode          : 0x7888652d60af538d393bbb06a78cc6584a2f767de80dc2e37661d9dc3e6b7b09
+authorizeUpgrade : 0xf9ec531ca25b0a47d599e29854c9f2769ef1161e0b83b202bdb8794b09275cdd
+IPFS             : QmbiZyen87uV7rvvAZsaFEyKedn3LTJHsyJjYZkEqoePaG
+BLAKE2_256       : 0x980b95d5663b79912768e56f31afd904b11cf44201592c8181272ebd9cfed619
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,454,329 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,453,670 bytes)**
 
 ```
-setCode          : 0x33d0641f12a52ae2f25b9b5a425129f75ab9ddfaa082095ccf5321be74145a95
-authorizeUpgrade : 0x048919316a5b4151eb7451ae2d7b56b685ed10a8244c7d53142edf11332ce9e5
-IPFS             : QmWf8QZKdFPxKR3a5ucnFMEuVNChraPoekzLE93Q4o78KG
-BLAKE2_256       : 0x07cad8f9808382b05529c60d24e85bc028528c681c49cda9e8dcf65713b7758a
+setCode          : 0xa687f0b21030eca6b294e57c4759f53e73c9d1d337efae09dec910012604fca5
+authorizeUpgrade : 0x02dc99ff6ff055e9f9a1c175ca34a8f009df0e0716fd821a683d1370a7cc91f7
+IPFS             : QmdAzPNXMMN6GWFtP3aAineACtvLMhRCa4yaciNaHpJRdz
+BLAKE2_256       : 0x094e3718f6ad0501a6ac7501039cfd066a9d091733494d1c6af6200d8951b984
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the
