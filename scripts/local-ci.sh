@@ -220,6 +220,10 @@ GATES_FAST=(
   # hosted workflows (`.github/workflows/pr-supervisor.yml`,
   # `.github/workflows/rust-clippy.yml`) that this repository does not contain. A
   # readiness manifest nothing validates is a claim, not a record.
+  # A paid RPC key or a signing key committed to source is a live credential for everyone who can
+  # read the repository, and removing it does not un-expose it. This scans `git ls-files` and prints
+  # file, line and pattern only — never the matched value, which would leak it into the CI log.
+  "provider secret guard:bash scripts/check-no-provider-secrets.sh"
   "feature matrix check:python3 scripts/feature_matrix.py check"
   # `make mainnet-check` stage 6b rebuilds the runtime and fails when it no
   # longer matches `docs/reports/runtime-wasm-hashes.json`. That is ten minutes

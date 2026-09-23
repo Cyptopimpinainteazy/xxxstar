@@ -75,6 +75,45 @@ impl ProviderCredentials {
         }
     }
 
+    /// Read provider keys from the environment.
+    ///
+    /// These were **hardcoded in this file** until 2026-09-23, together with a wallet private key
+    /// in `from_env` — a paid DRPC key, an Ankr key and an Alchemy key, all committed. Nothing here
+    /// reaches for a default: an absent variable means an absent key, and the caller falls back to
+    /// public endpoints and fails closed on anything that needs a credential.
+    pub fn from_env() -> Self {
+        let read = |name: &str| std::env::var(name).ok().filter(|v| !v.trim().is_empty());
+        Self {
+            alchemy_api_key: read("ALCHEMY_API_KEY"),
+            drpc_api_key: read("DRPC_API_KEY"),
+            ankr_api_key: read("ANKR_API_KEY"),
+        }
+    }
+
+    /// `https://<subdomain>.g.alchemy.com/v2/<key>`, when an Alchemy key is configured.
+    pub fn alchemy_url(&self, subdomain: &str) -> Option<String> {
+        self.alchemy_api_key
+            .as_ref()
+            .map(|key| format!("https://{subdomain}.g.alchemy.com/v2/{key}"))
+    }
+
+    /// `https://lb.drpc.org/<network>/<key>`, when a DRPC key is configured.
+    ///
+    /// This is the paid endpoint the operator brings: set `DRPC_API_KEY` and every network here
+    /// starts with it, with keyless public RPCs behind it as fallback.
+    pub fn drpc_url(&self, network: &str) -> Option<String> {
+        self.drpc_api_key
+            .as_ref()
+            .map(|key| format!("https://lb.drpc.org/{network}/{key}"))
+    }
+
+    /// `https://rpc.ankr.com/<network>/<key>`, when an Ankr key is configured.
+    pub fn ankr_url(&self, network: &str) -> Option<String> {
+        self.ankr_api_key
+            .as_ref()
+            .map(|key| format!("https://rpc.ankr.com/{network}/{key}"))
+    }
+
     pub fn with_alchemy(mut self, key: String) -> Self {
         self.alchemy_api_key = Some(key);
         self
@@ -168,41 +207,62 @@ pub struct EnvConfig {
 }
 
 impl EnvConfig {
-    /// Create a new default configuration
+    /// Keyless public endpoints for a network, best first.
+    ///
+    /// These are what the configuration falls back to when no provider key is set: public,
+    /// rate-limited, fine for reads and for the gates, and *not* a secret. Anything that needs a
+    /// paid endpoint sets one of `ALCHEMY_API_KEY` / `DRPC_API_KEY` / `ANKR_API_KEY` and
+    /// [`EnvConfig::from_env`] puts it in front of these.
+    pub fn public_endpoints(network: NetworkEnv) -> Vec<&'static str> {
+        match network {
+            NetworkEnv::Arbitrum => vec![
+                "https://arb1.arbitrum.io/rpc",
+                "https://arbitrum.llamarpc.com",
+            ],
+            NetworkEnv::Base => vec!["https://mainnet.base.org", "https://base.llamarpc.com"],
+            NetworkEnv::Polygon => vec!["https://polygon-rpc.com", "https://polygon.llamarpc.com"],
+            NetworkEnv::Avalanche => vec![
+                "https://api.avax.network/ext/bc/C/rpc",
+                "https://avalanche-c-chain-rpc.publicnode.com",
+            ],
+            NetworkEnv::Bsc => vec![
+                "https://bsc-dataseed.binance.org",
+                "https://bsc-rpc.publicnode.com",
+            ],
+        }
+    }
+
+    /// The network's provider slug, as the paid endpoints spell it.
+    fn provider_slug(network: NetworkEnv) -> &'static str {
+        match network {
+            NetworkEnv::Arbitrum => "arbitrum",
+            NetworkEnv::Base => "base",
+            NetworkEnv::Polygon => "polygon",
+            NetworkEnv::Avalanche => "avalanche",
+            NetworkEnv::Bsc => "bsc",
+        }
+    }
+
+    /// An Alchemy subdomain for a network, where Alchemy names one differently.
+    fn alchemy_subdomain(network: NetworkEnv) -> &'static str {
+        match network {
+            NetworkEnv::Arbitrum => "arb-mainnet",
+            NetworkEnv::Base => "base-mainnet",
+            NetworkEnv::Polygon => "polygon-mainnet",
+            NetworkEnv::Avalanche => "avalanche-mainnet",
+            NetworkEnv::Bsc => "bnb-mainnet",
+        }
+    }
+
+    /// Create a new configuration with **no credentials**: public endpoints, no wallet.
     pub fn new(network: NetworkEnv) -> Self {
         let mut rpc_urls = BTreeMap::new();
-
-        // Default RPC URLs based on network
-        match network {
-            NetworkEnv::Arbitrum => {
-                rpc_urls.insert(
-                    "primary".to_string(),
-                    vec![
-                        "https://arb-mainnet.g.alchemy.com/v2/Fe5T2pGsX76ml9kDCwVRZhtmkdixfrDQ"
-                            .to_string(),
-                    ],
-                );
-                rpc_urls.insert("fallback".to_string(), vec![
-                    "https://lb.drpc.org/arbitrum/ArgUBy0RzURpos-Jlz1TqLRxbgscV2AR8JXZrqRhf0fE".to_string(),
-                    "https://rpc.ankr.com/arbitrum/648269110992d35fb12b490f3e9d00e18141ad9212081909344f15ec1c342a3c".to_string(),
-                    "https://arb1.arbitrum.io/rpc".to_string(),
-                ]);
-            }
-            NetworkEnv::Base => {
-                rpc_urls.insert(
-                    "primary".to_string(),
-                    vec![
-                        "https://base-mainnet.g.alchemy.com/v2/Fe5T2pGsX76ml9kDCwVRZhtmkdixfrDQ"
-                            .to_string(),
-                    ],
-                );
-                rpc_urls.insert(
-                    "fallback".to_string(),
-                    vec!["https://mainnet.base.org".to_string()],
-                );
-            }
-            _ => {}
-        }
+        let public = Self::public_endpoints(network);
+        rpc_urls.insert("primary".to_string(), vec![public[0].to_string()]);
+        rpc_urls.insert(
+            "fallback".to_string(),
+            public[1..].iter().map(|url| url.to_string()).collect(),
+        );
 
         Self {
             network,
@@ -215,25 +275,61 @@ impl EnvConfig {
         }
     }
 
-    /// Load configuration from environment (for wasm and no_std compatible subset)
+    /// Load configuration from the environment.
+    ///
+    /// Every credential comes from here and nowhere else. Until 2026-09-23 this function hardcoded
+    /// a paid DRPC key, an Ankr key, an Alchemy key **and a wallet private key** as its "defaults",
+    /// which meant anyone with the repository could spend from that wallet. There is no default
+    /// now: no key means no keyed endpoint, no `X3_BOT_PRIVATE_KEY` means no wallet, and a caller
+    /// that needs a wallet gets `None` and has to say so rather than signing with someone else's.
+    ///
+    /// Recognised variables:
+    /// - `X3_NETWORK` — arbitrum (default), base, polygon, avalanche, bsc
+    /// - `ALCHEMY_API_KEY`, `DRPC_API_KEY`, `ANKR_API_KEY` — paid endpoints, promoted ahead of the
+    ///   public ones when present
+    /// - `X3_BOT_PRIVATE_KEY`, `X3_BOT_ADDRESS` — the signing wallet; both required for a wallet
     pub fn from_env() -> Self {
-        // Default to Arbitrum
-        let network = NetworkEnv::Arbitrum;
+        let network = std::env::var("X3_NETWORK")
+            .ok()
+            .and_then(|name| NetworkEnv::from_env(&name))
+            .unwrap_or(NetworkEnv::Arbitrum);
+
         let mut config = Self::new(network);
+        config.provider_credentials = ProviderCredentials::from_env();
 
-        // Load credentials if available
-        config.provider_credentials = ProviderCredentials::new()
-            .with_alchemy("Fe5T2pGsX76ml9kDCwVRZhtmkdixfrDQ".to_string())
-            .with_drpc("ArgUBy0RzURpos-Jlz1TqLRxbgscV2AR8JXZrqRhf0fE".to_string())
-            .with_ankr(
-                "648269110992d35fb12b490f3e9d00e18141ad9212081909344f15ec1c342a3c".to_string(),
-            );
+        // Paid endpoints first, public ones behind them, and only the ones actually configured.
+        let credentials = &config.provider_credentials;
+        let slug = Self::provider_slug(network);
+        let promoted: Vec<String> = [
+            credentials.drpc_url(slug),
+            credentials.alchemy_url(Self::alchemy_subdomain(network)),
+            credentials.ankr_url(slug),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
 
-        // Load wallet if available
-        config.wallet = Some(WalletConfig::new(
-            "480c2f0730a4b305123b759f2a20ceb701643116671b232ffd5cdcbb90d4431a".to_string(),
-            "0x7f1d163dBe1d42F9813820996e039E6f81D5f62c".to_string(),
-        ));
+        if !promoted.is_empty() {
+            let mut all = promoted;
+            all.extend(config.rpc_urls.remove("primary").unwrap_or_default());
+            all.extend(config.rpc_urls.remove("fallback").unwrap_or_default());
+            config
+                .rpc_urls
+                .insert("primary".to_string(), vec![all.remove(0)]);
+            config.rpc_urls.insert("fallback".to_string(), all);
+        }
+
+        config.wallet = match (
+            std::env::var("X3_BOT_PRIVATE_KEY"),
+            std::env::var("X3_BOT_ADDRESS"),
+        ) {
+            (Ok(private_key), Ok(address))
+                if !private_key.trim().is_empty() && !address.trim().is_empty() =>
+            {
+                Some(WalletConfig::new(private_key, address))
+            }
+            _ => None,
+        };
 
         config
     }
