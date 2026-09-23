@@ -571,6 +571,29 @@ other people's recorded endpoints rather than our credentials. Untracking them r
 a side effect and stops a build artifact from being edited by hand. Acceptance: `git ls-files`
 contains no `dist/` and no crawler state.
 
+## GAP-DEAD-ENDPOINT-CONFIG — the RPC endpoint tables no code reads — 2026-09-23
+
+`config/rpc-endpoints.toml` and `infra/mainnet-rpc-endpoints.toml` list a chain, a chain id, a public
+`rpc_url` and an `env_var` for every supported chain — the shape of an operator surface. Nothing
+reads either file. `git grep` for the names finds a memory note, an audit inventory and one
+marketing blurb in `infra/x3star-subdomains/server.js`; the only runtime `toml::from_str` in the
+workspace parses the feature registry and the feature flags in `x3-readiness`. The header's
+instruction and the file's own rows also disagree: it says to set `X3_CHAIN_RPC_<NAME>`, the rows
+declare `X3_RPC_<NAME>`, and neither name is consulted anywhere.
+
+This mattered the moment the operator bought paid endpoints, because that file is where an operator
+would put one. Dropping a URL into it, or exporting `X3_RPC_ETHEREUM`, changes nothing today. The
+paid-endpoint path that does exist is `ProviderCredentials::from_env()` in `crates/external-chains`
+(`DRPC_API_KEY` → `https://lb.drpc.org/<network>/<key>`), promoted ahead of the keyless list by
+`EnvConfig::from_env()` for the five networks it names — `X3_NETWORK` picks one — while the table in
+this file lists seven, Ethereum and the test networks among them.
+
+**TICKET-104 — make one endpoint surface real, or say it is documentation.** Either wire a single
+loader and delete the other table (and make the env var the file names the one that is read), or
+keep the tables as reference and put that at the top instead of an instruction that does nothing.
+Acceptance: one canonical way to point a chain at an endpoint, and `git grep` for the chosen
+mechanism finds the code that consumes it.
+
 ## GAP-TMP-NOT-DURABLE — a `/tmp` sweep cost a two-hour measurement — 2026-09-23
 
 Everything this agent had under `/tmp` was removed between 02:01 and 03:22 UTC: the git worktree the
