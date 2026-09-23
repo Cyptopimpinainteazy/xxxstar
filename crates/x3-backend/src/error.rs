@@ -151,6 +151,9 @@ pub enum BackendErrorKind {
     #[error("unsupported bytecode version: {0}")]
     UnsupportedVersion(u32),
 
+    #[error("bytecode checksum mismatch: header says {found:#010x}, the body computes to {expected:#010x}")]
+    ChecksumMismatch { expected: u32, found: u32 },
+
     #[error("corrupted bytecode at offset {offset}")]
     CorruptedBytecode { offset: usize },
 

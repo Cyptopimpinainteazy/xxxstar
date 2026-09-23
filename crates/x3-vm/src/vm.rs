@@ -1425,6 +1425,19 @@ mod tests {
     use super::*;
     use x3_backend::bc_format_helpers;
 
+    /// Stamp the envelope's checksum, as the writer does, before loading hand-assembled bytes.
+    ///
+    /// These envelopes used to leave the checksum field zero and load anyway, because nothing read
+    /// it; `BytecodeModule::from_bytes` verifies it now (TICKET-108), and a zero field is a mismatch
+    /// like any other. Hand-assembled test bytecode has to be as valid as compiled bytecode, or the
+    /// test is not testing what it says.
+    fn sealed(mut bytes: Vec<u8>) -> Vec<u8> {
+        let checksum = x3_common::bytecode::checksum(&bytes[x3_common::bytecode::HEADER_LEN..]);
+        let at = x3_common::bytecode::CHECKSUM_OFFSET;
+        bytes[at..at + 4].copy_from_slice(&checksum.to_le_bytes());
+        bytes
+    }
+
     #[test]
     fn vm_smoke_add() {
         // Use the helper to assemble a simple module
@@ -1590,7 +1603,7 @@ mod tests {
         out.push(0u8); // debug
         out.push(0u8); // metadata
 
-        let mut vm = VM::from_bytes(&out).expect("module should load");
+        let mut vm = VM::from_bytes(&sealed(out)).expect("module should load");
         let result = vm.call_function(0, &[]).expect("execution should succeed");
 
         // Caller r1 should remain 100 (callee's r1 must not clobber caller)
@@ -1674,7 +1687,7 @@ mod tests {
         out.push(0u8);
 
         // Execute and verify store/load
-        let mut vm = VM::from_bytes(&out).expect("module should load");
+        let mut vm = VM::from_bytes(&sealed(out)).expect("module should load");
         let res = vm.call_function(0, &[]).expect("exec");
         assert_eq!(res.value, Some(Value::I64(13)));
 
@@ -1739,7 +1752,7 @@ mod tests {
         outb.push(0u8);
         outb.push(0u8);
 
-        let mut vm2 = VM::from_bytes(&outb).expect("module should load");
+        let mut vm2 = VM::from_bytes(&sealed(outb)).expect("module should load");
         let r = vm2
             .call_function(0, &[])
             .expect_err("atomic rollback should abort");
@@ -1787,7 +1800,7 @@ mod tests {
         outc.push(0u8);
         outc.push(0u8);
 
-        let mut vmc = VM::from_bytes(&outc).expect("module should load");
+        let mut vmc = VM::from_bytes(&sealed(outc)).expect("module should load");
         let r = vmc.call_function(0, &[]).expect("read global");
         assert_eq!(r.value, Some(Value::I64(7)));
     }
@@ -1937,7 +1950,7 @@ mod tests {
         out.push(0u8); // debug
         out.push(0u8); // metadata
 
-        let mut vm = VM::from_bytes(&out).expect("module should load");
+        let mut vm = VM::from_bytes(&sealed(out)).expect("module should load");
         let result = vm
             .call_function(0, &[])
             .expect("nested call should succeed");

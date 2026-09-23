@@ -37,6 +37,13 @@ use sp_std::vec::Vec;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum X3Error {
     InvalidMagic,
+    /// The envelope declares a format version this loader cannot read, or requires a newer loader.
+    UnsupportedVersion(u32),
+    /// The header's checksum does not match the body — corrupted in transit or edited.
+    ChecksumMismatch {
+        expected: u32,
+        found: u32,
+    },
     UnexpectedEof,
     InvalidOpcode(u8),
     DivisionByZero,
@@ -227,10 +234,35 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
         return Err(X3Error::UnexpectedEof);
     }
     let magic = r.read_bytes(4)?;
-    if magic != b"X3BC" {
+    if magic != x3_common::bytecode::MAGIC {
         return Err(X3Error::InvalidMagic);
     }
-    r.skip(20)?; // version, flags, checksum, minversion, features
+
+    // The rest of the header used to be skipped (`r.skip(20)`): version, flags, checksum,
+    // min-version and feature flags all read past and never checked, so a module with a future
+    // version or a body corrupted after compilation was accepted as long as it parsed (TICKET-108).
+    // The writer emits all of it, and the definitions live in `x3-common` so this reader and
+    // `x3-backend` cannot disagree about them.
+    let version = r.read_u32()?;
+    let _flags = r.read_u32()?;
+    let checksum = r.read_u32()?;
+    let min_version = r.read_u32()?;
+    let _features = r.read_u32()?;
+
+    if !x3_common::bytecode::version_is_readable(version) {
+        return Err(X3Error::UnsupportedVersion(version));
+    }
+    if !x3_common::bytecode::loader_satisfies(min_version) {
+        // The module says it needs a loader at least this new; this one is older.
+        return Err(X3Error::UnsupportedVersion(min_version));
+    }
+    let expected = x3_common::bytecode::checksum(&bytes[x3_common::bytecode::HEADER_LEN..]);
+    if checksum != expected {
+        return Err(X3Error::ChecksumMismatch {
+            expected,
+            found: checksum,
+        });
+    }
 
     // Const pool
     let const_count = r.read_u32()? as usize;
@@ -1212,11 +1244,11 @@ mod tests {
     fn make_simple_module() -> Vec<u8> {
         let mut b = Vec::new();
         // Header
-        b.extend_from_slice(b"X3BC");
-        b.extend_from_slice(&1u32.to_le_bytes()); // version 1.0.0
+        b.extend_from_slice(x3_common::bytecode::MAGIC);
+        b.extend_from_slice(&x3_common::bytecode::VERSION.to_le_bytes()); // 1.0.0
         b.extend_from_slice(&0u32.to_le_bytes()); // flags
-        b.extend_from_slice(&0u32.to_le_bytes()); // checksum (unused in mini)
-        b.extend_from_slice(&1u32.to_le_bytes()); // min_version
+        b.extend_from_slice(&0u32.to_le_bytes()); // checksum (filled at the end, as the writer does)
+        b.extend_from_slice(&x3_common::bytecode::MIN_SUPPORTED_VERSION.to_le_bytes());
         b.extend_from_slice(&0u32.to_le_bytes()); // features
                                                   // Const pool (empty)
         b.extend_from_slice(&0u32.to_le_bytes());
@@ -1237,7 +1269,47 @@ mod tests {
         // no debug, no metadata
         b.push(0u8);
         b.push(0u8);
+
+        // The checksum the writer computes, over everything after the header.
+        let checksum = x3_common::bytecode::checksum(&b[x3_common::bytecode::HEADER_LEN..]);
+        let at = x3_common::bytecode::CHECKSUM_OFFSET;
+        b[at..at + 4].copy_from_slice(&checksum.to_le_bytes());
         b
+    }
+
+    #[test]
+    fn test_a_corrupted_body_is_rejected() {
+        // The header is intact and the structure would parse; only the body changed.
+        let mut payload = make_simple_module();
+        let last = payload.len() - 1;
+        payload[last] ^= 0xFF;
+        assert!(matches!(
+            parse_module(&payload),
+            Err(X3Error::ChecksumMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_a_future_format_version_is_rejected() {
+        // The checksum covers the body, not the header, so this is a well-formed envelope
+        // announcing a version this loader does not read.
+        let mut payload = make_simple_module();
+        payload[4..8].copy_from_slice(&x3_common::bytecode::MAX_SUPPORTED_VERSION.to_le_bytes());
+        assert!(matches!(
+            parse_module(&payload),
+            Err(X3Error::UnsupportedVersion(_))
+        ));
+    }
+
+    #[test]
+    fn test_a_module_requiring_a_newer_loader_is_rejected() {
+        let mut payload = make_simple_module();
+        let newer_minor = (1u32 << 16) | (1u32 << 8);
+        payload[16..20].copy_from_slice(&newer_minor.to_le_bytes());
+        assert!(matches!(
+            parse_module(&payload),
+            Err(X3Error::UnsupportedVersion(_))
+        ));
     }
 
     #[test]
@@ -1285,13 +1357,19 @@ mod tests {
         assert_eq!(result.return_val, MiniValue::I64(8));
     }
 
+    /// The same envelope as `make_simple_module`, with a different code section.
+    ///
+    /// It used to declare version `1` and `min_version` `1` — neither of which is a packed
+    /// `(major, minor, patch)`, so under the format's own rules the module was unreadable
+    /// (`1 >> 16 == 0`, a different major) and the payload was only accepted because the reader
+    /// skipped the header. The constants and the checksum come from the shared definition now.
     fn rebuild_with_code(code: &[u8]) -> Vec<u8> {
         let mut b = Vec::new();
-        b.extend_from_slice(b"X3BC");
-        b.extend_from_slice(&1u32.to_le_bytes());
+        b.extend_from_slice(x3_common::bytecode::MAGIC);
+        b.extend_from_slice(&x3_common::bytecode::VERSION.to_le_bytes());
         b.extend_from_slice(&0u32.to_le_bytes());
         b.extend_from_slice(&0u32.to_le_bytes());
-        b.extend_from_slice(&1u32.to_le_bytes());
+        b.extend_from_slice(&x3_common::bytecode::MIN_SUPPORTED_VERSION.to_le_bytes());
         b.extend_from_slice(&0u32.to_le_bytes());
         // Const pool (empty)
         b.extend_from_slice(&0u32.to_le_bytes());
@@ -1310,6 +1388,10 @@ mod tests {
         b.extend_from_slice(code);
         b.push(0u8);
         b.push(0u8);
+
+        let checksum = x3_common::bytecode::checksum(&b[x3_common::bytecode::HEADER_LEN..]);
+        let at = x3_common::bytecode::CHECKSUM_OFFSET;
+        b[at..at + 4].copy_from_slice(&checksum.to_le_bytes());
         b
     }
 }

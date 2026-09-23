@@ -55,17 +55,20 @@ use crate::error::{BackendError, BackendErrorKind, BackendResult};
 use crate::opcode::{ConstIdx, FuncIdx, Register};
 
 /// Magic bytes identifying X3 bytecode files.
-pub const MAGIC: &[u8; 4] = b"X3BC";
+///
+/// The header's constants and checksum live in `x3-common::bytecode` now: the no-std decoder in
+/// `x3-integration::mini_x3` speaks the same format and cannot depend on this crate (TICKET-108).
+pub const MAGIC: &[u8; 4] = x3_common::bytecode::MAGIC;
 
 /// Current bytecode format version (semantic: major.minor.patch packed as u32).
 /// Format: (major << 16) | (minor << 8) | patch
-pub const VERSION: u32 = VersionInfo::new(1, 0, 0).to_packed();
+pub const VERSION: u32 = x3_common::bytecode::VERSION;
 
 /// Minimum version this loader can read.
-pub const MIN_SUPPORTED_VERSION: u32 = VersionInfo::new(1, 0, 0).to_packed();
+pub const MIN_SUPPORTED_VERSION: u32 = x3_common::bytecode::MIN_SUPPORTED_VERSION;
 
 /// Maximum version this loader can read (exclusive next major).
-pub const MAX_SUPPORTED_VERSION: u32 = VersionInfo::new(2, 0, 0).to_packed();
+pub const MAX_SUPPORTED_VERSION: u32 = x3_common::bytecode::MAX_SUPPORTED_VERSION;
 
 /// Semantic version information for bytecode format.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -418,7 +421,18 @@ impl BytecodeModule {
         let flags = ModuleFlags(u32::from_le_bytes([
             bytes[8], bytes[9], bytes[10], bytes[11],
         ]));
-        let _checksum = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
+        // The writer computes this over everything after the header; a reader that ignores it
+        // accepts a body corrupted in transit (TICKET-108). Verified here now.
+        let checksum = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
+        let expected = x3_common::bytecode::checksum(&bytes[x3_common::bytecode::HEADER_LEN..]);
+        if checksum != expected {
+            return Err(BackendError::without_span(
+                BackendErrorKind::ChecksumMismatch {
+                    expected,
+                    found: checksum,
+                },
+            ));
+        }
         let min_version = VersionInfo::from_packed(u32::from_le_bytes([
             bytes[16], bytes[17], bytes[18], bytes[19],
         ]));
@@ -1094,13 +1108,8 @@ impl BytecodeModule {
     }
 
     fn compute_checksum(&self, data: &[u8]) -> u32 {
-        // Simple CRC32-like checksum
-        let mut sum: u32 = 0;
-        for byte in data {
-            sum = sum.wrapping_add(*byte as u32);
-            sum = sum.wrapping_mul(31);
-        }
-        sum
+        // One implementation, shared with the no-std reader through `x3-common`.
+        x3_common::bytecode::checksum(data)
     }
 
     /// Get function by index.
@@ -1500,5 +1509,60 @@ mod tests {
         assert_eq!(decoded.min_version, VersionInfo::new(1, 0, 0));
         assert!(decoded.features.has(FeatureFlags::GAS_METERING));
         assert!(decoded.is_compatible());
+    }
+
+    #[test]
+    fn the_shared_version_predicates_agree_with_version_info() {
+        // `x3-common::bytecode` expresses the same rules on the packed integer, because the
+        // no-std reader has no access to `VersionInfo`. If the two ever disagree, one of the two
+        // decoders is lying about what it accepts.
+        use x3_common::bytecode as shared;
+
+        let current = VersionInfo::current();
+        for packed in [
+            0u32,
+            1,
+            shared::MIN_SUPPORTED_VERSION,
+            shared::VERSION,
+            (1 << 16) | (1 << 8),
+            shared::MAX_SUPPORTED_VERSION,
+            u32::MAX,
+        ] {
+            let version = VersionInfo::from_packed(packed);
+            assert_eq!(
+                current.can_read(version),
+                shared::version_is_readable(packed),
+                "can_read disagrees at {packed:#010x}"
+            );
+            assert_eq!(
+                current.satisfies(version),
+                shared::loader_satisfies(packed),
+                "satisfies disagrees at {packed:#010x}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_corrupted_body_fails_the_checksum() {
+        let mut module = BytecodeModule::new();
+        module.const_pool.add_integer(123).unwrap();
+        let bytes = module.to_bytes();
+        assert!(
+            BytecodeModule::from_bytes(&bytes).is_ok(),
+            "the module this test corrupts must load first"
+        );
+
+        // Change one byte after the header. The structure still parses; the checksum does not.
+        let mut corrupted = bytes.clone();
+        let last = corrupted.len() - 1;
+        corrupted[last] ^= 0xFF;
+        match BytecodeModule::from_bytes(&corrupted) {
+            Err(error) => assert!(
+                matches!(error.kind, BackendErrorKind::ChecksumMismatch { .. }),
+                "expected a checksum mismatch, got {:?}",
+                error.kind
+            ),
+            Ok(_) => panic!("a body corrupted after compilation must not load"),
+        }
     }
 }
