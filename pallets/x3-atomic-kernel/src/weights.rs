@@ -43,9 +43,6 @@ pub trait WeightInfo {
     /// Assign an executor to a pending bundle.
     fn assign_bundle_executor() -> Weight;
     
-    /// Submit finalization result (unsigned OCW path).
-    fn submit_finalization_result() -> Weight;
-    
     /// Record Flash Finality anchor (unsigned OCW path).
     fn record_flash_finality_anchor() -> Weight;
 
@@ -104,13 +101,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
     /// Storage: `PoaeProofs` (r:1 w:1)
     /// Storage: `FinalityCertAnchors` (r:1 w:0)
     ///
-    /// Same as finalize_atomic_bundle but called via unsigned tx.
-    fn submit_finalization_result() -> Weight {
-        Weight::from_parts(35_000_000, 3_500)
-            .saturating_add(T::DbWeight::get().reads(3_u64))
-            .saturating_add(T::DbWeight::get().writes(2_u64))
-    }
-
     /// Storage: `FinalityCertAnchors` (r:1 w:1)
     fn record_flash_finality_anchor() -> Weight {
         Weight::from_parts(8_000_000, 500)
@@ -139,9 +129,6 @@ impl WeightInfo for () {
     }
     fn assign_bundle_executor() -> Weight {
         Weight::from_parts(5_000, 0)
-    }
-    fn submit_finalization_result() -> Weight {
-        Weight::from_parts(10_000, 0)
     }
     fn record_flash_finality_anchor() -> Weight {
         Weight::from_parts(3_000, 0)

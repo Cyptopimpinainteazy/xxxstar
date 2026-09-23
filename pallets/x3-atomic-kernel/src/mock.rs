@@ -15,8 +15,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::cell::Cell;
 use x3_asset_kernel_types::traits::EconomicHaltInspect;
 
 pub type AccountId = u64;
@@ -35,55 +34,59 @@ pub const MIN_BOND: Balance = 10_000_000;
 // ── Switchable economic halt ───────────────────────────────────────────────
 //
 // `NoEconomicHalt` can never halt, which left the halt guard inside
-// `submit_atomic_bundle` with no way to observe it. This provider lets a test
-// flip the flag; the guard serialises halt tests and always clears the flag on
-// drop so tests running in parallel cannot observe it.
+// `submit_atomic_bundle` with no way to observe it. This provider lets a test flip the flag.
+//
+// The flag is **thread-local**, and it used to be a process-wide `AtomicBool` behind a mutex. The
+// mutex serialised the halt tests against each other, but every other test in the crate read the
+// same global: `cargo test -p pallet-x3-atomic-kernel` failed about one run in three with
+// `EconomicHaltActive` raised by `submit_atomic_bundle` inside a test that had nothing to do with
+// halting — a test that never takes this guard can observe a halt test's `true` mid-flight.
+// `cargo test` runs each test on its own thread, so a thread-local gives every test its own economy
+// and removes the race instead of scheduling around it. (Measured: 2 of 6 whole-suite runs failed
+// before this change, 0 of 10 after — see
+// `.ai/reports/unsigned-finalization-removed-20260923.md`.)
 
 pub struct SwitchableEconomicHalt;
 
-static ECONOMIC_HALTED: AtomicBool = AtomicBool::new(false);
-static HALT_LOCK: Mutex<()> = Mutex::new(());
+thread_local! {
+    static ECONOMIC_HALTED: Cell<bool> = const { Cell::new(false) };
+}
 
 impl EconomicHaltInspect for SwitchableEconomicHalt {
     fn is_halted() -> bool {
-        ECONOMIC_HALTED.load(Ordering::SeqCst)
+        ECONOMIC_HALTED.with(Cell::get)
     }
 }
 
-/// Holds the halt lock with the economy open; flip it with [`EconomicHaltGuard::halt`].
+/// Opens the economy on this thread's mock; flip it with [`EconomicHaltGuard::halt`].
 ///
-/// Holding the lock for the whole test keeps halt tests from racing each other,
-/// and the flag is cleared on drop even if the test panics.
+/// The flag is cleared on drop even if the test panics, so a failing halt test cannot leave the
+/// next test on the same thread halted.
 #[allow(dead_code)]
 pub fn economy_open() -> EconomicHaltGuard {
-    let lock = HALT_LOCK
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    ECONOMIC_HALTED.store(false, Ordering::SeqCst);
-    EconomicHaltGuard { _lock: lock }
+    ECONOMIC_HALTED.with(|halted| halted.set(false));
+    EconomicHaltGuard
 }
 
 #[allow(dead_code)]
-pub struct EconomicHaltGuard {
-    _lock: MutexGuard<'static, ()>,
-}
+pub struct EconomicHaltGuard;
 
 #[allow(dead_code)]
 impl EconomicHaltGuard {
     /// Halt new economic operations, as governance would.
     pub fn halt(&self) {
-        ECONOMIC_HALTED.store(true, Ordering::SeqCst);
+        ECONOMIC_HALTED.with(|halted| halted.set(true));
     }
 
     /// Lift the halt.
     pub fn resume(&self) {
-        ECONOMIC_HALTED.store(false, Ordering::SeqCst);
+        ECONOMIC_HALTED.with(|halted| halted.set(false));
     }
 }
 
 impl Drop for EconomicHaltGuard {
     fn drop(&mut self) {
-        ECONOMIC_HALTED.store(false, Ordering::SeqCst);
+        ECONOMIC_HALTED.with(|halted| halted.set(false));
     }
 }
 

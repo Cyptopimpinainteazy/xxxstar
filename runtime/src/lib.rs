@@ -384,7 +384,15 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // no gateway can no longer assign or finalize a bundle: that is the correct posture
     // for a chain that has not said who may, and it replaces the previous posture, where
     // the answer was "whoever read the repository".
-    spec_version: 19,
+    // 20: the unsigned finalization extrinsic is gone. `submit_finalization_result`
+    // (call_index 4) was `ensure_none`, its off-chain marker (`x3fin:`) had no writer in this
+    // repository, and the certificate it checked was anchored by an equally unsigned call — so a
+    // caller planted the value it was about to be checked against, and any account could finalize
+    // any `Executing` bundle. Finalization is the signed `finalize_atomic_bundle` (`X3LangOrigin`,
+    // a genesis-named gateway account since 19) or `finalize_with_settlement` (`SettlementOrigin`).
+    // One call and one weight entry removed, no storage key changes shape, so no migration.
+    // `transaction_version` is unchanged: no existing call's encoding moved.
+    spec_version: 20,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,

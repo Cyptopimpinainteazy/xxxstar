@@ -2171,9 +2171,9 @@ async fn run_flash_finality_voter<Client, Block>(
                         metrics.shadow_agreements
                     );
                 } else {
-                    // No Flash certificate — derive cert hash from GRANDPA-finalized
-                    // block hash. This provides non-zero certs for the unsigned
-                    // `submit_finalization_result` path even without Flash-Finality.
+                    // No Flash certificate — derive the cert hash from the GRANDPA-finalized
+                    // block hash. The pallet OCW anchors this under `x3ff:`, and the atomic
+                    // gateway service then signs `finalize_atomic_bundle` with it.
                     let cert_hash = sp_core::blake2_256(&hash);
                     let mut key = b"x3ff:".to_vec();
                     key.extend_from_slice(&number.to_le_bytes());

@@ -33,7 +33,7 @@ use x3_vm::{
 /// 1. **Pallet bundle_id** — assigned by `submit_atomic_bundle` on the
 ///    `pallet-x3-atomic-kernel`. Derived from `SHA-256(submitter ∥ block ∥ legs_hash)`.
 ///    This is the canonical on-chain identifier stored in `Bundles<T>` and used by
-///    the OCW key `"x3fin:" + bundle_id`.
+///    the on-chain bundle id the signed finalization names.
 ///
 /// 2. **Off-chain bundle_id** — derived by `AtomicSwapOrchestrator::derive_bundle_id()`
 ///    from `SHA-256(swap_id ∥ svm_tx ∥ evm_tx ∥ nonce)`. Useful for local correlation
@@ -177,12 +177,15 @@ pub struct ProcessResult {
     pub committed_at_ns: Option<u64>,
 }
 
-/// Parameters for the `submit_finalization_result` (unsigned) or
-/// `finalize_atomic_bundle` (signed) extrinsic on the x3-atomic-kernel pallet.
+/// Parameters for the signed `finalize_atomic_bundle` extrinsic on the
+/// x3-atomic-kernel pallet.
 ///
-/// After `process_swap()` succeeds, call `build_finalization_request()` to get
-/// this struct, then submit it via the Substrate RPC (`author_submitExtrinsic`)
-/// or through an off-chain worker.
+/// After `process_swap()` succeeds, call `build_finalization_request()` to get this
+/// struct, then submit it as a signed extrinsic from the account the chain's custody
+/// registry authorizes for `GatewayRole::X3Lang` — what the node's atomic gateway
+/// service does. There is no unsigned finalization extrinsic: it was removed on
+/// 2026-09-23, because it was `ensure_none` and its certificate check compared the
+/// caller's input with the caller's own earlier input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinalizationRequest {
     /// Bundle identifier — must match the one registered on-chain via
@@ -302,9 +305,8 @@ impl AtomicSwapOrchestrator {
     /// ## bundle_id selection
     ///
     /// If `pair.pallet_bundle_id` is `Some(id)`, that on-chain ID is used as the
-    /// canonical identifier in `ProcessResult` and the OCW local-storage key.  This
-    /// ensures the OCW (`offchain_worker` in `pallet-x3-atomic-kernel`) can find the
-    /// finalization record and auto-submit the unsigned `submit_finalization_result` tx.
+    /// canonical identifier in `ProcessResult`, so the finalization the gateway service
+    /// signs names the bundle the pallet actually stored.
     ///
     /// If `pair.pallet_bundle_id` is `None`, the orchestrator derives an off-chain ID
     /// from the pair contents — suitable for tests and simulations only.
@@ -884,62 +886,6 @@ mod tests {
     // They confirm that each stage produces outputs correctly consumed by the
     // next stage, matching the protocol that the on-chain OCW reads.
 
-    /// Verify the OCW local-storage key format agrees between the orchestrator
-    /// write path and the pallet OCW read path.
-    ///
-    /// Protocol: key = b"x3fin:" (6 bytes) || bundle_id (32 bytes) = 38 bytes total.
-    #[test]
-    fn test_ocw_key_format_matches_pallet_protocol() {
-        let pair = make_pair(0xAB, b"svm_ocw_test", b"evm_ocw_test", 42);
-        let bundle_id = AtomicSwapOrchestrator::derive_bundle_id(&pair);
-
-        let mut key = b"x3fin:".to_vec();
-        key.extend_from_slice(bundle_id.as_bytes());
-
-        // Key must be exactly 38 bytes (6 prefix + 32 bundle_id)
-        assert_eq!(key.len(), 38, "OCW key must be 38 bytes");
-        assert_eq!(&key[..6], b"x3fin:", "OCW key must start with 'x3fin:'");
-        assert_eq!(
-            &key[6..],
-            bundle_id.as_bytes(),
-            "OCW key suffix must be the bundle_id"
-        );
-    }
-
-    /// Verify the OCW local-storage payload format:
-    /// 40 bytes = receipt_root[0..32] || committed_at_ns[32..40] (LE u64).
-    #[test]
-    fn test_ocw_payload_encode_decode_roundtrip() {
-        let svm = [0x11u8; 32];
-        let evm = [0x22u8; 32];
-        let receipt_root = AtomicSwapOrchestrator::compute_receipt_root(&svm, &evm);
-        let committed_at_ns: u64 = 1_700_000_000_000_000_001;
-
-        // Encode (as the orchestrator would write to local storage)
-        let mut payload = receipt_root.as_bytes().to_vec();
-        payload.extend_from_slice(&committed_at_ns.to_le_bytes());
-
-        assert_eq!(payload.len(), 40, "OCW payload must be 40 bytes");
-
-        // Decode (as the pallet OCW would read from local storage)
-        let decoded_root = H256::from_slice(&payload[..32]);
-        let decoded_ns = u64::from_le_bytes(payload[32..40].try_into().expect("slice is 8 bytes"));
-
-        assert_eq!(
-            decoded_root, receipt_root,
-            "decoded receipt_root must match"
-        );
-        assert_eq!(
-            decoded_ns, committed_at_ns,
-            "decoded committed_at_ns must match"
-        );
-        assert_ne!(
-            decoded_root,
-            H256::zero(),
-            "receipt_root of real data must not be zero"
-        );
-    }
-
     /// Full data-flow E2E test:
     /// AtomicPair → derive_bundle_id → compute_receipt_root →
     /// ProcessResult → FinalizationRequest → OCW payload
@@ -1068,7 +1014,7 @@ mod tests {
     ///   submit_atomic_bundle() → BundleSubmitted(bundle_id) → pass into AtomicPair
     ///   → process_swap() → ProcessResult::bundle_id == pallet bundle_id
     ///   → FinalizationRequest::bundle_id == pallet bundle_id
-    ///   → OCW key "x3fin:" + pallet bundle_id  ← matches Bundles<T> key
+    ///   → the signed finalization names that bundle id
     #[test]
     fn test_pallet_bundle_id_overrides_derived_id() {
         // Simulate the pallet's SHA-256(submitter ∥ block ∥ legs_hash) result
@@ -1121,11 +1067,6 @@ mod tests {
             "FinalizationRequest must carry pallet bundle_id"
         );
 
-        // OCW key built with pallet bundle_id matches what the pallet looks up
-        let mut ocw_key = b"x3fin:".to_vec();
-        ocw_key.extend_from_slice(pallet_id.as_bytes());
-        assert_eq!(ocw_key.len(), 38);
-        assert_eq!(&ocw_key[6..], pallet_id.as_bytes());
     }
 
     /// Verify that when `pallet_bundle_id` is `None`, the pipeline falls back to
