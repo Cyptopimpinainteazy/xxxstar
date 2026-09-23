@@ -63,6 +63,37 @@ It writes, into `deployment/chain-specs/fresh/generated/` (gitignored):
 Keep the 0600 permissions, back both sets up, and never commit them
 (`deployment/chain-specs/fresh/.gitignore` covers that path).
 
+### Who may drive the atomic kernel (required)
+
+The runtime does not ship a privileged account. The atomic kernel's `X3LangOrigin` and
+`SettlementOrigin` — which gate `assignBundleExecutor`, `finalizeAtomicBundle`,
+`rollbackBundle` and `finalizeWithSettlement` — read `pallet-x3-custody`'s gateway registry, and
+that registry comes from genesis:
+
+```bash
+X3_TESTNET_ATOMIC_GATEWAYS='["<ss58 of the gateway service account>"]' \
+X3_TESTNET_SETTLEMENT_GATEWAYS='["<ss58 of the settlement service account>"]' \
+X3_NODE_BIN=target/release/x3-chain-node \
+python3 scripts/testnet/build-x3-testnet-spec.py <validator-count>
+```
+
+`X3_{STAGING,TESTNET,PRODUCTION}_ATOMIC_GATEWAYS` and `..._SETTLEMENT_GATEWAYS` are JSON
+arrays of SS58 accounts and are **required** for a live spec; the builder refuses the published
+development seeds (`//x3-atomic-gateway`, `//x3-settlement-gateway`) outright. The spec carries
+the result at `genesis.runtimeGenesis.config.x3Custody.x3LangGateways` /
+`settlementGateways`, so it is reviewable in the same diff as the chain id and identical for
+everyone who joins from it.
+
+The node's atomic service signs with `--x3-gateway-uri` (default `//x3-atomic-gateway`), so the
+account named in genesis and the URI the service runs with have to be the same account. If they
+are not, the service's extrinsics are rejected — the chain fails closed, and it says so one line
+per rejected call rather than doing something surprising. After launch the set is changed by
+governance, not by a rebuild: `x3Custody.authorizeGateway` / `x3Custody.revokeGateway`.
+
+A chain whose genesis names no gateway cannot assign or finalize a bundle at all. That is the
+intended posture, and it is what replaced the previous one — a compiled-in dev account, whose
+seed is in the repository, held by anyone who read it.
+
 ### Pinning Bitcoin's checkpoint (the SPV trust root)
 
 The settlement engine accepts BTC evidence only from a header on a **checkpoint-anchored**

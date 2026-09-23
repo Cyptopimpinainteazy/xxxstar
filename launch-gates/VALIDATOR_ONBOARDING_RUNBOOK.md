@@ -21,7 +21,7 @@ the launch are still missing, so nothing below sends you to a dead end.
 | canonical repository | `https://github.com/Cyptopimpinainteazy/xxxstar` | use this; `x3network/x3-chain` does not exist |
 | published release with a binary | **none** (only a draft tag `v0.4.0-rc.1`, drafts have no public assets) | `scripts/install-validator.sh --from-release` refuses and prints the build route. Build from source (Option B). |
 | Docker image | **not published** | Option C is not available yet |
-| mainnet genesis | must be generated; `chain-specs/x3-mainnet-*.json` is not committed | `scripts/mainnet/generate_mainnet_chain_spec.sh` (needs the authority/council/treasury keys and escrow addresses) |
+| mainnet genesis | must be generated; `chain-specs/x3-mainnet-*.json` is not committed | `scripts/mainnet/generate_mainnet_chain_spec.sh` (needs the authority/council/treasury keys, the atomic and settlement gateway accounts, and the escrow addresses) |
 | `--chain mainnet` | **not a valid id** | pass a spec **path** (`--chain /etc/x3/chain-spec.json`), or the built-in `production` id |
 
 Everything in this runbook that touches the binary, the genesis and the systemd
@@ -299,8 +299,12 @@ sudo bash scripts/install-validator.sh \
 
 **Getting the genesis.** `x3-mainnet-plain.json` is produced by
 `scripts/mainnet/generate_mainnet_chain_spec.sh`, which needs the authority,
-endowed, council and treasury keys plus the EVM/SVM escrow addresses (see
-`launch-gates/GENESIS_CEREMONY_CHECKLIST.md`). One validator does not build the
+endowed, council and treasury keys, the EVM/SVM escrow addresses, and the two
+gateway accounts the chain will authorize — `X3_PRODUCTION_ATOMIC_GATEWAYS` and
+`X3_PRODUCTION_SETTLEMENT_GATEWAYS`, JSON arrays of SS58 (see
+`launch-gates/GENESIS_CEREMONY_CHECKLIST.md`). The builder refuses the published
+development seeds, and a chain whose genesis names no gateway cannot assign or
+finalize an atomic bundle at all, so decide those accounts in the ceremony. One validator does not build the
 genesis alone — it must be identical on every validator, so take it from the
 ceremony and check its `sha256sum` against the published value.
 
