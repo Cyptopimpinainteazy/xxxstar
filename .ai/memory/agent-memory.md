@@ -6927,3 +6927,11 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - `scripts/testnet/consensus-soak.sh` now **defaults `NODE_TRIE_CACHE_BYTES=0`**, keeps the 1 GiB bound as a node-leak detector, and prints the cache size it ran with. Production budget, for operators: **~2.4 GiB RSS per validator after two hours** with default caches.
 - Release soak also confirmed consensus on the *release* binary: agreement at heights 9044/18088/27132, +36,159 blocks each, zero peer bans, 0–3 trie timeouts.
 - `x3SettlementEngine.submitBtcHeaders` (call_index 35) + `BtcHeaderOrigin` landed as spec_version 17 (PR #474); the mock composes `EitherOfDiverse<EnsureRoot, EnsureSignedBy<MockBtcRelayers>>` so "root-only by default, named relayer when a network opts in" is testable with one config item.
+
+## 2026-09-23 (twenty-ninth pass) — /tmp is not durable on this box
+### Facts to remember
+- **A `/tmp` sweep at ~03:22 UTC removed everything this agent had there**: the worktree (`/tmp/x3-soak-run`), `CARGO_TARGET_DIR=/tmp/x3-signer-target`, Bitcoin Core + the regtest chain, three soak directories (including the in-flight TICKET-100b run), and `packages/ts-sdk/node_modules`. `df` fell from ~1.4 TB to 593 GB — a disk sweep, not a targeted deletion.
+- **Nothing was lost that mattered**: every commit was pushed (`origin/master` `770e13ab08`, PRs #466–#475), the srtool images survive at `sha256:8638a668…`, and the repository's own `target/` (54 GB) cut the rebuild to 9 minutes.
+- **Durable work lives in the repo**: `.gitignore` line 169 ignores `/.wt-*/` for exactly this. The new worktree is `<repo>/.wt-agent` (branch `agent/soak-100b`), `CARGO_TARGET_DIR=<repo>/target`, and soak `BASE_DIR` inside the worktree. Never `/tmp` again on this box.
+- **The Codex sandbox broke after the sweep**: non-escalated commands fail with `error building bubblewrap command: mountinfo path is not absolute`. Every command needs `require_escalated` until the box's sandbox is restarted. Environment, not repository.
+- `docker images | head -4` truncated the list and made me briefly believe the srtool images had been pruned — check the full list before concluding a tool is gone.
