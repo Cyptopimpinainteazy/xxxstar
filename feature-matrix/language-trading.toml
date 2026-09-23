@@ -65,8 +65,15 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["End-to-end compiler→runtime route incomplete"]
-evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]
+blockers = ["No test drives a compiled program's call into the atomic kernel: the bridge proves compile → runtime-loadable bytecode, and the route from there to `X3AtomicKernel` is the open half"]
+required_tests = [
+  "compile_source_emits_runtime_loadable_bytecode",
+  "compile_source_rejects_invalid_source",
+  "test_execute_returns_42",
+  "test_gas_exhausted",
+]
+test_evidence = ["note: the four tests above are in crates/x3-integration (tests/compiler_bridge.rs, src/mini_x3.rs); measured on master 2026-09-23 (TICKET-101 third pass)"]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
 registry_feature = "atomic_kernel"
 
 [[feature]]
@@ -151,8 +158,10 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs tamper/replay tests"]
-evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]
+blockers = ["**Nothing here is authenticated.** There is no signature or digest of any kind in the X3BC envelope, so the row's own name claims more than the code does; the decoder validates structure, the magic, and gas accounting. TICKET-108"]
+required_tests = ["test_invalid_magic", "test_parse_minimal_module"]
+test_evidence = ["note: the no-std decoder is crates/x3-integration/src/mini_x3.rs::parse_module, whose tests are test_invalid_magic / test_parse_minimal_module / test_execute_returns_42 / test_gas_exhausted; measured on master 2026-09-23"]
+evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22
@@ -168,5 +177,7 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs signed domain-separated production envelope proof"]
-evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]
+blockers = ["The envelope is versioned on paper and unchecked in the no-std decoder: `mini_x3::parse_module` skips the 20 header bytes after the magic — version, flags, checksum, min-version, feature flags — so a wrong-version or corrupted module is accepted when its structure parses. `x3-backend` writes a checksum over the body and neither reader verifies it. TICKET-108"]
+required_tests = ["test_invalid_magic", "test_execute_returns_42", "test_gas_exhausted"]
+test_evidence = ["note: the format is defined in crates/x3-backend/src/bc_format.rs and re-implemented for no-std in crates/x3-integration/src/mini_x3.rs; measured on master 2026-09-23 (TICKET-101 third pass)"]
+evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
