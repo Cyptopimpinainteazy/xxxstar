@@ -60,20 +60,38 @@ Consequence: an attacker front-running a legitimate executor's off-chain worker 
 `do_finalize_bundle` refuses a second finalization (`ProofAlreadyExists`). Every such bundle is
 consumed with a proof nobody produced.
 
-## The dispatch path is weaker than the validation path
+## Correction, 2026-09-23: the dispatch path is not weaker than the validation path
 
-`ValidateUnsigned` requires `BundleStatus::Executing`. The dispatch the extrinsic actually runs,
-`do_finalize_bundle`, accepts **`Pending` as well**:
+This file first claimed that `do_finalize_bundle` accepting `Pending` as well as `Executing` meant "a
+bundle that was never assigned to anybody can be finalized", because a block author includes unsigned
+extrinsics without the pool's validation. **That is wrong, and the code says so two checks later:**
 
 ```rust
-ensure!(
-    record.status == BundleStatus::Pending || record.status == BundleStatus::Executing,
-    Error::<T>::InvalidBundleState
-);
+// do_finalize_bundle, later in the same storage layer
+Self::verify_bundle_consistency(&record)?;
+// ... and inside verify_bundle_consistency:
+ensure!(record.executor.is_some(), Error::<T>::InvalidBundleState);
 ```
 
-A block author can include an unsigned extrinsic without the pool's validation, so the weaker of the
-two checks is the one that holds. A bundle that was never assigned to anybody can be finalized.
+`record.executor` is set in exactly one place — `assign_bundle_executor`, which sets
+`BundleStatus::Executing` on the line before it — so a `Pending` bundle has no executor and cannot pass
+the consistency check. The `Pending` acceptance was a *dead* branch, not an open door, and tracing it
+took two greps.
+
+What it was, though, is a contradiction a reader had to resolve: `validate_unsigned` says `Executing`,
+the dispatch accepted `Pending`, and the reason the difference did not matter lived in a third
+function. `do_finalize_bundle` now requires `Executing` explicitly, with a comment saying why, and the
+rollback path keeps accepting `Pending` — cancelling an unclaimed bundle is exactly what a submitter
+is entitled to do. My first attempt at this edit hit the rollback check instead, which a pre-existing
+test (`economic_halt_does_not_trap_pending_bundle_funds`) caught immediately: the test suite was doing
+its job even where my reading was not.
+
+The rest of this file — the unsigned call, the self-satisfying certificate, the missing tests — stands,
+and the tests now exist: `finalization_refuses_a_bundle_nobody_has_been_assigned_to`,
+`finalization_requires_the_chain_to_have_anchored_the_certificate`,
+`finalization_requires_the_receipt_root_the_bundle_commits_to`, `finalization_happens_once`, and
+`an_unsigned_finalization_cannot_be_attributed_to_the_executor` — the last of which asserts today's
+behaviour on purpose, so that closing the hole has to change it.
 
 ## Also true
 

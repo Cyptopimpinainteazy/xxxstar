@@ -319,6 +319,27 @@ No fund path in this repository releases value on `BundleFinalized`, so the impa
 integrity and liveness rather than a drain — but it is a P0 core-pallet claim and `X3-RT-002` drops
 from 40 to 25 on it. There is also no test for `submit_finalization_result` anywhere.
 
+**Corrected 2026-09-23, and the tests now exist.** The claim that "the dispatch path is weaker than the
+validation path, so a bundle that was never assigned can be finalized" was **wrong**: `executor` is set
+only by `assign_bundle_executor` (which also sets `Executing`), and `verify_bundle_consistency` requires
+it, so a `Pending` bundle was already refused — two checks later than the documented rule, which is
+what made it confusing rather than exploitable. `do_finalize_bundle` now requires `Executing`
+explicitly; rollback still accepts `Pending`, because cancelling an unclaimed bundle is the submitter's
+right (a pre-existing test caught my first attempt at the edit, which hit the rollback check).
+
+Five tests now cover the entry point, which had none: refusal of a bundle nobody was assigned to,
+refusal of a certificate the chain never anchored, the receipt-root commitment (wrong root refused,
+right root accepted, bundle `Finalized`, PoAE proof stored), finalization happening once, and
+`an_unsigned_finalization_cannot_be_attributed_to_the_executor` — the hole asserted *as* today's
+behaviour so that closing it must change the test.
+
+**What remains for TICKET-097 is exactly the authorization model**, and it is the owner's call: the
+anchor is unsigned and stores the first non-zero certificate for a height, the finalization is
+unsigned, so a caller can plant the value it is about to be checked against. Either the result gains a
+signature from the assigned executor (or a committee quorum), or the chain gets a real finality source
+(a signed finalized-head tracker, or a verified GRANDPA justification). Both were judged too large to
+guess at without that decision.
+
 **TICKET-097 — authorize bundle finalization.** Pick one: (a) require the assigned executor's
 signature on the result (and adjust the off-chain worker's submission path); (b) give the runtime a
 real finality source — a signed finalized-head tracker or a verified GRANDPA justification — so

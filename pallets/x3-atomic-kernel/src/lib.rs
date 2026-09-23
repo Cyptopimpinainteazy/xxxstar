@@ -1426,9 +1426,16 @@ pub mod pallet {
 
                 let mut record = Bundles::<T>::get(bundle_id).ok_or(Error::<T>::BundleNotFound)?;
 
+                // `Executing` only — the rule `validate_unsigned` states, and the one this function
+                // could not be read as enforcing while it also accepted `Pending`. A `Pending`
+                // bundle has no executor (only `assign_bundle_executor` sets one, and it sets
+                // `Executing` with it), so `verify_bundle_consistency` below would refuse it too —
+                // but a block author includes unsigned extrinsics without the pool's validation,
+                // and "refused two checks later for a different reason" is not the documented rule.
+                // (Rollback keeps accepting `Pending`: cancelling an unclaimed bundle is exactly
+                // what a submitter is entitled to do.)
                 ensure!(
-                    record.status == BundleStatus::Pending
-                        || record.status == BundleStatus::Executing,
+                    record.status == BundleStatus::Executing,
                     Error::<T>::InvalidBundleState
                 );
 
