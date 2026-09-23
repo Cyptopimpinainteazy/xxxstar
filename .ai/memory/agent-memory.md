@@ -7116,3 +7116,18 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - `atomic_gateway::published_dev_seed` matches exactly after trimming (`//x3-atomic-gateway-prod` is a
   different account); `refuses_published_seed_on_a_live_chain(chain_type, chain_id, uri)` is a pure
   rule with three unit tests — the cheapest way to make a startup decision testable.
+### TICKET-101 third pass — measure from the tests, not from a name pattern
+- The second pass declared six rows unbacked because it searched `test_*domain/binding/...`. This
+  repository names tests as sentences, so the search found nothing and the conclusion was wrong:
+  `crates/x3-atomic-swap/src/secret_release.rs` alone holds 11 tests, firewall and permit included.
+  **When measuring coverage, list the crate's `#[test]` names and read them — do not grep a prefix.**
+- Finished rows now carry `required_tests`, which `feature_matrix.py check` resolves against the row's
+  own `paths`; that is the only form of the claim a later pass cannot wave away.
+- **TICKET-108 (new): the X3BC envelope's version, min_version and checksum are written and never
+  checked.** `crates/x3-backend/src/bc_format.rs` writes them; `crates/x3-integration/src/mini_x3.rs`
+  (the no_std decoder, and the one `executor::execute` uses without the `std` feature) skips all 20
+  header bytes after the magic, and `x3-backend`'s reader takes the checksum into `_checksum`. Two
+  decoders for one format, the weaker one in the runtime.
+- Editing a row's blockers+evidence wholesale silently deleted an `evidence` array on two rows, and
+  `feature_matrix.py check` caught it immediately ("at least one evidence entry is required"). Keep at
+  least one entry when rewriting those lines.

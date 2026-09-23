@@ -272,8 +272,16 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Must land firewall and unforgeable permit together"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+blockers = ["No live external-chain proof of the release path (TICKET-095): these tests exercise the chain-side firewall against constructed evidence, not a real EVM/SVM/BTC release"]
+required_tests = [
+  "authorizes_only_when_all_required_domains_are_finalized",
+  "rejects_reused_proof_across_required_domains",
+  "rejects_refunded_destination",
+  "rejects_wrong_preimage",
+  "rejects_stale_intent_hash_and_terminal_status",
+]
+test_evidence = ["note: firewall and permit are landed in crates/x3-atomic-swap/src/secret_release.rs, which holds 11 tests; measured 2026-09-23 (TICKET-101 third pass). The 2026-09-23 second pass reported 'no tests of those behaviours' because it searched for names starting with test_ — these are sentence-named."]
+evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability", "pr #162 merged 2026-09-13, pr #163 merged 2026-09-17; provenance recorded 2026-09-22; tests measured on master 2026-09-23"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -361,9 +369,15 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs checks chain-id and VM binding", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+blockers = ["No live external-chain proof of the binding (TICKET-095): the chain-id and VM checks are exercised against constructed evidence only"]
+required_tests = [
+  "rejects_wrong_chain_or_vm_binding",
+  "rejects_missing_destination_domain",
+  "rejects_refunded_destination",
+  "proof_set_rejects_duplicate_domain_operation",
+]
+evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "note: PR #162 checks chain-id and VM binding; #163 hardens the permit", "pr #162 merged 2026-09-13, pr #163 merged 2026-09-17; tests measured on master 2026-09-23 (TICKET-101 third pass)"]
+test_evidence = ["note: named tests live in crates/x3-atomic-swap (src/secret_release.rs and src/proof_bundle.rs); measured on master 2026-09-23 (TICKET-101 third pass)"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -415,9 +429,15 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs binds the finality proof to the exact lock tx and block", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+blockers = ["No live external-chain proof of the binding (TICKET-095): the tx/block checks are exercised against constructed evidence only"]
+required_tests = [
+  "rejects_finality_for_different_transaction_or_block",
+  "rejects_wrong_finality_domain_transaction_and_block",
+  "rejects_included_but_not_finalized_transaction",
+  "rejects_insufficient_confirmations",
+]
+evidence = ["crates/x3-atomic-swap/src/finality.rs", "note: PR #162 binds the finality proof to the exact lock transaction and block; #163 hardens the permit", "pr #162 merged 2026-09-13, pr #163 merged 2026-09-17; tests measured on master 2026-09-23 (TICKET-101 third pass)"]
+test_evidence = ["note: named tests live in crates/x3-atomic-swap (src/secret_release.rs and src/finality.rs); measured on master 2026-09-23 (TICKET-101 third pass)"]
 
 [[feature]]
 id = "X3-XCHAIN-022"

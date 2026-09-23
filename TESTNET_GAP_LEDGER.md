@@ -541,6 +541,46 @@ someone measures them; the next pass should start from the test names, not from 
 have no named test or file I could confirm on master this pass. Their scores stand until someone
 does, which is the point of the ticket.
 
+### TICKET-101 — CLOSED 2026-09-23, after three passes
+
+**Every row that was left open has now been measured against master.** Pass 1: five cross-chain rows gained their tests (82 → 88) and the three security rows were re-measured against reality, one blocker being false. Pass 2: X3-XCHAIN-020 gained its refund-rejection family and X3-XCHAIN-015's blocker stood and named its tests. Pass 3 (below): the six remaining rows — and the second pass's verdict on them was wrong. Scores stay where measurement put them; what changed is that each one now names the tests that back it, which the matrix gate checks.
+
+### Third pass over TICKET-101 — 2026-09-23 (the six that were left)
+
+**The second pass was wrong about the tests, and the reason is worth keeping: it searched for names
+beginning with `test_`.** The behaviours are covered, by sentence-named tests, and every name below is
+now in its row's `required_tests` — which `feature_matrix.py check` resolves against the row's own
+paths, so a later pass cannot claim absence without the gate contradicting it:
+
+| row | tests on master |
+| --- | --- |
+| X3-XCHAIN-013 Secret-release firewall | `authorizes_only_when_all_required_domains_are_finalized`, `rejects_reused_proof_across_required_domains`, `rejects_refunded_destination`, `rejects_wrong_preimage`, `rejects_stale_intent_hash_and_terminal_status` |
+| X3-XCHAIN-018 Secret-release domain binding | `rejects_wrong_chain_or_vm_binding`, `rejects_missing_destination_domain`, `rejects_refunded_destination`, `proof_set_rejects_duplicate_domain_operation` |
+| X3-XCHAIN-021 Secret-release tx/block binding | `rejects_finality_for_different_transaction_or_block`, `rejects_wrong_finality_domain_transaction_and_block`, `rejects_included_but_not_finalized_transaction`, `rejects_insufficient_confirmations` |
+| X3-LANG-004 Bytecode routing | `compile_source_emits_runtime_loadable_bytecode`, `compile_source_rejects_invalid_source`, `test_execute_returns_42`, `test_gas_exhausted` |
+| X3-LANG-009 Authenticated decoder | `test_invalid_magic`, `test_parse_minimal_module` |
+| X3-LANG-010 Versioned envelope | `test_invalid_magic`, `test_execute_returns_42`, `test_gas_exhausted` |
+
+`crates/x3-atomic-swap/src/secret_release.rs` alone holds eleven tests, including the firewall and the
+permit the row's old blocker said had to "land … together". Scores are unchanged: the evidence now
+supports `tested`, and nothing here justifies raising `mainnet_ready` past the live-proof gap.
+
+**Two blockers replaced, two sharpened, and the sharpening found something the numbers could not say.**
+
+**TICKET-108 — the bytecode envelope's version and checksum are written and never checked.**
+`crates/x3-backend/src/bc_format.rs` is the canonical format: magic, semantic version, `min_version`,
+feature flags, and a checksum over the body (`compute_checksum`, written at offset 12). For `no_std`
+builds `crates/x3-integration/src/mini_x3.rs` re-implements it — and that is the decoder
+`executor::execute` uses when the `std` feature is off, which is the runtime's case. Its
+`parse_module` reads the magic and then `r.skip(20)`: version, flags, checksum, min-version and feature
+flags are all skipped, and `x3-backend`'s own reader reads the checksum into `_checksum` without
+verifying it. A module with a wrong version, an unsatisfiable `min_version`, or a corrupted body is
+accepted as long as it parses structurally. So: two decoders for one format, the weaker one in the
+runtime, and X3-LANG-009's own name ("Authenticated bytecode decoder") describes something with no
+signature or digest behind it. Acceptance: one decoder for the format, or the no-std one verifying the
+magic, version, `min_version` and checksum the writer already emits, with a test each for a corrupted
+body and a future version. Evidence: `.ai/reports/feature-matrix-third-pass-20260923.md`.
+
 ## GAP-SECRETS-COMMITTED — four live credentials in tracked source — 2026-09-23
 
 Found while looking for somewhere to put a DRPC key the operator had just bought. Tracked source
