@@ -220,6 +220,44 @@ def main() -> int:
         check("a header whose parent was never admitted is refused",
               gap.returncode != 0 and "BtcParentMissing" in gap_out,
               "\n".join(gap_out.splitlines()[-4:]))
+
+        # Unattended: the loop keeps the chain at the tip and remembers where it got to. It has to
+        # catch up the two blocks the gap check mined (pushing 122..gapped in order) and then keep
+        # up as more arrive.
+        cursor = work / "cursor.json"
+        cursor.write_text(json.dumps({"height": tip, "block_hash": headers[-1]["block_hash"]}))
+        relay_log = work / "relay.log"
+        relay_handle = open(relay_log, "w")
+        relay = subprocess.Popen(
+            ["node", str(ROOT / "scripts/btc/push-headers.mjs"),
+             "--ws", f"ws://127.0.0.1:{args.rpc_port}", "--datadir", str(datadir),
+             "--bitcoin-cli", str(cli), "--suri", "//Alice", "--via", "sudo",
+             "--loop", "--cursor", str(cursor), "--interval", "2"],
+            stdout=relay_handle, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+        address = btc("-rpcwallet=x3", "getnewaddress")
+        btc("generatetoaddress", "3", address)
+        new_tip = int(btc("getblockcount"))
+        seen, advanced = None, False
+        deadline = time.time() + 90
+        while time.time() < deadline:
+            try:
+                seen = json.loads(cursor.read_text())["height"]
+            except Exception:
+                seen = None
+            if seen == new_tip:
+                advanced = True
+                break
+            time.sleep(2)
+        relay.terminate()
+        try:
+            relay.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            relay.kill()
+        relay_handle.close()
+        detail = "" if advanced else (
+            f"cursor at {seen}, bitcoin tip {new_tip}: "
+            + " | ".join(relay_log.read_text(errors="replace").splitlines()[-3:]))
+        check("the relay loop follows new blocks unattended", advanced, detail)
         stop_node()
     finally:
         stop_bitcoind()

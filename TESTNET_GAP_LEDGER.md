@@ -271,11 +271,16 @@ requires `btcBestHeight` to reach the tip, and requires a gapped push to be refu
 `BtcParentMissing`. **5/5** — and it **skips loudly** without a Bitcoin Core install rather than
 passing quietly.
 
-**What is still missing:** an unattended sender running against a public network (`push-headers.mjs`
-is one batch at a time, driven by hand); a checkpoint and a relayer on a real testnet; a push origin
-that is not root (`BtcHeaderOrigin = EnsureRoot` here by design, and a dev spec ships `sudo.key =
-null`, so an operator has to name it); and a bond, without which one relayer is a single point of
-failure.
+**The sender runs unattended now** (2026-09-23): `push-headers.mjs --loop --cursor <file>` keeps the
+chain at the local Bitcoin node's tip — batch pushes, a cursor written atomically only after a range
+is included, catch-up after restarts, resume from the cursor, and a **stop** rather than a skip when a
+range is refused (skipping a header would leave a permanent gap in the chain's view of Bitcoin). The
+drill requires all of it: **6/6**, including "the relay loop follows new blocks unattended".
+
+**What is still missing:** a relayer running against a *public* network; a checkpoint pinned on one;
+a push origin that is not root (`BtcHeaderOrigin = EnsureRoot` here by design, and a dev spec ships
+`sudo.key = null`, so an operator has to name it); and a bond, without which one relayer is a single
+point of failure and can withhold.
 
 **What is still missing, in order:** (1) one working signing path — nothing in this repository can
 sign and submit an extrinsic on this host, because no `node_modules` is installed anywhere and the
