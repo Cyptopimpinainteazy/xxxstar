@@ -519,6 +519,37 @@ someone measures them; the next pass should start from the test names, not from 
 have no named test or file I could confirm on master this pass. Their scores stand until someone
 does, which is the point of the ticket.
 
+## GAP-SECRETS-COMMITTED — four live credentials in tracked source — 2026-09-23
+
+Found while looking for somewhere to put a DRPC key the operator had just bought. Tracked source
+carried an Alchemy key, a paid DRPC key, an Ankr key **and a wallet private key** (the provider keys
+twice, in `crates/external-chains/src/{env_config,rpc}.rs`), plus a live Infura key in two
+`mcp-config.json` copies. The private key was `EnvConfig::from_env()`'s *default* wallet, so any build
+of that crate could sign from an account whose key anyone reading the repository knows. That address
+holds 0 ETH on Arbitrum and 0 on Base as of today (checked against public RPCs), so nothing has been
+taken — but it is burned.
+
+Fixed: credentials come only from `ALCHEMY_API_KEY` / `DRPC_API_KEY` / `ANKR_API_KEY`, the wallet only
+from `X3_BOT_PRIVATE_KEY` + `X3_BOT_ADDRESS` (absent means absent — no default key, no default
+wallet), symmetric with the private key never being defaulted; keyless public endpoints are the
+built-in default (`EnvConfig::new`) and paid endpoints are promoted ahead of them when configured
+(`EnvConfig::from_env`); and `scripts/check-no-provider-secrets.sh` — wired into `make guard` and
+`local-ci`, with a reasoned allow-list at `scripts/allowed-provider-secrets.txt` — refuses keyed
+provider URLs or 64-hex signing keys in tracked files, printing file, line and pattern but never the
+value. Evidence: `.ai/reports/provider-secrets-20260923.md`.
+
+**TICKET-102 — rotate, and decide about history.** Removing a value from HEAD does not un-expose it:
+rotate all four keys, treat the wallet as burned, and decide whether to rewrite history the way SEC-v1
+did for the validator seeds. Acceptance: every key that was ever in this repository is revoked, and no
+build anywhere defaults to a credential.
+
+**TICKET-103 — stop tracking build output and crawler state.**
+`packages/blockchain-connector/dist/` and `infra-structure/services/rpc-crawler/crawler_state.json` are
+output and state, currently allowed by the secret guard only because the keyed values in them are
+other people's recorded endpoints rather than our credentials. Untracking them removes those values as
+a side effect and stops a build artifact from being edited by hand. Acceptance: `git ls-files`
+contains no `dist/` and no crawler state.
+
 ## GAP-TMP-NOT-DURABLE — a `/tmp` sweep cost a two-hour measurement — 2026-09-23
 
 Everything this agent had under `/tmp` was removed between 02:01 and 03:22 UTC: the git worktree the

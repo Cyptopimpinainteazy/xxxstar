@@ -103,6 +103,26 @@ header, boots a node, reads `BtcCheckpoints` / `BtcHeaderMetaStore` / `BtcBestHe
 over RPC, requires the chain to keep authoring, and requires a spec whose checkpoint is not
 a mined header to be refused. Run it after changing anything here.
 
+### Provider credentials (RPC endpoints)
+
+Paid RPC credentials are **never** in source. They come from the environment, and a build with none of
+them set runs on keyless public endpoints:
+
+```
+export DRPC_API_KEY=…        # https://lb.drpc.org/<network>/<key> — promoted to primary per network
+export ALCHEMY_API_KEY=…     # https://<subnet>.g.alchemy.com/v2/<key>
+export ANKR_API_KEY=…        # https://rpc.ankr.com/<network>/<key>
+export INFURA_API_KEY=…      # for the MCP service configs under infra/
+```
+
+`crates/external-chains` reads these in `ProviderCredentials::from_env()`; `EnvConfig::new(network)`
+builds the public defaults, and `EnvConfig::from_env()` puts any configured paid endpoint in front of
+them. The signing wallet is `X3_BOT_PRIVATE_KEY` + `X3_BOT_ADDRESS`, and with them unset there is no
+wallet at all. `scripts/check-no-provider-secrets.sh` (in `make guard` and `local-ci`) fails a change
+that puts a keyed provider URL or a 64-hex signing key into tracked source; add an entry to
+`scripts/allowed-provider-secrets.txt` only with a stated reason, as that file does for vendored
+trees and generated data.
+
 ### Making the chain follow Bitcoin (a header relayer)
 
 An anchor is a starting point, not a subscription: until something pushes headers, the chain's

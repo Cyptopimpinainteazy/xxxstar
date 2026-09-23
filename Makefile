@@ -71,6 +71,7 @@ guard:
 	@python3 scripts/agent_guard.py
 	@python3 scripts/no_stub_guard.py
 	@python3 scripts/test_cheat_guard.py
+	@bash scripts/check-no-provider-secrets.sh
 
 test:
 	@pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_e2e_mocked.py

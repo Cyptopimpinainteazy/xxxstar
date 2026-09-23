@@ -4,6 +4,8 @@
 //! with fallback chains, load balancing, and automatic retry logic.
 
 use serde::{Deserialize, Serialize};
+
+use crate::env_config::ProviderCredentials;
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 /// RPC endpoint configuration
@@ -239,55 +241,102 @@ impl Default for RpcRegistry {
 
 /// Pre-configured Arbitrum mainnet RPC setup
 pub fn arbitrum_mainnet_config() -> ChainRpcConfig {
-    ChainRpcConfig::new(42161, "Arbitrum One")
-        // Primary RPC endpoints (from your config)
-        .add_rpc(RpcEndpoint::new("https://arb-mainnet.g.alchemy.com/v2/Fe5T2pGsX76ml9kDCwVRZhtmkdixfrDQ")
-            .with_priority(100)
-            .with_timeout(25000))
-        .add_rpc(RpcEndpoint::new("https://lb.drpc.org/arbitrum/ArgUBy0RzURpos-Jlz1TqLRxbgscV2AR8JXZrqRhf0fE")
-            .with_priority(90))
-        .add_rpc(RpcEndpoint::new("https://rpc.ankr.com/arbitrum/648269110992d35fb12b490f3e9d00e18141ad9212081909344f15ec1c342a3c")
-            .with_priority(80))
-        .add_rpc(RpcEndpoint::new("https://arb1.arbitrum.io/rpc")
-            .with_priority(70))
-        // WebSocket endpoints
-        .add_ws(WsEndpoint::new("wss://lb.drpc.org/arbitrum/ArgUBy0RzURpos-Jlz1TqLRxbgscV2AR8JXZrqRhf0fE"))
-        .add_ws(WsEndpoint::new("wss://rpc.ankr.com/arbitrum/ws/648269110992d35fb12b490f3e9d00e18141ad9212081909344f15ec1c342a3c"))
+    // Paid endpoints come from the environment, keyless public ones from source. This function used
+    // to hardcode an Alchemy key, a DRPC key and an Ankr key (2026-09-23); a build with none of the
+    // variables set now gets the public endpoints and nothing else.
+    let credentials = ProviderCredentials::from_env();
+    let mut config = ChainRpcConfig::new(42161, "Arbitrum One");
+    if let Some(url) = credentials.drpc_url("arbitrum") {
+        config = config
+            .add_rpc(
+                RpcEndpoint::new(url.clone())
+                    .with_priority(100)
+                    .with_timeout(25000),
+            )
+            .add_ws(WsEndpoint::new(url.replacen("https://", "wss://", 1)));
+    }
+    if let Some(url) = credentials.alchemy_url("arb-mainnet") {
+        config = config.add_rpc(RpcEndpoint::new(url).with_priority(90));
+    }
+    if let Some(url) = credentials.ankr_url("arbitrum") {
+        config = config.add_rpc(RpcEndpoint::new(url).with_priority(80));
+    }
+    config
+        .add_rpc(RpcEndpoint::new("https://arb1.arbitrum.io/rpc").with_priority(70))
+        .add_ws(WsEndpoint::new("wss://arbitrum-one-rpc.publicnode.com"))
         // Flash loan providers
-        .add_flashloan(FlashLoanProvider::new(
-            "Aave V3",
-            "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
-            3,
-        ).with_liquidity(100_000_000 * 10u128.pow(18)))
-        .add_flashloan(FlashLoanProvider::new(
-            "Balancer V2",
-            "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
-            5,
-        ).with_liquidity(250_000_000 * 10u128.pow(18)))
-        .add_flashloan(FlashLoanProvider::new(
-            "Radiant Capital",
-            "0xF4B1486DD74D07706052A33d31d7c0AAFD0659E1",
-            4,
-        ).with_liquidity(50_000_000 * 10u128.pow(18)))
-        .add_flashloan(FlashLoanProvider::new(
-            "dForce",
-            "0x0988f3C0cFd7F0326475fA7fDa7F64e0663B70F0",
-            5,
-        ).with_liquidity(40_000_000 * 10u128.pow(18)))
+        .add_flashloan(
+            FlashLoanProvider::new("Aave V3", "0x794a61358D6845594F94dc1DB02A252b5b4814aD", 3)
+                .with_liquidity(100_000_000 * 10u128.pow(18)),
+        )
+        .add_flashloan(
+            FlashLoanProvider::new(
+                "Balancer V2",
+                "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+                5,
+            )
+            .with_liquidity(250_000_000 * 10u128.pow(18)),
+        )
+        .add_flashloan(
+            FlashLoanProvider::new(
+                "Radiant Capital",
+                "0xF4B1486DD74D07706052A33d31d7c0AAFD0659E1",
+                4,
+            )
+            .with_liquidity(50_000_000 * 10u128.pow(18)),
+        )
+        .add_flashloan(
+            FlashLoanProvider::new("dForce", "0x0988f3C0cFd7F0326475fA7fDa7F64e0663B70F0", 5)
+                .with_liquidity(40_000_000 * 10u128.pow(18)),
+        )
         // DEX Routers
-        .add_dex(DexRouter::new("Uniswap V3", "AMM", "0xE592427A0AEce92De3Edee1F18E0157C05861564")
-            .with_factory("0x1F98431c8aD98523631AE4a59f267346ea31F984"))
-        .add_dex(DexRouter::new("SushiSwap V2", "AMM", "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506"))
-        .add_dex(DexRouter::new("Camelot V2", "AMM", "0xc873fEcbd354f5A56E00E710B90EF4201db2448d")
-            .with_factory("0x6EcCab422D763aC031210895C81787E87B43A652"))
-        .add_dex(DexRouter::new("Trader Joe V2", "AMM", "0xb4315eDB925C2c89bFdE53d243b4db61b5D0a4e2")
-            .with_factory("0x8e42f2F4101563bF679975178e880FD87d3eFd4e"))
-        .add_dex(DexRouter::new("Ramses V2", "AMM", "0xAAA87963EFeB6f7E0a2711F397663105Acb1805e")
-            .with_factory("0xAAA20D08e59F6561f242b08513D36266C5A29415"))
-        .add_dex(DexRouter::new("Chronos", "AMM", "0xE708aa9E887980750C040a6A2Cb901c37aA63434")
-            .with_factory("0xCEFb89f8103fC792B03C15d8c722a48A5C049660"))
+        .add_dex(
+            DexRouter::new(
+                "Uniswap V3",
+                "AMM",
+                "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+            )
+            .with_factory("0x1F98431c8aD98523631AE4a59f267346ea31F984"),
+        )
+        .add_dex(DexRouter::new(
+            "SushiSwap V2",
+            "AMM",
+            "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
+        ))
+        .add_dex(
+            DexRouter::new(
+                "Camelot V2",
+                "AMM",
+                "0xc873fEcbd354f5A56E00E710B90EF4201db2448d",
+            )
+            .with_factory("0x6EcCab422D763aC031210895C81787E87B43A652"),
+        )
+        .add_dex(
+            DexRouter::new(
+                "Trader Joe V2",
+                "AMM",
+                "0xb4315eDB925C2c89bFdE53d243b4db61b5D0a4e2",
+            )
+            .with_factory("0x8e42f2F4101563bF679975178e880FD87d3eFd4e"),
+        )
+        .add_dex(
+            DexRouter::new(
+                "Ramses V2",
+                "AMM",
+                "0xAAA87963EFeB6f7E0a2711F397663105Acb1805e",
+            )
+            .with_factory("0xAAA20D08e59F6561f242b08513D36266C5A29415"),
+        )
+        .add_dex(
+            DexRouter::new(
+                "Chronos",
+                "AMM",
+                "0xE708aa9E887980750C040a6A2Cb901c37aA63434",
+            )
+            .with_factory("0xCEFb89f8103fC792B03C15d8c722a48A5C049660"),
+        )
         .with_explorer("https://arbiscan.io")
-        .with_block_time(1000)  // Arbitrum L2: ~1s
+        .with_block_time(1000) // Arbitrum L2: ~1s
         .with_finality(1) // Arbitrum finalizes quickly
 }
 
@@ -298,12 +347,6 @@ pub fn create_default_registry() -> RpcRegistry {
         .register(
             ChainRpcConfig::new(8453, "Base Mainnet")
                 .add_rpc(RpcEndpoint::new("https://mainnet.base.org").with_priority(100))
-                .add_rpc(
-                    RpcEndpoint::new(
-                        "https://base-mainnet.g.alchemy.com/v2/Fe5T2pGsX76ml9kDCwVRZhtmkdixfrDQ",
-                    )
-                    .with_priority(90),
-                )
                 .with_explorer("https://basescan.org")
                 .with_block_time(2000),
         )
