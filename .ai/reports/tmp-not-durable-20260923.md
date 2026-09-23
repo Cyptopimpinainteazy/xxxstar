@@ -1,6 +1,7 @@
-# `/tmp` is not durable here — a cleanup cost a two-hour measurement and a build cache
+# `/tmp` is not durable here — a reboot cost a two-hour measurement and a build cache
 
-Date: 2026-09-23, ~02:01–03:22 UTC
+Date: 2026-09-23, ~02:01–03:22 UTC. **Cause: the machine rebooted at 02:56 UTC** (`who -b` →
+`system boot 2026-09-22 20:56` local = 02:56 UTC; `uptime -s` agrees) and the boot cleared `/tmp`.
 
 ## What happened
 
@@ -14,8 +15,10 @@ Between one command and the next, everything this agent had under `/tmp` was gon
 | `/tmp/x3-soak2h`, `/tmp/x3-soak-rel`, `/tmp/x3-soak-nocache2h` | three soak runs' samples, logs and reports — including the **in-flight** two-hour no-cache run (TICKET-100b), killed about ten minutes in |
 | `packages/ts-sdk/node_modules` | the `@polkadot/api` install that finally made extrinsic signing possible on this host |
 
-`df` went from ~1.4 TB used to 593 GB, so the cleanup freed far more than these: it was a
-disk-space sweep of `/tmp`, not an accident aimed at this work.
+`df` went from ~1.4 TB used to ~593 GB, so far more than these was cleared. `/tmp` is not a tmpfs
+here — it lives on the root filesystem — so this was the boot-time `/tmp` cleanup doing what it is
+configured to do, over a directory that had accumulated data from many sessions. Nothing about it
+was aimed at this work; a reboot is simply ordinary.
 
 ## What survived, and why this is an inconvenience rather than a loss
 
@@ -56,6 +59,6 @@ expect it until the box's sandbox is restarted.
 
 ## Not claimed
 
-Nothing here says the cleanup was wrong or malicious: freeing ~800 GB of `/tmp` is ordinary
-housekeeping, and the only thing it actually destroyed was data that should not have been living
-somewhere specified as temporary.
+Nothing here says the reboot was wrong or malicious. The only thing it actually destroyed was data
+that should not have been living in a directory the operating system is entitled to clear — and the
+repository already had the durable convention (`/.wt-*/`) that would have prevented it.
