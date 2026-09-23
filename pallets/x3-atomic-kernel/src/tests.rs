@@ -454,92 +454,9 @@ fn test_bundle_leg_encode_decode_roundtrip() {
 // agree exactly with what the AtomicSwapOrchestrator writes to off-chain
 // local storage.  They are pure computation tests — no FRAME mock needed.
 
-/// OCW key = b"x3fin:" (6) || bundle_id_bytes (32) = 38 bytes.
-/// Must match the key written by the orchestrator's finalization signal path.
-#[test]
-fn test_ocw_key_is_38_bytes_with_correct_prefix() {
-    let bundle_id = H256::repeat_byte(0xBB);
-    let mut key = b"x3fin:".to_vec();
-    key.extend_from_slice(bundle_id.as_bytes());
 
-    assert_eq!(
-        key.len(),
-        38,
-        "key must be 38 bytes (6 prefix + 32 bundle_id)"
-    );
-    assert_eq!(&key[..6], b"x3fin:", "key must start with 'x3fin:'");
-    assert_eq!(&key[6..38], bundle_id.as_bytes());
-}
 
-/// Payload decode: 40 bytes = receipt_root[0..32] || committed_at_ns[32..40] LE.
-/// Mirrors the decode in `offchain_worker()` hook — both sides must agree.
-#[test]
-fn test_ocw_payload_decode_matches_encode() {
-    use sp_core::hashing::sha2_256;
 
-    let receipt_root = H256::from(sha2_256(b"test_receipt_data"));
-    let committed_at_ns: u64 = 1_700_500_000_000_000_000u64;
-
-    // Encode (orchestrator writer side)
-    let mut payload: Vec<u8> = receipt_root.as_bytes().to_vec();
-    payload.extend_from_slice(&committed_at_ns.to_le_bytes());
-    assert_eq!(payload.len(), 40);
-
-    // Decode (pallet OCW reader side — mirrors offchain_worker() code)
-    let decoded_root = H256::from_slice(&payload[..32]);
-    let decoded_ns = u64::from_le_bytes(
-        payload[32..40]
-            .try_into()
-            .expect("slice is exactly 8 bytes"),
-    );
-
-    assert_eq!(decoded_root, receipt_root);
-    assert_eq!(decoded_ns, committed_at_ns);
-    assert_ne!(
-        decoded_root,
-        H256::zero(),
-        "SHA-256 of real data cannot be zero"
-    );
-}
-
-/// Verify `H256::zero()` guard: the OCW skips bundles with zero receipt_root.
-#[test]
-fn test_ocw_zero_receipt_root_is_rejected() {
-    let zero_root = H256::zero();
-    // Mirrors the guard in offchain_worker(): `if receipt_root == H256::zero() { continue }`
-    assert!(
-        zero_root == H256::zero(),
-        "zero H256 sentinel must work for OCW guard"
-    );
-
-    let non_zero = H256::repeat_byte(0x01);
-    assert_ne!(
-        non_zero,
-        H256::zero(),
-        "non-zero receipt_root must pass OCW guard"
-    );
-}
-
-/// Verify that different bundle IDs produce non-colliding OCW keys.
-#[test]
-fn test_ocw_keys_are_unique_per_bundle() {
-    use sp_core::hashing::sha2_256;
-
-    let id_a = H256::from(sha2_256(b"bundle_alpha"));
-    let id_b = H256::from(sha2_256(b"bundle_beta"));
-    assert_ne!(id_a, id_b);
-
-    let mut key_a = b"x3fin:".to_vec();
-    key_a.extend_from_slice(id_a.as_bytes());
-
-    let mut key_b = b"x3fin:".to_vec();
-    key_b.extend_from_slice(id_b.as_bytes());
-
-    assert_ne!(
-        key_a, key_b,
-        "distinct bundle IDs must produce distinct OCW keys"
-    );
-}
 
 // ── Flash Finality cert key protocol tests ────────────────────────────────
 
@@ -582,15 +499,15 @@ fn test_flash_cert_keys_are_unique_per_block() {
         key_100, key_101,
         "distinct block numbers must produce distinct cert keys"
     );
-    // Also verify x3ff and x3fin prefixes never collide (sanity check)
+    // And that a cert key cannot collide with a leg-receipt key (different prefix).
     let bundle_key: Vec<u8> = {
-        let mut k = b"x3fin:".to_vec();
+        let mut k = b"x3leg:".to_vec();
         k.extend_from_slice(&H256::repeat_byte(0x01).as_bytes()[..8]);
         k
     };
     assert_ne!(
         key_100, bundle_key,
-        "'x3ff:' keys must not collide with 'x3fin:' keys"
+        "'x3ff:' keys must not collide with 'x3leg:' keys"
     );
 }
 
@@ -1110,21 +1027,12 @@ fn test_ocw_leg_key_prefix_does_not_collide_with_finality_or_cert() {
         k.extend_from_slice(&0u32.to_le_bytes());
         k
     };
-    let fin_key: Vec<u8> = {
-        let mut k = b"x3fin:".to_vec();
-        k.extend_from_slice(bundle_id.as_bytes());
-        k
-    };
     let cert_key: Vec<u8> = {
         let mut k = b"x3ff:".to_vec();
         k.extend_from_slice(&42u64.to_le_bytes());
         k
     };
 
-    assert_ne!(
-        leg_key, fin_key,
-        "'x3leg:' keys must not collide with 'x3fin:' keys"
-    );
     assert_ne!(
         leg_key, cert_key,
         "'x3leg:' keys must not collide with 'x3ff:' keys"
@@ -1200,12 +1108,15 @@ fn economic_halt_does_not_block_inflight_bundle_assignment() {
     });
 }
 
-// ── Finalization: the unsigned entry point, and the one hole left in it ──────
+// ── Finalization: the checks, through the entry point that actually exists ───
 //
-// `submit_finalization_result` had **no test at all** until now. That is how a chain with an
-// unsigned finalization path and a self-satisfying certificate check went unnoticed for so long:
-// the checks were there, nobody had ever run them. These tests pin what the pallet does enforce,
-// and the last one pins what it *cannot* — the hole is the ticket, not an oversight in the test.
+// These tests were written against `submit_finalization_result`, the unsigned entry point, because
+// it had no test at all — and writing them is what showed the entry point's defect: it was
+// `ensure_none`, its off-chain marker had no writer in this repository, and the certificate it
+// checked was anchored by an equally unsigned call, so a caller planted the value it was about to
+// be checked against. That call is gone; these drive the same checks through the signed
+// `finalize_atomic_bundle` (`X3LangOrigin`) that the node's atomic gateway service uses, plus one
+// that the unsigned past cannot come back through validate_unsigned.
 
 /// The receipt root the pallet demands when the commitment check is compiled in — which it is for
 /// every build that is not `dev` or `testnet`.
@@ -1234,18 +1145,16 @@ fn anchor_cert(block: u64, cert: H256) {
     crate::FinalityCertAnchors::<Test>::insert(block, cert);
 }
 
+/// Finalize through the signed entry point the node's atomic gateway service uses.
+///
+/// `ALICE` is the authorized origin in this mock (`RootOrSignedAccount`); the finalized block is 1,
+/// which is the block the tests anchor their certificate for.
 fn finalize(
     bundle_id: H256,
     receipt_root: H256,
     cert: H256,
 ) -> frame_support::dispatch::DispatchResult {
-    AtomicKernel::submit_finalization_result(
-        RuntimeOrigin::none(),
-        bundle_id,
-        receipt_root,
-        cert,
-        0,
-    )
+    AtomicKernel::finalize_atomic_bundle(RuntimeOrigin::signed(ALICE), bundle_id, receipt_root, cert, 1)
 }
 
 #[test]
@@ -1332,29 +1241,33 @@ fn finalization_happens_once() {
 }
 
 #[test]
-fn an_unsigned_finalization_cannot_be_attributed_to_the_executor() {
-    // TICKET-097, stated as a test rather than as prose. `submit_finalization_result` is
-    // `ensure_none`: it has no caller identity to compare against `record.executor`, so *anyone*
-    // who can get an unsigned extrinsic into a block can finalize an `Executing` bundle — using a
-    // certificate they planted themselves via the equally unsigned anchor call. The pallet's own
-    // comment claims this requirement "prevents anonymous peers from finalizing bundles they never
-    // claimed", and that is true of *assignment*, not of finalization.
-    //
-    // This test asserts today's behaviour on purpose. Closing the hole has to change it, which is
-    // what makes it a useful alarm: the day someone lands the authorization fix, this test fails
-    // and the ticket closes with it.
+fn finalization_has_no_unsigned_entry_point() {
+    // TICKET-097. `submit_finalization_result` used to be callable with `RuntimeOrigin::none()`,
+    // which is what a block author's unsigned extrinsic carries: no identity at all. It is gone —
+    // the signed entry point is the only one, so an unsigned extrinsic no longer has a call to
+    // reach finalization through. The mock's `X3LangOrigin` accepts any *signed* account, so this
+    // asserts the property that matters here: no signature, no finalization.
     new_test_ext().execute_with(|| {
-        let bundle_id = submit_and_assign(100, 11); // executor is BOB
+        let bundle_id = submit_and_assign(100, 11);
         let cert = H256::repeat_byte(0x88);
         anchor_cert(1, cert);
         let root = committed_receipt_root(bundle_id, cert, 1);
 
-        // `RuntimeOrigin::none()` is what a block author's unsigned extrinsic carries: no identity.
-        assert_ok!(finalize(bundle_id, root, cert));
+        assert_noop!(
+            AtomicKernel::finalize_atomic_bundle(
+                RuntimeOrigin::none(),
+                bundle_id,
+                root,
+                cert,
+                1
+            ),
+            sp_runtime::DispatchError::BadOrigin
+        );
         assert_eq!(
             Bundles::<Test>::get(bundle_id).expect("record").status,
-            BundleStatus::Finalized,
-            "finalized by an origin the pallet cannot name, which is the ticket"
+            BundleStatus::Executing,
+            "an unsigned caller leaves the bundle exactly as it found it"
         );
+        assert_ok!(finalize(bundle_id, root, cert));
     });
 }

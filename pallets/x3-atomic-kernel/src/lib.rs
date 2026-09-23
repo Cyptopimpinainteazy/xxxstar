@@ -469,14 +469,17 @@ pub mod pallet {
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        /// Off-chain worker: auto-submits unsigned `submit_finalization_result` for
-        /// any `Executing` bundle whose GPU-committed finalization data is waiting
-        /// in off-chain local storage.
+        /// Off-chain worker: submits the unsigned `record_flash_finality_anchor` for the
+        /// certificate hash this node's finality voter observed.
         ///
-        /// The `AtomicSwapOrchestrator` (running as a node-side service) writes the
-        /// finalization record via `sp_io::offchain::local_storage_set` using the key
-        /// convention:  `b"x3fin:" + bundle_id_bytes (32)`.
-        /// The value is 40 bytes: `receipt_root (32) || committed_at_ns (8, LE)`.
+        /// There is no unsigned *finalization* path any more. `submit_finalization_result`
+        /// was `ensure_none`, its off-chain marker (`x3fin:`) had no writer anywhere in this
+        /// repository, and a caller could plant the certificate anchor it was about to be
+        /// checked against — so anyone who could get an unsigned extrinsic into a block could
+        /// finalize any `Executing` bundle. Finalization is the signed
+        /// `finalize_atomic_bundle` (`X3LangOrigin`, a genesis-authorized gateway account) or
+        /// `finalize_with_settlement` (`SettlementOrigin`); both are in
+        /// `.ai/reports/unsigned-finalization-removed-20260923.md`.
         ///
         /// The finality voter in `service.rs` writes the cert hash under
         /// key `b"x3ff:" + block_number_le (8 bytes)` = 13-byte key, 32-byte value.
@@ -524,53 +527,6 @@ pub mod pallet {
             for (bundle_id, record) in Bundles::<T>::iter() {
                 if record.status != BundleStatus::Executing {
                     continue;
-                }
-
-                // --- Finalization result (x3fin:) ---
-                {
-                    let mut key = b"x3fin:".to_vec();
-                    key.extend_from_slice(bundle_id.as_bytes());
-
-                    if let Some(data) =
-                        sp_io::offchain::local_storage_get(StorageKind::PERSISTENT, &key)
-                    {
-                        if data.len() >= 40 {
-                            let receipt_root = H256::from_slice(&data[..32]);
-                            let committed_at_ns =
-                                u64::from_le_bytes(data[32..40].try_into().unwrap_or([0u8; 8]));
-
-                            if receipt_root != H256::zero() {
-                                let call = Call::submit_finalization_result {
-                                    bundle_id,
-                                    receipt_root,
-                                    finality_cert,
-                                    committed_at_ns,
-                                };
-                                match SubmitTransaction::<T, Call<T>>::submit_transaction(
-                                    T::create_bare(call.into()),
-                                ) {
-                                    Ok(()) => {
-                                        sp_io::offchain::local_storage_clear(
-                                            StorageKind::PERSISTENT,
-                                            &key,
-                                        );
-                                        log::info!(
-                                            target: "x3-atomic-kernel",
-                                            "[OCW] submitted finalization for bundle {:?}",
-                                            bundle_id
-                                        );
-                                    }
-                                    Err(()) => {
-                                        log::error!(
-                                            target: "x3-atomic-kernel",
-                                            "[OCW] failed to submit finalization for bundle {:?}",
-                                            bundle_id
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
 
                 // --- Leg execution receipts (x3leg:) ---
@@ -849,34 +805,6 @@ pub mod pallet {
             Self::do_finalize_bundle(bundle_id, receipt_root, finality_cert, finalized_block)
         }
 
-        /// Submit finalization data as an **unsigned** transaction.
-        ///
-        /// This is the off-chain path: the `AtomicSwapOrchestrator` calls this
-        /// after GPU commit to close the bundle lifecycle without needing a funded
-        /// Substrate account.  The `receipt_root` itself acts as proof-of-execution
-        /// (it is SHA-256 of the GPU-committed shm entry).
-        ///
-        /// `finality_cert` is the finality certificate hash written by
-        /// the finality voter in `service.rs` to off-chain local storage
-        /// under key `"x3ff:" + block_number_le`.  Derived from the
-        /// GRANDPA block hash when Flash-Finality is not active.
-        ///
-        /// `committed_at_ns` is the GPU commit timestamp for auditing only — it is
-        /// not stored on-chain but is included for `ValidateUnsigned` deduplication.
-        #[pallet::call_index(4)]
-        #[pallet::weight(T::WeightInfo::submit_finalization_result())]
-        pub fn submit_finalization_result(
-            origin: OriginFor<T>,
-            bundle_id: H256,
-            receipt_root: H256,
-            finality_cert: H256,
-            _committed_at_ns: u64,
-        ) -> DispatchResult {
-            ensure_none(origin)?;
-            let now = <frame_system::Pallet<T>>::block_number();
-            Self::do_finalize_bundle(bundle_id, receipt_root, finality_cert, now)
-        }
-
         /// Store an on-chain anchor for a Flash Finality certificate.
         ///
         /// Submitted as an **unsigned** transaction by the off-chain worker
@@ -1079,47 +1007,7 @@ pub mod pallet {
         type Call = Call<T>;
 
         fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-            if let Call::submit_finalization_result {
-                bundle_id,
-                receipt_root,
-                finality_cert,
-                committed_at_ns,
-            } = call
-            {
-                // receipt_root must be non-zero (proves GPU committed actual data)
-                if *receipt_root == H256::zero() {
-                    return InvalidTransaction::BadProof.into();
-                }
-                if *finality_cert == H256::zero() {
-                    return InvalidTransaction::BadProof.into();
-                }
-                // Bundle must exist, be in Executing state (not Pending!), and have
-                // an assigned executor.  Requiring Executing guarantees that a signed
-                // `assign_bundle_executor` call ran first, binding a real Substrate
-                // account to the bundle.  This prevents anonymous peers from finalizing
-                // bundles they never claimed.
-                match Bundles::<T>::get(bundle_id) {
-                    Some(record)
-                        if record.status == BundleStatus::Executing
-                            && record.executor.is_some() =>
-                    {
-                        // Include the proof-bearing fields in the dedup tag so competing
-                        // receipt roots/certs for the same bundle do not evict each other before
-                        // dispatch-time proof checks can run.
-                        let mut tag = bundle_id.as_bytes().to_vec();
-                        tag.extend_from_slice(receipt_root.as_bytes());
-                        tag.extend_from_slice(finality_cert.as_bytes());
-                        tag.extend_from_slice(&committed_at_ns.to_le_bytes());
-                        ValidTransaction::with_tag_prefix("X3AtomicFinalize")
-                            .priority(TransactionPriority::MAX / 2)
-                            .and_provides([tag.as_slice()])
-                            .longevity(5)
-                            .propagate(true)
-                            .build()
-                    }
-                    _ => InvalidTransaction::Stale.into(),
-                }
-            } else if let Call::record_flash_finality_anchor { block_num, cert } = call {
+            if let Call::record_flash_finality_anchor { block_num, cert } = call {
                 if *cert == H256::zero() {
                     return InvalidTransaction::BadProof.into();
                 }
@@ -1398,8 +1286,9 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Shared finalization logic used by both `finalize_atomic_bundle` (signed)
-        /// and `submit_finalization_result` (unsigned).
+        /// Shared finalization logic, reached only through the two signed, authorized
+        /// entry points: `finalize_atomic_bundle` (`X3LangOrigin`) and
+        /// `finalize_with_settlement` (`SettlementOrigin`).
         fn do_finalize_bundle(
             bundle_id: H256,
             receipt_root: H256,

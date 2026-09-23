@@ -193,44 +193,6 @@ benchmarks! {
         assert_eq!(bundle.status, BundleStatus::RolledBack);
     }
 
-    // Benchmark submitting finalization result via unsigned extrinsic (OCW path).
-    // This is the on-chain finalization path called by the off-chain orchestrator.
-    submit_finalization_result {
-        let caller: T::AccountId = whitelisted_caller();
-        let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
-
-        let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
-            vm_type: proof::VmType::Svm,
-            token_in: H256::repeat_byte(0),
-            token_out: H256::repeat_byte(1),
-            amount_in: 100,
-            min_amount_out: 0,
-            deadline: 10_000,
-            access: proof::DeclaredAccess {
-                reads: Default::default(),
-                writes: Default::default(),
-            },
-        }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
-        let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
-
-        X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(caller.clone()).into(), bundle_id).unwrap();
-
-        let finality_cert = H256::repeat_byte(0x22);
-        let committed_at_ns = 1000000000u64;
-        FinalityCertAnchors::<T>::insert(1u64, finality_cert);
-        let receipt_root = benchmark_receipt_root::<T>(
-            bundle_id,
-            finality_cert,
-            frame_system::Pallet::<T>::block_number(),
-        );
-
-    }: _(RawOrigin::None, bundle_id, receipt_root, finality_cert, committed_at_ns)
-    verify {
-        let bundle = Bundles::<T>::get(bundle_id).unwrap();
-        assert_eq!(bundle.status, BundleStatus::Finalized);
-    }
-
     // Benchmark recording a Flash Finality certificate anchor on-chain.
     // Called by off-chain worker to anchor cert hash for validation.
     record_flash_finality_anchor {

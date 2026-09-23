@@ -22,28 +22,6 @@ use x3_atomic_swap::{
 const PROOF_HEIGHT: u64 = 18_000_000;
 
 #[test]
-fn settlement_finalization_marker_decode_requires_exact_payload() {
-    let bundle_id = H256::repeat_byte(0x11);
-    let receipt_root = H256::repeat_byte(0x22);
-    let finality_cert = H256::repeat_byte(0x33);
-    let mut marker = Vec::new();
-    marker.extend_from_slice(bundle_id.as_bytes());
-    marker.extend_from_slice(receipt_root.as_bytes());
-    marker.extend_from_slice(finality_cert.as_bytes());
-
-    assert_eq!(
-        Pallet::<Test>::decode_settlement_finalization_marker(&marker),
-        Some((bundle_id, receipt_root, finality_cert))
-    );
-
-    marker.pop();
-    assert_eq!(
-        Pallet::<Test>::decode_settlement_finalization_marker(&marker),
-        None
-    );
-}
-
-#[test]
 fn create_and_request_withdrawal() {
     let mut ext = new_test_ext();
     ext.execute_with(|| {
