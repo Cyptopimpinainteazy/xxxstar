@@ -248,7 +248,15 @@ fi
 pass "${MINUTES} minute(s) with no stall beyond ${STALL_TOLERANCE_SECS}s, no node lost, agreement held"
 pass "report: ${REPORT}"
 cleanup
-left=$( { pgrep -f -- "--base-path $BASE_DIR/node-" 2>/dev/null || true; } | wc -l | tr -d '[:space:]')
-[[ "$left" == "0" ]] || fail "cleanup left ${left} validator process(es) running"
+if [[ "$KEEP" == "1" ]]; then
+  # `--keep` means the operator wants the network left up for inspection. The cleanup check below
+  # exists to catch a cleanup that failed, so running it against a deliberately kept network
+  # reported "cleanup left 4 validator process(es) running" as a FAIL on every kept soak — a check
+  # contradicting the flag that chose to keep them.
+  info "KEEP=1 — skipping the cleanup check (the network is meant to be running)"
+else
+  left=$( { pgrep -f -- "--base-path $BASE_DIR/node-" 2>/dev/null || true; } | wc -l | tr -d '[:space:]')
+  [[ "$left" == "0" ]] || fail "cleanup left ${left} validator process(es) running"
+fi
 
 printf '\n[soak] PASSED: %s validators, %s minutes, one chain throughout.\n' "$COUNT" "$MINUTES"
