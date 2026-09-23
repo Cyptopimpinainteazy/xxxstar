@@ -38,8 +38,9 @@ required_tests = [
   "economic_halt_does_not_block_inflight_bundle_assignment"
 ]
 proof_report = "reports/six_route_invariants.md"
-readiness_score = 50
+readiness_score = 35
 blockers = [
+  "**Bundle finalization is not authorized, and its finality gate is self-satisfying** (2026-09-22): `record_flash_finality_anchor` is unsigned and stores the first non-zero cert for a height with no binding to the block or to an authority; `do_finalize_bundle` then accepts a result when `finality_cert == FinalityCertAnchors[block]`, which is the caller's input compared against the caller's earlier input. `submit_finalization_result` is unsigned as well, so any account can finalize any bundle in `Executing` — marking it `Finalized` with a proof nobody produced and blocking the honest executor's result (`ProofAlreadyExists`). `do_finalize_bundle` also accepts `Pending`, which `ValidateUnsigned` rejects, and a block author includes unsigned extrinsics without the pool's validation. The call has no test. Evidence: `.ai/reports/atomic-kernel-finalization-authorization-20260922.md`; TICKET-097",
   "Economic halt path now has dedicated single-node coverage (halt blocks new bundle submission with no state mutation; rollback/recovery stays open while halted and releases the whole bond) but has never been triggered in a multi-validator network",
   "Bond accounting on rollback was fixed on 2026-09-18 and now has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason now asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. Still outstanding: an independent audit of this change, and exercising the halt and rollback paths on a multi-validator network"
 ]
@@ -113,12 +114,41 @@ required_tests = [
   "btc_settlement_proof_two_tx_block_with_merkle_path",
   "btc_settlement_proof_naming_a_different_block_is_refused",
   "btc_spv_proof_direct_round_trip",
+  # The trust root (spec_version 14). The first of these is the reproduction: the
+  # raw SPV verifier accepts the forged block, the pallet refuses it, and it is
+  # accepted only once the header is genuinely anchored.
+  "the_raw_spv_verifier_accepts_the_fixture_the_pallet_refuses",
+  "a_btc_header_chain_cannot_start_without_a_checkpoint",
+  "a_bitcoin_proof_cannot_use_a_header_this_chain_never_admitted",
+  "a_btc_checkpoint_height_cannot_be_re_pointed",
+  "a_btc_extension_must_be_contiguous_with_its_parent",
+  "a_btc_extension_cannot_change_difficulty_off_a_retarget_boundary",
+  # Renamed 2026-09-23: the old name asserted a rule stricter than Bitcoin's (the median of
+  # fewer than eleven ancestors), which refused legitimate headers. The two tests below are
+  # the corrected halves — equality near the checkpoint accepted, below-median refused once
+  # eleven ancestors exist.
+  "a_header_close_to_the_checkpoint_may_share_its_timestamp",
+  "a_header_below_the_median_of_its_eleven_ancestors_is_refused",
+  "submit_btc_proof_refuses_a_header_that_was_never_admitted",
+  "the_retarget_bound_bites_exactly_at_a_factor_of_four",
+  # Data a real Bitcoin node produced (Core v28.1.0, regtest; see
+  # scripts/btc/capture-regtest-spv.py). Everything else in this list is a
+  # hand-written fixture.
+  "a_real_bitcoin_block_hashes_to_the_hash_the_node_reported",
+  "a_real_bitcoin_merkle_path_verifies_against_a_real_block",
+  "a_real_regtest_chain_anchors_and_extends_through_the_pallets_rules",
+  "a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored",
+  # The trust root in genesis, so a chain can be born anchored (spec_version 15).
+  "genesis_pins_a_bitcoin_checkpoint_and_admits_its_header",
+  "genesis_refuses_a_checkpoint_that_is_not_a_real_bitcoin_block",
+  "genesis_refuses_a_checkpoint_easier_than_the_networks_pow_limit",
+  "genesis_refuses_two_checkpoints_at_one_height",
 ]
 proof_report = "reports/btc_gateway_report.md"
 readiness_score = 45
 blockers = [
-  "No live Bitcoin run at all — not regtest, not testnet, not mainnet; the deposit/withdrawal path has never moved a coin",
-  "Headers are submitted by root and must chain to a header already in storage: there is no checkpoint anchor and no peer-sourced header sync, so bootstrapping the chain of headers is an operator action with no trusted source behind it",
+  "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, but nothing has run against testnet or mainnet and the deposit/withdrawal path has never moved a coin",
+  "The header chain bootstraps from a checkpoint (spec_version 14/15): `anchor_btc_checkpoint` pins one by root call, and a spec can now carry one in genesis (`btc_checkpoints`), so a chain can be born anchored and the live gate proves it (`scripts/testnet/btc-checkpoint-genesis-drill.sh`). No public network has one pinned, and the header still arrives by an operator copying a hash — there is no header source and no peer-sourced sync",
   "No BTC signer quorum: withdrawals have no production multi-signer policy",
   "BTC mainnet disabled by feature flag",
   "No external audit of the gateway, the vault or the header check",
@@ -283,9 +313,8 @@ required_tests = [
   "bridge_against_a_host_with_no_bridging_support_fails_closed"
 ]
 proof_report = "reports/trading_core_v1_report.md"
-readiness_score = 70
+readiness_score = 75
 blockers = [
-  "x3c audit's RiskScorer does not recognize trading-core-v1's AST shape (Item::AtomicTrade/Item::TradeRiskPolicy) — its risk score output is meaningless for these programs today; treat as unscored, not as safe (flagged in PR #216, still open)",
   "No multi-validator or live-network execution of a trading-core-v1 program has been performed — all 131 passing tests are single-process compiler/VM/CLI-level"
 ]
 dangerous_paths = ["solvency invariant", "oracle firewall", "replay ledger", "gas ceiling enforcement", "receipt signing"]
@@ -304,10 +333,9 @@ required_tests = [
   "sync_pool_price_writes_oracle_observation"
 ]
 proof_report = "reports/trading_core_v1_report.md"
-readiness_score = 65
+readiness_score = 70
 blockers = [
-  "No multi-validator or live-network run — 48 passing tests are all mock-runtime unit tests",
-  "Pre-execution risk scoring for trades that originate as trading-core-v1 programs depends on x3c audit's RiskScorer, which is currently blind to that AST shape — see [trading_core_v1]"
+  "No multi-validator or live-network run — 48 passing tests are all mock-runtime unit tests"
 ]
 dangerous_paths = ["kernel_comit settlement rollback", "AMM adapter registration", "cross-VM leg execution (EVM/SVM/X3)"]
 

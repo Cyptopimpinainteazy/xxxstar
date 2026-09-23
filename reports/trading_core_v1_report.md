@@ -1,5 +1,16 @@
 # Trading Core v1 — verification report (2026-09-18)
 
+> **Addendum 2026-09-22** — the "Known, un-fixed gap" recorded below (the
+> `RiskScorer` not recognizing `Item::AtomicTrade`/`Item::TradeRiskPolicy`) is
+> now **fixed**. `x3-lang/compiler/src/risk.rs` scores trading-core-v1 programs
+> through their own AST shape (chains, bridges, profit checks, gas/oracle/
+> cumulative-loss ceilings, refund path, receipt-based replay protection), and
+> `compiler/tests/test_risk_scorer_trading.rs` pins it (3 tests, including
+> "not scored as if it were empty"). Measured: `x3c audit trading_core_v1.x3`
+> now reports a category-by-category risk score (75/500 in mainnet mode) instead
+> of treating the program as empty. The stale blocker is removed from
+> `FEATURE_REGISTRY.toml`; the live-network blocker below still stands.
+
 Scope: the trading-core-v1 language surface added across PRs #133, #212, #216,
 #223 — a dedicated single/cross-chain atomic-trade DSL inside x3-lang
 (parser → semantic checker → IR lowering → bytecode verifier → VM execution →

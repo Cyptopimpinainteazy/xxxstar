@@ -66,6 +66,8 @@ pallet-transaction-payment = { workspace = true, default-features = false, featu
 pallet-x3-agent-law = { path = "../pallets/x3-agent-law", default-features = false, features = ["std"] }
 pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false, features = ["std"] }
 pallet-x3-atomic-kernel = { path = "../pallets/x3-atomic-kernel", default-features = false, features = ["std"] }
+pallet-x3-custody = { path = "../pallets/x3-custody", default-features = false, features = ["std"] }
+pallet-session = { workspace = true, default-features = false, features = ["std"] }
 frame-support = { workspace = true, default-features = false, features = ["std"] }
 
 sc-basic-authorship = { workspace = true }
@@ -110,6 +112,17 @@ frame-benchmarking-cli = { workspace = true, optional = true, default-features =
 [features]
 default = ["cli"]
 cli = []
+
+# The development runtime: `pallet-sudo` in the runtime, dev defaults in the specs, and
+# this network's `powLimit` at Bitcoin regtest's (`0x207fffff`) rather than mainnet's, so a
+# local chain can anchor a header it just mined.
+#
+# This existed as a runtime feature (`x3-chain-runtime/dev`) and as a chain name (`--chain
+# dev`) but not as a *node* feature, which meant `--chain dev` ran the default runtime: a
+# spec that called itself dev, a runtime with no `Sudo`, and a proof-of-work limit that
+# refuses every regtest header. Building with `--features dev` is what makes the dev spec
+# and the dev runtime the same thing.
+dev = ["x3-chain-runtime/dev"]
 
 testnet = ["x3-chain-runtime/testnet"]
 mainnet-rc1 = ["x3-chain-runtime/mainnet-rc1"]

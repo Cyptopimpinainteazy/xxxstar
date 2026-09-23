@@ -1,4 +1,5 @@
 use codec::Encode;
+use pallet_x3_settlement_engine::BtcBlockHeader;
 use sc_service::GenericChainSpec;
 use sc_service::{ChainSpec as ServiceChainSpec, ChainType};
 use serde::Deserialize;
@@ -882,6 +883,57 @@ fn parse_svm_escrow_from_env(var: &str) -> [u8; 32] {
         .unwrap_or([0u8; 32])
 }
 
+/// The Bitcoin headers a chain spec pins into the settlement engine's genesis.
+///
+/// `X3_BTC_CHECKPOINTS` is a comma-separated list of `<80-byte header hex>@<height>`
+/// entries. The header itself is the only thing that has to be real — the settlement
+/// engine's genesis build re-derives its hash and checks its proof of work against this
+/// network's `powLimit`, and refuses to build a chain whose anchor is not a Bitcoin
+/// block. The height is supplied beside it because a Bitcoin header does not carry one:
+/// a node knows it from where the header sits in the chain.
+///
+/// Parsing fails loudly, naming the offending entry, so a typo shows up when the spec is
+/// built rather than as a spec that will not start.
+fn btc_checkpoints_from_env() -> Vec<BtcBlockHeader> {
+    let Ok(raw) = std::env::var("X3_BTC_CHECKPOINTS") else {
+        return Vec::new();
+    };
+
+    raw.split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .map(|entry| {
+            let (header_hex, height) = entry.rsplit_once('@').unwrap_or_else(|| {
+                panic!(
+                    "X3_BTC_CHECKPOINTS entry {entry:?} must be <header hex>@<height>: a \
+                     Bitcoin header carries no height of its own"
+                )
+            });
+            let height: u64 = height.parse().unwrap_or_else(|e| {
+                panic!("X3_BTC_CHECKPOINTS entry {entry:?} has an unreadable height: {e}")
+            });
+            let bytes = hex::decode(header_hex)
+                .unwrap_or_else(|e| panic!("X3_BTC_CHECKPOINTS entry {entry:?} is not hex: {e}"));
+            if bytes.len() != 80 {
+                panic!(
+                    "X3_BTC_CHECKPOINTS entry {entry:?} is {} bytes; a Bitcoin header is \
+                     exactly 80",
+                    bytes.len()
+                );
+            }
+            BtcBlockHeader {
+                version: u32::from_le_bytes(bytes[0..4].try_into().expect("4 bytes")),
+                prev_block_hash: sp_core::H256::from_slice(&bytes[4..36]),
+                merkle_root: sp_core::H256::from_slice(&bytes[36..68]),
+                timestamp: u32::from_le_bytes(bytes[68..72].try_into().expect("4 bytes")),
+                bits: u32::from_le_bytes(bytes[72..76].try_into().expect("4 bytes")),
+                nonce: u32::from_le_bytes(bytes[76..80].try_into().expect("4 bytes")),
+                height,
+            }
+        })
+        .collect()
+}
+
 fn x3_chain_genesis(
     initial_authorities: Vec<(AuraId, GrandpaId)>,
     endowed_accounts: Vec<AccountId>,
@@ -898,6 +950,17 @@ fn x3_chain_genesis(
     allow_unattested_cross_domain_proofs: bool,
 ) -> RuntimeGenesisConfig {
     let mut endowed: BTreeSet<AccountId> = endowed_accounts.into_iter().collect();
+
+    // The SPV trust root this chain is born with, if the builder pinned one.
+    //
+    // A Bitcoin checkpoint belongs to *a network*, not to the node binary, so it
+    // arrives with the spec: `X3_BTC_CHECKPOINTS=<80-byte header hex>[,<header>…]`
+    // while building the spec puts each header in the settlement engine's genesis,
+    // where the pallet pins `(height, hash)` and admits the header (see
+    // `docs/reports/PUBLIC_TESTNET_LAUNCH.md`). The generated JSON — not the
+    // environment — is what a validator runs, so the commitment is reviewable in the
+    // same diff as the chain id.
+    let btc_checkpoints = btc_checkpoints_from_env();
 
     // Add authority accounts to endowed set
     for (aura, _) in initial_authorities.iter() {
@@ -990,9 +1053,16 @@ fn x3_chain_genesis(
         x3_dapp_hub: Default::default(),
         #[cfg(not(feature = "mainnet-rc1"))]
         x3_flash_loan: Default::default(),
+        // `Sudo` exists only in the dev runtime (feature `dev`), so its genesis config
+        // exists only in a build that has it. The default runtime has no root-callable
+        // pallet at all, which is the intended difference between a dev chain and one a
+        // validator can join.
+        #[cfg(feature = "dev")]
+        sudo: Default::default(),
         x3_crosschain_gateway: gateway_config,
         x3_settlement_engine: X3SettlementEngineConfig {
             allow_unattested_cross_domain_proofs,
+            btc_checkpoints,
             _phantom: core::marker::PhantomData,
         },
     }

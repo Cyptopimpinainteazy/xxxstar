@@ -6764,3 +6764,256 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 
 ### Canonical paths chosen
 - The addendum is the *only* place that supersedes the old audit's rows; the old text is left intact so the drift is visible rather than silently rewritten.
+
+## 2026-09-22 (sixteenth pass) — the BTC SPV trust root, and `rg -rn` is not `rg -n`
+
+### Facts to remember
+- **`rg -rn "pattern"` is `--replace n`**: it rewrites every match to the letter `n` in the output. Two sessions in a row read records through it and concluded the repo said things like `<code>session.n</code>` and "no n anchor". Use `rg -n` (or `grep -n`). This is the single most expensive small mistake in this repo's history.
+- **The BTC SPV path had two open doors, not "no bootstrap".** `submit_btc_header` accepted `height == 0` with no parent at all, and `nBits` is written by the submitter, so a chain could be started for one hash; `submit_btc_proof` inserted the caller's header with **no PoW check of any kind** and then computed `confirmations` from the caller's own `height`. Both are now `btc_admit_header`, and `verify_btc_proof`'s 2026-09-22 hashing fix had only made the *hash* honest, not the trust question. Fixed: spec_version 14, `anchor_btc_checkpoint` (call_index 34), `BtcCheckpoints`, `BtcHeaderMetaStore`, `BtcPoWLimitBits`.
+- **`cargo test -p pallet-x3-settlement-engine` = 144 + 23 passed** after the change; `--features runtime-benchmarks` compiles now (it did **not** on master: the `submit_proof` bench's `SettlementProof` was missing `receipt_index`/`trie_proof`).
+- **A benchmark cannot mine mainnet difficulty.** `submit_btc_header`/`anchor_btc_checkpoint` are deliberately unbenchmarked with fixed weights; the old bench only passed because it accepted a caller-chosen `nBits`. Do not "restore" it.
+- **Test-network `powLimit` must be regtest (0x207fffff)** or every BTC fixture would need ~2^32 hashes. The mock uses it; the runtime uses `0x1d00ffff` except under `feature = "dev"`.
+- `#[cfg]` on associated types inside `impl ... for Runtime` works, which is how the runtime picks the pow limit per feature (`dev` vs everything else).
+- Another agent landed **PR #451** (x3-lang price-impact/MEV ceilings) while this was in flight; master moved to `157701ac3e`. **PR #450 (`feat/x3-mcp-server`) is an explicit DRAFT** by a third agent — do not merge it on sight.
+
+### Decisions made this session
+- The anchor is **governance state, not a compiled constant**: no real Bitcoin checkpoint hashes could be verified offline, and shipping invented ones would be a fabricated trust root. Write-once-per-height storage plus an event makes the commitment auditable and un-movable.
+- BTC header helpers were made `pub(crate)` so the rules that no fixture can reach (the retarget boundary needs mainnet difficulty) can be stated directly as unit assertions instead of being left untested.
+- Split the work: the anchor landed as its own change with the runtime re-attested, rather than piling it onto the docs addendum PR.
+
+### Canonical paths chosen
+- `pallets/x3-settlement-engine/src/lib.rs` is the only place a BTC header may enter the chain's view (`btc_admit_header`). Any future header source (relayer, bridge, off-chain worker) must call it, not `BtcHeaders::insert`.
+
+## 2026-09-22 (seventeenth pass) — the first live Bitcoin run, and a segwit trap
+
+### Facts to remember
+- **Bitcoin Core v28.1.0 is installed at `/tmp/btc-core/bitcoin-28.1/bin/`** (downloaded from bitcoincore.org, verified against the published `SHA256SUMS`) with a running regtest node at `/tmp/btc-regtest` (RPC 18443, wallet `x3`). Nothing else on this box speaks Bitcoin; there is no bitcoind package and no Bitcoin docker image.
+- **A segwit transaction's raw bytes hash to its wtxid, not its txid.** `getrawtransaction` returns marker+flag+witness; the txid covers none of it. The pallet checks `tx_hash == dsha(tx_bytes)` and walks the merkle path over *txids*, so **SPV proofs must carry the witness-stripped serialization**. Found because the first real-data test failed; now pinned by tests and by `submit_btc_proof`'s doc. Real: 222 raw bytes vs 113 stripped, `wtxid 73eb7ff9…` vs `txid 91cbaa84…`.
+- **`scripts/btc/capture-regtest-spv.py`** captures header + merkle path + txid + both serializations from a live node, and refuses to print anything the node disagrees with (checks its own merkle root against `merkleroot` and its own header hash against the block hash). Artifact: `.ai/reports/btc-regtest-capture-20260922.json`.
+- Regtest's `powLimit` is `0x207fffff` — the same value the dev runtime uses, so **a regtest header can be anchored on a dev chain and on nothing else**. Testnet/mainnet need a header from those networks (`0x1d00ffff`).
+- `cargo test -p pallet-x3-settlement-engine` = **148 + 23 passed** with the four real-data tests.
+- **Another agent shares this working directory.** It checked out its own branch mid-session (`feat/x3-mcp-server`), which moved HEAD under a `git commit --amend` I was running; my `git add` + `--amend` landed my two doc files inside *their* commit. Repaired with `reset --soft <parent>` + unstage + `commit -C`, and all further work moved to the `/tmp/x3-btc-anchor` worktree. **Never assume a single writer in `xxxstar-main`; check `git branch --show-current` before every commit, and prefer a worktree.**
+- `.git` is read-only to the sandbox, so worktree operations (fetch/checkout/commit) need `require_escalated`.
+
+### Decisions made this session
+- Used a **real node's data** instead of a better hand-written fixture. The rows said "no live Bitcoin run of any kind" and the honest fix was to change that fact, not the wording.
+- Kept the capture script in `scripts/btc/` and the JSON in `.ai/reports/` so the fixture can be reproduced and re-verified rather than trusted.
+- Did not claim testnet readiness from a regtest run; the row now says exactly what is real (regtest) and what is not (testnet, mainnet, any coin movement).
+
+## 2026-09-22 (eighteenth pass) — the two-hour soak FAILED, and the peer set is why it mattered
+
+### Facts to remember
+- **The 2-hour soak failed**: `[soak] FAIL: rpc 12046 has not finalized since 1790099493 (27677 at height)`. Twenty minutes passed the same day; two hours did not. `X3-L1-001` dropped tested 88→85, mainnet_ready 60→55.
+- **The failure mechanism, read off the logs** (`/tmp/x3-soak120/logs/node-*.log`): trie-cache lock timeouts from minute four (105–419/node) → `State already discarded` / `block has an unknown parent` (14–252/node) → a missed Aura slot (`Creating inherent data took more time…`) → the lagging validator repeats block requests → **peers ban it** (`Same block request multiple times. Banned, disconnecting.`, 10–16 bans per node) → it loses peers → its view diverges (`Potential long-range attack: block not in finalized chain`) → it re-finalises *backwards* (27111 after 27136) → finality stalls.
+- **This is liveness, not safety.** No node finalised two conflicting chains in the whole run.
+- **The trigger was an over-subscribed box**: `load average 55–62` with four *debug* nodes at 1.3–1.6 GiB RSS plus other agents' work. Debug nodes are the wrong unit for a duration claim.
+- **The defect candidate is the ban policy**: banning a peer for asking for the same block repeatedly *is* banning a peer for being behind. Ten to sixteen bans per node means the peer set degrades itself rather than healing. TICKET-094.
+- Evidence file: `.ai/reports/soak-2h-failure-20260922.md`; ledger entry GAP-SOAK-2H.
+- **Pallet documentation is part of the runtime metadata, therefore part of the WASM**: a doc-comment-only change to a pallet still moves `runtime-wasm-hashes.json`. `check-runtime-hash-freshness.py` watches the whole dependency graph, not a "runtime files" list. Two more srtool cycles were needed for doc comments.
+
+### Decisions made this session
+- Recorded the soak as a FAILURE and dropped the row's score rather than describing it as "a long soak is still pending". The previous row's own words were "twenty minutes is not a duration claim"; the claim was tested and did not hold.
+- Wrote the re-run precondition into the ticket: **idle box first** (to eliminate load), then reproduce under deliberate contention. Without the idle run, "environment" and "defect" are not separable, and guessing which one it is would be the same mistake as the earlier over-claim.
+
+## 2026-09-22 (nineteenth pass) — a chain can be born anchored, and `--chain dev` never was a dev runtime
+
+### Facts to remember
+- **The node had no `dev` feature.** `--chain dev` built a dev *spec* and ran the **default** runtime: no `Sudo`, `powLimit` = mainnet `0x1d00ffff`, so every regtest-difficulty header was refused. Nothing in the repo could make a root call locally. Fixed: `node` feature `dev = ["x3-chain-runtime/dev"]` + the `sudo` genesis field in `chain_spec.rs`, **`cargo build -p x3-chain-node --features dev`**. Expect dev builds at `/tmp/x3-chain-node-dev` to be the ones with `Sudo`.
+- **Genesis now pins the BTC trust root**: `X3SettlementEngine::GenesisConfig.btc_checkpoints` (Vec<BtcBlockHeader>), validated at build (PoW under this network's `powLimit`, no duplicate heights), then `BtcCheckpoints` + `BtcHeaders` + `BtcHeaderMetaStore{anchored}` + `BtcBestHeight`. Env knob `X3_BTC_CHECKPOINTS="<header hex>@<height>[,…]"`; `build-x3-testnet-spec.py` forwards the environment already, so a testnet spec carries it in plain JSON. spec_version 14 → 15.
+- **`a_btc_...`** — no: **the live gate** is `scripts/testnet/btc-checkpoint-drill.sh` (in `GATES_TESTNET`, i.e. `local-ci --testnet`), running `scripts/testnet/btc-checkpoint-genesis-drill.py`, 12/12 checks: key math vs `twox_128("System")`, spec contents, genesis storage (`build-spec --raw`), live RPC storage, block production, and refusal of a lying checkpoint.
+- **A node needs `--node-key <hex seed>`**: this build exits `NetworkKeyNotFound(...)` rather than inventing a libp2p identity. Ports must be escalated (sandbox blocks bind) and the prometheus port must be free.
+- **Storage keys**: `twox_128(pallet) ++ twox_128(item)` for a value, `++ twox_64_concat(encode(key))` for a map with `Twox64Concat`, `++ blake2_128_concat(key)` for `Blake2_128Concat`. Pure-Python xxh64 in the drill is validated against Substrate's known `twox_128("System") = 26aa394eea5630e07c48ae0c9558cef7` before use — a wrong key reads as an empty value, which is indistinguishable from "not set".
+- **I edited the shared tree by mistake** (it was on another agent's branch) and reverted it immediately with `git checkout -- <file>` after confirming the diff was only mine. All work after that happened in `/tmp/x3-btc-genesis`. **Check `git branch --show-current` before editing, not before committing.**
+
+### Decisions made this session
+- Put the checkpoint in **genesis, not only in a root call**: a testnet should publish its root of trust with its chain id, and "the first person to hold the key anchors it" is not a launch procedure.
+- Made the genesis refusals **panic with the reason** rather than starting a chain with a bad anchor; the drill asserts the message, so a silent acceptance would fail the gate.
+- Bumped `spec_version` for a genesis-config change even though no storage migration is implied: the metadata and the WASM both moved.
+
+### Facts to remember (twentieth pass)
+- **`make guard` is three guards. `scripts/local-ci.sh` is the gate set.** A change passed `make guard`, readiness consistency and the feature matrix, and still failed `cargo fmt --check` (import ordering, two wraps) and `cargo clippy --workspace --all-targets -- -D warnings` (`s.len() % 2 == 0` → `is_multiple_of`). Run `local-ci` before claiming a change is verified; it took ~55 minutes under load but found both.
+- **Formatting moves the runtime bytes.** `cargo fmt` re-wrapped lines in the pallet and the compact artifact went 8,466,819 → 8,466,821 bytes, because an `assert!` message carries its `file:line`. So even a style fix needs a re-attestation (two more srtool cycles).
+- `local-ci` failures that were **pre-existing**: `nested workspaces` — `crates/x3-sidecar/Cargo.lock` is stale against its manifest and `--locked` refuses to update it. TICKET-096. The other 27 gates pass on merged master, including `testnet ceremony drill` (277s) and the new `btc checkpoint genesis` (180s).
+- `local-ci` writes per-gate logs under `.ai/runlogs/local-ci-<stamp>-<gate>.log` plus a summary JSON; read the log before assuming a failure is yours.
+
+### Facts to remember (twenty-first pass)
+- **TICKET-096 closed**: `crates/x3-sidecar/Cargo.lock` regenerated offline (`cargo update --offline --workspace` in that directory; nothing downloaded) — the nested-workspaces gate's own command, `SKIP_WASM_BUILD=1 cargo check --locked --all-targets`, now finishes clean. Verify the three previously failing gates individually after fixing them: `cargo fmt --all --check` (clean), `cargo clippy --workspace --all-targets -- -D warnings` (clean), nested sidecar check (clean).
+- **A merge of two attested revisions is a third revision.** Both the key-rotation change (`d471adfec4`, spec_version 16) and mine (`269d611d96`, spec_version 15) had their own records; merging them required a fresh two-build attestation at the merge commit (`93d97edd34`). The runtime record is one artifact for one revision — never resolve that file by picking a side.
+- The other agent did the **validator key rotation** work: `pallet_x3_custody` gained `KeyRotationPeriod`, `rotate_validator_key` now grants `current_block + period` (fixing the thrash I described), and the node gained a `validator rotate` operator command. My rotation recommendation is therefore done by them, not by me.
+- `local-ci` default+testnet run costs ~55 minutes under load ~16–30 and wrote `.ai/runlogs/local-ci-20260922T190339Z-summary.json` with per-gate logs.
+
+## 2026-09-22 (twenty-second pass) — the atomic kernel will finalize a bundle for anybody
+
+### Facts to remember
+- **`pallets/x3-atomic-kernel`'s bundle finalization is unauthorized and its finality gate is self-satisfying.** `record_flash_finality_anchor` is unsigned (`ensure_none`) and stores *the first non-zero cert for a height* with no binding to the block, a certificate or an authority; `do_finalize_bundle` then accepts a result when `finality_cert == FinalityCertAnchors[block]` — the caller's input compared against the caller's earlier input. `submit_finalization_result` is unsigned too, and its `ValidateUnsigned` reads only the bundle's status and that *an* executor is assigned, never who is calling. So any account can finalize any bundle in `Executing`, mark it `Finalized` with a proof nobody produced, and block the honest executor's result (`ProofAlreadyExists`).
+- **The dispatch path is weaker than the validation path**: `do_finalize_bundle` accepts `BundleStatus::Pending`, which `ValidateUnsigned` rejects; a block author includes unsigned extrinsics without the pool's validation.
+- **No test covers `submit_finalization_result` at all** (`grep` in the pallet's tests.rs finds nothing). `X3-RT-002` dropped 40 → 25 and the registry `atomic_kernel` score 50 → 35; `CURRENT_MAINNET_STATUS.md` had to move with them — `check-readiness-consistency.sh` **does** enforce that pairing (`claims 40% ... registry score=35%`).
+- The soak's log led here: `failed to anchor GRANDPA cert for block N: Transaction pool error: [Any { .. }] Already imported` on three of four validators, for every block. That specific error is benign (one node's anchor wins; `and_provides` dedupes the rest). The real defect in that task is that `node/src/service.rs`'s `run_grandpa_finality_anchor` **logs `cert anchored for block N` unconditionally after a failed submit** and advances its cursor before the submit, so a genuinely rejected anchor is never retried. TICKET-098.
+- `rg -n "Same block request multiple times"` → `polkadot-sdk .../sync/src/block_request_handler.rs`: the 4th identical block request from a peer is `Rep::new_fatal` (disconnect); headers-only requests only take −1024. `peer_store.rs:57` says `i32::MIN` "escapes the banned threshold in 69 seconds", so a ban self-heals — the failure mode is a *starved* node looping on one request, not a permanent ban. That points the fix at resource sizing/import throttling, not at the ban policy.
+- `docs/testnet-config/RELEASE-NOTES.md` claims "Achieved: 2.75M TPS in lab, 1-5M TPS on testnet" and a "Guarantee: Minimum 100k TPS on Solana testnet" with no benchmark anywhere in the repository. Claims-hygiene row X3-CLAIM-001 (mainnet_ready 5) is about exactly this.
+
+### Decisions made this session
+- Wrote the atomic-kernel finding as a **report + ticket (TICKET-097) with three fix options** rather than changing an unsigned security path in a hurry: whether the off-chain worker keeps submitting unsigned (and gains a signature/quorum) or the runtime gains a real finality source is an authorization-model decision, and picking wrong breaks the OCW flow silently.
+- Dropped two readiness scores (`X3-RT-002` 40 → 25, `atomic_kernel` 50 → 35) and the status document with them, because an unauthenticated finalization path is not a 40%-ready core pallet.
+
+## 2026-09-22 (twenty-third pass) — a release note for a release that does not exist
+
+### Facts to remember
+- **`docs/testnet-config/RELEASE-NOTES.md` announced a product**: `solana-gpu-validator-v1.0.tar.gz` (269 MB, CUDA kernels), "Achieved: 2.75M TPS in lab, 1-5M TPS on testnet", "Guarantee: Minimum 100k TPS", "825k signatures/second per GPU". None of it is in the repository — no such artifact, no `start-validator.sh`, and **no chain-level TPS measurement anywhere**.
+- **The traceable figures say the opposite**: `infra-structure/validator/benchmarks/gpu_tps_benchmark_results.json` records `ed25519_gpu_batch_16384 = 113,759/s` and `secp256k1_gpu_batch_4096 = 89,659/s` (not 825k), and the note's "PoH GPU acceleration: 1.55M hashes/second" is the repo's **CPU** `sha256_cpu = 1,565,073` relabelled as GPU work.
+- **Real things in that area** (do not repeat the overreach I made and then corrected): CUDA kernels exist (`infra-structure/validator/kernels/*.cu` + a `build.sh` that requires `nvcc`), GPU crates exist, and `scripts/gpu/run_swarm_tps_soak_matrix.sh` is a real soak harness. I first wrote "no `.cu` file anywhere" — wrong — and fixed it before landing. **Check the negative claim before writing it down.**
+- Four result files have **no producer in the repository**: `infra-structure/validator/benchmarks/{tps,gpu_tps}_benchmark_results.json` and `docs/testnet-config/day10-{validation,hotfix}-results.json`. TICKET-099.
+- Row `X3-CLAIM-001` moved 10/5/5 → 55/25/35; the blocker changed from "remove current-performance wording" (done) to "no GPU benchmark is possible on this host".
+
+### Decisions made this session
+- Rewrote the release note rather than deleting it: the kernels and harness are real, so the honest artifact is one that says which numbers are measured, which are borrowed and which are aspirational.
+- Filed TICKET-099 for the unprovenanced result files instead of deleting them — deleting a number is not the same as explaining it, and the audit trail belongs to the owner.
+
+## 2026-09-22 (twenty-fourth pass) — two hours on a quiet box, and what the memory bound was measuring
+
+### Facts to remember
+- **The loaded-box soak failure was environmental; the quiet-box run holds.** Same 4 validators, same launcher, 2 hours at load 5–12: one chain throughout, agreement at heights 9089/18178/27267, +36,092 blocks per validator, peers 3, **zero peer bans** (vs 10–16), 4–5 trie-cache lock timeouts (vs 105–419), no stall beyond 60s.
+- **The memory bound failure is real and is mostly a cache.** Default state cache: 690 → ~2,410 MiB over 2h (growth 1,714–1,760 MiB, rates per quarter 22/12/15/8 MiB/min). With `--trie-cache-size 0`: **+227 MiB and flat** (879 → 854 → 873 → 869 MiB) against +432 MiB at the same 15 minutes. `--trie-cache-size` *is* the state cache (`--help`: "Specify the state cache size"); `--db-cache` is the DB block cache.
+- A few hundred MiB over two hours is still unaccounted for, and this is a **debug** build — the release-binary footprint has not been measured. TICKET-100: make the rule `configured cache budget + measured margin`, report the cache size in the harness, and state a validator's memory budget in the runbook.
+- **The launcher now takes `NODE_TRIE_CACHE_BYTES`** (`--trie-cache-size`) alongside `NODE_DB_CACHE_MIB`; `NODE_NICE` also exists. That is how the controlled experiment was run.
+- **`pkill -f -- "<pattern>"` matches the shell running it** when the pattern appears in its own command line — it killed my own `bash -c` (exit 143). Use `pgrep -f "[x]3-chain-node"` or the launcher's pid files (`/tmp/x3-soak*/pids/node-*.pid`).
+- The soak's `KEEP=1` leaves the network running after the verdict; stop it via the pid files.
+## 2026-09-22 (twentieth pass) — validator key rotation wired end to end (in code)
+
+### Facts to remember
+- **`pallets/x3-custody::rotate_validator_key` no longer copies the old key's `rotation_due_at` onto the new key.** It now grants `current_block + KeyRotationPeriod`, and the new `KeyRotationPeriod` pallet constant (7 days = `3_024_000` blocks at the 200ms block target) is the single period source. Added a test for the already-elapsed case (register due 10, advance to 250, rotate → new due 350). `cargo test -p pallet-x3-custody` 26 passed.
+- **`node/src/validator_rotation.rs`** is the new operator path: `OperatorKey` (sr25519 SURI) derives Aura/GRANDPA session keys, builds a signed `session.set_keys` extrinsic (empty proof), and the module encodes the exact `twox_128("X3Custody") ++ twox_128("ValidatorKeyRegistry") ++ blake2_128_concat(account)` storage keys. Node unit tests cover key derivation, deterministic call construction, and storage-key bytes.
+- **`x3-chain-node validator rotate`** (new CLI command) reads the on-chain custody registry, refuses an unregistered account by name, and prints (or `--submit`s) the signed `set_keys` plus the next due block. It is operator-driven only; there is no unattended rotation.
+- **`scripts/testnet/validator-rotation-drill.sh`** + **`local-ci --rotation`** are the opt-in gate (also in `--all`); the drill checks the unregistered-account refusal and the registered happy path against a live node.
+- The sr25519 signature is randomized, so the node's determinism test compares the **call bytes**, not the full extrinsic (two otherwise-identical set_keys extrinsics differ only in their signature).
+- The node links against system OpenSSL: run node/pallet tests with `OPENSSL_DIR=/usr OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu OPENSSL_INCLUDE_DIR=/usr/include`; the Linuxbrew `libcrypto` requires GLIBC_2.38 and fails at link.
+
+### Remaining (honest)
+- The drill has not been run against a live network yet; that is the proof that the signed `session.setKeys` lands and the due block moves. No key ceremony/backup/recovery runbook, no external audit.
+
+### Next task seed
+1. Run `local-ci --rotation` against a booted dev/testnet node and record the due-block-before/after. 2. Key ceremony/backup/recovery runbook. 3. External audit of the key paths.
+
+## 2026-09-22 (twenty-fifth pass) — twenty-eight rows cited five PRs, none of them open
+### Facts to remember
+- Every `open_prs` citation in `feature-matrix/*.toml` was checked against GitHub: **#129 merged 2026-09-18, #135 CLOSED (never merged), #162 merged 2026-09-13, #163 merged 2026-09-17, #166 merged 2026-09-17**. Not one was open.
+- `scripts/feature_matrix.py` warns *"feature includes open PR work and is not master capability"* for **any** row with `open_prs` set, so the matrix claimed seventeen shipped capabilities were not on master, and eleven rows rested on a PR that never merged. All 28 corrected: `source = "master"` (or `research` for the one with no on-master evidence), `open_prs` dropped, and a dated note in `evidence` naming the PR and merge date.
+- **X3-MEV-002** ("Private transaction submission controls") went to `source = "research"`: the only on-master candidate is `crates/confidential-gpu`'s `execute_private_tx`, which is private *execution*, not private *submission*.
+- **New evidence found while checking:** the compiler carries `max_price_impact` (`x3-lang/compiler/src/trading_semantic.rs`, `trading_lowering.rs`) and the VM enforces price-impact and MEV-leakage ceilings, failing closed when the host reports nothing (`x3-lang/vm/tests/trading_execution.rs`: `price_impact_ceiling_is_enforced_when_host_reports_it`, `price_impact_ceiling_fails_closed_when_host_reports_nothing`, `mev_leakage_ceiling_is_enforced_when_host_reports_it`). X3-MEV-003 30 → 45 and X3-MEV-006 35 → 45 on that; ordering is still not guaranteed, so X3-MEV-008 stays the fair-ordering row.
+- `scripts/mainnet_release_gate.py` **does exist** (31 KB at `scripts/` root, not under `scripts/mainnet/`) — I briefly thought it was missing from a wrong path.
+- TICKET-101: the thirteen merged-PR rows' *scores* still predate their merges. Provenance is fixed; measurement is the remaining audit.
+
+## 2026-09-22 (twenty-sixth pass) — TICKET-101's first pass, and a blocker that was false
+### Facts to remember
+- **The hosted `production-gate` workflow has five runs, all `workflow_dispatch`, all cancelled, longest 1h34m, none green** (2026-09-19). The gate of record here is local: `scripts/local-ci.sh` (30/30 green on `bae40d46c8`) and the reproducible-build pair `scripts/run-srtool.sh` + `scripts/update-runtime-hashes.sh`.
+- `X3-SEC-004`'s blocker ("srtool hardening is on #166 branch, not master yet") was **false** — #166 merged 2026-09-17. Replaced with what is actually missing (no full production-gate run) and its mainnet_ready dropped 72 → 62. `X3-SEC-001/002` 60 → 65 with the local evidence written down.
+- `crates/cross-vm-coordinator` holds **133 `#[test]` functions**, and the named ones matching the matrix rows are: `exact_rebind_is_idempotent`, `identical_fast_lock_replay_is_successful_noop_but_conflict_fails`, `duplicate_slow_claim_and_refund_completion_are_idempotent`, `distributed_fence_survives_authority_restart`, `fast_claim_retry_survives_coordinator_restart`, `conflicting_concurrent_lock_observations_yield_one_winner_one_conflict`, `terminal_phase_conflicting_with_canonical_evidence_halts`, `distributed_secret_registry_allows_same_session_retry_only`, `release_does_not_reuse_fencing_epoch`. Five rows' `test_evidence` now names them; `tested` 82 → 88.
+- Still unverified and left alone: X3-LANG-004/009/010, X3-XCHAIN-013/015/018/020/021 — no named test confirmed on master.
+- TICKET-101 covers **seventeen** rows, not thirteen (I wrote the wrong count in the ledger and corrected it).
+- Patching TOML with Python: a bare `HOSTED,` inside a replacement string is literal text, not interpolation — it produced `Invalid value` at parse time, caught immediately by `tomllib`. Parse the file after every scripted edit.
+
+## 2026-09-22 (twenty-seventh pass) — the BTC header path gets a receiving end
+### Facts to remember
+- **`x3SettlementEngine.submitBtcHeaders` exists as of spec_version 17** (call_index 35): up to `MAX_BTC_HEADERS_PER_CALL = 100` headers, origin = `Config::BtcHeaderOrigin` (runtime sets `EnsureRoot`; a network can name a relayer/multisig/governance), atomic via `with_storage_layer`, and every header still goes through `btc_admit_header`. Four tests: ordinary account refused; root **and** the designated relayer accepted with metas anchored at derived heights; a batch failing partway rolls back (asserted on `BtcBestHeight` and absent metas); over-bound refused. **156 + 23 tests pass.**
+- The mock composes the origin as `EitherOfDiverse<EnsureRoot<u64>, EnsureSignedBy<MockBtcRelayers, u64>>` with `SortedMembers` implemented for BOB — that is how one Config item can express "root-only by default, named-account when a network opts in" and remain testable.
+- Building/checking during a long soak: **`cargo check -j 4` / `cargo test -j 4` / `cargo clippy -j 4`** keep 28 of 32 cores free, so a two-hour measurement survives a code change. The re-attest (srtool ×2) is the part that must wait.
+- The receiving end is only half of TICKET-095. Still missing: a working signing path (no `node_modules` anywhere in the tree — `npm ci` in `packages/ts-sdk` unlocks both `push-headers.mjs` and the TPS harness `scripts/testnet/load-remarks-tps.js`), an end-to-end drill, a bond/slashing for withholding, and a real checkpoint on a public network.
+
+## 2026-09-23 (twenty-eighth pass) — the memory bound was measuring the cache, so the harness stopped running the cache
+### Facts to remember
+- **Release and debug grow the same**: 2h, 4 validators, default state cache → 1,714–1,760 MiB (debug) and **1,736–1,748 MiB (release)**. Debug overhead is not the cause.
+- The SDK's `--trie-cache-size` default is exactly **1 GiB** (`substrate/client/cli/src/params/import_params.rs`: `default_value_t = 1024 * 1024 * 1024`), and `--trie-cache-size 0` makes `trie_cache_maximum_size()` return `None` (cache disabled).
+- With the cache disabled: **+227 MiB and flat** in 15 minutes, vs +432 MiB still climbing. The 2h no-cache run (TICKET-100b, `/tmp/x3-soak-nocache2h`, release binary, ports 12344/32700) is in flight to confirm the full-window margin.
+- `scripts/testnet/consensus-soak.sh` now **defaults `NODE_TRIE_CACHE_BYTES=0`**, keeps the 1 GiB bound as a node-leak detector, and prints the cache size it ran with. Production budget, for operators: **~2.4 GiB RSS per validator after two hours** with default caches.
+- Release soak also confirmed consensus on the *release* binary: agreement at heights 9044/18088/27132, +36,159 blocks each, zero peer bans, 0–3 trie timeouts.
+- `x3SettlementEngine.submitBtcHeaders` (call_index 35) + `BtcHeaderOrigin` landed as spec_version 17 (PR #474); the mock composes `EitherOfDiverse<EnsureRoot, EnsureSignedBy<MockBtcRelayers>>` so "root-only by default, named relayer when a network opts in" is testable with one config item.
+
+## 2026-09-23 (twenty-ninth pass) — /tmp is not durable on this box
+### Facts to remember
+- **A `/tmp` sweep at ~03:22 UTC removed everything this agent had there**: the worktree (`/tmp/x3-soak-run`), `CARGO_TARGET_DIR=/tmp/x3-signer-target`, Bitcoin Core + the regtest chain, three soak directories (including the in-flight TICKET-100b run), and `packages/ts-sdk/node_modules`. `df` fell from ~1.4 TB to 593 GB — a disk sweep, not a targeted deletion.
+- **Nothing was lost that mattered**: every commit was pushed (`origin/master` `770e13ab08`, PRs #466–#475), the srtool images survive at `sha256:8638a668…`, and the repository's own `target/` (54 GB) cut the rebuild to 9 minutes.
+- **Durable work lives in the repo**: `.gitignore` line 169 ignores `/.wt-*/` for exactly this. The new worktree is `<repo>/.wt-agent` (branch `agent/soak-100b`), `CARGO_TARGET_DIR=<repo>/target`, and soak `BASE_DIR` inside the worktree. Never `/tmp` again on this box.
+- **The Codex sandbox broke after the sweep**: non-escalated commands fail with `error building bubblewrap command: mountinfo path is not absolute`. Every command needs `require_escalated` until the box's sandbox is restarted. Environment, not repository.
+- `docker images | head -4` truncated the list and made me briefly believe the srtool images had been pruned — check the full list before concluding a tool is gone.
+
+## 2026-09-23 (thirtieth pass) — the chain followed Bitcoin, and the drill found my own bug
+### Facts to remember
+- **End-to-end proof**: a dev chain born anchored on real regtest header 119 followed Bitcoin to **125** via `submitBtcHeaders` (six pushed headers, each `{height, anchored: true}`), and pushing only header 127 (parent never admitted) was refused with `BtcParentMissing`. Commands and output: `.ai/reports/btc-header-push-drill-20260923.md`.
+- **The drill caught a real defect in my own receiving rules**: `btc_median_time_past` padded Bitcoin's 11-block median with the ancestors it had, so a header above an anchor had to *postdate the anchor* — stricter than Bitcoin, and it refused legitimate headers (a regtest chain mined in one second has equal timestamps on consecutive blocks). Now returns `Option<u32>`: `None` until eleven ancestors, check skipped; from the 12th header on it is exactly Bitcoin's rule. `spec_version` 17 → 18.
+- **`pallet_sudo` swallow**: the outer `sudo.sudo(call)` extrinsic succeeds even when the inner call fails — the failure arrives as `Sudid { sudo_result: Err(..) }` in the events. My sender reported "included" for a refused header until it read that event. Any sudo-driven tooling must check it.
+- **A dev spec ships `sudo.key = null`**: `--chain dev` gives you a `sudo` pallet nobody can call. Set `genesis.runtimeGenesis.config.sudo.key = <Alice>` in the spec (then root calls work through `sudo.sudo`).
+- Backgrounded nodes die with the exec session. Use `setsid nohup <script> > log 2>&1 < /dev/null &`, and kill by **port** (`fuser -k 12444/tcp`) or pid file — never `pkill -f <pattern>` or `pgrep -f <pattern>` when the pattern appears anywhere in the same command line (it matched my own shell three times).
+- `node --check` proves syntax, not behaviour: `--from-height` parsed into `args['from-height']` while the code read `args.from`, so every run died with "required" and only a real run could show it.
+
+## 2026-09-23 (thirty-first pass) — the push is a gate, not a session
+### Facts to remember
+- **`scripts/testnet/btc-header-push-drill.sh` (gate `btc header push`)**: starts a private regtest bitcoind, mines 121 blocks, captures 7 consecutive headers, pins the oldest as the checkpoint in a dev spec, gives the spec a sudo account, boots the chain, pushes 6 headers, requires `btcBestHeight == tip`, then requires a gapped push to be refused with `BtcParentMissing`. **5/5.** Without Bitcoin Core it prints `SKIPPED — nothing was verified` and exits 0 (a loud skip, not a pass). Env: `X3_BITCOIND_DIR`, `X3_BTC_DRILL_NODE_BIN`.
+- `scripts/testnet/btc-header-push-drill.py` holds the logic; the `.sh` is the thin wrapper that resolves the dev binary (building it if needed).
+- **My own records can carry paste artefacts**: an earlier insertion into `TESTNET_GAP_LEDGER.md` left literal `+` prefixes on 16 lines (diff-style text pasted as content). Repaired; `grep -c '^+'` on a markdown file is a cheap check before committing prose.
+- Bitcoind for the drill lives at `<worktree>/btc/bitcoin-28.1` (checksum-verified), datadir `<worktree>/btc/regtest` — under the *worktree*, so a reboot's /tmp clear cannot take it.
+
+## 2026-09-23 (thirty-second pass) — the sender runs unattended, and the drill proves it
+### Facts to remember
+- **`push-headers.mjs --loop --cursor <file>`** is an unattended relayer: it polls the local Bitcoin node, pushes ranges as **one batch call** (up to 100 headers), writes the cursor **atomically and only after a range is included**, catches up after restarts, resumes from the cursor, and **stops rather than skipping** when a range is refused (skipping leaves a permanent gap in the chain's view). Cursor JSON = `{height, block_hash, updated_at}`; `block_hash` is stored in **display order** and reversed before the linkage check (`rangeHeaders`).
+- The drill now asserts six things, **6/6**: spec carries the checkpoint; the chain boots; a batch push works; the chain followed Bitcoin; a gapped push is refused with `BtcParentMissing`; and **the relay loop follows new blocks unattended** (it must catch up blocks mined while it was off, then keep up).
+- Inserting a block into a Python function with a `for…else` is easy to get wrong — my first attempt landed inside the RPC-wait's `else:` and produced an IndentationError; the second put the loop *before* the gap check, which made the gap check's premise false (the loop had already pushed the blocks the gap needed missing). Anchor insertions on unique text near the *end* of the body, and re-run the whole drill after every reorder.
+- TOML string surgery: replacing from an opening quote to the *next* quote drops the closing quote. Always re-parse the file (`tomllib`) immediately after scripted edits — it caught this and the earlier `HOSTED,` mistake within seconds.
+
+## 2026-09-23 (thirty-third pass) — the no-cache soak passes, and the vault was verifying a different tree
+### Facts to remember
+- **TICKET-100b closed: the two-hour no-cache soak PASSES.** Release binary, 4 validators, 120 samples: one chain throughout, +36,146 to +36,148 blocks per validator, peers 3, **no stall beyond 60s, no node lost**, and memory growth **392–398 MiB** against the 1 GiB bound. With the default 1 GiB state cache the same node grows ~1.75 GiB — configured memory, not a leak.
+- **`KEEP=1` used to end every kept soak in a false FAIL**: the cleanup check ("cleanup left N validator processes") ran even though `--keep` is exactly the flag that says to leave them. Fixed — the check is skipped under `KEEP=1`.
+- **Found a wrong second SPV implementation by testing the three against one real block**: `x3-bitcoin-vault::verify_merkle_proof` ordered each `(node, sibling)` pair by *byte value* instead of by the transaction's *position*, so it verified a different tree — it accepted the leftmost tx when the leaf was the smaller hash (the only case its tests covered) and rejected valid proofs elsewhere. Now `verify_merkle_proof(txid, tx_index, merkle_root, proof)` reads the direction from the index, `verify_deposit_spv` takes the position, and `merkle_proof_is_position_aware_not_value_sorted` pins it.
+- **`the_three_bitcoin_header_implementations_agree`** (pallet tests) compares the pallet, the vault and `x3-crosschain-intent` on the committed real regtest capture: same 32 bytes for the header, same verdict for the proof, and byte order asserted **both ways** (wire vs display). `x3-bitcoin-vault` is now a dev-dependency of the pallet so one test can see all three.
+- The intent crate's `BtcBlockHeader::hash()` **documented "big-endian (display order)" while returning wire order** — a comment that would have had a reader reverse a hash before comparing it. Fixed.
+- TOML string surgery drops the closing quote *every time* I do it by slicing to the next quote. Re-parse immediately (`tomllib`) — it caught this twice today within seconds.
+
+## 2026-09-23 (thirty-fourth pass) — four live credentials were in tracked source
+### Facts to remember
+- **The repository had a wallet private key and four provider keys committed.** `crates/external-chains/src/env_config.rs` used an Alchemy key, a paid DRPC key, an Ankr key *and* a wallet private key (`0x7f1d163dBe1d42F9813820996e039E6f81D5f62c`) as its **defaults**; `crates/external-chains/src/rpc.rs` repeated the provider keys in its endpoint table; `infra/mcp-config.json` and `infra-structure/config/mcp-config.json` each carried a live Infura key six times. The wallet holds **0 ETH on Arbitrum and Base** (checked), so nothing was taken — but it is burned, and all four keys need rotating (they are in git history; removal from HEAD does not un-expose them).
+- **Fixed**: credentials only from `ALCHEMY_API_KEY` / `DRPC_API_KEY` / `ANKR_API_KEY`, wallet only from `X3_BOT_PRIVATE_KEY` + `X3_BOT_ADDRESS`, keyless public endpoints as the built-in default, paid endpoints promoted ahead when configured. **The operator's paid DRPC endpoints therefore just need `export DRPC_API_KEY=…`** — `ProviderCredentials::from_env()` builds `https://lb.drpc.org/<network>/<key>` per supported network.
+- **`scripts/check-no-provider-secrets.sh`** scans `git ls-files` for keyed provider URLs and 64-hex `private_key`-shaped values, prints file/line/pattern only (never the value — it prints into a CI log), skips vendored trees, and takes exceptions from `scripts/allowed-provider-secrets.txt` (each with a stated reason: the e2e placeholder key, the generated chain registry's third-party demo key, crawler state, `dist/`). Wired into `make guard` and `local-ci`.
+- **The guard found two files a careful manual scan missed** (the second MCP config, the generated chain list) — the argument for the guard over good intentions.
+- **Same shared-tree mistake, third time**: I did this whole turn's edits in `/home/lojak/Desktop/xxxstar-main` (the other agent's branch) instead of `.wt-agent`. Recovered by copying the nine files into the worktree, restoring the shared tree with `git checkout --`, then redoing three files *from master* because copying them from the other branch's checkout had brought a whole-file re-serialization (1,030-line diffs). **Check `git branch --show-current` before the first edit of a turn, not before the commit** — and prefer `json` edits that preserve formatting (textual substitution), because `json.load` + `json.dump` rewrites the entire file.
+
+## 2026-09-23 (thirty-fifth pass) — my own finding was overstated, and the tests that were missing now exist
+### Facts to remember
+- **The claim "the atomic kernel's dispatch lets an unassigned bundle be finalized" was wrong.** `record.executor` is set in exactly one place — `assign_bundle_executor`, which sets `Executing` on the line before — and `verify_bundle_consistency` requires `executor.is_some()`, so a `Pending` bundle was already refused. The `Pending` acceptance in `do_finalize_bundle` was a dead branch, not an open door.
+- **`s.replace(old, new, 1)` in a Python edit hits the FIRST occurrence** — here, the rollback path's status check, where accepting `Pending` is correct (a submitter must be able to cancel an unclaimed bundle). A pre-existing test (`economic_halt_does_not_trap_pending_bundle_funds`) failed immediately and caught it. Anchor scripted edits on a unique *preceding* string, as done on the second attempt (`ensure!(finality_cert == anchored…` then the next occurrence).
+- `submit_finalization_result` now has **five tests** (it had none): pending refusal, unanchored-certificate refusal, the receipt-root commitment (wrong refused / right accepted / status `Finalized` / PoAE stored), finalization-once (refused on **status**, not `ProofAlreadyExists`, because the status check runs first), and `an_unsigned_finalization_cannot_be_attributed_to_the_executor` — the hole asserted as today's behaviour so closing it must change the test.
+- The kernel's `codec` name is `parity_scale_codec` (not `codec`), and `ReceiptRootData` is `#[derive(Encode)]` inside `pub mod pallet` → `crate::ReceiptRootData`.
+- `pallet-x3-atomic-kernel` **is** in the runtime graph, so this change needs a re-attestation.
+
+## 2026-09-23 (thirty-sixth pass) — the paid endpoint drill, and the endpoint table nothing reads
+### Facts to remember
+- **The operator's paid DRPC endpoints are still not on this box.** No `~/.x3-provider-keys`, no
+  `DRPC_API_KEY` anywhere in the environment (checked 05:00–06:00 MDT). The host *can* reach
+  `lb.drpc.org`, and a placeholder key gets DRPC's own `Your token is invalid or expired`, so the
+  path works end to end and the key is the only missing piece.
+- **New: `scripts/drills/provider-endpoint-drill.sh`, run as `make provider-drill`.** Per network it
+  requires (1) `eth_chainId` to equal the chain the repository believes that network is, from *both*
+  the paid endpoint and a keyless public one, (2) the **same block hash at head − 64** from both,
+  and (3) a receipt with `status == 0x1` naming that block, reported by both. Evidence lands in
+  `.ai/reports/provider-endpoint-<utc>.json`. The key is never printed and never written — endpoints
+  are printed with it redacted. Exit 2 when no key is configured, so a missing key cannot look green.
+- **`--paid-url-template` with no `{key}` in it needs no key**, which is how the drill was validated
+  before the operator's key existed: `base.publicnode.com` against `mainnet.base.org` agreed on
+  chain `0x2105`, block `51677151` and receipt `status 0x1` for the same transaction. Two independent
+  providers agreeing on one block is the property the paid endpoint is bought for.
+- **A free endpoint that refuses archive reads is caught rather than excused**: `base.publicnode.com`
+  answered the block but answered the receipt with `Archive requests require a personal token`. The
+  drill reports the provider's own words and fails that network.
+- **`config/rpc-endpoints.toml` and `infra/mainnet-rpc-endpoints.toml` have no reader at all**
+  (TICKET-104). Its header says to set `X3_CHAIN_RPC_<NAME>`, its rows declare `X3_RPC_<NAME>`, and
+  neither name is consulted anywhere; the only runtime `toml::from_str` in the workspace is the
+  feature registry and flags in `x3-readiness`. An operator dropping a paid URL in that file changes
+  nothing. The paid path that *does* exist is `ProviderCredentials::from_env()` →
+  `EnvConfig::from_env()`, which reads `X3_NETWORK` and promotes DRPC/Alchemy/Ankr ahead of the
+  keyless list for the five networks it names.
+- **Re-attestation for `0d296d236b`: the bytes moved this time** (compact the same 8,474,849 bytes
+  with a different `setCode`; compressed 1,453,609, was 1,453,670), because
+  `pallet-x3-atomic-kernel` is in the runtime graph. `spec_version` stays at 18 — every reachable
+  call accepts and refuses what it did before. Merged as PR #486; `origin/master` is `7cd788a68d`.
+- `apply_patch` fails intermittently in this sandbox (`bubblewrap … mountinfo path is not absolute`)
+  even with escalation. Scripted `python3` edits plus `bash -n` / `jq` / `git diff --check` afterwards
+  work every time.

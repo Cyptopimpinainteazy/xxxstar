@@ -19,6 +19,7 @@ use crate::mock::{
 use crate::Event;
 use crate::{BundleRollbackReason, BundleStatus, Bundles, Error, NonceRegistry};
 use frame_support::{assert_noop, assert_ok, BoundedVec};
+use parity_scale_codec::Encode;
 
 use crate::mock::RuntimeEvent;
 
@@ -1195,6 +1196,165 @@ fn economic_halt_does_not_block_inflight_bundle_assignment() {
             Balances::reserved_balance(ALICE),
             0,
             "a halt must not trap the bond of an in-flight bundle"
+        );
+    });
+}
+
+// ── Finalization: the unsigned entry point, and the one hole left in it ──────
+//
+// `submit_finalization_result` had **no test at all** until now. That is how a chain with an
+// unsigned finalization path and a self-satisfying certificate check went unnoticed for so long:
+// the checks were there, nobody had ever run them. These tests pin what the pallet does enforce,
+// and the last one pins what it *cannot* — the hole is the ticket, not an oversight in the test.
+
+/// The receipt root the pallet demands when the commitment check is compiled in — which it is for
+/// every build that is not `dev` or `testnet`.
+fn committed_receipt_root(bundle_id: H256, cert: H256, finalized_block: u64) -> H256 {
+    let record = Bundles::<Test>::get(bundle_id).expect("the bundle exists");
+    let executor_hash = match record.executor.as_ref() {
+        Some(account) => H256::from(sp_io::hashing::blake2_256(&account.encode())),
+        None => H256::zero(),
+    };
+    H256::from(sp_io::hashing::blake2_256(
+        &crate::ReceiptRootData {
+            bundle_id,
+            legs_hash: record.legs_hash,
+            leg_count: record.leg_count,
+            executor_hash,
+            finalized_block,
+            finality_cert: cert,
+        }
+        .encode(),
+    ))
+}
+
+/// The chain has committed to `cert` for `block` — what the voter's anchor call does on a live
+/// chain, written straight to storage here.
+fn anchor_cert(block: u64, cert: H256) {
+    crate::FinalityCertAnchors::<Test>::insert(block, cert);
+}
+
+fn finalize(
+    bundle_id: H256,
+    receipt_root: H256,
+    cert: H256,
+) -> frame_support::dispatch::DispatchResult {
+    AtomicKernel::submit_finalization_result(
+        RuntimeOrigin::none(),
+        bundle_id,
+        receipt_root,
+        cert,
+        0,
+    )
+}
+
+#[test]
+fn finalization_refuses_a_bundle_nobody_has_been_assigned_to() {
+    // A `Pending` bundle has no executor, so this is refused on status before anything else about
+    // the proof matters. A block author can include an unsigned extrinsic without the pool's
+    // validation, so this is the check a reader must be able to point at.
+    new_test_ext().execute_with(|| {
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle(),
+            100,
+            1,
+            7,
+        ));
+        let (bundle_id, _) = Bundles::<Test>::iter().next().expect("stored");
+        let cert = H256::repeat_byte(0x11);
+        anchor_cert(1, cert);
+
+        assert_noop!(
+            finalize(bundle_id, H256::repeat_byte(0x22), cert),
+            Error::<Test>::InvalidBundleState
+        );
+    });
+}
+
+#[test]
+fn finalization_requires_the_chain_to_have_anchored_the_certificate() {
+    // The certificate the caller supplies must be one this chain has committed to. What that is
+    // worth is the separate question of where the anchor comes from (TICKET-097): the anchor call
+    // is unsigned too, so a caller can plant the value it is about to check against.
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 8);
+        anchor_cert(1, H256::repeat_byte(0x33));
+
+        assert_noop!(
+            finalize(bundle_id, H256::repeat_byte(0x22), H256::repeat_byte(0x44)),
+            Error::<Test>::InvalidFinalityCert
+        );
+    });
+}
+
+#[test]
+fn finalization_requires_the_receipt_root_the_bundle_commits_to() {
+    // The commitment check is compiled in for this build, so a receipt root that is not the hash of
+    // the bundle's own fields is refused — and the right one is accepted.
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 9);
+        let cert = H256::repeat_byte(0x55);
+        anchor_cert(1, cert);
+
+        assert_noop!(
+            finalize(bundle_id, H256::repeat_byte(0x66), cert),
+            Error::<Test>::InvalidReceiptRoot
+        );
+
+        let root = committed_receipt_root(bundle_id, cert, 1);
+        assert_ok!(finalize(bundle_id, root, cert));
+        assert_eq!(
+            Bundles::<Test>::get(bundle_id).expect("record").status,
+            BundleStatus::Finalized
+        );
+        assert!(crate::PoaeProofs::<Test>::contains_key(bundle_id));
+    });
+}
+
+#[test]
+fn finalization_happens_once() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 10);
+        let cert = H256::repeat_byte(0x77);
+        anchor_cert(1, cert);
+        let root = committed_receipt_root(bundle_id, cert, 1);
+
+        assert_ok!(finalize(bundle_id, root, cert));
+        // The second call is refused on status: the bundle is `Finalized`, and the status check runs
+        // before the "already has a PoAE proof" check. Both are refusals; this is the one it gives.
+        assert_noop!(
+            finalize(bundle_id, root, cert),
+            Error::<Test>::InvalidBundleState
+        );
+        assert!(crate::PoaeProofs::<Test>::contains_key(bundle_id));
+    });
+}
+
+#[test]
+fn an_unsigned_finalization_cannot_be_attributed_to_the_executor() {
+    // TICKET-097, stated as a test rather than as prose. `submit_finalization_result` is
+    // `ensure_none`: it has no caller identity to compare against `record.executor`, so *anyone*
+    // who can get an unsigned extrinsic into a block can finalize an `Executing` bundle — using a
+    // certificate they planted themselves via the equally unsigned anchor call. The pallet's own
+    // comment claims this requirement "prevents anonymous peers from finalizing bundles they never
+    // claimed", and that is true of *assignment*, not of finalization.
+    //
+    // This test asserts today's behaviour on purpose. Closing the hole has to change it, which is
+    // what makes it a useful alarm: the day someone lands the authorization fix, this test fails
+    // and the ticket closes with it.
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 11); // executor is BOB
+        let cert = H256::repeat_byte(0x88);
+        anchor_cert(1, cert);
+        let root = committed_receipt_root(bundle_id, cert, 1);
+
+        // `RuntimeOrigin::none()` is what a block author's unsigned extrinsic carries: no identity.
+        assert_ok!(finalize(bundle_id, root, cert));
+        assert_eq!(
+            Bundles::<Test>::get(bundle_id).expect("record").status,
+            BundleStatus::Finalized,
+            "finalized by an origin the pallet cannot name, which is the ticket"
         );
     });
 }

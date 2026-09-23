@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "project": "x3-chain",
   "generated_at": "2025-09-28T00:00:00Z",
-  "orchestrator_hint": "kubernetes|docker-compose|custom-mcp-orchestrator",
+  "orchestrator_hint": "kubernetes|docker-compose|custom-mcp-orchestrator Provider keys are not shipped in this file: the keyed RPC entries are empty on purpose (a live Infura key was committed here until 2026-09-23). Export the provider's key in the environment instead.",
   "services": [
     {
       "id": "fs-mcp",
@@ -84,13 +84,13 @@
       "description": "Full-featured EVM tooling: compile, deploy, simulate transactions and run unit/fuzz tests across EVM chains.",
       "env": {
         "DEFAULT_RPC": "http://localhost:8545",
-        "INFURA_PROJECT_ID": "159db9ce2a55451eb73fbb9d1a6126d2",
-        "INFURA_MAINNET": "https://mainnet.infura.io/v3/159db9ce2a55451eb73fbb9d1a6126d2",
-        "INFURA_GOERLI": "https://goerli.infura.io/v3/159db9ce2a55451eb73fbb9d1a6126d2",
-        "INFURA_SEPOLIA": "https://sepolia.infura.io/v3/159db9ce2a55451eb73fbb9d1a6126d2",
-        "INFURA_POLYGON": "https://polygon-mainnet.infura.io/v3/159db9ce2a55451eb73fbb9d1a6126d2",
-        "INFURA_BUNDLER": "https://bundler.infura.io/v3/159db9ce2a55451eb73fbb9d1a6126d2",
-        "INFURA_GAS": "https://gas.api.infura.io/v3/159db9ce2a55451eb73fbb9d1a6126d2"
+        "INFURA_PROJECT_ID": "",
+        "INFURA_MAINNET": "",
+        "INFURA_GOERLI": "",
+        "INFURA_SEPOLIA": "",
+        "INFURA_POLYGON": "",
+        "INFURA_BUNDLER": "",
+        "INFURA_GAS": ""
       },
       "secrets": ["ETH_RPC_KEY"],
       "ports": [ { "container": 8545, "protocol": "http" } ],

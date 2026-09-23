@@ -5,16 +5,19 @@ id = "X3-CLAIM-001"
 name = "Million-TPS GPU claims"
 subsystem = "claims_hygiene"
 source = "claim_risk"
-paths = ["GPU_VALIDATOR_HONEST_AUDIT.md"]
-implemented = 10
-tested = 5
-mainnet_ready = 5
+paths = ["GPU_VALIDATOR_HONEST_AUDIT.md", "docs/testnet-config/RELEASE-NOTES.md"]
+implemented = 55
+tested = 25
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "research"
 claim_risk = true
-blockers = ["Keep as target only; remove current-performance wording"]
-evidence = ["GPU_VALIDATOR_HONEST_AUDIT.md", "note: Honest GPU audit says no real GPU finalized-TPS benchmark"]
+blockers = [
+  "The current-performance wording is gone: `docs/testnet-config/RELEASE-NOTES.md` announced a released `solana-gpu-validator-v1.0.tar.gz` with \"Achieved: 2.75M TPS in lab, 1-5M TPS on testnet\" and a \"Guarantee: Minimum 100k TPS\", none of which exists in this repository (no `.cu`/`.ptx` file, no tarball, no TPS benchmark of any kind). It now states what is real, marks the figures as targets, and names the two orphan result files (`day10-validation-results.json`, `day10-hotfix-results.json`) that nothing here produces — TICKET-099",
+  "What remains is not wording: no GPU benchmark can run on this host (no compute device) and no GPU artifact is published, so any acceleration claim is still unverifiable here",
+]
+evidence = ["GPU_VALIDATOR_HONEST_AUDIT.md", "docs/testnet-config/RELEASE-NOTES.md", ".ai/reports/gpu-claims-hygiene-20260922.md", "note: Honest GPU audit says no real GPU finalized-TPS benchmark; the release note that contradicted it has been rewritten and the orphan result artifacts are ticketed"]
 
 [[feature]]
 id = "X3-CLAIM-002"

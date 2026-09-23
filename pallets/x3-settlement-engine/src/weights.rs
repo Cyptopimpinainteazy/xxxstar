@@ -13,6 +13,8 @@ pub trait WeightInfo {
     fn refund_intent() -> Weight;
     fn verify_btc_proof() -> Weight;
     fn update_btc_block_header() -> Weight;
+    fn submit_btc_headers() -> Weight;
+    fn anchor_btc_checkpoint() -> Weight;
     fn submit_external_proof() -> Weight;
     fn create_bond() -> Weight;
     fn claim_bond() -> Weight;
@@ -46,6 +48,15 @@ impl WeightInfo for () {
     }
     fn update_btc_block_header() -> Weight {
         Weight::from_parts(50_000_000, 0)
+    }
+    fn submit_btc_headers() -> Weight {
+        // A full batch of 100 headers, each one a proof-of-work check over 80 bytes plus a
+        // handful of storage reads and writes: the same shape as `anchor_btc_checkpoint`,
+        // multiplied by the batch bound.
+        Weight::from_parts(6_000_000_000, 0)
+    }
+    fn anchor_btc_checkpoint() -> Weight {
+        Weight::from_parts(60_000_000, 0)
     }
     fn submit_external_proof() -> Weight {
         Weight::from_parts(180_000_000, 0)
@@ -125,6 +136,18 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
         Weight::from_parts(50_000_000, 3000)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(1))
+    }
+
+    fn submit_btc_headers() -> Weight {
+        Weight::from_parts(6_000_000_000, 400_000)
+            .saturating_add(T::DbWeight::get().reads(3))
+            .saturating_add(T::DbWeight::get().writes(3))
+    }
+
+    fn anchor_btc_checkpoint() -> Weight {
+        Weight::from_parts(60_000_000, 4000)
+            .saturating_add(T::DbWeight::get().reads(3))
+            .saturating_add(T::DbWeight::get().writes(3))
     }
 
     fn submit_external_proof() -> Weight {

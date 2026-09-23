@@ -24,7 +24,23 @@ KEEP="${KEEP:-0}"
 # several blocks a minute on an idle chain, so a minute of nothing is a stall, not a
 # slow round; the tolerance exists because samples are taken on an interval.
 STALL_TOLERANCE_SECS="${STALL_TOLERANCE_SECS:-60}"
-# Memory is reported, and only a *large* growth fails: debug builds are noisy.
+# Memory: the check is about **the node**, so the state cache is off unless the caller asks
+# for it.
+#
+# `--trie-cache-size` (the state cache) defaults to 1 GiB in this SDK, and a node filling a
+# configured cache is not leaking. Measured on 2026-09-22, 4 validators, 2 hours each way:
+# growth 1,714–1,760 MiB (debug) and 1,736–1,748 MiB (release) with the default cache, against
+# +227 MiB and *flat* in 15 minutes with `NODE_TRIE_CACHE_BYTES=0`. A 1 GiB bound therefore
+# fails every normally-configured node and measures its cache, not its allocations — so the
+# soak disables the cache by default and the bound below is about the pipeline.
+#
+# Set `NODE_TRIE_CACHE_BYTES` to a production value to measure the footprint instead: 1 GiB of
+# state cache put a node at ~2.4 GiB RSS over two hours. That number belongs in an operator's
+# memory budget, not in a leak detector.
+NODE_TRIE_CACHE_BYTES="${NODE_TRIE_CACHE_BYTES:-0}"
+export NODE_TRIE_CACHE_BYTES
+# Memory is reported, and only a *large* growth fails. With the cache disabled, this is the
+# node's own growth: ~230 MiB over 15 minutes in the measurement above.
 MAX_RSS_GROWTH_MIB="${MAX_RSS_GROWTH_MIB:-1024}"
 RPC_BASE="${RPC_BASE:-9944}"
 
@@ -155,6 +171,7 @@ while :; do
 done
 
 final_elapsed=$(( $(date +%s) - start ))
+info "state cache: NODE_TRIE_CACHE_BYTES=${NODE_TRIE_CACHE_BYTES:-0} (0 = disabled; see the memory note above)"
 info "soak window complete (${final_elapsed}s). Checking agreement at sampled heights"
 
 min_height=999999999
@@ -231,7 +248,15 @@ fi
 pass "${MINUTES} minute(s) with no stall beyond ${STALL_TOLERANCE_SECS}s, no node lost, agreement held"
 pass "report: ${REPORT}"
 cleanup
-left=$( { pgrep -f -- "--base-path $BASE_DIR/node-" 2>/dev/null || true; } | wc -l | tr -d '[:space:]')
-[[ "$left" == "0" ]] || fail "cleanup left ${left} validator process(es) running"
+if [[ "$KEEP" == "1" ]]; then
+  # `--keep` means the operator wants the network left up for inspection. The cleanup check below
+  # exists to catch a cleanup that failed, so running it against a deliberately kept network
+  # reported "cleanup left 4 validator process(es) running" as a FAIL on every kept soak — a check
+  # contradicting the flag that chose to keep them.
+  info "KEEP=1 — skipping the cleanup check (the network is meant to be running)"
+else
+  left=$( { pgrep -f -- "--base-path $BASE_DIR/node-" 2>/dev/null || true; } | wc -l | tr -d '[:space:]')
+  [[ "$left" == "0" ]] || fail "cleanup left ${left} validator process(es) running"
+fi
 
 printf '\n[soak] PASSED: %s validators, %s minutes, one chain throughout.\n' "$COUNT" "$MINUTES"

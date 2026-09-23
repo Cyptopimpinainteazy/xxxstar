@@ -50,6 +50,10 @@ proptest = "1.4"
 secp256k1 = { version = "0.28", features = ["recovery", "rand"] }
 rand = "0.8"
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types" }
+# The cross-implementation agreement test compares this pallet's Bitcoin header hashing and merkle
+# walk against `crates/x3-bitcoin-vault`'s and `crates/x3-crosschain-intent`'s, so a change in byte
+# order in any of the three fails a test instead of silently invalidating another's proofs.
+x3-bitcoin-vault = { path = "../../crates/x3-bitcoin-vault" }
 
 [features]
 default = ["std"]

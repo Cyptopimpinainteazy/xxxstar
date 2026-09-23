@@ -88,6 +88,9 @@ pub use evm_live::LiveEvmExecutor;
 pub mod btc_live;
 
 #[cfg(feature = "std")]
+pub use btc_live::{BtcIn, BtcOut, BtcRawTx, BtcRpcBroadcaster, BtcTx};
+
+#[cfg(feature = "std")]
 pub mod x3vm_live;
 
 #[cfg(feature = "std")]
@@ -118,6 +121,9 @@ pub use adapter::{
 pub use adapter_ledger::{
     claim_proof_to_entry, lock_proof_to_entry, refund_proof_to_entry, AdapterLedgerBridge,
 };
+// Simulation-only: these produce mock txids and placeholder proof bytes that no
+// real Bitcoin node accepts. Use the `btc_live::{BtcTx, BtcRpcBroadcaster}` path
+// for anything that must reach mainnet.
 pub use bitcoin_htlc::{
     BitcoinNetwork, BitcoinScript, BtcHtlcAdapter, BtcTransactionBuilder, StatefulBtcAdapter,
 };

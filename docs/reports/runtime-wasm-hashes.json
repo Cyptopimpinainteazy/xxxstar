@@ -4,27 +4,27 @@
   "image_digest": "sha256:8638a668bd6d29111dc01953fbead6eb08c062e1cc62d3047a245a52b6edb3bf",
   "srtool": "0.18.4",
   "rustc": "1.93.0",
-  "recorded_at": "2026-09-22",
-  "recorded_revision": "9fe02ac37",
-  "runtime_version": "x3-chain-13 (x3-chain-1.tx1.au1)",
+  "recorded_at": "2026-09-23",
+  "recorded_revision": "0d296d236b",
+  "runtime_version": "x3-chain-18 (x3-chain-1.tx1.au1)",
   "metadata": "V14",
   "runtimes": {
     "compact": {
-      "size": "8426935",
-      "set_code": "0xd998dae29f7608357622ef37ee527cd31e00ea7bb10e0121d56872e17ebf492c",
-      "authorize_upgrade": "0x91814730dc970cf52cc42765c933c108eaa0656d223ddfaa9923a4947d419a5a",
-      "ipfs": "QmSBXVCK52s1RUcasXSYmnMuAda7qsGWNDantshhbFEB59",
-      "blake2_256": "0x871c8feb70f6068a1ba9a98e1a49e23b48e5c895ea7bf0a393c7274fa5490c63",
-      "version": "x3-chain-13 (x3-chain-1.tx1.au1)",
+      "size": "8474849",
+      "set_code": "0x678abec69f30bd5fd2a5afc296b482cb14fcc7738c8109b39fcde80b0efc9b36",
+      "authorize_upgrade": "0x48640b791bff46e897b15e2de521ed271cb9c51d5ad82fb985de7f8a01b6be40",
+      "ipfs": "Qmf2FBS65ayur4Udb4hwQr7Dee7NoZDGZuKAY2V2ywKSwN",
+      "blake2_256": "0xd62665d003f586565013cfaa1e6a6abfa58796c201d3c8225f1e798e1f44338c",
+      "version": "x3-chain-18 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     },
     "compressed": {
-      "size": "1444353",
-      "set_code": "0xeac27a0153d54d4c4a44b4d5aa1aabfd075abb9039bbde88efa6dac8f6f7bb48",
-      "authorize_upgrade": "0x0a1803da86c99dbafdb7abff4ca6442e5476b5f91a6ddb6fa7fd752359cd5a58",
-      "ipfs": "Qmb3Mg778EfaX6fj25pzVompH8grdrsxKbPwUcxWRXtsaY",
-      "blake2_256": "0x5a8200f4890d1630dfc2394f6119058a9159c56c545aa2fb8a896e8d5067f5e2",
-      "version": "x3-chain-13 (x3-chain-1.tx1.au1)",
+      "size": "1453609",
+      "set_code": "0xe55c4a202972f640a47b1960551bf83a757d2e1211a32fc7c43071d183c76344",
+      "authorize_upgrade": "0x9b7ab954b0b5ab89668378bdcfa6dc5065b5e094e9b0cbc69a33a89005df0806",
+      "ipfs": "QmZka2CcEDNfCzofLMGeqdHVWMiUsJuvJtwH1UH6JWcfpP",
+      "blake2_256": "0xc6bbd66a4d1de9c48e1ab3009c3fc468a5869916d797b9457236d6e12225eb07",
+      "version": "x3-chain-18 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     }
   }

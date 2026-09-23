@@ -6,16 +6,17 @@ name = "BTC Fortress gateway"
 subsystem = "cross_chain"
 source = "master"
 paths = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs"]
-implemented = 70
-tested = 60
-mainnet_ready = 35
+implemented = 80
+tested = 85
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "No live Bitcoin run of any kind — not regtest, not testnet, not mainnet; the deposit/withdrawal path has never moved a coin",
-  "Header bootstrap has no trusted source: `submit_btc_header` is root-only and requires each header to chain to one already in storage, but there is no checkpoint anchor and no peer-sourced header sync",
+  "Regtest is now real, testnet and mainnet are not: a live Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`, `.ai/reports/btc-regtest-capture-20260922.json`), but no coin has ever moved on a network anyone else can see, and no header from testnet or mainnet has been anchored",
+  "A chain can now be born anchored — `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12, including a live node serving the anchor and refusing a spec that lies) — but no *public* network has one pinned, and the header still arrives by an operator copying a hash rather than from a header source",
+  "The sender runs unattended now (`push-headers.mjs --loop --cursor …`: batch pushes, an atomic cursor, catch-up after restarts, and it **stops** rather than skipping a refused range — the drill requires all of it, 6/6), but nothing runs against a public network yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
   "No BTC signer quorum for withdrawals",
   "BTC mainnet disabled by feature flag; no external audit",
 ]
@@ -27,7 +28,7 @@ blockers = [
 # (deposits, withdrawals, PSBTs, header-chain verification) and the bridge's HTLC
 # and SPV modules.
 evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22 with the named tests below"]
-test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "crates/x3-bitcoin-vault/src/lib.rs", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding) and the vault's 23 tests including header-chain linkage and tampered-signature rejection; `cargo test -p pallet-x3-settlement-engine --lib` = 135 passed, `cargo test -p x3-bitcoin-vault --lib` = 23 passed on 2026-09-22"]
+test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, and four tests over data a real Bitcoin Core v28.1.0 regtest node produced — its block 121 header hashes to the hash the node reported, its merkle path reconstructs its root and a tampered sibling does not, blocks 121/122 anchor and extend through the pallet's rules, and a real transaction's proof is refused until its block is anchored and accepted after) plus the vault's 23 tests including header-chain linkage and tampered-signature rejection; `cargo test -p pallet-x3-settlement-engine` = 148 + 23 passed, `cargo test -p x3-bitcoin-vault --lib` = 23 passed on 2026-09-22"]
 registry_feature = "btc_fortress_gateway"
 
 [[feature]]
@@ -44,10 +45,10 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "No live Bitcoin run: the script builder, the merkle walk and the header chain are exercised against fixtures, never against a chain",
-  "The header chain the SPV check reads has no trusted bootstrap (root-submitted, chained to storage, no checkpoint anchor)",
+  "No live Bitcoin run beyond regtest: the script builder, the merkle walk and the header chain are now exercised against a real regtest node's blocks (block 121's header, its merkle path and a confirmed transaction), and a dev chain can be born anchored on that block, but nothing has run against testnet or mainnet",
+  "The header chain the SPV check reads now bootstraps from a governance-anchored checkpoint (`anchor_btc_checkpoint`, spec_version 14) and extends only under Bitcoin's height/difficulty/timestamp rules, but no chain has anchored one yet, so the path is fail-closed and unexercised end to end",
   "No signer quorum for withdrawals; no external audit",
-  "Three SPV implementations exist — this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` — and only the pallet's is on the runtime path; they agree on the wire layout after the 2026-09-22 fix, but consolidating them would remove a standing drift risk",
+  "Three SPV implementations still exist — this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` — and only the pallet's is on the runtime path. They are now *tested against each other* on a real regtest block (`the_three_bitcoin_header_implementations_agree`), which is how the vault's merkle walk was found to be verifying a different tree (it ordered each pair by byte value instead of by the transaction's position, and is now position-aware). Consolidating them into one would remove the drift risk rather than detect it",
 ]
 # The old note said "proof verification was placeholder". Half true, and the wrong
 # half mattered: the txid and merkle checks were real, but the proof-of-work check
@@ -207,22 +208,22 @@ blockers = ["Needs Byzantine provider and partition tests"]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Quorum types exported and used by security logic"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-010"
 name = "Cross-domain semantic idempotency"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
 implemented = 88
-tested = 82
+tested = 88
 mainnet_ready = 68
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Strengthened exact-head production gate still pending"]
-evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 persists operation journal; duplicate identical evidence becomes no-op"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [166]
+evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 persists operation journal; duplicate identical evidence becomes no-op", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): exact_rebind_is_idempotent (intent_binding.rs), identical_fast_lock_replay_is_successful_noop_but_conflict_fails (state_machine.rs), duplicate_slow_claim_and_refund_completion_are_idempotent (state_machine.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
 id = "X3-XCHAIN-011"
@@ -258,10 +259,11 @@ blockers = ["Needs live heterogeneous provider evidence"]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Secret-release design rejects rpc_quorum_agreed=false"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-013"
 name = "Secret-release firewall"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 85
 tested = 78
@@ -271,32 +273,32 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Must land firewall and unforgeable permit together"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability"]
-open_prs = [162, 163]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-014"
 name = "Coordinator restart recovery"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
 implemented = 88
-tested = 82
+tested = 88
 mainnet_ready = 70
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Needs real process/network restart drill"]
-evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 adversarial restart test"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [166]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 adversarial restart test", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): distributed_fence_survives_authority_restart (lease.rs), fast_claim_retry_survives_coordinator_restart (state_machine.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-015"
 name = "Split-write crash recovery"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
 implemented = 88
 tested = 82
@@ -306,51 +308,51 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Needs merge plus long-running persistence fault injection"]
-evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 tests exact persistence crash window"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [166]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 tests exact persistence crash window", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+test_evidence = ["note: persistence round-trip tests exist (inmemory_persistence_roundtrip, inmemory_persistence_load_all, inmemory_used_secrets_roundtrip, inmemory_secret_claim_ownership_roundtrip, offchain_save_load_roundtrip in crates/cross-vm-coordinator/src/persistence.rs), but none injects a fault mid-write — which is what this row is named for, so the blocker stands"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-016"
 name = "Conflicting retry rejection"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
 implemented = 90
-tested = 85
+tested = 88
 mainnet_ready = 72
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending production-gate proof"]
-evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 returns IdempotencyConflict for mismatched evidence"]
-test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
-open_prs = [166]
+evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 returns IdempotencyConflict for mismatched evidence", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): conflicting_concurrent_lock_observations_yield_one_winner_one_conflict (concurrent.rs), terminal_phase_conflicting_with_canonical_evidence_halts (recovery.rs), identical_fast_lock_replay_is_successful_noop_but_conflict_fails (state_machine.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-017"
 name = "Cross-session secret ownership"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
 implemented = 90
-tested = 85
+tested = 88
 mainnet_ready = 72
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending production-gate proof"]
-evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: secret hash -> owning session id"]
-test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
-open_prs = [166]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: secret hash -> owning session id", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): distributed_secret_registry_allows_same_session_retry_only (lease.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-018"
 name = "Secret-release domain binding"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
@@ -360,33 +362,33 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs checks chain-id and VM binding"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs checks chain-id and VM binding", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [162, 163]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-019"
 name = "Secret-release proof reuse rejection"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
-tested = 82
+tested = 88
 mainnet_ready = 72
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [162, 163]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): release_does_not_reuse_fencing_epoch (lease.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-020"
 name = "Secret-release refund rejection"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
@@ -396,15 +398,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs rejects refunded destination evidence"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [162, 163]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs rejects refunded destination evidence", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
+test_evidence = ["note: exact tests named on master 2026-09-23: test_double_refund_rejected and test_claim_after_refund_rejected (crates/x3-atomic-swap/src/{bitcoin_htlc,cosmwasm_htlc,fuel_htlc}.rs), test_stateful_double_refund_rejected and test_stateful_claim_then_refund_rejected (bitcoin_htlc.rs), test_evm_unauthorized_refund_rejected (evm_htlc.rs) — the refund-rejection family, per VM"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
 id = "X3-XCHAIN-021"
 name = "Secret-release tx/block binding"
 subsystem = "cross_chain"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
@@ -414,9 +416,8 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs binds the finality proof to the exact lock tx and block"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs binds the finality proof to the exact lock tx and block", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
-open_prs = [162, 163]
 
 [[feature]]
 id = "X3-XCHAIN-022"

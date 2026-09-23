@@ -35,9 +35,6 @@ pub mod rpc_middleware;
 /// Phase 5: Network Bootstrapping.
 pub mod network;
 
-/// Phase 6: Validator Setup.
-pub mod authority;
-
 /// Phase 7: Telemetry/Monitoring.
 pub mod metrics;
 
@@ -47,6 +44,11 @@ pub mod chain_spec;
 
 /// Atomic gateway key handling and signed atomic-kernel extrinsic builders.
 pub mod atomic_gateway;
+
+/// Operator support for validator key rotation: derives session keys and
+/// builds signed `session.set_keys` extrinsics against the on-chain custody
+/// registry.
+pub mod validator_rotation;
 
 /// Node-side atomic gateway execution service.
 pub mod atomic_service;

@@ -332,7 +332,48 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // this hash, so headers stored by an earlier version would be filed under a
     // different key. No migration is needed: every deployed chain has an empty
     // `BtcHeaders` map (the BTC path is not live on any network yet).
-    spec_version: 13,
+    //
+    // 14: the BTC SPV path has a trust root. New storage: `BtcCheckpoints`
+    // (height → committed hash, the anchor) and `BtcHeaderMetaStore` (block hash →
+    // the height the parent link implies and whether the header is on an anchored
+    // chain). New call `anchor_btc_checkpoint` (root). `submit_btc_header` no longer
+    // accepts `height == 0` with no parent, refuses headers whose target is easier
+    // than the network's `powLimit`, requires the parent's height plus one and
+    // Bitcoin's `nBits` for that height, and both SPV entry points now require the
+    // header to be on a checkpoint-anchored chain. No migration is needed: the new
+    // maps start empty and every deployed chain has an empty `BtcHeaders` map (the
+    // BTC path is not live on any network yet). Anchoring a checkpoint is an
+    // operator action, and until one is anchored this chain settles no BTC proofs —
+    // which is the point: an unanchored header proves nothing.
+    // 15: the SPV trust root can be pinned in genesis. `X3SettlementEngine`'s
+    // `GenesisConfig` gains `btc_checkpoints` (a list of Bitcoin headers): each one is
+    // validated as genesis is built — proof of work under this network's `powLimit`, no
+    // two entries at one height — and then pins `(height, hash)` in `BtcCheckpoints` and
+    // admits the header onto the anchored chain. A testnet can therefore start with the
+    // root of trust already in its spec, instead of waiting for a root call.
+    // `BtcBlockHeader` gains serde so a spec (which is JSON) can carry it; that is the
+    // spec's shape only, never the proof path, which still hashes the 80 wire bytes.
+    // 16: validator key rotation is wired to the on-chain custody registry.
+    // `pallet_x3_custody` gains a `KeyRotationPeriod` constant, and
+    // `rotate_validator_key` now grants `current_block + period` instead of
+    // inheriting an overdue due block; the node gains the `validator rotate`
+    // operator command. No storage migration: the constant is metadata-only and
+    // the due-block semantics change is confined to the rotation extrinsic.
+    // 17: the Bitcoin header path can be pushed in batches by an origin the runtime
+    // names. `x3SettlementEngine` gains `submit_btc_headers` (call_index 35, up to
+    // `MAX_BTC_HEADERS_PER_CALL` headers, atomic: a batch refused partway applies
+    // nothing) and the `BtcHeaderOrigin` config item, which this runtime sets to
+    // `EnsureRoot` — root-only, exactly as before, since no header relayer exists yet.
+    // A testnet or mainnet that runs one points that item at the origin it trusts; the
+    // admission rules do not change, because it decides who may speak, never what is
+    // true. No storage migration: one new item, no existing key changes shape.
+    // 18: the BTC median-time-past rule is Bitcoin's, not stricter. With fewer than eleven
+    // ancestors on the chain — the first eleven headers above a checkpoint — the median cannot be
+    // computed from stored history, and the pallet now skips the check instead of using the
+    // parent's timestamp as the median, which is a higher number than Bitcoin's and refused real
+    // headers (a regtest chain mined inside one second gives consecutive blocks the same
+    // timestamp). No storage change.
+    spec_version: 18,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -2505,6 +2546,24 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type MaxPendingIntents = MaxPendingIntents;
     type DefaultSettlementTimeout = DefaultSettlementTimeout;
     type MinBtcConfirmations = MinBtcConfirmations;
+    /// Bitcoin's `powLimit` for the network this build tracks.
+    ///
+    /// A local dev chain has to be able to anchor a header it just mined, so the dev
+    /// runtime uses regtest's limit. Every other build — testnet and the mainnet RC —
+    /// uses mainnet's `0x1d00ffff`, which is what makes the anchor carry real work:
+    /// a header easier than that limit is one Bitcoin itself would have refused.
+    #[cfg(feature = "dev")]
+    type BtcPoWLimitBits = frame_support::traits::ConstU32<0x207f_ffff>;
+    #[cfg(not(feature = "dev"))]
+    type BtcPoWLimitBits = frame_support::traits::ConstU32<0x1d00_ffff>;
+    /// Who may push Bitcoin headers in bulk (`x3SettlementEngine.submitBtcHeaders`).
+    ///
+    /// Root: this chain has no header relayer, and naming an account that does not exist yet
+    /// would be a permission nobody is watching. A network that runs one points this at the
+    /// origin it trusts — `EnsureSignedBy<BtcRelayerAccount, AccountId>`, a multisig, or
+    /// governance — and the receiving rules do not change, because this decides who may
+    /// *speak*, never what is *true* (TICKET-095).
+    type BtcHeaderOrigin = frame_system::EnsureRoot<AccountId>;
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
     type CrossChainValidator = RuntimeCrossChainValidator;
@@ -2901,6 +2960,12 @@ parameter_types! {
     pub const CustodyMaxSignersPerVault: u32 = 16;
     pub const CustodyMaxVaultsPerSigner: u32 = 32;
     pub const CustodyMaxPoliciesPerTier: u32 = 8;
+    /// Validator key rotation period: 7 days at the 200ms block target
+    /// (7 * 24 * 60 * 60 * 1000 / 200 = 3_024_000 blocks). A successful
+    /// rotation always grants a fresh full period, measured from the block in
+    /// which the rotation landed, so a late rotation never produces a key that
+    /// is already overdue.
+    pub const CustodyKeyRotationPeriod: BlockNumber = 3_024_000;
 }
 
 impl pallet_x3_custody::Config for Runtime {
@@ -2909,6 +2974,7 @@ impl pallet_x3_custody::Config for Runtime {
     type MaxSignersPerVault = CustodyMaxSignersPerVault;
     type MaxVaultsPerSigner = CustodyMaxVaultsPerSigner;
     type MaxPoliciesPerTier = CustodyMaxPoliciesPerTier;
+    type KeyRotationPeriod = CustodyKeyRotationPeriod;
 }
 
 // ===== X3 Reconciliation Configuration (Phase 5) =====

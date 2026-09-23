@@ -5,7 +5,7 @@
 local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-loom local-ci-list\
  local-ci-all local-ci-prepush local-ci-dry-run\
  local-ci-deep srtool-install\
- batch-runner\
+ batch-runner provider-drill\
  bench bench-criterion bench-k6 bench-pallets bench-report bench-all
 
 # Local CI — the gates that actually execute on this machine. Hosted CI for this
@@ -71,6 +71,13 @@ guard:
 	@python3 scripts/agent_guard.py
 	@python3 scripts/no_stub_guard.py
 	@python3 scripts/test_cheat_guard.py
+	@bash scripts/check-no-provider-secrets.sh
+
+# The operator's paid RPC endpoints cannot be reached from a gate: the key is
+# the operator's, and a check that needs egress is not a gate. This runs the
+# drill on demand and writes what the endpoints answered under .ai/reports/.
+provider-drill:
+	@bash scripts/drills/provider-endpoint-drill.sh $(ARGS)
 
 test:
 	@pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_e2e_mocked.py

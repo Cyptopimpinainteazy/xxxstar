@@ -7,7 +7,7 @@ subsystem = "consensus_l1"
 source = "master"
 paths = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh"]
 implemented = 88
-tested = 88
+tested = 90
 mainnet_ready = 60
 priority = "P0"
 confidence = "high"
@@ -17,7 +17,9 @@ blockers = [
   "Every validator runs on one host: no independent operators, no geographic or administrative separation",
   "No slashing, jailing or equivocation evidence from a multi-operator network — those paths have unit coverage only",
   "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
-  "Twenty minutes is not a duration claim: era rotation is unexercised, and the debug nodes grew ~490–515 MiB of RSS each over the run — cache or leak is not yet distinguishable without a longer soak",
+  "Era rotation is unexercised",
+  "Two hours on a quiet box now holds — one chain, agreement at three heights, +36,092 blocks per validator, peers 3 throughout, zero peer bans, no stall beyond 60s (`.ai/reports/soak-2h-idle-20260922.md`) — so the earlier failure was load-induced: a starved validator falls behind, repeats one block request, and the peer set bans it out, which turns a lag into a partition. What that experiment does **not** show is whether a loaded validator can recover, and nothing throttles a node that is behind its own import queue",
+  "Two hours, four validators, release and debug: consensus holds (one chain, agreement at three heights, +36,146 to +36,159 blocks per validator, peers 3, zero peer bans, no stall beyond 60s) and, with the state cache out of the measurement, memory holds too — worst growth 398 MiB against the 1 GiB bound (`<repo>/.wt-agent/soak-100b`, `.ai/reports/soak-2h-idle-20260922.md`). With the default 1 GiB state cache the same node grows ~1.75 GiB, which is configured memory rather than a leak, and the harness now says which cache size it ran with instead of failing every normally-configured node",
 ]
 # The launcher could not run at all before 2026-09-22: it required `subkey` (not
 # installed, not part of this repo), its default spec was a storage-raw Live file
@@ -34,22 +36,21 @@ id = "X3-L1-002"
 name = "Validator key management"
 subsystem = "consensus_l1"
 source = "master"
-paths = ["scripts/testnet/inject-keystore.sh", "scripts/harden-validator.sh", "scripts/install-validator.sh", "scripts/generate-bootnode-keys.py", "node/src/authority.rs", "pallets/x3-custody/src/lib.rs"]
-implemented = 75
-tested = 60
-mainnet_ready = 40
+paths = ["scripts/testnet/inject-keystore.sh", "scripts/harden-validator.sh", "scripts/install-validator.sh", "scripts/generate-bootnode-keys.py", "node/src/validator_rotation.rs", "scripts/testnet/validator-rotation-drill.sh", "pallets/x3-custody/src/lib.rs"]
+implemented = 90
+tested = 75
+mainnet_ready = 50
 priority = "P0"
 confidence = "medium"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "Key rotation exists twice and is connected zero times: node/src/authority.rs has KeyRotationSchedule/rotate_keys/validators_needing_rotation with unit tests and **no caller anywhere**, and pallets/x3-custody tracks an on-chain ValidatorKeyRegistry with rotation_due_at, but nothing drives one from the other — no end-to-end rotation has ever run",
-  "No tooling registers a new validator's session keys on a running chain (`session.setKeys` is callable in the runtime; nothing calls it), so onboarding means editing genesis or re-running a local launcher",
+  "No live end-to-end rotation has run yet: the `validator rotate` operator command and the drill script exist and are unit-tested, but the drill has not been executed against a running network to prove the signed `session.setKeys` lands and the next due block moves",
   "No key ceremony, backup or recovery runbook, and no HSM/KMS guidance for the operator keys",
   "No external audit of the key paths",
 ]
-evidence = ["scripts/testnet/inject-keystore.sh", "node/src/authority.rs", "pallets/x3-custody/src/lib.rs", "scripts/harden-validator.sh", "note: the node derives and stores keys itself — `keys generate|insert|list|verify` (verify exits non-zero on a mismatch) — and `inject-keystore.sh` now injects through `keys insert` instead of the absent `subkey`, verified 2026-09-22 by writing a keystore and reading it back with `keys list`; keystore-only keys were measured driving Aura authoring with no X3_DEV_SEED (head reached 9 in ~45s), which contradicts the older note in run-fresh-validators.sh"]
-test_evidence = ["scripts/testnet/inject-keystore.sh", "node/src/authority.rs", "pallets/x3-custody/src/tests.rs", "scripts/mainnet/validator_install_gate.sh", "note: unit tests cover SessionKeys derivation and the rotation schedule (should_rotate/schedule_next_rotation/rotate_keys) and the custody registry's rotation_due_at; the release gate's stage 2d exercises the install path (3 cases accepted, 6 refused, nothing written in check mode); key insertion and keystore-backed authoring were verified first-hand on 2026-09-22"]
+evidence = ["scripts/testnet/inject-keystore.sh", "node/src/validator_rotation.rs", "pallets/x3-custody/src/lib.rs", "scripts/harden-validator.sh", "note: the on-chain `pallet_x3_custody` registry is now the single source of truth — `validator rotate` reads `ValidatorKeyRegistry`/`KeyRotationSchedule`, refuses an unregistered account by name, derives fresh Aura/GRANDPA session keys, and builds a signed `session.set_keys` extrinsic; the pallet's `rotate_validator_key` no longer copies the old due block onto the new key (late rotations now grant a fresh `current_block + KeyRotationPeriod`); the former in-memory `node/src/authority.rs` rotation manager (zero callers) was deleted"]
+test_evidence = ["scripts/testnet/inject-keystore.sh", "node/src/validator_rotation.rs", "pallets/x3-custody/src/tests.rs", "scripts/mainnet/validator_install_gate.sh", "note: `pallet-x3-custody` tests (26) cover the corrected late-rotation semantics and an already-elapsed case; `x3-chain-node` unit tests cover session-key derivation, deterministic set_keys call construction, and the exact `twox_128`/`blake2_128_concat` storage-key encoding; the rotation drill and `local-ci --rotation` gate are wired but have not yet run against a live network"]
 
 [[feature]]
 id = "X3-L1-003"

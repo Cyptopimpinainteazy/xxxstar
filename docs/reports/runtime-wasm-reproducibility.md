@@ -44,6 +44,67 @@ bytes**:
   domain-separated Blake2b-256 instead of XOR mixing, which collided (`"A" * 64` and
   `"B" * 64` produced the same id, and that id keys both the pallet's `Withdrawals`
   map and the relayer's processed set), and `spec_version` moves to 13.
+* `93fe86c9bd` — the BTC SPV path gets a trust root: `anchor_btc_checkpoint`
+  (root) commits this chain to a Bitcoin height/hash in write-once
+  `BtcCheckpoints`, `BtcPoWLimitBits` carries Bitcoin's per-network `powLimit`, the
+  single admission path `btc_admit_header` derives heights from the parent link and
+  enforces Bitcoin's `nBits` and median-time-past rules, and both SPV entry points
+  accept evidence only from a checkpoint-anchored chain. New storage and a new call,
+  so `spec_version` moves to 14.
+* `e74bb199f9` — the BTC tests now run on data a real Bitcoin Core v28.1.0 regtest
+  node produced (header, merkle path and a confirmed transaction), and the SPV entry
+  points document which transaction serialization they take. `spec_version` is
+  unchanged at 14: **the bytes still move**, because pallet documentation is part of
+  the runtime metadata, and metadata is in the WASM. That is the reason this gate
+  watches the whole dependency graph rather than a hand-kept list of "runtime files".
+* `2a4296b630` — the SPV trust root can be pinned in genesis: `X3SettlementEngine`'s
+  `GenesisConfig` carries `btc_checkpoints`, validated as genesis is built and then
+  admitted onto the anchored chain, so a testnet can start with the root of trust in its
+  spec. `BtcBlockHeader` gains serde for the spec's benefit only. `spec_version` moves to
+  15.
+* `269d611d96` — formatting only, and the runtime still reports `x3-chain-15`; but the
+  bytes moved by two. `cargo fmt` re-wrapped lines in the pallet, and an `assert!`'s
+  message carries the `file:line` it was written at, so where a line sits is part of the
+  artifact. Nothing about the format of a change is invisible to this gate, which is the
+  point of measuring bytes rather than intentions.
+* `d471adfec4` — validator key rotation is wired to the on-chain custody registry:
+  `pallet_x3_custody` gains `KeyRotationPeriod` and `rotate_validator_key` grants
+  `current_block + period` instead of inheriting an overdue due block; the node gains
+  the `validator rotate` operator command. `spec_version` moves to 16.
+* `93d97edd34` — the merge of the formatting fix with that key-rotation change. Both
+  revisions were attested separately and neither record described the other's tree, which
+  is what a single record for a single artifact means: at any moment the file describes
+  **the revision it names**, and a merge of two attested revisions is a third revision
+  that has to be rebuilt. Two from-scratch builds of the merge agree, and the compact
+  artifact is 8,468,726 bytes.
+* `e28a0907be` — the Bitcoin header path gains a batch submission
+  (`x3SettlementEngine.submitBtcHeaders`, call_index 35, up to 100 headers per call, atomic so
+  a batch refused partway applies nothing) and a `BtcHeaderOrigin` config item, which this
+  runtime sets to `EnsureRoot`. `spec_version` moves to 17. Two from-scratch builds of
+  `e28a0907be` agree, and the compact artifact was 8,475,400 bytes at that revision.
+* `a7878e933e` — the BTC median-time-past rule stops being stricter than Bitcoin's: with fewer than
+  eleven ancestors (the first headers above a checkpoint) the median is not computable from stored
+  history, so the check is skipped instead of using the parent as a stand-in, which refused real
+  headers. `spec_version` moves to 18. Two from-scratch builds of `a7878e933e` agree, and the compact
+  artifact is 8,474,849 bytes.
+* `5ec1b61576` — formatting only, and the hashes did not move: collapsing a multi-line `ensure!` into
+  one line leaves the macro's `file:line` where it was, so this is the first revision in this list
+  whose bytes are identical to its predecessor's. `recorded_revision` moved; nothing else did.
+* `7ea1819169` — Bitcoin merkle verification in `x3-bitcoin-vault` becomes position-aware, and the
+  pallet's tests now compare all three implementations on one real regtest block. The hashes are
+  again identical to the previous revision's: the vault is a *dev*-dependency of the pallet, and the
+  intent crate's change is a doc comment, so nothing the runtime instantiates moved. Two revisions
+  in a row where only `recorded_revision` changes is worth noticing: it means the gate is measuring
+  what it claims to measure rather than reacting to any edit in the graph.
+* `0d296d236b` — the atomic kernel's `do_finalize_bundle` requires the bundle to be `Executing`
+  instead of accepting a `Pending` one and leaving the refusal to `verify_bundle_consistency` two
+  checks later, and five tests now cover the finalization entry point (the alarm TICKET-097 has to
+  change). **The bytes move again**: the pallet is instantiated by the runtime, so this is not a
+  dev-dependency revision. `spec_version` deliberately stays at 18 — every reachable call accepts
+  and refuses exactly what it did before, a `Pending` bundle being refused both before and after,
+  only earlier and with a different error code, and no state transition changes. Two from-scratch
+  builds of `0d296d236b` agree: compact 8,474,849 bytes (same size as the previous revision,
+  different bytes) and compressed 1,453,609.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -69,24 +130,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,426,935 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,474,849 bytes)**
 
 ```
-Version          : x3-chain-13 (x3-chain-1.tx1.au1)
+Version          : x3-chain-18 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xd998dae29f7608357622ef37ee527cd31e00ea7bb10e0121d56872e17ebf492c
-authorizeUpgrade : 0x91814730dc970cf52cc42765c933c108eaa0656d223ddfaa9923a4947d419a5a
-IPFS             : QmSBXVCK52s1RUcasXSYmnMuAda7qsGWNDantshhbFEB59
-BLAKE2_256       : 0x871c8feb70f6068a1ba9a98e1a49e23b48e5c895ea7bf0a393c7274fa5490c63
+setCode          : 0x678abec69f30bd5fd2a5afc296b482cb14fcc7738c8109b39fcde80b0efc9b36
+authorizeUpgrade : 0x48640b791bff46e897b15e2de521ed271cb9c51d5ad82fb985de7f8a01b6be40
+IPFS             : Qmf2FBS65ayur4Udb4hwQr7Dee7NoZDGZuKAY2V2ywKSwN
+BLAKE2_256       : 0xd62665d003f586565013cfaa1e6a6abfa58796c201d3c8225f1e798e1f44338c
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,444,353 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,453,609 bytes)**
 
 ```
-setCode          : 0xeac27a0153d54d4c4a44b4d5aa1aabfd075abb9039bbde88efa6dac8f6f7bb48
-authorizeUpgrade : 0x0a1803da86c99dbafdb7abff4ca6442e5476b5f91a6ddb6fa7fd752359cd5a58
-IPFS             : Qmb3Mg778EfaX6fj25pzVompH8grdrsxKbPwUcxWRXtsaY
-BLAKE2_256       : 0x5a8200f4890d1630dfc2394f6119058a9159c56c545aa2fb8a896e8d5067f5e2
+setCode          : 0xe55c4a202972f640a47b1960551bf83a757d2e1211a32fc7c43071d183c76344
+authorizeUpgrade : 0x9b7ab954b0b5ab89668378bdcfa6dc5065b5e094e9b0cbc69a33a89005df0806
+IPFS             : QmZka2CcEDNfCzofLMGeqdHVWMiUsJuvJtwH1UH6JWcfpP
+BLAKE2_256       : 0xc6bbd66a4d1de9c48e1ab3009c3fc468a5869916d797b9457236d6e12225eb07
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the

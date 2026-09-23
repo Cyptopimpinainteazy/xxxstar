@@ -63,6 +63,98 @@ It writes, into `deployment/chain-specs/fresh/generated/` (gitignored):
 Keep the 0600 permissions, back both sets up, and never commit them
 (`deployment/chain-specs/fresh/.gitignore` covers that path).
 
+### Pinning Bitcoin's checkpoint (the SPV trust root)
+
+The settlement engine accepts BTC evidence only from a header on a **checkpoint-anchored**
+chain, and until one exists it refuses every BTC proof — correct, and useless for a testnet
+unless the anchor is part of the launch. Two ways to set it, and the second is the one to
+use for a network:
+
+```bash
+# Option A — a root call after the chain is live (requires a runtime with `Sudo`):
+#   sudo.sudo(x3SettlementEngine.anchorBtcCheckpoint(header))
+#   Write-once per height: it will not re-point an anchored height at another branch.
+
+# Option B — pin it in the spec, so the chain is born anchored:
+X3_BTC_CHECKPOINTS="<80-byte header hex>@<height>" \
+X3_NODE_BIN=target/release/x3-chain-node \
+python3 scripts/testnet/build-x3-testnet-spec.py <validator-count>
+```
+
+`X3_BTC_CHECKPOINTS` is a comma-separated list of `<header hex>@<height>` (a Bitcoin header
+does not carry its own height — a node knows it from where the header sits in the chain).
+The generated spec's `genesis.runtimeGenesis.config.x3SettlementEngine.btcCheckpoints`
+carries it, which means **the commitment is reviewable in the same diff as the chain id**,
+identical for everyone who joins from that spec, and not something a key holder can change
+later. The pallet validates every entry as genesis is built: a header that does not satisfy
+its own proof of work, or whose `nBits` is easier than this network's `powLimit`, or a second
+entry at an already-claimed height, makes the node **refuse to start** rather than launch a
+chain whose root of trust is a lie.
+
+Choose the header from the network you are tracking. A regtest header (`0x207fffff`) only
+anchors on a chain built with `--features dev`, because that is the only runtime whose
+`powLimit` is regtest's; testnet and mainnet specs use `0x1d00ffff` and need a header from
+that network. Get one with `scripts/btc/capture-regtest-spv.py` (regtest) or any Bitcoin
+RPC (`getblockheader <hash> false`), and check it against a second source before shipping it:
+the spec makes this chain *believe* that hash, so a wrong one is a wrong chain.
+
+`scripts/testnet/btc-checkpoint-drill.sh` is the gate for this: it pins a real captured
+header, boots a node, reads `BtcCheckpoints` / `BtcHeaderMetaStore` / `BtcBestHeight` back
+over RPC, requires the chain to keep authoring, and requires a spec whose checkpoint is not
+a mined header to be refused. Run it after changing anything here.
+
+### Provider credentials (RPC endpoints)
+
+Paid RPC credentials are **never** in source. They come from the environment, and a build with none of
+them set runs on keyless public endpoints:
+
+```
+export DRPC_API_KEY=…        # https://lb.drpc.org/<network>/<key> — promoted to primary per network
+export ALCHEMY_API_KEY=…     # https://<subnet>.g.alchemy.com/v2/<key>
+export ANKR_API_KEY=…        # https://rpc.ankr.com/<network>/<key>
+export INFURA_API_KEY=…      # for the MCP service configs under infra/
+```
+
+`crates/external-chains` reads these in `ProviderCredentials::from_env()`; `EnvConfig::new(network)`
+builds the public defaults, and `EnvConfig::from_env()` puts any configured paid endpoint in front of
+them. The signing wallet is `X3_BOT_PRIVATE_KEY` + `X3_BOT_ADDRESS`, and with them unset there is no
+wallet at all. `scripts/check-no-provider-secrets.sh` (in `make guard` and `local-ci`) fails a change
+that puts a keyed provider URL or a 64-hex signing key into tracked source; add an entry to
+`scripts/allowed-provider-secrets.txt` only with a stated reason, as that file does for vendored
+trees and generated data.
+
+### Making the chain follow Bitcoin (a header relayer)
+
+An anchor is a starting point, not a subscription: until something pushes headers, the chain's
+view of Bitcoin stops at the checkpoint and no later deposit can be proven. The receiving end is
+`x3SettlementEngine.submitBtcHeaders(headers)` — call_index 35, up to 100 headers per call, atomic
+(a batch refused at header *k* applies nothing) — and the sender is
+`scripts/btc/push-headers.mjs`, which reads headers from a local Bitcoin node, checks the chain of
+them itself, and submits them.
+
+Who may submit is `x3SettlementEngine`'s `BtcHeaderOrigin` config item. This runtime sets
+`EnsureRoot`, so the path is root-only: on a dev chain that means `sudo.sudo(...)`, and on a
+network with governance it means a governance motion. To run a relayer service, point that item at
+the origin you trust — `EnsureSignedBy<BtcRelayerAccount, AccountId>`, a multisig, or a proxy — and
+nothing about the receiving rules changes, because the item decides who may **speak**, never what is
+**true**: every header still has to satisfy proof of work under this network's `powLimit`, link to
+an admitted header, carry its parent's `nBits` for its height, and postdate the median of its
+ancestors.
+
+**Measured 2026-09-23:** a dev chain born anchored on real regtest header 119 followed Bitcoin to 125
+through six pushed headers, each recorded `{height, anchored: true}`, and a header whose parent was
+never admitted was refused with `BtcParentMissing`. The drill also caught a real bug in the receiving
+rules — a median-time-past check stricter than Bitcoin's, which refused legitimate headers — so
+`spec_version` is now 18. `.ai/reports/btc-header-push-drill-20260923.md` has the commands and the
+outcome. Note that a dev spec ships `sudo.key = null`: an operator who wants to push through root on a
+dev chain has to name the sudo account in the spec first.
+
+What that means in practice: a Byzantine relayer cannot mint Bitcoin. It can **withhold** headers
+(the chain stops advancing — a liveness problem) or push a branch that satisfies the rules (which
+the checkpoint and the 4× retarget clamp make expensive). The bond and the slashing that price
+withholding are not written yet — TICKET-095 — so run one relayer you control, and expect that to
+be a single point of failure until there are several.
+
 ## 4. Start each validator
 
 On the host that will run validator *n*: copy the spec, its `validator-n.suri` and

@@ -1,10 +1,11 @@
 # Language / Trading feature matrix fragment.
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/tests/test_e2e_examples.rs, x3-lang/vm/src/executor.rs
 id = "X3-LANG-001"
 name = "Compile→encode→decode→execute→receipt E2E"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["x3-lang/compiler"]
 implemented = 30
 tested = 10
@@ -14,14 +15,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Genuine E2E test still required"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #10"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #10", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/tests/test_e2e_examples.rs, x3-lang/vm/src/executor.rs"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/trading.rs, x3-lang/compiler/tests/
 id = "X3-LANG-002"
 name = "Economic replay validation in receipts"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["x3-lang/compiler"]
 implemented = 35
 tested = 15
@@ -31,14 +32,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Receipts need replay-economic validation"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/trading.rs, x3-lang/compiler/tests/"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/crates/x3-common/src/capability.rs, x3-lang/crates/x3-ast/src/trading.rs
 id = "X3-LANG-003"
 name = "Signed / attested trading receipts"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["x3-lang/compiler"]
 implemented = 35
 tested = 15
@@ -48,14 +49,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Receipt signatures/attestations incomplete"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/crates/x3-common/src/capability.rs, x3-lang/crates/x3-ast/src/trading.rs"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22
 id = "X3-LANG-004"
 name = "Bytecode routing to atomic kernel"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-integration"]
 implemented = 40
 tested = 20
@@ -65,15 +66,15 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["End-to-end compiler→runtime route incomplete"]
-evidence = ["crates/x3-integration", "note: Known .x3 integration requirement"]
-open_prs = [129]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]
 registry_feature = "atomic_kernel"
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/crates/x3-common/src/capability.rs
 id = "X3-LANG-005"
 name = "Chain/capability version enforcement"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["x3-lang/compiler"]
 implemented = 40
 tested = 20
@@ -83,14 +84,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Version gates incomplete"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/crates/x3-common/src/capability.rs"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/bridge.rs (bytecode decode paths)
 id = "X3-LANG-006"
 name = "Decoded bytecode → TradingVm execution"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["x3-lang/compiler"]
 implemented = 40
 tested = 20
@@ -100,14 +101,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Decoder/executor connection incomplete"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #4"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #4", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/bridge.rs (bytecode decode paths)"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/ir.rs, x3-lang/compiler/tests/
 id = "X3-LANG-007"
 name = "Stateful trading IR verifier"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["x3-lang/compiler"]
 implemented = 40
 tested = 20
@@ -117,14 +118,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Needs real stateful verifier"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #3"]
-open_prs = [135]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #3", "cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/ir.rs, x3-lang/compiler/tests/"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22
 id = "X3-LANG-008"
 name = ".x3 compile_source integration"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-integration"]
 implemented = 45
 tested = 25
@@ -134,14 +135,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["PR recovery/rebase and exact E2E proof needed"]
-evidence = ["crates/x3-integration", "note: Known grant-track gap"]
-open_prs = [129]
+evidence = ["crates/x3-integration", "note: Known grant-track gap", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22
 id = "X3-LANG-009"
 name = "Authenticated bytecode decoder"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-integration"]
 implemented = 45
 tested = 25
@@ -151,14 +152,14 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Needs tamper/replay tests"]
-evidence = ["crates/x3-integration", "note: Known .x3 integration requirement"]
-open_prs = [129]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
+# Provenance corrected 2026-09-22: PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22
 id = "X3-LANG-010"
 name = "Versioned runtime bytecode envelope"
 subsystem = "language_trading"
-source = "open_pr"
+source = "master"
 paths = ["crates/x3-integration"]
 implemented = 45
 tested = 25
@@ -168,5 +169,4 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Needs signed domain-separated production envelope proof"]
-evidence = ["crates/x3-integration", "note: Known .x3 integration requirement"]
-open_prs = [129]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]

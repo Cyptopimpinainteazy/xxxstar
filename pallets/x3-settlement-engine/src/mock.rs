@@ -163,6 +163,11 @@ impl pallet_x3_settlement_engine::Config for Test {
     type MaxPendingIntents = frame_support::traits::ConstU32<10>;
     type DefaultSettlementTimeout = frame_support::traits::ConstU64<60>;
     type MinBtcConfirmations = frame_support::traits::ConstU32<1>;
+    // Bitcoin's regtest `powLimit`. A test cannot mine a mainnet-difficulty header,
+    // and the regtest limit is Bitcoin's own answer to "which limit may a chain that
+    // mines its own headers use"; production runtimes carry `0x1d00ffff`.
+    type BtcPoWLimitBits = frame_support::traits::ConstU32<0x207f_ffff>;
+    type BtcHeaderOrigin = MockBtcHeaderOrigin;
     type ChallengePeriod = frame_support::traits::ConstU64<10>;
     type SettlementTimeoutBlocks = frame_support::traits::ConstU64<28800>; // ~24 hours at 3s blocks
     type SettlementFeeBps = SettlementFeeBps;
@@ -221,6 +226,30 @@ impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvide
 pub const ALICE: u64 = 1;
 pub const BOB: u64 = 2;
 
+/// The accounts this mock treats as header relayers: BOB, and nobody else.
+///
+/// The chain runtime sets `BtcHeaderOrigin = EnsureRoot`, so this path is root-only there.
+/// The mock composes root with a named account so both halves of the semantic are testable:
+/// root is accepted, the designated relayer is accepted, and an ordinary account is refused —
+/// which is the difference between "only root may speak" and "root or a relayer may speak".
+pub struct MockBtcRelayers;
+
+impl frame_support::traits::SortedMembers<u64> for MockBtcRelayers {
+    fn sorted_members() -> sp_std::vec::Vec<u64> {
+        sp_std::vec![BOB]
+    }
+
+    fn contains(who: &u64) -> bool {
+        *who == BOB
+    }
+}
+
+/// Root, or BOB — see [`MockBtcRelayers`].
+pub type MockBtcHeaderOrigin = frame_support::traits::EitherOfDiverse<
+    frame_system::EnsureRoot<u64>,
+    frame_system::EnsureSignedBy<MockBtcRelayers, u64>,
+>;
+
 /// Build test externalities.
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = frame_system::GenesisConfig::<Test>::default()
@@ -243,6 +272,41 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         // that exercise the strict rule (the production/testnet posture) set this
         // to false themselves — see `allow_unattested_cross_domain_proofs_is_false_by_default_in_live_genesis`.
         crate::AllowUnattestedCrossDomainProofs::<Test>::put(true);
+    });
+    ext
+}
+
+/// Externalities whose settlement-engine genesis pins these Bitcoin checkpoints.
+///
+/// Unlike [`new_test_ext`], this runs the pallet's own `BuildGenesisConfig` rather than
+/// setting storage by hand, so what is under test is the genesis path a chain spec
+/// actually takes — including its refusals, which panic.
+pub fn new_test_ext_with_btc_checkpoints(
+    headers: sp_std::vec::Vec<crate::types::BtcBlockHeader>,
+) -> sp_io::TestExternalities {
+    let mut t = frame_system::GenesisConfig::<Test>::default()
+        .build_storage()
+        .unwrap();
+
+    pallet_balances::GenesisConfig::<Test> {
+        balances: vec![(ALICE, 1_000_000), (BOB, 1_000_000)],
+        dev_accounts: None,
+    }
+    .assimilate_storage(&mut t)
+    .unwrap();
+
+    crate::pallet::GenesisConfig::<Test> {
+        allow_unattested_cross_domain_proofs: true,
+        btc_checkpoints: headers,
+        _phantom: core::marker::PhantomData,
+    }
+    .assimilate_storage(&mut t)
+    .unwrap();
+
+    let mut ext = sp_io::TestExternalities::new(t);
+    ext.execute_with(|| {
+        System::set_block_number(1);
+        Timestamp::set_timestamp(1_000);
     });
     ext
 }

@@ -45,7 +45,17 @@ pub struct BtcBlockHeader {
 
 impl BtcBlockHeader {
     /// Compute the SHA-256d (double SHA-256) hash of this block header.
-    /// The hash is returned in big-endian order (conventional display order).
+    ///
+    /// The bytes returned are the digest in **wire (internal) order** — the same bytes
+    /// `x3-settlement-engine`'s `compute_btc_block_hash` and `x3-bitcoin-vault`'s
+    /// `BitcoinBlockHeader::block_hash` return, and the same bytes a header's `prev_blockhash` field
+    /// carries. Bitcoin *displays* a block hash as the reverse of this (`000000000019d668…` for the
+    /// genesis block); anything that prints a hash has to reverse it, and anything that compares one
+    /// must not. The previous doc comment here claimed display order, which the code has never
+    /// returned — a comment that would have had a reader reverse a hash before comparing it.
+    ///
+    /// Only compiled where `sha2` is available (`test` or `std`); the verification path in this
+    /// module hashes through `sha256d(&serialize_header(..))` on every build.
     #[cfg(any(test, feature = "std"))]
     pub fn hash(&self) -> [u8; 32] {
         use sha2::{Digest, Sha256};

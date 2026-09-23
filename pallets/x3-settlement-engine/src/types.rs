@@ -4,6 +4,7 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::fmt::Debug;
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_core::H256;
 use sp_std::vec::Vec;
 
@@ -234,8 +235,24 @@ pub struct BtcUtxoState {
 }
 
 /// BTC block header (80 bytes, compact)
+///
+/// `Serialize`/`Deserialize` are for the chain spec, not the runtime: a checkpoint is
+/// pinned in the settlement engine's genesis (`GenesisConfig::btc_checkpoints`), and a
+/// spec is JSON. The wire format the pallet hashes is the 80 bytes below — see
+/// `btc_header_wire_bytes`; serde's shape is the spec's business and never reaches the
+/// proof path.
 #[derive(
-    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
+    Clone,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Debug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
 )]
 pub struct BtcBlockHeader {
     /// Block version
@@ -252,6 +269,27 @@ pub struct BtcBlockHeader {
     pub nonce: u32,
     /// Block height (not in actual header, but needed)
     pub height: u64,
+}
+
+/// What the pallet records beside every Bitcoin header it admits.
+///
+/// The header itself is a wire object: its `height` field is supplied by whoever
+/// submits it and is *not* hashed, so it cannot be trusted. This record is the
+/// pallet's own view — the height it derived from the parent link, and whether the
+/// header descends from a governance-anchored checkpoint at all.
+///
+/// `anchored` is the property that makes a header usable as SPV evidence: a header
+/// that merely satisfies its own `bits` proves nothing, because the submitter chose
+/// `bits`. Only a chain rooted at a height/hash this chain has committed to carries
+/// the work that Bitcoin's own difficulty rules accumulated.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
+pub struct BtcHeaderMeta {
+    /// Height derived from the parent link (never the submitter's claim).
+    pub height: u64,
+    /// `true` when this header is, or descends from, an anchored checkpoint.
+    pub anchored: bool,
 }
 
 // ============================================================================
