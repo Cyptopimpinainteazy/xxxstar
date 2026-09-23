@@ -3788,10 +3788,7 @@ pub mod pallet {
                 // Checked only once eleven ancestors are on this chain: see
                 // `btc_median_time_past` for why guessing from fewer is worse than skipping.
                 if let Some(median) = Self::btc_median_time_past(&header.prev_block_hash) {
-                    ensure!(
-                        header.timestamp > median,
-                        Error::<T>::BtcTimestampTooOld
-                    );
+                    ensure!(header.timestamp > median, Error::<T>::BtcTimestampTooOld);
                 }
                 (parent.height.saturating_add(1), true)
             } else {
