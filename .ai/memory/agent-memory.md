@@ -6944,3 +6944,10 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - **A dev spec ships `sudo.key = null`**: `--chain dev` gives you a `sudo` pallet nobody can call. Set `genesis.runtimeGenesis.config.sudo.key = <Alice>` in the spec (then root calls work through `sudo.sudo`).
 - Backgrounded nodes die with the exec session. Use `setsid nohup <script> > log 2>&1 < /dev/null &`, and kill by **port** (`fuser -k 12444/tcp`) or pid file — never `pkill -f <pattern>` or `pgrep -f <pattern>` when the pattern appears anywhere in the same command line (it matched my own shell three times).
 - `node --check` proves syntax, not behaviour: `--from-height` parsed into `args['from-height']` while the code read `args.from`, so every run died with "required" and only a real run could show it.
+
+## 2026-09-23 (thirty-first pass) — the push is a gate, not a session
+### Facts to remember
+- **`scripts/testnet/btc-header-push-drill.sh` (gate `btc header push`)**: starts a private regtest bitcoind, mines 121 blocks, captures 7 consecutive headers, pins the oldest as the checkpoint in a dev spec, gives the spec a sudo account, boots the chain, pushes 6 headers, requires `btcBestHeight == tip`, then requires a gapped push to be refused with `BtcParentMissing`. **5/5.** Without Bitcoin Core it prints `SKIPPED — nothing was verified` and exits 0 (a loud skip, not a pass). Env: `X3_BITCOIND_DIR`, `X3_BTC_DRILL_NODE_BIN`.
+- `scripts/testnet/btc-header-push-drill.py` holds the logic; the `.sh` is the thin wrapper that resolves the dev binary (building it if needed).
+- **My own records can carry paste artefacts**: an earlier insertion into `TESTNET_GAP_LEDGER.md` left literal `+` prefixes on 16 lines (diff-style text pasted as content). Repaired; `grep -c '^+'` on a markdown file is a cheap check before committing prose.
+- Bitcoind for the drill lives at `<worktree>/btc/bitcoin-28.1` (checksum-verified), datadir `<worktree>/btc/regtest` — under the *worktree*, so a reboot's /tmp clear cannot take it.

@@ -374,6 +374,10 @@ GATES_TESTNET=(
   # chain to keep authoring, and requires a spec whose checkpoint is not a mined header to
   # be refused. Needs `--features dev`: only that runtime's `powLimit` is regtest's.
   "btc checkpoint genesis:bash scripts/testnet/btc-checkpoint-drill.sh"
+  # The other half of the Bitcoin path: real headers from a real Bitcoin node pushed onto an
+  # anchored chain, in order, with a gapped push refused. Needs a Bitcoin Core install
+  # (X3_BITCOIND_DIR) and the dev runtime; without Bitcoin Core it skips and says so.
+  "btc header push:bash scripts/testnet/btc-header-push-drill.sh"
 )
 
 # Consensus has to last, not just start. This boots four validators and samples them on

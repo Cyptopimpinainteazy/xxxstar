@@ -237,37 +237,45 @@ the chain of them itself, and submits the batch (directly, or through `sudo` on 
 
 
 ### TICKET-095 progress — a real header push, end to end (2026-09-23)
-+
-+A live dev chain, **born anchored on real Bitcoin regtest header 119**, followed Bitcoin to **125**
-+through six headers pushed from a running Bitcoin Core v28.1.0 node:
-+
-+```
-+[push] on-chain btcBestHeight before: 119
-+[push] block 120 … through … block 125, each included in a block
-+[push] on-chain btcBestHeight after:  125
-+[push] header meta at 125: {"height":"125","anchored":true}
-+```
-+
-+and the negative control held — pushing only header 127, whose parent was never admitted, was refused
-+with `x3SettlementEngine.BtcParentMissing`.
-+
-+**The drill found a real defect, and it was mine.** The first attempt refused header 120 with
-+`BtcTimestampTooOld`, and the header was legitimate: Bitcoin's median-time-past rule is the median of
-+the previous **eleven** blocks, and the pallet was padding that median with the one ancestor it had —
-+which is a *higher* number, so it required a header above an anchor to postdate the anchor. A rule
-+stricter than the chain it follows refuses real headers, which is a liveness bug in the relayer path.
-+`btc_median_time_past` now returns `Option<u32>` (`None` until eleven ancestors are stored; the check
-+is skipped, not made stricter) and two tests state both halves. `spec_version` 17 → 18, re-attested.
-+
-+Two sender bugs were fixed with it: `--from-height`/`--to-height` parsing into keys the script never
-+read, and the fact that **`pallet_sudo` reports the inner call's failure in a `Sudid` event while the
-+outer extrinsic succeeds** — a refused header looked exactly like an accepted one until the script
-+read that event. Evidence: `.ai/reports/btc-header-push-drill-20260923.md`.
-+
-+**What is still missing:** the steps are a session, not yet `scripts/testnet/btc-header-push-drill.sh`
-+(the next step); no public network has a checkpoint or a relayer; the push ran through `sudo` because
-+this runtime sets `BtcHeaderOrigin = EnsureRoot`, and a dev spec ships `sudo.key = null`, so an
-+operator has to set it; and nothing bonds the relayer against withholding.
+
+A live dev chain, **born anchored on real Bitcoin regtest header 119**, followed Bitcoin to **125**
+through six headers pushed from a running Bitcoin Core v28.1.0 node:
+
+```
+[push] on-chain btcBestHeight before: 119
+[push] block 120 … through … block 125, each included in a block
+[push] on-chain btcBestHeight after:  125
+[push] header meta at 125: {"height":"125","anchored":true}
+```
+
+and the negative control held — pushing only header 127, whose parent was never admitted, was refused
+with `x3SettlementEngine.BtcParentMissing`.
+
+**The drill found a real defect, and it was mine.** The first attempt refused header 120 with
+`BtcTimestampTooOld`, and the header was legitimate: Bitcoin's median-time-past rule is the median of
+the previous **eleven** blocks, and the pallet was padding that median with the one ancestor it had —
+which is a *higher* number, so it required a header above an anchor to postdate the anchor. A rule
+stricter than the chain it follows refuses real headers, which is a liveness bug in the relayer path.
+`btc_median_time_past` now returns `Option<u32>` (`None` until eleven ancestors are stored; the check
+is skipped, not made stricter) and two tests state both halves. `spec_version` 17 → 18, re-attested.
+
+Two sender bugs were fixed with it: `--from-height`/`--to-height` parsing into keys the script never
+read, and the fact that **`pallet_sudo` reports the inner call's failure in a `Sudid` event while the
+outer extrinsic succeeds** — a refused header looked exactly like an accepted one until the script
+read that event. Evidence: `.ai/reports/btc-header-push-drill-20260923.md`.
+
+**The session is now a drill:** `scripts/testnet/btc-header-push-drill.sh` (gate entry
+`btc header push`) starts a private regtest bitcoind, mines, pins the oldest captured header as the
+checkpoint, gives the dev spec a sudo account, boots the chain, pushes six real headers in order,
+requires `btcBestHeight` to reach the tip, and requires a gapped push to be refused with
+`BtcParentMissing`. **5/5** — and it **skips loudly** without a Bitcoin Core install rather than
+passing quietly.
+
+**What is still missing:** an unattended sender running against a public network (`push-headers.mjs`
+is one batch at a time, driven by hand); a checkpoint and a relayer on a real testnet; a push origin
+that is not root (`BtcHeaderOrigin = EnsureRoot` here by design, and a dev spec ships `sudo.key =
+null`, so an operator has to name it); and a bond, without which one relayer is a single point of
+failure.
 
 **What is still missing, in order:** (1) one working signing path — nothing in this repository can
 sign and submit an extrinsic on this host, because no `node_modules` is installed anywhere and the
@@ -496,25 +504,25 @@ have no named test or file I could confirm on master this pass. Their scores sta
 does, which is the point of the ticket.
 
 ## GAP-TMP-NOT-DURABLE — a `/tmp` sweep cost a two-hour measurement — 2026-09-23
-+
-+Everything this agent had under `/tmp` was removed between 02:01 and 03:22 UTC: the git worktree the
-+work ran from, the cargo target directory, Bitcoin Core and its live regtest chain, three soak
-+directories — including the **in-flight** two-hour no-cache run (TICKET-100b) — and the
-+`@polkadot/api` install that had just made extrinsic signing possible here. `df` fell from ~1.4 TB
-+to 593 GB, so it was a disk-space sweep, not an accident aimed at this work.
-+
-+**Nothing of value was lost**, because everything was pushed: `origin/master` is `770e13ab08` with
-+#466–#475 in it, the srtool images survive at the digest the runtime record names, and the
-+repository's own `target/` cut the rebuild to nine minutes. The captured Bitcoin artifacts are
-+committed.
-+
-+The repository already ignores `/.wt-*/` — "git worktrees used by parallel fix agents" — for
-+exactly this reason, and this agent was using `/tmp` because it was convenient. **Worktrees, soak
-+base directories and build output belong inside the repository (`<repo>/.wt-<name>/`) or another
-+durable path, never `/tmp`.** A long measurement must write its samples somewhere that outlives the
-+session. Fixed as described: `.wt-agent`, `CARGO_TARGET_DIR=<repo>/target`, soak `BASE_DIR` inside
-+the worktree. Evidence: `.ai/reports/tmp-not-durable-20260923.md`.
-+
-+Separately: the Codex sandbox stopped working for non-escalated commands after the sweep
-+(`error building bubblewrap command: mountinfo path is not absolute`), so every command now needs
-+escalation. Environment, not repository.
+
+Everything this agent had under `/tmp` was removed between 02:01 and 03:22 UTC: the git worktree the
+work ran from, the cargo target directory, Bitcoin Core and its live regtest chain, three soak
+directories — including the **in-flight** two-hour no-cache run (TICKET-100b) — and the
+`@polkadot/api` install that had just made extrinsic signing possible here. `df` fell from ~1.4 TB
+to 593 GB, so it was a disk-space sweep, not an accident aimed at this work.
+
+**Nothing of value was lost**, because everything was pushed: `origin/master` is `770e13ab08` with
+#466–#475 in it, the srtool images survive at the digest the runtime record names, and the
+repository's own `target/` cut the rebuild to nine minutes. The captured Bitcoin artifacts are
+committed.
+
+The repository already ignores `/.wt-*/` — "git worktrees used by parallel fix agents" — for
+exactly this reason, and this agent was using `/tmp` because it was convenient. **Worktrees, soak
+base directories and build output belong inside the repository (`<repo>/.wt-<name>/`) or another
+durable path, never `/tmp`.** A long measurement must write its samples somewhere that outlives the
+session. Fixed as described: `.wt-agent`, `CARGO_TARGET_DIR=<repo>/target`, soak `BASE_DIR` inside
+the worktree. Evidence: `.ai/reports/tmp-not-durable-20260923.md`.
+
+Separately: the Codex sandbox stopped working for non-escalated commands after the sweep
+(`error building bubblewrap command: mountinfo path is not absolute`), so every command now needs
+escalation. Environment, not repository.
