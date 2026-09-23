@@ -499,6 +499,17 @@ release candidate either. `X3-SEC-004` mainnet_ready 72 → 62 on that; `X3-SEC-
 the local evidence written down (two from-scratch srtool builds agreeing, five times over five
 revisions this session, plus the freshness gate firing on `local-ci`).
 
+**Second pass, 2026-09-23.** Checked the eight that were left: X3-XCHAIN-020 has the
+refund-rejection family named for it (`test_double_refund_rejected`, `test_claim_after_refund_rejected`,
+`test_stateful_*`, `test_evm_unauthorized_refund_rejected`) and now cites them; X3-XCHAIN-015 has
+persistence round-trip tests and no fault injection, so its blocker stands and now names them. The
+other six were checked and **nothing named for them exists on master**: no `test_*domain/binding/
+firewall/permit/reuse/secret*` in `crates/x3-atomic-swap` (so X3-XCHAIN-013/018/021's `tested=82` is
+not backed by tests of those behaviours), and no `test_*envelope/decode/route*` in
+`crates/x3-integration` (whose code exists — `compiler_bridge.rs`, `executor.rs`, `hostcalls.rs` — so
+X3-LANG-004/009/010's low scores are honest and their blockers accurate). Those scores stay until
+someone measures them; the next pass should start from the test names, not from the numbers.
+
 **Still unverified, deliberately untouched:** X3-LANG-004/009/010 and X3-XCHAIN-013/015/018/020/021
 have no named test or file I could confirm on master this pass. Their scores stand until someone
 does, which is the point of the ticket.
