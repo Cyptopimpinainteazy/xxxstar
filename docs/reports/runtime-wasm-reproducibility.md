@@ -87,6 +87,9 @@ bytes**:
   history, so the check is skipped instead of using the parent as a stand-in, which refused real
   headers. `spec_version` moves to 18. Two from-scratch builds of `a7878e933e` agree, and the compact
   artifact is 8,474,849 bytes.
+* `5ec1b61576` — formatting only, and the hashes did not move: collapsing a multi-line `ensure!` into
+  one line leaves the macro's `file:line` where it was, so this is the first revision in this list
+  whose bytes are identical to its predecessor's. `recorded_revision` moved; nothing else did.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
