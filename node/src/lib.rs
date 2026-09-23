@@ -53,6 +53,9 @@ pub mod validator_rotation;
 /// Node-side atomic gateway execution service.
 pub mod atomic_service;
 
+/// Certificates this node observed for finalized blocks (TICKET-107).
+pub mod finality_certs;
+
 /// Concrete signer for X3SettlementEngine live lock/claim/refund extrinsics.
 ///
 /// The implementation lives in the `x3-runtime-signer` crate so the relayer can

@@ -617,7 +617,21 @@ off-chain marker had no writer anywhere in the repository, so there was nothing 
 section above and `.ai/reports/unsigned-finalization-removed-20260923.md`. This change removed the
 *key* that made the authorized paths anybody's; that one removed the *unauthenticated* path.
 
-**TICKET-107 — the signed path still trusts an unsigned anchor.** `node/src/atomic_service.rs`'s
+**TICKET-107 — CLOSED 2026-09-23 (node-side).** `AtomicGatewayService::finalize_bundle` no longer
+finalizes with whatever certificate the chain's anchor holds. The node keeps the certificates *it*
+observed, per block (`node/src/finality_certs.rs`; written by the flash-finality voter and, when Flash
+is off, by the GRANDPA anchor task, which is the same value each of them anchors), and
+`decide_finalization_cert` finalizes only when the chain's anchor agrees with the observed value. A
+disagreement is refused with both hashes in the error, so a planted anchor can no longer be signed —
+it stalls finalization for *that height* and nothing else, because the service keeps polling and the
+next finalized height has a fresh anchor. Five unit tests, including
+`a_planted_anchor_is_refused_rather_than_signed`. Evidence:
+`.ai/reports/finality-certificate-trust-20260923.md`. What is *not* done: the anchor call itself is
+still unsigned and first-write-wins, so a peer can still consume a height's anchor; making it
+authenticated is a chain change and is not needed for safety now that no node signs an anchor it did
+not observe.
+
+**TICKET-107 (as filed) — the signed path trusted an unsigned anchor.** `node/src/atomic_service.rs`'s
 `finalize_bundle` waits for `FinalityCertAnchors[block]` and finalizes with whatever certificate it
 finds there. Anyone can write that anchor first (the call is still `ensure_none`), so an attacker can
 make the honest service sign a fabricated certificate: the bundle ends `Finalized` with a proof no

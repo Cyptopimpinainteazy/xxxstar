@@ -841,6 +841,11 @@ pub fn new_full_with_atomic_gateway<
         log::info!("🧩 Atomic kernel feature gate is disabled (default)");
     }
 
+    // The certificates *this* node observed, shared with the finality tasks below so the atomic
+    // gateway service finalizes with a value it produced rather than one the chain was told
+    // (TICKET-107).
+    let observed_certs = crate::finality_certs::ObservedFinalityCerts::new();
+
     // Optional node-side atomic gateway service: signs and submits
     // atomic-kernel extrinsics through this node's transaction pool.
     let atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>> = if feature_flags
@@ -848,7 +853,12 @@ pub fn new_full_with_atomic_gateway<
     {
         match atomic_gateway_uri {
             Some(uri) => {
-                match AtomicGatewayService::new(&uri, client.clone(), transaction_pool.clone()) {
+                match AtomicGatewayService::new(
+                        &uri,
+                        client.clone(),
+                        transaction_pool.clone(),
+                        observed_certs.clone(),
+                    ) {
                     Ok(service) => {
                         let uri_for_log = uri.clone();
                         let (tx, rx) = mpsc::channel::<AtomicGatewayCommand>(64);
@@ -1304,7 +1314,12 @@ pub fn new_full_with_atomic_gateway<
         task_manager.spawn_essential_handle().spawn(
             "flash-finality-voter",
             Some("flash-finality"),
-            run_flash_finality_voter(gadget_for_voter, client_for_voter, enable_flash_live_mode),
+            run_flash_finality_voter(
+                gadget_for_voter,
+                client_for_voter,
+                enable_flash_live_mode,
+                observed_certs.clone(),
+            ),
         );
 
         log::info!("⚡ Flash Finality gadget, network bridge, and voter started");
@@ -1314,7 +1329,7 @@ pub fn new_full_with_atomic_gateway<
         task_manager.spawn_essential_handle().spawn(
             "grandpa-finality-anchor",
             Some("x3"),
-            run_grandpa_finality_anchor(client_for_anchor, pool_for_anchor),
+            run_grandpa_finality_anchor(client_for_anchor, pool_for_anchor, observed_certs.clone()),
         );
     }
 
@@ -2020,6 +2035,8 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
 async fn run_grandpa_finality_anchor(
     client: Arc<FullClient>,
     pool: Arc<crate::atomic_service::AtomicPool>,
+    // The certificates this task anchors, for the atomic gateway service to finalize with.
+    observed_certs: crate::finality_certs::ObservedFinalityCerts,
 ) {
     log::info!("⚡ GRANDPA finality anchor task started");
     let mut last_finalized_hash = sp_core::H256::zero();
@@ -2049,6 +2066,7 @@ async fn run_grandpa_finality_anchor(
             }
 
             let cert_hash = sp_core::blake2_256(&hash);
+            observed_certs.record(number, H256(cert_hash));
             let call = RuntimeCall::X3AtomicKernel(
                 pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
                     block_num: number,
@@ -2105,6 +2123,8 @@ async fn run_flash_finality_voter<Client, Block>(
     gadget: Arc<FlashFinalityGadget>,
     client: Arc<Client>,
     enable_live_mode: bool,
+    // The certificates this voter observed, for the atomic gateway service to finalize with.
+    observed_certs: crate::finality_certs::ObservedFinalityCerts,
 ) where
     Client: BlockchainEvents<Block> + BlockBackend<Block> + Send + Sync + 'static,
     Block: sp_runtime::traits::Block + 'static,
@@ -2141,6 +2161,7 @@ async fn run_flash_finality_voter<Client, Block>(
                             &key,
                             &cert_hash,
                         );
+                        observed_certs.record(number, H256(cert_hash));
                         log::info!(
                             "⚡ [FlashFinality] cert stored at key x3ff:{} → cert_hash=0x{}",
                             number,
@@ -2182,6 +2203,7 @@ async fn run_flash_finality_voter<Client, Block>(
                         &key,
                         &cert_hash,
                     );
+                    observed_certs.record(number, H256(cert_hash));
                     log::debug!(
                         "⚡ [GRANDPA] cert stored at key x3ff:{} → cert_hash=0x{}",
                         number,

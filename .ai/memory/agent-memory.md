@@ -7082,3 +7082,16 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   (the value it writes under `x3ff:`) and treat the anchor as a cross-check.
 - `feature-matrix.py check`, `check-readiness-consistency.sh` and `test_cheat_guard.py` all stay
   green through a deletion like this; `test_cheat_guard` does *not* police deleted test names.
+
+### TICKET-107 closed — the same day it was filed
+- `node/src/finality_certs.rs`: `ObservedFinalityCerts` (bounded `block -> cert` map, shared by the
+  flash voter, the GRANDPA anchor task and the atomic gateway service) plus
+  `decide_finalization_cert(observed, anchored)` — `Finalize` only when the chain's anchor equals the
+  certificate this node observed, `Poisoned` (refuse loudly) when it differs, `Wait` otherwise.
+- `finalize_bundle` now queries the anchor at `info.finalized_hash` (it used `best_hash` while asking
+  about the finalized height) and refuses to sign a planted certificate.
+- The residual is liveness: an unsigned, first-write-wins anchor still lets a peer stall *one height*;
+  the service moves on to the next finalized height. Making the anchor authenticated is a runtime
+  change to argue on merits.
+- Pure decision functions are the cheap way to satisfy "a test where a planted anchor does not change
+  what the service signs": extract the rule, test the rule, wire it.
