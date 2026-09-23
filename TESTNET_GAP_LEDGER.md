@@ -597,7 +597,17 @@ and testnet specs name in genesis; staging, testnet and production take
 specs already applied to endowed accounts and authorities, now applied to privilege.
 `spec_version` 19. Evidence: `.ai/reports/gateway-origin-registry-20260923.md`.
 
-**TICKET-105 — the node's default gateway URI is still a public seed.** `AtomicGatewayKey` defaults to
+**TICKET-105 — CLOSED 2026-09-23.** There is no default any more, in the code or in the help text:
+the CLI's doc comment claimed `//x3-atomic-gateway` was the dev default, which the spawn path never
+implemented. `--x3-gateway-uri` (or `X3_ATOMIC_GATEWAY_URI`) is required for the service, and a
+**live** chain refuses to start the service with a published development seed
+(`atomic_gateway::published_dev_seed`, exact match after trimming, so `//x3-atomic-gateway-prod` is a
+different account) — with one error line naming the chain, the seed and the flag to pass instead.
+Dev and local chains still accept them, which is what they are for. Four unit tests
+(`service::published_seed_tests`, `atomic_gateway::tests::published_dev_seeds_are_recognised_and_nothing_else_is`).
+Evidence: `.ai/reports/gateway-uri-default-removed-20260923.md`.
+
+**TICKET-105 (as filed) — the node's default gateway URI was a public seed.** `AtomicGatewayKey` defaults to
 `//x3-atomic-gateway`, so a live chain that names an operator account in genesis and runs its service
 with the default URI gets a service whose extrinsics are rejected — fail-closed, but silent until an
 operator reads the log. Acceptance: the node refuses to start the atomic service with a published dev

@@ -7108,3 +7108,11 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   `x3_custody` and **fund it well above the bond** — funding exactly `MinBond` leaves the account with
   zero free balance and `Currency::reserve` refuses with `InsufficientBond`, which cost a round trip to
   diagnose. `10_000 * X3` works; `X3` is 10^9 and `AtomicKernelMinBond` is 10^12.
+### TICKET-105 closed — the gateway URI rule the docs promised
+- The CLI help claimed `--x3-gateway-uri` "defaults to `//x3-atomic-gateway` for dev chains"; the spawn
+  path never implemented a default (it refuses to start the service without one). Now the help says
+  **required**, and a **live** chain refuses a published seed outright with one error line naming the
+  chain, the seed and the flag — instead of a service whose every extrinsic the runtime rejects.
+- `atomic_gateway::published_dev_seed` matches exactly after trimming (`//x3-atomic-gateway-prod` is a
+  different account); `refuses_published_seed_on_a_live_chain(chain_type, chain_id, uri)` is a pure
+  rule with three unit tests — the cheapest way to make a startup decision testable.

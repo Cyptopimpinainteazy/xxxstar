@@ -852,6 +852,15 @@ pub fn new_full_with_atomic_gateway<
         .enable_atomic_kernel
     {
         match atomic_gateway_uri {
+            Some(uri)
+                if refuses_published_seed_on_a_live_chain(
+                    config.chain_spec.chain_type(),
+                    config.chain_spec.id(),
+                    &uri,
+                ) =>
+            {
+                None
+            }
             Some(uri) => {
                 match AtomicGatewayService::new(
                     &uri,
@@ -2032,6 +2041,34 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
 /// transaction both look like errors here and only the second is worth retrying — and if
 /// it never lands the cursor advances with an `error!` naming the height, rather than
 /// being dropped silently.
+/// Refuse to run the atomic gateway service with a seed this repository publishes, on a live chain.
+///
+/// The runtime only accepts atomic calls from accounts the chain's genesis authorizes, so a service
+/// signing with `//x3-atomic-gateway` on a live chain would have every extrinsic rejected. That is
+/// fail-closed, but silent: the operator sees a service that does nothing. Refusing here, with the
+/// reason, is one line in the log instead of a hunt (TICKET-105).
+fn refuses_published_seed_on_a_live_chain(
+    chain_type: sc_service::ChainType,
+    chain_id: &str,
+    uri: &str,
+) -> bool {
+    if chain_type != sc_service::ChainType::Live {
+        return false;
+    }
+    match crate::atomic_gateway::published_dev_seed(uri) {
+        Some(seed) => {
+            log::error!(
+                "🧩 refusing to start the atomic gateway service on chain '{chain_id}' with the \
+                 published development seed {seed}: it is in this repository, so it is not a \
+                 secret, and this chain's genesis will not have authorized it — pass \
+                 --x3-gateway-uri (or X3_ATOMIC_GATEWAY_URI) with the account the genesis names"
+            );
+            true
+        }
+        None => false,
+    }
+}
+
 async fn run_grandpa_finality_anchor(
     client: Arc<FullClient>,
     pool: Arc<crate::atomic_service::AtomicPool>,
@@ -3904,3 +3941,47 @@ mod gpu_sidecar_tests {
 // DISABLED: Tests require sc_service::Configuration API changes
 // #[cfg(test)]
 // mod tests { ... }
+
+#[cfg(test)]
+mod published_seed_tests {
+    use super::refuses_published_seed_on_a_live_chain;
+    use sc_service::ChainType;
+
+    #[test]
+    fn a_live_chain_refuses_the_published_seeds() {
+        assert!(refuses_published_seed_on_a_live_chain(
+            ChainType::Live,
+            "x3_chain_production",
+            "//x3-atomic-gateway"
+        ));
+        assert!(refuses_published_seed_on_a_live_chain(
+            ChainType::Live,
+            "x3_chain_testnet",
+            "//Alice"
+        ));
+    }
+
+    #[test]
+    fn a_dev_chain_may_use_them() {
+        // The dev and local specs name these accounts in genesis, so this is the case they are for.
+        assert!(!refuses_published_seed_on_a_live_chain(
+            ChainType::Development,
+            "x3_chain_dev",
+            "//x3-atomic-gateway"
+        ));
+        assert!(!refuses_published_seed_on_a_live_chain(
+            ChainType::Local,
+            "x3_chain_local",
+            "//x3-atomic-gateway"
+        ));
+    }
+
+    #[test]
+    fn a_live_chain_accepts_an_operator_account() {
+        assert!(!refuses_published_seed_on_a_live_chain(
+            ChainType::Live,
+            "x3_chain_production",
+            "//OperatorGateway"
+        ));
+    }
+}

@@ -84,10 +84,11 @@ the result at `genesis.runtimeGenesis.config.x3Custody.x3LangGateways` /
 `settlementGateways`, so it is reviewable in the same diff as the chain id and identical for
 everyone who joins from it.
 
-The node's atomic service signs with `--x3-gateway-uri` (default `//x3-atomic-gateway`), so the
-account named in genesis and the URI the service runs with have to be the same account. If they
-are not, the service's extrinsics are rejected — the chain fails closed, and it says so one line
-per rejected call rather than doing something surprising. After launch the set is changed by
+The node's atomic service signs with `--x3-gateway-uri`. There is no default: the account named in
+genesis and the URI the service runs with have to be the same account, so the URI is required
+whenever `--enable-atomic-kernel` is set. A live chain refuses to start the service at all if the
+URI is one of the published development seeds, and says which one — the alternative is a service
+whose every extrinsic is rejected for a reason only the log knows. After launch the set is changed by
 governance, not by a rebuild: `x3Custody.authorizeGateway` / `x3Custody.revokeGateway`.
 
 A chain whose genesis names no gateway cannot assign or finalize a bundle at all. That is the
