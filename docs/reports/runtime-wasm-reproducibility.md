@@ -124,6 +124,13 @@ bytes**:
   (was 8,482,706), compressed 1,459,662 (was 1,458,035) — which makes it the first
   revision in this list where a *removal* changes the bytes.
   Two from-scratch builds agree.
+* `cc19883faf` — two test files that never compiled are replaced by four that do, and the
+  formatting drift the last three merges left behind is repaired. The hashes are **identical to
+  `ae4a4c912b`'s**: `runtime/src/tests.rs` and `pallets/x3-atomic-kernel/src/tests.rs` are
+  `#[cfg(test)]` code, which the WASM build does not compile, and the rest is `cargo fmt`. Only
+  `recorded_revision` moves. That is the third revision in this list where that happens, and it is
+  the property the gate exists for: it watches the runtime's dependency graph rather than the
+  timestamp of the last edit.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that

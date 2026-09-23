@@ -7095,3 +7095,16 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   change to argue on merits.
 - Pure decision functions are the cheap way to satisfy "a test where a planted anchor does not change
   what the service signs": extract the rule, test the rule, wire it.
+### TICKET-106 closed — and a formatting gate nobody ran
+- `tests/e2e/safety_tests.rs` and `real_finality_proofs.rs` were **not tests needing a harness**: they
+  used `BundleLeg::Lock { amount, asset }` (no such variant), a 3-argument `submit_atomic_bundle` (the
+  real call takes chain id and nonce), `H256::random()` bundle ids, `assert_err!(.., "string")`, and
+  `RuntimeOrigin::signed(1)` for a gate that requires the genesis-named gateway. Deleted; four real
+  runtime-level tests now live in `runtime/src/tests.rs`.
+- **`cargo fmt --all -- --check` was RED on master** after #488/#491/#492: those PRs ran tests,
+  `cargo check` and clippy, never the format gate. If you merge runtime/pallet/node Rust, run
+  `cargo fmt --all -- --check` before the PR, or the next agent inherits the drift.
+- Runtime-level tests need genesis, not just `TestExternalities::default()`: authorize the gateway in
+  `x3_custody` and **fund it well above the bond** — funding exactly `MinBond` leaves the account with
+  zero free balance and `Currency::reserve` refuses with `InsufficientBond`, which cost a round trip to
+  diagnose. `10_000 * X3` works; `X3` is 10^9 and `AtomicKernelMinBond` is 10^12.

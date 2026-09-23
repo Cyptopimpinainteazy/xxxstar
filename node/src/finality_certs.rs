@@ -88,7 +88,9 @@ pub fn decide_finalization_cert(
         (Some(observed), Some(anchored)) if observed == anchored => {
             FinalizationCertificate::Finalize(observed)
         }
-        (Some(observed), Some(anchored)) => FinalizationCertificate::Poisoned { observed, anchored },
+        (Some(observed), Some(anchored)) => {
+            FinalizationCertificate::Poisoned { observed, anchored }
+        }
         // Either we have not seen a certificate ourselves, or ours has not been anchored yet.
         // Both are "wait": never finalize on a value this node did not observe.
         _ => FinalizationCertificate::Wait,
@@ -140,7 +142,10 @@ mod tests {
             decide_finalization_cert(None, Some(cert(0xBB))),
             FinalizationCertificate::Wait
         );
-        assert_eq!(decide_finalization_cert(None, None), FinalizationCertificate::Wait);
+        assert_eq!(
+            decide_finalization_cert(None, None),
+            FinalizationCertificate::Wait
+        );
     }
 
     #[test]
@@ -148,7 +153,11 @@ mod tests {
         let certs = ObservedFinalityCerts::new();
         certs.record(10, cert(0x01));
         certs.record(10, cert(0x02));
-        assert_eq!(certs.get(10), Some(cert(0x01)), "first observation wins, as on chain");
+        assert_eq!(
+            certs.get(10),
+            Some(cert(0x01)),
+            "first observation wins, as on chain"
+        );
 
         certs.record(10 + KEEP_BLOCKS + 1, cert(0x03));
         assert_eq!(certs.get(10), None, "old heights are dropped");

@@ -79,7 +79,6 @@ pub struct SettlementStatusResponse {
     pub total_locked: u128,
 }
 
-
 /// Full intent snapshot for operator/RPC inspection.
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
