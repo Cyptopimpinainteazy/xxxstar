@@ -604,7 +604,21 @@ operator reads the log. Acceptance: the node refuses to start the atomic service
 seed against a live chain id, or says so on one line at startup, and the runbook names
 `--x3-gateway-uri` as required for a live chain.
 
-**TICKET-106 — two e2e files are not test targets.** `tests/e2e/safety_tests.rs` and
+**TICKET-106 — CLOSED 2026-09-23.** Both files are deleted, and the runtime tests now cover what
+they claimed. They were not merely undeclared test targets: they were written against an API that
+never existed — `submit_atomic_bundle(origin, legs, deadline)` is missing the chain id and nonce the
+call takes, `BundleLeg::Lock { amount, asset }` is not a variant of the leg type,
+`RuntimeOrigin::signed(1)` is not an account this runtime ever authorized for the atomic gate, and
+`assert_err!(result, "NonceAlreadyUsed")` compares a `DispatchError` with a string. Nothing could have
+compiled them; "declare the targets and fix them" would have meant writing new tests under an old file
+name. Four real ones live in `runtime/src/tests.rs` against the actual API:
+`the_atomic_kernel_refuses_an_account_the_chain_did_not_authorize`,
+`the_genesis_authorized_gateway_reaches_the_atomic_kernel`,
+`a_bundle_finalizes_once_with_the_receipt_root_the_chain_requires`, and
+`a_bundle_nonce_cannot_be_replayed`. Evidence:
+`.ai/reports/e2e-safety-tests-replaced-20260923.md`.
+
+**TICKET-106 (as filed) — two e2e files were not test targets.** `tests/e2e/safety_tests.rs` and
 `tests/e2e/real_finality_proofs.rs` sit in the `e2e_tests` workspace member but are not declared in
 `tests/e2e/Cargo.toml`, and `safety_tests.rs` declares `mod mock;` for a file that does not exist, so
 neither can compile. Both drive `finalize_atomic_bundle` with `RuntimeOrigin::signed(1)` — an origin
