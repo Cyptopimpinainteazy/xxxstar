@@ -15,6 +15,7 @@ use frame_support::storage::storage_prefix;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
 use pallet_x3_atomic_kernel::BundleRollbackReason;
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
+use pallet_x3_settlement_engine::runtime_api::GovernanceSettlementApi;
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sc_client_api::{BlockBackend, StorageProvider};
 use sc_transaction_pool_api::TransactionPool;
@@ -691,6 +692,8 @@ where
         pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
     <FullClient as ProvideRuntimeApi<Block>>::Api:
         pallet_x3_atomic_kernel::X3AtomicKernelApi<Block>,
+    <FullClient as ProvideRuntimeApi<Block>>::Api:
+        pallet_x3_settlement_engine::runtime_api::GovernanceSettlementApi<Block, AccountId, Balance, u32>,
 {
     let mut module = RpcModule::new(());
 
@@ -714,6 +717,36 @@ where
                     "at": format!("0x{}", hex::encode(at)),
                 })),
             }
+        },
+    )?;
+
+    let client_for_intent = client.clone();
+    module.register_method(
+        "x3_getIntentSnapshot",
+        move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let (intent_hex,): (String,) = params.parse()?;
+            let intent_id = H256(decode_hex_32(&intent_hex, "runtime intent id")?);
+            let at = client_for_intent.info().best_hash;
+            let api = client_for_intent.runtime_api();
+            let snapshot = api
+                .get_intent_snapshot(at, intent_id)
+                .map_err(|e| custom_error(format!("settlement runtime API failed: {e}")))?;
+            serde_json::to_value(snapshot)
+                .map_err(|e| custom_error(format!("serialize intent snapshot failed: {e}")))
+        },
+    )?;
+
+    let client_for_settlement_status = client.clone();
+    module.register_method(
+        "x3_settlementStatus",
+        move |_, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let at = client_for_settlement_status.info().best_hash;
+            let api = client_for_settlement_status.runtime_api();
+            let status = api
+                .settlement_status(at)
+                .map_err(|e| custom_error(format!("settlement status runtime API failed: {e}")))?;
+            serde_json::to_value(status)
+                .map_err(|e| custom_error(format!("serialize settlement status failed: {e}")))
         },
     )?;
 

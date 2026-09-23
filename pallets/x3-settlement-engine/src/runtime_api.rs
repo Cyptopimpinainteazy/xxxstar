@@ -79,6 +79,16 @@ pub struct SettlementStatusResponse {
     pub total_locked: u128,
 }
 
+
+/// Full intent snapshot for operator/RPC inspection.
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+pub struct IntentSnapshot<AccountId> {
+    pub intent: crate::types::SettlementIntent<AccountId>,
+    pub state: crate::types::IntentState,
+    pub escrows: Vec<crate::types::EscrowLeg<AccountId>>,
+}
+
 sp_api::decl_runtime_apis! {
     /// Runtime API for querying X3 settlement engine state
     pub trait GovernanceSettlementApi<AccountId, Balance, BlockNumber>
@@ -92,6 +102,9 @@ sp_api::decl_runtime_apis! {
 
         /// Get settlement information for a transfer
         fn get_settlement(transfer_id: TransferId) -> Option<SettlementResponse<AccountId, Balance, BlockNumber>>;
+
+        /// Get the canonical intent state and all currently materialized escrow legs.
+        fn get_intent_snapshot(intent_id: H256) -> Option<IntentSnapshot<AccountId>>;
 
         /// Get all pending settlements for an account
         fn get_account_pending_settlements(account: AccountId) -> Vec<SettlementResponse<AccountId, Balance, BlockNumber>>;

@@ -32,6 +32,7 @@ pub const MAX_TRIE_PROOF_SIZE: u32 = 2048;
     Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 #[scale_info(skip_type_params(AccountId))]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct SettlementIntent<AccountId> {
     /// Unique intent identifier
     pub intent_id: H256,
@@ -61,6 +62,7 @@ pub struct SettlementIntent<AccountId> {
 #[derive(
     Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssetSpec {
     /// Chain where asset resides
     pub chain: ExternalChainId,
@@ -74,6 +76,7 @@ pub struct AssetSpec {
 #[derive(
     Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum TokenId {
     /// Native currency (ETH, SOL, BTC)
     Native,
@@ -103,6 +106,7 @@ impl Default for TokenId {
     Eq,
     Default,
 )]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum IntentState {
     /// Intent created, waiting for escrows
     #[default]
@@ -158,6 +162,7 @@ pub struct SettlementTransfer<AccountId, Balance> {
     Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 #[scale_info(skip_type_params(AccountId))]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct EscrowLeg<AccountId> {
     /// Parent intent ID
     pub intent_id: H256,
@@ -193,6 +198,7 @@ pub struct EscrowLeg<AccountId> {
     Eq,
     Default,
 )]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum EscrowLegState {
     /// Waiting for deposit
     #[default]
@@ -294,6 +300,7 @@ pub struct BtcHeaderMeta {
 #[derive(
     Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct SettlementProof {
     /// Type of proof
     pub proof_type: ProofType,
@@ -348,6 +355,7 @@ pub struct SettlementProof {
     Eq,
     Default,
 )]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum ProofType {
     /// Merkle Patricia Trie proof (EVM)
     #[default]
@@ -383,6 +391,7 @@ pub enum ProofType {
     Hash,
     Default,
 )]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExternalChainId {
     /// Native X3 chain (EVM/SVM/X3VM internal)
     #[default]
