@@ -187,10 +187,101 @@ pub struct SignerPolicy {
 
 // ── Pallet ────────────────────────────────────────────────────────────────────
 
+/// Which privileged gate an account is authorized to pass.
+///
+/// The atomic kernel, the cross-VM router and the settlement engine each take an
+/// `EnsureOrigin<Success = AccountId>` from the runtime. Those origins were
+/// `EnsureSignedBy<X3LangGatewayAccount, _>` — an account whose seed is the
+/// well-known development phrase `//x3-atomic-gateway`, so the privilege belonged
+/// to anyone who read this repository. They are this registry instead: filled from
+/// genesis and edited only by governance, so a chain's privileged accounts are the
+/// ones its own genesis names, and no compiled-in account is privileged anywhere.
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    codec::Encode,
+    codec::Decode,
+    codec::DecodeWithMemTracking,
+    scale_info::TypeInfo,
+    codec::MaxEncodedLen,
+    sp_runtime::RuntimeDebug,
+)]
+pub enum GatewayRole {
+    /// May assign, finalize and roll back atomic bundles, and drive the cross-VM
+    /// router's X3-language entry points.
+    X3Lang = 0,
+    /// May call the atomic kernel's settlement finalization path.
+    Settlement = 1,
+}
+
+/// Marker: the [`GatewayRole::X3Lang`] gate.
+pub enum X3LangGatewayRole {}
+
+/// Marker: the [`GatewayRole::Settlement`] gate.
+pub enum SettlementGatewayRole {}
+
+/// A role a [`EnsureAuthorizedGateway`] checks membership for.
+pub trait GatewayRoleMarker {
+    /// The role this marker stands for.
+    const ROLE: GatewayRole;
+}
+
+impl GatewayRoleMarker for X3LangGatewayRole {
+    const ROLE: GatewayRole = GatewayRole::X3Lang;
+}
+
+impl GatewayRoleMarker for SettlementGatewayRole {
+    const ROLE: GatewayRole = GatewayRole::Settlement;
+}
+
+/// `EnsureOrigin` accepting a signed origin whose account this pallet's
+/// `AuthorizedGateways` authorizes for `R`'s role.
+///
+/// Membership lives in storage rather than in a `parameter_types!` constant
+/// because a constant cannot be set per chain: it is compiled into the WASM every
+/// chain shares. Nothing is authorized until a chain's genesis says so, which is
+/// what makes "the dev account is the gateway" impossible by construction rather
+/// than by remembering to change a constant at release time.
+pub struct EnsureAuthorizedGateway<T, R>(sp_std::marker::PhantomData<(T, R)>);
+
+impl<T, R> frame_support::traits::EnsureOrigin<T::RuntimeOrigin> for EnsureAuthorizedGateway<T, R>
+where
+    T: Config,
+    R: GatewayRoleMarker,
+{
+    type Success = T::AccountId;
+
+    fn try_origin(o: T::RuntimeOrigin) -> Result<Self::Success, T::RuntimeOrigin> {
+        o.into().and_then(|o| match o {
+            frame_system::RawOrigin::Signed(who) => {
+                if AuthorizedGateways::<T>::contains_key(R::ROLE, &who) {
+                    Ok(who)
+                } else {
+                    Err(frame_system::RawOrigin::Signed(who).into())
+                }
+            }
+            other => Err(other.into()),
+        })
+    }
+
+    /// No origin is *always* authorized: membership is per chain, per account, and
+    /// changeable by governance, so there is no origin this could return that is
+    /// still valid one block later. A pallet that wants to act as a gateway has to
+    /// route through a call the chain authorized, not through a synthesized origin —
+    /// and a benchmark that needs a gateway origin has to authorize one first.
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<T::RuntimeOrigin, ()> {
+        Err(())
+    }
+}
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::{
-        AuthorizationTier, KeyRole, SignerEntry, SignerPolicy, ThresholdPolicy, ValidatorKeyRecord,
+        AuthorizationTier, GatewayRole, KeyRole, SignerEntry, SignerPolicy, ThresholdPolicy,
+        ValidatorKeyRecord,
     };
     use frame_support::{pallet_prelude::*, BoundedVec};
     use frame_system::pallet_prelude::*;
@@ -207,6 +298,24 @@ pub mod pallet {
         pub initial_tier_thresholds: Vec<Vec<u8>>,
         /// SCALE-encoded (T::AccountId, SignerPolicy) entries.
         pub initial_signer_limits: Vec<Vec<u8>>,
+        /// Accounts authorized for `GatewayRole::X3Lang`.
+        ///
+        /// A chain with none of these cannot run an atomic bundle at all. That is
+        /// the intended failure mode: the alternative was a compiled-in account
+        /// whose seed is a public development phrase.
+        ///
+        /// `serde(default)` because this field did not exist when the specs in
+        /// `chain-specs/` and `deployment/chain-specs/` were generated: a plain spec
+        /// that names this pallet but not this field fails to load without it
+        /// (`missing field 'x3LangGateways'` — measured, not assumed). An old spec
+        /// loads and simply authorizes nobody, which is the same fail-closed posture
+        /// as a chain that never named a gateway.
+        #[serde(default)]
+        pub x3_lang_gateways: Vec<T::AccountId>,
+        /// Accounts authorized for `GatewayRole::Settlement`. `serde(default)` for
+        /// the same reason as `x3_lang_gateways`.
+        #[serde(default)]
+        pub settlement_gateways: Vec<T::AccountId>,
         pub _phantom: sp_std::marker::PhantomData<T>,
     }
 
@@ -223,6 +332,12 @@ pub mod pallet {
                 let (signer, policy): (T::AccountId, SignerPolicy) =
                     Decode::decode(&mut &blob[..]).expect("valid SCALE-encoded signer limit");
                 SignerLimits::<T>::insert(signer, policy);
+            }
+            for account in &self.x3_lang_gateways {
+                AuthorizedGateways::<T>::insert(GatewayRole::X3Lang, account, ());
+            }
+            for account in &self.settlement_gateways {
+                AuthorizedGateways::<T>::insert(GatewayRole::Settlement, account, ());
             }
         }
     }
@@ -308,6 +423,23 @@ pub mod pallet {
     pub type KeyRotationSchedule<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, BlockNumberFor<T>, OptionQuery>;
 
+    /// Accounts authorized for a privileged [`GatewayRole`]: filled from genesis,
+    /// edited by `GovernanceOrigin` only, and read by [`EnsureAuthorizedGateway`].
+    ///
+    /// The runtime wires this to the atomic kernel's `X3LangOrigin` and
+    /// `SettlementOrigin` and to the cross-VM router's `X3LangOrigin`.
+    #[pallet::storage]
+    #[pallet::getter(fn authorized_gateways)]
+    pub type AuthorizedGateways<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        GatewayRole,
+        Blake2_128Concat,
+        T::AccountId,
+        (),
+        OptionQuery,
+    >;
+
     // ── Events ────────────────────────────────────────────────────────────────
 
     #[pallet::event]
@@ -356,6 +488,16 @@ pub mod pallet {
             signer: T::AccountId,
             tier: AuthorizationTier,
         },
+        /// An account was authorized for a privileged gateway role.
+        GatewayAuthorized {
+            role: GatewayRole,
+            account: T::AccountId,
+        },
+        /// An account's authorization for a privileged gateway role was revoked.
+        GatewayRevoked {
+            role: GatewayRole,
+            account: T::AccountId,
+        },
     }
 
     // ── Errors ────────────────────────────────────────────────────────────────
@@ -376,6 +518,10 @@ pub mod pallet {
         KeyRoleNotAllowedForTier,
         /// Adding another signer would exceed `MaxSignersPerVault`.
         MaxSignersReached,
+        /// The account is already authorized for this gateway role.
+        GatewayAlreadyAuthorized,
+        /// The account is not authorized for this gateway role.
+        GatewayNotAuthorized,
     }
 
     // ── Extrinsics ────────────────────────────────────────────────────────────
@@ -620,11 +766,60 @@ pub mod pallet {
             });
             Err(Error::<T>::SignerNotFound.into())
         }
+
+        /// Authorize `account` for a privileged gateway `role`.
+        ///
+        /// `GovernanceOrigin` only. This is the call a live chain uses to name the
+        /// operator's gateway service, instead of the dev account that used to be
+        /// compiled into the runtime as the origin itself.
+        #[pallet::call_index(8)]
+        #[pallet::weight(Weight::from_parts(6_000, 0))]
+        pub fn authorize_gateway(
+            origin: OriginFor<T>,
+            role: GatewayRole,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            ensure!(
+                !AuthorizedGateways::<T>::contains_key(role, &account),
+                Error::<T>::GatewayAlreadyAuthorized
+            );
+            AuthorizedGateways::<T>::insert(role, &account, ());
+            Self::deposit_event(Event::GatewayAuthorized { role, account });
+            Ok(())
+        }
+
+        /// Revoke `account`'s authorization for a privileged gateway `role`.
+        ///
+        /// `GovernanceOrigin` only. Revoking the last `X3Lang` gateway leaves the
+        /// chain unable to finalize a bundle, which is the same posture as never
+        /// having named one: fail closed, visibly, rather than fall back.
+        #[pallet::call_index(9)]
+        #[pallet::weight(Weight::from_parts(6_000, 0))]
+        pub fn revoke_gateway(
+            origin: OriginFor<T>,
+            role: GatewayRole,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            ensure!(
+                AuthorizedGateways::<T>::contains_key(role, &account),
+                Error::<T>::GatewayNotAuthorized
+            );
+            AuthorizedGateways::<T>::remove(role, &account);
+            Self::deposit_event(Event::GatewayRevoked { role, account });
+            Ok(())
+        }
     }
 
     // ── Public helpers ────────────────────────────────────────────────────────
 
     impl<T: Config> Pallet<T> {
+        /// Returns `true` if `account` is authorized for `role`.
+        pub fn is_gateway_authorized(role: GatewayRole, account: &T::AccountId) -> bool {
+            AuthorizedGateways::<T>::contains_key(role, account)
+        }
+
         /// Returns `true` if `signer` has an active entry at `tier` in the
         /// `(chain_id, asset_id)` vault.
         pub fn is_signer_authorized(

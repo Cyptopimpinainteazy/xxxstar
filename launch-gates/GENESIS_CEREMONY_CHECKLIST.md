@@ -132,6 +132,20 @@ No shortcuts. No exceptions. This is not a suggestion list—it is the law.
   - ✅ Verified: Emergency halt requires governance
   - Audit date: _______________________
 
+- [ ] **Atomic gateway accounts decided and named in genesis**
+  - `X3_PRODUCTION_ATOMIC_GATEWAYS`: `________________` (SS58 — who may assign, finalize and
+    roll back an atomic bundle, and drive the cross-VM router's X3-language entry points)
+  - `X3_PRODUCTION_SETTLEMENT_GATEWAYS`: `________________` (SS58 — who may finalize a settlement)
+  - ✅ Verified: neither is derived from a published development seed (`//x3-atomic-gateway`,
+    `//x3-settlement-gateway`, `//Alice`, …) — the spec builder refuses those outright, so a
+    ceremony that tries to reuse them stops rather than launching
+  - ✅ Verified: each node's atomic service runs with `--x3-gateway-uri` pointing at an account
+    in the `ATOMIC_GATEWAYS` list
+  - ✅ Verified: a chain whose genesis names none of these refuses to assign or finalize a bundle
+    (fail closed) rather than falling back to a compiled-in account
+  - Recorded in the spec at: `genesis.runtimeGenesis.config.x3Custody.{x3LangGateways,settlementGateways}`
+  - Changeable after launch by governance: `x3Custody.authorizeGateway` / `x3Custody.revokeGateway`
+
 ---
 
 ## Phase 3: Validator Configuration

@@ -106,6 +106,8 @@ ENDOWED="["
 COUNCIL="["
 TREASURY="["
 PEERS=()
+FIRST_AURA=""
+SECOND_AURA=""
 for i in 0 1 2; do
   seed="${SEEDS[$i]}"
   aura="$(keygen aura "$seed" ss58)" || die "keys generate (aura) failed"
@@ -116,6 +118,8 @@ for i in 0 1 2; do
   require_key_output "$ed_hex" "hex public key for grandpa" '^0x[0-9a-f]{64}$'
 
   PEERS+=("$(peer_id_for "$ed_hex")")
+  [ "$i" -eq 0 ] && FIRST_AURA="$aura"
+  [ "$i" -eq 1 ] && SECOND_AURA="$aura"
 
   [ "$i" -gt 0 ] && AUTHORITIES="$AUTHORITIES," && ENDOWED="$ENDOWED,"
   AUTHORITIES="$AUTHORITIES{\"aura\":\"$aura\",\"grandpa\":\"$grandpa\"}"
@@ -136,6 +140,18 @@ BOOTNODES="/ip4/127.0.0.1/tcp/$(( BASE_PORT + 1 ))/p2p/${PEERS[0]},\
 /ip4/127.0.0.1/tcp/$(( BASE_PORT + 2 ))/p2p/${PEERS[1]},\
 /ip4/127.0.0.1/tcp/$(( BASE_PORT + 3 ))/p2p/${PEERS[2]}"
 
+# The privileged origins come from genesis now (GAP-GATEWAY-ORIGIN): the runtime
+# grants the atomic kernel's `X3LangOrigin`/`SettlementOrigin` only to accounts the
+# chain's own genesis names, and `production_config()` refuses a published dev seed
+# outright. This fixture uses two of its own authorities — the same account for both
+# roles in a one-validator fixture — where a real operator uses dedicated gateway
+# accounts and points the node's `--x3-gateway-uri` at one of them.
+[ -n "$SECOND_AURA" ] || SECOND_AURA="$FIRST_AURA"
+GATEWAYS_ATOMIC="[\"$FIRST_AURA\"]"
+GATEWAYS_SETTLEMENT="[\"$SECOND_AURA\"]"
+
+export "${ENV_PREFIX}_ATOMIC_GATEWAYS=$GATEWAYS_ATOMIC"
+export "${ENV_PREFIX}_SETTLEMENT_GATEWAYS=$GATEWAYS_SETTLEMENT"
 export "${ENV_PREFIX}_AUTHORITIES=$AUTHORITIES"
 export "${ENV_PREFIX}_ENDOWED_ACCOUNTS=$ENDOWED"
 export "${ENV_PREFIX}_COUNCIL_MEMBERS=$COUNCIL"

@@ -18,6 +18,12 @@
 # "grandpa": <ss58>}` built from those two commands, one entry per validator.
 # Generate the keys offline on an air-gapped machine and never commit the seeds.
 #
+# `X3_PRODUCTION_ATOMIC_GATEWAYS` and `X3_PRODUCTION_SETTLEMENT_GATEWAYS` are the
+# accounts the custody registry authorizes for the atomic kernel's privileged
+# origins. They are required and must be the operator's own accounts: the spec
+# builder refuses the published development seeds (`//x3-atomic-gateway`,
+# `//x3-settlement-gateway`), which used to be the runtime's origins themselves.
+#
 # To prove the mechanism without real keys:
 #   bash scripts/mainnet/production_genesis_gate.sh
 #
@@ -26,6 +32,8 @@
 #   X3_PRODUCTION_ENDOWED_ACCOUNTS='[...]' \
 #   X3_PRODUCTION_COUNCIL_MEMBERS='[...]' \
 #   X3_PRODUCTION_TREASURY_SIGNERS='[...]' \
+#   X3_PRODUCTION_ATOMIC_GATEWAYS='["<ss58>"]' \
+#   X3_PRODUCTION_SETTLEMENT_GATEWAYS='["<ss58>"]' \
 #   X3_EVM_ESCROW_ADDR=0x... X3_SVM_ESCROW_ADDR=0x... \
 #   TESTNET_BOOTNODES='/ip4/.../p2p/12D3Koo...' \
 #   bash scripts/mainnet/generate_mainnet_chain_spec.sh
@@ -43,6 +51,8 @@ REQUIRED_VARS=(
   X3_PRODUCTION_ENDOWED_ACCOUNTS
   X3_PRODUCTION_COUNCIL_MEMBERS
   X3_PRODUCTION_TREASURY_SIGNERS
+  X3_PRODUCTION_ATOMIC_GATEWAYS
+  X3_PRODUCTION_SETTLEMENT_GATEWAYS
   X3_EVM_ESCROW_ADDR
   X3_SVM_ESCROW_ADDR
 )

@@ -7017,3 +7017,43 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - `apply_patch` fails intermittently in this sandbox (`bubblewrap … mountinfo path is not absolute`)
   even with escalation. Scripted `python3` edits plus `bash -n` / `jq` / `git diff --check` afterwards
   work every time.
+
+## 2026-09-23 (thirty-seventh pass) — the runtime's privileged origin was a public dev key
+### Facts to remember
+- **`X3LangOrigin` and `SettlementOrigin` were `EnsureSignedBy<{X3Lang,Settlement}GatewayAccount, _>`,
+  and those two constants are the sr25519 accounts of `//x3-atomic-gateway` and
+  `//x3-settlement-gateway`** — `node/src/atomic_gateway.rs::gateway_account_matches_runtime_constant`
+  asserts exactly that. A chain spec cannot change a constant compiled into the WASM, so every chain
+  this runtime builds, `mainnet-rc1` included, gave `assign_bundle_executor`, `finalize_atomic_bundle`,
+  `rollback_bundle`, the cross-VM router's `X3LangOrigin`/`VmAdapterOrigin` and
+  `finalize_with_settlement` to anyone who read the repository. This is the same class as the four
+  committed credentials, one level up: the authorization root, in the runtime, not rotatable.
+- **Fix**: `pallet-x3-custody` now holds `AuthorizedGateways: StorageDoubleMap<GatewayRole, AccountId,
+  ()>`, two genesis items, `authorize_gateway`/`revoke_gateway` (call indices 8, 9, governance-only),
+  and `EnsureAuthorizedGateway<T, R>` (signed **and** a member; `try_successful_origin` = `Err(())`).
+  The runtime's two aliases are that type. Dev/local specs name the dev accounts
+  (`dev_gateway_genesis`); staging/testnet/production parse
+  `X3_{STAGING,TESTNET,PRODUCTION}_{ATOMIC,SETTLEMENT}_GATEWAYS` and
+  `assert_no_dev_gateway_accounts` refuses the published seeds. `spec_version` 19.
+- **Every live-spec generator had to learn the two new variables or spec building now fails**:
+  `scripts/mainnet/make-fixture-live-spec.sh` (shared by `production_genesis_gate.sh` and
+  `validator_install_gate.sh`), `scripts/mainnet/generate_mainnet_chain_spec.sh` (required-vars list),
+  `scripts/mainnet/rc6_public_testnet_readiness.sh`, `scripts/testnet/build-x3-testnet-spec.py`. The
+  fixture seeds there are raw hex (`0x0101…`), not dev phrases, so the new guard accepts them.
+- **The node's atomic service still defaults its URI to `//x3-atomic-gateway`** (TICKET-105): against a
+  live chain naming a different account, its extrinsics are rejected — fail-closed but silent.
+- **TICKET-097 is untouched by this.** `submit_finalization_result` is `ensure_none` and never consults
+  `X3LangOrigin`, so an anonymous peer can still plant a certificate anchor for the current block and
+  finalize an `Executing` bundle against it.
+- **`python3 scripts/feature_matrix.py check` is RED on master: 11 errors, all "evidence path does not
+  exist: cited PR"**. Cause is cosmetic but real: `feature-matrix/{language-trading,mev-privacy}.toml`
+  put a provenance *sentence* ("cited PR #135 was closed unmerged, so it is not a source: …") inside an
+  `evidence` array, and the checker resolves every evidence string as a path. The prose belongs in a
+  comment or a `note` field.
+- **Slashed funds are burned, not treasured**: `SlashTreasuryRecipient::get()` and
+  `AgentRegistrySlashRecipient::get()` both return `AccountId::new([0u8; 32])` — no key exists for it —
+  under a name that says treasury. Naming drift, not a hole; a tokenomics decision to change.
+- The "95% testnet ready" of a week ago came from `docs/reports/XCHECKLIST.md` (dated Dec 2025), which
+  scores ten rows a flat 95% for "the crate exists / the spec is in docs / live at
+  rpc.testnet.x3-chain.io". That host does not resolve today. `CURRENT_MAINNET_STATUS.md` said ~54% on
+  2026-09-05 and documents its own corrections (atomic kernel 85% -> 40% -> 35%).

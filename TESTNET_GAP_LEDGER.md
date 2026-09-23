@@ -571,6 +571,52 @@ other people's recorded endpoints rather than our credentials. Untracking them r
 a side effect and stops a build artifact from being edited by hand. Acceptance: `git ls-files`
 contains no `dist/` and no crawler state.
 
+## GAP-GATEWAY-ORIGIN — the atomic gateway was a compiled-in dev key — 2026-09-23
+
+The runtime gated the atomic kernel, the cross-VM router and the settlement finalization path with
+`EnsureSignedBy<X3LangGatewayAccount, AccountId>` and
+`EnsureSignedBy<SettlementGatewayAccount, AccountId>`. Those constants are the sr25519 public keys of
+`//x3-atomic-gateway` and `//x3-settlement-gateway`, which `node/src/atomic_gateway.rs` asserts in a
+test (`gateway_account_matches_runtime_constant`), and which the node's own comment calls "overridable
+via CLI/env". The node service can override them; **the runtime could not** — the account was compiled
+into the WASM. Every chain built from this runtime, `mainnet-rc1` included, handed
+`assign_bundle_executor`, `finalize_atomic_bundle`, `rollback_bundle`, the router's
+`X3LangOrigin`/`VmAdapterOrigin` and `finalize_with_settlement` to an account whose seed is in this
+repository. Anyone who can read the source can sign as it, and can fund it themselves to pay fees.
+
+This is the credential class from GAP-SECRETS-COMMITTED one level up: not a provider key but the
+authorization root, and not in a file that can be rotated but in the runtime every chain shares.
+
+Fixed: the privileged gates read `pallet_x3_custody`'s genesis-configured `AuthorizedGateways`
+(`GatewayRole::X3Lang` / `GatewayRole::Settlement`) through a new `EnsureAuthorizedGateway` origin,
+which requires a signature **and** membership. The dev accounts stay as the accounts the dev, local
+and testnet specs name in genesis; staging, testnet and production take
+`X3_{STAGING,TESTNET,PRODUCTION}_ATOMIC_GATEWAYS` and `..._SETTLEMENT_GATEWAYS`, and
+`assert_no_dev_gateway_accounts` refuses the published dev seeds at spec-build time — the guard the
+specs already applied to endowed accounts and authorities, now applied to privilege.
+`spec_version` 19. Evidence: `.ai/reports/gateway-origin-registry-20260923.md`.
+
+**TICKET-105 — the node's default gateway URI is still a public seed.** `AtomicGatewayKey` defaults to
+`//x3-atomic-gateway`, so a live chain that names an operator account in genesis and runs its service
+with the default URI gets a service whose extrinsics are rejected — fail-closed, but silent until an
+operator reads the log. Acceptance: the node refuses to start the atomic service with a published dev
+seed against a live chain id, or says so on one line at startup, and the runbook names
+`--x3-gateway-uri` as required for a live chain.
+
+**TICKET-106 — two e2e files are not test targets.** `tests/e2e/safety_tests.rs` and
+`tests/e2e/real_finality_proofs.rs` sit in the `e2e_tests` workspace member but are not declared in
+`tests/e2e/Cargo.toml`, and `safety_tests.rs` declares `mod mock;` for a file that does not exist, so
+neither can compile. Both drive `finalize_atomic_bundle` with `RuntimeOrigin::signed(1)` — an origin
+this runtime has never accepted — and both assert `Ok`. They read as coverage of the atomic lifecycle
+and provide none. Acceptance: declare them as targets and repair them against the current origin model,
+or delete them and say so in the commit.
+
+**TICKET-097 is not closed by this.** `submit_finalization_result` is still `ensure_none` and never
+consults `X3LangOrigin`, so an anonymous peer can still anchor a certificate it chooses and finalize
+an `Executing` bundle against it. This ticket removes the *key* that made the authorized path
+anybody's; TICKET-097 is the *unsigned* path, and it still needs the executor's attestation or a real
+finality source.
+
 ## GAP-DEAD-ENDPOINT-CONFIG — the RPC endpoint tables no code reads — 2026-09-23
 
 `config/rpc-endpoints.toml` and `infra/mainnet-rpc-endpoints.toml` list a chain, a chain id, a public

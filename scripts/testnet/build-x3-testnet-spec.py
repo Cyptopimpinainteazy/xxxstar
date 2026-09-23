@@ -180,6 +180,15 @@ env["X3_TESTNET_AUTHORITIES"] = json.dumps(aut)
 env["X3_TESTNET_ENDOWED_ACCOUNTS"] = json.dumps(endowed)
 env["X3_TESTNET_COUNCIL_MEMBERS"] = json.dumps(endowed[: max(2, COUNT // 3)])
 env["X3_TESTNET_TREASURY_SIGNERS"] = json.dumps(endowed[: max(2, COUNT // 3)])
+# The runtime grants the atomic kernel's privileged origins only to accounts the
+# chain's genesis names (GAP-GATEWAY-ORIGIN), and `testnet_config()` refuses the
+# published dev seeds. These are generated validator accounts, never a dev phrase;
+# a real operator uses dedicated gateway accounts and points the node's
+# `--x3-gateway-uri` at one.
+env["X3_TESTNET_ATOMIC_GATEWAYS"] = json.dumps([aut[0]["aura"]])
+env["X3_TESTNET_SETTLEMENT_GATEWAYS"] = json.dumps(
+    [aut[1]["aura"] if len(aut) > 1 else aut[0]["aura"]]
+)
 env["X3_EVM_ESCROW_ADDR"] = "0x" + "11" * 20
 env["X3_SVM_ESCROW_ADDR"] = "0x" + "22" * 32
 # A Live spec with no bootNodes cannot start a node at all:

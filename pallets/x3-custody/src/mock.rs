@@ -66,6 +66,30 @@ impl pallet_x3_custody::Config for Test {
     type KeyRotationPeriod = KeyRotationPeriod;
 }
 
+/// Build externalities whose genesis authorizes the given gateway accounts.
+///
+/// `new_test_ext` builds only the frame-system genesis, so the registry starts
+/// empty — which is exactly the posture a chain that named no gateway has, and the
+/// one the origin tests below start from.
+pub fn new_test_ext_with_gateways(
+    x3_lang_gateways: Vec<u64>,
+    settlement_gateways: Vec<u64>,
+) -> sp_io::TestExternalities {
+    let mut storage = frame_system::GenesisConfig::<Test>::default()
+        .build_storage()
+        .unwrap();
+    pallet_x3_custody::GenesisConfig::<Test> {
+        x3_lang_gateways,
+        settlement_gateways,
+        ..Default::default()
+    }
+    .assimilate_storage(&mut storage)
+    .unwrap();
+    let mut ext: sp_io::TestExternalities = storage.into();
+    ext.execute_with(|| System::set_block_number(1));
+    ext
+}
+
 /// Build clean test externalities with block number initialised to 1.
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut ext: sp_io::TestExternalities = frame_system::GenesisConfig::<Test>::default()

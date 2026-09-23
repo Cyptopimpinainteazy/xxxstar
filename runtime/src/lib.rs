@@ -373,7 +373,18 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // parent's timestamp as the median, which is a higher number than Bitcoin's and refused real
     // headers (a regtest chain mined inside one second gives consecutive blocks the same
     // timestamp). No storage change.
-    spec_version: 18,
+    // 19: the privileged origins stop being compiled-in accounts. The atomic kernel's
+    // `X3LangOrigin`/`SettlementOrigin` and the cross-VM router's `X3LangOrigin`/
+    // `VmAdapterOrigin` read `pallet-x3-custody`'s genesis-configured gateway registry
+    // instead of `EnsureSignedBy<X3LangGatewayAccount, _>` /
+    // `EnsureSignedBy<SettlementGatewayAccount, _>`, whose seeds are the public dev
+    // phrases `//x3-atomic-gateway` and `//x3-settlement-gateway`. Two new custody calls
+    // (`authorize_gateway`, `revoke_gateway`), one new storage map, and two new genesis
+    // items; no existing key changes shape, so no migration. A chain whose genesis names
+    // no gateway can no longer assign or finalize a bundle: that is the correct posture
+    // for a chain that has not said who may, and it replaces the previous posture, where
+    // the answer was "whoever read the repository".
+    spec_version: 19,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -1180,13 +1191,21 @@ pub type EnsureRootOrTwoThirdsCouncil = frame_support::traits::EitherOfDiverse<
 pub type EnsureCouncilMember = pallet_collective::EnsureMember<AccountId, CouncilCollective>;
 
 ord_parameter_types! {
-    /// Dedicated runtime account that represents verified x3-lang execution.
+    /// The **development** atomic-gateway account: the sr25519 public key of the
+    /// well-known phrase `//x3-atomic-gateway`, which is also the node's default
+    /// `--x3-gateway-uri`.
     ///
-    /// Cross-VM feature extrinsics are intentionally wired to this account so
-    /// users must enter through x3-lang tooling/runtime instead of calling the
-    /// low-level router and atomic-kernel pallets directly. The account is an
-    /// sr25519 public key whose seed is held by the node's atomic gateway
-    /// service (`//x3-atomic-gateway` by default, overridable via CLI/env).
+    /// Its seed is in this repository, so it is **not** an origin any more. Until
+    /// 2026-09-23 this constant *was* the origin — `X3LangOrigin =
+    /// EnsureSignedBy<X3LangGatewayAccount, _>` — which made every chain this
+    /// runtime builds, the `mainnet-rc1` variant included, hand its atomic kernel,
+    /// cross-VM router and settlement gates to an account anyone can sign as. The
+    /// gates read `pallet_x3_custody::AuthorizedGateways` now, and the dev, local,
+    /// testnet and staging specs name this account explicitly in their genesis. A
+    /// live spec names its own operator account and gets nothing here for free.
+    ///
+    /// Kept because those dev specs endow it, and because the node's
+    /// `AtomicGatewayKey` default derives from the same phrase.
     pub const X3LangGatewayAccount: AccountId = AccountId::new([
         0x4c, 0x81, 0xd4, 0x16, 0xba, 0xa8, 0xc0, 0xe2,
         0xb2, 0xe9, 0x99, 0x77, 0xe4, 0x52, 0x32, 0x87,
@@ -1195,12 +1214,20 @@ ord_parameter_types! {
     ]);
 }
 
-pub type EnsureX3LangGateway = frame_system::EnsureSignedBy<X3LangGatewayAccount, AccountId>;
+/// Origin guard for the x3-lang execution paths: the atomic kernel's `X3LangOrigin`
+/// and the cross-VM router's `X3LangOrigin`/`VmAdapterOrigin`.
+///
+/// Signed **and** authorized for `GatewayRole::X3Lang` in `pallet-x3-custody`'s
+/// genesis-configured registry — not a compiled-in account.
+pub type EnsureX3LangGateway =
+    pallet_x3_custody::EnsureAuthorizedGateway<Runtime, pallet_x3_custody::X3LangGatewayRole>;
 
 ord_parameter_types! {
-    /// Dedicated runtime account for the settlement engine. Separate from the
-    /// X3-lang gateway so that `finalize_with_settlement` cannot be called by
-    /// the gateway. Seed: `//x3-settlement-gateway`.
+    /// The **development** settlement-gateway account (`//x3-settlement-gateway`),
+    /// separate from the x3-lang gateway so that `finalize_with_settlement` cannot
+    /// be called by the same account. Same story as `X3LangGatewayAccount`: a public
+    /// dev seed, kept for dev specs and endowments, and authorized only where a
+    /// chain's genesis says so.
     pub const SettlementGatewayAccount: AccountId = AccountId::new([
         0x46, 0xec, 0x0b, 0x4a, 0x2c, 0x8f, 0x07, 0xe9,
         0x5b, 0x63, 0x71, 0x59, 0x8e, 0x7b, 0x3b, 0x88,
@@ -1209,10 +1236,10 @@ ord_parameter_types! {
     ]);
 }
 
-/// Origin guard for `finalize_with_settlement`: only the settlement pallet's
-/// derived account may invoke this extrinsic.
+/// Origin guard for the settlement paths (`finalize_with_settlement`): signed
+/// **and** authorized for `GatewayRole::Settlement` in the custody registry.
 pub type EnsureSettlementGateway =
-    frame_system::EnsureSignedBy<SettlementGatewayAccount, AccountId>;
+    pallet_x3_custody::EnsureAuthorizedGateway<Runtime, pallet_x3_custody::SettlementGatewayRole>;
 
 pub type CouncilCollective = pallet_collective::Instance1;
 impl pallet_collective::Config<CouncilCollective> for Runtime {

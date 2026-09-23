@@ -24,11 +24,11 @@
 //! 21. rotate_validator_key — late rotation grants a fresh, future due block
 
 use crate::{
-    mock::{new_test_ext, RuntimeOrigin, System, Test, X3Custody},
+    mock::{new_test_ext, new_test_ext_with_gateways, RuntimeOrigin, System, Test, X3Custody},
     pallet::{CustodyMap, KeyRotationSchedule, SignerLimits, ValidatorKeyRegistry},
-    AuthorizationTier, Error, KeyRole, SignerPolicy,
+    AuthorizationTier, Error, GatewayRole, KeyRole, SignerPolicy,
 };
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{assert_noop, assert_ok, traits::EnsureOrigin};
 
 const ALICE: u64 = 1;
 const BOB: u64 = 2;
@@ -603,6 +603,125 @@ fn test_signer_deactivated_event_emitted() {
                 signer: ALICE,
             }
             .into(),
+        );
+    });
+}
+
+// ── Gateway authorization (TICKET-105) ────────────────────────────────────────
+//
+// The atomic kernel's `X3LangOrigin`/`SettlementOrigin` and the cross-VM router's
+// `X3LangOrigin` are `EnsureAuthorizedGateway` over this storage. Before these
+// existed the origins were `EnsureSignedBy<X3LangGatewayAccount, _>`, whose seed is
+// the public phrase `//x3-atomic-gateway` — so the tests that matter here are the
+// ones that show membership is the only way through, and that an empty registry
+// admits nobody.
+
+type X3LangGate = crate::EnsureAuthorizedGateway<Test, crate::X3LangGatewayRole>;
+type SettlementGate = crate::EnsureAuthorizedGateway<Test, crate::SettlementGatewayRole>;
+
+#[test]
+fn genesis_authorizes_exactly_the_named_gateways() {
+    new_test_ext_with_gateways(vec![ALICE], vec![BOB]).execute_with(|| {
+        assert!(X3Custody::is_gateway_authorized(
+            GatewayRole::X3Lang,
+            &ALICE
+        ));
+        assert!(!X3Custody::is_gateway_authorized(GatewayRole::X3Lang, &BOB));
+        assert!(X3Custody::is_gateway_authorized(
+            GatewayRole::Settlement,
+            &BOB
+        ));
+        assert!(!X3Custody::is_gateway_authorized(
+            GatewayRole::Settlement,
+            &ALICE
+        ));
+    });
+}
+
+#[test]
+fn an_empty_registry_admits_nobody() {
+    new_test_ext().execute_with(|| {
+        assert!(X3LangGate::ensure_origin(RuntimeOrigin::signed(ALICE)).is_err());
+        assert!(SettlementGate::ensure_origin(RuntimeOrigin::signed(ALICE)).is_err());
+    });
+}
+
+#[test]
+fn a_gateway_origin_admits_only_the_authorized_account() {
+    new_test_ext_with_gateways(vec![ALICE], vec![]).execute_with(|| {
+        assert_eq!(
+            X3LangGate::ensure_origin(RuntimeOrigin::signed(ALICE)).ok(),
+            Some(ALICE)
+        );
+        assert!(X3LangGate::ensure_origin(RuntimeOrigin::signed(BOB)).is_err());
+    });
+}
+
+#[test]
+fn a_role_grants_only_its_own_gate() {
+    new_test_ext_with_gateways(vec![ALICE], vec![BOB]).execute_with(|| {
+        assert!(SettlementGate::ensure_origin(RuntimeOrigin::signed(ALICE)).is_err());
+        assert!(X3LangGate::ensure_origin(RuntimeOrigin::signed(BOB)).is_err());
+    });
+}
+
+#[test]
+fn an_unsigned_origin_never_passes_a_gate() {
+    new_test_ext_with_gateways(vec![ALICE], vec![BOB]).execute_with(|| {
+        assert!(X3LangGate::ensure_origin(RuntimeOrigin::none()).is_err());
+        assert!(X3LangGate::ensure_origin(RuntimeOrigin::root()).is_err());
+        assert!(SettlementGate::ensure_origin(RuntimeOrigin::none()).is_err());
+    });
+}
+
+#[test]
+fn authorize_gateway_requires_governance() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            X3Custody::authorize_gateway(RuntimeOrigin::signed(ALICE), GatewayRole::X3Lang, BOB),
+            sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+#[test]
+fn authorize_gateway_grants_and_refuses_a_duplicate() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(X3Custody::authorize_gateway(
+            RuntimeOrigin::root(),
+            GatewayRole::X3Lang,
+            ALICE
+        ));
+        assert!(X3LangGate::ensure_origin(RuntimeOrigin::signed(ALICE)).is_ok());
+        assert_noop!(
+            X3Custody::authorize_gateway(RuntimeOrigin::root(), GatewayRole::X3Lang, ALICE),
+            Error::<Test>::GatewayAlreadyAuthorized
+        );
+    });
+}
+
+#[test]
+fn revoke_gateway_takes_the_privilege_back() {
+    new_test_ext_with_gateways(vec![ALICE], vec![]).execute_with(|| {
+        assert_ok!(X3Custody::revoke_gateway(
+            RuntimeOrigin::root(),
+            GatewayRole::X3Lang,
+            ALICE
+        ));
+        assert!(X3LangGate::ensure_origin(RuntimeOrigin::signed(ALICE)).is_err());
+        assert_noop!(
+            X3Custody::revoke_gateway(RuntimeOrigin::root(), GatewayRole::X3Lang, ALICE),
+            Error::<Test>::GatewayNotAuthorized
+        );
+    });
+}
+
+#[test]
+fn revoke_gateway_requires_governance() {
+    new_test_ext_with_gateways(vec![ALICE], vec![]).execute_with(|| {
+        assert_noop!(
+            X3Custody::revoke_gateway(RuntimeOrigin::signed(BOB), GatewayRole::X3Lang, ALICE),
+            sp_runtime::DispatchError::BadOrigin
         );
     });
 }
