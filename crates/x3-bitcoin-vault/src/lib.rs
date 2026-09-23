@@ -463,9 +463,13 @@ impl BtcVault {
     /// is checked against that block's merkle root (`verify_merkle_proof`). Only
     /// then does the deposit move on to signer approval — the previous code
     /// advanced on `!spv_proof.is_empty()`.
+    /// `tx_index` is the deposit transaction's position in its block's merkle tree. It is part of
+    /// the proof, not an optimisation: without it the walk cannot know which sibling comes first
+    /// (see `verify_merkle_proof`), so it is required rather than defaulted.
     pub fn verify_deposit_spv(
         &mut self,
         index: usize,
+        tx_index: u32,
         headers: &[&[u8]],
         merkle_proof: &[u8],
     ) -> Result<(), BtcVaultError> {
@@ -484,7 +488,7 @@ impl BtcVault {
         let tip_raw = *headers.last().ok_or(BtcVaultError::SpvVerificationFailed)?;
         let tip =
             BitcoinBlockHeader::parse(tip_raw).map_err(|_| BtcVaultError::SpvVerificationFailed)?;
-        if !verify_merkle_proof(&txid, &tip.merkle_root, merkle_proof) {
+        if !verify_merkle_proof(&txid, tx_index, &tip.merkle_root, merkle_proof) {
             return Err(BtcVaultError::SpvVerificationFailed);
         }
 
@@ -787,7 +791,24 @@ pub fn verify_block_header_chain(headers: &[&[u8]]) -> Result<u64, &'static str>
     Ok(headers.len() as u64)
 }
 
-pub fn verify_merkle_proof(txid: &[u8; 32], merkle_root: &[u8; 32], proof: &[u8]) -> bool {
+/// Verify that `txid` is the transaction at `tx_index` of a block whose merkle root is
+/// `merkle_root`, given the sibling hashes from the leaf to the root.
+///
+/// **The index is not optional.** Bitcoin's tree concatenates a node with its sibling in the order
+/// the *position* dictates: the left child first, the right child second, at every level, with the
+/// position read from the low bits of the index. An earlier version of this function had no index
+/// and instead put whichever hash was numerically smaller first: that is a different tree. It
+/// happened to accept the leftmost transaction whenever the leaf was the smaller of the two (which
+/// is all its tests covered), and it rejected valid proofs for every other position — the same
+/// defect `x3-settlement-engine` fixed as C-009, still live here because nothing had ever shown the
+/// two implementations the same block. `verify_merkle_proof_agrees_with_settlement_engine` in that
+/// pallet is what shows it now.
+pub fn verify_merkle_proof(
+    txid: &[u8; 32],
+    tx_index: u32,
+    merkle_root: &[u8; 32],
+    proof: &[u8],
+) -> bool {
     if proof.is_empty() {
         return txid == merkle_root;
     }
@@ -796,10 +817,12 @@ pub fn verify_merkle_proof(txid: &[u8; 32], merkle_root: &[u8; 32], proof: &[u8]
     }
 
     let mut hash = *txid;
+    let mut index = tx_index;
     for chunk in proof.chunks(32) {
         let mut sibling = [0u8; 32];
         sibling.copy_from_slice(chunk);
-        let combined = if hash <= sibling {
+        // Even index: this node is a left child, so it comes first. Odd: it is a right child.
+        let combined = if index.is_multiple_of(2) {
             [hash.as_slice(), sibling.as_slice()].concat()
         } else {
             [sibling.as_slice(), hash.as_slice()].concat()
@@ -811,6 +834,7 @@ pub fn verify_merkle_proof(txid: &[u8; 32], merkle_root: &[u8; 32], proof: &[u8]
             out.copy_from_slice(&h2);
             out
         };
+        index /= 2;
     }
     hash == *merkle_root
 }
@@ -994,13 +1018,13 @@ mod tests {
 
         // SPV needs a real proof-of-work block, not a non-empty blob.
         assert_eq!(
-            vault.verify_deposit_spv(0, &[[0u8; 80].as_slice()], &[]),
+            vault.verify_deposit_spv(0, 0, &[[0u8; 80].as_slice()], &[]),
             Err(BtcVaultError::SpvVerificationFailed)
         );
 
         let header = header_containing(vault.pending_deposits[0].txid);
         vault
-            .verify_deposit_spv(0, &[header.as_slice()], &[])
+            .verify_deposit_spv(0, 0, &[header.as_slice()], &[])
             .unwrap();
         let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
         let deposit = vault.pending_deposits[0].clone();
@@ -1142,7 +1166,7 @@ mod tests {
             .record_confirmations(0, min_confirmations)
             .expect("observed confirmations are accepted");
         vault
-            .verify_deposit_spv(0, &[header.as_slice()], &[])
+            .verify_deposit_spv(0, 0, &[header.as_slice()], &[])
             .expect("mined header + inclusion proof verifies");
     }
 
@@ -1176,7 +1200,7 @@ mod tests {
     fn test_merkle_proof() {
         let txid = [1u8; 32];
         let merkle_root = txid;
-        assert!(verify_merkle_proof(&txid, &merkle_root, &[]));
+        assert!(verify_merkle_proof(&txid, 0, &merkle_root, &[]));
 
         let sibling = [2u8; 32];
         let combined = [txid.as_slice(), sibling.as_slice()].concat();
@@ -1184,7 +1208,36 @@ mod tests {
         let h2 = Sha256::digest(h1);
         let mut root = [0u8; 32];
         root.copy_from_slice(&h2);
-        assert!(verify_merkle_proof(&txid, &root, &sibling));
+        assert!(verify_merkle_proof(&txid, 0, &root, &sibling));
+    }
+
+    #[test]
+    fn merkle_proof_is_position_aware_not_value_sorted() {
+        // A two-leaf tree whose left leaf is numerically *larger* than its sibling. The previous
+        // walk put whichever hash was smaller first, so it could not reconstruct this root from
+        // index 0 — and it would "verify" index 1 against a tree that is not this one.
+        let left = [0xffu8; 32];
+        let right = [0x01u8; 32];
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&left);
+        combined.extend_from_slice(&right);
+        let h1 = Sha256::digest(&combined);
+        let h2 = Sha256::digest(h1);
+        let mut root = [0u8; 32];
+        root.copy_from_slice(&h2);
+
+        assert!(
+            verify_merkle_proof(&left, 0, &root, &right),
+            "at index 0 the node comes first, whatever the bytes compare like"
+        );
+        assert!(
+            verify_merkle_proof(&right, 1, &root, &left),
+            "at index 1 the sibling comes first"
+        );
+        assert!(
+            !verify_merkle_proof(&left, 1, &root, &right),
+            "the same leaf, root and sibling at the wrong position is not in this tree"
+        );
     }
 
     #[test]
@@ -1424,7 +1477,7 @@ mod tests {
         //    `spv_proof` blob submitted above as verification.
         let header = header_containing(deposit_txid);
         vault
-            .verify_deposit_spv(0, &[header.as_slice()], &[])
+            .verify_deposit_spv(0, 0, &[header.as_slice()], &[])
             .unwrap();
         assert_eq!(
             vault.pending_deposits[0].status,

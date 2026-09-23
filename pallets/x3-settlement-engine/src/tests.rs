@@ -4827,3 +4827,96 @@ fn a_batch_larger_than_the_bound_is_refused() {
         );
     });
 }
+
+// ── Three implementations, one byte order ─────────────────────────────────────
+//
+// The pallet, `x3-bitcoin-vault` and `x3-crosschain-intent` each hash a Bitcoin header, and only
+// the pallet's is on the runtime path — but a proof built by one and checked by another crosses
+// the boundary, and byte order is where Bitcoin code goes wrong: the digest is one order and the
+// hash a block explorer prints is its reverse. This test pins all three to the same bytes, on a
+// header a real Bitcoin node produced, so a change in any of them fails here instead of silently
+// invalidating the others' proofs.
+
+#[test]
+fn the_three_bitcoin_header_implementations_agree() {
+    use x3_bitcoin_vault::BitcoinBlockHeader as VaultHeader;
+
+    let wire = unhex(regtest_capture::HEADER_HEX);
+    let header = header_from_wire(regtest_capture::HEADER_HEX, regtest_capture::HEIGHT);
+
+    // 1. the pallet
+    let pallet_hash = Pallet::<Test>::compute_btc_block_hash(&header);
+
+    // 2. the vault
+    let vault_hash = VaultHeader::parse(&wire)
+        .expect("80 wire bytes")
+        .block_hash();
+
+    // 3. the cross-chain intent crate (a runtime-path dependency of this pallet)
+    let prev: [u8; 32] = header
+        .prev_block_hash
+        .as_bytes()
+        .try_into()
+        .expect("H256 is 32 bytes");
+    let root: [u8; 32] = header
+        .merkle_root
+        .as_bytes()
+        .try_into()
+        .expect("H256 is 32 bytes");
+    let intent_hash = x3_crosschain_intent::proof::BtcBlockHeader {
+        version: header.version,
+        prev_blockhash: prev,
+        merkle_root: root,
+        timestamp: header.timestamp,
+        bits: header.bits,
+        nonce: header.nonce,
+    }
+    .hash();
+
+    assert_eq!(
+        pallet_hash.as_bytes(),
+        &vault_hash,
+        "settlement-engine and x3-bitcoin-vault must return the same 32 bytes for one header"
+    );
+    assert_eq!(
+        pallet_hash.as_bytes(),
+        &intent_hash,
+        "and x3-crosschain-intent must return the same bytes as both"
+    );
+
+    // The agreed bytes are the **wire (internal)** order — the reverse of the hash an explorer
+    // shows, and the order a header's `prev_blockhash` field carries. This is the distinction the
+    // intent crate's doc comment used to get wrong, so it is asserted in both directions.
+    assert_eq!(
+        pallet_hash,
+        display_hash_to_internal(regtest_capture::BLOCK_HASH_DISPLAY),
+        "the agreed bytes are the wire order for this block"
+    );
+    let display_bytes = unhex(regtest_capture::BLOCK_HASH_DISPLAY);
+    assert_ne!(
+        pallet_hash.as_bytes(),
+        display_bytes.as_slice(),
+        "and they are not the display order — which is exactly the confusion to prevent"
+    );
+
+    // And the merkle walk agrees too: the pallet's direction-aware walk against the vault's.
+    let txid = display_hash_to_internal(regtest_capture::TXID_DISPLAY);
+    let path: Vec<H256> = regtest_capture::MERKLE_PATH_HEX
+        .iter()
+        .map(|p| H256::from_slice(&unhex(p)))
+        .collect();
+    assert!(
+        Pallet::<Test>::verify_btc_merkle_proof(&txid, regtest_capture::TX_INDEX, &path, &header)
+            .expect("the merkle walk is infallible for a well-formed path"),
+        "the pallet reconstructs the root"
+    );
+    let mut flat: Vec<u8> = Vec::with_capacity(path.len() * 32);
+    for sibling in &path {
+        flat.extend_from_slice(sibling.as_bytes());
+    }
+    let txid_bytes: [u8; 32] = txid.as_bytes().try_into().expect("H256 is 32 bytes");
+    assert!(
+        x3_bitcoin_vault::verify_merkle_proof(&txid_bytes, regtest_capture::TX_INDEX, &root, &flat),
+        "and the vault does too, from the same txid, the same position and the same siblings"
+    );
+}
