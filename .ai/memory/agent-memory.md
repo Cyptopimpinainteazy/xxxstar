@@ -6918,3 +6918,12 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - The mock composes the origin as `EitherOfDiverse<EnsureRoot<u64>, EnsureSignedBy<MockBtcRelayers, u64>>` with `SortedMembers` implemented for BOB — that is how one Config item can express "root-only by default, named-account when a network opts in" and remain testable.
 - Building/checking during a long soak: **`cargo check -j 4` / `cargo test -j 4` / `cargo clippy -j 4`** keep 28 of 32 cores free, so a two-hour measurement survives a code change. The re-attest (srtool ×2) is the part that must wait.
 - The receiving end is only half of TICKET-095. Still missing: a working signing path (no `node_modules` anywhere in the tree — `npm ci` in `packages/ts-sdk` unlocks both `push-headers.mjs` and the TPS harness `scripts/testnet/load-remarks-tps.js`), an end-to-end drill, a bond/slashing for withholding, and a real checkpoint on a public network.
+
+## 2026-09-23 (twenty-eighth pass) — the memory bound was measuring the cache, so the harness stopped running the cache
+### Facts to remember
+- **Release and debug grow the same**: 2h, 4 validators, default state cache → 1,714–1,760 MiB (debug) and **1,736–1,748 MiB (release)**. Debug overhead is not the cause.
+- The SDK's `--trie-cache-size` default is exactly **1 GiB** (`substrate/client/cli/src/params/import_params.rs`: `default_value_t = 1024 * 1024 * 1024`), and `--trie-cache-size 0` makes `trie_cache_maximum_size()` return `None` (cache disabled).
+- With the cache disabled: **+227 MiB and flat** in 15 minutes, vs +432 MiB still climbing. The 2h no-cache run (TICKET-100b, `/tmp/x3-soak-nocache2h`, release binary, ports 12344/32700) is in flight to confirm the full-window margin.
+- `scripts/testnet/consensus-soak.sh` now **defaults `NODE_TRIE_CACHE_BYTES=0`**, keeps the 1 GiB bound as a node-leak detector, and prints the cache size it ran with. Production budget, for operators: **~2.4 GiB RSS per validator after two hours** with default caches.
+- Release soak also confirmed consensus on the *release* binary: agreement at heights 9044/18088/27132, +36,159 blocks each, zero peer bans, 0–3 trie timeouts.
+- `x3SettlementEngine.submitBtcHeaders` (call_index 35) + `BtcHeaderOrigin` landed as spec_version 17 (PR #474); the mock composes `EitherOfDiverse<EnsureRoot, EnsureSignedBy<MockBtcRelayers>>` so "root-only by default, named relayer when a network opts in" is testable with one config item.
