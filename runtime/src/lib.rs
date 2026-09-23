@@ -367,7 +367,13 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // A testnet or mainnet that runs one points that item at the origin it trusts; the
     // admission rules do not change, because it decides who may speak, never what is
     // true. No storage migration: one new item, no existing key changes shape.
-    spec_version: 17,
+    // 18: the BTC median-time-past rule is Bitcoin's, not stricter. With fewer than eleven
+    // ancestors on the chain — the first eleven headers above a checkpoint — the median cannot be
+    // computed from stored history, and the pallet now skips the check instead of using the
+    // parent's timestamp as the median, which is a higher number than Bitcoin's and refused real
+    // headers (a regtest chain mined inside one second gives consecutive blocks the same
+    // timestamp). No storage change.
+    spec_version: 18,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
