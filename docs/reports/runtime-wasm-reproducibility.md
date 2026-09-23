@@ -90,6 +90,12 @@ bytes**:
 * `5ec1b61576` — formatting only, and the hashes did not move: collapsing a multi-line `ensure!` into
   one line leaves the macro's `file:line` where it was, so this is the first revision in this list
   whose bytes are identical to its predecessor's. `recorded_revision` moved; nothing else did.
+* `7ea1819169` — Bitcoin merkle verification in `x3-bitcoin-vault` becomes position-aware, and the
+  pallet's tests now compare all three implementations on one real regtest block. The hashes are
+  again identical to the previous revision's: the vault is a *dev*-dependency of the pallet, and the
+  intent crate's change is a doc comment, so nothing the runtime instantiates moved. Two revisions
+  in a row where only `recorded_revision` changes is worth noticing: it means the gate is measuring
+  what it claims to measure rather than reacting to any edit in the graph.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that

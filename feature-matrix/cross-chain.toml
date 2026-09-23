@@ -48,7 +48,7 @@ blockers = [
   "No live Bitcoin run beyond regtest: the script builder, the merkle walk and the header chain are now exercised against a real regtest node's blocks (block 121's header, its merkle path and a confirmed transaction), and a dev chain can be born anchored on that block, but nothing has run against testnet or mainnet",
   "The header chain the SPV check reads now bootstraps from a governance-anchored checkpoint (`anchor_btc_checkpoint`, spec_version 14) and extends only under Bitcoin's height/difficulty/timestamp rules, but no chain has anchored one yet, so the path is fail-closed and unexercised end to end",
   "No signer quorum for withdrawals; no external audit",
-  "Three SPV implementations exist — this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` — and only the pallet's is on the runtime path; they agree on the wire layout after the 2026-09-22 fix, but consolidating them would remove a standing drift risk",
+  "Three SPV implementations still exist — this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` — and only the pallet's is on the runtime path. They are now *tested against each other* on a real regtest block (`the_three_bitcoin_header_implementations_agree`), which is how the vault's merkle walk was found to be verifying a different tree (it ordered each pair by byte value instead of by the transaction's position, and is now position-aware). Consolidating them into one would remove the drift risk rather than detect it",
 ]
 # The old note said "proof verification was placeholder". Half true, and the wrong
 # half mattered: the txid and merkle checks were real, but the proof-of-work check
