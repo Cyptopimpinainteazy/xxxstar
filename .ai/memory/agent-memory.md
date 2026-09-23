@@ -6911,3 +6911,10 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Still unverified and left alone: X3-LANG-004/009/010, X3-XCHAIN-013/015/018/020/021 — no named test confirmed on master.
 - TICKET-101 covers **seventeen** rows, not thirteen (I wrote the wrong count in the ledger and corrected it).
 - Patching TOML with Python: a bare `HOSTED,` inside a replacement string is literal text, not interpolation — it produced `Invalid value` at parse time, caught immediately by `tomllib`. Parse the file after every scripted edit.
+
+## 2026-09-22 (twenty-seventh pass) — the BTC header path gets a receiving end
+### Facts to remember
+- **`x3SettlementEngine.submitBtcHeaders` exists as of spec_version 17** (call_index 35): up to `MAX_BTC_HEADERS_PER_CALL = 100` headers, origin = `Config::BtcHeaderOrigin` (runtime sets `EnsureRoot`; a network can name a relayer/multisig/governance), atomic via `with_storage_layer`, and every header still goes through `btc_admit_header`. Four tests: ordinary account refused; root **and** the designated relayer accepted with metas anchored at derived heights; a batch failing partway rolls back (asserted on `BtcBestHeight` and absent metas); over-bound refused. **156 + 23 tests pass.**
+- The mock composes the origin as `EitherOfDiverse<EnsureRoot<u64>, EnsureSignedBy<MockBtcRelayers, u64>>` with `SortedMembers` implemented for BOB — that is how one Config item can express "root-only by default, named-account when a network opts in" and remain testable.
+- Building/checking during a long soak: **`cargo check -j 4` / `cargo test -j 4` / `cargo clippy -j 4`** keep 28 of 32 cores free, so a two-hour measurement survives a code change. The re-attest (srtool ×2) is the part that must wait.
+- The receiving end is only half of TICKET-095. Still missing: a working signing path (no `node_modules` anywhere in the tree — `npm ci` in `packages/ts-sdk` unlocks both `push-headers.mjs` and the TPS harness `scripts/testnet/load-remarks-tps.js`), an end-to-end drill, a bond/slashing for withholding, and a real checkpoint on a public network.

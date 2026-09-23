@@ -103,6 +103,30 @@ header, boots a node, reads `BtcCheckpoints` / `BtcHeaderMetaStore` / `BtcBestHe
 over RPC, requires the chain to keep authoring, and requires a spec whose checkpoint is not
 a mined header to be refused. Run it after changing anything here.
 
+### Making the chain follow Bitcoin (a header relayer)
+
+An anchor is a starting point, not a subscription: until something pushes headers, the chain's
+view of Bitcoin stops at the checkpoint and no later deposit can be proven. The receiving end is
+`x3SettlementEngine.submitBtcHeaders(headers)` — call_index 35, up to 100 headers per call, atomic
+(a batch refused at header *k* applies nothing) — and the sender is
+`scripts/btc/push-headers.mjs`, which reads headers from a local Bitcoin node, checks the chain of
+them itself, and submits them.
+
+Who may submit is `x3SettlementEngine`'s `BtcHeaderOrigin` config item. This runtime sets
+`EnsureRoot`, so the path is root-only: on a dev chain that means `sudo.sudo(...)`, and on a
+network with governance it means a governance motion. To run a relayer service, point that item at
+the origin you trust — `EnsureSignedBy<BtcRelayerAccount, AccountId>`, a multisig, or a proxy — and
+nothing about the receiving rules changes, because the item decides who may **speak**, never what is
+**true**: every header still has to satisfy proof of work under this network's `powLimit`, link to
+an admitted header, carry its parent's `nBits` for its height, and postdate the median of its
+ancestors.
+
+What that means in practice: a Byzantine relayer cannot mint Bitcoin. It can **withhold** headers
+(the chain stops advancing — a liveness problem) or push a branch that satisfies the rules (which
+the checkpoint and the 4× retarget clamp make expensive). The bond and the slashing that price
+withholding are not written yet — TICKET-095 — so run one relayer you control, and expect that to
+be a single point of failure until there are several.
+
 ## 4. Start each validator
 
 On the host that will run validator *n*: copy the spec, its `validator-n.suri` and
