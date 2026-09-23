@@ -159,6 +159,36 @@ fn account_from_public(public: sp_core::sr25519::Public) -> AccountId {
     <Signature as Verify>::Signer::from(public).into_account()
 }
 
+/// Seeds that are published in this repository, and therefore are not secrets.
+///
+/// The node's atomic service signs `assign_bundle_executor`, `finalize_atomic_bundle` and the rest of
+/// the atomic-kernel surface. A chain only accepts those calls from the accounts its genesis
+/// authorizes (spec 19 on), so a live chain running this service with a published seed gets its
+/// extrinsics rejected — fail-closed, but the operator has no idea why unless the node says so
+/// (TICKET-105). It says so now, and refuses to start the service at all.
+pub const PUBLISHED_DEV_SEEDS: &[&str] = &[
+    "//x3-atomic-gateway",
+    "//x3-settlement-gateway",
+    "//Alice",
+    "//Bob",
+    "//Charlie",
+    "//Dave",
+    "//Eve",
+    "//Ferdie",
+];
+
+/// The published development seed `uri` is, if it is one.
+///
+/// The comparison is exact after trimming: `//x3-atomic-gateway-something` is a different (and
+/// possibly secret) URI, and refusing it would be wrong.
+pub fn published_dev_seed(uri: &str) -> Option<&'static str> {
+    let trimmed = uri.trim();
+    PUBLISHED_DEV_SEEDS
+        .iter()
+        .copied()
+        .find(|seed| *seed == trimmed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,6 +196,22 @@ mod tests {
 
     fn gateway() -> AtomicGatewayKey {
         AtomicGatewayKey::from_uri("//x3-atomic-gateway").expect("well-known dev key loads")
+    }
+
+    #[test]
+    fn published_dev_seeds_are_recognised_and_nothing_else_is() {
+        assert_eq!(
+            published_dev_seed("//x3-atomic-gateway"),
+            Some("//x3-atomic-gateway")
+        );
+        assert_eq!(published_dev_seed("  //Alice  "), Some("//Alice"));
+        // A longer URI is a different account, and may be the operator's own secret.
+        assert_eq!(published_dev_seed("//x3-atomic-gateway-prod"), None);
+        assert_eq!(
+            published_dev_seed("//OperatorGateway"),
+            None,
+            "an operator's own phrase is not a published seed"
+        );
     }
 
     #[test]

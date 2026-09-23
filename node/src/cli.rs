@@ -104,9 +104,10 @@ pub struct NodeFeatureFlags {
 
     /// Sr25519 secret URI for the X3-lang atomic gateway account.
     ///
-    /// Required when `--enable-atomic-kernel` is set. Defaults to
-    /// `//x3-atomic-gateway` for dev chains; also honored from the
-    /// `X3_ATOMIC_GATEWAY_URI` environment variable.
+    /// **Required** when `--enable-atomic-kernel` is set: there is no default. The chain only accepts
+    /// atomic calls from the accounts its genesis authorizes, so this has to name one of them. The
+    /// published development seeds are refused on a live chain rather than silently signing
+    /// transactions the runtime will reject. Also honored from `X3_ATOMIC_GATEWAY_URI`.
     #[arg(long, value_name = "SURI")]
     pub atomic_gateway_uri: Option<String>,
 
