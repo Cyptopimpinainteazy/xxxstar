@@ -6983,3 +6983,37 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - `submit_finalization_result` now has **five tests** (it had none): pending refusal, unanchored-certificate refusal, the receipt-root commitment (wrong refused / right accepted / status `Finalized` / PoAE stored), finalization-once (refused on **status**, not `ProofAlreadyExists`, because the status check runs first), and `an_unsigned_finalization_cannot_be_attributed_to_the_executor` — the hole asserted as today's behaviour so closing it must change the test.
 - The kernel's `codec` name is `parity_scale_codec` (not `codec`), and `ReceiptRootData` is `#[derive(Encode)]` inside `pub mod pallet` → `crate::ReceiptRootData`.
 - `pallet-x3-atomic-kernel` **is** in the runtime graph, so this change needs a re-attestation.
+
+## 2026-09-23 (thirty-sixth pass) — the paid endpoint drill, and the endpoint table nothing reads
+### Facts to remember
+- **The operator's paid DRPC endpoints are still not on this box.** No `~/.x3-provider-keys`, no
+  `DRPC_API_KEY` anywhere in the environment (checked 05:00–06:00 MDT). The host *can* reach
+  `lb.drpc.org`, and a placeholder key gets DRPC's own `Your token is invalid or expired`, so the
+  path works end to end and the key is the only missing piece.
+- **New: `scripts/drills/provider-endpoint-drill.sh`, run as `make provider-drill`.** Per network it
+  requires (1) `eth_chainId` to equal the chain the repository believes that network is, from *both*
+  the paid endpoint and a keyless public one, (2) the **same block hash at head − 64** from both,
+  and (3) a receipt with `status == 0x1` naming that block, reported by both. Evidence lands in
+  `.ai/reports/provider-endpoint-<utc>.json`. The key is never printed and never written — endpoints
+  are printed with it redacted. Exit 2 when no key is configured, so a missing key cannot look green.
+- **`--paid-url-template` with no `{key}` in it needs no key**, which is how the drill was validated
+  before the operator's key existed: `base.publicnode.com` against `mainnet.base.org` agreed on
+  chain `0x2105`, block `51677151` and receipt `status 0x1` for the same transaction. Two independent
+  providers agreeing on one block is the property the paid endpoint is bought for.
+- **A free endpoint that refuses archive reads is caught rather than excused**: `base.publicnode.com`
+  answered the block but answered the receipt with `Archive requests require a personal token`. The
+  drill reports the provider's own words and fails that network.
+- **`config/rpc-endpoints.toml` and `infra/mainnet-rpc-endpoints.toml` have no reader at all**
+  (TICKET-104). Its header says to set `X3_CHAIN_RPC_<NAME>`, its rows declare `X3_RPC_<NAME>`, and
+  neither name is consulted anywhere; the only runtime `toml::from_str` in the workspace is the
+  feature registry and flags in `x3-readiness`. An operator dropping a paid URL in that file changes
+  nothing. The paid path that *does* exist is `ProviderCredentials::from_env()` →
+  `EnvConfig::from_env()`, which reads `X3_NETWORK` and promotes DRPC/Alchemy/Ankr ahead of the
+  keyless list for the five networks it names.
+- **Re-attestation for `0d296d236b`: the bytes moved this time** (compact the same 8,474,849 bytes
+  with a different `setCode`; compressed 1,453,609, was 1,453,670), because
+  `pallet-x3-atomic-kernel` is in the runtime graph. `spec_version` stays at 18 — every reachable
+  call accepts and refuses what it did before. Merged as PR #486; `origin/master` is `7cd788a68d`.
+- `apply_patch` fails intermittently in this sandbox (`bubblewrap … mountinfo path is not absolute`)
+  even with escalation. Scripted `python3` edits plus `bash -n` / `jq` / `git diff --check` afterwards
+  work every time.
