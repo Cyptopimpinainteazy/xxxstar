@@ -96,6 +96,15 @@ bytes**:
   intent crate's change is a doc comment, so nothing the runtime instantiates moved. Two revisions
   in a row where only `recorded_revision` changes is worth noticing: it means the gate is measuring
   what it claims to measure rather than reacting to any edit in the graph.
+* `0d296d236b` — the atomic kernel's `do_finalize_bundle` requires the bundle to be `Executing`
+  instead of accepting a `Pending` one and leaving the refusal to `verify_bundle_consistency` two
+  checks later, and five tests now cover the finalization entry point (the alarm TICKET-097 has to
+  change). **The bytes move again**: the pallet is instantiated by the runtime, so this is not a
+  dev-dependency revision. `spec_version` deliberately stays at 18 — every reachable call accepts
+  and refuses exactly what it did before, a `Pending` bundle being refused both before and after,
+  only earlier and with a different error code, and no state transition changes. Two from-scratch
+  builds of `0d296d236b` agree: compact 8,474,849 bytes (same size as the previous revision,
+  different bytes) and compressed 1,453,609.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
@@ -126,19 +135,19 @@ other values below.
 ```
 Version          : x3-chain-18 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0x7888652d60af538d393bbb06a78cc6584a2f767de80dc2e37661d9dc3e6b7b09
-authorizeUpgrade : 0xf9ec531ca25b0a47d599e29854c9f2769ef1161e0b83b202bdb8794b09275cdd
-IPFS             : QmbiZyen87uV7rvvAZsaFEyKedn3LTJHsyJjYZkEqoePaG
-BLAKE2_256       : 0x980b95d5663b79912768e56f31afd904b11cf44201592c8181272ebd9cfed619
+setCode          : 0x678abec69f30bd5fd2a5afc296b482cb14fcc7738c8109b39fcde80b0efc9b36
+authorizeUpgrade : 0x48640b791bff46e897b15e2de521ed271cb9c51d5ad82fb985de7f8a01b6be40
+IPFS             : Qmf2FBS65ayur4Udb4hwQr7Dee7NoZDGZuKAY2V2ywKSwN
+BLAKE2_256       : 0xd62665d003f586565013cfaa1e6a6abfa58796c201d3c8225f1e798e1f44338c
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,453,670 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,453,609 bytes)**
 
 ```
-setCode          : 0xa687f0b21030eca6b294e57c4759f53e73c9d1d337efae09dec910012604fca5
-authorizeUpgrade : 0x02dc99ff6ff055e9f9a1c175ca34a8f009df0e0716fd821a683d1370a7cc91f7
-IPFS             : QmdAzPNXMMN6GWFtP3aAineACtvLMhRCa4yaciNaHpJRdz
-BLAKE2_256       : 0x094e3718f6ad0501a6ac7501039cfd066a9d091733494d1c6af6200d8951b984
+setCode          : 0xe55c4a202972f640a47b1960551bf83a757d2e1211a32fc7c43071d183c76344
+authorizeUpgrade : 0x9b7ab954b0b5ab89668378bdcfa6dc5065b5e094e9b0cbc69a33a89005df0806
+IPFS             : QmZka2CcEDNfCzofLMGeqdHVWMiUsJuvJtwH1UH6JWcfpP
+BLAKE2_256       : 0xc6bbd66a4d1de9c48e1ab3009c3fc468a5869916d797b9457236d6e12225eb07
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the
