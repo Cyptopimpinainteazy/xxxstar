@@ -12716,6 +12716,7 @@ dependencies = [
  "sp-std 14.0.0",
  "x3-asset-kernel-types",
  "x3-atomic-swap",
+ "x3-bitcoin-vault",
  "x3-crosschain-intent",
  "x3-verification-router",
 ]
