@@ -5,6 +5,9 @@
 //! transaction pool.
 
 use crate::atomic_gateway::AtomicGatewayKey;
+use crate::finality_certs::{
+    decide_finalization_cert, FinalizationCertificate, ObservedFinalityCerts,
+};
 use crate::service::FullClient;
 use atomic_swap_orchestrator::{
     kernel_compatible_receipt_root, AtomicExecutionRequest, AtomicLegExecution, KernelBundleLeg,
@@ -65,12 +68,19 @@ pub struct AtomicGatewayService {
     next_tx_nonce: Arc<AtomicU64>,
     balances: Arc<SubstrateClientBalanceAdapter<FullClient, Block>>,
     dispatcher: RuntimeCrossVmDispatcher<FullClient, Block>,
+    /// The certificates this node's finality tasks observed, per block (TICKET-107).
+    observed_certs: ObservedFinalityCerts,
 }
 
 impl AtomicGatewayService {
     /// Create the service. `uri` is the sr25519 secret URI for the runtime's
     /// configured `X3LangGatewayAccount`.
-    pub fn new(uri: &str, client: Arc<FullClient>, pool: Arc<AtomicPool>) -> Result<Self, String> {
+    pub fn new(
+        uri: &str,
+        client: Arc<FullClient>,
+        pool: Arc<AtomicPool>,
+        observed_certs: ObservedFinalityCerts,
+    ) -> Result<Self, String> {
         let key = AtomicGatewayKey::from_uri(uri)?;
         let genesis_hash = client
             .block_hash(0)
@@ -90,6 +100,7 @@ impl AtomicGatewayService {
             next_tx_nonce: Arc::new(AtomicU64::new(0)),
             balances,
             dispatcher,
+            observed_certs,
         })
     }
 
@@ -351,21 +362,41 @@ impl AtomicGatewayService {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 continue;
             }
-            let finalized_hash = info.best_hash;
-            let finality_cert = match self
+            let finalized_hash = info.finalized_hash;
+            let anchored = match self
                 .client
                 .runtime_api()
                 .get_finality_cert_anchor(finalized_hash, block_num)
             {
-                Ok(Some(cert)) => cert,
-                Ok(None) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                    continue;
-                }
+                Ok(anchor) => anchor,
                 Err(e) => {
                     return Err(format!("finality cert anchor runtime call failed: {e}"));
                 }
             };
+
+            // TICKET-107. The anchor is written by an unsigned call, first-write-wins, so a peer can
+            // plant a certificate for this height before any honest writer gets there. This node
+            // finalizes only with a certificate *it* observed, and only once the chain agrees:
+            // signing whatever the chain happened to hold would make this node attest a value no
+            // voter produced. A disagreement is refused loudly instead (forgery becomes a bounded
+            // liveness failure that names the block).
+            let finality_cert =
+                match decide_finalization_cert(self.observed_certs.get(block_num), anchored) {
+                    FinalizationCertificate::Finalize(cert) => cert,
+                    FinalizationCertificate::Wait => {
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                        continue;
+                    }
+                    FinalizationCertificate::Poisoned { observed, anchored } => {
+                        return Err(format!(
+                            "refusing to finalize bundle {bundle_id:?} at block {block_num}: the \
+                             chain's anchor is 0x{} but this node observed 0x{} — a planted anchor \
+                             is not something this node will sign",
+                            hex::encode(anchored.as_bytes()),
+                            hex::encode(observed.as_bytes())
+                        ));
+                    }
+                };
 
             let submitter = self.key.account();
             let executor_hash = H256(sp_core::hashing::blake2_256(&submitter.encode()));
