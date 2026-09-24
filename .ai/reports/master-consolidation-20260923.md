@@ -95,9 +95,17 @@ Verified: `SKIP_WASM_BUILD=1 cargo check --workspace`,
 Open Dependabot alerts went from **86 (2 critical, 6 high)** to **70 (0
 critical, 6 high, 46 moderate, 18 low)**. The remaining high alerts
 (`yamux 0.12.1`, `rustls-webpki 0.101.7`, `hickory-proto 0.24.4`,
-`libp2p-quic 0.11.1`, `quinn-proto 0.11.14`) are resolved *by libp2p 0.54.1
-itself*, so they need an upstream polkadot-sdk/libp2p bump, not a local edit.
-`hickory-proto` has no patched release at all.
+`libp2p-quic 0.11.1`) are resolved *by libp2p 0.54.1 itself*, so they need an
+upstream polkadot-sdk/libp2p bump, not a local edit. `hickory-proto` has no
+patched release at all.
+
+`quinn-proto` was a different case and is now cleared. The root
+`[patch.crates-io]` declared `quinn-proto = { path = "patches/quinn-proto" }`,
+but the vendored copy is 0.11.14 while the graph resolves 0.11.17, so cargo
+never applied it — it only ever produced a `[[patch.unused]]` record naming
+0.11.14 in `Cargo.lock`, which is what `GHSA-4w2j-m93h-cj5j` (`< 0.11.15`) was
+matching. No compiled artefact ever contained that version. Removing the dead
+declaration deleted only that 4-line record.
 
 ## Correction: `x3-sidecar` is not broken
 
@@ -114,9 +122,13 @@ a gate failure and a partial patch (crypto-common only) just moves the error to
 
 ## Not done — needs a decision
 
-1. **~30 diverging local branches** still exist. Their content is on master
-   (triage above + the 2026-09-22 report), so they are deletion candidates, but
-   deletion was not performed.
+1. ~~diverging local branches~~ — **DONE**: the 39 branches on `origin` that
+   are provably ancestors of master (every commit still reachable from master)
+   were deleted on 2026-09-23; `origin` went from 120 to 81 branches. Kept:
+   `master`, the five branches checked out by live worktrees, the `preserve/*`
+   and `archive/*` snapshots, and the two named deliberate-exclusion lineages.
+   The `patch-id`-equivalent and still-diverging branches were **not** deleted —
+   their commits are not reachable from master, so they need a separate call.
 2. **`atomicstar` remote** is a different lineage (`rc1-clean-foundation`: 247
    novel commits, ~108k-file divergence). Merging it into master would destroy
    content; it needs an explicit decision.
@@ -124,3 +136,50 @@ a gate failure and a partial patch (crypto-common only) just moves the error to
 4. `.wt-agent` holds uncommitted edits to `.ai/memory/agent-memory.md` and
    `TESTNET_GAP_LEDGER.md` (64 lines) belonging to another live session; left
    alone.
+
+### Deleted branches on 2026-09-23 (name → commit)
+
+All of these are ancestors of master, so their commits stay reachable from
+master; the branch pointers can be restored from these SHAs if ever wanted.
+
+```
+ci/cross-domain-gates c4990a72e1504275b64066fe8ada41dc26f3f949
+feat/arbitrum-send-message 66338856ef273e9fdecd4528e0c49f09a69498b4
+feat/btc-regtest-live f61a71cf11d100324b9875aaf20b0194d6b0c7a9
+feat/provider-endpoint-drill 52b051d87568f844248c838b22654c1d52279f69
+feat/settlement-proof-adapter 0494ebe9cbb3bda17aa1b2ad162f465b3e78ca37
+feat/settlement-proof-producer c334fa091710f1bf8db25b030e81682857e08337
+feat/validator-key-rotation-takeover 6b5429024ebee00d911c092d8eb7a451e5fc027c
+feat/x3-mcp-server be55709f693e394b031277f2264d8cb0f2089c80
+feat/x3lang-host-measurement-semantics 8911d36c6bcc7e83ebbb283247c763881f44f392
+feat/x3lang-measured-guards fcbce2dec6069e189f08621fa99a4f7c9e75aee3
+feat/x3lang-measured-quantities 909ba6e62f1eb446e19907c93a9ceed82053581c
+feat/x3lang-readiness-audit-score 4387e1beeefcf1e795ee65e0c002f6502cfcb64b
+feat/x3lang-receipt-verify-trusted 9f785d1d472302329f4362d64ec20854f983fb53
+fix/agent-guard-path-separator fb23beed04f2a870caf30ab54ae1a1b0d59531ec
+fix/atomic-finalization-tests 2b50aec40df31ad03d1766fbad5b98bf921cb5a7
+fix/e2e-safety-tests b75732f1ac321cad78832a33bde38f152917997a
+fix/evm-header-anchor 7f4425a68c889c7674285a993b8316b728868e92
+fix/external-chains-honest-adapters f2ff298415e97b5d474743f6ab5ecbfc26520db1
+fix/finality-certificate-trust d756269b5054685ed5d65188959c9bcd289d04a9
+fix/flash-finality-verified-proposal e20706383a9f322f609b2f323df4bd87c4e36404
+fix/gateway-attested-path d4c1897f6d425aba7a06c4875e2763a14f9e76db
+fix/gateway-origin-registry 678079c4315f3d5ff69d8cb6a43e8cd77ff84393
+fix/gateway-uri-default eb0bbe9c2bf2a24e730a751974458d6a0b09e6e2
+fix/kernel-authority-bounds af6710c7e8f1d7d5558a6f06c0711ff3d61e35cf
+fix/nested-sidecar-lock f50417fa41714fd0a6cd2768ea869d40d7806edf
+fix/nested-wasmtime-sandbox-escape 1a5d674299f8bedd86d19c203ae302ffcd1e1d5c
+fix/orchestra-crate-root b334a9cedc0cfdedd6e404d014d0a06e81fd3a39
+fix/relayer-real-submission a8748fdd5914e7742c7426aab57d0994b9bca0c7
+fix/remove-unsigned-finalization cc8f185da4f6f2a1ace3c5e1fd6e125660ddf27a
+fix/settlement-proof-set-gate af64a076971e3967ecdbf5020699b295c12daa02
+fix/typed-evm-receipts a50c31dfb963a327ab211d3d433528549c95f568
+fix/x3-swap-router-two-generations fd195b7bdcab4353aaf6736b9de07563fd684fbf
+merge/all-work-c3095b883 8214d32fc90609d30026b901355c06fe2b231b02
+salvage/foundry-real-evm-deploy 1e5ef77e619ddc1778f9cdcaf8650fe777cb52ce
+test/evm-bundle-gate-live 11465cdb899bcf06cc82db65e7935f5eafc489cf
+test/evm-header-anchor-live 7073dfe4d6b98c647a0f320c715071c27776d485
+test/evm-settlement-path-live c07c2da4dcbc5888a36f3e88dd2089361011b33e
+test/strict-posture-cross-domain 64cd86231437de4f2fe5a5e4ea3bbc1a977b019c
+wip/x3lang-objectives-20260918 44a12ba9445f78215a785d7984b0b75a9d8b178f
+```
