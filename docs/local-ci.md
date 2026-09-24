@@ -141,6 +141,48 @@ gates fail, so a partial run is still readable.
 
 ### Verification discipline
 
+#### Redirected `CARGO_TARGET_DIR` and the WASM build
+
+Two of the three cargo gates that build `runtime/` (`clippy workspace`,
+`clippy runtime rc1`) go through substrate-wasm-builder. That build script finds
+the workspace `Cargo.lock` by walking up from the **target** directory:
+`<target>/debug/build/<crate>/out` → … → the directory holding `Cargo.lock`.
+
+When a run redirects `CARGO_TARGET_DIR` outside the workspace — the usual reason
+being to dodge artifacts that another toolchain left in a shared `target/` — the
+walk finds nothing and the nested wasm build re-resolves its entire dependency
+graph from the network. That re-resolution picks a graph where `crypto-common`
+carries `std`, and the wasm build then dies with:
+
+```
+cargo:warning=Could not find `Cargo.lock` for .../runtime/Cargo.toml, while
+               searching from .../out. To fix this, point the
+               `WASM_BUILD_WORKSPACE_HINT` env variable to the directory of the
+               workspace being compiled.
+error[E0463]: can't find crate for `std`
+   = note: the `wasm32v1-none` target may not support the standard library
+```
+
+`run_gate` therefore exports `WASM_BUILD_WORKSPACE_HINT=$ROOT` for every gate.
+With it, `cargo clippy -p x3-chain-runtime --all-targets --no-default-features
+--features std,mainnet-rc1 -- -D warnings` is rc=0 against a target directory
+outside the workspace, where without it the same command fails in the wasm
+sub-build. The default (in-tree) target layout is unaffected.
+
+##### Poisoned shared target directories
+
+This box has several worktrees pointed at one `target/`. If something builds
+there with a toolchain other than the pinned 1.90.0 (the default `stable` is
+1.98.1), every later build sees
+`error[E0514]: found crate ... compiled by an incompatible version of rustc` and
+the three workspace-wide cargo gates go red for reasons that have nothing to do
+with the diff. Re-run those gates with a dedicated target dir:
+
+```bash
+CARGO_TARGET_DIR=/tmp/x3-verify-target ./scripts/local-ci.sh \
+  --only workspace-check,clippy-workspace,clippy-runtime-rc1
+```
+
 `--only <light subset>` is for triage, not for sign-off. A change under
 `runtime/` (including `runtime/build.rs`, which is compiled by every clippy
 configuration) or in a build script must be verified with the whole fast set —
