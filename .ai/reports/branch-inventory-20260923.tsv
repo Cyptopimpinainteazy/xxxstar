@@ -382,8 +382,6 @@ refs/remotes/origin/archive/local-20260920/test/cross-domain-refund-recovery-202
 refs/remotes/origin/archive/pr126-pre-master-rewrite-20260909	origin-branch	UNRELATED_LINEAGE	shares no history with master; preserved, must not be deleted
 refs/remotes/origin/archive/stale-x3lang-trading-wip-20260918	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/codex/x3-economic-safety-kernel	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
-refs/remotes/origin/dependabot/cargo/curve25519-dalek-5.0.0	origin-branch	NOT_ON_MASTER	commits not reachable from master yet
-refs/remotes/origin/dependabot/cargo/lru-0.16.4	origin-branch	NOT_ON_MASTER	commits not reachable from master yet
 refs/remotes/origin/docs/matrix-third-pass	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/econsafety-kernel	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/fix/matrix-evidence-prose	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
@@ -437,32 +435,32 @@ refs/remotes/origin/wip/chatgpt-mainnet-attestation-20260918	origin-branch	ON_MA
 refs/remotes/origin/wip/prompts-to-skills-20260918	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/wip/x3lang-arb-graph-filter-20260919	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/wip/x3lang-preserve-packets-and-arbitrage-20260919	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
-refs/remotes/atomicstar/Cyptopimpinainteazy-patch-1	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/agents/feature-prioritization-and-execution-plan	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/autoprove-yolo-v0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/axum-0.8.9	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/cargo-2dfe81512a	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/config-0.14.1	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/curve25519-dalek-5.0.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/dashmap-6.2.1	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/ed25519-zebra-4.2.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/hex-literal-1.1.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/jsonrpsee-0.26.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/k256-0.14.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/keccak-hash-0.12.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/libp2p-0.54.1	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/lsp-types-0.97.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/ndarray-0.17.2	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/petgraph-0.8.3	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/priority-queue-2.7.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/rand_chacha-0.9.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/solana-program-5.0.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/tokio-tungstenite-0.30.0	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/cargo/tower-0.5.3	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/dependabot/npm_and_yarn/apps/inferstructor-dashboard/npm_and_yarn-fa0e04ea13	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/develop	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/gh-pages	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
+refs/remotes/atomicstar/Cyptopimpinainteazy-patch-1	atomicstar-branch	UNRELATED_LINEAGE	atomicstar remote: different project state, no shared history
+refs/remotes/atomicstar/agents/feature-prioritization-and-execution-plan	atomicstar-branch	UNRELATED_LINEAGE	atomicstar remote: different project state, no shared history
+refs/remotes/atomicstar/autoprove-yolo-v0	atomicstar-branch	UNRELATED_LINEAGE	atomicstar remote: different project state, no shared history
+refs/remotes/atomicstar/dependabot/cargo/axum-0.8.9	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/cargo-2dfe81512a	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/config-0.14.1	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/curve25519-dalek-5.0.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/dashmap-6.2.1	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/ed25519-zebra-4.2.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/hex-literal-1.1.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/jsonrpsee-0.26.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/k256-0.14.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/keccak-hash-0.12.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/libp2p-0.54.1	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/lsp-types-0.97.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/ndarray-0.17.2	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/petgraph-0.8.3	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/priority-queue-2.7.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/rand_chacha-0.9.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/solana-program-5.0.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/tokio-tungstenite-0.30.0	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/cargo/tower-0.5.3	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/dependabot/npm_and_yarn/apps/inferstructor-dashboard/npm_and_yarn-fa0e04ea13	atomicstar-branch	MIRROR_BEHIND	atomicstar remote: shares history with master but is based on the stale mirror head (its default branch main = 157701ac3, an ancestor of master)
+refs/remotes/atomicstar/develop	atomicstar-branch	UNRELATED_LINEAGE	atomicstar remote: different project state, no shared history
+refs/remotes/atomicstar/gh-pages	atomicstar-branch	UNRELATED_LINEAGE	atomicstar remote: different project state, no shared history
 refs/remotes/atomicstar/main	atomicstar-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
-refs/remotes/atomicstar/rc1-clean-foundation	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/sprint-0/foundation/kernel-audit	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
-refs/remotes/atomicstar/substrate-upgrade-stable2603	atomicstar-branch	SEPARATE_REPO	atomicstar remote: different repository, unrelated history
+refs/remotes/atomicstar/rc1-clean-foundation	atomicstar-branch	UNRELATED_LINEAGE	atomicstar remote: different project state, no shared history
+refs/remotes/atomicstar/sprint-0/foundation/kernel-audit	atomicstar-branch	UNRELATED_LINEAGE	atomicstar remote: different project state, no shared history
+refs/remotes/atomicstar/substrate-upgrade-stable2603	atomicstar-branch	UNRELATED_LINEAGE	atomicstar remote: different project state, no shared history

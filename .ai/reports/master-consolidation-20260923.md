@@ -341,3 +341,56 @@ Two open Dependabot proposals remain on the repo (#497 `curve25519-dalek`,
 #498 `lru`); neither clears its advisory (each leaves the vulnerable copy in
 place and adds a third version), documented above. Left open — closing them
 would not clear the advisories, and the ignore policy is the maintainer's call.
+
+## Pass 4: closing the last non-master branches (2026-09-24)
+
+Both remaining non-master refs in this repository were open Dependabot proposals.
+Each was measured against the current master tip and closed, with the measurement
+posted on the PR, because neither clears the advisory it targets:
+
+- **#498 `lru 0.12.5 → 0.16.4`** — bumps only `crates/x3-gulfstream` and
+  `crates/x3-turbine`; the vulnerable 0.12.5 arrives via `libp2p-identify` →
+  `libp2p 0.54.1` → `sc-network` (polkadot-sdk stable2512). Merging would leave
+  three copies (`0.7.8`, `0.12.5`, `0.16.4`) with the vulnerable one intact.
+- **#497 `curve25519-dalek 4.1.3 → 5.0.0`** — the advisory is `< 4.1.3`; 3.2.0
+  arrives via `ed25519-dalek 1.0.1` ← `agave-precompiles` ← `solana-program-test`
+  (dev-dependency of `x3-svm-integration`) and via `ed25519-zebra 3.1.0` ←
+  `x3-mobile-sdk`, which really does call it. Merging would leave 3.2.0 in place
+  and add a third copy.
+
+Both branches were deleted, so **the repository has no open pull requests and no
+non-master branch except one documented archive**.
+
+### The atomicstar remote is a stale mirror, not a different project
+
+Earlier passes listed the `atomicstar` remote as "a different repository". That
+was wrong, and the inventory now says so precisely:
+
+- `atomicstar/main` is `157701ac3` — which was **our** master tip at the start of
+  this session — so `main` is an ancestor of master.
+- 20 of its branches (all the `dependabot/*` ones) share history with master but
+  are based on that stale mirror head.
+- 8 have no shared history (`develop`, `rc1-clean-foundation`, `gh-pages`,
+  `sprint-0/foundation/kernel-audit`, `substrate-upgrade-stable2603`,
+  `autoprove-yolo-v0`, `agents/feature-prioritization-and-execution-plan`,
+  `Cyptopimpinainteazy-patch-1`).
+
+Updating that repository is a write to a *different* GitHub repository, so it is
+left alone pending an explicit decision.
+
+### Final state
+
+| scope | refs | on master | not on master |
+| --- | --- | --- | --- |
+| this repository (`refs/heads` + `refs/remotes/origin`) | 436 | **429** | 7 |
+| `origin` branches specifically | 70 | 69 | 1 |
+| `atomicstar` remote | 29 | 1 | 20 behind + 8 unrelated |
+
+The 7 refs that are not on master are all the *same* pre-rewrite lineage (no
+merge-base with master): 6 are local-only, and exactly one is a branch on GitHub
+— `archive/pr126-pre-master-rewrite-20260909`. That branch is not an oversight:
+`docs/superpowers/plans/2026-09-09-repository-recovery-completion.md` records it
+as a completed step ("archive old PR #126 head as
+`archive/pr126-pre-master-rewrite-20260909`"), and the reconciliation report
+forbids joining the unrelated histories. It is therefore the single, principled,
+documented exception.
