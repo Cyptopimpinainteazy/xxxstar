@@ -394,3 +394,83 @@ as a completed step ("archive old PR #126 head as
 `archive/pr126-pre-master-rewrite-20260909`"), and the reconciliation report
 forbids joining the unrelated histories. It is therefore the single, principled,
 documented exception.
+
+## Pass 5: the redundant preservation refs retired (2026-09-24)
+
+The `preserve/*` and `archive/local-20260920/*` namespaces were created by the
+2026-09-19 triage to hold commits that existed on **no** remote ref — "the
+commits survive without rewriting anyone else's branch". Every one of those
+commits is now an ancestor of master (the recording merges above made that
+true), so the namespaces have no remaining purpose: master carries the
+commits, which is a strictly stronger guarantee than a side branch.
+
+All 59 were verified with `git merge-base --is-ancestor <ref> master` before
+deletion, nothing in code, CI, scripts or workflows references them (only the
+triage report lists them), and every tip SHA is recorded below — any of them
+can be recreated exactly with `git branch <name> <sha> && git push origin <name>`.
+
+Kept: `master`, the five branches checked out by live worktrees, the four
+named deliberate-exclusion lineages, and the one unrelated pre-rewrite archive
+that the recovery plan requires.
+
+```
+archive/local-20260920/codex/x3-economic-safety-kernel 0c75dab0656bdb4028a4689e161b79173b8d0236
+archive/local-20260920/codex/x3-trading-core-v1-hardening 5df7d70b9b465ef81564e4b49e93d94acbce13f3
+archive/local-20260920/docs/merge-queue-production-gate-lean 69d66ac9131b4e6d63f13a6216f4e99623a2dcd7
+archive/local-20260920/feat/canonical-cross-domain-proof-bundle-20260911 a44b13fb5037753c64cab957f18f0309aa33516c
+archive/local-20260920/feat/idempotent-cross-domain-coordinator-20260911 d126a41652665d6fcabece015373b2269f550193
+archive/local-20260920/feat/live-feature-matrix-20260912 e6c6b09e8dd3d905131edcb7220bc7ceb6033efb
+archive/local-20260920/feat/live-secret-release-firewall-20260911 a10ac597cdd284fa2b5247fab645c9141ccde73c
+archive/local-20260920/feat/settlement-proofset-gate-20260911 c1d8ba790bcae071bbe2e30cbd86d900959995cc
+archive/local-20260920/feat/x3-lang-crosschain-integration-20260909 ef83d056619dafa76e1f5bdda758672d050b0379
+archive/local-20260920/finish/x3vm-live-transport 921f81d64e1f2d2f628e47c69b1384b9bed6d10a
+archive/local-20260920/finish/x3vm-live-transport-fix 42f9a2d77a960d091c109d47c0823de1a259bb9f
+archive/local-20260920/fix/x3lang-frame-classification ea0294fb82851bd92f901f3e4f1c6940253bc1b7
+archive/local-20260920/fix/x3lang-proof-vocabulary c5a7ab1e08544b363066f9d9ee7682fcda53fd59
+archive/local-20260920/test/cross-domain-refund-recovery-20260911 29a3dcaff7201f65376b4d4f112a297e6fdd38f3
+archive/stale-x3lang-trading-wip-20260918 5862ce19341e883601000558a17b44c86e8a2324
+preserve/20260918/cargo/ark-ec-0.6.0 2cb3b22d916d1aecfbf0ec92f37383d78063542c
+preserve/20260918/cargo/ark-ff-0.6.0 9ece03653ad2724d05ec5375332b59cc61eb344a
+preserve/20260918/cargo/ark-std-0.6.0 8c2c9d98ba86869860c6a7021715824df9043324
+preserve/20260918/cargo/frame-benchmarking-cli-54f11b1 bcefcd21cbb664b1772387a7989a7f3eab533ef8
+preserve/20260918/cargo/frame-support-54f11b1 35f5e44b731a682234bc1510e63473eec2f23af0
+preserve/20260918/cargo/hex-literal-1.1.0 3950a6104b209ea562d20efb7ef8872b80f66403
+preserve/20260918/cargo/libloading-0.9.0 a84b69d9e133854b38a03568bf60fd5dd76c9a8d
+preserve/20260918/cargo/minicbor-2.3.0 b092c771c76541779d4def60429416b0a986201d
+preserve/20260918/cargo/pallet-scheduler-54f11b1 4416fee9937fdadc055265d74e98860b8aa65fca
+preserve/20260918/cargo/pallet-staking-54f11b1 d0a4786be37da115037f4cf83cc7749bbbbef48f
+preserve/20260918/cargo/pallet-sudo-54f11b1 9c2ebb0691c73218acec34ec007d61141a57bf6f
+preserve/20260918/cargo/redis-1.7.0 630141bc3cb87bf03bded92a36df7f963c60e259
+preserve/20260918/cargo/sc-basic-authorship-54f11b1 6d58f6f73ee1dc4f2257b1c50f0770665c387051
+preserve/20260918/cargo/sc-cli-54f11b1 a9bb9327e3ed53c09887d8bb281ec44570d9e417
+preserve/20260918/cargo/sc-consensus-aura-54f11b1 65d9baac255a10bc048e7aa85d187f267b029802
+preserve/20260918/cargo/sc-rpc-54f11b1 5551b1c90b224fd46c2affcca74db3341d9e81c5
+preserve/20260918/cargo/sc-rpc-api-54f11b1 13de37ce7e1b36b75f45998bf7f973d2ce0c08b7
+preserve/20260918/cargo/sp-keystore-54f11b1 131b04d5afea58aff3758894d41a5fd27decd555
+preserve/20260918/cargo/sp-version-54f11b1 8731eab698f5496330e0a94a9e3f0b3fd53192cc
+preserve/20260918/codex-x3-economic-safety-kernel 0c75dab0656bdb4028a4689e161b79173b8d0236
+preserve/20260918/codex-x3-trading-core-v1-hardening 5df7d70b9b465ef81564e4b49e93d94acbce13f3
+preserve/20260918/feat-live-feature-matrix-20260912 e6c6b09e8dd3d905131edcb7220bc7ceb6033efb
+preserve/20260918/feat-live-secret-release-firewall-20260911 a10ac597cdd284fa2b5247fab645c9141ccde73c
+preserve/20260918/feat-settlement-proofset-gate-20260911 c1d8ba790bcae071bbe2e30cbd86d900959995cc
+preserve/20260918/feat-x3-lang-crosschain-integration-20260909 ef83d056619dafa76e1f5bdda758672d050b0379
+preserve/20260918/finish-x3vm-live-transport 921f81d64e1f2d2f628e47c69b1384b9bed6d10a
+preserve/20260918/finish-x3vm-live-transport-fix 42f9a2d77a960d091c109d47c0823de1a259bb9f
+preserve/20260918/merge-into-master a64721d04d9eeee5220fae6d8ca058ef74d13731
+preserve/20260918/pip/psycopg2-binary-gte-2.9.13 14b46f300cd6af77f4f2d6ff19102e04dc5c1d03
+preserve/20260918/test-cross-domain-refund-recovery-20260911 29a3dcaff7201f65376b4d4f112a297e6fdd38f3
+preserve/20260919/canonical-cross-domain-proof-bundle-20260911 a44b13fb5037753c64cab957f18f0309aa33516c
+preserve/20260919/cross-domain-refund-recovery-20260911 29a3dcaff7201f65376b4d4f112a297e6fdd38f3
+preserve/20260919/idempotent-cross-domain-coordinator-20260911 d126a41652665d6fcabece015373b2269f550193
+preserve/20260919/live-feature-matrix-20260912 e6c6b09e8dd3d905131edcb7220bc7ceb6033efb
+preserve/20260919/live-secret-release-firewall-20260911 a10ac597cdd284fa2b5247fab645c9141ccde73c
+preserve/20260919/merge-queue-production-gate-lean 69d66ac9131b4e6d63f13a6216f4e99623a2dcd7
+preserve/20260919/settlement-proofset-gate-20260911 c1d8ba790bcae071bbe2e30cbd86d900959995cc
+preserve/20260919/x3-economic-safety-kernel 0c75dab0656bdb4028a4689e161b79173b8d0236
+preserve/20260919/x3-lang-crosschain-integration-20260909 ef83d056619dafa76e1f5bdda758672d050b0379
+preserve/20260919/x3-trading-core-v1-hardening 5df7d70b9b465ef81564e4b49e93d94acbce13f3
+preserve/20260919/x3lang-frame-classification ea0294fb82851bd92f901f3e4f1c6940253bc1b7
+preserve/20260919/x3lang-proof-vocabulary c5a7ab1e08544b363066f9d9ee7682fcda53fd59
+preserve/20260919/x3vm-live-transport 921f81d64e1f2d2f628e47c69b1384b9bed6d10a
+preserve/20260919/x3vm-live-transport-fix 42f9a2d77a960d091c109d47c0823de1a259bb9f
+```
