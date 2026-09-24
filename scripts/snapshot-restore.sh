@@ -6,6 +6,8 @@
 #   backup:  bash scripts/snapshot-restore.sh backup  <validator_base_path>
 #   restore: bash scripts/snapshot-restore.sh restore <snapshot_tar> <target_base_path>
 #   list:    bash scripts/snapshot-restore.sh list    [snapshot_dir]
+#   verify:  bash scripts/snapshot-restore.sh verify-snapshot <manifest.json> <chunks_dir> \
+#                [--chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n>]
 #
 # Exit codes:
 #   0 — success
@@ -17,6 +19,17 @@
 # Environment variables:
 #   X3_SNAPSHOT_DIR   — snapshot staging directory (default: /tmp/x3-snapshots)
 #   X3_RPC_ENDPOINT   — for optional pre-backup health check
+#   X3_SNAPSHOT_VERIFIER — path to the x3-state-snapshot binary (else target/{release,debug})
+#
+# Set X3_SNAPSHOT_MANIFEST (plus X3_SNAPSHOT_CHUNKS and the anchor vars below) to
+# make `restore` verify a content-addressed snapshot before it writes anything:
+#   X3_SNAPSHOT_MANIFEST        manifest.json for the snapshot being restored
+#   X3_SNAPSHOT_CHUNKS          directory holding the <index>.chunk files
+#   X3_SNAPSHOT_CHAIN_ID        chain id from consensus
+#   X3_SNAPSHOT_BLOCK_HASH      finalized block hash from consensus
+#   X3_SNAPSHOT_STATE_ROOT      state root of that finalized block
+#   X3_SNAPSHOT_RUNTIME_VERSION runtime spec_version of that block
+#   X3_SNAPSHOT_STATE_VERSION   trie layout, 0 or 1 (default 1)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -35,6 +48,8 @@ usage() {
     echo "  backup:  bash scripts/snapshot-restore.sh backup  <validator_base_path>"
     echo "  restore: bash scripts/snapshot-restore.sh restore <snapshot_tar> <target_base_path>"
     echo "  list:    bash scripts/snapshot-restore.sh list    [snapshot_dir]"
+    echo "  verify:  bash scripts/snapshot-restore.sh verify-snapshot <manifest.json> <chunks_dir> \\"
+    echo "               [--chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n>]"
     exit 1
 }
 
@@ -119,6 +134,48 @@ do_backup() {
     echo "   bash scripts/snapshot-restore.sh restore $TAR_PATH <target_base_path>"
 }
 
+# ── content-addressed snapshot verification ─────────────────────────────────
+
+# Locate the x3-state-snapshot verifier: explicit override first, then a built
+# binary. Prints the path and returns 0, or returns 1 when there is none.
+resolve_snapshot_verifier() {
+    if [[ -n "${X3_SNAPSHOT_VERIFIER:-}" ]]; then
+        printf '%s' "$X3_SNAPSHOT_VERIFIER"
+        return 0
+    fi
+
+    local repo_root candidate
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    for candidate in target/release/x3-state-snapshot target/debug/x3-state-snapshot; do
+        if [[ -x "$repo_root/$candidate" ]]; then
+            printf '%s' "$repo_root/$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# verify_snapshot_dir <manifest.json> <chunks_dir> [extra verifier args...]
+verify_snapshot_dir() {
+    local manifest="$1"
+    shift
+    local chunks_dir="$1"
+    shift
+
+    local verifier
+    if ! verifier="$(resolve_snapshot_verifier)"; then
+        echo -e "${RED}❌ x3-state-snapshot verifier not found${NC}"
+        echo "   Build it:   cargo build --release -p x3-state-snapshot"
+        echo "   Or set:     X3_SNAPSHOT_VERIFIER=/path/to/x3-state-snapshot"
+        exit 4
+    fi
+
+    # An unset anchor is not silently treated as "verified": the verifier warns,
+    # and then only checks chunk integrity plus the recomputed state root.
+    "$verifier" verify --manifest "$manifest" --chunks "$chunks_dir" "$@"
+}
+
 # ── restore ─────────────────────────────────────────────────────────────────
 do_restore() {
     local TAR="$1"
@@ -133,6 +190,41 @@ do_restore() {
     if ! tar -tzf "$TAR" > /dev/null 2>&1; then
         echo -e "${RED}❌ Snapshot archive is corrupt or unreadable: $TAR${NC}"
         exit 4
+    fi
+
+    # A snapshot that ships a content-addressed manifest has to verify before
+    # anything is written. Restoring first and asking questions later is how a
+    # corrupted or substituted mirror ends up as a validator's database.
+    if [[ -n "${X3_SNAPSHOT_MANIFEST:-}" ]]; then
+        local chunks_dir="${X3_SNAPSHOT_CHUNKS:-}"
+        local chain_id="${X3_SNAPSHOT_CHAIN_ID:-}"
+        local block_hash="${X3_SNAPSHOT_BLOCK_HASH:-}"
+        local state_root="${X3_SNAPSHOT_STATE_ROOT:-}"
+        local runtime_version="${X3_SNAPSHOT_RUNTIME_VERSION:-}"
+
+        if [[ -z "$chunks_dir" || -z "$chain_id" || -z "$block_hash" || -z "$state_root" || -z "$runtime_version" ]]; then
+            echo -e "${RED}❌ X3_SNAPSHOT_MANIFEST is set but the check is incomplete${NC}"
+            echo "   Also set X3_SNAPSHOT_CHUNKS, X3_SNAPSHOT_CHAIN_ID, X3_SNAPSHOT_BLOCK_HASH,"
+            echo "   X3_SNAPSHOT_STATE_ROOT and X3_SNAPSHOT_RUNTIME_VERSION — the anchor must come"
+            echo "   from consensus, not from the snapshot."
+            exit 4
+        fi
+
+        echo -e "${BLUE}🔎 Verifying snapshot against the finalized anchor before restoring ...${NC}"
+        local -a anchor_args=(
+            --chain-id "$chain_id"
+            --block-hash "$block_hash"
+            --state-root "$state_root"
+            --runtime-version "$runtime_version"
+        )
+        if [[ -n "${X3_SNAPSHOT_STATE_VERSION:-}" ]]; then
+            anchor_args+=(--state-version "$X3_SNAPSHOT_STATE_VERSION")
+        fi
+
+        if ! verify_snapshot_dir "$X3_SNAPSHOT_MANIFEST" "$chunks_dir" "${anchor_args[@]}"; then
+            echo -e "${RED}❌ Refusing to restore: the snapshot did not verify against the anchor${NC}"
+            exit 4
+        fi
     fi
 
     check_validator_stopped "$TARGET"
@@ -201,6 +293,20 @@ case "$ACTION" in
         ;;
     list)
         do_list "${2:-$SNAPSHOT_DIR}"
+        ;;
+    verify-snapshot)
+        # Verify a content-addressed snapshot (manifest + chunk directory)
+        # before anyone restores it. Anchor flags after the two paths are
+        # passed straight through to the verifier:
+        #   bash scripts/snapshot-restore.sh verify-snapshot <manifest.json> <chunks_dir> \
+        #       --chain-id x3_testnet_v1 --block-hash 0x.. --state-root 0x.. --runtime-version N
+        MANIFEST_PATH="${2:-}"
+        CHUNKS_DIR="${3:-}"
+        if [[ -z "$MANIFEST_PATH" || -z "$CHUNKS_DIR" ]]; then
+            echo -e "${RED}❌ verify-snapshot needs <manifest.json> <chunks_dir>${NC}"
+            exit 1
+        fi
+        verify_snapshot_dir "$MANIFEST_PATH" "$CHUNKS_DIR" "${@:4}"
         ;;
     *)
         usage

@@ -247,6 +247,7 @@ members = [
     "crates/x3-bench",
     "crates/x3-bot",
     "crates/x3-canonical-truth",
+    "crates/x3-state-snapshot",
     # Burn-down batch 3 (issue #274).
     "crates/x3-runtime-params",
     "crates/x3-parallel-executor",
@@ -369,6 +370,8 @@ sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2
 sp-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-staking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-trie = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-state-machine = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }

@@ -14,7 +14,7 @@ use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
 use sc_service::{
     ChainType, Configuration, Error as ServiceError, KeystoreContainer, PartialComponents,
-    TaskManager,
+    RpcMethods, TaskManager,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::{TransactionPool, TransactionSource};
@@ -25,6 +25,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, Hash as HashT},
     DigestItem, SaturatedConversion,
 };
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
@@ -684,6 +685,221 @@ fn enforce_startup_gate_if_authority(is_authority: bool) -> Result<(), ServiceEr
     })
 }
 
+/// Environment variable that acknowledges, on the record, that an authority
+/// node is serving unsafe RPC methods beyond loopback.
+///
+/// This deliberately is not a CLI flag. The acknowledgement has to sit in the
+/// unit file / container env / harness that starts the node, so it is visible
+/// in the deployment rather than typed once by hand, and the refusal message
+/// names it so the escape hatch is discoverable without being accidental.
+pub const ALLOW_UNSAFE_AUTHORITY_RPC_ENV: &str = "X3_ALLOW_UNSAFE_AUTHORITY_RPC";
+
+/// Values of [`ALLOW_UNSAFE_AUTHORITY_RPC_ENV`] that count as an acknowledgement.
+fn acknowledgement_is_set(value: Option<&str>) -> bool {
+    match value {
+        Some(raw) => {
+            let trimmed = raw.trim();
+            trimmed == "1" || trimmed.eq_ignore_ascii_case("true")
+        }
+        None => false,
+    }
+}
+
+/// Describe the authority-unsafe-RPC violation, if the configuration is one.
+///
+/// `sc_rpc_server::deny_unsafe` clears `DenyUnsafe` for `RpcMethods::Unsafe`
+/// irrespective of the interface a request arrives on: only `Unsafe` is
+/// address-independent, while `Auto` is downgraded to safe methods the moment
+/// the listener is not loopback. A validator that exposes `Unsafe` off-host
+/// therefore hands `author_insertKey` / `author_rotateKeys` / node-control
+/// methods to anyone who can open the port — on the same process that is
+/// signing blocks. The client-side policy in `infra/rpc/chains.yaml` and the
+/// comment in `packaging/systemd/x3-validator.service` both say this must not
+/// be the production shape; this gate is what makes it untrue-by-default
+/// instead of untrue-by-convention.
+fn unsafe_rpc_exposure_violation(
+    is_authority: bool,
+    rpc_methods: RpcMethods,
+    listen_addrs: &[SocketAddr],
+) -> Option<String> {
+    if !is_authority || !matches!(rpc_methods, RpcMethods::Unsafe) {
+        return None;
+    }
+
+    let exposed: Vec<String> = listen_addrs
+        .iter()
+        .filter(|addr| !addr.ip().is_loopback())
+        .map(|addr| addr.to_string())
+        .collect();
+
+    if exposed.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "--rpc-methods unsafe is bound to non-loopback address(es) [{}] while this node runs as an \
+         authority. Bind RPC to 127.0.0.1, use --rpc-methods safe, or set {}=1 to acknowledge the \
+         exposure explicitly.",
+        exposed.join(", "),
+        ALLOW_UNSAFE_AUTHORITY_RPC_ENV,
+    ))
+}
+
+/// Gate authority startup on the RPC exposure rules above.
+fn enforce_rpc_exposure_gate_with_acknowledgement(
+    is_authority: bool,
+    rpc_methods: RpcMethods,
+    listen_addrs: &[SocketAddr],
+    acknowledged: bool,
+) -> Result<(), ServiceError> {
+    let violation = unsafe_rpc_exposure_violation(is_authority, rpc_methods, listen_addrs);
+
+    match (violation, acknowledged) {
+        (Some(violation), true) => {
+            log::warn!(
+                "⚠️  {} is set; starting anyway: {}",
+                ALLOW_UNSAFE_AUTHORITY_RPC_ENV,
+                violation
+            );
+            Ok(())
+        }
+        (Some(violation), false) => Err(ServiceError::Other(format!(
+            "Refusing to start an authority node with unsafe RPC exposed: {violation}"
+        ))),
+        (None, _) => Ok(()),
+    }
+}
+
+/// Read the RPC surface out of the resolved [`Configuration`] and apply the
+/// exposure gate.
+fn enforce_rpc_exposure_gate(config: &Configuration) -> Result<(), ServiceError> {
+    let listen_addrs: Vec<SocketAddr> = config
+        .rpc
+        .addr
+        .as_ref()
+        .map(|endpoints| {
+            endpoints
+                .iter()
+                .map(|endpoint| endpoint.listen_addr)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let acknowledged = acknowledgement_is_set(
+        std::env::var(ALLOW_UNSAFE_AUTHORITY_RPC_ENV)
+            .ok()
+            .as_deref(),
+    );
+
+    enforce_rpc_exposure_gate_with_acknowledgement(
+        config.role.is_authority(),
+        config.rpc.methods,
+        &listen_addrs,
+        acknowledged,
+    )
+}
+
+/// Floor below which an authority node must not start writing.
+///
+/// [`crate::disk_guard`] owns the policy; this is the startup half of it. A node
+/// that boots with its data volume already under the floor hands every
+/// subsequent trie write a chance to fail mid-commit, so it refuses instead and
+/// says why in the operator's log.
+fn enforce_disk_space_gate(config: &Configuration) -> Result<(), ServiceError> {
+    let min_free_bytes = crate::disk_guard::min_free_bytes_from_env();
+
+    if !config.role.is_authority() || min_free_bytes == 0 {
+        return Ok(());
+    }
+
+    let data_path = config.base_path.path();
+
+    match crate::disk_guard::free_bytes(data_path) {
+        Ok(free_bytes) => {
+            let pressure = crate::disk_guard::classify(free_bytes, min_free_bytes);
+            match crate::disk_guard::describe(pressure, free_bytes, min_free_bytes) {
+                Some(message) if pressure.is_authoring_safe() => {
+                    log::warn!("💾 disk-space guard: {message}");
+                    Ok(())
+                }
+                Some(message) => Err(ServiceError::Other(format!(
+                    "Refusing to start an authority node: {message}"
+                ))),
+                None => {
+                    log::debug!(
+                        "💾 disk-space guard: {free_bytes} bytes free at {}",
+                        data_path.display()
+                    );
+                    Ok(())
+                }
+            }
+        }
+        Err(err) => {
+            // A path we cannot measure is not evidence of pressure. Report it and
+            // carry on rather than turning a measurement failure into an outage.
+            log::warn!(
+                "disk-space guard could not measure {}: {err}; continuing without it",
+                data_path.display()
+            );
+            Ok(())
+        }
+    }
+}
+
+/// Background watchdog that keeps re-measuring free space while the node runs.
+///
+/// Boot-time measurement is only half the problem: a volume can fill while the
+/// node is up. The watchdog does not stop authoring by itself — that needs the
+/// authoring task's cooperation — but it turns a silent approach to `ENOSPC`
+/// into a loud, state-change-only operator signal, which is the part the
+/// storage audit found entirely missing.
+fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
+    let min_free_bytes = crate::disk_guard::min_free_bytes_from_env();
+    if min_free_bytes == 0 {
+        return;
+    }
+
+    let data_path = config.base_path.path().to_path_buf();
+    let interval = crate::disk_guard::probe_interval_from_env();
+    let is_authority = config.role.is_authority();
+
+    task_manager
+        .spawn_handle()
+        .spawn("x3-disk-watchdog", None, async move {
+            let mut ticker = tokio::time::interval(interval);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
+            let mut last_reported: Option<crate::disk_guard::DiskPressure> = None;
+
+            loop {
+                ticker.tick().await;
+
+                let Ok(free_bytes) = crate::disk_guard::free_bytes(&data_path) else {
+                    continue;
+                };
+                let pressure = crate::disk_guard::classify(free_bytes, min_free_bytes);
+
+                // Only speak when the level changes, so a full disk does not fill
+                // the operator's log at one line per probe interval.
+                if last_reported == Some(pressure) {
+                    continue;
+                }
+
+                if let Some(message) =
+                    crate::disk_guard::describe(pressure, free_bytes, min_free_bytes)
+                {
+                    if matches!(pressure, crate::disk_guard::DiskPressure::Critical) {
+                        log::error!("💾 disk-space guard [authority={is_authority}]: {message}");
+                    } else {
+                        log::warn!("💾 disk-space guard: {message}");
+                    }
+                }
+
+                last_reported = Some(pressure);
+            }
+        });
+}
+
 struct CrossVmBridgeSafetyGate {
     finality_oracle: InMemoryFinalityOracle,
     risk_engine: GatewayRiskEngine,
@@ -805,6 +1021,8 @@ pub fn new_full_with_atomic_gateway<
     atomic_gateway_uri: Option<String>,
 ) -> Result<TaskManager, ServiceError> {
     enforce_startup_gate_if_authority(config.role.is_authority())?;
+    enforce_rpc_exposure_gate(&config)?;
+    enforce_disk_space_gate(&config)?;
 
     tune_transaction_pool_config(&mut config);
     let sc_service::PartialComponents {
@@ -817,6 +1035,8 @@ pub fn new_full_with_atomic_gateway<
         transaction_pool,
         other: (grandpa_block_import, grandpa_link, mut telemetry),
     } = new_partial(&config)?;
+
+    spawn_disk_watchdog(&task_manager, &config);
 
     // configure network protocols; GRANDPA may be disabled when using Flash Finality
     let mut net_config = sc_network::config::FullNetworkConfiguration::<
@@ -2270,6 +2490,110 @@ mod tests {
     #[test]
     fn startup_gate_passes_for_reference_authority_build() {
         assert!(enforce_startup_gate_if_authority(true).is_ok());
+    }
+
+    fn any_addr(port: u16) -> SocketAddr {
+        SocketAddr::from(([0, 0, 0, 0], port))
+    }
+
+    fn loopback_addr(port: u16) -> SocketAddr {
+        SocketAddr::from(([127, 0, 0, 1], port))
+    }
+
+    #[test]
+    fn unsafe_rpc_gate_rejects_unsafe_methods_bound_beyond_loopback_on_an_authority() {
+        let violation = unsafe_rpc_exposure_violation(
+            true,
+            RpcMethods::Unsafe,
+            &[loopback_addr(9944), any_addr(9944)],
+        )
+        .expect("an authority serving unsafe methods off-host must be a violation");
+
+        // Only the reachable address is named; the loopback listener is not an exposure.
+        assert!(violation.contains("0.0.0.0:9944"), "{violation}");
+        assert!(!violation.contains("127.0.0.1:9944"), "{violation}");
+        assert!(
+            violation.contains(ALLOW_UNSAFE_AUTHORITY_RPC_ENV),
+            "{violation}"
+        );
+
+        let refused = enforce_rpc_exposure_gate_with_acknowledgement(
+            true,
+            RpcMethods::Unsafe,
+            &[any_addr(9944)],
+            false,
+        );
+        assert!(
+            refused.is_err(),
+            "the unacknowledged case must refuse startup"
+        );
+    }
+
+    #[test]
+    fn unsafe_rpc_gate_allows_unsafe_methods_that_stay_on_loopback() {
+        // This is the shape every local multi-node harness uses
+        // (--rpc-methods unsafe with no --rpc-external); it must keep working.
+        assert!(unsafe_rpc_exposure_violation(
+            true,
+            RpcMethods::Unsafe,
+            &[loopback_addr(9944), loopback_addr(9945)]
+        )
+        .is_none());
+        assert!(enforce_rpc_exposure_gate_with_acknowledgement(
+            true,
+            RpcMethods::Unsafe,
+            &[loopback_addr(9944)],
+            false
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn unsafe_rpc_gate_allows_external_listeners_that_serve_only_safe_methods() {
+        // `RpcMethods::Auto` is downgraded to safe methods as soon as the
+        // listener is not loopback, so an external listener alone is not the
+        // violation — the e2e harnesses rely on exactly this combination.
+        for methods in [RpcMethods::Auto, RpcMethods::Safe] {
+            assert!(unsafe_rpc_exposure_violation(true, methods, &[any_addr(9944)]).is_none());
+        }
+    }
+
+    #[test]
+    fn unsafe_rpc_gate_ignores_non_authorities() {
+        // A public RPC node is allowed to expose unsafe methods out of band; the
+        // gate exists for the process that signs blocks.
+        assert!(
+            unsafe_rpc_exposure_violation(false, RpcMethods::Unsafe, &[any_addr(9944)]).is_none()
+        );
+        assert!(enforce_rpc_exposure_gate_with_acknowledgement(
+            false,
+            RpcMethods::Unsafe,
+            &[any_addr(9944)],
+            false
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn unsafe_rpc_gate_acknowledgement_downgrades_the_refusal_to_a_warning() {
+        assert!(enforce_rpc_exposure_gate_with_acknowledgement(
+            true,
+            RpcMethods::Unsafe,
+            &[any_addr(9944)],
+            true
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn unsafe_rpc_gate_acknowledgement_accepts_only_explicit_truthy_values() {
+        for value in ["1", "true", "TRUE", " true "] {
+            assert!(acknowledgement_is_set(Some(value)), "{value:?}");
+        }
+        for value in ["", "0", "false", "yes", "on", "2"] {
+            assert!(!acknowledgement_is_set(Some(value)), "{value:?}");
+        }
+        assert!(!acknowledgement_is_set(None));
     }
 
     #[test]

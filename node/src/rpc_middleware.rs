@@ -33,6 +33,12 @@ impl Default for RateLimitConfig {
         // Heavy methods get stricter limits
         method_limits.insert("eth_call".to_string(), 100); // 100/min
         method_limits.insert("eth_estimateGas".to_string(), 60); // 60/min
+                                                                 // Log queries are the expensive read: even with the block-range cap in
+                                                                 // `rpc_frontier`, one call walks a range and decodes every log in it.
+                                                                 // Without an explicit entry they would inherit `default_method_limit`
+                                                                 // (600/min) and be priced the same as `eth_blockNumber`.
+        method_limits.insert("eth_getLogs".to_string(), 60); // 60/min
+        method_limits.insert("x3_getEvmLogs".to_string(), 60); // 60/min
         method_limits.insert("atlasKernel_getCanonicalBalance".to_string(), 300); // 300/min
         method_limits.insert("atlasKernel_getAssetMetadata".to_string(), 600); // 600/min
         method_limits.insert("atlasKernel_isAuthorized".to_string(), 600); // 600/min
@@ -416,6 +422,56 @@ mod tests {
         let cors = CorsConfig::default();
         assert!(cors.is_origin_allowed("http://localhost:3000"));
         assert!(!cors.is_origin_allowed("http://evil.com"));
+    }
+
+    /// The methods whose cost is dominated by how much state they walk, rather
+    /// than by the size of the request. Each of these must be priced explicitly:
+    /// a method that is missing from `method_limits` silently inherits
+    /// `default_method_limit` (600/min), i.e. the same budget as `eth_blockNumber`.
+    const HEAVY_METHODS: [&str; 3] = ["eth_getLogs", "x3_getEvmLogs", "atomicTrade_simulate"];
+
+    #[test]
+    fn heavy_methods_are_priced_below_the_default_limit() {
+        let config = RateLimitConfig::default();
+
+        for method in HEAVY_METHODS {
+            let limit = config
+                .method_limits
+                .get(method)
+                .copied()
+                .unwrap_or_else(|| {
+                    panic!("{method} must be priced explicitly, not inherit the default limit")
+                });
+            assert!(
+                limit < config.default_method_limit,
+                "{method} is priced at {limit}/min, which is not stricter than the \
+                 {} /min default",
+                config.default_method_limit
+            );
+        }
+    }
+
+    #[test]
+    fn cheap_methods_stay_on_the_permissive_default() {
+        let config = RateLimitConfig::default();
+        let effective_limit = |method: &str| {
+            config
+                .method_limits
+                .get(method)
+                .copied()
+                .unwrap_or(config.default_method_limit)
+        };
+
+        // Not an exhaustive list — the point is that the pricing map is not a
+        // blanket throttle over the whole RPC surface.
+        for method in ["eth_blockNumber", "eth_chainId", "system_health"] {
+            assert_eq!(
+                effective_limit(method),
+                config.default_method_limit,
+                "{method} must not be throttled below the default budget"
+            );
+        }
+        assert_eq!(config.default_method_limit, 600);
     }
 
     #[test]

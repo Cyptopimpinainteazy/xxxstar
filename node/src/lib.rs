@@ -35,6 +35,9 @@ pub mod rpc_middleware;
 /// Phase 5: Network Bootstrapping.
 pub mod network;
 
+/// Free-space guard for authority nodes (disk-full protection).
+pub mod disk_guard;
+
 /// Phase 7: Telemetry/Monitoring.
 pub mod metrics;
 
