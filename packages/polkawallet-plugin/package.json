@@ -1,7 +1,7 @@
 {
   "name": "@x3-chain/x3-wallet",
   "version": "0.1.0",
-  "description": "Polkawallet JS API plugin for X3 Chain x3chain — wraps @polkadot/api for x3vm, atomic trades, x3 lang, flashloans, governance, and all X3 Chain pallets",
+  "description": "Polkawallet JS API plugin for X3 Chain x3chain \u2014 wraps @polkadot/api for x3vm, atomic trades, x3 lang, flashloans, governance, and all X3 Chain pallets",
   "main": "dist/main.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -47,5 +47,11 @@
     "type": "git",
     "url": "https://github.com/x3-chain/x3-chain",
     "directory": "packages/polkawallet-plugin"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2",
+    "jayson": {
+      "uuid": "^11.1.1"
+    }
   }
 }

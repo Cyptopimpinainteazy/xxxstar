@@ -1,7 +1,7 @@
 {
   "name": "@x3-chain/atomic-swap-sdk",
   "version": "0.1.0",
-  "description": "Multi-chain atomic swap SDK with HTLC support for EVM, Solana, Bitcoin, and Substrate — Polkadex-inspired DEX engine",
+  "description": "Multi-chain atomic swap SDK with HTLC support for EVM, Solana, Bitcoin, and Substrate \u2014 Polkadex-inspired DEX engine",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/index.mjs",
@@ -56,5 +56,10 @@
     "type": "git",
     "url": "https://github.com/x3-chain/x3-chain",
     "directory": "packages/atomic-swap-sdk"
+  },
+  "overrides": {
+    "jayson": {
+      "uuid": "^11.1.1"
+    }
   }
 }

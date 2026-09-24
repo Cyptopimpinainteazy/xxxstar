@@ -1,7 +1,7 @@
 {
   "name": "@x3-chain/blockchain-connector",
   "version": "0.1.0",
-  "description": "Enterprise-grade blockchain connector SDK — multi-chain RPC proxy, WebSocket streaming, test harness, and benchmarks",
+  "description": "Enterprise-grade blockchain connector SDK \u2014 multi-chain RPC proxy, WebSocket streaming, test harness, and benchmarks",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
@@ -55,5 +55,10 @@
     "type": "git",
     "url": "https://github.com/x3-chain/x3-chain",
     "directory": "packages/blockchain-connector"
+  },
+  "overrides": {
+    "jayson": {
+      "uuid": "^11.1.1"
+    }
   }
 }
