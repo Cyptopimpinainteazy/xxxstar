@@ -274,8 +274,11 @@ impl WgpuBackend {
             .as_ref()
             .expect("keccak buffers initialized after capacity check");
 
-        self.queue
-            .write_buffer(&buffers.blocks_buffer, 0, bytemuck::cast_slice(&block_words));
+        self.queue.write_buffer(
+            &buffers.blocks_buffer,
+            0,
+            bytemuck::cast_slice(&block_words),
+        );
         self.queue.write_buffer(
             &buffers.block_offsets_buffer,
             0,

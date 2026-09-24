@@ -427,12 +427,8 @@ impl AtlasDnsServer {
                 }
                 DnsRecordType::SRV(srv) => {
                     if let Ok(target) = srv.target.to_name() {
-                        record.data = RData::SRV(rdata::SRV::new(
-                            srv.priority,
-                            srv.weight,
-                            srv.port,
-                            target,
-                        ));
+                        record.data =
+                            RData::SRV(rdata::SRV::new(srv.priority, srv.weight, srv.port, target));
                     }
                 }
                 DnsRecordType::CAA(_) | DnsRecordType::HINFO(_) => {

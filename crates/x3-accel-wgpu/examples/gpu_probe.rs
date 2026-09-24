@@ -53,7 +53,10 @@ fn main() -> ExitCode {
     println!("backend            : {:?}", info.backend);
     println!("device_type        : {:?}", info.device_type);
     println!("driver             : {} {}", info.driver, info.driver_info);
-    println!("vendor / device    : {:#06x} / {:#06x}", info.vendor, info.device);
+    println!(
+        "vendor / device    : {:#06x} / {:#06x}",
+        info.vendor, info.device
+    );
     println!();
 
     let parity_inputs = parity_vectors();
@@ -83,7 +86,10 @@ fn main() -> ExitCode {
         return ExitCode::from(3);
     }
 
-    println!("parity             : OK ({} messages, CPU match)\n", parity_inputs.len());
+    println!(
+        "parity             : OK ({} messages, CPU match)\n",
+        parity_inputs.len()
+    );
 
     let batch = throughput_vectors();
     let input_bytes: u64 = batch.iter().map(|message| message.len() as u64).sum();
@@ -128,7 +134,12 @@ fn main() -> ExitCode {
     }
     let soak_elapsed = soak_start.elapsed();
 
-    println!("batch              : {} messages x {} bytes ({} bytes total)", batch.len(), THROUGHPUT_MESSAGE_BYTES, input_bytes);
+    println!(
+        "batch              : {} messages x {} bytes ({} bytes total)",
+        batch.len(),
+        THROUGHPUT_MESSAGE_BYTES,
+        input_bytes
+    );
     println!(
         "cpu  sha256 (sha2) : {:>9.3} ms  {:>12.0} msg/s  {:>8.2} MB/s",
         ms(cpu_elapsed),
@@ -189,7 +200,11 @@ fn main() -> ExitCode {
         }
     };
     let keccak_gpu_elapsed = keccak_gpu_start.elapsed();
-    if keccak_batch_outputs.iter().fold(0u8, |acc, digest| acc ^ digest[0]) != keccak_cpu_sink {
+    if keccak_batch_outputs
+        .iter()
+        .fold(0u8, |acc, digest| acc ^ digest[0])
+        != keccak_cpu_sink
+    {
         eprintln!("PARITY_MISMATCH (keccak256): throughput batch diverged from CPU baseline");
         return ExitCode::from(3);
     }
@@ -211,7 +226,10 @@ fn main() -> ExitCode {
     let keccak_soak_elapsed = keccak_soak_start.elapsed();
 
     println!();
-    println!("keccak256          : parity OK ({} messages, CPU match)", keccak_parity_inputs.len());
+    println!(
+        "keccak256          : parity OK ({} messages, CPU match)",
+        keccak_parity_inputs.len()
+    );
     println!(
         "cpu  keccak (rust)  : {:>9.3} ms  {:>12.0} msg/s  {:>8.2} MB/s",
         ms(keccak_cpu_elapsed),
@@ -244,7 +262,11 @@ fn main() -> ExitCode {
 fn parity_vectors() -> Vec<Vec<u8>> {
     PARITY_LENGTHS
         .iter()
-        .map(|&length| (0..length).map(|index| (index as u8).wrapping_mul(31).wrapping_add(7)).collect())
+        .map(|&length| {
+            (0..length)
+                .map(|index| (index as u8).wrapping_mul(31).wrapping_add(7))
+                .collect()
+        })
         .collect()
 }
 
