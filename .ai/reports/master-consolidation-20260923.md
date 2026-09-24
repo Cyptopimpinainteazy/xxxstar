@@ -296,3 +296,48 @@ git for-each-ref --format='%(refname)' refs/heads refs/remotes/origin \
       git merge-base --is-ancestor "$r" master || echo "NOT ON MASTER: $r"
     done
 ```
+
+## Security pass 3: the old polkadot-sdk lineage (2026-09-24)
+
+`crates/x3-staking-analytics` declared `sp-runtime = "33.0"` and never used it —
+no `sp_runtime` reference exists anywhere in the crate. Because 33 is older than
+the workspace's, it dragged a *second, obsolete* polkadot-sdk stack into
+`Cargo.lock`: sp-core 30, sp-io 32, sp-keystore 0.36, sp-state-machine 0.37,
+sp-trie 31, sp-application-crypto 32, and through them sp-tracing 16 →
+tracing-subscriber 0.2.25 and sp-wasm-interface 20 → **wasmtime 8.0.1**.
+
+Removing the unused dependency deleted 1513 lock lines. The lock now resolves one
+sp-runtime (45.0.0), one sp-tracing (19.0.0), one tracing-subscriber (0.3.23) and
+one wasmtime (36.0.14) — which cleared the five `wasmtime` advisories,
+`wasmtime-jit-debug` and `tracing-subscriber` outright, and is why #497/#498
+below no longer touch anything that matters.
+
+Verified: `SKIP_WASM_BUILD=1 cargo check --workspace`,
+`cargo test -p x3-staking-analytics` (58 passed).
+
+### Alert totals across the whole session
+
+**86 (2 critical, 6 high) → 43 (0 critical, 4 high, 25 medium, 14 low).**
+
+Cleared: all 2 critical, 2 of the 6 high (both `quinn-proto`), and 41
+medium/low. What remains and why:
+
+- **4 high** — `libp2p-quic`, `rustls-webpki`, `yamux`, `hickory-proto`, all
+  resolved *by libp2p 0.54.1 itself* (arriving via polkadot-sdk stable2512).
+  Needs an upstream bump; `hickory-proto` has no patched release at all.
+- **12 medium — `uuid` + `stream-json`** — both arrive via `@solana/web3.js` →
+  `jayson@4.3.0`. `jayson@5.0.0` removes both dependencies, but the SDK pins
+  `jayson ^4.3.0`, so this is upstream's move.
+- **`curve25519-dalek 3.2.0`** — the remaining 3.2.0 comes from
+  `ed25519-dalek 1.0.1` (Solana's `agave-precompiles`) *and* `ed25519-zebra
+  3.1.0`, which `crates/x3-mobile-sdk` genuinely uses (`SigningKey`,
+  `VerificationKey`, `Signature`) — that one needs a code migration to
+  ed25519-zebra 4.x, not a manifest bump.
+- The rest (`protobuf` 2.28 via `prometheus`, `idna` 0.1.5 via `url` 1.7,
+  `ring` 0.16.20 via `jsonwebtoken` 8, `serde_with`, `hickory-proto`) are
+  upstream-pinned.
+
+Two open Dependabot proposals remain on the repo (#497 `curve25519-dalek`,
+#498 `lru`); neither clears its advisory (each leaves the vulnerable copy in
+place and adds a third version), documented above. Left open — closing them
+would not clear the advisories, and the ignore policy is the maintainer's call.
