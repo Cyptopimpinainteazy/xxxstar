@@ -25,7 +25,22 @@ import json
 import pathlib
 import subprocess
 import sys
-import tomllib
+
+try:  # Python 3.11+
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 and older
+    # The gate is run by whatever python3 the box has. On 3.10 that is the
+    # `tomli` backport; without either there is no TOML parser and the check
+    # cannot mean anything, so say so rather than dying on an import. This is
+    # the second script in the tree with this problem — feature_matrix.py had
+    # the same one, and `local-ci.sh` reported this gate as a bare FAIL until
+    # now.
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError as exc:  # pragma: no cover - environment guard
+        raise SystemExit(
+            "check-workspace-membership needs a TOML parser: Python 3.11+ (tomllib) or the `tomli` backport"
+        ) from exc
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASELINE = ROOT / ".ai" / "workspace-membership-baseline.txt"
