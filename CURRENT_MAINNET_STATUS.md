@@ -1,6 +1,6 @@
 # X3 Atomic Star — Mainnet Status
 
-**Updated: 2026-09-20 — ~54% registry-scored readiness (53.74% across 19 current entries, recalculated from `FEATURE_REGISTRY.toml`). The registry paths and cited test names resolve to real code; this is not a mainnet-ready claim.**
+**Updated: 2026-09-24 — ~55% registry-scored readiness (55.29% across 21 current entries, recalculated from `FEATURE_REGISTRY.toml`). The registry paths and cited test names resolve to real code; this is not a mainnet-ready claim.**
 
 > `FEATURE_REGISTRY.toml` is the single canonical source. All percentages derive from it.
 > Run `scripts/check-readiness-consistency.sh` to validate (now also fails on fictional registry paths).
@@ -17,6 +17,7 @@ Atomic Gateway (crates/x3-gateway)                 ██████░░░�
 Triforge Runtime (pallets/evolution-core)          ██████░░░░  65%  GUARDED_TESTNET — CI build step wired, mainnet-rc1 feature wired
 X3 Wallet Pallet (pallets/x3-wallet-pallet)        █████░░░░░  55%  LIVE_TESTNET — CI gate verified, biometric security review pending
 Launch Gate (scripts/mainnet)                      █████░░░░░  55%  LIVE_TESTNET — Readiness consistency + mainnet-rc1 wired
+State Snapshot (crates/x3-state-snapshot)          █████░░░░░  55%  GUARDED_TESTNET — Content-addressed manifest, chunk verifier and exporter, 40 tests; the state root is recomputed from the snapshot's own bytes
 X3 Sentinel (pallets/x3-sentinel)                  █████░░░░░  50%  GUARDED_TESTNET — CI gate wired
 X3 Reactor (crates/x3-bench)                       ████░░░░░░  40%  LIVE_TESTNET — Benchmark not in CI critical path
 X3 Swarm Core (crates/x3-swarm-core)               ██░░░░░░░░  25%  GUARDED_TESTNET — Experimental, not in CI
@@ -25,7 +26,7 @@ Repo Scanner Agent (scripts/swarm)                 ██░░░░░░░�
 Tauri OS (apps/tauri-os)                           █░░░░░░░░░  15%  GUARDED_TESTNET — Dead buttons report, Tauri wiring pending
 ```
 
-**Average readiness: ~54%** — 19 features are currently tracked. Eight aspirational/fictional rows were purged on 2026-09-05; `atomic_kernel` was corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 because its required tests were fictional, and to 35% on 2026-09-22 because bundle finalization is not authorized and its finality gate compares the caller's input with the caller's earlier input (TICKET-097). Core consensus features are at guarded-testnet, not mainnet, maturity.
+**Average readiness: ~55%** — 21 features are currently tracked. Eight aspirational/fictional rows were purged on 2026-09-05; `atomic_kernel` was corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 because its required tests were fictional, and to 35% on 2026-09-22 because bundle finalization is not authorized and its finality gate compares the caller's input with the caller's earlier input (TICKET-097). `state_snapshot` was added on 2026-09-24 at 55% (format, verifier and exporter exist and are unit tested; no chain-produced root has been matched yet, so it is not testnet-proven). Core consensus features are at guarded-testnet, not mainnet, maturity.
 
 ### 2026-09-07 Atomic lifecycle live evidence
 

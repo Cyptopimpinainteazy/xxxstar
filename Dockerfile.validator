@@ -81,7 +81,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 EXPOSE 30333 9933 9616
 
 # ── Default Command ──────────────────────────────────────────────────────
-# Override with `docker run -e VALIDATOR_NAME=val-1 ...` for custom names
+# Override with `docker run -e VALIDATOR_NAME=val-1 -e X3_BOOTNODES=… ...`
 # Flags explained:
 #   --chain: Chain specification file
 #   --validator: Enable validator mode (block production)
@@ -93,21 +93,21 @@ EXPOSE 30333 9933 9616
 #   --prometheus-port: Metrics endpoint
 #   --prometheus-external: Expose Prometheus metrics
 #   --log: Logging level
-#   --no-tmp: Persistent storage (replace --tmp for dev)
-
-CMD [ \
-    "x3-chain-node", \
-    "--chain", "/etc/x3/chain-spec.json", \
-    "--validator", \
-    "--name", "${VALIDATOR_NAME:-x3-validator}", \
-    "--base-path", "/home/validator/data", \
-    "--rpc-port", "9933", \
-    "--rpc-external", \
-    "--rpc-methods", "Safe", \
-    "--prometheus-port", "9616", \
-    "--prometheus-external", \
-    "--log", "info" \
-]
+#   --bootnodes: From X3_BOOTNODES; required, see below
+#
+# X3_BOOTNODES is required, and the check is in the command rather than in this
+# comment because the bundled spec cannot carry the answer: the bootnodes that
+# are missing are the deployment's, and inventing peer ids for
+# deployment/chain-specs/x3-testnet-raw.json would be a lie. A validator that
+# starts with no peers looks healthy and does nothing, which is the worst of the
+# available failures — so this refuses to start instead.
+#
+#   docker run -e X3_BOOTNODES="/ip4/<host>/tcp/30333/p2p/<peerid>,…" …
+#
+# X3_CHAIN_SPEC overrides the bundled chain spec. Note that the bundled
+# `x3-testnet-raw.json` is a Live *raw* spec, which the node refuses to load;
+# mount a plain spec and set X3_CHAIN_SPEC for anything beyond inspection.
+CMD ["sh", "-c", "if [ -z \"$X3_BOOTNODES\" ]; then echo 'X3_BOOTNODES is required (comma-separated multiaddrs); the bundled spec ships with an empty bootNodes list, so a node started without it would never find a peer' >&2; exit 2; fi; exec x3-chain-node --chain \"${X3_CHAIN_SPEC:-/etc/x3/chain-spec.json}\" --validator --name \"${VALIDATOR_NAME:-x3-validator}\" --base-path /home/validator/data --rpc-port 9933 --rpc-external --rpc-methods Safe --prometheus-port 9616 --prometheus-external --bootnodes \"$X3_BOOTNODES\" --log info"]
 
 # ── Metadata ─────────────────────────────────────────────────────────────
 LABEL org.opencontainers.image.title="X3 Chain Validator" \

@@ -37,7 +37,11 @@ required_tests = [
   "rollback_deadline_exceeded_before_the_deadline_is_rejected",
   "economic_halt_does_not_block_inflight_bundle_assignment"
 ]
-proof_report = "reports/six_route_invariants.md"
+# `reports/six_route_invariants.md` was cited here and does not exist. A citation
+# to a missing file is not evidence, so it is cleared rather than left dangling;
+# the row's score is *not* re-measured by this edit, and the absence of a written
+# proof report is part of why it sits where it sits.
+proof_report = ""
 readiness_score = 35
 blockers = [
   "**CLOSED 2026-09-23 — bundle finalization is authorized, and the unauthorised entry point is gone.** `submit_finalization_result` was `ensure_none` and its off-chain marker (`x3fin:`) had no writer anywhere in this repository; together with an equally unsigned certificate anchor it let any account finalize any `Executing` bundle with a proof nobody produced (TICKET-097). The call, its pool validation, its OCW branch, its weight entry, its benchmark and the settlement engine's marker path were removed. Finalization is now only `finalize_atomic_bundle` (`X3LangOrigin` — a genesis-named gateway account since spec 19) and `finalize_with_settlement` (`SettlementOrigin`), and the pallet's finalization tests drive that core. Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`. The score below is *not* re-measured here: raising it is TICKET-101's re-measurement, not an edit made in passing. Still open on this row: the signed path's certificate comes from an unsigned anchor any peer can write first (TICKET-107), and the halt/rollback paths have never been exercised on a multi-validator network.",
@@ -51,7 +55,8 @@ mode = "GUARDED_TESTNET"
 crate_or_service = "runtime"
 tauri_app = "LaunchGate"
 required_tests = ["runtime_upgrade_rehearsal", "runtime_upgrade_rehearsal_storage_versions", "runtime_upgrade_rehearsal_migrations_advance_behind_versions"]
-proof_report = "reports/mainnet_readiness_report.md"
+# `reports/mainnet_readiness_report.md` does not exist; citation cleared.
+proof_report = ""
 readiness_score = 80
 blockers = [
   "Migration dry-run is automated for all six runtime variants and passing against real genesis state: scripts/check-runtime-variants.sh runs runtime_upgrade_rehearsal per feature set, seeding each variant's actual genesis through frame_support::genesis_builder_helper (the plain functions behind the sp_api GenesisBuilder runtime API), then executing the same OnRuntimeUpgrade hooks an upgrade would (AllPalletsWithSystem + the Migrations tuple) and asserting the work fits inside a block",
@@ -75,7 +80,9 @@ required_tests = [
   "test_expired_transfer_refunds_to_source",
   "external_bridges_are_paused_at_genesis"
 ]
-proof_report = "reports/six_route_invariants.md"
+# `reports/six_route_invariants.md` does not exist; citation cleared (see the
+# note on [atomic_kernel]).
+proof_report = ""
 readiness_score = 88
 blockers = [
   "External-bridge path disabled at genesis — governance gate, not code gap"
@@ -87,7 +94,8 @@ mode = "GUARDED_TESTNET"
 crate_or_service = "pallets/x3-cross-vm-router"
 tauri_app = "Gateway"
 required_tests = ["enabling_external_bridges_requires_documented_audit_gate", "revoking_bridge_audit_gate_disables_external_bridges"]
-proof_report = "reports/btc_gateway_report.md"
+# `reports/btc_gateway_report.md` does not exist; citation cleared.
+proof_report = ""
 readiness_score = 65
 blockers = [
   "Gateway is guarded — ExternalBridgesEnabled = false at genesis (governance gate)"
@@ -144,7 +152,8 @@ required_tests = [
   "genesis_refuses_a_checkpoint_easier_than_the_networks_pow_limit",
   "genesis_refuses_two_checkpoints_at_one_height",
 ]
-proof_report = "reports/btc_gateway_report.md"
+# `reports/btc_gateway_report.md` does not exist; citation cleared.
+proof_report = ""
 readiness_score = 45
 blockers = [
   "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, but nothing has run against testnet or mainnet and the deposit/withdrawal path has never moved a coin",
@@ -211,7 +220,9 @@ mode = "LIVE_TESTNET"
 crate_or_service = "crates/x3-bench"
 tauri_app = "Reactor"
 required_tests = ["create_and_compare_reports", "test_compile_optimized"]
-proof_report = "reports/reactor_benchmark_report.md"
+# `reports/reactor_benchmark_report.md` does not exist; citation cleared. The row
+# already records that its benchmark is not in the CI critical path.
+proof_report = ""
 readiness_score = 40
 blockers = [
   "Benchmark infrastructure not in CI critical path",
@@ -225,7 +236,10 @@ mode = "GUARDED_TESTNET"
 crate_or_service = "apps/tauri-os"
 tauri_app = "AtomicConsole"
 required_tests = []
-proof_report = "reports/tauri_e2e_report.md"
+# `reports/tauri_e2e_report.md` does not exist. `reports/tauri_desktop_gap_report.md`
+# does, but it is a gap report, not the end-to-end proof this field names, so the
+# citation is cleared rather than repointed at something close enough.
+proof_report = ""
 readiness_score = 15
 blockers = [
   "Desktop UI only — not part of blockchain runtime",
@@ -240,7 +254,8 @@ mode = "LIVE_TESTNET"
 crate_or_service = "scripts/mainnet/mainnet_rc_gate.sh"
 tauri_app = "LaunchGate"
 required_tests = ["testnet_rc_gate", "mainnet_rc_gate"]
-proof_report = "reports/mainnet_readiness_report.md"
+# `reports/mainnet_readiness_report.md` does not exist; citation cleared.
+proof_report = ""
 readiness_score = 55
 blockers = [
   "mainnet_rc_gate is manual approval, not automated"
@@ -251,7 +266,8 @@ dangerous_paths = ["mainnet deployment", "approval gates"]
 mode = "GUARDED_TESTNET"
 crate_or_service = "crates/x3-swarm-core"
 tauri_app = "SwarmCommand"
-proof_report = "reports/swarm_health_report.md"
+# `reports/swarm_health_report.md` does not exist; citation cleared.
+proof_report = ""
 readiness_score = 25
 # CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names
 # previously listed here existed as real tests anywhere under crates/x3-swarm-core.
@@ -267,7 +283,8 @@ dangerous_paths = ["keys", "secrets", "mainnet"]
 mode = "LIVE_TESTNET"
 crate_or_service = "scripts/swarm/swarm_scan.sh"
 tauri_app = "SwarmCommand"
-proof_report = "reports/swarm_scan_report.md"
+# `reports/swarm_scan_report.md` does not exist; citation cleared.
+proof_report = ""
 readiness_score = 25
 required_tests = ["swarm_scan_generates_report"]
 blockers = [
@@ -289,7 +306,8 @@ required_tests = [
   "register_biometric_works",
   "initiate_recovery_works"
 ]
-proof_report = "reports/wallet_pallet_report.md"
+# `reports/wallet_pallet_report.md` does not exist; citation cleared.
+proof_report = ""
 readiness_score = 55
 blockers = [
   "Biometric template and recovery logic have no security review"
@@ -461,6 +479,48 @@ blockers = [
   "No production submitter: pallets/x3-settlement-engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused and the authority path is undecided",
 ]
 dangerous_paths = ["programs/svm/x3_atomic_swap", "SVM domain", "hashlock and timelock logic", "PDA authority checks"]
+
+# ── 2026-09-24: state snapshot format, verifier and exporter ──
+# The storage audit (2026-09-24) found X3 had backup/restore tooling but no
+# snapshot *format*: nothing content-addressed, and nothing checkable against a
+# finalized state root. This row is that format, its verifier and its exporter
+# (`crates/x3-state-snapshot`), with 40 tests and both directions exercised end
+# to end on the repository's own 6 MB raw chain spec.
+#
+# Proven today: the chunk set must be complete and correctly ordered; every
+# chunk matches the hash the manifest committed to; the manifest hash is
+# canonical and covers every field; the manifest matches a caller-supplied
+# anchor (chain id, block hash, state root, runtime version); and the entries
+# carried by the chunks recompute to the declared state root under the chain's
+# own trie layout and hasher — cross-checked against `sp_state_machine`'s
+# reference root function for both layouts. A copied manifest pointing at a
+# different state root is refused even when the caller's anchor agrees with the
+# tampered manifest, because the bytes do not recompute to it.
+#
+# Not proven yet: the recomputed root has never been compared with a root
+# produced by a running chain, and the exporter consumes `export-state` output
+# rather than reading the database directly. Both are recorded below.
+[state_snapshot]
+mode = "GUARDED_TESTNET"
+crate_or_service = "crates/x3-state-snapshot"
+required_tests = [
+  "the_recomputed_root_matches_the_state_machines_own_reference_implementation",
+  "a_snapshot_whose_bytes_do_not_produce_the_declared_root_is_refused",
+  "verification_detects_state_swapped_in_under_a_copied_manifest",
+  "a_snapshot_from_another_chain_is_refused",
+  "a_stale_snapshot_is_refused_when_the_caller_sets_a_floor",
+  "an_incomplete_snapshot_is_refused",
+  "a_corrupt_chunk_is_refused_at_the_chunk_that_is_wrong",
+  "exporting_the_same_state_twice_produces_the_same_manifest_hash"
+]
+proof_report = ""
+readiness_score = 55
+blockers = [
+  "The recomputed state root has never been compared against a root produced by a running chain: that needs `export-state` on a live node, which needs the embedded runtime WASM, which needs clang. Until then the claim is 'the SDK's own root function, cross-checked against the SDK's reference implementation', not 'matched a real chain root'.",
+  "The exporter consumes `export-state` output rather than reading the database directly, so the operator flow is export-state -> build -> verify, and nothing yet reads the trie straight out of RocksDB.",
+  "No snapshot has been produced from a chain larger than the repository's raw genesis fixture, so chunk counts, chunk sizes and wall-clock export timings at real state sizes are unmeasured."
+]
+dangerous_paths = ["crates/x3-state-snapshot", "validator state sync", "restore path"]
 
 # ── Score adjustments 2026-06-17 ──
 # atomic_kernel:  75→85  (6 tests verified passing, EconomicHalt gate wired)

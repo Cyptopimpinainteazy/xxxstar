@@ -177,6 +177,30 @@ if [[ "$TESTS_MISSING" -gt 0 ]]; then
 fi
 echo ""
 
+# --- proof_report existence check ---
+# `proof_report` is a row's pointer to its written evidence. Eight of the ten
+# distinct paths cited when this check was added did not exist on disk — a
+# citation to a missing file is not evidence, and nothing was resolving them, so
+# they had drifted unread. An empty value stays allowed: it says "this row has no
+# written report". A path that resolves to nothing does not.
+echo "--- Checking proof_report paths resolve ---"
+REPORTS_MISSING=0
+while IFS= read -r line; do
+  if [[ "$line" =~ ^proof_report[[:space:]]*=[[:space:]]*\"([^\"]*)\" ]]; then
+    p="${BASH_REMATCH[1]}"
+    [ -z "$p" ] && continue
+    if [[ ! -e "$REPO_ROOT/$p" ]]; then
+      echo "  VIOLATION: proof_report '$p' does not exist on disk"
+      REPORTS_MISSING=$((REPORTS_MISSING + 1))
+    fi
+  fi
+done < "$REGISTRY"
+VIOLATIONS=$((VIOLATIONS + REPORTS_MISSING))
+if [[ "$REPORTS_MISSING" -gt 0 ]]; then
+  echo "  → $REPORTS_MISSING proof_report path(s) do not resolve. Write the report, or clear the field."
+fi
+echo ""
+
 # --- Cross-check TESTNET_FEATURE_FLAGS.toml against registry modes ---
 if [[ -f "$FLAGS" ]]; then
   echo "--- Checking TESTNET_FEATURE_FLAGS.toml vs registry modes ---"

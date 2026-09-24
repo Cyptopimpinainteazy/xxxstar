@@ -213,6 +213,15 @@ GATES_FAST=(
   "invariant registry:python3 scripts/check-invariant-registry.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
+  # A `migrations.rs` whose crate never declares the module is uncompiled,
+  # untested dead weight that looks exactly like the real thing. Five such files
+  # were sitting under pallets when this gate was added.
+  "migration modules wired:bash scripts/ci/check_migration_modules_are_wired.sh"
+  # The snapshot format's whole job is to refuse bad input, so the refusals are
+  # demonstrated on disk against a real export rather than only in unit tests:
+  # corrupt/truncated/missing chunks, substituted state under a forged but
+  # self-consistent manifest, wrong block, wrong chain, wrong runtime, stale.
+  "snapshot murder test:bash launch-gates/snapshot-murder-test.sh"
   # `scripts/feature_matrix.py check` validates the granular readiness manifest:
   # every declared path and evidence path has to exist, scores have to respect the
   # per-priority caps, and the enums have to hold. It takes a tenth of a second and
@@ -244,6 +253,11 @@ GATES_FAST=(
   "test atomic-kernel:cargo test -p pallet-x3-atomic-kernel"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
+  # The snapshot format is the trust boundary for state sync: a mirror must not
+  # be able to alter metadata or a chunk without the verifier noticing. Its
+  # murder-test matrix (wrong chain, stale, wrong state root, corrupt /
+  # reordered / missing chunk) is cheap, so it belongs in the gate set of record.
+  "test state snapshot:cargo test -p x3-state-snapshot"
   # No SKIP_WASM_BUILD here on purpose: the service tests boot a real node whose
   # chain spec is decoded by the *embedded* runtime, so the runtime WASM must be
   # built for this feature set. `SKIP_WASM_BUILD=1` used to embed whatever blob
