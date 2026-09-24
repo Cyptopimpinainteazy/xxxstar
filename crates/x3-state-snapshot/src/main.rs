@@ -2,6 +2,7 @@
 //!
 //! ```text
 //! x3-state-snapshot hash-manifest <manifest.json>
+//! x3-state-snapshot root --from-raw-spec <spec.json> [--state-version <0|1>]
 //! x3-state-snapshot build --from-raw-spec <spec.json> --out <dir>
 //!     --chain-id <id> --block-number <n> --block-hash <0x..> --state-root <0x..>
 //!     --runtime-version <n> --finality-proof <0x..>
@@ -41,6 +42,7 @@ const DEFAULT_DATABASE_FORMAT: &str = "rocksdb-substrate-trie-v1";
 const USAGE: &str = "\
 usage:
   x3-state-snapshot hash-manifest <manifest.json>
+  x3-state-snapshot root --from-raw-spec <spec.json> [--state-version <0|1>]
   x3-state-snapshot build --from-raw-spec <spec.json> --out <dir>
       --chain-id <id> --block-number <n> --block-hash <0x..> --state-root <0x..>
       --runtime-version <n> --finality-proof <0x..>
@@ -64,8 +66,89 @@ fn main() -> ExitCode {
             None => fail_usage("hash-manifest needs a manifest path"),
         },
         Some("build") => build(&args[1..]),
+        Some("root") => root(&args[1..]),
         Some("verify") => verify(&args[1..]),
         _ => fail_usage("expected a subcommand"),
+    }
+}
+
+/// Print the state root a raw spec's genesis state produces.
+///
+/// Separate from `build` on purpose: this answers "what does this state hash
+/// to?" without writing a manifest, so a root probe does not need to invent a
+/// finality proof. It is the piece that lets the derived root be compared with a
+/// chain-produced one.
+fn root(args: &[String]) -> ExitCode {
+    let mut spec_path: Option<PathBuf> = None;
+    let mut state_version: Option<u8> = None;
+    let mut index = 0;
+
+    while index < args.len() {
+        let flag = args[index].clone();
+        match flag.as_str() {
+            "--from-raw-spec" => {
+                spec_path = Some(PathBuf::from(match value_at(args, &mut index, &flag) {
+                    Ok(value) => value,
+                    Err(message) => return fail_usage(&message),
+                }));
+            }
+            "--state-version" => {
+                let raw = match value_at(args, &mut index, &flag) {
+                    Ok(value) => value,
+                    Err(message) => return fail_usage(&message),
+                };
+                match raw.parse::<u8>() {
+                    Ok(version) => state_version = Some(version),
+                    Err(err) => return fail_usage(&format!("{flag} {raw:?}: {err}")),
+                }
+            }
+            other => return fail_usage(&format!("unexpected argument {other:?}")),
+        }
+        index += 1;
+    }
+
+    let Some(spec_path) = spec_path else {
+        return fail_usage("root needs --from-raw-spec");
+    };
+
+    let raw = match std::fs::read_to_string(&spec_path) {
+        Ok(raw) => raw,
+        Err(err) => {
+            eprintln!("error: cannot read {}: {err}", spec_path.display());
+            return ExitCode::from(1);
+        }
+    };
+    let spec: serde_json::Value = match serde_json::from_str(&raw) {
+        Ok(spec) => spec,
+        Err(err) => {
+            eprintln!("error: cannot parse {}: {err}", spec_path.display());
+            return ExitCode::from(1);
+        }
+    };
+    let entries = match state_entries_from_raw_spec(&spec) {
+        Ok(entries) => entries,
+        Err(err) => {
+            eprintln!("error: {err}");
+            return ExitCode::from(1);
+        }
+    };
+    let version = match TrieVersion::from_u8(state_version.unwrap_or(1)) {
+        Ok(version) => version,
+        Err(err) => {
+            eprintln!("error: {err}");
+            return ExitCode::from(1);
+        }
+    };
+
+    match compute_state_root(&entries, version) {
+        Ok(root) => {
+            println!("{root}");
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            eprintln!("error: {err}");
+            ExitCode::from(1)
+        }
     }
 }
 
