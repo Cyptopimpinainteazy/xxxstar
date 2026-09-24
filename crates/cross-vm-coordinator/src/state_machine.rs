@@ -121,15 +121,13 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
     ///
     /// Distributed lease holders call this immediately after acquiring a new
     /// fencing epoch so a long-lived process cannot commit from stale memory.
-    pub fn refresh_from_persistence(
-        &mut self,
-        session_id: &str,
-    ) -> Result<(), CoordinatorError> {
-        let session = self.persistence.load(session_id).ok_or_else(|| {
-            CoordinatorError::SessionNotFound {
-                session_id: session_id.to_string(),
-            }
-        })?;
+    pub fn refresh_from_persistence(&mut self, session_id: &str) -> Result<(), CoordinatorError> {
+        let session =
+            self.persistence
+                .load(session_id)
+                .ok_or_else(|| CoordinatorError::SessionNotFound {
+                    session_id: session_id.to_string(),
+                })?;
         self.sessions.insert(session_id.to_string(), session);
 
         let persisted_claims = self.persistence.load_used_secret_claims();
@@ -144,7 +142,6 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         }
         Ok(())
     }
-
 
     /// Get a mutable session by ID.
     pub fn get_session_mut(&mut self, session_id: &str) -> Option<&mut SwapSession> {
@@ -169,10 +166,27 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         self.sessions.len()
     }
 
+    /// Entries in the HTLC-secret replay guard.
+    ///
+    /// Exposed for monitoring and tests. The guard is append-only: see
+    /// [`Self::purge_terminated_sessions`] for why nothing shrinks it.
+    pub fn used_secret_count(&self) -> usize {
+        self.used_secrets.len()
+    }
+
     /// Purge terminated sessions (Complete, Refunded, Failed) older than `max_age_secs`.
     ///
-    /// Call periodically (e.g., every epoch) to prevent unbounded memory growth on
-    /// long-running nodes. Returns the number of sessions purged.
+    /// Call periodically (e.g., every epoch) to bound the session map. Returns the
+    /// number of sessions purged.
+    ///
+    /// This does **not** bound `used_secrets`. That replay guard is append-only in
+    /// this crate: it is written on claim and restored from persistence on start,
+    /// and there is no prune path for it anywhere. It grows by one 32-byte entry
+    /// per claimed secret for the life of the node, and purging sessions must not
+    /// shrink it either - a secret has to stay burned after its session ages out,
+    /// or a revealed secret becomes reusable once the session that used it is
+    /// gone. Bounding the guard is a policy question (how long a secret stays
+    /// burned), so it is stated here rather than guessed at with a timeout.
     pub fn purge_terminated_sessions(&mut self, now_unix: u64, max_age_secs: u64) -> usize {
         let mut purged = 0;
         let mut cursor: Option<String> = None;
@@ -1337,5 +1351,42 @@ mod state_machine_regression_tests {
         let second_batch =
             coordinator.next_stale_terminal_session_batch(now, max_age, Some("swap-004-stale"), 2);
         assert_eq!(second_batch, vec!["swap-006-stale".to_string()]);
+    }
+
+    /// Audit Finding 6 regression: the replay guard must not be released by purging.
+    ///
+    /// `purge_terminated_sessions` bounds the session map. It must never shrink
+    /// `used_secrets`, because a secret has to stay burned after the session that
+    /// used it ages out - otherwise a revealed secret becomes reusable exactly
+    /// when its session disappears.
+    ///
+    /// The guard growing without a prune path is a known, stated limitation (see
+    /// the `purge_terminated_sessions` docs). What this test pins is the security
+    /// half: purge does not un-burn anything. If someone later adds guard
+    /// pruning, this test is where it has to be argued.
+    #[test]
+    fn purging_a_terminated_session_never_releases_a_burned_secret() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x5A; 32]);
+        let burned = *blake3::hash(secret.as_bytes()).as_bytes();
+
+        let persistence = Arc::new(InMemoryPersistence::new());
+        persistence.save_used_secrets(&[burned]);
+
+        let mut coordinator =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        assert_eq!(
+            coordinator.used_secret_count(),
+            1,
+            "the replay guard is restored from persistence on construction"
+        );
+
+        let purged = coordinator.purge_terminated_sessions(now, 0);
+        assert_eq!(purged, 0, "there is nothing terminal to purge");
+        assert_eq!(
+            coordinator.used_secret_count(),
+            1,
+            "purging sessions must never release a burned secret"
+        );
     }
 }
