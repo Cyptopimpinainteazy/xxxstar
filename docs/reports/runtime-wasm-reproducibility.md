@@ -131,6 +131,12 @@ bytes**:
   `recorded_revision` moves. That is the third revision in this list where that happens, and it is
   the property the gate exists for: it watches the runtime's dependency graph rather than the
   timestamp of the last edit.
+* `8ba9f897f` — the storage/RPC/validator-ops audit. The treasury, agent-accounts and agent-memory
+  migration modules read their pallet's declared `STORAGE_VERSION` instead of restating a literal,
+  and five `migrations.rs` files that no crate declared are deleted. The bytes move this time:
+  compact 8,485,072 bytes (was 8,482,928), compressed 1,458,341 (was 1,459,662) — the compressed
+  artifact shrinks while the compact one grows, which is exactly why the record is rebuilt rather
+  than reasoned about. Two from-scratch builds agree.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
