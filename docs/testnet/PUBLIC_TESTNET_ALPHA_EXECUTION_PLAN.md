@@ -11,16 +11,17 @@ Public Testnet Alpha does **not** launch because RC6 packaging is green.
 
 Launch requires all of the following:
 
-1. RC5 72-hour internal alpha passes on a real multi-node environment.
-2. RC6 package/readiness gate passes.
-3. Public bootnodes are deployed and reachable.
-4. At least 7 validators are online, with no single-rack/single-provider topology masquerading as decentralization.
-5. Public RPC/WebSocket, faucet, explorer/indexer and monitoring are deployed separately from validator consensus hosts.
-6. A signed ceremony manifest is published and verifies against the live network.
-7. Live validator key rotation succeeds without loss of finality.
-8. Validator restart, validator replacement, snapshot restore and minority-failure recovery drills pass.
-9. Runtime-upgrade and rolling-node-upgrade rehearsals pass.
-10. No conflicting finalized heads, unexplained supply drift or unrecoverable atomic-settlement state is observed.
+1. **X3Lang production cutover passes:** the Rust `x3-lang/compiler` + canonical X3Lang VM semantics are the single production `.x3` path and source-to-finality execution is proven on the validator network. See `docs/x3-lang/PRODUCTION_CUTOVER_GATE.md`.
+2. RC5 72-hour internal alpha passes on a real multi-node environment.
+3. RC6 package/readiness gate passes.
+4. Public bootnodes are deployed and reachable.
+5. At least 7 validators are online, with no single-rack/single-provider topology masquerading as decentralization.
+6. Public RPC/WebSocket, faucet, explorer/indexer and monitoring are deployed separately from validator consensus hosts.
+7. A signed ceremony manifest is published and verifies against the live network.
+8. Live validator key rotation succeeds without loss of finality.
+9. Validator restart, validator replacement, snapshot restore and minority-failure recovery drills pass.
+10. Runtime-upgrade and rolling-node-upgrade rehearsals pass.
+11. No conflicting finalized heads, unexplained supply drift or unrecoverable atomic-settlement state is observed.
 
 ## Target topology
 
@@ -86,7 +87,8 @@ Public RPC must never be the same endpoint/process exposure used for validator a
 # Dependency graph
 
 ```text
-P0-01 release freeze / exact commit
+P0-00 X3Lang production cutover
+  -> P0-01 release freeze / exact commit
   -> P0-02 RC5 72h
   -> P0-03 RC6 package
   -> P0-04 public bootnodes + DNS
@@ -117,6 +119,29 @@ P2:
 
 # P0 — Launch blockers
 
+## P0-00 — X3Lang production cutover
+
+X3Lang is a **pre-launch product requirement**, not a later feature.
+
+Public Alpha is blocked until `docs/x3-lang/PRODUCTION_CUTOVER_GATE.md` passes. The production target is the Rust `x3-lang/compiler` + canonical X3Lang VM semantic contract, connected through the root runtime integration boundary and proven all the way to GRANDPA-finalized execution evidence.
+
+Current alternate compiler/interpreter paths may remain only as compatibility/test adapters if they cannot redefine production language semantics and their equivalence is proven.
+
+### Hard PASS
+
+- canonical Rust compiler authority is unambiguous
+- canonical VM semantics are unambiguous
+- production runtime consumes canonical artifacts
+- no fixture/dry-run host in the launch proof
+- differential VM conformance passes
+- one X3-native `.x3` program reaches actual runtime state and GRANDPA finality
+- one Trading Core `.x3` program reaches actual runtime state and GRANDPA finality
+- finalized receipt binds source, bytecode, execution, state roots, inclusion and finality
+- mutation/replay tests fail closed
+
+If this gate is red, RC5/RC6 may continue as engineering rehearsals, but **Public Testnet Alpha remains NO-GO**.
+
+---
 ## P0-01 — Freeze an exact Alpha candidate
 
 ### Goal
@@ -779,6 +804,7 @@ No PASS is accepted without an artifact or reproducible command.
 
 | Gate | Must be green? |
 |---|---|
+| X3Lang production cutover | YES |
 | RC5 72h | YES |
 | RC6 package | YES |
 | public bootnodes | YES |
