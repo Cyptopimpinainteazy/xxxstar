@@ -196,9 +196,6 @@ impl Token {
 }
 
 // Re-export signing module for external use.
-// Signing requires std (uses SS58 codec, format!, secp256k1 RNG, mnemonic phrases).
-// Off-chain consumers (node RPC, bridge host code) build with std.
-#[cfg(feature = "std")]
 /// The X3BC envelope's fixed header — the part a decoder must check before it trusts anything else.
 ///
 /// Two decoders speak this format: `x3-backend::bc_format` (std) writes and reads it, and
@@ -292,6 +289,15 @@ pub mod bytecode {
     }
 }
 
+// Signing requires std (uses SS58 codec, format!, secp256k1 RNG, mnemonic phrases).
+// Off-chain consumers (node RPC, bridge host code) build with std.
+//
+// This attribute sat one item higher until 2026-09-24: inserting the `bytecode` module above this
+// line put `#[cfg(feature = "std")]` on that module instead of on `signing`, so a no-std build
+// compiled `signing` — and failed, taking seven crates' no-default-features builds and the runtime's
+// WASM build with it. A scripted insertion anchored on a bare `pub mod X;` moves whatever attribute
+// precedes it; anchor on the attribute too.
+#[cfg(feature = "std")]
 pub mod signing;
 #[cfg(feature = "std")]
 pub use signing::{
