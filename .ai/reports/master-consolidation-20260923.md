@@ -511,3 +511,38 @@ behind. Its 20 Dependabot branches propose bumps against that old head (includin
 `libp2p 0.50.1 → 0.54.1`, which master already has), and it has 20 open PRs.
 Updating or retiring that repository is a write to a second GitHub repository and
 is left to the maintainer.
+
+## Pass 6: work that existed on no remote at all (2026-09-24)
+
+The "without losing any work" half of the objective needed one more check: every
+local branch that is *not* on master, tested against every remote ref and tag for
+reachability. Four had commits that existed nowhere but this machine.
+
+| branch | commits | unique objects | disposition |
+| --- | --- | --- | --- |
+| `docs/grant-readiness-truth-20260908` | 30 | 100 | **preserved on the remote** as tag `preserve/local-only-20260924/docs/grant-readiness-truth-20260908` |
+| `t5/fix-annotations-20260522-1458` | 13 | 92 | **preserved on the remote** as tag `preserve/local-only-20260924/t5/fix-annotations-20260522-1458` |
+| `wip/consolidation-20260917/recovered-usb-clone` | 179 | 106,996 (3.80 GB) | cannot be pushed — see below |
+| `your-task-branch` | 14 | 79,106 (1.47 GB) | cannot be pushed — see below |
+
+(`fix-x3lang-python` and `archive/pr126-pre-master-rewrite-20260909` were already
+reachable from `origin/archive/pr126-pre-master-rewrite-20260909`.)
+
+Tags rather than branches: the work is on GitHub and nothing is lost, but the
+branch list stays at 11 with 10 of them on master.
+
+**The two large ones remain local-only.** Together they are ~5.3 GB of objects
+that exist on no remote; GitHub rejects pushes of that size, so they cannot be
+preserved the same way. They are old, unrelated-lineage snapshots
+(`recovered-usb-clone` is a recovered USB copy, `your-task-branch` dates to
+2026-05-23). Recommended, one command, off-machine storage required:
+
+```bash
+git bundle create x3-local-only-20260924.bundle \
+  refs/heads/wip/consolidation-20260917/recovered-usb-clone refs/heads/your-task-branch
+```
+
+Note on method: an initial `git push origin --tags` was started and then aborted
+— it would have uploaded unrelated large histories. It was killed during pack
+generation, before any ref was sent; `git ls-remote --tags origin` afterwards
+shows exactly three tags (`v0.4.0-rc.1` plus the two above), so nothing landed.
