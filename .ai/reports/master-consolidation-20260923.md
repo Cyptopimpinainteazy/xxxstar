@@ -474,3 +474,40 @@ preserve/20260919/x3lang-proof-vocabulary c5a7ab1e08544b363066f9d9ee7682fcda53fd
 preserve/20260919/x3vm-live-transport 921f81d64e1f2d2f628e47c69b1384b9bed6d10a
 preserve/20260919/x3vm-live-transport-fix 42f9a2d77a960d091c109d47c0823de1a259bb9f
 ```
+
+### Result after pass 5
+
+```
+origin branches: 11   ->  10 on master, 1 documented exception
+  master
+  docs/matrix-third-pass                              on master  (live worktree)
+  fix/matrix-evidence-prose                           on master  (live worktree)
+  merge/x3-mcp-server                                 on master  (live worktree)
+  wip/chatgpt-mainnet-attestation-20260918            on master  (live worktree)
+  wip/prompts-to-skills-20260918                      on master  (live worktree)
+  codex/x3-economic-safety-kernel                     on master  (documented exclusion)
+  econsafety-kernel                                   on master  (documented exclusion)
+  wip/x3lang-arb-graph-filter-20260919                on master  (documented exclusion)
+  wip/x3lang-preserve-packets-and-arbitrage-20260919  on master  (documented exclusion)
+  archive/pr126-pre-master-rewrite-20260909           UNRELATED LINEAGE — see below
+```
+
+`origin` went 120 → 81 → 73 → 70 → **11** across this work. Every ref in this
+repository is now either an ancestor of master or one of the 7 refs in the
+unrelated pre-rewrite lineage; 6 of those 7 are local-only, leaving the single
+archive branch above.
+
+That branch cannot be brought onto master: it shares **no** history with master,
+and the repository's own recovery plan says "Do not merge the unrelated `main`
+and `master` histories" while requiring that head to stay archived under exactly
+that name. Making master its ancestor would splice a second root history into
+this project. It is therefore the one principled, documented exception, and the
+decision to keep it as a branch (rather than convert it to a tag, or merge the
+histories) belongs to the maintainer.
+
+The `atomicstar` remote is a stale mirror of this repository, not a separate
+project: `atomicstar/main` is `157701ac3`, an ancestor of master, and 577 commits
+behind. Its 20 Dependabot branches propose bumps against that old head (including
+`libp2p 0.50.1 → 0.54.1`, which master already has), and it has 20 open PRs.
+Updating or retiring that repository is a write to a second GitHub repository and
+is left to the maintainer.
