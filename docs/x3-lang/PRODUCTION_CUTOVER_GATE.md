@@ -24,9 +24,84 @@ Authority rules:
 2. `x3-lang/vm` owns production X3Lang bytecode semantics.
 3. `x3-lang/crates/x3-tools/src/bin/x3c.rs` is the production developer CLI.
 4. Root `crates/x3-*` code may integrate canonical X3Lang artifacts with Substrate, but may not define a competing language or bytecode meaning.
-5. The Python `x3-lang/*.py` MVP remains a development/reference surface only after cutover. It cannot produce artifacts accepted as production X3Lang launch evidence.
+5. The Python `x3-lang/*.py` path remains the shipping/user-facing compatibility and intent-DSL surface during migration. It may parse/validate and emit a versioned validated-intent envelope, but it may not independently define production bytecode or consensus execution semantics.
 6. Root `crates/x3-compiler` cannot remain an independent production compiler. It must delegate to or consume artifacts from the canonical `x3-lang/compiler`.
 7. `crates/x3-integration/src/mini_x3.rs` cannot silently define consensus semantics independently of `x3-lang/vm`.
+
+## Dual-path plan
+
+The two paths remain, but with a strict one-way authority boundary:
+
+```text
+User-facing / compatibility path
+
+Python x3-lang MVP
+  -> parse / validate legacy + MVP intent syntax
+  -> emit versioned validated_intent_v1 envelope
+  -> canonical Rust bridge
+  -> x3-lang/compiler
+  -> canonical X3BC
+                         \
+                          -> production execution/finality
+
+Native Rust path
+
+.x3 source
+  -> x3c
+  -> x3-lang/compiler
+  -> canonical X3BC
+                         /
+```
+
+The rule is:
+
+> **Two front doors are allowed. Two language specifications, bytecode meanings, or consensus VMs are not.**
+
+### Python path
+
+Keep it because it is the current shipping MVP surface and preserves compatibility for existing scripts/examples/users. Its long-term role is a compatibility frontend and intent translator.
+
+It must:
+
+- preserve supported Python-MVP syntax during the migration window;
+- produce a versioned, deterministic validated-intent envelope;
+- bind source identity/hash and schema version;
+- feed the canonical Rust compiler/integration boundary;
+- fail closed when the Rust canonical path cannot represent a requested semantic;
+- never silently execute a Python-only semantic on validators.
+
+The Python path may eventually be deprecated only after an explicit compatibility/migration release proves source-equivalent Rust behavior. It is not deleted as part of the production cutover.
+
+### Rust path
+
+The Rust workspace is the production authority:
+
+```text
+x3-lang/compiler
+x3-lang/vm
+x3-lang/spec
+x3c
+```
+
+It owns grammar/semantic contracts for Rust-native X3Lang, IR, X3BC, verifier rules, gas/opcode semantics and the production artifact format.
+
+### Root crates
+
+Root `crates/x3-*` remain the Substrate/runtime integration and compatibility layer.
+
+They may:
+
+- translate versioned envelopes;
+- submit/verify canonical artifacts;
+- expose runtime hostcalls;
+- bind execution to chain state/finality.
+
+They may not:
+
+- create an independent production grammar;
+- emit a competing production X3BC format;
+- redefine opcode/gas semantics;
+- accept bytecode the canonical verifier rejects.
 
 ## Current divergence that blocks launch
 
@@ -204,7 +279,8 @@ cargo run --manifest-path x3-lang/Cargo.toml -p x3-tools --bin x3c -- \
 
 ## Alpha launch criterion
 
-- [ ] Rust `x3-lang/compiler` is the only production compiler authority
+- [ ] Rust `x3-lang/compiler` is the only production compiler/bytecode authority
+- [ ] Python MVP remains supported as a compatibility/intent frontend and routes into the canonical Rust path
 - [ ] Rust `x3-lang/vm` semantic contract is canonical
 - [ ] root integration delegates rather than redefines compilation
 - [ ] runtime execution has no unproven alternate semantics
