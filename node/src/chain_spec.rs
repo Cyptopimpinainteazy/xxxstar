@@ -1122,7 +1122,7 @@ fn x3_chain_genesis(
         x3_coin: X3CoinConfig {
             team_allocations: Vec::new(),
             ecosystem_allocations: Vec::new(),
-            liquidity_allocations: Vec::new(),
+            presale_allocations: Vec::new(),
         },
         #[cfg(not(feature = "mainnet-rc1"))]
         x3_oracle: Default::default(),

@@ -18,7 +18,7 @@ type X3Coin = Pallet<Test>;
 const TREASURY: u64 = 1;
 const TEAM_MEMBER: u64 = 2;
 const ECOSYSTEM_PARTNER: u64 = 3;
-const LIQUIDITY_PROVIDER: u64 = 4;
+const PRESALE_BUYER: u64 = 4;
 const BONUS_CLAIMER: u64 = 5;
 const CROSS_CHAIN_USER: u64 = 6;
 
@@ -100,17 +100,17 @@ fn btc_finality_merkle_proof(txid: H256, block_height: u64, confirmations: u32) 
 fn genesis_config_works() {
     new_test_ext().execute_with(|| {
         // Check total supply
-        assert_eq!(X3Coin::total_supply(), 2_000_000_000_000_000_000_000);
+        assert_eq!(X3Coin::total_supply(), 8_888_888_888_000_000_000_000);
 
         // Check treasury allocation (20%)
-        assert_eq!(X3Coin::treasury_balance(), 400_000_000_000_000_000_000);
+        assert_eq!(X3Coin::treasury_balance(), 2_222_222_222_000_000_000_000);
 
         // Check bonus pool allocation (10%)
-        assert_eq!(X3Coin::bonus_pool_balance(), 200_000_000_000_000_000_000);
+        assert_eq!(X3Coin::bonus_pool_balance(), 888_888_889_000_000_000_000);
 
         // Check team vesting schedule
         let team_schedule = X3Coin::team_vesting(TEAM_MEMBER).unwrap();
-        assert_eq!(team_schedule.total_amount, 300_000_000_000_000_000_000);
+        assert_eq!(team_schedule.total_amount, 888_888_888_000_000_000_000);
         assert_eq!(team_schedule.claimed, 0);
         assert_eq!(team_schedule.start_block, 0);
         assert_eq!(team_schedule.cliff_blocks, 7_884_000);
@@ -119,13 +119,13 @@ fn genesis_config_works() {
         // Check ecosystem allocation (no vesting)
         assert_eq!(
             pallet_x3_kernel::CanonicalLedger::<Test>::get(ECOSYSTEM_PARTNER, X3_ASSET_ID),
-            500_000_000_000_000_000_000
+            1_777_777_778_000_000_000_000
         );
 
         // Check liquidity allocation (no vesting)
         assert_eq!(
-            pallet_x3_kernel::CanonicalLedger::<Test>::get(LIQUIDITY_PROVIDER, X3_ASSET_ID),
-            600_000_000_000_000_000_000
+            pallet_x3_kernel::CanonicalLedger::<Test>::get(PRESALE_BUYER, X3_ASSET_ID),
+            1_333_333_333_000_000_000_000
         );
     });
 }
@@ -184,7 +184,7 @@ fn bonus_claim_works() {
         assert_ok!(X3Coin::claim_bonus(RuntimeOrigin::signed(BONUS_CLAIMER)));
 
         // Check that bonus was transferred (10% of initial pool) to canonical ledger
-        let bonus_amount = 200_000_000_000_000_000_000u128 / 10;
+        let bonus_amount = 888_888_889_000_000_000_000u128 / 10;
         assert_eq!(
             pallet_x3_kernel::CanonicalLedger::<Test>::get(BONUS_CLAIMER, X3_ASSET_ID),
             bonus_amount
@@ -193,7 +193,7 @@ fn bonus_claim_works() {
         // Check bonus pool was reduced
         assert_eq!(
             X3Coin::bonus_pool_balance(),
-            200_000_000_000_000_000_000 - bonus_amount
+            888_888_889_000_000_000_000 - bonus_amount
         );
 
         // Check claim record was added
@@ -257,7 +257,7 @@ fn cross_chain_mint_works() {
         // Check treasury balance was reduced
         assert_eq!(
             X3Coin::treasury_balance(),
-            400_000_000_000_000_000_000 - amount
+            2_222_222_222_000_000_000_000 - amount
         );
 
         // Check target account received tokens
@@ -305,7 +305,7 @@ fn cross_chain_burn_works() {
         // Check treasury balance was increased
         assert_eq!(
             X3Coin::treasury_balance(),
-            400_000_000_000_000_000_000 - amount
+            2_222_222_222_000_000_000_000 - amount
         );
 
         // Check source account canonical balance was reduced
@@ -499,7 +499,7 @@ fn cross_chain_rejects_btc_low_confirmations() {
 fn cross_chain_insufficient_treasury_balance() {
     new_test_ext().execute_with(|| {
         let target_account = CROSS_CHAIN_USER.encode();
-        let amount = 500_000_000_000_000_000_000; // More than treasury has
+        let amount = 3_000_000_000_000_000_000_000; // More than treasury has (2,222,222,222 X3)
 
         let proof = X3Proof::EvmProof {
             tx_hash: H256::from_low_u64_be(12345),
@@ -618,19 +618,24 @@ fn proof_serialization() {
 fn runtime_api_works() {
     new_test_ext().execute_with(|| {
         // Test total supply
-        assert_eq!(X3Coin::get_total_supply(), 2_000_000_000_000_000_000_000);
+        assert_eq!(X3Coin::get_total_supply(), 8_888_888_888_000_000_000_000);
 
         // Test treasury balance
-        assert_eq!(X3Coin::get_treasury_balance(), 400_000_000_000_000_000_000);
+        assert_eq!(X3Coin::get_treasury_balance(), 2_222_222_222_000_000_000_000);
 
         // Test bonus pool balance
         assert_eq!(
             X3Coin::get_bonus_pool_balance(),
-            200_000_000_000_000_000_000
+            888_888_889_000_000_000_000
         );
 
-        // Test vested amount (linear vesting begins from start block)
-        assert_eq!(X3Coin::get_vested_amount(&TEAM_MEMBER), 19_025_875_190_258);
+        // Test vested amount: linear vesting from the start block, so at block 1 exactly one
+        // block's worth of the team bucket has vested. Derived from the constants rather than
+        // a literal, so a change to the supply re-fails here rather than silently passing.
+        assert_eq!(
+            X3Coin::get_vested_amount(&TEAM_MEMBER),
+            X3_TEAM_ALLOCATION / TEAM_VESTING_BLOCKS as u128
+        );
 
         // Test total bonus claims (should be 0 initially)
         assert_eq!(X3Coin::get_total_bonus_claims(&BONUS_CLAIMER), 0);
@@ -664,7 +669,7 @@ fn invariants_hold() {
         assert_eq!(X3Coin::total_supply(), initial_total);
 
         // Invariant 2: Treasury balance + distributed tokens should equal initial treasury
-        let initial_treasury = 400_000_000_000_000_000_000;
+        let initial_treasury = 2_222_222_222_000_000_000_000;
         let current_treasury = X3Coin::treasury_balance();
         let distributed = initial_treasury - current_treasury;
 
@@ -738,7 +743,7 @@ fn stress_test_multiple_operations() {
         // Check treasury balance was reduced correctly
         assert_eq!(
             X3Coin::treasury_balance(),
-            400_000_000_000_000_000_000 - total_minted
+            2_222_222_222_000_000_000_000 - total_minted
         );
     });
 }
@@ -763,7 +768,7 @@ fn edge_cases() {
         ));
 
         // Check balances unchanged
-        assert_eq!(X3Coin::treasury_balance(), 400_000_000_000_000_000_000);
+        assert_eq!(X3Coin::treasury_balance(), 2_222_222_222_000_000_000_000);
         assert_eq!(
             pallet_x3_kernel::CanonicalLedger::<Test>::get(CROSS_CHAIN_USER, X3_ASSET_ID),
             0
