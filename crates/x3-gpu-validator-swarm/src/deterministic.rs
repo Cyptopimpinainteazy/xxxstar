@@ -281,8 +281,14 @@ impl DeterministicEngine {
         }
     }
 
-    #[cfg(test)]
-    fn new_with_accel_backend(accel_backend: Box<dyn AccelBackend>) -> Self {
+    /// Build an engine whose accelerator backend is supplied by the caller
+    /// instead of selected from `X3_ACCEL`.
+    ///
+    /// `new` reads the accelerator from the environment. A test (or a deployment
+    /// that knows which backend it runs) that asserts a specific backend has to
+    /// pin it here, or the assertion silently changes meaning with the ambient
+    /// environment.
+    pub fn new_with_accel_backend(accel_backend: Box<dyn AccelBackend>) -> Self {
         Self {
             mode: RwLock::new(ExecutionMode::GpuWithCpuVerification),
             verification_level: RwLock::new(VerificationLevel::Standard),
@@ -922,7 +928,11 @@ mod tests {
 
     #[test]
     fn test_hash_batches_use_selected_accelerator_with_cpu_truth() {
-        let engine = DeterministicEngine::new();
+        // Pinned, not selected: `DeterministicEngine::new` takes the backend from
+        // `X3_ACCEL`, so on an accelerator host this test asserted "cpu" against a
+        // "wgpu" engine and failed. The backend under test is CPU, so say so.
+        let engine =
+            DeterministicEngine::new_with_accel_backend(Box::new(x3_accel::CpuBackend::new()));
         engine.set_mode(ExecutionMode::CpuFallback);
         assert_eq!(engine.accelerator_backend_name(), "cpu");
 

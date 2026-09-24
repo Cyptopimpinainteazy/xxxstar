@@ -173,6 +173,29 @@ pub struct Validator {
 impl Validator {
     /// Create a new validator
     pub fn new(config: SwarmConfig, validator_id: String) -> Self {
+        Self::build(config, validator_id, None)
+    }
+
+    /// Build a validator whose deterministic engine is pinned to an explicit
+    /// accelerator backend instead of the one `X3_ACCEL` selects.
+    ///
+    /// `new` takes the accelerator from the environment, so an assertion about a
+    /// specific backend would otherwise depend on the operator's environment —
+    /// which is exactly how a CPU-truth test starts failing (or silently passing)
+    /// on a GPU host.
+    pub fn with_accel_backend(
+        config: SwarmConfig,
+        validator_id: String,
+        accel_backend: Box<dyn x3_accel::AccelBackend>,
+    ) -> Self {
+        Self::build(config, validator_id, Some(accel_backend))
+    }
+
+    fn build(
+        config: SwarmConfig,
+        validator_id: String,
+        accel_backend: Option<Box<dyn x3_accel::AccelBackend>>,
+    ) -> Self {
         // Derive validator address from ID (hash-based)
         let mut validator_address = [0u8; 32];
         let id_bytes = validator_id.as_bytes();
@@ -197,7 +220,10 @@ impl Validator {
         } else {
             ExecutionMode::CpuFallback
         };
-        let engine = DeterministicEngine::new();
+        let engine = match accel_backend {
+            Some(backend) => DeterministicEngine::new_with_accel_backend(backend),
+            None => DeterministicEngine::new(),
+        };
         metrics.set_accelerator_backend(engine.accelerator_backend_name());
 
         let signing_key = load_configured_signing_key(&config.identity.keypair_path)
@@ -561,7 +587,13 @@ mod tests {
     #[test]
     fn test_validator_task() {
         let config = SwarmConfig::default();
-        let validator = Validator::new(config, "test-validator".to_string());
+        // Pinned to CPU: the assertions below are about CPU truth, and
+        // `Validator::new` would otherwise pick the backend from `X3_ACCEL`.
+        let validator = Validator::with_accel_backend(
+            config,
+            "test-validator".to_string(),
+            Box::new(x3_accel::CpuBackend::new()),
+        );
 
         validator.initialize().unwrap();
         assert_eq!(validator.current_mode(), ExecutionMode::CpuFallback);
