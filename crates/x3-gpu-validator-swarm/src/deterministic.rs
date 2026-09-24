@@ -4,12 +4,7 @@
 
 use crate::crypto::{HashAlgorithm, HashOutput, VerificationResult};
 use crate::error::{SwarmError, SwarmResult};
-#[cfg(any(
-    feature = "cuda",
-    feature = "opencl",
-    feature = "metal",
-    feature = "vulkan"
-))]
+#[cfg(feature = "vm-gpu-hostcalls")]
 use crate::gpu_bytecode;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -456,21 +451,11 @@ impl DeterministicEngine {
         }
 
         // Without GPU features compiled in, route straight to CPU
-        #[cfg(not(any(
-            feature = "cuda",
-            feature = "opencl",
-            feature = "metal",
-            feature = "vulkan"
-        )))]
+        #[cfg(not(feature = "vm-gpu-hostcalls"))]
         return self.execute_cpu(task, algorithm);
 
         // With GPU features: use GPU hostcalls
-        #[cfg(any(
-            feature = "cuda",
-            feature = "opencl",
-            feature = "metal",
-            feature = "vulkan"
-        ))]
+        #[cfg(feature = "vm-gpu-hostcalls")]
         {
             let gpu_backend = match self.get_gpu_backend() {
                 Some(backend) => backend,
@@ -509,12 +494,7 @@ impl DeterministicEngine {
     }
 
     /// Low-level GPU execution via X3 VM bytecode dispatch (requires a GPU feature flag)
-    #[cfg(any(
-        feature = "cuda",
-        feature = "opencl",
-        feature = "metal",
-        feature = "vulkan"
-    ))]
+    #[cfg(feature = "vm-gpu-hostcalls")]
     fn exec_on_gpu_device(
         &self,
         task: &DeterministicTask,
@@ -604,30 +584,15 @@ impl DeterministicEngine {
             return Ok(self.execution_success_with_accel(task, accel_result, mode));
         }
 
-        #[cfg(not(any(
-            feature = "cuda",
-            feature = "opencl",
-            feature = "metal",
-            feature = "vulkan"
-        )))]
+        #[cfg(not(feature = "vm-gpu-hostcalls"))]
         return self.execute_cpu(task, algorithm);
 
-        #[cfg(any(
-            feature = "cuda",
-            feature = "opencl",
-            feature = "metal",
-            feature = "vulkan"
-        ))]
+        #[cfg(feature = "vm-gpu-hostcalls")]
         self.execute_with_verification_gpu(task, algorithm)
     }
 
     /// GPU+CPU dual-verification logic (only compiled when a GPU backend is enabled)
-    #[cfg(any(
-        feature = "cuda",
-        feature = "opencl",
-        feature = "metal",
-        feature = "vulkan"
-    ))]
+    #[cfg(feature = "vm-gpu-hostcalls")]
     fn execute_with_verification_gpu(
         &self,
         task: &DeterministicTask,

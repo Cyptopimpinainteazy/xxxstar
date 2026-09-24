@@ -24,11 +24,28 @@ name = "x3-cpu-validator"
 path = "src/bin/x3_cpu_validator.rs"
 
 [features]
-default = ["cuda"]
-cuda = []
-opencl = []
-metal = []
-vulkan = []
+# Real, parity-checked acceleration is `wgpu`: it wires `x3-accel-wgpu`'s device
+# kernels (SHA256 and Keccak-256) behind a backend that recomputes every batch on
+# CPU and refuses to report a result that diverges. Select it at runtime with
+# `X3_ACCEL=wgpu`. CPU remains consensus truth, so the default build is CPU-only.
+#
+# `vm-gpu-hostcalls` selects the separate X3VM hostcall dispatch path
+# (`x3_vm::gpu`). That path needs a host that implements the GPU hostcalls; it
+# carries no device kernel of its own.
+#
+# This block used to be `default = ["cuda"]` with empty `cuda`/`opencl`/`metal`/
+# `vulkan` labels. There is no CUDA FFI, no `cudaMalloc`, and no
+# `#[link(name = "cuda")]` anywhere in this crate, so the default build claimed an
+# accelerator it could not perform and the four labels told a reader nothing about
+# which code they compiled (GPU_VALIDATOR_HONEST_AUDIT.md, "empty labels").
+#
+# `vm-gpu-hostcalls` stays in the default set because it gates the crate's
+# coordinator modules (`orchestrator`, `multi_gpu_dispatcher`, `telemetry`, …),
+# which are CPU-side code that `node`'s `gpu-validator` feature links against.
+# Dropping it from the default set would delete those modules from every
+# dependent's build graph. Its name now says what it actually enables.
+default = ["vm-gpu-hostcalls"]
+vm-gpu-hostcalls = []
 wgpu = ["x3-accel/wgpu"]
 
 [dependencies]

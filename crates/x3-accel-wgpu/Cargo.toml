@@ -12,4 +12,5 @@ thiserror = "1.0"
 wgpu = "0.20"
 
 [dev-dependencies]
+keccak-hash = "0.11"
 sha2 = "0.10"
