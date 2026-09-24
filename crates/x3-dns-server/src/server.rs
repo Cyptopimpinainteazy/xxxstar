@@ -241,7 +241,7 @@ impl AtlasDnsServer {
         let request =
             Message::from_bytes(packet).map_err(|e| DnsError::Serialization(e.to_string()))?;
 
-        debug!("📨 DNS request from {}: {:?}", src, request.queries());
+        debug!("📨 DNS request from {}: {:?}", src, &request.queries);
 
         // Update query statistics
         {
@@ -286,18 +286,18 @@ impl AtlasDnsServer {
 
     /// Process DNS request and build response
     async fn process_dns_request(&self, request: &Message) -> Message {
-        let mut response = Message::new(request.id(), MessageType::Response, OpCode::Query);
-        response.set_authoritative(true);
-        response.set_recursion_desired(request.recursion_desired());
-        response.set_recursion_available(false);
+        let mut response = Message::new(request.metadata.id, MessageType::Response, OpCode::Query);
+        response.metadata.authoritative = true;
+        response.metadata.recursion_desired = request.metadata.recursion_desired;
+        response.metadata.recursion_available = false;
 
         // Copy queries to response
-        for query in request.queries() {
+        for query in &request.queries {
             response.add_query(query.clone());
         }
 
         // Process each query
-        for query in request.queries() {
+        for query in &request.queries {
             let query_name = query.name().to_string();
             let query_name_clean = query_name.trim_end_matches('.');
 
@@ -309,7 +309,7 @@ impl AtlasDnsServer {
 
             // Check if this is an .x3 domain
             if !query_name_clean.ends_with(".x3") && query_name_clean != "x3" {
-                response.set_response_code(ResponseCode::Refused);
+                response.metadata.response_code = ResponseCode::Refused;
                 continue;
             }
 
@@ -318,7 +318,7 @@ impl AtlasDnsServer {
             let domain_name = match domain_result {
                 Ok(d) => d,
                 Err(_) => {
-                    response.set_response_code(ResponseCode::FormErr);
+                    response.metadata.response_code = ResponseCode::FormErr;
                     continue;
                 }
             };
@@ -338,10 +338,10 @@ impl AtlasDnsServer {
                         response.add_answer(record);
                     }
 
-                    if response.answers().is_empty() {
-                        response.set_response_code(ResponseCode::NoError);
+                    if response.answers.is_empty() {
+                        response.metadata.response_code = ResponseCode::NoError;
                     } else {
-                        response.set_response_code(ResponseCode::NoError);
+                        response.metadata.response_code = ResponseCode::NoError;
                     }
 
                     // Update stats
@@ -352,7 +352,7 @@ impl AtlasDnsServer {
                 }
                 Ok(None) => {
                     // Domain not found
-                    response.set_response_code(ResponseCode::NXDomain);
+                    response.metadata.response_code = ResponseCode::NXDomain;
 
                     // Update stats
                     {
@@ -362,7 +362,7 @@ impl AtlasDnsServer {
                 }
                 Err(e) => {
                     error!("Error looking up domain: {}", e);
-                    response.set_response_code(ResponseCode::ServFail);
+                    response.metadata.response_code = ResponseCode::ServFail;
 
                     // Update stats
                     {
@@ -402,37 +402,37 @@ impl AtlasDnsServer {
             // Set the record data based on type (will overwrite initial data)
             match &dns_record.data {
                 DnsRecordType::A(ip) => {
-                    record.set_data(RData::A(rdata::A(*ip)));
+                    record.data = RData::A(rdata::A(*ip));
                 }
                 DnsRecordType::AAAA(ip) => {
-                    record.set_data(RData::AAAA(rdata::AAAA(*ip)));
+                    record.data = RData::AAAA(rdata::AAAA(*ip));
                 }
                 DnsRecordType::CNAME(target) => {
                     if let Ok(name) = Name::from_ascii(target) {
-                        record.set_data(RData::CNAME(rdata::CNAME(name)));
+                        record.data = RData::CNAME(rdata::CNAME(name));
                     }
                 }
                 DnsRecordType::TXT(text) => {
-                    record.set_data(RData::TXT(rdata::TXT::new(vec![text.clone()])));
+                    record.data = RData::TXT(rdata::TXT::new(vec![text.clone()]));
                 }
                 DnsRecordType::MX(mx) => {
                     if let Ok(name) = mx.exchange.to_name() {
-                        record.set_data(RData::MX(rdata::MX::new(mx.priority, name)));
+                        record.data = RData::MX(rdata::MX::new(mx.priority, name));
                     }
                 }
                 DnsRecordType::NS(nameserver) => {
                     if let Ok(name) = Name::from_ascii(nameserver) {
-                        record.set_data(RData::NS(rdata::NS(name)));
+                        record.data = RData::NS(rdata::NS(name));
                     }
                 }
                 DnsRecordType::SRV(srv) => {
                     if let Ok(target) = srv.target.to_name() {
-                        record.set_data(RData::SRV(rdata::SRV::new(
+                        record.data = RData::SRV(rdata::SRV::new(
                             srv.priority,
                             srv.weight,
                             srv.port,
                             target,
-                        )));
+                        ));
                     }
                 }
                 DnsRecordType::CAA(_) | DnsRecordType::HINFO(_) => {

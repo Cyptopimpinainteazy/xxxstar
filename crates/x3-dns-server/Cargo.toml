@@ -9,11 +9,12 @@ license = "MIT"
 repository = "https://github.com/Cyptopimpinainteazy/x3-chain"
 
 [dependencies]
-# Core DNS dependencies — pinned exact to prevent Cargo resolving to beta.1 which has rand 0.10 API breakage
-hickory-server = "=0.26.0-alpha.1"
-hickory-resolver = "=0.26.0-alpha.1"
-hickory-proto = "=0.26.0-alpha.1"
-hickory-client = "=0.26.0-alpha.1"
+# hickory-proto is the only one of the four hickory crates this crate actually uses;
+# hickory-server/resolver/client were dead dependencies. The proto pin moves off
+# 0.26.0-alpha.1, which carried GHSA-3v94-mw7p-v465
+# (O(n^2) name compression CPU exhaustion, fixed in 0.26.1); the older beta.1 pin this
+# replaced had a rand 0.10 API break, which 0.26.3 does not.
+hickory-proto = "=0.26.3"
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
