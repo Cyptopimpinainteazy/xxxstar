@@ -183,3 +183,42 @@ test/evm-settlement-path-live c07c2da4dcbc5888a36f3e88dd2089361011b33e
 test/strict-posture-cross-domain 64cd86231437de4f2fe5a5e4ea3bbc1a977b019c
 wip/x3lang-objectives-20260918 44a12ba9445f78215a785d7984b0b75a9d8b178f
 ```
+
+## Security pass 2 (2026-09-23, continued)
+
+Two more alert groups cleared, both verified:
+
+- **`tokio-postgres` 0.7.13 → 0.7.18** (`DataRow`-with-fewer-fields panic, DoS).
+  It could not be updated at all: `cargo update` failed outright because
+  `pallets/x3-kernel` declared `serde_json = "=1.0.143"` and never used it.
+  Removing that dead dependency (and its `serde_json/std` feature entry)
+  unblocked the lock; serde_json is held at 1.0.144, the minimum
+  `postgres-types` needs, rather than 1.0.151, which also pulls the new `zmij`
+  float formatter.
+- **`qs` 6.14.2 → 6.16.0 in four npm projects** (`infra/blockchain-tps`,
+  `infra-structure/services/blockchain-tps`,
+  `infra-structure/services/chain-db`, `apps/x3-desktop/rag-bot`) — 12 moderate
+  alerts across three `qs` advisories. `express` pins `qs ~6.14.0` and no
+  express 4.x admits the patched range, so `npm audit fix` reported "fix
+  available" and changed nothing; each project now carries an explicit
+  `overrides` entry, and all four report 0 vulnerabilities.
+
+### Still open, with the reason
+
+- **`uuid` + `stream-json` (12 medium, six lockfiles)** — both arrive through
+  `@solana/web3.js` → `jayson@4.3.0`, which pins `uuid ^8.3.2` and
+  `stream-json ^1.9.1`. `jayson@5.0.0` drops both dependencies, but
+  `@solana/web3.js` pins `jayson ^4.3.0`, so the clean fix has to come from
+  upstream. Forcing `uuid@11`/`stream-json@3` under jayson would be two major
+  jumps inside the SDK's Solana RPC client and is not worth that risk.
+- **`esbuild` 0.27.7 (4 low)** — direct in `apps/inferstructor-dashboard` and
+  `infra-structure/dashboard` as `^0.27.7`; reaching 0.28.1 means changing the
+  declared range, and neither package is covered by the JS test gate, so it was
+  left alone rather than shipped unverified.
+- **`elliptic` (1 low, `packages/polkawallet-bridge-adapter`)** — no patched
+  release exists.
+- **The 4 high alerts** remain as described above (libp2p 0.54.1's own
+  components; needs an upstream polkadot-sdk bump).
+
+Alert totals across this session: **86 (2 critical, 6 high) → 55 (0 critical,
+4 high, 33 medium, 18 low)**.
