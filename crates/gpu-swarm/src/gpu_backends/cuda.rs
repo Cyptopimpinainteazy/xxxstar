@@ -8,9 +8,9 @@ use crate::error::{SwarmError, SwarmResult};
 use crate::protocol::TaskResult;
 use crate::task::{Task, TaskType};
 use async_trait::async_trait;
+use parking_lot::Mutex;
 use std::path::PathBuf;
 use std::sync::Arc;
-use parking_lot::Mutex;
 use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tracing::{debug, info, warn};
@@ -19,7 +19,7 @@ use tracing::{debug, info, warn};
 use ::x3_vm::gpu_hostcalls::GpuHostcalls;
 
 #[cfg(feature = "x3-runtime")]
-use ::x3_vm::{Value, VM, Verifier, VerifyOptions};
+use ::x3_vm::{Value, Verifier, VerifyOptions, VM};
 
 #[cfg(feature = "x3-runtime")]
 use x3_gpu_validator_swarm::gpu_bytecode as bytecode_gen;
@@ -37,7 +37,8 @@ pub struct CudaExecutor {
     #[cfg(feature = "x3-runtime")]
     bytecode_cache: Arc<Mutex<LruCache<String, Vec<u8>>>>,
     #[cfg(feature = "x3-runtime")]
-    verified_bytecode_cache: Arc<Mutex<std::collections::HashMap<String, Arc<::x3_vm::BytecodeModule>>>>,
+    verified_bytecode_cache:
+        Arc<Mutex<std::collections::HashMap<String, Arc<::x3_vm::BytecodeModule>>>>,
 }
 
 impl CudaExecutor {
@@ -67,9 +68,9 @@ impl CudaExecutor {
             #[cfg(feature = "x3-runtime")]
             gpu_hostcalls: Arc::new(Mutex::new(None)),
             #[cfg(feature = "x3-runtime")]
-            bytecode_cache: Arc::new(Mutex::new(
-                LruCache::new(std::num::NonZeroUsize::new(512).unwrap())
-            )),
+            bytecode_cache: Arc::new(Mutex::new(LruCache::new(
+                std::num::NonZeroUsize::new(512).unwrap(),
+            ))),
             #[cfg(feature = "x3-runtime")]
             verified_bytecode_cache: Arc::new(Mutex::new(std::collections::HashMap::new())),
         };
@@ -291,16 +292,9 @@ impl CudaExecutor {
                 );
                 Some(bytecode.clone())
             }
-            TaskType::Custom {
-                task_type,
-                payload,
-            } => {
+            TaskType::Custom { task_type, payload } => {
                 // Generate cache key from task type and payload
-                let cache_key = format!(
-                    "{}_{}", 
-                    task_type, 
-                    blake3::hash(payload).to_hex()
-                );
+                let cache_key = format!("{}_{}", task_type, blake3::hash(payload).to_hex());
 
                 // Check cache first
                 {
@@ -315,15 +309,16 @@ impl CudaExecutor {
                 }
 
                 // For custom tasks, check if they're hash operations
-                let generated_bytecode = if task_type.contains("hash") || task_type.contains("sha256") {
+                let generated_bytecode = if task_type.contains("hash")
+                    || task_type.contains("sha256")
+                {
                     debug!(
                         "[CudaExecutor] Custom SHA-256 task {} with {} bytes of input",
                         task.id,
                         payload.len()
                     );
                     // Generate SHA-256 bytecode module
-                    let module =
-                        bytecode_gen::generate_sha256_batch_bytecode(payload.clone(), 1);
+                    let module = bytecode_gen::generate_sha256_batch_bytecode(payload.clone(), 1);
                     // Convert module to bytes
                     Some(module.to_bytes())
                 } else if task_type.contains("keccak") {
@@ -359,10 +354,7 @@ impl CudaExecutor {
             }
             _ => {
                 // Other task types are not GPU-acceleratable
-                debug!(
-                    "[CudaExecutor] Task {} type not GPU-acceleratable",
-                    task.id
-                );
+                debug!("[CudaExecutor] Task {} type not GPU-acceleratable", task.id);
                 None
             }
         }
@@ -372,7 +364,7 @@ impl CudaExecutor {
     async fn execute_gpu_bytecode(&self, bytecode: &[u8]) -> SwarmResult<Vec<u8>> {
         // Generate cache key from raw bytecode hash
         let cache_key = blake3::hash(bytecode).to_hex().to_string();
-        
+
         // Check if bytecode is already verified and cached
         {
             let cache = self.verified_bytecode_cache.lock();
@@ -383,10 +375,10 @@ impl CudaExecutor {
                 );
                 let module = cached_module.clone(); // Arc is cheap clone
                 drop(cache); // Release lock early
-                
+
                 // Use cached verified module - dereference Arc to get BytecodeModule
                 let mut vm = VM::new((*module).clone());
-                
+
                 // Get GPU hostcalls if available
                 if let Some(gpu_hostcalls) = self.get_gpu_hostcalls() {
                     gpu_hostcalls.register_on_vm(&mut vm);
@@ -397,35 +389,30 @@ impl CudaExecutor {
                         "GPU hostcalls not available".to_string(),
                     ));
                 }
-                
+
                 // Execute the GPU bytecode
                 match vm.call_function(0, &[]) {
-                    Ok(execution_result) => {
-                        match execution_result.value {
-                            Some(Value::Bytes(result_bytes)) => {
-                                debug!(
+                    Ok(execution_result) => match execution_result.value {
+                        Some(Value::Bytes(result_bytes)) => {
+                            debug!(
                                     "[CudaExecutor] GPU bytecode execution completed (cached module), {} bytes result",
                                     result_bytes.len()
                                 );
-                                Ok(result_bytes)
-                            }
-                            other => {
-                                warn!(
+                            Ok(result_bytes)
+                        }
+                        other => {
+                            warn!(
                                     "[CudaExecutor] GPU bytecode execution returned unexpected value: {:?}",
                                     other
                                 );
-                                Err(SwarmError::ExecutionError(format!(
-                                    "GPU bytecode execution returned unexpected value: {:?}",
-                                    other
-                                )))
-                            }
+                            Err(SwarmError::ExecutionError(format!(
+                                "GPU bytecode execution returned unexpected value: {:?}",
+                                other
+                            )))
                         }
-                    }
+                    },
                     Err(e) => {
-                        warn!(
-                            "[CudaExecutor] GPU bytecode execution failed: {}",
-                            e
-                        );
+                        warn!("[CudaExecutor] GPU bytecode execution failed: {}", e);
                         Err(SwarmError::ExecutionError(format!(
                             "GPU bytecode execution failed: {}",
                             e
@@ -434,29 +421,28 @@ impl CudaExecutor {
                 }
             } else {
                 drop(cache); // Release lock before expensive Verifier
-                
+
                 // Cache miss - need to verify bytecode
                 debug!(
                     "[CudaExecutor] Verified bytecode cache MISS for hash {}",
                     &cache_key[..16]
                 );
-                
+
                 // Deserialize bytecode into a VM module
                 let module = Verifier::verify_module_bytes(bytecode, &VerifyOptions::default())
-                    .map_err(|e| SwarmError::ExecutionError(format!(
-                        "Failed to verify GPU bytecode: {}",
-                        e
-                    )))?;
-                
+                    .map_err(|e| {
+                        SwarmError::ExecutionError(format!("Failed to verify GPU bytecode: {}", e))
+                    })?;
+
                 // Store verified module in cache
                 {
                     let mut cache = self.verified_bytecode_cache.lock();
                     cache.insert(cache_key.clone(), Arc::new(module.clone()));
                 }
-                
+
                 // Create VM and register GPU hostcalls
                 let mut vm = VM::new(module);
-                
+
                 // Get GPU hostcalls if available
                 if let Some(gpu_hostcalls) = self.get_gpu_hostcalls() {
                     gpu_hostcalls.register_on_vm(&mut vm);
@@ -467,35 +453,30 @@ impl CudaExecutor {
                         "GPU hostcalls not available".to_string(),
                     ));
                 }
-                
+
                 // Execute the GPU bytecode
                 match vm.call_function(0, &[]) {
-                    Ok(execution_result) => {
-                        match execution_result.value {
-                            Some(Value::Bytes(result_bytes)) => {
-                                debug!(
-                                    "[CudaExecutor] GPU bytecode execution completed, {} bytes result",
-                                    result_bytes.len()
-                                );
-                                Ok(result_bytes)
-                            }
-                            other => {
-                                warn!(
+                    Ok(execution_result) => match execution_result.value {
+                        Some(Value::Bytes(result_bytes)) => {
+                            debug!(
+                                "[CudaExecutor] GPU bytecode execution completed, {} bytes result",
+                                result_bytes.len()
+                            );
+                            Ok(result_bytes)
+                        }
+                        other => {
+                            warn!(
                                     "[CudaExecutor] GPU bytecode execution returned unexpected value: {:?}",
                                     other
                                 );
-                                Err(SwarmError::ExecutionError(format!(
-                                    "GPU bytecode execution returned unexpected value: {:?}",
-                                    other
-                                )))
-                            }
+                            Err(SwarmError::ExecutionError(format!(
+                                "GPU bytecode execution returned unexpected value: {:?}",
+                                other
+                            )))
                         }
-                    }
+                    },
                     Err(e) => {
-                        warn!(
-                            "[CudaExecutor] GPU bytecode execution failed: {}",
-                            e
-                        );
+                        warn!("[CudaExecutor] GPU bytecode execution failed: {}", e);
                         Err(SwarmError::ExecutionError(format!(
                             "GPU bytecode execution failed: {}",
                             e
@@ -505,7 +486,6 @@ impl CudaExecutor {
             }
         }
     }
-
 }
 
 #[async_trait]
@@ -564,9 +544,7 @@ impl GpuExecutor for CudaExecutor {
                         // Try to execute GPU bytecode
                         match self.execute_gpu_bytecode(&bytecode).await {
                             Ok(gpu_result) => {
-                                debug!(
-                                    "[CudaExecutor::execute] GPU bytecode execution succeeded"
-                                );
+                                debug!("[CudaExecutor::execute] GPU bytecode execution succeeded");
                                 gpu_result
                             }
                             Err(e) => {

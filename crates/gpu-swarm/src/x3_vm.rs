@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "x3-runtime")]
-use ::x3_vm::{VMConfig, Value, Verifier, VerifyOptions, VM, gpu_hostcalls::GpuHostcalls};
+use ::x3_vm::{gpu_hostcalls::GpuHostcalls, VMConfig, Value, Verifier, VerifyOptions, VM};
 
 #[cfg(feature = "x3-runtime")]
 use x3_gpu_validator_swarm::gpu_bytecode as bytecode_gen;
@@ -352,7 +352,12 @@ impl X3VmExecutor {
         );
 
         // Try to register GPU hostcalls if available (non-blocking check)
-        if let Some(hostcalls_arc) = self.gpu_hostcalls.try_lock().ok().and_then(|guard| guard.clone()) {
+        if let Some(hostcalls_arc) = self
+            .gpu_hostcalls
+            .try_lock()
+            .ok()
+            .and_then(|guard| guard.clone())
+        {
             debug!("[X3VmExecutor] Registering GPU hostcalls");
             hostcalls_arc.register_on_vm(&mut vm);
             info!("[X3VmExecutor] GPU hostcalls registered, using GPU execution path");

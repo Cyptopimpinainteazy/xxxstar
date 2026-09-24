@@ -656,7 +656,10 @@ mod tests {
         let result = job.execute().unwrap();
 
         if let JobOutput::MempoolAnalysis(mp_result) = result {
-            assert!(mp_result.stats.total_txs >= 0);
+            assert_eq!(
+                mp_result.stats.total_txs, 1,
+                "the one pending transaction must be counted in the analysis"
+            );
             assert!(mp_result.gas_analysis.contains_key(&1));
         }
     }

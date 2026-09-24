@@ -73,7 +73,9 @@ async fn bench_gpu_tps_with_cache_analysis() {
             for (i, device) in devices.iter().enumerate() {
                 println!(
                     "  Device {}: {} ({} GB VRAM)",
-                    i, device.name, device.total_memory / (1024 * 1024 * 1024)
+                    i,
+                    device.name,
+                    device.total_memory / (1024 * 1024 * 1024)
                 );
             }
             devices
@@ -191,10 +193,7 @@ async fn bench_gpu_tps_with_cache_analysis() {
         "\nRepeated Payloads Avg:  {:.3} ms/task",
         avg_latency_repeated
     );
-    println!(
-        "Varied Payloads Avg:    {:.3} ms/task",
-        avg_latency_varied
-    );
+    println!("Varied Payloads Avg:    {:.3} ms/task", avg_latency_varied);
 
     println!("\n=========================================\n");
 

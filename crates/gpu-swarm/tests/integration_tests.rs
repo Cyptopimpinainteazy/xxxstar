@@ -2,14 +2,12 @@
 
 use gpu_swarm::{
     config::SwarmConfig,
-    error::SwarmResult,
-    node::{GpuBackend, GpuCapabilities, NodeId, NodeRegistry, NodeStatus, SwarmNode},
+    node::{GpuBackend, GpuCapabilities, NodeRegistry, NodeStatus, SwarmNode},
     scheduler::{SchedulerConfig, SchedulingStrategy, TaskScheduler},
-    task::{Task, TaskId, TaskPriority, TaskStatus, TaskType},
+    task::{Task, TaskId, TaskPriority, TaskType},
     verification::{ExecutionVerifier, VerificationConfig},
 };
 use std::time::Duration;
-use uuid::Uuid;
 
 /// Helper to create a test GPU capabilities struct
 fn test_gpu_capabilities(vram_gb: u64) -> GpuCapabilities {
@@ -27,16 +25,6 @@ fn test_gpu_capabilities(vram_gb: u64) -> GpuCapabilities {
         supports_fp16: true,
         supports_tensor_cores: false,
     }
-}
-
-/// Helper to create a test node ID
-fn test_node_id(seed: u8) -> NodeId {
-    let mut id = [0u8; 32];
-    id[0] = seed;
-    for i in 1..32 {
-        id[i] = seed.wrapping_add(i as u8);
-    }
-    id
 }
 
 /// Helper to create a test submitter ID
@@ -127,9 +115,24 @@ fn test_scheduler_creation() {
         enable_task_stealing: true,
     };
 
-    let _scheduler = TaskScheduler::new(config);
-    // Scheduler created successfully
-    assert!(true);
+    // A freshly built scheduler must accept a well-formed task and keep it.
+    let mut scheduler = TaskScheduler::new(config);
+    let task = Task::new(
+        TaskType::MempoolSimulation {
+            chain_id: 1,
+            tx_count: 100,
+            rpc_endpoint: "http://localhost:8545".to_string(),
+        },
+        test_submitter(),
+        100,
+    );
+    let id = scheduler
+        .submit(task)
+        .expect("scheduler must accept a valid task");
+    assert!(
+        scheduler.get_task(id).is_some(),
+        "a submitted task must be retrievable from the scheduler"
+    );
 }
 
 #[test]
@@ -196,9 +199,23 @@ fn test_scheduling_strategies() {
             ..Default::default()
         };
 
-        let _scheduler = TaskScheduler::new(config);
-        // Scheduler created with strategy
-        assert!(true);
+        let mut scheduler = TaskScheduler::new(config);
+        let task = Task::new(
+            TaskType::MempoolSimulation {
+                chain_id: 1,
+                tx_count: 100,
+                rpc_endpoint: "http://localhost:8545".to_string(),
+            },
+            test_submitter(),
+            100,
+        );
+        let id = scheduler
+            .submit(task)
+            .expect("scheduler must accept a valid task under every strategy");
+        assert!(
+            scheduler.get_task(id).is_some(),
+            "queued task must be retrievable under every strategy"
+        );
     }
 }
 
@@ -214,7 +231,7 @@ fn test_gpu_backends() {
 
     for backend in backends {
         let mut caps = test_gpu_capabilities(8);
-        caps.backends = vec![backend.clone()];
+        caps.backends = vec![backend];
 
         assert!(caps.backends.contains(&backend));
     }
@@ -294,9 +311,12 @@ fn test_verification_config() {
         reexecution_rate: 10,
     };
 
+    // A fresh verifier must not report pending work for a task it never saw.
     let verifier = ExecutionVerifier::new(config.clone());
-    // Verifier is created successfully
-    assert!(true);
+    assert!(
+        verifier.pending_status(TaskId::new_v4()).is_none(),
+        "fresh verifier must have no pending status for an unknown task"
+    );
 }
 
 #[test]

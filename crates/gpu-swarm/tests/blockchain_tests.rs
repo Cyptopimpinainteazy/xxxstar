@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod gpu_backend_tests {
-    use gpu_swarm::gpu_backends::{GpuBackendType, GpuExecutorManager};
+    use gpu_swarm::gpu_backends::GpuExecutorManager;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -109,8 +109,10 @@ mod blockchain_tests {
             .await
             .unwrap();
 
+        // A client with no record of this account must report zero rather than
+        // fabricating a balance.
         let stake = client.get_stake("alice").await.unwrap();
-        assert!(stake >= 0);
+        assert_eq!(stake, 0, "unstaked account must report zero");
     }
 
     #[tokio::test]
@@ -119,8 +121,12 @@ mod blockchain_tests {
             .await
             .unwrap();
 
+        // No completed work means no accrued rewards.
         let rewards = client.get_pending_rewards("alice").await.unwrap();
-        assert!(rewards >= 0);
+        assert_eq!(
+            rewards, 0,
+            "account with no work must have no pending rewards"
+        );
     }
 
     #[test]
@@ -237,8 +243,10 @@ mod monitoring_tests {
         collector.tasks_completed.inc();
 
         let metrics = collector.gather_metrics();
-        // In production, would test actual Prometheus output
-        assert!(true); // Just verify no panics
+        assert!(
+            metrics.contains("gpu_task_submitted_total"),
+            "gathered metrics must expose the submitted-task counter, got: {metrics}"
+        );
     }
 
     #[test]

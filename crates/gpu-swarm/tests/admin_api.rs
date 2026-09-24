@@ -6,7 +6,7 @@ use reqwest::blocking::Client;
 use tempfile::tempdir;
 
 use gpu_swarm::admin::AdminState;
-use gpu_swarm::admin::{ensure_config_dir, ensure_local_token, run_admin};
+use gpu_swarm::admin::{ensure_local_token, run_admin};
 
 #[test]
 fn admin_register_and_login_flow() {

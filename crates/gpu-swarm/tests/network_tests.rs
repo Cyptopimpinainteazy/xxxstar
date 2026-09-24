@@ -3,7 +3,6 @@
 #[cfg(test)]
 mod network_tests {
     use gpu_swarm::network::{NetworkConfig, NetworkManager, PeerId};
-    use std::time::Duration;
 
     #[tokio::test]
     async fn test_network_manager_creation() {
@@ -84,7 +83,7 @@ mod network_tests {
         }
 
         let healthy = manager.healthy_peers();
-        assert!(healthy.len() > 0);
+        assert!(!healthy.is_empty());
     }
 
     #[tokio::test]
@@ -103,7 +102,7 @@ mod network_tests {
         use gpu_swarm::network::PeerDiscovery;
 
         let local_id = PeerId::random();
-        let mut discovery = PeerDiscovery::new(vec![], local_id);
+        let discovery = PeerDiscovery::new(vec![], local_id);
 
         let peer_id = PeerId::random();
         discovery.add_peer(peer_id, vec!["/ip4/127.0.0.1/tcp/9010".to_string()]);

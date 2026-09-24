@@ -5,8 +5,8 @@ use crate::error::{SwarmError, SwarmResult};
 use crate::protocol::TaskResult;
 use crate::task::Task;
 use async_trait::async_trait;
-use std::sync::Arc;
 use parking_lot::Mutex;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 

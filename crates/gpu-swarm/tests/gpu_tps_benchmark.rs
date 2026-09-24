@@ -81,7 +81,9 @@ async fn bench_gpu_tps_baseline() {
             for (i, device) in devices.iter().enumerate() {
                 println!(
                     "  Device {}: {} ({} GB VRAM)",
-                    i, device.name, device.total_memory / (1024 * 1024 * 1024)
+                    i,
+                    device.name,
+                    device.total_memory / (1024 * 1024 * 1024)
                 );
             }
             devices
@@ -123,7 +125,10 @@ async fn bench_gpu_tps_baseline() {
 
     for i in 0..sha256_count {
         let task = create_sha256_task(sha256_payload.clone());
-        match executor.execute(&task, device_id, std::time::Duration::from_secs(30)).await {
+        match executor
+            .execute(&task, device_id, std::time::Duration::from_secs(30))
+            .await
+        {
             Ok(_result) => {
                 sha256_success += 1;
                 if (i + 1) % 100 == 0 {
@@ -155,7 +160,10 @@ async fn bench_gpu_tps_baseline() {
 
     for i in 0..keccak256_count {
         let task = create_keccak256_task(keccak256_payload.clone());
-        match executor.execute(&task, device_id, std::time::Duration::from_secs(30)).await {
+        match executor
+            .execute(&task, device_id, std::time::Duration::from_secs(30))
+            .await
+        {
             Ok(_result) => {
                 keccak256_success += 1;
                 if (i + 1) % 100 == 0 {
@@ -194,7 +202,10 @@ async fn bench_gpu_tps_baseline() {
     println!("Total Tasks Failed: {}", total_failures);
     println!("Total Execution Time: {:.2}s", total_elapsed.as_secs_f64());
     println!("\n>>> BASELINE TPS: {:.2} tasks/sec <<<", overall_tps);
-    println!(">>> BASELINE AVG LATENCY: {:.2} ms/task <<<\n", overall_avg_latency);
+    println!(
+        ">>> BASELINE AVG LATENCY: {:.2} ms/task <<<\n",
+        overall_avg_latency
+    );
 
     // Success rate
     let success_rate = (total_success as f64 / total_tasks as f64) * 100.0;
