@@ -70,6 +70,22 @@ pub struct X3PrometheusMetrics {
     pub cross_vm_aborted: prometheus::Counter,
     /// Fee deductions
     pub fee_deductions: prometheus::Counter,
+    /// Serialised size of each imported block, in bytes.
+    ///
+    /// The storage audit's per-block metric list asks for `block_bytes`, and it
+    /// is what turns "blocks are small" into the disk arithmetic the audit
+    /// depends on: at 200 ms slots the chain produces ~157.7M blocks/year, so a
+    /// 10 KB block is 1.58 TB/year and a 50 KB block is 7.9 TB/year before any
+    /// state growth.
+    pub imported_block_bytes: prometheus::Histogram,
+    /// Extrinsics per imported block.
+    pub imported_block_extrinsics: prometheus::Histogram,
+    /// Wall-clock seconds between imported blocks.
+    ///
+    /// Distinct from the configured slot time: a chain that targets 200 ms and
+    /// lands on 900 ms has a throughput problem that block-height metrics alone
+    /// cannot show.
+    pub block_interval_seconds: prometheus::Histogram,
 }
 
 impl X3PrometheusMetrics {
@@ -122,6 +138,40 @@ impl X3PrometheusMetrics {
         let fee_deductions =
             prometheus::Counter::new("x3_fee_deductions_total", "Total number of fee deductions")?;
 
+        // Buckets are chosen for the questions the storage audit asks: "how big
+        // is a block, really" (1 KB .. 4 MB), "how full is a block" (0 .. 512
+        // extrinsics), and "what cadence does the chain actually hold" (10 ms ..
+        // 10 s).
+        let imported_block_bytes = prometheus::Histogram::with_opts(
+            prometheus::HistogramOpts::new(
+                "x3_imported_block_bytes",
+                "Serialised size of each imported block (header + extrinsics) in bytes",
+            )
+            .buckets(vec![
+                1_024.0,
+                4_096.0,
+                16_384.0,
+                65_536.0,
+                262_144.0,
+                1_048_576.0,
+                4_194_304.0,
+            ]),
+        )?;
+        let imported_block_extrinsics = prometheus::Histogram::with_opts(
+            prometheus::HistogramOpts::new(
+                "x3_imported_block_extrinsics",
+                "Number of extrinsics in each imported block",
+            )
+            .buckets(vec![0.0, 1.0, 8.0, 32.0, 128.0, 512.0, 2_048.0]),
+        )?;
+        let block_interval_seconds = prometheus::Histogram::with_opts(
+            prometheus::HistogramOpts::new(
+                "x3_block_interval_seconds",
+                "Wall-clock seconds between imported blocks",
+            )
+            .buckets(vec![0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0]),
+        )?;
+
         registry.register(Box::new(blocks_produced.clone()))?;
         registry.register(Box::new(transactions_received.clone()))?;
         registry.register(Box::new(comits_submitted.clone()))?;
@@ -135,6 +185,9 @@ impl X3PrometheusMetrics {
         registry.register(Box::new(cross_vm_committed.clone()))?;
         registry.register(Box::new(cross_vm_aborted.clone()))?;
         registry.register(Box::new(fee_deductions.clone()))?;
+        registry.register(Box::new(imported_block_bytes.clone()))?;
+        registry.register(Box::new(imported_block_extrinsics.clone()))?;
+        registry.register(Box::new(block_interval_seconds.clone()))?;
 
         Ok(Self {
             blocks_produced,
@@ -150,6 +203,9 @@ impl X3PrometheusMetrics {
             cross_vm_committed,
             cross_vm_aborted,
             fee_deductions,
+            imported_block_bytes,
+            imported_block_extrinsics,
+            block_interval_seconds,
         })
     }
 }

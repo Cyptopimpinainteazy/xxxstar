@@ -1567,10 +1567,37 @@ pub fn new_full_with_atomic_gateway<
                 use futures_util::StreamExt;
 
                 let mut notifications = client.import_notification_stream();
+                let mut last_import: Option<std::time::Instant> = None;
                 while let Some(notification) = notifications.next().await {
                     let number: u64 = (*notification.header.number()).saturated_into();
                     if let Some(ref m) = metrics_for_import {
                         m.blocks_produced.inc();
+
+                        // Per-block storage metrics. The body costs one read from
+                        // the client we already hold — five a second on a chain
+                        // targeting 200 ms slots, against the state writes the
+                        // block has just made — and in exchange `block_bytes` and
+                        // the block cadence stop being assumptions. The audit's
+                        // disk arithmetic (157.7M blocks/year, so 10 KB/block is
+                        // 1.58 TB/year) needs exactly these two numbers to be
+                        // measured rather than estimated.
+                        if let Ok(Some(signed)) = client.block(notification.hash) {
+                            use codec::Encode;
+                            // `signed.block` is the header plus its extrinsics;
+                            // the justification is deliberately excluded, so this
+                            // is the block the chain produces rather than the
+                            // wrapper it is stored in.
+                            m.imported_block_bytes
+                                .observe(signed.block.encode().len() as f64);
+                            m.imported_block_extrinsics
+                                .observe(signed.block.extrinsics.len() as f64);
+                        }
+                        let now = std::time::Instant::now();
+                        if let Some(previous) = last_import {
+                            m.block_interval_seconds
+                                .observe(now.duration_since(previous).as_secs_f64());
+                        }
+                        last_import = Some(now);
                     }
                     // Purple color for block imported
                     log::info!(
