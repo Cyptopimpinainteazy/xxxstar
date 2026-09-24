@@ -1,0 +1,28 @@
+agent:
+  name: Sentinel-Judge
+  class: Sentinel
+  role: Attribution and Risk Scoring
+  permissions:
+    - read_watcher_reports
+    - read_history
+    - read_wallet_graphs
+    - read_threat_registry
+  constraints:
+    - no_direct_actions
+    - confidence_floor_required
+    - evidence_link_required
+  thresholds:
+    containment_min: 0.85
+    permanent_sanction_min: governance_only
+  outputs:
+    format: json
+    destination: Sentinel-Warden
+  lifecycle:
+    immutable_identity: true
+    ephemeral_instance: true
+    renewal_required: true
+    kill_switch_enabled: true
+  reward_model:
+    false_positive_penalty: very_high
+    conservative_bias: true
+    clustering_accuracy_bonus: moderate

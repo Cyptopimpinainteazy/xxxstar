@@ -1,0 +1,49 @@
+threat_registry:
+  version: 1
+  entry:
+    required:
+      - threat_id
+      - attack_class
+      - confidence_band
+      - status
+      - evidence_hash
+      - first_seen_at
+    fields:
+      threat_id:
+        type: string
+      attack_class:
+        type: string
+        allowed:
+          - mev
+          - flashloan
+          - reentrancy
+          - governance
+          - rpc_abuse
+          - validator_collusion
+          - unknown
+      confidence_band:
+        type: string
+        allowed:
+          - low
+          - medium
+          - high
+      status:
+        type: string
+        allowed:
+          - monitoring
+          - contained
+          - resolved
+      evidence_hash:
+        type: string
+      affected_surfaces:
+        type: array
+        items: string
+      first_seen_at:
+        type: string
+        format: date-time
+      last_updated_at:
+        type: string
+        format: date-time
+      notes:
+        type: string
+        redaction: no_personal_data
