@@ -1,0 +1,274 @@
+{
+  "generated_at": 1775974016.0339146,
+  "duration_s": 0.05986166000366211,
+  "levels": [
+    1000,
+    5000
+  ],
+  "tested_chains": 3,
+  "our_chain_id": "solana",
+  "our_chain_max_tps": 439083.79046103597,
+  "global_max_tps": 741986.9799037646,
+  "lanes": [
+    {
+      "name": "primary",
+      "url": "http://localhost:9001/accelerate/batch"
+    },
+    {
+      "name": "shadow",
+      "url": "http://localhost:9002/accelerate/batch"
+    },
+    {
+      "name": "tertiary",
+      "url": "http://localhost:9003/accelerate/batch"
+    }
+  ],
+  "chains": [
+    {
+      "chain_id": "akash",
+      "chain_name": "Akash",
+      "max_tps": 741986.9799037646,
+      "best_level": 5000,
+      "levels": [
+        {
+          "level": 1000,
+          "successful": 1000,
+          "failed": 0,
+          "success_rate": 1.0,
+          "duration_s": 0.004256010055541992,
+          "tps": 234961.8508767016,
+          "lanes": [
+            {
+              "lane": "primary",
+              "requested": 334,
+              "successful": 334,
+              "failed": 0,
+              "duration_s": 0.003299236297607422,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "shadow",
+              "requested": 333,
+              "successful": 333,
+              "failed": 0,
+              "duration_s": 0.003979682922363281,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "tertiary",
+              "requested": 333,
+              "successful": 333,
+              "failed": 0,
+              "duration_s": 0.003793001174926758,
+              "status": 200,
+              "error": null
+            }
+          ]
+        },
+        {
+          "level": 5000,
+          "successful": 5000,
+          "failed": 0,
+          "success_rate": 1.0,
+          "duration_s": 0.0067386627197265625,
+          "tps": 741986.9799037646,
+          "lanes": [
+            {
+              "lane": "primary",
+              "requested": 1667,
+              "successful": 1667,
+              "failed": 0,
+              "duration_s": 0.00646209716796875,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "shadow",
+              "requested": 1667,
+              "successful": 1667,
+              "failed": 0,
+              "duration_s": 0.006327629089355469,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "tertiary",
+              "requested": 1666,
+              "successful": 1666,
+              "failed": 0,
+              "duration_s": 0.004882097244262695,
+              "status": 200,
+              "error": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chain_id": "algorand",
+      "chain_name": "Algorand",
+      "max_tps": 632949.6272598316,
+      "best_level": 5000,
+      "levels": [
+        {
+          "level": 1000,
+          "successful": 1000,
+          "failed": 0,
+          "success_rate": 1.0,
+          "duration_s": 0.001959562301635742,
+          "tps": 510318.0435576104,
+          "lanes": [
+            {
+              "lane": "primary",
+              "requested": 334,
+              "successful": 334,
+              "failed": 0,
+              "duration_s": 0.0018758773803710938,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "shadow",
+              "requested": 333,
+              "successful": 333,
+              "failed": 0,
+              "duration_s": 0.0016388893127441406,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "tertiary",
+              "requested": 333,
+              "successful": 333,
+              "failed": 0,
+              "duration_s": 0.0013136863708496094,
+              "status": 200,
+              "error": null
+            }
+          ]
+        },
+        {
+          "level": 5000,
+          "successful": 5000,
+          "failed": 0,
+          "success_rate": 1.0,
+          "duration_s": 0.00789952278137207,
+          "tps": 632949.6272598316,
+          "lanes": [
+            {
+              "lane": "primary",
+              "requested": 1667,
+              "successful": 1667,
+              "failed": 0,
+              "duration_s": 0.005165815353393555,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "shadow",
+              "requested": 1667,
+              "successful": 1667,
+              "failed": 0,
+              "duration_s": 0.007495403289794922,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "tertiary",
+              "requested": 1666,
+              "successful": 1666,
+              "failed": 0,
+              "duration_s": 0.004411458969116211,
+              "status": 200,
+              "error": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chain_id": "solana",
+      "chain_name": "SOLANA",
+      "max_tps": 439083.79046103597,
+      "best_level": 5000,
+      "levels": [
+        {
+          "level": 1000,
+          "successful": 1000,
+          "failed": 0,
+          "success_rate": 1.0,
+          "duration_s": 0.0033299922943115234,
+          "tps": 300300.99520297843,
+          "lanes": [
+            {
+              "lane": "primary",
+              "requested": 334,
+              "successful": 334,
+              "failed": 0,
+              "duration_s": 0.003139495849609375,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "shadow",
+              "requested": 333,
+              "successful": 333,
+              "failed": 0,
+              "duration_s": 0.0016071796417236328,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "tertiary",
+              "requested": 333,
+              "successful": 333,
+              "failed": 0,
+              "duration_s": 0.002898693084716797,
+              "status": 200,
+              "error": null
+            }
+          ]
+        },
+        {
+          "level": 5000,
+          "successful": 5000,
+          "failed": 0,
+          "success_rate": 1.0,
+          "duration_s": 0.011387348175048828,
+          "tps": 439083.79046103597,
+          "lanes": [
+            {
+              "lane": "primary",
+              "requested": 1667,
+              "successful": 1667,
+              "failed": 0,
+              "duration_s": 0.011299371719360352,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "shadow",
+              "requested": 1667,
+              "successful": 1667,
+              "failed": 0,
+              "duration_s": 0.005608558654785156,
+              "status": 200,
+              "error": null
+            },
+            {
+              "lane": "tertiary",
+              "requested": 1666,
+              "successful": 1666,
+              "failed": 0,
+              "duration_s": 0.010973453521728516,
+              "status": 200,
+              "error": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+# ── X3 Chain – Secondary Node Fleet Configuration ────────────────────────
+# 5 secondary servers × ~3-4 GTX 1070s each ≈ 17 GPUs total
+
+[fleet]
+name = "secondary-gpu-fleet"
+
+# ── Node definitions ──────────────────────────────────────────────────────────
+
+[[nodes]]
+name          = "sec-node-01"
+host          = "192.168.1.11"
+ssh_user      = "x3"
+gpu_count     = 4
+gpu_model     = "GTX 1070"
+gpu_vram_mb   = 8192
+role          = "validator"
+chains        = ["ethereum", "polygon", "arbitrum", "optimism", "base"]
+
+[[nodes]]
+name          = "sec-node-02"
+host          = "192.168.1.12"
+ssh_user      = "x3"
+gpu_count     = 4
+gpu_model     = "GTX 1070"
+gpu_vram_mb   = 8192
+role          = "validator"
+chains        = ["solana", "eclipse", "sui"]
+
+[[nodes]]
+name          = "sec-node-03"
+host          = "192.168.1.13"
+ssh_user      = "x3"
+gpu_count     = 3
+gpu_model     = "GTX 1070"
+gpu_vram_mb   = 8192
+role          = "validator"
+chains        = ["cosmoshub", "osmosis", "injective", "celestia"]
+
+[[nodes]]
+name          = "sec-node-04"
+host          = "192.168.1.14"
+ssh_user      = "x3"
+gpu_count     = 3
+gpu_model     = "GTX 1070"
+gpu_vram_mb   = 8192
+role          = "validator"
+chains        = ["polkadot", "kusama", "moonbeam", "astar"]
+
+[[nodes]]
+name          = "sec-node-05"
+host          = "192.168.1.15"
+ssh_user      = "x3"
+gpu_count     = 3
+gpu_model     = "GTX 1070"
+gpu_vram_mb   = 8192
+role          = "overflow"
+chains        = []                     # Auto-assigned overflow chains
+
+# ── Common GPU settings ──────────────────────────────────────────────────────
+
+[gpu_defaults]
+max_batch        = 8192
+streams          = 4
+vram_headroom_mb = 512
+
+[scheduler]
+rebalance_interval_sec = 60
+idle_threshold_sec     = 10
+preempt_latency_ms     = 100
+
+[swarm]
+enabled          = true
+max_idle_tasks   = 32
+priority_floor   = 20
+
+[metrics]
+prometheus_port  = 9100
+json_log_path    = "/var/log/x3/secondary-metrics.jsonl"
+
+[connectivity]
+core_node_url    = "ws://192.168.1.10:9944"
+heartbeat_sec    = 15
+reconnect_max    = 5

@@ -1,0 +1,674 @@
+{
+  "summary": {
+    "total": 102,
+    "ok": 54,
+    "skipped": 4
+  },
+  "results": [
+    {
+      "chain_id": "eth",
+      "rpc_url": "https://mainnet.infura.io/v3/${INFURA_API_KEY}",
+      "skipped": "templated_rpc"
+    },
+    {
+      "chain_id": "exp",
+      "rpc_url": "https://node.expanse.tech",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.36796288899950014
+    },
+    {
+      "chain_id": "rop",
+      "rpc_url": "https://ropsten.infura.io/v3/${INFURA_API_KEY}",
+      "skipped": "templated_rpc"
+    },
+    {
+      "chain_id": "rin",
+      "rpc_url": "https://rinkeby.infura.io/v3/${INFURA_API_KEY}",
+      "skipped": "templated_rpc"
+    },
+    {
+      "chain_id": "gor",
+      "rpc_url": "https://goerli.infura.io/v3/${INFURA_API_KEY}",
+      "skipped": "templated_rpc"
+    },
+    {
+      "chain_id": "tch",
+      "rpc_url": "https://rpc.dome.cloud",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.5332812870001362
+    },
+    {
+      "chain_id": "ubq",
+      "rpc_url": "https://rpc.octano.dev",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.octano.dev', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.octano.dev', port=443): Failed to resolve 'rpc.octano.dev' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "quai",
+      "rpc_url": "https://rpc.quai.network/cyprus1",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.16195462199993926
+    },
+    {
+      "chain_id": "oeth",
+      "rpc_url": "https://mainnet.optimism.io",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.2834158949999619
+    },
+    {
+      "chain_id": "meta",
+      "rpc_url": "https://api.metadium.com/prod",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.0466200450000542
+    },
+    {
+      "chain_id": "kal",
+      "rpc_url": "https://api.metadium.com/dev",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.040062040000521
+    },
+    {
+      "chain_id": "dstg",
+      "rpc_url": "https://staging.diode.io:8443/",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='staging.diode.io', port=8443): Max retries exceeded with url: / (Caused by NewConnectionError(\"HTTPSConnection(host='staging.diode.io', port=8443): Failed to establish a new connection: [Errno 111] Connection refused\"))"
+    },
+    {
+      "chain_id": "flr",
+      "rpc_url": "https://flare-api.flare.network/ext/C/rpc",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.27130605099955574
+    },
+    {
+      "chain_id": "diode",
+      "rpc_url": "https://prenet.diode.io:8443/",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.37033565700039617
+    },
+    {
+      "chain_id": "cflr",
+      "rpc_url": "https://coston-api.flare.network/ext/C/rpc",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.24019034300090425
+    },
+    {
+      "chain_id": "tfi",
+      "rpc_url": "https://rpc.thaifi.com",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.thaifi.com', port=443): Read timed out. (read timeout=6)"
+    },
+    {
+      "chain_id": "tst",
+      "rpc_url": "https://testnet-rpc.thundercore.com",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.48152846800076077
+    },
+    {
+      "chain_id": "sgb",
+      "rpc_url": "https://songbird-api.flare.network/ext/C/rpc",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.3031803200001377
+    },
+    {
+      "chain_id": "esc",
+      "rpc_url": "https://api.elastos.io/eth",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.1535698910001884
+    },
+    {
+      "chain_id": "esct",
+      "rpc_url": "https://api-testnet.elastos.io/eth",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7585708440001326
+    },
+    {
+      "chain_id": "kardiachain",
+      "rpc_url": "https://rpc.kardiachain.io",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.kardiachain.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.kardiachain.io', port=443): Failed to resolve 'rpc.kardiachain.io' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "cro",
+      "rpc_url": "https://evm.cronos.org",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.2025254459995267
+    },
+    {
+      "chain_id": "l1test",
+      "rpc_url": "https://testrpc.genesisl1.org",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='testrpc.genesisl1.org', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLCertVerificationError(1, \"[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'testrpc.genesisl1.org'. (_ssl.c:1007)\")))"
+    },
+    {
+      "chain_id": "shib",
+      "rpc_url": "https://rpc.shibchain.org",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.shibchain.org', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.shibchain.org', port=443): Failed to resolve 'rpc.shibchain.org' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "bobarinkeby",
+      "rpc_url": "https://rinkeby.boba.network/",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rinkeby.boba.network', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rinkeby.boba.network', port=443): Failed to resolve 'rinkeby.boba.network' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "l1",
+      "rpc_url": "https://rpc.genesisl1.org",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.6329618039999332
+    },
+    {
+      "chain_id": "rsk",
+      "rpc_url": "https://public-node.rsk.co",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.3322824930000934
+    },
+    {
+      "chain_id": "trsk",
+      "rpc_url": "https://public-node.testnet.rsk.co",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.3147387710005205
+    },
+    {
+      "chain_id": "goodt",
+      "rpc_url": "https://test2.goodata.io",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='test2.goodata.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='test2.goodata.io', port=443): Failed to resolve 'test2.goodata.io' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "good",
+      "rpc_url": "https://rpc.goodata.io",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.goodata.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.goodata.io', port=443): Failed to resolve 'rpc.goodata.io' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "scai",
+      "rpc_url": "https://mainnet-rpc.scai.network",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7945035020002251
+    },
+    {
+      "chain_id": "tbwg",
+      "rpc_url": "https://rpc.tbwg.io",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.tbwg.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.tbwg.io', port=443): Failed to resolve 'rpc.tbwg.io' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "dx",
+      "rpc_url": "https://mainnet.dxchain.com",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='mainnet.dxchain.com', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='mainnet.dxchain.com', port=443): Failed to resolve 'mainnet.dxchain.com' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "xpla",
+      "rpc_url": "https://dimension-evm-rpc.xpla.dev",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.5024794880000627
+    },
+    {
+      "chain_id": "val",
+      "rpc_url": "https://rpc.valorbit.com/v2",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.valorbit.com', port=443): Max retries exceeded with url: /v2 (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.valorbit.com', port=443): Failed to resolve 'rpc.valorbit.com' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "u2u",
+      "rpc_url": "https://rpc-mainnet.u2u.xyz",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.6083747369993944
+    },
+    {
+      "chain_id": "telosevm",
+      "rpc_url": "https://rpc.telos.net",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.26121089400021447
+    },
+    {
+      "chain_id": "telosevmtestnet",
+      "rpc_url": "https://rpc.testnet.telos.net",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.2837307649997456
+    },
+    {
+      "chain_id": "lukso",
+      "rpc_url": "https://42.rpc.thirdweb.com",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.6024618209994514
+    },
+    {
+      "chain_id": "pangolin",
+      "rpc_url": "https://pangolin-rpc.darwinia.network",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='pangolin-rpc.darwinia.network', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='pangolin-rpc.darwinia.network', port=443): Failed to resolve 'pangolin-rpc.darwinia.network' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "crab",
+      "rpc_url": "https://crab-rpc.darwinia.network",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='crab-rpc.darwinia.network', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='crab-rpc.darwinia.network', port=443): Failed to resolve 'crab-rpc.darwinia.network' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "pangoro",
+      "rpc_url": "https://pangoro-rpc.darwinia.network",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='pangoro-rpc.darwinia.network', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='pangoro-rpc.darwinia.network', port=443): Failed to resolve 'pangoro-rpc.darwinia.network' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "darwinia",
+      "rpc_url": "https://rpc.darwinia.network",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.104949483999917
+    },
+    {
+      "chain_id": "aic",
+      "rpc_url": "https://aic.acria.ai",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.4153245050001715
+    },
+    {
+      "chain_id": "etmp",
+      "rpc_url": "https://rpc.etm.network",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.etm.network', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.etm.network', port=443): Failed to resolve 'rpc.etm.network' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "etmptest",
+      "rpc_url": "https://rpc.pioneer.etm.network",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.pioneer.etm.network', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.pioneer.etm.network', port=443): Failed to resolve 'rpc.pioneer.etm.network' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "xdc",
+      "rpc_url": "https://erpc.xinfin.network",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.2884785770002054
+    },
+    {
+      "chain_id": "txdc",
+      "rpc_url": "https://rpc.apothem.network",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.47201881799992407
+    },
+    {
+      "chain_id": "cet",
+      "rpc_url": "https://rpc.coinex.net",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.9603588780000791
+    },
+    {
+      "chain_id": "tcet",
+      "rpc_url": "https://testnet-rpc.coinex.net/",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.9970462609999231
+    },
+    {
+      "chain_id": "op",
+      "rpc_url": "https://mainnet.openpiece.io",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='mainnet.openpiece.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='mainnet.openpiece.io', port=443): Failed to resolve 'mainnet.openpiece.io' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "zyx",
+      "rpc_url": "https://rpc-1.zyx.network/",
+      "ok": false,
+      "status_code": 521,
+      "latency_seconds": 0.3991329479995329
+    },
+    {
+      "chain_id": "bnb",
+      "rpc_url": "https://bsc-dataseed1.bnbchain.org",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.3566327159996945
+    },
+    {
+      "chain_id": "sys",
+      "rpc_url": "https://rpc.syscoin.org",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.6265213090000543
+    },
+    {
+      "chain_id": "ontologymainnet",
+      "rpc_url": "http://dappnode1.ont.io:20339",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7207363789993906
+    },
+    {
+      "chain_id": "eos-legacy",
+      "rpc_url": "https://api.eosargentina.io",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='api.eosargentina.io', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLCertVerificationError(1, \"[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'api.eosargentina.io'. (_ssl.c:1007)\")))"
+    },
+    {
+      "chain_id": "go",
+      "rpc_url": "https://rpc.gochain.io",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.465286216000095
+    },
+    {
+      "chain_id": "etc",
+      "rpc_url": "https://etc.rivet.link",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.35726377999981196
+    },
+    {
+      "chain_id": "metc",
+      "rpc_url": "https://rpc.mordor.etccooperative.org",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.29227949300002365
+    },
+    {
+      "chain_id": "ellaism",
+      "rpc_url": "https://jsonrpc.ellaism.org",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='jsonrpc.ellaism.org', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLError(1, '[SSL: TLSV1_UNRECOGNIZED_NAME] tlsv1 unrecognized name (_ssl.c:1007)')))"
+    },
+    {
+      "chain_id": "tokt",
+      "rpc_url": "https://exchaintestrpc.okex.org",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='exchaintestrpc.okex.org', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='exchaintestrpc.okex.org', port=443): Failed to resolve 'exchaintestrpc.okex.org' ([Errno -5] No address associated with hostname)\"))"
+    },
+    {
+      "chain_id": "okt",
+      "rpc_url": "https://exchainrpc.okex.org",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.757761116000438
+    },
+    {
+      "chain_id": "dbm",
+      "rpc_url": "http://test-rpc.dbmbp.com",
+      "ok": false,
+      "status_code": 405,
+      "latency_seconds": 0.19884257200010325
+    },
+    {
+      "chain_id": "so1",
+      "rpc_url": "https://rpc.soter.one",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.soter.one', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.soter.one', port=443): Failed to resolve 'rpc.soter.one' ([Errno -3] Temporary failure in name resolution)\"))"
+    },
+    {
+      "chain_id": "okov",
+      "rpc_url": "https://kovan.optimism.io/",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='kovan.optimism.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='kovan.optimism.io', port=443): Failed to resolve 'kovan.optimism.io' ([Errno -5] No address associated with hostname)\"))"
+    },
+    {
+      "chain_id": "hsc",
+      "rpc_url": "https://http-mainnet.hoosmartchain.com",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='http-mainnet.hoosmartchain.com', port=443): Max retries exceeded with url: / (Caused by ConnectTimeoutError(<HTTPSConnection(host='http-mainnet.hoosmartchain.com', port=443) at 0x7f6862fde8c0>, 'Connection to http-mainnet.hoosmartchain.com timed out. (connect timeout=6)'))"
+    },
+    {
+      "chain_id": "cfxtest",
+      "rpc_url": "https://evmtestnet.confluxrpc.com",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.2024876049999875
+    },
+    {
+      "chain_id": "dxc",
+      "rpc_url": "https://testnet-http.dxchain.com",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='testnet-http.dxchain.com', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='testnet-http.dxchain.com', port=443): Failed to resolve 'testnet-http.dxchain.com' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "fncy",
+      "rpc_url": "https://fncy-seed1.fncy.world",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='fncy-seed1.fncy.world', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='fncy-seed1.fncy.world', port=443): Failed to resolve 'fncy-seed1.fncy.world' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "idchain",
+      "rpc_url": "https://idchain.one/rpc/",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.8860414130003846
+    },
+    {
+      "chain_id": "dsc",
+      "rpc_url": "https://node.decimalchain.com/web3/",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.6165072140001939
+    },
+    {
+      "chain_id": "mix",
+      "rpc_url": "https://rpc2.mix-blockchain.org:8647",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc2.mix-blockchain.org', port=8647): Max retries exceeded with url: / (Caused by ConnectTimeoutError(<HTTPSConnection(host='rpc2.mix-blockchain.org', port=8647) at 0x7f6862fdecb0>, 'Connection to rpc2.mix-blockchain.org timed out. (connect timeout=6)'))"
+    },
+    {
+      "chain_id": "spoa",
+      "rpc_url": "https://sokol.poa.network",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='sokol.poa.network', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='sokol.poa.network', port=443): Failed to resolve 'sokol.poa.network' ([Errno -5] No address associated with hostname)\"))"
+    },
+    {
+      "chain_id": "primuschain",
+      "rpc_url": "https://ethnode.primusmoney.com/mainnet",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.98814552299973
+    },
+    {
+      "chain_id": "zenith",
+      "rpc_url": "https://dataserver-us-1.zenithchain.co/",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='dataserver-us-1.zenithchain.co', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='dataserver-us-1.zenithchain.co', port=443): Failed to resolve 'dataserver-us-1.zenithchain.co' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "genechain",
+      "rpc_url": "https://rpc.genechain.io",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='rpc.genechain.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='rpc.genechain.io', port=443): Failed to resolve 'rpc.genechain.io' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "joc",
+      "rpc_url": "https://rpc-1.japanopenchain.org:8545",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.9387634189997698
+    },
+    {
+      "chain_id": "meter",
+      "rpc_url": "https://rpc.meter.io",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.2297546979998515
+    },
+    {
+      "chain_id": "metertest",
+      "rpc_url": "https://rpctest.meter.io",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.2930193700003656
+    },
+    {
+      "chain_id": "linqto-devnet",
+      "rpc_url": "https://linqto-dev.com",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='linqto-dev.com', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='linqto-dev.com', port=443): Failed to resolve 'linqto-dev.com' ([Errno -5] No address associated with hostname)\"))"
+    },
+    {
+      "chain_id": "gttest",
+      "rpc_url": "https://testnet.gatenode.cc",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='testnet.gatenode.cc', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='testnet.gatenode.cc', port=443): Failed to resolve 'testnet.gatenode.cc' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "gt",
+      "rpc_url": "https://evm.gatenode.cc",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7008481620005114
+    },
+    {
+      "chain_id": "nnw",
+      "rpc_url": "https://connect.novanetwork.io",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='connect.novanetwork.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host='connect.novanetwork.io', port=443): Failed to resolve 'connect.novanetwork.io' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "vic",
+      "rpc_url": "https://rpc.viction.xyz",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.0724494819996835
+    },
+    {
+      "chain_id": "vict",
+      "rpc_url": "https://rpc-testnet.viction.xyz",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.1206922200008194
+    },
+    {
+      "chain_id": "gar-s0",
+      "rpc_url": "https://s0.garizon.net/rpc",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='s0.garizon.net', port=443): Read timed out. (read timeout=6)"
+    },
+    {
+      "chain_id": "gar-s1",
+      "rpc_url": "https://s1.garizon.net/rpc",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='s1.garizon.net', port=443): Read timed out. (read timeout=6)"
+    },
+    {
+      "chain_id": "gar-s2",
+      "rpc_url": "https://s2.garizon.net/rpc",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='s2.garizon.net', port=443): Read timed out. (read timeout=6)"
+    },
+    {
+      "chain_id": "gar-s3",
+      "rpc_url": "https://s3.garizon.net/rpc",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='s3.garizon.net', port=443): Read timed out. (read timeout=6)"
+    },
+    {
+      "chain_id": "sdlt",
+      "rpc_url": "https://rpc.swissdlt.ch",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 2.0601680649997434
+    },
+    {
+      "chain_id": "camdl",
+      "rpc_url": "https://rpc1.camdl.gov.kh/",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.3938256360006562
+    },
+    {
+      "chain_id": "kub",
+      "rpc_url": "https://rpc.bitkubchain.io",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.4605856930002119
+    },
+    {
+      "chain_id": "bnbt",
+      "rpc_url": "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.3217947399998593
+    },
+    {
+      "chain_id": "six",
+      "rpc_url": "https://sixnet-rpc-evm.sixprotocol.net",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.39337724699998944
+    },
+    {
+      "chain_id": "poa",
+      "rpc_url": "https://core.poa.network",
+      "ok": false,
+      "status_code": 403,
+      "latency_seconds": 0.22334383799989155
+    },
+    {
+      "chain_id": "gno",
+      "rpc_url": "https://rpc.gnosischain.com",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.35302740699989954
+    },
+    {
+      "chain_id": "eti",
+      "rpc_url": "https://api.einc.io/jsonrpc/mainnet",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='api.einc.io', port=443): Max retries exceeded with url: /jsonrpc/mainnet (Caused by NameResolutionError(\"HTTPSConnection(host='api.einc.io', port=443): Failed to resolve 'api.einc.io' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "tw3g",
+      "rpc_url": "https://testnet-rpc-0.web3games.org/evm",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='testnet-rpc-0.web3games.org', port=443): Max retries exceeded with url: /evm (Caused by NameResolutionError(\"HTTPSConnection(host='testnet-rpc-0.web3games.org', port=443): Failed to resolve 'testnet-rpc-0.web3games.org' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "wlc",
+      "rpc_url": "https://seoul.worldland.foundation",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.796705299999303
+    },
+    {
+      "chain_id": "tklc",
+      "rpc_url": "https://klc.live/",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='klc.live', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLCertVerificationError(1, \"[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'klc.live'. (_ssl.c:1007)\")))"
+    },
+    {
+      "chain_id": "dw3g",
+      "rpc_url": "https://devnet.web3games.org/evm",
+      "ok": false,
+      "error": "HTTPSConnectionPool(host='devnet.web3games.org', port=443): Max retries exceeded with url: /evm (Caused by NameResolutionError(\"HTTPSConnection(host='devnet.web3games.org', port=443): Failed to resolve 'devnet.web3games.org' ([Errno -2] Name or service not known)\"))"
+    },
+    {
+      "chain_id": "vlx",
+      "rpc_url": "https://evmexplorer.velas.com/rpc",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7965930990003471
+    }
+  ]
+}
