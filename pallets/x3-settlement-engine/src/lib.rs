@@ -930,6 +930,9 @@ pub mod pallet {
         FinalSignatureMismatch,
         /// Final signature for this intent was already submitted
         FinalSignatureAlreadyUsed,
+        /// Every bucket in the bounded expiry-index window is full, so the intent
+        /// or lock could not be given a reachable automatic-expiry slot.
+        ExpiryIndexFull,
     }
 
     // ============================================================================
@@ -1071,9 +1074,10 @@ pub mod pallet {
                         // real timeout passes, without requiring the manual
                         // `refund_settlement` extrinsic.
                         let next_block = n.saturating_add(1u32.into());
-                        IntentDeadlineIndex::<T>::mutate(next_block, |list| {
-                            let _ = list.try_push(*intent_id);
-                        });
+                        // Best effort inside a hook: a hook cannot fail the block,
+                        // so if the spill window is saturated the intent keeps the
+                        // manual `refund_settlement` path.
+                        let _ = Self::index_intent_deadline(next_block, *intent_id);
                         weight = weight.saturating_add(
                             <T as frame_system::Config>::DbWeight::get().reads_writes(1, 1),
                         );
@@ -1304,11 +1308,10 @@ pub mod pallet {
                 let blocks_until_deadline: u32 = ((secs_to_deadline / 6).saturating_add(1)) as u32;
                 let deadline_block = frame_system::Pallet::<T>::block_number()
                     .saturating_add(blocks_until_deadline.saturated_into());
-                IntentDeadlineIndex::<T>::mutate(deadline_block, |list| {
-                    // Silently drop if the slot is full (>20 intents/block);
-                    // the intent is still refundable via the `refund_settlement` extrinsic.
-                    let _ = list.try_push(intent_id);
-                });
+                // Spill into a later bucket when this one is full. A bare
+                // try_push would silently leave the intent with no automatic
+                // refund path (the audit s Finding 3 starvation case).
+                Self::index_intent_deadline(deadline_block, intent_id)?;
             }
 
             Self::deposit_event(Event::X3IntentCreated {
@@ -1412,9 +1415,7 @@ pub mod pallet {
                 // Register at deadline+1: is_expired returns true when current_block > deadline,
                 // so the first block where the lock is expired is deadline+1.
                 let expiry_block = current_block + commit_deadline_blocks + 1;
-                AtomicLockExpiryIndex::<T>::mutate(expiry_block, |ids| {
-                    let _ = ids.try_push(intent_id);
-                });
+                Self::index_lock_expiry(expiry_block, intent_id)?;
             }
 
             // Update intent
@@ -1454,9 +1455,7 @@ pub mod pallet {
                             ids.retain(|x| *x != intent_id);
                         });
                     }
-                    AtomicLockExpiryIndex::<T>::mutate(new_expiry, |ids| {
-                        let _ = ids.try_push(intent_id);
-                    });
+                    Self::index_lock_expiry(new_expiry, intent_id)?;
 
                     AtomicLocks::<T>::insert(intent_id, atomic_lock);
                 }
@@ -2481,7 +2480,59 @@ pub mod pallet {
     // Internal Functions
     // ============================================================================
 
+    /// Buckets to try before failing closed when an expiry-index bucket is full.
+    /// 20 entries per bucket x 16 buckets absorbs a 320-intent burst sharing one
+    /// deadline.
+    const MAX_EXPIRY_INDEX_SPILL_BLOCKS: u32 = 16;
+
     impl<T: Config> Pallet<T> {
+        /// Register `intent_id` in the first deadline bucket at or after
+        /// `start_block` that still has room, spilling forward when a bucket is full.
+        ///
+        /// Each bucket is a `BoundedVec<_, 20>` and `on_initialize` drains a whole
+        /// bucket at once, so a bare `try_push` that silently fails leaves the intent
+        /// with no automatic refund path at all. Spilling keeps every intent
+        /// reachable; if the whole window is saturated we fail closed and the caller
+        /// aborts, which rolls back its storage writes.
+        fn index_intent_deadline(
+            start_block: BlockNumberFor<T>,
+            intent_id: H256,
+        ) -> Result<BlockNumberFor<T>, DispatchError> {
+            let mut block = start_block;
+            for _ in 0..MAX_EXPIRY_INDEX_SPILL_BLOCKS {
+                let mut placed = false;
+                IntentDeadlineIndex::<T>::mutate(block, |list| {
+                    if list.try_push(intent_id).is_ok() {
+                        placed = true;
+                    }
+                });
+                if placed {
+                    return Ok(block);
+                }
+                block = block.saturating_add(1u32.into());
+            }
+            Err(Error::<T>::ExpiryIndexFull.into())
+        }
+
+        /// Same spill policy as [`Self::index_intent_deadline`], for the atomic-lock
+        /// expiry index which is keyed by a plain `u32` block number.
+        fn index_lock_expiry(start_block: u32, intent_id: H256) -> Result<u32, DispatchError> {
+            let mut block = start_block;
+            for _ in 0..MAX_EXPIRY_INDEX_SPILL_BLOCKS {
+                let mut placed = false;
+                AtomicLockExpiryIndex::<T>::mutate(block, |ids| {
+                    if ids.try_push(intent_id).is_ok() {
+                        placed = true;
+                    }
+                });
+                if placed {
+                    return Ok(block);
+                }
+                block = block.saturating_add(1);
+            }
+            Err(Error::<T>::ExpiryIndexFull.into())
+        }
+
         /// Generate unique intent ID
         pub fn generate_intent_id(
             maker: &AccountIdOf<T>,
