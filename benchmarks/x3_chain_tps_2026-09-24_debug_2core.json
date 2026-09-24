@@ -1,0 +1,64 @@
+{
+  "produced_by": "scripts/testnet/load-remarks-tps.js",
+  "date_utc": "2026-09-24T17:32:37.370Z",
+  "host": {
+    "cpu_model": "Intel(R) Celeron(R) CPU G3930 @ 2.90GHz",
+    "cpu_count": 2,
+    "os": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "build_profile": "debug",
+    "note": "shared desktop; the user's editor was running during the run"
+  },
+  "command": "NODE_PATH=<polkadot-api> RPC_WS=ws://127.0.0.1:9945 SENDER_MODE=dev SENDER_COUNT=6 CONCURRENCY=32 DURATION_SEC=20 FINALITY_WAIT_SEC=12 MAX_ERROR_RATE=1 node scripts/testnet/load-remarks-tps.js",
+  "report": {
+    "timestamp_utc": "2026-09-24T17:32:37.370Z",
+    "chain": "x3",
+    "rpc_ws": "ws://127.0.0.1:9945",
+    "tx_type": "system.remark",
+    "sender_mode": "dev",
+    "senders": 6,
+    "sender_offset": 0,
+    "sender_count_requested": 6,
+    "prefund_enabled": false,
+    "prefund_amount_planck": "1000000000000",
+    "duration_sec": 20,
+    "concurrency": 32,
+    "finality_wait_sec": 12,
+    "sent": 764,
+    "accepted": 764,
+    "failed": 0,
+    "finalized": 764,
+    "finalized_method": "account_nonce_delta",
+    "send_tps": 38.2,
+    "accepted_submit_tps": 38.2,
+    "finalized_tps_submit_window": 38.2,
+    "finalized_tps_wall": 23.825,
+    "wall_sec_including_finality_wait": 32.067,
+    "error_rate": 0,
+    "baseline_requirements": {
+      "require_baseline": false,
+      "min_duration_sec": 1200,
+      "min_finalized_tps": 0,
+      "max_error_rate": 1,
+      "baseline_ok": false
+    }
+  },
+  "compare": {
+    "recorded_best_2026_02_19_release": {
+      "config": {
+        "concurrency": 32,
+        "duration_sec": 20,
+        "senders": 6
+      },
+      "finalized_tps_submit_window": 575.5,
+      "finalized_tps_wall": 359.171,
+      "source": "recovered from the 2026-04 archive: benchmarks/x3_chain_tps_sweep.json"
+    },
+    "this_run_finalized_tps_submit_window": 38.2,
+    "comparable": false,
+    "why_not_comparable": [
+      "this run is a debug build; the February figure was a release build",
+      "this host has 2 cores and was running other work; the February host is unrecorded",
+      "both are loopback single-node measurements of system.remark, the cheapest possible workload"
+    ]
+  }
+}
