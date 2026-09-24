@@ -45,7 +45,7 @@ chrono = { version = "0.4", features = ["serde"], optional = true }
 tokio-cron-scheduler = { version = "0.9", optional = true }
 
 # Cross-chain messaging
-libp2p = { version = "0.50", features = ["tcp", "quic", "noise"], optional = true }
+libp2p = { version = "0.54", features = ["tcp", "quic", "noise"], optional = true }
 
 [dev-dependencies]
 tempfile = "3.0"
