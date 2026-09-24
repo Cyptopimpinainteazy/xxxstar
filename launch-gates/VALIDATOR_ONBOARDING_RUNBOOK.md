@@ -573,10 +573,18 @@ x3-chain-node send-extrinsic \
 
 **Database Backend:**
 ```bash
-# RocksDB (default, recommended)
+# RocksDB — recommended, and what this runbook assumes
 --database rocksdb
 
-# ParityDB (experimental, faster writes)
+# ParityDB — what the node actually picks when --database is not passed.
+# Verified 2026-09-24 by starting the node with no database flag; it logs
+# "Database: ParityDb at <base>/chains/<id>/paritydb/full". The previous wording
+# here called RocksDB the default, which is not what the binary does, so every
+# operator following this page without the flag above has been running ParityDB
+# while believing otherwise. Which backend *should* be the default is an open
+# question (the storage audit asks for a RocksDB-vs-ParityDB benchmark on X3's
+# real workload and it has not been run); this line only stops the page from
+# asserting something false.
 --database paritydb
 ```
 

@@ -65,12 +65,32 @@ async fn rpc(url: &str, method: &str, params: serde_json::Value) -> serde_json::
     serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("{method} did not answer JSON: {e}"))
 }
 
+/// Same call as [`rpc`], but a transport failure comes back as an `Err` so the
+/// readiness loop can retry it. Everything after startup still uses `rpc`, where
+/// a failed connection is a real failure.
+async fn try_rpc(
+    url: &str,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let body = format!(r#"{{"jsonrpc":"2.0","method":"{method}","params":{params},"id":1}}"#);
+    let bytes = x3_external_chains::rpc_http::post_json(url, body.as_bytes())
+        .await
+        .map_err(|e| format!("{method} over HTTP failed: {e}"))?;
+    serde_json::from_slice(&bytes).map_err(|e| format!("{method} did not answer JSON: {e}"))
+}
+
 async fn wait_for_chain(url: &str) {
     let deadline = Instant::now() + Duration::from_secs(30);
     while Instant::now() < deadline {
-        let answer = rpc(url, "eth_chainId", serde_json::json!([])).await;
-        if answer.get("result").is_some() {
-            return;
+        // `rpc` panics on a transport error, which is exactly what "anvil has not
+        // bound its port yet" looks like — so this loop could never wait for
+        // anything: the first refused connection failed the test instead of
+        // being retried.
+        if let Ok(answer) = try_rpc(url, "eth_chainId", serde_json::json!([])).await {
+            if answer.get("result").is_some() {
+                return;
+            }
         }
         thread::sleep(Duration::from_millis(250));
     }
