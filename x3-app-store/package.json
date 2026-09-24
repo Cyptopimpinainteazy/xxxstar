@@ -1,0 +1,36 @@
+{
+  "name": "x3-app-store",
+  "version": "1.0.0",
+  "description": "X3 App Store - Automated Crypto App Discovery and Profit Sharing Platform",
+  "main": "start.sh",
+  "scripts": {
+    "start": "./start.sh",
+    "dev": "./start.sh",
+    "test": "echo 'No tests configured'",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../github-scraper && npm install && cd ../treasury && npm install && cd ../app-store-manager && npm install"
+  },
+  "keywords": [
+    "x3",
+    "app-store",
+    "crypto",
+    "blockchain",
+    "defi",
+    "profit-sharing",
+    "treasury"
+  ],
+  "author": "X3 Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Cyptopimpinainteazy/x3-chain.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Cyptopimpinainteazy/x3-chain/issues"
+  },
+  "homepage": "https://github.com/Cyptopimpinainteazy/x3-chain#readme"
+}

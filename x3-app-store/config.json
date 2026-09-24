@@ -1,0 +1,112 @@
+{
+  "app": {
+    "name": "X3 App Store",
+    "version": "1.0.0",
+    "description": "Automated crypto app discovery and profit sharing platform",
+    "baseUrl": "http://localhost:3000",
+    "frontendUrl": "http://localhost:3001"
+  },
+  "database": {
+    "mongodb": {
+      "uri": "mongodb://localhost:27017/x3-app-store",
+      "options": {
+        "useNewUrlParser": true,
+        "useUnifiedTopology": true
+      }
+    },
+    "redis": {
+      "host": "localhost",
+      "port": 6379,
+      "password": ""
+    }
+  },
+  "github": {
+    "apiUrl": "https://api.github.com",
+    "searchInterval": "6h",
+    "maxResults": 100,
+    "languages": ["javascript", "typescript", "python", "rust", "go", "solidity"],
+    "topics": ["crypto", "blockchain", "defi", "airdrop", "farming", "mining"]
+  },
+  "treasury": {
+    "profitSharing": {
+      "userShare": 0.5,
+      "treasuryShare": 0.5
+    },
+    "tokenManagement": {
+      "autoAddTokens": true,
+      "tokenDiscoveryInterval": "1h"
+    },
+    "rewardSystem": {
+      "initialAirdrop": true,
+      "periodicRewards": true,
+      "rewardCheckInterval": "6h"
+    }
+  },
+  "appStore": {
+    "approvalProcess": {
+      "stages": ["sandbox", "testing", "approved"],
+      "sandboxTimeout": "30m",
+      "testingTimeout": "1h"
+    },
+    "security": {
+      "maxFileSize": "50MB",
+      "allowedFileTypes": ["zip", "tar.gz", "tar.bz2"],
+      "virusScan": true
+    },
+    "monitoring": {
+      "healthCheckInterval": "5m",
+      "performanceMetrics": true
+    }
+  },
+  "security": {
+    "jwt": {
+      "secret": "your_jwt_secret_here",
+      "expiresIn": "7d"
+    },
+    "session": {
+      "secret": "your_session_secret_here",
+      "maxAge": "24h"
+    },
+    "rateLimiting": {
+      "windowMs": "15m",
+      "max": 100
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "file": "./logs/app.log",
+    "maxSize": "10m",
+    "maxFiles": 5
+  },
+  "monitoring": {
+    "prometheus": {
+      "enabled": true,
+      "port": 9090,
+      "path": "/metrics"
+    },
+    "grafana": {
+      "enabled": true,
+      "port": 3000
+    }
+  },
+  "deployment": {
+    "environments": {
+      "development": {
+        "port": 3000,
+        "host": "localhost",
+        "debug": true
+      },
+      "staging": {
+        "port": 3000,
+        "host": "staging.x3-app-store.com",
+        "debug": false
+      },
+      "production": {
+        "port": 3000,
+        "host": "api.x3-app-store.com",
+        "debug": false
+      }
+    }
+  }
+}

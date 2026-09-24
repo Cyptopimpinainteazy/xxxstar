@@ -1,0 +1,21 @@
+# X3 Sidecar E2E Benchmark Configuration
+rpc_port = 9955
+metrics_port = 9956
+chain_rpc = "http://localhost:9944"
+data_dir = "/x3-sidecar-data"
+executor_key = "0000000000000000000000000000000000000000000000000000000000000001"
+max_pending_jobs = 1000
+gpu_enabled = false
+worker_threads = 4
+submit_retries = 3
+heartbeat_interval = 30
+benchmark_signer = "x3-sidecar-e2e"
+benchmark_gateway_url = "http://x3-gateway:8080"
+benchmark_gateway_token = "benchmark-secret-token-e2e"
+
+[vm]
+max_gas = 10000000
+memory_limit = 67108864
+stack_limit = 1024
+jit_enabled = false
+jit_threshold = 100

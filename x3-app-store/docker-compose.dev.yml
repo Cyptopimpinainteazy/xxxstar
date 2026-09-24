@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: x3-app-store-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+      - MONGO_INITDB_DATABASE=x3-app-store
+    volumes:
+      - mongo-data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - x3-app-store-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: x3-app-store-redis
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=password
+    volumes:
+      - redis-data:/data
+    networks:
+      - x3-app-store-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: x3-app-store-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/x3-app-store
+      - REDIS_URL=redis://:password@redis:6379
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - x3-app-store-network
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: x3-app-store-frontend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - x3-app-store-network
+    command: npm run dev
+
+  github-scraper:
+    build:
+      context: ./github-scraper
+      dockerfile: Dockerfile
+    container_name: x3-app-store-scraper
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/x3-app-store
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    volumes:
+      - ./github-scraper:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+    networks:
+      - x3-app-store-network
+    command: node scraper.js
+
+  treasury:
+    build:
+      context: ./treasury
+      dockerfile: Dockerfile
+    container_name: x3-app-store-treasury
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/x3-app-store
+      - COINGECKO_API_URL=https://api.coingecko.com/api/v3
+    volumes:
+      - ./treasury:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+    networks:
+      - x3-app-store-network
+    command: node treasury.js
+
+  app-store-manager:
+    build:
+      context: ./app-store-manager
+      dockerfile: Dockerfile
+    container_name: x3-app-store-manager
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/x3-app-store
+    volumes:
+      - ./app-store-manager:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+    networks:
+      - x3-app-store-network
+    command: node manager.js
+
+volumes:
+  mongo-data:
+  redis-data:
+
+networks:
+  x3-app-store-network:
+    driver: bridge
