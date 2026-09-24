@@ -37,23 +37,14 @@ use crate::opcode::Opcode;
 ///   Ret       r2         ; return 49
 ///   ```
 ///
-/// Compute a CRC32 checksum over the bytecode body (everything after the
-/// 24-byte header). The checksum is validated on VM load to detect bit-rot
-/// and malformed modules.
+/// The envelope's checksum, over the body — everything after the 24-byte header.
+///
+/// This file used to carry its own CRC32 implementation while the writer used a wrapping
+/// multiply-and-add, so fixtures built here were not bytecode the reader would accept. The
+/// definition lives in `x3-common::bytecode` and is shared with the writer, the std reader and the
+/// no-std reader (TICKET-108).
 fn compute_bytecode_checksum(body: &[u8]) -> u32 {
-    // Simple CRC32 using polynomial 0xEDB88320 (standard IEEE 802.3)
-    let mut crc: u32 = 0xFFFFFFFF;
-    for &byte in body {
-        crc ^= byte as u32;
-        for _ in 0..8 {
-            if crc & 1 != 0 {
-                crc = (crc >> 1) ^ 0xEDB88320;
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
-    !crc
+    x3_common::bytecode::checksum(body)
 }
 
 /// Write the 24-byte X3BC header (magic + version + flags + checksum_placeholder + min_version + features).
@@ -66,7 +57,7 @@ fn write_header(out: &mut Vec<u8>) {
     out.extend_from_slice(&0u32.to_le_bytes()); // features
 }
 
-/// Patch the checksum field (bytes 12-15) with the CRC32 of the body.
+/// Patch the checksum field (bytes 12-15) with the body's checksum.
 fn patch_checksum(module: &mut [u8]) {
     if module.len() < 24 {
         return;

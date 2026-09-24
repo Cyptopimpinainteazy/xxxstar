@@ -111,32 +111,14 @@ impl Verifier {
             VerifierError::without_offset(VerifierErrorKind::ParseError(format!("{}", e)))
         })?;
 
-        // Validate CRC32 checksum: read from header bytes 12-15, compute over
-        // body (bytes 24..), reject on mismatch. Bit-rot or truncated modules
-        // are caught here before any further verification runs.
-        if bytes.len() >= 24 {
-            let header_checksum = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
-            if header_checksum != 0 {
-                // Only validate if the header carries a non-zero checksum.
-                let mut crc: u32 = 0xFFFFFFFF;
-                for &byte in &bytes[24..] {
-                    crc ^= byte as u32;
-                    for _ in 0..8 {
-                        if crc & 1 != 0 {
-                            crc = (crc >> 1) ^ 0xEDB88320;
-                        } else {
-                            crc >>= 1;
-                        }
-                    }
-                }
-                let computed = !crc;
-                if header_checksum != computed {
-                    return Err(VerifierError::without_offset(
-                        VerifierErrorKind::ChecksumMismatch,
-                    ));
-                }
-            }
-        }
+        // The checksum is verified by the parse above — `BytecodeModule::from_bytes` compares the
+        // header's value against the same function the writer used, and refuses on mismatch.
+        //
+        // This used to be a second, *different* check here: a CRC32 computed over the body and
+        // compared only when the header's value was non-zero. The writer has always written a
+        // wrapping multiply-and-add sum, so the two disagreed, and every module a compiler produced
+        // was rejected by this gate — while a module with a zeroed checksum field was accepted
+        // without any check at all (TICKET-108). One format, one algorithm, checked always.
 
         // Run verification passes
         Self::verify_module(&module, options)?;
@@ -1106,6 +1088,41 @@ mod tests {
             code,
             debug_info: None,
             metadata: None,
+        }
+    }
+
+    /// The checksum the *writer* puts in the header is the one the verifier must expect.
+    ///
+    /// `BytecodeModule::to_bytes` writes a wrapping multiply-and-add over the body; the verifier
+    /// recomputed a CRC32 and compared only when the header value was non-zero, so every module a
+    /// compiler produced carried a checksum the verifier read as wrong (TICKET-108).
+    #[test]
+    fn a_written_module_passes_its_own_checksum() {
+        let module = make_simple_module(vec![Opcode::Nop.to_byte(), Opcode::Halt.to_byte()]);
+        let bytes = module.to_bytes();
+        let result = Verifier::verify_module_bytes(&bytes, &VerifyOptions::default());
+        assert!(
+            result.is_ok(),
+            "a module written by the compiler must verify, got {:?}",
+            result.err().map(|e| e.kind)
+        );
+    }
+
+    #[test]
+    fn a_corrupted_body_fails_the_checksum() {
+        let module = make_simple_module(vec![Opcode::Nop.to_byte(), Opcode::Halt.to_byte()]);
+        let mut bytes = module.to_bytes();
+        let last = bytes.len() - 1;
+        bytes[last] ^= 0xFF;
+        let error = Verifier::verify_module_bytes(&bytes, &VerifyOptions::default())
+            .expect_err("a body corrupted after compilation must not verify");
+        match error.kind {
+            // The parse refuses it: the checksum the writer computed no longer matches.
+            VerifierErrorKind::ParseError(ref message) => assert!(
+                message.contains("checksum"),
+                "expected the checksum to be named, got {message}"
+            ),
+            other => panic!("expected a parse refusal naming the checksum, got {other:?}"),
         }
     }
 
