@@ -284,10 +284,20 @@ impl AccelBackend for WgpuBackend {
         })
     }
 
-    fn keccak256_batch(&self, _inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
-        Err(AccelError::KernelUnavailable {
-            backend: BackendKind::Wgpu,
-            algorithm: "keccak256",
+    fn keccak256_batch(&self, inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
+        self.inner.keccak256_batch(inputs).map_err(|err| match err {
+            x3_accel_wgpu::WgpuAccelError::InvalidInput(message) => {
+                AccelError::InvalidInput(message)
+            }
+            x3_accel_wgpu::WgpuAccelError::AdapterUnavailable
+            | x3_accel_wgpu::WgpuAccelError::DeviceRequestFailed(_)
+            | x3_accel_wgpu::WgpuAccelError::BufferMapFailed(_) => {
+                AccelError::BackendUnavailable(BackendKind::Wgpu)
+            }
+            x3_accel_wgpu::WgpuAccelError::KernelUnavailable(_) => AccelError::KernelUnavailable {
+                backend: BackendKind::Wgpu,
+                algorithm: "keccak256",
+            },
         })
     }
 

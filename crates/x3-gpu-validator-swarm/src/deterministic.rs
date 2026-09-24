@@ -4,12 +4,7 @@
 
 use crate::crypto::{HashAlgorithm, HashOutput, VerificationResult};
 use crate::error::{SwarmError, SwarmResult};
-#[cfg(any(
-    feature = "cuda",
-    feature = "opencl",
-    feature = "metal",
-    feature = "vulkan"
-))]
+#[cfg(feature = "vm-gpu-hostcalls")]
 use crate::gpu_bytecode;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -286,8 +281,14 @@ impl DeterministicEngine {
         }
     }
 
-    #[cfg(test)]
-    fn new_with_accel_backend(accel_backend: Box<dyn AccelBackend>) -> Self {
+    /// Build an engine whose accelerator backend is supplied by the caller
+    /// instead of selected from `X3_ACCEL`.
+    ///
+    /// `new` reads the accelerator from the environment. A test (or a deployment
+    /// that knows which backend it runs) that asserts a specific backend has to
+    /// pin it here, or the assertion silently changes meaning with the ambient
+    /// environment.
+    pub fn new_with_accel_backend(accel_backend: Box<dyn AccelBackend>) -> Self {
         Self {
             mode: RwLock::new(ExecutionMode::GpuWithCpuVerification),
             verification_level: RwLock::new(VerificationLevel::Standard),
@@ -456,21 +457,11 @@ impl DeterministicEngine {
         }
 
         // Without GPU features compiled in, route straight to CPU
-        #[cfg(not(any(
-            feature = "cuda",
-            feature = "opencl",
-            feature = "metal",
-            feature = "vulkan"
-        )))]
+        #[cfg(not(feature = "vm-gpu-hostcalls"))]
         return self.execute_cpu(task, algorithm);
 
         // With GPU features: use GPU hostcalls
-        #[cfg(any(
-            feature = "cuda",
-            feature = "opencl",
-            feature = "metal",
-            feature = "vulkan"
-        ))]
+        #[cfg(feature = "vm-gpu-hostcalls")]
         {
             let gpu_backend = match self.get_gpu_backend() {
                 Some(backend) => backend,
@@ -509,12 +500,7 @@ impl DeterministicEngine {
     }
 
     /// Low-level GPU execution via X3 VM bytecode dispatch (requires a GPU feature flag)
-    #[cfg(any(
-        feature = "cuda",
-        feature = "opencl",
-        feature = "metal",
-        feature = "vulkan"
-    ))]
+    #[cfg(feature = "vm-gpu-hostcalls")]
     fn exec_on_gpu_device(
         &self,
         task: &DeterministicTask,
@@ -604,30 +590,15 @@ impl DeterministicEngine {
             return Ok(self.execution_success_with_accel(task, accel_result, mode));
         }
 
-        #[cfg(not(any(
-            feature = "cuda",
-            feature = "opencl",
-            feature = "metal",
-            feature = "vulkan"
-        )))]
+        #[cfg(not(feature = "vm-gpu-hostcalls"))]
         return self.execute_cpu(task, algorithm);
 
-        #[cfg(any(
-            feature = "cuda",
-            feature = "opencl",
-            feature = "metal",
-            feature = "vulkan"
-        ))]
+        #[cfg(feature = "vm-gpu-hostcalls")]
         self.execute_with_verification_gpu(task, algorithm)
     }
 
     /// GPU+CPU dual-verification logic (only compiled when a GPU backend is enabled)
-    #[cfg(any(
-        feature = "cuda",
-        feature = "opencl",
-        feature = "metal",
-        feature = "vulkan"
-    ))]
+    #[cfg(feature = "vm-gpu-hostcalls")]
     fn execute_with_verification_gpu(
         &self,
         task: &DeterministicTask,
@@ -957,7 +928,11 @@ mod tests {
 
     #[test]
     fn test_hash_batches_use_selected_accelerator_with_cpu_truth() {
-        let engine = DeterministicEngine::new();
+        // Pinned, not selected: `DeterministicEngine::new` takes the backend from
+        // `X3_ACCEL`, so on an accelerator host this test asserted "cpu" against a
+        // "wgpu" engine and failed. The backend under test is CPU, so say so.
+        let engine =
+            DeterministicEngine::new_with_accel_backend(Box::new(x3_accel::CpuBackend::new()));
         engine.set_mode(ExecutionMode::CpuFallback);
         assert_eq!(engine.accelerator_backend_name(), "cpu");
 
