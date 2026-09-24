@@ -546,3 +546,60 @@ Note on method: an initial `git push origin --tags` was started and then aborted
 — it would have uploaded unrelated large histories. It was killed during pack
 generation, before any ref was sent; `git ls-remote --tags origin` afterwards
 shows exactly three tags (`v0.4.0-rc.1` plus the two above), so nothing landed.
+
+## Pass 7: the last branch outside master (2026-09-24)
+
+`archive/pr126-pre-master-rewrite-20260909` was the only branch left on the
+remote that was not an ancestor of master. It cannot be merged — it shares no
+history with master (218 commits, its own root, `git merge-base` empty) and the
+recovery plan forbids joining the unrelated histories.
+
+It is now preserved as a **tag of the same name** pointing at the identical
+commit, and the branch was deleted. Nothing is lost: the whole 218-commit
+lineage still hangs off that object and is visible on the remote under exactly
+the name the plan requires. Restore the branch whenever wanted:
+
+```bash
+git push origin refs/tags/archive/pr126-pre-master-rewrite-20260909:refs/heads/archive/pr126-pre-master-rewrite-20260909
+```
+
+### Result: every branch on the remote is on master
+
+```
+$ git ls-remote --heads origin | wc -l
+10
+$ for r in $(git for-each-ref --format='%(refname)' refs/remotes/origin | grep -v HEAD); do
+    git merge-base --is-ancestor "$r" master || echo "NOT ON MASTER: $r"; done
+(no output — all 10 are ancestors of master)
+```
+
+`origin` went **120 → 10** branches over this work, and 10/10 are now on master:
+
+```
+master
+docs/matrix-third-pass                                (live worktree)
+fix/matrix-evidence-prose                             (live worktree)
+merge/x3-mcp-server                                   (live worktree)
+wip/chatgpt-mainnet-attestation-20260918              (live worktree)
+wip/prompts-to-skills-20260918                        (live worktree)
+codex/x3-economic-safety-kernel                       (documented exclusion)
+econsafety-kernel                                     (documented exception lineage)
+wip/x3lang-arb-graph-filter-20260919                  (documented exclusion)
+wip/x3lang-preserve-packets-and-arbitrage-20260919    (documented exclusion)
+```
+
+Preserved on the remote as five tags: `archive/pr126-pre-master-rewrite-20260909`
+plus the four `preserve/local-only-20260924/*` and `preserve/20260924/*` names.
+
+### What is deliberately out of scope
+
+- **Two local-only branches**, `wip/consolidation-20260917/recovered-usb-clone`
+  (3.80 GB / 3,041 MB of tree content, 88,443 files) and `your-task-branch`
+  (1.47 GB / 1,561 MB, 71,965 files). They are unrelated-lineage snapshots whose
+  content alone exceeds GitHub's push limits, so they cannot be published in any
+  form — not even squashed. They remain on disk, untouched, with the bundle
+  command in pass 6. Nothing here deleted them.
+- **`Cyptopimpinainteazy/x3-atomic-star`**, a second repository on the same
+  account (default branch `main`, not `master`; 29 branches, 20 open Dependabot
+  PRs, 21 open issues). Its `main` is `157701ac3`, an ancestor of master 577
+  commits behind. Writing to a second repository is not part of this task.

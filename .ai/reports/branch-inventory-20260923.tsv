@@ -365,7 +365,6 @@ refs/heads/wip/x3lang-route-fallback-20260918	local-branch	ON_MASTER	commits rea
 refs/heads/x3/nostd-port-only	local-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/heads/x3lang-live-quotes	local-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/heads/your-task-branch	local-branch	UNRELATED_LINEAGE	shares no history with master; preserved, must not be deleted
-refs/remotes/origin/archive/pr126-pre-master-rewrite-20260909	origin-branch	UNRELATED_LINEAGE	shares no history with master; preserved, must not be deleted
 refs/remotes/origin/codex/x3-economic-safety-kernel	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/docs/matrix-third-pass	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/econsafety-kernel	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
