@@ -1389,4 +1389,45 @@ mod state_machine_regression_tests {
             "purging sessions must never release a burned secret"
         );
     }
+
+    /// CRITICAL-006 regression, driven through the coordinator itself.
+    ///
+    /// The version of this check that lived in tests/security_regression.rs was
+    /// arithmetic over three local variables: it never called the coordinator, so
+    /// it passed with every timelock check deleted. This loads a session that is
+    /// ready to execute (HtlcsLocked) and asks the real state machine to start
+    /// flash execution after its fast-chain timelock has passed. It must abort,
+    /// not advance.
+    #[test]
+    fn critical_006_coordinator_aborts_flash_execution_past_the_timelock() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x6B; 32]);
+        let session_id = "c006-session";
+        let session =
+            idempotency_test_session(session_id, SwapPhase::HtlcsLocked, secret.hash(), now);
+        let timelock_fast = session.timelock_fast;
+        assert!(
+            timelock_fast > now,
+            "fixture: the fast-chain timelock must start in the future"
+        );
+
+        let persistence = Arc::new(InMemoryPersistence::new());
+        persistence.save(&session);
+        let mut coordinator =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+
+        // One second past the timelock, which is well past the safety margin.
+        let err = coordinator
+            .begin_flash_execution(session_id, timelock_fast + 1)
+            .expect_err("starting flash execution after the timelock must fail");
+        assert!(
+            matches!(err, CoordinatorError::TimelockExpired { .. }),
+            "expected TimelockExpired, got {err:?}"
+        );
+        assert_eq!(
+            coordinator.get_session(session_id).expect("session").phase,
+            SwapPhase::Aborting,
+            "the swap must abort rather than advance once its timelock has passed"
+        );
+    }
 }
