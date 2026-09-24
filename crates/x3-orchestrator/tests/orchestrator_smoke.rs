@@ -3,7 +3,8 @@ use std::sync::Arc;
 use x3_orchestrator::{
     adapters::{evm::EvmAdapter, svm::SvmAdapter, x3vm::X3VmAdapter},
     AdapterRegistry, CanonicalSupplySnapshot, ChainId, CrossVmMessage, ExecutionProof,
-    OrchestratorError, OrchestratorRouter, ReplayGuard, VmKind,
+    MockProofVerifier, MockVmExecutor, OrchestratorError, OrchestratorRouter, ProofVerifier,
+    ReplayGuard, VmKind,
 };
 
 fn sample_message() -> CrossVmMessage {
@@ -33,10 +34,62 @@ fn sample_proof(message_id: &str) -> ExecutionProof {
 
 fn build_router() -> OrchestratorRouter {
     let registry = Arc::new(AdapterRegistry::new());
-    registry.register(Arc::new(EvmAdapter::new(ChainId::new("ethereum-sepolia"))));
-    registry.register(Arc::new(SvmAdapter::new(ChainId::new("solana-devnet"))));
-    registry.register(Arc::new(X3VmAdapter::new(ChainId::new("x3-local"))));
+    // These routes assert routing and replay behaviour, so each adapter is given
+    // the crate's test verifier. Without one the adapters refuse every proof —
+    // which is the production default, and is asserted separately below.
+    let evm = EvmAdapter::new(ChainId::new("ethereum-sepolia"))
+        .with_verifier(Arc::new(MockProofVerifier))
+        .with_executor(Arc::new(MockVmExecutor));
+    let svm = SvmAdapter::new(ChainId::new("solana-devnet"))
+        .with_verifier(Arc::new(MockProofVerifier))
+        .with_executor(Arc::new(MockVmExecutor));
+    let x3vm = X3VmAdapter::new(ChainId::new("x3-local"))
+        .with_verifier(Arc::new(MockProofVerifier))
+        .with_executor(Arc::new(MockVmExecutor));
+
+    registry.register(Arc::new(evm));
+    registry.register(Arc::new(svm));
+    registry.register(Arc::new(x3vm));
     OrchestratorRouter::new(registry, Arc::new(ReplayGuard::new()))
+}
+
+/// The honest default: an adapter constructed without a verifier must refuse,
+/// not route. Without this, "no verifier configured" could silently become
+/// "proof accepted" the next time someone moves a default.
+#[test]
+fn adapters_without_a_verifier_refuse_proofs() {
+    let id = ChainId::new("ethereum-sepolia");
+    let proof = sample_proof("0xdeadbeef");
+
+    let adapters: Vec<Box<dyn x3_orchestrator::ChainAdapter>> = vec![
+        Box::new(EvmAdapter::new(id.clone())),
+        Box::new(SvmAdapter::new(ChainId::new("solana-devnet"))),
+        Box::new(X3VmAdapter::new(ChainId::new("x3-local"))),
+    ];
+
+    for adapter in adapters {
+        match adapter.verify(&proof) {
+            Err(OrchestratorError::ExecutionFailed(message)) => {
+                assert!(
+                    message.contains("not wired"),
+                    "{:?}: unexpected refusal message {message:?}",
+                    adapter.chain_id(),
+                );
+            }
+            other => panic!(
+                "{:?}: an adapter with no verifier must refuse, got {other:?}",
+                adapter.chain_id()
+            ),
+        }
+    }
+
+    // And the verifier path really is exercised: the mock accepts a well-formed
+    // proof, so a passing route above means delegation happened.
+    let verifier = MockProofVerifier;
+    assert!(
+        matches!(verifier.verify(&proof), Ok(true)),
+        "the mock verifier must accept a well-formed proof"
+    );
 }
 
 #[test]
