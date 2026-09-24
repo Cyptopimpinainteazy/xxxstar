@@ -161,6 +161,10 @@ COMMON_ENV=(env CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0
 run_job runtime_gate_reference "${COMMON_ENV[@]}" cargo test -p x3-chain-runtime fraud_proofs::startup_gate::tests::gate_passes_with_reference_scheduler --lib --target-dir "${RUNTIME_TARGET_DIR}" -- --nocapture || true
 run_job runtime_gate_deterministic "${COMMON_ENV[@]}" cargo test -p x3-chain-runtime fraud_proofs::startup_gate::tests::gate_is_deterministic --lib --target-dir "${RUNTIME_TARGET_DIR}" -- --nocapture || true
 run_job node_gate_reference "${COMMON_ENV[@]}" cargo test -p x3-chain-node startup_gate_passes_for_reference_authority_build --lib --target-dir "${NODE_TARGET_DIR}" -- --nocapture || true
+# Authority nodes must refuse `--rpc-methods unsafe` on a non-loopback listener:
+# sc_rpc_server::deny_unsafe clears DenyUnsafe for that combination regardless of
+# the interface, so a validator would hand author_* control methods to the network.
+run_job node_rpc_exposure_gate "${COMMON_ENV[@]}" cargo test -p x3-chain-node unsafe_rpc_gate_ --lib --target-dir "${NODE_TARGET_DIR}" -- --nocapture || true
 
 FAILS=$(awk -F, 'NR>1 && $2=="FAIL" {c++} END {print c+0}' "${OUT_DIR}/matrix.csv")
 PASSES=$(awk -F, 'NR>1 && $2=="PASS" {c++} END {print c+0}' "${OUT_DIR}/matrix.csv")

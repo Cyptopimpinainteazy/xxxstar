@@ -51,6 +51,7 @@ hex = "0.4"
 bs58 = "0.5"
 log = "0.4"
 env_logger = "0.10"
+fs2 = "0.4"
 serde = { workspace = true }
 serde_json = "1.0"
 reqwest = { version = "0.12", features = ["json"] }
@@ -58,7 +59,7 @@ pallet-x3-wrapped = { path = "../pallets/x3-wrapped", default-features = false, 
 codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive"] }
 x3-common = { path = "../crates/x3-common" }
 jsonrpsee = { workspace = true }
-tokio = { version = "1.37", features = ["rt", "rt-multi-thread"] }
+tokio = { version = "1.37", features = ["rt", "rt-multi-thread", "time"] }
 pallet-evm = { workspace = true, default-features = false, features = ["std"] }
 pallet-collective = { workspace = true, default-features = false, features = ["std"] }
 pallet-cross-chain-validator = { path = "../pallets/cross-chain-validator", default-features = false, features = ["std"] }

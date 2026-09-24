@@ -1,0 +1,18 @@
+# Python dependencies for the test suites AGENTS.md names.
+#
+# `python -m pytest` is a required proof command, and it could not run on a bare
+# box: the root suite imports pydantic/aiohttp/redis, uses the asyncio plugin, and
+# (on Python 3.10) needs the `tomli` backport because `scripts/feature_matrix.py`
+# reads TOML. None of that was declared anywhere, so the command failed on an
+# import instead of reporting a result.
+#
+#   python3 -m pip install --user -r requirements-dev.txt
+#
+pytest>=8
+pytest-asyncio>=0.24
+pydantic>=2
+aiohttp>=3.9
+redis>=5
+# `tomllib` is stdlib from 3.11; this is the backport scripts/feature_matrix.py
+# falls back to on 3.10.
+tomli>=2; python_version < "3.11"

@@ -18,7 +18,7 @@ pub mod router;
 pub mod types;
 
 pub use error::{OrchestratorError, Result};
-pub use executor::VmExecutor;
+pub use executor::{MockVmExecutor, VmExecutor};
 pub use invariant::CanonicalSupplySnapshot;
 pub use message::CrossVmMessage;
 pub use proof::{ExecutionProof, MockProofVerifier, ProofVerifier};

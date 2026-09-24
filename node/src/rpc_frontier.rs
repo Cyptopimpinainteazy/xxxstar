@@ -17,6 +17,50 @@ use sp_runtime::DigestItem;
 use std::sync::Arc;
 use x3_chain_runtime::{opaque::Block, AccountId, AssetId, Balance};
 
+/// Maximum number of blocks a single `eth_getLogs` / `x3_getEvmLogs` call may
+/// span.
+///
+/// `{"fromBlock":"0x0","toBlock":"latest"}` is the canonical request that looks
+/// free and is not: the handler passes the range to the runtime and decodes
+/// every log it returns. At X3's 200 ms slot time the chain grows roughly
+/// 432,000 blocks/day, so "everything so far" gets more expensive every day
+/// while costing an attacker nothing to repeat. Public RPC is meant to route
+/// historical queries to archive/indexer infrastructure (`infra/rpc/chains.yaml`
+/// carries `require_archive_for` for exactly this class of method), so the
+/// live-RPC path gets a hard cap and an explicit error rather than unbounded
+/// work on the node that is also serving consensus traffic.
+pub const MAX_LOG_BLOCK_RANGE: u64 = 10_000;
+
+/// Reject log queries whose block range is inverted or wider than the cap.
+fn validate_log_block_range(
+    method: &str,
+    from_block: u64,
+    to_block: u64,
+) -> Result<(), jsonrpsee::types::ErrorObjectOwned> {
+    if to_block < from_block {
+        return Err(jsonrpsee::types::ErrorObjectOwned::owned(
+            -32602,
+            format!("{method}: toBlock ({to_block}) is before fromBlock ({from_block})"),
+            None::<()>,
+        ));
+    }
+
+    let span = to_block - from_block + 1;
+    if span > MAX_LOG_BLOCK_RANGE {
+        return Err(jsonrpsee::types::ErrorObjectOwned::owned(
+            -32602,
+            format!(
+                "{method}: block range {from_block}..={to_block} spans {span} blocks, above the \
+                 {MAX_LOG_BLOCK_RANGE} block limit. Narrow the range, or query an archive/indexer \
+                 endpoint for historical logs."
+            ),
+            None::<()>,
+        ));
+    }
+
+    Ok(())
+}
+
 /// Decode a SVM pubkey from either a 0x-prefixed hex string (32 bytes) or
 /// a base58-encoded Solana-style pubkey.
 fn decode_svm_pubkey(s: &str) -> Result<Vec<u8>, jsonrpsee::types::ErrorObjectOwned> {
@@ -694,6 +738,7 @@ where
             .and_then(|v| v.as_str())
             .map(decode_address)
             .transpose()?;
+        validate_log_block_range("eth_getLogs", from_block, to_block)?;
         // Encode filter as SCALE tuple: (from_block: u64, to_block: u64, address: Option<[u8; 20]>)
         // SCALE encoding: u64 (8 bytes LE) + u64 (8 bytes LE) + Option tag (0x00/0x01) + [u8; 20] (if Some)
         let mut filter_bytes = Vec::new();
@@ -862,6 +907,7 @@ where
                 .and_then(|v| v.as_str())
                 .map(decode_address)
                 .transpose()?;
+            validate_log_block_range("x3_getEvmLogs", from_block, to_block)?;
             // Encode filter as SCALE tuple: (from_block: u64, to_block: u64, address: Option<[u8; 20]>)
             // SCALE encoding: u64 (8 bytes LE) + u64 (8 bytes LE) + Option tag (0x00/0x01) + [u8; 20] (if Some)
             let mut filter_bytes = Vec::new();
@@ -1817,7 +1863,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_address, parse_gas_limit};
+    use super::{decode_address, parse_gas_limit, validate_log_block_range, MAX_LOG_BLOCK_RANGE};
 
     #[test]
     fn decode_address_accepts_20_byte_hex() {
@@ -1833,6 +1879,38 @@ mod tests {
         let err = decode_address(&addr).expect_err("address must be rejected");
         let text = format!("{err:?}");
         assert!(text.contains("Address must be 20 bytes"));
+    }
+
+    #[test]
+    fn log_range_limit_accepts_a_range_exactly_at_the_cap() {
+        // 100..=100+MAX-1 is MAX blocks wide, which is allowed; one block more is not.
+        let last_allowed = 100 + MAX_LOG_BLOCK_RANGE - 1;
+        assert!(validate_log_block_range("eth_getLogs", 100, last_allowed).is_ok());
+        assert!(validate_log_block_range("eth_getLogs", 100, last_allowed + 1).is_err());
+    }
+
+    #[test]
+    fn log_range_limit_rejects_the_unbounded_scan() {
+        // This is the request shape the handler defaults to when the caller
+        // omits both bounds: fromBlock = 0, toBlock = latest.
+        let err = validate_log_block_range("eth_getLogs", 0, 157_000_000)
+            .expect_err("0..latest must not be allowed to walk the entire chain");
+        let text = format!("{err:?}");
+        assert!(text.contains("above the"), "{text}");
+        assert!(text.contains("archive/indexer"), "{text}");
+    }
+
+    #[test]
+    fn log_range_limit_rejects_an_inverted_range() {
+        let err = validate_log_block_range("x3_getEvmLogs", 500, 499)
+            .expect_err("toBlock < fromBlock must be an error, not a silently empty result");
+        let text = format!("{err:?}");
+        assert!(text.contains("is before"), "{text}");
+    }
+
+    #[test]
+    fn log_range_limit_allows_a_single_block_query() {
+        assert!(validate_log_block_range("eth_getLogs", 42, 42).is_ok());
     }
 
     #[test]

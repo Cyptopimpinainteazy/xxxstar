@@ -25234,6 +25234,7 @@ dependencies = [
  "frame-benchmarking-cli",
  "frame-support",
  "frame-system",
+ "fs2",
  "futures 0.3.34",
  "futures-util",
  "hex",
@@ -26568,6 +26569,21 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+]
+
+[[package]]
+name = "x3-state-snapshot"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sp-core",
+ "sp-state-machine",
+ "sp-trie",
+ "tempfile",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

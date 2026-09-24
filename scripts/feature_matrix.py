@@ -15,8 +15,20 @@ from pathlib import Path
 import re
 import sys
 import tempfile
-import tomllib
 from typing import Any
+
+try:  # Python 3.11+
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 and older
+    # The gate is run by whatever python3 the box has; on 3.10 that is the
+    # `tomli` backport. Without one of the two there is no TOML parser and the
+    # check cannot mean anything, so say that rather than failing on an import.
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError as exc:  # pragma: no cover - environment guard
+        raise SystemExit(
+            "feature_matrix needs a TOML parser: Python 3.11+ (tomllib) or the `tomli` backport"
+        ) from exc
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MATRIX = ROOT / "FEATURE_MATRIX.toml"
