@@ -1,0 +1,103 @@
+[package]
+name = "gpu-swarm"
+version = "0.1.0"
+edition = "2021"
+description = "Distributed GPU compute swarm for X3 X3 Chain"
+authors = ["X3 Chain Team"]
+license = "MIT"
+repository = "https://github.com/x3-chain/x3-chain"
+
+[[bin]]
+name = "swarm-node"
+path = "src/bin/swarm-node.rs"
+
+[[bin]]
+name = "swarm-coordinator"
+path = "src/bin/swarm-coordinator.rs"
+
+[features]
+default = ["cuda", "x3-runtime"]
+cuda = []
+opencl = []
+metal = []
+vulkan = ["dep:wgpu"]
+webgpu = ["dep:wgpu"]
+x3-runtime = ["dep:x3-vm", "dep:x3-mir", "dep:x3-gpu-validator-swarm", "dep:x3-backend"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Networking
+libp2p = { version = "0.53", features = ["tokio", "tcp", "noise", "yamux", "gossipsub", "mdns", "kad", "identify", "ping", "macros"] }
+hyper-util = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_bytes = "0.11"
+bincode = "1.3"
+prost = "0.12"
+
+# Crypto
+blake2 = "0.10"
+blake3 = "1.5"
+sha2 = "0.10"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"
+getrandom = "0.2"
+
+# Wallet and platform utilities
+# (Using simple prototype mnemonic generator in admin for now)
+dirs = "4.0"
+
+# GPU abstraction (compile-time features)
+wgpu = { version = "23", optional = true }
+
+# Metrics & logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+prometheus = "0.14.0"
+
+# HTTP admin UI and web server
+axum = "0.7"
+hyper = "1.8"
+tiny_http = "0.12"
+tower-http = { version = "0.4", features = ["fs", "trace"] }
+
+# Utils
+thiserror = "1.0"
+anyhow = "1.0"
+parking_lot = "0.12"
+dashmap = "5.5"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+toml = "0.8"
+humantime-serde = "1.1"
+
+# Crypto primitives for wallet and key storage
+pbkdf2 = "0.11"
+hmac = "0.12"
+aes-gcm = "0.10"
+argon2 = "0.4"
+base64 = "0.21"
+once_cell = "1.18"
+
+reqwest = { version = "0.11", features = ["json", "blocking", "rustls-tls"] }
+
+# Caching
+lru = "0.12"
+
+# X3 integration
+x3-vm = { path = "../x3-vm", optional = true }
+x3-mir = { path = "../x3-mir", optional = true }
+x3-gpu-validator-swarm = { path = "../x3-gpu-validator-swarm", optional = true }
+x3-backend = { path = "../x3-backend", optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.9"
+criterion = "0.5"

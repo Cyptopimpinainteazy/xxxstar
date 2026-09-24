@@ -287,6 +287,8 @@ members = [
     "crates/x3-pq",
     # Burn-down batch 15 (issue #274).
     "crates/x3-mobile-sdk",
+    # Salvaged from the x3-chain-master snapshot: distributed GPU compute swarm.
+    "crates/gpu-swarm",
 ]
 default-members = ["node"]
 resolver = "2"
