@@ -193,5 +193,11 @@ apps/x3-desktop/dist/
 # (e.g. docs/reports/.cursor/, docs/reports/.ai-todo/) from accidental copies.
 .cursor/
 .gemini/
+# Roo Code project MCP config carries machine-specific absolute paths (node
+# binary, extension path, workspace path), exactly like .vscode/, .cursor/ and
+# .gemini/ above. The portable half of the Roo guardrails is `.roo/rules/`,
+# which is tracked; this file stays local so a clone does not inherit another
+# machine's paths.
+.roo/mcp.json
 .todo
 .ai-todo/

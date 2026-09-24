@@ -2,6 +2,10 @@
 
 You are working on X3 Atomic Star.
 
+Guardrails: `AGENTS.md` is binding for every agent in this repo, and its rules are inlined in
+`rules/00-agent-guardrails.md` (prime directive, forbidden constructs, required proof commands,
+mandatory completion report, critical X3 systems, TODO MCP requirements). Read both before acting.
+
 Hard rules:
 - No stubs.
 - No fake completion.
@@ -18,8 +22,15 @@ Cost rules:
 - Use the `X3 Cheap Scan` mode for first-pass repo work.
 - Use cheap/local models only for broad scans, stale-doc checks, and blocker discovery.
 - Escalate to stronger models only for final audit, hard bugs, and architecture/security decisions.
-- Do not use write, command, or MCP tools automatically in this repo.
-- Ask before mutating files, running shell commands, or touching MCP.
+
+Tool and mutation policy:
+- Read-only work (searching, reading files, `git status`/`git diff`, running the tests and guard
+  scripts) is expected without asking — it is how claims get proven.
+- Run the required proof commands from `rules/00-agent-guardrails.md` before reporting a change as
+  done. Do not report completion on a change whose applicable proof commands were never run.
+- Ask before state-changing or destructive actions: file mutations outside the scoped task, git
+  push/merge/reset, deletes, deployments, secret or key handling, and anything touching production
+  config, genesis, treasury, validator keys, or bridge admin.
 
 Required tracking:
 - CODE_COVERAGE_TRACKER.md
