@@ -384,7 +384,6 @@ refs/remotes/origin/archive/stale-x3lang-trading-wip-20260918	origin-branch	ON_M
 refs/remotes/origin/codex/x3-economic-safety-kernel	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/dependabot/cargo/curve25519-dalek-5.0.0	origin-branch	NOT_ON_MASTER	commits not reachable from master yet
 refs/remotes/origin/dependabot/cargo/lru-0.16.4	origin-branch	NOT_ON_MASTER	commits not reachable from master yet
-refs/remotes/origin/dependabot/npm_and_yarn/apps/inferstructor-dashboard/npm_and_yarn-fa0e04ea13	origin-branch	NOT_ON_MASTER	commits not reachable from master yet
 refs/remotes/origin/docs/matrix-third-pass	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/econsafety-kernel	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)
 refs/remotes/origin/fix/matrix-evidence-prose	origin-branch	ON_MASTER	commits reachable from master (verified: git merge-base --is-ancestor)

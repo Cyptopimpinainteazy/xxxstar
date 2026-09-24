@@ -222,3 +222,77 @@ Two more alert groups cleared, both verified:
 
 Alert totals across this session: **86 (2 critical, 6 high) → 55 (0 critical,
 4 high, 33 medium, 18 low)**.
+
+## Final consolidation: every branch accounted for (2026-09-23/24)
+
+Objective: every branch on master on GitHub, nothing lost, and a state we can
+state exactly. Result, measured from the refs themselves:
+
+| state | refs | meaning |
+| --- | --- | --- |
+| `ON_MASTER` | **430** | `git merge-base --is-ancestor <ref> master` succeeds — commits reachable from master |
+| `SEPARATE_REPO` | 28 | the `atomicstar` remote (`x3-atomic-star`), a different repository with **no** merge-base with master |
+| `UNRELATED_LINEAGE` | 7 | pre-rewrite `main` lineage: no merge-base with master, so unreachable by merging; preserved |
+| `NOT_ON_MASTER` | 2 | two open Dependabot proposals (below) |
+
+Machine-readable per-ref detail: `.ai/reports/branch-inventory-20260923.tsv`
+(one row per ref with the state and how it was decided).
+
+### How the 430 got there
+
+- `9fca6b290` — one octopus merge recording **every non-ancestor origin branch**
+  that shares history with master (65 refs, 44 unique tips after git drops
+  redundant parents).
+- `31ff8a1d2` — the same for **every local branch** (79 refs, 27 unique tips).
+- Both are `-s ours`: parents recorded, **tree byte-identical to master**
+  (`git diff HEAD^1..HEAD` empty on each). So no branch can dangle and no
+  master content moved.
+- `88de8a9da` — the one ref out of 74 re-examined that still carried work master
+  lacked (`WASM_BUILD_WORKSPACE_HINT`), merged **with its content**.
+- 50 branch pointers deleted on `origin` (39 first, 11 more) after proving each
+  was an ancestor of master; every name→SHA pair is recorded above, and all of
+  those commits are reachable from master, so nothing was lost.
+
+Content deliberately **not** applied to master, though now reachable through the
+merge commits: `codex/x3-economic-safety-kernel` (risk ceilings removed on
+purpose), `wip/x3lang-arb-graph-filter-20260919` and
+`wip/x3lang-preserve-packets-and-arbitrage-20260919` (alternate PHASE 37 kept
+off), `archive/stale-x3lang-trading-wip-20260918` (stale snapshot).
+
+### The two refs that are not on master
+
+Both are Dependabot proposals, and neither actually clears the advisory it
+targets — each would add a *third* copy of the crate while leaving the
+vulnerable copy in place:
+
+- **#498 `lru 0.12.5 → 0.16.4`** — bumps only `crates/x3-gulfstream` and
+  `crates/x3-turbine`. `cargo tree -i lru@0.12.5` shows the vulnerable 0.12.5
+  is pulled by `libp2p-identify` → `libp2p 0.54.1` → `sc-network`, which the PR
+  does not touch. Result would be `0.7.8`, `0.12.5` **and** `0.16.4` in the lock.
+- **#497 `curve25519-dalek 4.1.3 → 5.0.0`** — the advisory is `< 4.1.3`, and the
+  vulnerable **3.2.0** comes from `ed25519-zebra 3.1.0` → `sp-core 30.0.0`
+  (an older polkadot-sdk lineage reached through `x3-staking-analytics`). The PR
+  leaves 3.2.0 in place and adds 5.0.0 alongside 4.1.3.
+
+Both are still open. The real fix for each is upstream (polkadot-sdk / the old
+`sp-core` dependency), not a bump of our own manifests. Left open rather than
+closed because closing would not clear the advisory and the ignore-policy
+decision belongs to the maintainer.
+
+**#496 `esbuild 0.27.7 → 0.28.2` (instructor-dashboard)** *was* landed — it is
+self-contained and verified: `npm ci`, `npm test` (61 passed), `npm run build`
+green, `npm audit` 0 vulnerabilities. Merged through GitHub as `ce5dbf9899`,
+branch deleted, and it is now an ancestor of master. (Alert totals move 55 → 54.)
+
+### Reproducing the claim
+
+```bash
+# every ref, classified
+awk -F'\t' '$3=="ON_MASTER"' .ai/reports/branch-inventory-20260923.tsv | wc -l
+
+# nothing dangles: for every ref not in the inventory's other buckets, this fails
+git for-each-ref --format='%(refname)' refs/heads refs/remotes/origin \
+  | while read -r r; do
+      git merge-base --is-ancestor "$r" master || echo "NOT ON MASTER: $r"
+    done
+```
