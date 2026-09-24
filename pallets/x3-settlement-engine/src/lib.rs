@@ -2634,7 +2634,10 @@ pub mod pallet {
             let receipt_hash = sp_io::hashing::keccak_256(receipt_rlp);
             let receipt_hash_h256 = H256::from(receipt_hash);
 
-            // The tx_hash in the proof should match the receipt hash (they're the same in Ethereum)
+            // `proof.tx_hash` carries the *receipt* hash on this path, not the
+            // transaction hash. Those are different objects in Ethereum
+            // (`keccak(tx_rlp)` vs `keccak(receipt_rlp)`); the field name is a
+            // historical misnomer that the relayer producer compensates for.
             if receipt_hash_h256 != proof.tx_hash {
                 return Ok(false);
             }

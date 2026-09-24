@@ -304,7 +304,19 @@ pub struct BtcHeaderMeta {
 pub struct SettlementProof {
     /// Type of proof
     pub proof_type: ProofType,
-    /// Transaction hash on external chain
+    /// The hash this proof's inclusion check is bound to.
+    ///
+    /// **On the EVM path this is the receipt hash**, `keccak256(receipt_data)`,
+    /// not the transaction hash. A receipt and its transaction are different
+    /// objects that hash differently (`keccak(receipt_rlp)` vs `keccak(tx_rlp)`);
+    /// the producer in `crates/x3-relayer/src/evm_receipt_proof.rs` fills this
+    /// field with the receipt hash for exactly that reason.
+    ///
+    /// The name is a historical misnomer. Renaming it is a proof-schema change
+    /// and needs a versioned migration, so it is documented here rather than
+    /// renamed in place.
+    ///
+    /// The BTC SPV and SVM paths carry their own evidence hash here.
     pub tx_hash: H256,
     /// Block hash containing the transaction
     pub block_hash: H256,
