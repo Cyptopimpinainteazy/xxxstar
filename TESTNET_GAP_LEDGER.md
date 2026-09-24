@@ -567,7 +567,75 @@ supports `tested`, and nothing here justifies raising `mainnet_ready` past the l
 
 **Two blockers replaced, two sharpened, and the sharpening found something the numbers could not say.**
 
-**TICKET-108 — the bytecode envelope's version and checksum are written and never checked.**
+**TICKET-108 — CLOSED 2026-09-23.** The envelope is one format with one checksum now, and every
+reader checks it. What measuring it found was worse than the ticket: there were **three**
+implementations of the header's checksum — the writer's wrapping multiply-and-add
+(`BytecodeModule::to_bytes`), a real CRC32 in `bc_format_helpers`' fixtures, and a second CRC32 in
+`x3-vm`'s verifier — and the verifier's was the only one that compared anything. Because it compared
+CRC32 against a value the writer had produced with a different algorithm, **every module a compiler
+produced was refused by `Verifier::verify_module_bytes`**, and a module whose checksum field was zero
+skipped the check entirely. Reproduced before the fix, with a test that is now the regression test:
+
+```
+a_written_module_passes_its_own_checksum ... FAILED   (ChecksumMismatch, compiler output vs verifier)
+```
+
+Fixed by defining the header once, in `x3-common::bytecode` — magic, header length, the packed version
+bounds, `checksum`, and the two version predicates — and pointing the writer, `bc_format_helpers`,
+`BytecodeModule::from_bytes`, `mini_x3` (the no-std decoder) and the verifier at it. The verifier's own
+CRC32 block is gone: `from_bytes` verifies the checksum always, so one check remains. `mini_x3` now
+reads the twenty header bytes it used to skip and refuses a future version, an unsatisfiable
+`min_version` and a checksum mismatch; two hand-assembled fixtures in `x3-vm` and one in
+`x3-integration` were writing a zero checksum and are stamped properly now. Tests:
+`a_written_module_passes_its_own_checksum`, `a_corrupted_body_fails_the_checksum` (verifier),
+`a_corrupted_body_fails_the_checksum` (backend), `the_shared_version_predicates_agree_with_version_info`,
+`test_a_corrupted_body_is_rejected`, `test_a_future_format_version_is_rejected`,
+`test_a_module_requiring_a_newer_loader_is_rejected`, plus the shared module's own two. Evidence:
+`.ai/reports/bytecode-envelope-20260923.md`.
+
+**TICKET-109 — crates declare `no_std` and cannot build without `std`, from one pre-existing root
+cause.** Measured at `cc19883faf` — the revision *before* the envelope commit — so this is not that
+change: `cargo check -p x3-common --no-default-features` fails there with
+
+```
+error[E0277]: the trait bound `String: serde::Serialize` is not satisfied
+   --> crates/x3-common/src/lib.rs:44:35
+error[E0277]: the trait bound `String: serde::Deserialize<'de>` is not satisfied
+   --> crates/x3-common/src/lib.rs:48:12
+```
+
+— a `String`-carrying enum with serde derives, in a crate that turns `std` off: `serde`'s `alloc`
+feature is not enabled on that path. Every crate that depends on `x3-common` with
+`default-features = false` inherits it, which is why `bash scripts/check-no-default-features.sh` is
+red (its `KNOWN_UNBUILDABLE` list is deliberately empty), and `x3-chain-runtime` is one of them.
+Note what this is *not*: the runtime's **WASM** build works, because crates in that graph enable
+`serde` with `alloc`; it is the isolated no-default-features configuration that cannot build, which is
+exactly what the gate exists to catch and what nothing in the default suite runs.
+
+**A correction to this ticket's first filing.** It attributed the failures to `x3-common::signing`
+needing `std`/`alloc`/`full_crypto`. That was true for about twenty minutes on 2026-09-24 and it was
+**this agent's bug**, not the repository's: inserting the shareable `bytecode` module above
+`#[cfg(feature = "std")] pub mod signing;` moved the attribute onto the inserted module, un-gating
+`signing` for no-std builds — which also broke the runtime's WASM build in srtool, the check that
+caught it. The fix restores the attribute and leaves `bytecode` ungated (it is `no_std`-safe by
+construction: constants and a loop). The lesson is in the memory file: a scripted insertion anchored on
+a bare `pub mod X;` moves whatever attribute precedes it.
+
+What was left after the fix, and is the actual ticket:
+
+```
+no-default-features: 7 of 87 cannot build without default features and is **not** on the known list:
+  pallet-atomic-trade-engine  pallet-x3-coin  pallet-x3-kernel  pallet-x3-settlement-engine
+  x3-chain-runtime            x3-common       x3-x3-integration
+```
+
+The failing set, with the signing errors removed by the fix and the serde errors remaining, is what
+`check-no-default-features.sh` reports; the earlier seven-crate reading included the signing errors my
+bug introduced. Acceptance: `x3-common` builds without `std` (enable `serde/alloc` on that path, and
+make any other `std`-only dependency explicit), or the crates that cannot honestly be `no_std` stop
+claiming it — and `check-no-default-features.sh` is green with the empty known-list intact.
+
+**TICKET-108 (as filed) — the bytecode envelope's version and checksum are written and never checked.**
 `crates/x3-backend/src/bc_format.rs` is the canonical format: magic, semantic version, `min_version`,
 feature flags, and a checksum over the body (`compute_checksum`, written at offset 12). For `no_std`
 builds `crates/x3-integration/src/mini_x3.rs` re-implements it — and that is the decoder

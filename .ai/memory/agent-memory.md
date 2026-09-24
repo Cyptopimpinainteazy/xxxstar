@@ -7131,3 +7131,36 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Editing a row's blockers+evidence wholesale silently deleted an `evidence` array on two rows, and
   `feature_matrix.py check` caught it immediately ("at least one evidence entry is required"). Keep at
   least one entry when rewriting those lines.
+### TICKET-108 closed — three checksums, and the verifier was rejecting the compiler's output
+- The X3BC header's checksum existed **three times**: the writer's wrapping multiply-and-add, a CRC32
+  in `bc_format_helpers`, and a CRC32 in `x3-vm`'s verifier — and only the verifier compared anything,
+  so it refused every compiler-written module (reproduced: `a_written_module_passes_its_own_checksum`
+  failed with `ChecksumMismatch` before the fix) while accepting bytecode with a zeroed field.
+- One definition now lives in `x3-common::bytecode` (magic, header length, packed version bounds,
+  `checksum`, version predicates); the writer, both backend fixtures, `from_bytes`, `mini_x3` and the
+  verifier all use it, and `from_bytes` verifies always. `mini_x3` no longer `skip(20)`s the header.
+- **Hand-assembled test bytecode has to be as valid as compiled bytecode** or the test is lying: three
+  fixtures wrote a zero checksum and one declared version `1` instead of packed `1.0.0` (which is
+  `0x0001_0000`) — invisible while nobody read the header.
+- `cargo test -p x3-vm` is the check that catches drift between the writer and a reader; it did not
+  exist before, which is why the disagreement survived.
+- **TICKET-109 (new): `bash scripts/check-no-default-features.sh` is red — 7 of 87 crates claim no_std
+  and cannot build without std, all from one file** (`x3-common/src/signing.rs`: `secp256k1::rand`,
+  `format!`/`String` without `alloc`, `sp_core::ed25519::Pair` signing). The gate's known list is
+  deliberately empty, so this is drift, and `local-ci-variants` is not in the default suite — which is
+  why it went unnoticed.
+### A scripted insertion moved a `#[cfg]` attribute, and the WASM build caught it
+- Inserting the `bytecode` module with `t.replace("pub mod signing;", module + "pub mod signing;")`
+  placed it **between** `#[cfg(feature = "std")]` and `pub mod signing;`, so the attribute applied to
+  the new module and `signing` compiled in no-std builds. Symptoms, in order of discovery: the
+  no-default-features gate went from green to "7 of 87 … new drift", then srtool failed with
+  `sp_core::ed25519::Pair::sign` missing in `x3-common::signing` — i.e. **the runtime WASM stopped
+  building on master**, because my commit had already been auto-merged there.
+- **Anchor scripted insertions on the attribute, not on a bare `pub mod X;`**, or the attribute moves.
+  Same family as the `s.replace(old,new,1)` trap: textual edits to Rust move semantics, not just text.
+- `cargo check -p x3-common --no-default-features` fails on master **before** this work too (measured
+  at `cc19883faf`): `String: serde::Serialize` / `Deserialize` at lib.rs:44-48 — serde without `alloc`
+  on the no-std path. That is TICKET-109, and it is pre-existing; the signing errors were mine.
+- The isolated `--no-default-features` configuration is **not** the same as the runtime's WASM graph
+  (which enables serde/alloc), so a crate failing the former can still build the latter — and vice
+  versa: only srtool builds the thing governance attests to.
