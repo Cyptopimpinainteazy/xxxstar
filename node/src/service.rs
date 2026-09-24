@@ -13,8 +13,8 @@ use sc_consensus::{BlockCheckParams, BlockImport, BlockImportParams, ImportResul
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
 use sc_service::{
-    ChainType, Configuration, Error as ServiceError, KeystoreContainer, PartialComponents,
-    RpcMethods, TaskManager,
+    BlocksPruning, ChainType, Configuration, Error as ServiceError, KeystoreContainer,
+    PartialComponents, PruningMode, RpcMethods, TaskManager,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::{TransactionPool, TransactionSource};
@@ -846,6 +846,109 @@ fn enforce_disk_space_gate(config: &Configuration) -> Result<(), ServiceError> {
     }
 }
 
+/// What this node will actually keep, in words an operator can check.
+///
+/// The storage audit's ask was blunt: "before production we need exact policies:
+/// validator keep N state versions, RPC keep M, archive keep all — no vague
+/// 'pruning enabled'". Substrate resolves the policy from flags and defaults
+/// inside the service and nothing here reported the result, so an operator could
+/// not tell a bounded validator from an accidental archive. At 200 ms slots the
+/// chain produces roughly 432,000 blocks/day, which makes that difference the
+/// gap between a bounded disk and multi-terabyte growth.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PruningDigest {
+    /// Human-readable state-trie retention.
+    pub state: String,
+    /// Human-readable block retention.
+    pub blocks: String,
+    /// True when the state trie is kept without bound. This is the side that
+    /// grows with the chain.
+    pub state_unbounded: bool,
+    /// True when *every imported* block is kept, not just every finalized one.
+    ///
+    /// `--blocks-pruning` defaults to `archive-canonical` (keep all finalized
+    /// blocks), so a node on the SDK default already reports `KeepFinalized`.
+    /// That is a default rather than a choice, and warning on it would fire for
+    /// every validator that did not pass the flag — noise, not signal. Keeping
+    /// every block *ever imported* is the deliberate `archive` setting.
+    pub blocks_keep_everything: bool,
+}
+
+/// Describe a resolved pruning policy without needing a running node.
+pub fn describe_pruning(state: Option<PruningMode>, blocks: BlocksPruning) -> PruningDigest {
+    // Matched by reference: `PruningMode` is not `Copy`, and `state` is still
+    // needed below to decide whether the policy is an archive at all.
+    let state_text = match &state {
+        Some(PruningMode::ArchiveAll) => "every state version (archive-all)".to_string(),
+        Some(PruningMode::ArchiveCanonical) => {
+            "canonical state only (archive-canonical)".to_string()
+        }
+        Some(PruningMode::Constrained(constraints)) => match constraints.max_blocks {
+            Some(n) => format!("last {n} state versions"),
+            None => "constrained, but with no block bound".to_string(),
+        },
+        // `PruningMode::default()` is `Constrained { max_blocks: Some(256) }`
+        // (`DEFAULT_MAX_BLOCK_CONSTRAINT` in sc-state-db), which is what the
+        // service falls back to when no `--state-pruning` was given.
+        None => "the SDK default (256 state versions)".to_string(),
+    };
+
+    let blocks_text = match blocks {
+        BlocksPruning::KeepAll => "every block ever imported".to_string(),
+        BlocksPruning::KeepFinalized => "every finalized block (SDK default)".to_string(),
+        BlocksPruning::Some(n) => format!("last {n} finalized blocks"),
+    };
+
+    let state_unbounded = state
+        .as_ref()
+        .map(|mode| mode.is_archive())
+        .unwrap_or(false);
+    let blocks_keep_everything = matches!(blocks, BlocksPruning::KeepAll);
+
+    PruningDigest {
+        state: state_text,
+        blocks: blocks_text,
+        state_unbounded,
+        blocks_keep_everything,
+    }
+}
+
+/// Whether a resolved policy is worth warning an authority about.
+///
+/// Only unbounded *state* and "keep every block ever" qualify. The SDK's own
+/// block default does not: it is what a node gets by not passing the flag, and
+/// flagging it would train operators to ignore the line.
+pub fn should_warn_about_pruning(digest: &PruningDigest, is_authority: bool) -> bool {
+    is_authority && (digest.state_unbounded || digest.blocks_keep_everything)
+}
+
+/// Log the resolved pruning policy, and say plainly when an authority is not
+/// bounded.
+fn log_pruning_policy(config: &Configuration) {
+    let digest = describe_pruning(config.state_pruning.clone(), config.blocks_pruning);
+    let warn = should_warn_about_pruning(&digest, config.role.is_authority());
+
+    log::info!(
+        "🗄️  Pruning: state keeps {}, blocks keeps {}{}",
+        digest.state,
+        digest.blocks,
+        if warn {
+            " — unbounded for an authority"
+        } else {
+            ""
+        }
+    );
+
+    if warn {
+        log::warn!(
+            "🗄️  This authority node keeps unbounded state or blocks. Validators are meant to be \
+             bounded — that is what keeps their disks from growing with the chain — so unless this \
+             is deliberate, start it with an explicit bound (for example --pruning=256 and \
+             --blocks-pruning=256) and run archive nodes separately."
+        );
+    }
+}
+
 /// Background watchdog that keeps re-measuring free space while the node runs.
 ///
 /// Boot-time measurement is only half the problem: a volume can fill while the
@@ -1023,6 +1126,7 @@ pub fn new_full_with_atomic_gateway<
     enforce_startup_gate_if_authority(config.role.is_authority())?;
     enforce_rpc_exposure_gate(&config)?;
     enforce_disk_space_gate(&config)?;
+    log_pruning_policy(&config);
 
     tune_transaction_pool_config(&mut config);
     let sc_service::PartialComponents {
@@ -2594,6 +2698,77 @@ mod tests {
             assert!(!acknowledgement_is_set(Some(value)), "{value:?}");
         }
         assert!(!acknowledgement_is_set(None));
+    }
+
+    #[test]
+    fn pruning_reports_a_bounded_policy_with_its_numbers() {
+        let digest = describe_pruning(
+            Some(PruningMode::blocks_pruning(256)),
+            BlocksPruning::Some(256),
+        );
+
+        assert_eq!(digest.state, "last 256 state versions");
+        assert_eq!(digest.blocks, "last 256 finalized blocks");
+        assert!(
+            !digest.state_unbounded,
+            "an explicit bound is not unbounded"
+        );
+        assert!(!digest.blocks_keep_everything);
+        assert!(!should_warn_about_pruning(&digest, true));
+    }
+
+    #[test]
+    fn pruning_warns_an_authority_when_state_is_unbounded() {
+        let digest = describe_pruning(Some(PruningMode::ArchiveAll), BlocksPruning::Some(256));
+
+        assert!(digest.state.contains("archive-all"), "{}", digest.state);
+        assert!(digest.state_unbounded);
+        assert!(
+            should_warn_about_pruning(&digest, true),
+            "an authority that archives state must be told"
+        );
+    }
+
+    #[test]
+    fn pruning_reports_the_sdk_block_default_without_warning() {
+        // `--blocks-pruning` defaults to `archive-canonical`. Warning on that
+        // would fire for every validator that did not pass the flag, which is
+        // how a warning becomes noise.
+        let digest = describe_pruning(
+            Some(PruningMode::blocks_pruning(256)),
+            BlocksPruning::KeepFinalized,
+        );
+
+        assert!(digest.blocks.contains("SDK default"), "{}", digest.blocks);
+        assert!(!digest.blocks_keep_everything);
+        assert!(!should_warn_about_pruning(&digest, true));
+    }
+
+    #[test]
+    fn pruning_warns_an_authority_keeping_every_block_but_not_an_archive() {
+        let digest = describe_pruning(
+            Some(PruningMode::blocks_pruning(256)),
+            BlocksPruning::KeepAll,
+        );
+
+        assert!(digest.blocks_keep_everything);
+        assert!(should_warn_about_pruning(&digest, true));
+        assert!(
+            !should_warn_about_pruning(&digest, false),
+            "an archive node is allowed to archive"
+        );
+    }
+
+    #[test]
+    fn pruning_names_the_sdk_state_default_when_unset() {
+        let digest = describe_pruning(None, BlocksPruning::Some(256));
+
+        assert_eq!(digest.state, "the SDK default (256 state versions)");
+        assert!(
+            !digest.state_unbounded,
+            "the SDK default is bounded, so it is not an archive claim"
+        );
+        assert!(!should_warn_about_pruning(&digest, true));
     }
 
     #[test]
