@@ -7828,3 +7828,47 @@ decision needs.
    X3-XVM-002 in one place), then decide the default-set question with the 632s measurement in hand.
 2. Re-run `submit_comit_v2`'s benchmark and retire the explicit write declaration.
 3. With the servers up: `--failure`, `--testnet`, 7-validator soak.
+
+## 2026-09-25 (forty-fifth pass) — the cross-VM proof was already written and simply never ran
+
+### What closed
+- **X3-XVM-002's "other half" was not missing work — it was an ungated test.** Chasing the row's
+  "each bridge's observe-and-record path" led to `pallets/x3-cross-vm-router/src/tests.rs`, which
+  wires the registry, the supply ledger and the router into one runtime and already asserts the
+  reconciliation: `test_x3_native_evm_svm_roundtrip_preserves_supply` (pending 50 in flight, 0 on
+  completion, canonical ceiling unchanged, invariant checked at each leg),
+  `test_failed_destination_credit_refunds_pending_supply` (an expired leg returns pending to the
+  source) and `test_all_six_internal_routes_succeed`. None of it was in a gate list.
+- **Third instance of the same hole this session** (kernel pallet, supply ledger, now the router), so
+  treat "this suite must be passing somewhere" as a claim to check rather than a fact: compare
+  `cargo metadata --no-deps` members against the `cargo test -p` names in `scripts/local-ci.sh`.
+  Measured then: **8 of 194** members named. Now 10.
+- Added `test x3-cross-vm-router` (81 tests, 0.13s of actual test time) and
+  `test x3-asset-registry` (31 tests) to the fast set. The atomic path's pallets are now all in the
+  default proof: atomic-kernel, x3-kernel, supply-ledger, cross-vm-router, asset-registry,
+  settlement-engine, cross-vm-coordinator, state-snapshot, verification-router.
+- Rows: X3-XVM-002 to "two thirds closed" with both tests named (tested 78 -> 86), X3-XVM-003
+  re-derived from its stale one-liner blocker (tested 78 -> 84). `mainnet_ready` unchanged on both:
+  the external-bridge half and concurrent multi-validator traffic are still absent.
+
+### Measured at `ca15cb74d`
+- `bash scripts/local-ci.sh` -> **38 of 38 gates PASS** (34 at the start of this gate work; +kernel,
+  +supply-ledger, +router, +registry).
+- `test x3-cross-vm-router` 81 passed; `test x3-asset-registry` 31 passed.
+- Workspace-wide (previous turn, `5940dc520`): 472 suites, 6468 passed / 0 failed, 632s.
+- No runtime byte changed, so no WASM re-attestation was needed.
+
+### Still open
+1. The external half of X3-XVM-002: a real external chain's lock observed and recorded into these
+   transitions, plus router↔ledger reconciliation under concurrent multi-validator traffic.
+2. `submit_comit_v2`'s benchmark not re-run (the receipt write stays hand-declared).
+3. No chain-level upgrade rehearsal for the 1 -> 2 storage move; old artifact vs upgraded VM untested.
+4. One host: no multi-validator evidence. Rotate the bridge API key in git history.
+5. The default-vs-deep gate decision: `test workspace` is green in 632s but is still opt-in.
+
+### Next task seed
+1. Decide the gate-economics question with `test workspace`'s 632s measurement in hand (promote, or
+   run it on a schedule, or leave it opt-in and say so in the docs) — the three holes above are all
+   the same class of gap.
+2. Re-run `submit_comit_v2`'s benchmark and retire the explicit write declaration.
+3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
