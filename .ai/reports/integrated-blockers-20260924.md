@@ -17,11 +17,12 @@ producer.
 
 ## 1. Merged in this pass
 
-Eleven commits across four pull requests: #501, #503, #504, #505.
+Eleven commits across four pull requests: #501, #503, #504, #505 — then #506
+(this document), #507, #508 (txpool gauges) and #509 (snapshot restore).
 
 | area | what landed | evidence |
 |---|---|---|
-| state snapshots | `crates/x3-state-snapshot`: manifest, chunk verifier, state-root recomputation, exporter, `hash-manifest`/`root`/`build`/`verify` CLI | 40 unit tests; `launch-gates/snapshot-murder-test.sh` 13/13 |
+| state snapshots | `crates/x3-state-snapshot`: manifest, chunk verifier, state-root recomputation, exporter, **restore**, `hash-manifest`/`root`/`build`/`verify`/`restore` CLI | 48 unit tests; `launch-gates/snapshot-murder-test.sh` 20/20; `scripts/mainnet/verify-snapshot-restore.sh` PASS |
 | snapshot root | recompute matches a **chain-produced** root | measured: header `0x46b7cb92…` vs rebuilt from the node's own `build-spec --chain dev --raw`, byte-identical (130 entries) |
 | node RPC | authority refuses `--rpc-methods unsafe` on a non-loopback listener | 5 unit tests; `sc_rpc_server::deny_unsafe` is address-independent for `Unsafe` |
 | node storage | free-space guard, startup gate, watchdog | `node/src/disk_guard.rs`, 9 unit tests |
@@ -36,10 +37,34 @@ Eleven commits across four pull requests: #501, #503, #504, #505.
 
 ## 2. Measurements established this session
 
-**State root.** `x3-state-snapshot` reproduces a chain-produced genesis root
-exactly: `0x46b7cb9219500cbe54c5d32b216376e6e1f17acc874108cad18951214e5b4038`
-(dev chain, spec_version 20). `scripts/mainnet/verify-snapshot-root-against-chain.sh`
-automates this against any node → MATCH.
+**State root.** `x3-state-snapshot` reproduces a chain-produced root exactly, at
+genesis (`0x46b7cb9219500cbe54c5d32b216376e6e1f17acc874108cad18951214e5b4038`,
+dev chain, spec_version 20) **and at a real block**: `export-state` at block 6290
+of a dev chain (12,526 entries) recomputes to that header's own root,
+`0xbe94def3c9cdaecc8ab5efb94e9a3a49a526dff6b881a1b35f7869de2c60ecbb`.
+`scripts/mainnet/verify-snapshot-root-against-chain.sh` automates the genesis
+comparison against any node → MATCH.
+
+**Snapshot restore, end to end against a running chain.** #509 closed the
+export/import pair. `scripts/mainnet/verify-snapshot-restore.sh` starts a chain,
+exports state at a real block, builds a snapshot anchored to it, restores it into
+a raw chain spec, and boots a second node from that spec — the node recomputes
+the chain's own state root out of its genesis header and reports the restored
+`:code`'s `spec_version`. A chunk with one flipped byte is refused and leaves no
+spec behind. `launch-gates/snapshot-murder-test.sh` went 13/13 → **20/20**, with
+the restore refusals (corrupt chunk, substituted state under a forged manifest,
+wrong chain, stale, and no silent overwrite of an existing spec) demonstrated on
+disk through the shipped binary.
+
+**Two limits found while proving it.** (a) A restored spec's genesis header is
+number 0 while its state is block N's, so a node booted from it serves that state
+and then refuses to author — `frame-system` panics, "Block number must be
+strictly increasing" (reproduced). Restored state is state *transport*, not a
+join-at-height path. (b) `export-state` on a node with bounded state pruning
+fails with `UnknownBlock("State already discarded")` for any block whose state has
+been pruned (reproduced at block 2616 of a node that had run for 10 h, and it
+succeeds at the head). A snapshot source has to archive state, or export at the
+head.
 
 **Per-block storage, on a dev chain (measured, live `/metrics`):** ~215.6 bytes per
 block and ~1.44 extrinsics per block while idle; **893.9 bytes and 6.48 extrinsics
@@ -186,9 +211,14 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
 8. **`state_growth_bytes`.** Not measurable from the import notification; needs the
    state diff. Block bodies turned out to be small (§2), so state growth is the
    number that decides disk economics — and it is unmeasured.
-9. **Snapshot restore path.** Verification and export exist; nothing writes a
-   snapshot's entries back into a database and re-reads the root. The audit's
-   export/import pair is half-built.
+9. ~~**Snapshot restore path.**~~ **Closed by #509** and proven against a live
+   chain (§2). The half that remains is the one this does not pretend to be: the
+   restore writes a raw chain spec whose genesis *state* is block N's state, so a
+   node that boots from it recomputes the same root and then refuses to author
+   (its header is number 0). Installing that state behind block N's header — the
+   path a validator joining at a height actually needs — is state/warp sync, and
+   does not exist here. `export-state` also needs unpruned state or the head
+   (measured).
 10. **Disk-pressure authoring stop.** The guard warns and gates startup, but does
     not take an authority out of authoring. `sc-keystore`/`sp-keystore` expose **no
     key-removal API**, so the usual mechanism is unavailable; this needs a
@@ -236,8 +266,11 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
   47–51 here versus 575 then is a harness-capacity difference, not a like-for-like
   regression figure — and disentangling the two needs a load host that is not the
   node's host.
-* **No claim that the snapshot format is complete:** it verifies, exports and
-  cross-checks against a real chain root, and cannot yet restore.
+* **No claim that state sync is finished.** The snapshot format verifies,
+  exports, cross-checks against real chain roots and restores into a bootable
+  chain spec, but it is state *transport*: nothing installs that state behind a
+  block header, so a validator still cannot join a running chain at height N with
+  it. Warp/state sync is the missing client-side half.
 * **No reproducibility claim.** `srtool` is installed, but it builds inside Docker
   and docker is absent on this machine, so the release-reproducibility gate has
   never executed here.
