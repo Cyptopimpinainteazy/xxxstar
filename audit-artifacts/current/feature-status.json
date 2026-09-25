@@ -2903,17 +2903,17 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 29,
+      "composite": 54,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
         "note: Trading Core v1 gap #3"
       ],
       "id": "X3-LANG-007",
-      "implemented": 40,
+      "implemented": 70,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 25,
+      "mainnet_ready": 30,
       "missing_work": [
         "Needs real stateful verifier"
       ],
@@ -2923,11 +2923,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 20,
-      "tests": "tested score 20% (no named test list on this row)"
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4360,7 +4360,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "09319984497266bbf8916a00b169d12de5008ed58200ca127ce579129f16e3f9",
+    "source_digest": "d4ad05122253c9465727c1108e8434ff02673896a8674017d01ad2d345829e4a",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4371,7 +4371,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "0f78d298b710f13e4a0826e18cae06df9a72b7a2d444b7f2596b44ed92c689bd",
+      "feature-matrix/language-trading.toml": "895b8f58dc75a81119c5a45fa6b6af55dd0b566ff7ec823a3009aa63b64c5304",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",
@@ -4807,8 +4807,8 @@
       "FUNCTIONAL BUT UNHARDENED": 56,
       "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
-      "PARTIAL": 52,
-      "STUB": 19
+      "PARTIAL": 53,
+      "STUB": 18
     },
     "matrix_features": 145,
     "registry_features": 21,

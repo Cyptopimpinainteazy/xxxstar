@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `09319984497266bb…` — the artifacts move when
+Source digest: `d4ad05122253c946…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -143,7 +143,7 @@ fails when they do not match.
 | MTX-X3-LANG-004 | language_trading | Bytecode routing to atomic kernel: No test drives a compiled program's call into the atomic kernel: the bridge proves compile → runtime-loadable bytecode, and the route from there to `X3AtomicKernel` is the open half | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 20% (no named test list on this row) | open |
 | MTX-X3-LANG-005 | language_trading | Chain/capability version enforcement: Version gates incomplete | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 20% (no named test list on this row) | open |
 | MTX-X3-LANG-006 | language_trading | Decoded bytecode → TradingVm execution: Both engines decode and execute the compiler's fixture corpus to the source's values; not yet driven from the kernel, and not proven beyond those shapes | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 60% (no named test list on this row) | open |
-| MTX-X3-LANG-007 | language_trading | Stateful trading IR verifier: Needs real stateful verifier | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 20% (no named test list on this row) | open |
+| MTX-X3-LANG-007 | language_trading | Stateful trading IR verifier: Needs real stateful verifier | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 70% (no named test list on this row) | open |
 | MTX-X3-LANG-008 | language_trading | .x3 compile_source integration: PR recovery/rebase and exact E2E proof needed | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 25% (no named test list on this row) | open |
 | MTX-X3-LANG-009 | language_trading | Authenticated bytecode decoder: **Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 25% (no named test list on this row) | open |
 | MTX-X3-LANG-010 | language_trading | Versioned runtime bytecode envelope: Corrected 2026-09-24 against the code: TICKET-108 is closed by commit 6cc986b5d8. `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the liter… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 25% (no named test list on this row) | open |

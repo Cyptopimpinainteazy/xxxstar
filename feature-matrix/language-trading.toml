@@ -150,15 +150,23 @@ test_evidence = ["crates/x3-integration/tests/compiler_bridge.rs: the corpus tes
 evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "note: Trading Core v1 gap #4"]
 
 [[feature]]
-# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/ir.rs, x3-lang/compiler/tests/
+# Re-measured 2026-09-24 (TICKET-134): the verifier this row says is needed exists —
+# `x3-lang/compiler/src/trading_verify.rs`, with eight coded economic diagnostics (X3E4021..4028) and
+# a test naming each — and it was measured against PHASE 4's invariant list with one program per
+# invariant: use-before-binding and binding/asset-type mismatch (`X3E2107`, types named), the same debt
+# repaid twice (`X3E4022`), an unfulfilled declared effect (`X3E4021`), a removed `all_debts_repaid`
+# guard and an unknown risk policy (`X3E4025`) are all refused. One invariant was **not** enforced —
+# "profit checks must occur after all required costs are known" — and a guard placed before the swaps
+# checked clean; that is fixed and tested. Still unproven: BEGIN/END exactly once, position
+# close-or-return, ROLLBACK preserving declared invariants.
 id = "X3-LANG-007"
 name = "Stateful trading IR verifier"
 subsystem = "language_trading"
 source = "master"
 paths = ["x3-lang/compiler"]
-implemented = 40
-tested = 20
-mainnet_ready = 25
+implemented = 70
+tested = 70
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"

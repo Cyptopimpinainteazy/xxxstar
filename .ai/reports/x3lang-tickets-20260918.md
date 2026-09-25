@@ -5231,3 +5231,36 @@ Measured (`dest_chain`/`dest_asset`/`dest_receiver` against each source's `to` l
 solana/SOL/wallet; `staking_intent.x3` solana/stakedSOL/vault; `timeout_refund_minimal.x3`
 Solana/USDC/4Nd1mz… — all three were `x3`/`UNKNOWN`/`unknown` before.
 Regression: `compiler/tests/test_intent_endpoints.rs` pins the three fields on a cross-chain fixture.
+
+## TICKET-134 — PHASE 4's "profit checks after all costs are known" was not enforced — CLOSED
+Type: CLOSED in this commit (2026-09-24) · Subsystem: x3-lang/compiler (trading_verify)
+Found while attacking the trading verifier with one program per PHASE 4 invariant, which is the
+measurement X3-LANG-007's row was missing. The verifier recorded only *that* a `net_profit` guard
+exists (`has_net_profit_guard`), never *where* it is — so this program checked clean:
+
+```
+atomic trade T using P {
+    borrow 1_000 USDC from aave_v3 as debt
+    require net_profit >= 1_000 USDC        // before anything has produced a profit
+    let weth = swap debt.amount USDC -> ETH via uniswap_v3 min_out 1 ETH
+    repay debt
+    require all_debts_repaid
+    emit receipt
+}
+```
+
+Measured before: `x3c check` exit 0. The guard's position is now compared against the last
+borrow/swap/repay (the statements that change what the profit *is*), and a guard that runs earlier is
+refused with `X3E4023` naming both statement positions. A bridge is not counted: it moves value
+without changing it.
+After: the program above exits 1 with "checks `net_profit` at statement 2 but statement 5 still
+changes what the profit is"; the same guard moved after the `repay` checks clean; examples and the
+whole workspace suite are unaffected (1316 passed / 0 failed, 30 of them in the verifier's own file,
+which gained the pair as a test).
+
+Also measured in the same sweep, and each already enforced (evidence for X3-LANG-007):
+use-before-binding and binding/asset-type mismatch → `X3E2107` with the types named; the same debt
+repaid twice → `X3E4022` "repays debt 'debt' more than once"; an unfulfilled declared effect →
+`X3E4021`; a removed `all_debts_repaid` → `X3E4025`; an unknown risk policy → `X3E4025`.
+Not probed, and so still unproven for that row: BEGIN/END exactly once, position close-or-return,
+and ROLLBACK preserving declared invariants.
