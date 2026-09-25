@@ -66,8 +66,8 @@ single-host one. The repository's own comparison file also records
 **The February figures are not reproducible here — and the limit is the load
 generator, not the chain.** Same loader, same nominal configuration (6 senders,
 concurrency 32, 20 s, loopback), release build: **47–51 finalized TPS** where the
-archive recorded **575.5**. Three candidate explanations were tested and two are
-excluded by measurement:
+archive recorded **575.5**. Three candidate explanations were tested and all three
+are excluded by measurement:
 
 * *build profile* — release is only 25–35 % faster than debug here (38.2 → 47–51);
 * *block cadence* — the chain holds **200 ms** blocks, exactly the target;
@@ -83,6 +83,8 @@ What moves the number is the number of signers, not concurrency:
 | 6 | 32 / 128 / 512 | 50.5 / 46.1 / 53.1 |
 | 24 | 256 | 77.0 |
 | 48 | 512 | 99.6 |
+| 96 | 1024 | 91.4 |
+| 192 | 1024 | 149.6 (submit window) / 73.2 (wall) |
 
 A 16x increase in concurrency changes nothing; quadrupling and then doubling the
 signer count raises it steadily. That is the signature of a **client-bound**
@@ -90,6 +92,22 @@ measurement: the JavaScript load generator signs and submits from the same two
 cores the node is using. The ceiling measured here is therefore the harness's, and
 **the chain's own ceiling is still unmeasured** — including whether it is anywhere
 near the 575 the February host recorded.
+
+At 192 senders the chain's own counters show **14.12 extrinsics per 200 ms block**
+(up from 6.48 at the light load), and once again **no backlog**: pool submissions
+3,082 against 3,318 included over the same window, 0 failed. The chain absorbed
+everything it was offered again. Its measured inclusion rate was ~70 tx/s, which
+matches the wall figure of 73.2 and is the number to quote; 149.6 is the
+submit-window artifact described next.
+
+**A metric caveat that applies to every TPS figure in this document.** The loader
+reports two numbers: `finalized_tps_submit_window`, which divides finalized
+transactions by the *submit* duration and ignores the finality wait, and
+`finalized_tps_wall`, which divides by wall time including it. For a chain that
+keeps producing blocks while a backlog drains, only the wall figure describes
+steady state. The archive's headline 575.5 is a submit-window number — its own wall
+figure was 359.2 — so the February comparison is 359 versus 73, about 5x, rather
+than 575 versus 47.
 
 **100K TPS is not supported by any measurement here.** It is ~172x the best
 single-host figure and ~3,270x the 7-validator figure.
