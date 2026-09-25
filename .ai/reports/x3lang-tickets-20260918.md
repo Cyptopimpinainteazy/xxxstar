@@ -5321,3 +5321,36 @@ index 1 with a longer name, called with two arguments), global table (stored the
 debug and metadata sections (both readers execute the same code; the checksum covers an edited
 trailing byte for both), plus the version cases above. Six tests in
 `crates/x3-integration/tests/bc_const_pool_parity.rs`.
+
+## TICKET-138 — X3-LANG-004/005/008 measured: three STUB rows, two of them already true — record
+Type: RECORD + one test added (2026-09-24) · Subsystem: crates/x3-integration, pallets/x3-kernel, x3-lang/vm
+Not a defect. The measurement these three rows were missing, kept here because it is the evidence their
+scores now rest on.
+
+**X3-LANG-004 (bytecode routing to atomic kernel).** The row said "No test drives a compiled program's
+call into the atomic kernel". The route exists — `X3VmAdapter` in `pallets/x3-kernel/src/adapters.rs`
+is what the kernel is configured with in production, and it delegates to
+`x3_x3_integration::X3Executor` — but the pallet's own tests configure `TestX3Adapter`, which fabricates
+a receipt. New test `pallets/x3-kernel/tests/x3_adapter_route.rs` drives the **production** adapter with
+a module compiled from `.x3` source in the test: two programs returning different values, `validate`,
+`estimate_gas`, and the kernel's own `ExecutionReceipt` with its value, its metered gas and its
+`EXECUTION_RECEIPT_VERSION` stamp; plus a corrupted module refused by both `validate` and `execute`. The
+`compile` feature of `x3-x3-integration` is a **dev-dependency** there: the kernel executes artifacts and
+never compiles source. Not covered: an extrinsic dispatched through the pallet's storage with that
+adapter wired in.
+
+**X3-LANG-005 (chain/capability version enforcement).** "Version gates incomplete" is contradicted:
+the compiled-policy version is checked against the host's policy version **before any host call** and
+refuses with `CapabilityVersionMismatch` (`vm/tests/trading_execution.rs`, which also asserts the host
+transaction never began); unknown economic-object versions fail closed with
+`UnsupportedVersion { object, version }` (`vm/tests/economic_types.rs`); capability manifests are
+checked per operation — a borrow's provider, a swap's venue, a bridge's adapter each have to be in the
+host's manifest (`vm/src/trading.rs`, `UnknownCapability`); and the envelope's own version/min-version
+are enforced by both readers (X3-LANG-010, TICKET-137). Not exercised: a live upgrade, an old artifact
+against a newer VM on a running chain.
+
+**X3-LANG-008 (`.x3` compile_source integration).** "PR recovery/rebase and exact E2E proof needed" is
+now met: the chain source → compiler → X3BC → both readers → both engines → receipt is proven by six
+tests in `crates/x3-integration/tests/compiler_bridge.rs` (values read off each source), and the
+envelope body parity suite covers the sections after the constant pool. What remains is the node's own
+use of that path, which is X3-LANG-004's residue above.

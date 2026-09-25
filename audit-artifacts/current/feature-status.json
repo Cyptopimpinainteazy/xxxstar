@@ -2816,7 +2816,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 29,
+      "composite": 51,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration",
@@ -2824,12 +2824,12 @@
         "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"
       ],
       "id": "X3-LANG-004",
-      "implemented": 40,
+      "implemented": 65,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 25,
+      "mainnet_ready": 30,
       "missing_work": [
-        "No test drives a compiled program's call into the atomic kernel: the bridge proves compile \u2192 runtime-loadable bytecode, and the route from there to `X3AtomicKernel` is the open half"
+        "The production adapter the kernel is configured with (X3VmAdapter) is now driven by a test with a module compiled from .x3 source in the test: validate, estimate_gas, and the kernel's own ExecutionReceipt carrying the program's value, its metered gas and the receipt version, plus a corrupted module refused by both validate and execute (pallets/x3-kernel/tests/x3_adapter_route.rs, added 2026-09-24). What is not covered is an extrinsic dispatched through the pallet's storage with that adapter wired in: the pallet's own tests configure TestX3Adapter, which fabricates its receipt"
       ],
       "name": "Bytecode routing to atomic kernel",
       "paths": [
@@ -2837,28 +2837,28 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 20,
-      "tests": "tested score 20% (no named test list on this row)"
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 29,
+      "composite": 51,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
         "note: Trading Core v1 gap #7"
       ],
       "id": "X3-LANG-005",
-      "implemented": 40,
+      "implemented": 65,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 25,
+      "mainnet_ready": 30,
       "missing_work": [
-        "Version gates incomplete"
+        "Re-measured 2026-09-24: the gates exist and refuse by name with tests \u2014 the compiled-policy version is checked against the host's before any host call (CapabilityVersionMismatch, and the test asserts the host transaction never began), unknown economic-object versions fail closed (UnsupportedVersion { object, version }), capability manifests are checked per operation (a borrow's provider, a swap's venue, a bridge's adapter; UnknownCapability), and the envelope's version/min-version are enforced by both readers (X3-LANG-010). What is not exercised is a live upgrade: an old artifact against a newer VM on a running chain"
       ],
       "name": "Chain/capability version enforcement",
       "paths": [
@@ -2866,11 +2866,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 20,
-      "tests": "tested score 20% (no named test list on this row)"
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2934,7 +2934,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 34,
+      "composite": 64,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration",
@@ -2942,12 +2942,12 @@
         "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"
       ],
       "id": "X3-LANG-008",
-      "implemented": 45,
+      "implemented": 80,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 40,
       "missing_work": [
-        "PR recovery/rebase and exact E2E proof needed"
+        "Re-measured 2026-09-24: the exact E2E proof this row asked for exists \u2014 source to compiler to X3BC to both readers to both engines to receipt, six tests whose expectations are read off each source, plus the envelope body parity suite. The remaining half is the node's own use of that path, which is X3-LANG-004's residue"
       ],
       "name": ".x3 compile_source integration",
       "paths": [
@@ -2955,11 +2955,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 25,
-      "tests": "tested score 25% (no named test list on this row)"
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4362,7 +4362,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "449e8fcfa6e64141f4c6e2e7ff7f8e2c7335cacd97fce1bd452e281b2a297bfd",
+    "source_digest": "58ad8c66de996a45a6ad94163917b26bfb286fcf814710d7f2b0e8a5019140e2",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4373,7 +4373,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "9e771b0f83df5acc916500beebb327213a25888bec21ac94ec4a87411af6a563",
+      "feature-matrix/language-trading.toml": "9ffa2017b9133f461e78fcf85b42b7be1a53e44bd9dc83179ff827832c4fffb3",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",
@@ -4809,8 +4809,8 @@
       "FUNCTIONAL BUT UNHARDENED": 56,
       "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
-      "PARTIAL": 57,
-      "STUB": 14
+      "PARTIAL": 60,
+      "STUB": 11
     },
     "matrix_features": 145,
     "registry_features": 21,
