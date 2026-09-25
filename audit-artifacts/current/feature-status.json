@@ -2721,7 +2721,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 55,
+      "composite": 57,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
@@ -2729,12 +2729,12 @@
         "note: Trading Core v1 gap #10"
       ],
       "id": "X3-LANG-001",
-      "implemented": 70,
+      "implemented": 72,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "Proven for the swept operand kinds and the compiler's fixture corpus, including a `while` loop with a mutated local on both engines; not proven for match statements, floats, strings or host calls. The optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"
+        "Proven for the swept operand kinds and the compiler's fixture corpus, including a `while` loop with a mutated local, `break`/`continue`, and float arithmetic with the on-chain refusal asserted; not proven for match statements, strings or host calls. The optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"
       ],
       "name": "Compile\u2192encode\u2192decode\u2192execute\u2192receipt E2E",
       "paths": [
@@ -2750,8 +2750,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 75,
-      "tests": "tested score 75% (no named test list on this row)"
+      "tested": 78,
+      "tests": "tested score 78% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4360,7 +4360,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "e5c475e67af5212c5afcc0d0fb0378b05d3a66c745d67dc96933b5b1560e0af6",
+    "source_digest": "09319984497266bbf8916a00b169d12de5008ed58200ca127ce579129f16e3f9",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4371,7 +4371,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "0b9b8b343c16e0880b6b6ac97c4f08588fdac2f8b486a48a97303327207c893f",
+      "feature-matrix/language-trading.toml": "0f78d298b710f13e4a0826e18cae06df9a72b7a2d444b7f2596b44ed92c689bd",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",

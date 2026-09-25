@@ -43,7 +43,12 @@ mod bench {
                         id: MirBlockId(1),
                         statements: vec![MirStatement::Assign {
                             target: MirValue(4),
-                            rhs: MirRhs::Binary(BinaryOp::Less, MirValue(3), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Less,
+                                left: MirValue(3),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         }],
                         terminator: Some(MirTerminator::Branch {
                             cond: MirValue(4),
@@ -57,15 +62,30 @@ mod bench {
                         statements: vec![
                             MirStatement::Assign {
                                 target: MirValue(5),
-                                rhs: MirRhs::Binary(BinaryOp::Add, MirValue(2), MirValue(3)),
+                                rhs: MirRhs::Binary {
+                                    op: BinaryOp::Add,
+                                    left: MirValue(2),
+                                    right: MirValue(3),
+                                    float: false,
+                                },
                             },
                             MirStatement::Assign {
                                 target: MirValue(2),
-                                rhs: MirRhs::Binary(BinaryOp::Add, MirValue(5), MirValue(3)),
+                                rhs: MirRhs::Binary {
+                                    op: BinaryOp::Add,
+                                    left: MirValue(5),
+                                    right: MirValue(3),
+                                    float: false,
+                                },
                             },
                             MirStatement::Assign {
                                 target: MirValue(3),
-                                rhs: MirRhs::Binary(BinaryOp::Add, MirValue(3), MirValue(1)),
+                                rhs: MirRhs::Binary {
+                                    op: BinaryOp::Add,
+                                    left: MirValue(3),
+                                    right: MirValue(1),
+                                    float: false,
+                                },
                             },
                         ],
                         terminator: Some(MirTerminator::Goto(MirBlockId(1))),
@@ -111,7 +131,12 @@ mod bench {
                         id: MirBlockId(1),
                         statements: vec![MirStatement::Assign {
                             target: MirValue(5),
-                            rhs: MirRhs::Binary(BinaryOp::Less, MirValue(3), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Less,
+                                left: MirValue(3),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         }],
                         terminator: Some(MirTerminator::Branch {
                             cond: MirValue(5),
@@ -133,7 +158,12 @@ mod bench {
                         id: MirBlockId(3),
                         statements: vec![MirStatement::Assign {
                             target: MirValue(6),
-                            rhs: MirRhs::Binary(BinaryOp::Less, MirValue(4), MirValue(2)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Less,
+                                left: MirValue(4),
+                                right: MirValue(2),
+                                float: false,
+                            },
                         }],
                         terminator: Some(MirTerminator::Branch {
                             cond: MirValue(6),
@@ -146,7 +176,12 @@ mod bench {
                         id: MirBlockId(4),
                         statements: vec![MirStatement::Assign {
                             target: MirValue(4),
-                            rhs: MirRhs::Binary(BinaryOp::Add, MirValue(4), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Add,
+                                left: MirValue(4),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         }],
                         terminator: Some(MirTerminator::Goto(MirBlockId(3))),
                     },
@@ -155,7 +190,12 @@ mod bench {
                         id: MirBlockId(5),
                         statements: vec![MirStatement::Assign {
                             target: MirValue(3),
-                            rhs: MirRhs::Binary(BinaryOp::Add, MirValue(3), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Add,
+                                left: MirValue(3),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         }],
                         terminator: Some(MirTerminator::Goto(MirBlockId(1))),
                     },
@@ -202,15 +242,30 @@ mod bench {
                             // Invariant: x + y should be hoisted out
                             MirStatement::Assign {
                                 target: MirValue(5),
-                                rhs: MirRhs::Binary(BinaryOp::Add, MirValue(1), MirValue(2)),
+                                rhs: MirRhs::Binary {
+                                    op: BinaryOp::Add,
+                                    left: MirValue(1),
+                                    right: MirValue(2),
+                                    float: false,
+                                },
                             },
                             MirStatement::Assign {
                                 target: MirValue(6),
-                                rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(5), MirValue(3)),
+                                rhs: MirRhs::Binary {
+                                    op: BinaryOp::Mul,
+                                    left: MirValue(5),
+                                    right: MirValue(3),
+                                    float: false,
+                                },
                             },
                             MirStatement::Assign {
                                 target: MirValue(3),
-                                rhs: MirRhs::Binary(BinaryOp::Add, MirValue(3), MirValue(1)),
+                                rhs: MirRhs::Binary {
+                                    op: BinaryOp::Add,
+                                    left: MirValue(3),
+                                    right: MirValue(1),
+                                    float: false,
+                                },
                             },
                         ],
                         terminator: Some(MirTerminator::Branch {

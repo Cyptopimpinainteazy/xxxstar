@@ -363,7 +363,12 @@ mod tests {
                 id: MirBlockId(1),
                 statements: vec![MirStatement::Assign {
                     target: MirValue(1),
-                    rhs: MirRhs::Binary(x3_ast::BinaryOp::Add, MirValue(0), MirValue(0)),
+                    rhs: MirRhs::Binary {
+                        op: x3_ast::BinaryOp::Add,
+                        left: MirValue(0),
+                        right: MirValue(0),
+                        float: false,
+                    },
                 }],
                 terminator: Some(MirTerminator::Return(Some(MirValue(1)))),
             },

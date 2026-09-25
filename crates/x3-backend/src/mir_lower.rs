@@ -189,10 +189,15 @@ impl MirBytecodeCompiler {
                         let src = self.get_reg(*val)?;
                         self.compile_unary(*op, dst, src)?;
                     }
-                    MirRhs::Binary(op, left, right) => {
+                    MirRhs::Binary {
+                        op,
+                        left,
+                        right,
+                        float,
+                    } => {
                         let left_reg = self.get_reg(*left)?;
                         let right_reg = self.get_reg(*right)?;
-                        self.compile_binary(*op, dst, left_reg, right_reg)?;
+                        self.compile_binary(*op, dst, left_reg, right_reg, *float)?;
                     }
                     MirRhs::Call { target, args } => {
                         let arg_regs: Vec<Register> = args
@@ -350,23 +355,40 @@ impl MirBytecodeCompiler {
         dst: Register,
         left: Register,
         right: Register,
+        float: bool,
     ) -> BackendResult<()> {
-        // For now assume integer operations - a real compiler would track types
-        match op {
-            BinaryOp::Add => self.emitter.emit_add_i(dst, left, right),
-            BinaryOp::Sub => self.emitter.emit_sub_i(dst, left, right),
-            BinaryOp::Mul => self.emitter.emit_mul_i(dst, left, right),
-            BinaryOp::Div => self.emitter.emit_div_i(dst, left, right),
-            BinaryOp::Mod => self.emitter.emit_mod_i(dst, left, right),
-            BinaryOp::Equal => self.emitter.emit_eq_i(dst, left, right),
-            BinaryOp::NotEqual => self.emitter.emit_ne_i(dst, left, right),
-            BinaryOp::Less => self.emitter.emit_lt_i(dst, left, right),
-            BinaryOp::LessEqual => self.emitter.emit_le_i(dst, left, right),
-            BinaryOp::Greater => self.emitter.emit_gt_i(dst, left, right),
-            BinaryOp::GreaterEqual => self.emitter.emit_ge_i(dst, left, right),
-            BinaryOp::LogicalAnd => self.emitter.emit_land(dst, left, right),
-            BinaryOp::LogicalOr => self.emitter.emit_lor(dst, left, right),
-            BinaryOp::Pow => {
+        // The operator alone cannot say which add to emit: the language shares one `+` between
+        // `i64` and `f64`, so the MIR carries the flag set where the operands are known to be floats.
+        // This used to assume integer ("a real compiler would track types"), so `1.5 + 2.5` compiled
+        // to an integer add and the VM refused it with `TypeMismatch("i64", "F64(1.5)")` (TICKET-133).
+        // The logical operators and `Pow` have no float form in the opcode set and keep their
+        // existing handling rather than being given a made-up encoding.
+        match (op, float) {
+            (BinaryOp::Add, false) => self.emitter.emit_add_i(dst, left, right),
+            (BinaryOp::Sub, false) => self.emitter.emit_sub_i(dst, left, right),
+            (BinaryOp::Mul, false) => self.emitter.emit_mul_i(dst, left, right),
+            (BinaryOp::Div, false) => self.emitter.emit_div_i(dst, left, right),
+            (BinaryOp::Mod, false) => self.emitter.emit_mod_i(dst, left, right),
+            (BinaryOp::Equal, false) => self.emitter.emit_eq_i(dst, left, right),
+            (BinaryOp::NotEqual, false) => self.emitter.emit_ne_i(dst, left, right),
+            (BinaryOp::Less, false) => self.emitter.emit_lt_i(dst, left, right),
+            (BinaryOp::LessEqual, false) => self.emitter.emit_le_i(dst, left, right),
+            (BinaryOp::Greater, false) => self.emitter.emit_gt_i(dst, left, right),
+            (BinaryOp::GreaterEqual, false) => self.emitter.emit_ge_i(dst, left, right),
+            (BinaryOp::Add, true) => self.emitter.emit_add_f(dst, left, right),
+            (BinaryOp::Sub, true) => self.emitter.emit_sub_f(dst, left, right),
+            (BinaryOp::Mul, true) => self.emitter.emit_mul_f(dst, left, right),
+            (BinaryOp::Div, true) => self.emitter.emit_div_f(dst, left, right),
+            (BinaryOp::Mod, true) => self.emitter.emit_mod_f(dst, left, right),
+            (BinaryOp::Equal, true) => self.emitter.emit_eq_f(dst, left, right),
+            (BinaryOp::NotEqual, true) => self.emitter.emit_ne_f(dst, left, right),
+            (BinaryOp::Less, true) => self.emitter.emit_lt_f(dst, left, right),
+            (BinaryOp::LessEqual, true) => self.emitter.emit_le_f(dst, left, right),
+            (BinaryOp::Greater, true) => self.emitter.emit_gt_f(dst, left, right),
+            (BinaryOp::GreaterEqual, true) => self.emitter.emit_ge_f(dst, left, right),
+            (BinaryOp::LogicalAnd, _) => self.emitter.emit_land(dst, left, right),
+            (BinaryOp::LogicalOr, _) => self.emitter.emit_lor(dst, left, right),
+            (BinaryOp::Pow, _) => {
                 // Emit a runtime call to the built-in `Pow` handler.
                 // The VM executor dispatches `CallBuiltin(Pow)` as a hostcall
                 // with the base (left) and exponent (right) as arguments.
@@ -484,7 +506,12 @@ mod tests {
                         },
                         MirStatement::Assign {
                             target: MirValue(2),
-                            rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Add,
+                                left: MirValue(0),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         },
                     ],
                     terminator: Some(MirTerminator::Return(Some(MirValue(2)))),

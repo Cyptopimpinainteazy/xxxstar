@@ -52,7 +52,12 @@ impl ExprKey {
     /// Extract and canonicalize expression from MIR RHS
     pub fn from_rhs(rhs: &MirRhs, vn_table: &mut ValueNumbering) -> Option<Self> {
         let canonical = match rhs {
-            MirRhs::Binary(op, lhs, rhs) => CanonicalExpr::from_binary(*op, *lhs, *rhs),
+            MirRhs::Binary {
+                op,
+                left: lhs,
+                right: rhs,
+                ..
+            } => CanonicalExpr::from_binary(*op, *lhs, *rhs),
             MirRhs::Unary(op, val) => CanonicalExpr::from_unary(*op, *val),
             _ => return None, // Skip literals, calls, etc.
         };
@@ -563,7 +568,9 @@ fn next_value_id(func: &MirFunction) -> usize {
                     MirRhs::Unary(_, v) => {
                         max_id = max_id.max(v.0);
                     }
-                    MirRhs::Binary(_, l, r) => {
+                    MirRhs::Binary {
+                        left: l, right: r, ..
+                    } => {
                         max_id = max_id.max(l.0.max(r.0));
                     }
                     MirRhs::Call { args, .. } => {
@@ -627,7 +634,9 @@ fn replace_value_in_rhs(rhs: &mut MirRhs, from: MirValue, to: MirValue) {
                 *v = to;
             }
         }
-        MirRhs::Binary(_, l, r) => {
+        MirRhs::Binary {
+            left: l, right: r, ..
+        } => {
             if *l == from {
                 *l = to;
             }
@@ -719,7 +728,9 @@ fn operands_of(rhs: &MirRhs) -> Vec<MirValue> {
     match rhs {
         MirRhs::Literal(_) => vec![],
         MirRhs::Unary(_, v) => vec![*v],
-        MirRhs::Binary(_, a, b) => vec![*a, *b],
+        MirRhs::Binary {
+            left: a, right: b, ..
+        } => vec![*a, *b],
         MirRhs::Call { args, .. } => args.clone(),
         MirRhs::Load { addr, .. } => vec![*addr],
         MirRhs::Store { addr, val, .. } => vec![*addr, *val],
@@ -736,7 +747,12 @@ mod tests {
     fn make_binary_stmt(target: usize, op: BinaryOp, lhs: usize, rhs: usize) -> MirStatement {
         MirStatement::Assign {
             target: MirValue(target),
-            rhs: MirRhs::Binary(op, MirValue(lhs), MirValue(rhs)),
+            rhs: MirRhs::Binary {
+                op,
+                left: MirValue(lhs),
+                right: MirValue(rhs),
+                float: false,
+            },
         }
     }
 

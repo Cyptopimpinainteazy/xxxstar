@@ -71,6 +71,16 @@ struct MirFunctionBuilder {
     /// (TICKET-132).
     mutated: std::collections::HashSet<SymbolId>,
     slots: HashMap<SymbolId, MirValue>,
+    /// Values this lowering knows hold a float.
+    ///
+    /// The type checker has no float primitive, so the flag cannot come from `HirExpr::ty`; it comes
+    /// from the expression that produced the value (a float literal, or an operation on one) and is
+    /// carried forward here. A float that arrives from somewhere this cannot see — a call's result —
+    /// is treated as an integer, which fails loudly at the opcode (`TypeMismatch`) rather than
+    /// silently computing on the wrong representation (TICKET-133).
+    float_values: std::collections::HashSet<MirValue>,
+    /// Whether each mutated name's cell holds a float, so a read of it keeps the flag.
+    slot_float: HashMap<SymbolId, bool>,
     /// The loops this builder is inside, innermost last: where `break` and `continue` go.
     ///
     /// `break` and `continue` used to be matched to an empty arm — the comment said label
@@ -100,6 +110,8 @@ impl MirFunctionBuilder {
             value_map: HashMap::new(),
             mutated: std::collections::HashSet::new(),
             slots: HashMap::new(),
+            float_values: std::collections::HashSet::new(),
+            slot_float: HashMap::new(),
             loops: Vec::new(),
             next_value: 0,
         };
@@ -149,6 +161,8 @@ impl MirFunctionBuilder {
                     // The initial value *is* the cell: it has a register, writes store into it and
                     // reads load from it, so the loop's back-edge sees the current value.
                     self.slots.insert(*symbol, evaluated);
+                    let is_float = self.float_values.contains(&evaluated);
+                    self.slot_float.insert(*symbol, is_float);
                 }
                 self.value_map.insert(*symbol, evaluated);
             }
@@ -165,6 +179,10 @@ impl MirFunctionBuilder {
                             )));
                         }
                         let evaluated = self.lower_expr(value)?;
+                        if self.slots.contains_key(symbol) {
+                            let is_float = self.float_values.contains(&evaluated);
+                            self.slot_float.insert(*symbol, is_float);
+                        }
                         if let Some(&cell) = self.slots.get(symbol) {
                             // Store into the cell, do not just rename the value: the loop's
                             // condition was lowered already and reads this register.
@@ -310,17 +328,27 @@ impl MirFunctionBuilder {
 
     fn lower_expr(&mut self, expr: &HirExpr) -> Result<MirValue, MirError> {
         match &expr.kind {
-            HirExprKind::Literal(literal) => Ok(self.emit_literal(literal.clone())),
+            HirExprKind::Literal(literal) => {
+                let value = self.emit_literal(literal.clone());
+                if matches!(literal, x3_common::Literal::Float(_)) {
+                    self.float_values.insert(value);
+                }
+                Ok(value)
+            }
             HirExprKind::Var(symbol) => {
                 // A mutated name is read from its cell, not from the value map: the map holds the
                 // value of the last assignment *as this lowering walked it*, and a loop body's
                 // reader may execute before an assignment the walk has already passed. Loading from
                 // the cell is what makes the loop see the current value (TICKET-132).
                 if let Some(&cell) = self.slots.get(symbol) {
-                    return Ok(self.emit_assignment(MirRhs::Load {
+                    let loaded = self.emit_assignment(MirRhs::Load {
                         model: MemoryModel::Register,
                         addr: cell,
-                    }));
+                    });
+                    if *self.slot_float.get(symbol).unwrap_or(&false) {
+                        self.float_values.insert(loaded);
+                    }
+                    return Ok(loaded);
                 }
                 self.value_map
                     .get(symbol)
@@ -330,7 +358,18 @@ impl MirFunctionBuilder {
             HirExprKind::Binary { op, left, right } => {
                 let left_val = self.lower_expr(left)?;
                 let right_val = self.lower_expr(right)?;
-                Ok(self.emit_assignment(MirRhs::Binary(*op, left_val, right_val)))
+                let float =
+                    self.float_values.contains(&left_val) || self.float_values.contains(&right_val);
+                let value = self.emit_assignment(MirRhs::Binary {
+                    op: *op,
+                    left: left_val,
+                    right: right_val,
+                    float,
+                });
+                if float {
+                    self.float_values.insert(value);
+                }
+                Ok(value)
             }
             HirExprKind::Unary { op, operand } => {
                 let val = self.lower_expr(operand)?;

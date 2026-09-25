@@ -160,7 +160,7 @@ impl GasAnalyzer {
             MirStatement::Assign { rhs, .. } => match rhs {
                 MirRhs::Literal(_) => "const".to_string(),
                 MirRhs::Unary(op, _) => format!("{:?}", op).to_lowercase(),
-                MirRhs::Binary(op, _, _) => format!("{:?}", op).to_lowercase(),
+                MirRhs::Binary { op, .. } => format!("{:?}", op).to_lowercase(),
                 MirRhs::Call { .. } => "call".to_string(),
                 MirRhs::Load { .. } => "load".to_string(),
                 MirRhs::Store { .. } => "store".to_string(),

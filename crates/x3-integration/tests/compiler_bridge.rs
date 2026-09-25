@@ -268,3 +268,47 @@ fn the_compiler_fixture_corpus_executes_to_the_value_its_source_states() {
         failures.join("\n  ")
     );
 }
+
+/// Floating point is computed in simulation and refused on-chain — and both halves are asserted.
+///
+/// The verifier's on-chain options deny float opcodes (`VerifyOptions::on_chain` sets
+/// `deny_float_arithmetic`), because a float result that depends on the platform's rounding is not a
+/// deterministic state transition. So a float program must not run on the on-chain path: what this
+/// test requires is that the *arithmetic* is real in simulation (`1.5 + 2.5 == 4.0`, so the branch
+/// returns 7) and that the same artifact is refused on-chain by that policy rather than computed.
+///
+/// The refusal is the interesting half for the compiler: before the float flag reached the backend
+/// it emitted an integer add for `1.5 + 2.5`, which failed at run time with `TypeMismatch("i64",
+/// "F64(1.5)")` — a type error where the language owes the reader either the operation or a policy
+/// refusal (TICKET-133).
+#[test]
+fn float_arithmetic_runs_in_simulation_and_is_refused_on_chain() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../x3-compiler/tests/fixtures/float_math.x3");
+    let source = std::fs::read_to_string(&path).expect("the fixture must be readable");
+    let bytes = compile_source(&source).expect("the fixture must compile");
+
+    let receipt = X3Executor::execute(&bytes, &[], X3ExecutorConfig::simulation())
+        .expect("simulation must execute a float program");
+    assert!(
+        receipt.success,
+        "1.5 + 2.5 == 4.0 takes the branch: {}",
+        String::from_utf8_lossy(&receipt.return_data)
+    );
+    assert_eq!(
+        receipt.return_data,
+        7i64.to_le_bytes().to_vec(),
+        "the float arithmetic must produce the value the source states"
+    );
+
+    let refused = X3Executor::execute(&bytes, &[], X3ExecutorConfig::on_chain());
+    assert!(
+        refused.is_err(),
+        "an on-chain run must refuse float arithmetic, not compute it: {refused:?}"
+    );
+    let message = format!("{:?}", refused.expect_err("refused"));
+    assert!(
+        message.contains("ForbiddenOnChain"),
+        "and say that it is the float opcode policy, not a parse or type failure: {message}"
+    );
+}

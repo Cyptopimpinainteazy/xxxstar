@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `e5c475e67af5212c…` — the artifacts move when
+Source digest: `09319984497266bb…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -137,7 +137,7 @@ fails when they do not match.
 | MTX-X3-GPU-015 | gpu_performance | Benchmark regression CI gate: Need benchmark corpus tied to launch SLOs | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 75% (no named test list on this row) | open |
 | MTX-X3-GPU-016 | gpu_performance | GPU Blake2b batching: No verified accelerator kernel | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | STUB · tested score 10% (no named test list on this row) | open |
 | MTX-X3-GPU-017 | gpu_performance | GPU Merkle-root acceleration: No verified accelerator kernel | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | STUB · tested score 10% (no named test list on this row) | open |
-| MTX-X3-LANG-001 | language_trading | Compile→encode→decode→execute→receipt E2E: Proven for the swept operand kinds and the compiler's fixture corpus, including a `while` loop with a mutated local on both engines; not proven for match statements, floats, strings or host calls. The optimizer is order-sensitive: moving th… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 75% (no named test list on this row) | open |
+| MTX-X3-LANG-001 | language_trading | Compile→encode→decode→execute→receipt E2E: Proven for the swept operand kinds and the compiler's fixture corpus, including a `while` loop with a mutated local, `break`/`continue`, and float arithmetic with the on-chain refusal asserted; not proven for match statements, strings or ho… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 78% (no named test list on this row) | open |
 | MTX-X3-LANG-002 | language_trading | Economic replay validation in receipts: Receipts need replay-economic validation | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 15% (no named test list on this row) | open |
 | MTX-X3-LANG-003 | language_trading | Signed / attested trading receipts: Receipt signatures/attestations incomplete | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 15% (no named test list on this row) | open |
 | MTX-X3-LANG-004 | language_trading | Bytecode routing to atomic kernel: No test drives a compiled program's call into the atomic kernel: the bridge proves compile → runtime-loadable bytecode, and the route from there to `X3AtomicKernel` is the open half | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 20% (no named test list on this row) | open |

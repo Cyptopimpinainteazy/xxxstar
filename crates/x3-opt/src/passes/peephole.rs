@@ -106,7 +106,9 @@ impl PeepholePass {
             None => return None, // atomic markers have no rhs
         };
         match rhs {
-            MirRhs::Binary(op, left, right) => {
+            MirRhs::Binary {
+                op, left, right, ..
+            } => {
                 let left_const = constants.get(left);
                 let right_const = constants.get(right);
 
@@ -168,12 +170,22 @@ impl PeepholePass {
                         // RULE 6: x * 2 → x + x (strength reduction)
                         if let Some(r) = right_const {
                             if Self::is_two(r) {
-                                return Some(MirRhs::Binary(BinaryOp::Add, *left, *left));
+                                return Some(MirRhs::Binary {
+                                    op: BinaryOp::Add,
+                                    left: *left,
+                                    right: *left,
+                                    float: false,
+                                });
                             }
                         }
                         if let Some(l) = left_const {
                             if Self::is_two(l) {
-                                return Some(MirRhs::Binary(BinaryOp::Add, *right, *right));
+                                return Some(MirRhs::Binary {
+                                    op: BinaryOp::Add,
+                                    left: *right,
+                                    right: *right,
+                                    float: false,
+                                });
                             }
                         }
 
@@ -437,7 +449,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(1),
-                rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(2), MirValue(0)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Mul,
+                    left: MirValue(2),
+                    right: MirValue(0),
+                    float: false,
+                },
             },
         ];
 
@@ -464,7 +481,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(1),
-                rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(2), MirValue(0)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Mul,
+                    left: MirValue(2),
+                    right: MirValue(0),
+                    float: false,
+                },
             },
         ];
 
@@ -476,7 +498,12 @@ mod tests {
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
         assert_eq!(
             v1_stmt.rhs().unwrap(),
-            &MirRhs::Binary(BinaryOp::Add, MirValue(2), MirValue(2))
+            &MirRhs::Binary {
+                op: BinaryOp::Add,
+                left: MirValue(2),
+                right: MirValue(2),
+                float: false
+            }
         );
     }
 
@@ -491,7 +518,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(1),
-                rhs: MirRhs::Binary(BinaryOp::Equal, MirValue(2), MirValue(0)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Equal,
+                    left: MirValue(2),
+                    right: MirValue(0),
+                    float: false,
+                },
             },
         ];
 
@@ -512,7 +544,12 @@ mod tests {
         // v0 = v0 != v0  => v0 = false
         let stmts = vec![MirStatement::Assign {
             target: MirValue(0),
-            rhs: MirRhs::Binary(BinaryOp::NotEqual, MirValue(1), MirValue(1)),
+            rhs: MirRhs::Binary {
+                op: BinaryOp::NotEqual,
+                left: MirValue(1),
+                right: MirValue(1),
+                float: false,
+            },
         }];
 
         let mut module = make_module(make_func(stmts));
@@ -576,7 +613,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(1),
-                rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(2)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Add,
+                    left: MirValue(0),
+                    right: MirValue(2),
+                    float: false,
+                },
             },
         ];
 
@@ -598,7 +640,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(1),
-                rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(0), MirValue(2)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Mul,
+                    left: MirValue(0),
+                    right: MirValue(2),
+                    float: false,
+                },
             },
         ];
 

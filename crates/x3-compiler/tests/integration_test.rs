@@ -58,7 +58,12 @@ mod integration_tests {
                         id: MirBlockId(0),
                         statements: vec![MirStatement::Assign {
                             target: MirValue(2),
-                            rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Add,
+                                left: MirValue(0),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         }],
                         terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
                     }],
@@ -72,7 +77,12 @@ mod integration_tests {
                         id: MirBlockId(0),
                         statements: vec![MirStatement::Assign {
                             target: MirValue(2),
-                            rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(0), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Mul,
+                                left: MirValue(0),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         }],
                         terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
                     }],

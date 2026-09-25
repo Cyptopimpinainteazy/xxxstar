@@ -205,7 +205,13 @@ impl Pass for CopyPropagationPass {
                         let mut new_rhs = rhs.clone();
 
                         // Replace values in the RHS
-                        if let MirRhs::Binary(op, lhs, rhs_val) = rhs {
+                        if let MirRhs::Binary {
+                            op,
+                            left: lhs,
+                            right: rhs_val,
+                            float: false,
+                        } = rhs
+                        {
                             // Check for identity patterns first
                             if let Some(identity_operand) =
                                 self.is_identity(*op, *lhs, *rhs_val, &literals)
@@ -223,7 +229,12 @@ impl Pass for CopyPropagationPass {
                             let new_rhs_val = self.replace_value(*rhs_val, &copies);
 
                             if new_lhs != *lhs || new_rhs_val != *rhs_val {
-                                new_rhs = MirRhs::Binary(*op, new_lhs, new_rhs_val);
+                                new_rhs = MirRhs::Binary {
+                                    op: *op,
+                                    left: new_lhs,
+                                    right: new_rhs_val,
+                                    float: false,
+                                };
                                 iter_changes += 1;
                             }
                         } else if let MirRhs::Unary(op, arg) = rhs {

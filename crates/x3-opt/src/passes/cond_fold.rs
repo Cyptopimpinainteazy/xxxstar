@@ -219,7 +219,7 @@ fn collect_vars(func: &MirFunction) -> Vec<MirValue> {
                     MirRhs::Unary(_, operand) => {
                         vars.insert(*operand);
                     }
-                    MirRhs::Binary(_, left, right) => {
+                    MirRhs::Binary { left, right, .. } => {
                         vars.insert(*left);
                         vars.insert(*right);
                     }
@@ -295,7 +295,9 @@ fn evaluate_rhs(rhs: &MirRhs, env: &BTreeMap<MirValue, ConstVal>) -> ConstVal {
             Some(ConstVal::Overdefined) => ConstVal::Overdefined,
             _ => ConstVal::Unknown,
         },
-        MirRhs::Binary(op, left, right) => {
+        MirRhs::Binary {
+            op, left, right, ..
+        } => {
             let left_val = env.get(left).cloned().unwrap_or(ConstVal::Unknown);
             let right_val = env.get(right).cloned().unwrap_or(ConstVal::Unknown);
             match (left_val, right_val) {

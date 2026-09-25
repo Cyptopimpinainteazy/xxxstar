@@ -133,7 +133,7 @@ fn uses_of(stmt: &MirStatement) -> Vec<MirValue> {
         MirStatement::Assign { rhs, .. } => match rhs {
             MirRhs::Literal(_) => vec![],
             MirRhs::Unary(_, operand) => vec![*operand],
-            MirRhs::Binary(_, left, right) => vec![*left, *right],
+            MirRhs::Binary { left, right, .. } => vec![*left, *right],
             MirRhs::Call { args, .. } => args.clone(),
             MirRhs::Load { addr, .. } => vec![*addr],
             MirRhs::Store { addr, val, .. } => vec![*addr, *val],
@@ -245,7 +245,12 @@ mod tests {
                 1,
                 vec![MirStatement::Assign {
                     target: MirValue(1),
-                    rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(0)),
+                    rhs: MirRhs::Binary {
+                        op: BinaryOp::Add,
+                        left: MirValue(0),
+                        right: MirValue(0),
+                        float: false,
+                    },
                 }],
                 MirTerminator::Return(Some(MirValue(1))),
             ),
