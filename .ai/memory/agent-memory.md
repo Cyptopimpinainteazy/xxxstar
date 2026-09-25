@@ -7164,3 +7164,86 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - The isolated `--no-default-features` configuration is **not** the same as the runtime's WASM graph
   (which enables serde/alloc), so a crate failing the former can still build the latter — and vice
   versa: only srtool builds the thing governance attests to.
+
+## 2026-09-24 (thirty-ninth pass) — completion matrix, the live/cross tiers, and two silent divergences
+
+### Environment facts a future agent needs first
+- **The tool sandbox is broken in this session**: every `exec_command` fails with
+  `error building bubblewrap command: mountinfo path is not absolute`, and `apply_patch` fails the same
+  way. Workaround used here: pass `sandbox_permissions: "require_escalated"` with a short
+  `justification`, and edit files with assert-guarded Python replacement scripts that verify each
+  anchor before writing. Retry `apply_patch` once — it succeeded exactly once in this session, then
+  never again, so treat it as unavailable and do not build a plan that requires it.
+- Do **not** run `pkill -f "local-ci.sh ..."`: the pattern matches sibling agents' runs. It killed a
+  concurrent live-gate run mid-flight here. Kill by PID.
+- Two sessions running `cargo test --workspace` at once clobber each other's log if both redirect to
+  the same path; one agent's `tee /tmp/x3-ws-test.log` truncated this agent's log twice.
+- `origin/master` moved under this branch during the session: it is now `45f1c6935`, which *contains*
+  this branch (HEAD was an ancestor), so the branch is 35 commits behind its own merged work.
+  `scripts/auto-merge-prs.sh` (untracked) and a merge commit `9df36d188` are what did it.
+
+### Measured at HEAD, this session (all reproduced, not read from a report)
+- `cargo test --workspace --no-fail-fast` -> **6420 passed, 0 failed, 53 ignored**.
+- `bash scripts/local-ci.sh` (fast set) -> **35/35 PASS**, including the new `audit matrix freshness`.
+- The no_std gate is **green**, and `TICKET-109`'s "7 of 87 crates cannot build without default
+  features" is **stale**: the script now passes `--features alloc` for a crate that declares `alloc`
+  (x3-common declares it), and all 87 crates pass. Verified two ways here — 62 crates directly (the
+  half an earlier capture had truncated away) and the other 25 in the gate's own output.
+- `--live --cross` at `2b5a9ee15` -> 8 of 9 PASS, one **real failure**: `cross-domain EVM (strict
+  posture)`.
+
+### The two defects this session actually fixed
+- **A hardcoded SCALE pallet-error index had drifted** (`c1f2163e5`). `node/tests/x3vm_evm_live.rs`
+  asserted the strict posture refuses an unverified external bundle with `index: 31, error: [40, 0, 0, 0]`;
+  the runtime answered `[50, 0, 0, 0]`. The runtime was right: a pallet error's index is its position in
+  the pallet's `Error` enum, and the BTC-header + adaptor-signature variants landed above
+  `CrossDomainProofUnverified`, moving it 40 -> 50. The test's *comment* asserted 40 as a fact.
+  Fixed by deriving both halves (`Pallet::<Runtime>::index()` + the variant's `Encode`, **padded to the
+  4-byte `ModuleError` form** — a bare `encode()` of a unit variant prints `[50]`, which cost a
+  build-loop iteration). Gate: FAIL 620s -> PASS 223s.
+- **The two X3BC readers disagreed on string constants** (`a79b2d401`). `mini_x3` (the `no_std` reader
+  `pallets/x3-kernel` actually executes) read the length, skipped it, and pushed `Bytes(vec![])`, so a
+  compiled module with a string constant executed on chain with the empty value while the std reader
+  returned the real one; unknown constant tags also reported `UnexpectedEof` instead of a named error.
+  Now pinned by `crates/x3-integration/tests/bc_const_pool_parity.rs`, which drives both readers over
+  one writer-produced envelope. **The rest of the X3BC body (functions, globals, code) still has no
+  cross-reader parity test** — same class, still open.
+
+### Also landed
+- `7b776053d` + `7dc96d7c6`: the external-bridge launch flag contradicted the registry, and
+  `pallet-x3-settlement-engine`'s accept-all `NoOpCrossChainValidator` was compiled into every build
+  (now behind an off-by-default `dev-proofs`; every reference outside a test module was verified gone).
+- `ed95e7d2f`: `scripts/x3_audit_matrix.py` derives `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`,
+  `docs/audit/X3_AGENT_QUEUE.md` and `audit-artifacts/current/feature-status.json` from
+  `FEATURE_REGISTRY.toml` + `FEATURE_MATRIX.toml`, and local-ci gates their freshness.
+
+### Decisions worth keeping
+- **A generated artifact must be pinned to the sha256 of its sources, never to `HEAD`.** The first
+  version of the audit artifacts embedded the commit, so every commit made them stale — which is how a
+  freshness gate trains people to regenerate without reading. Commit-stamped copies belong in the
+  release-evidence bundle instead.
+- **Do not write a SCALE index, a pallet index or a module-error byte array into a test.** Derive them.
+  This is the same lesson as TICKET-108's hand-assembled fixtures, one layer up.
+- The queue's priority column is deliberately *not* the directive's P0-P4 call; it is a derived triage
+  hint, because turning "is this launch-blocking?" into a numeric rule is a guess. Say so in the artifact.
+
+### Blockers and open threats
+- **A bridge infrastructure API key was committed** by the import commits `3fdc95d6e` / `bb9610503`
+  and is still in git history. It was removed from the tree (`8182526e4`, now an
+  `os.environ["INFRASTRUCTURE_API_KEY"]` read that fails loudly), but removal does not revoke it:
+  **rotate the key**. This is the single most important loose end from this session.
+- RC6's public-testnet spec generation is still FAIL for the honest reason (needs operator keys that
+  may not be committed); bootnodes remain `PENDING`; the multi-validator blocker recorded against
+  almost every L1 row is untouched by this pass — the drills ran, but on one host.
+- `docs/reports/FEATURE_READINESS_MATRIX.md` (2026-06-10) still claims all five verifiers accept and
+  cites `crates/x3-verification-router/src/strategies/evm.rs`, which does not exist.
+
+### Next task seed
+1. Rotate the leaked infrastructure key and purge it from history (operator action, ticket it).
+2. Add parity tests for the remaining X3BC body sections (functions, globals, code) — the reader pair
+   that just diverged is the one the runtime uses.
+3. `X3-LANG-001` / `MTX-X3-LANG-004`: real `.x3` source -> receipt end-to-end, and compiled bytecode
+   driving `X3AtomicKernel`; both are still STUB in the queue.
+4. Run `scripts/local-ci.sh --failure` and `--testnet` at the current commit and record them; the
+   queue's most repeated blocker is "never exercised on a multi-validator network".
+5. Re-run `x3_audit_matrix.py` after any `FEATURE_REGISTRY.toml`/matrix edit — the gate will tell you.
