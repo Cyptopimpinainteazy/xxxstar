@@ -171,6 +171,16 @@ bytes**:
   `mini_evm::execute_evm`, which had no test at all, now has 13 unit tests plus five across the two
   `tests/` files that had been disabled by `#![cfg(any())]`. The bytes move: compact 8,506,569 bytes
   (was 8,501,495), compressed 1,463,589 (was 1,461,704). Two from-scratch builds agree.
+* `971ae2908` — the X3 executor's gas limit is enforced, and the two bytecode readers stop
+  allocating from the module. `X3Executor::execute` built its VM with `VM::from_bytes`, which uses
+  `VMConfig::default()`, so the gas limit, call depth and stack size in `X3ExecutorConfig` were
+  discarded: a measured 100-gas limit admitted a 2,000-instruction program. Separately,
+  `mini_x3` (the reader `pallets/x3-kernel` executes on chain) and `x3-backend` both did
+  `Vec::with_capacity(count)` on a count read straight out of the module, so `const_count =
+  0xFF00_0001` asked for 95 GB — the on-chain one aborted with "memory allocation of
+  102676561944 bytes failed". Both are bounded by the remaining input now. The bytes move:
+  compact 8,506,628 bytes (was 8,506,569), compressed 1,463,682 (was 1,463,589). Two
+  from-scratch builds agree.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that

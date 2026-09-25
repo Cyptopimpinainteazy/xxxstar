@@ -5,25 +5,25 @@
   "srtool": "0.18.4",
   "rustc": "1.93.0",
   "recorded_at": "2026-09-25",
-  "recorded_revision": "6b3e241eb",
+  "recorded_revision": "971ae2908",
   "runtime_version": "x3-chain-20 (x3-chain-1.tx1.au1)",
   "metadata": "V14",
   "runtimes": {
     "compact": {
-      "size": "8506569",
-      "set_code": "0x7d6a0d903b11265ec58c05c271962cbdfad3fa3235886fcffeaa61871cda4795",
-      "authorize_upgrade": "0xb4ed994e4ab42133b239b61b5a0473a0c214448ffd2ade7313861577441f3261",
-      "ipfs": "QmYPptQEcP1G7wp7bfM5Lt83QrHpi89UauUV8UbnTWhq2w",
-      "blake2_256": "0x397cc7cdff892cfe9337e97ac1953ca2d3e03fa1f8d4220bcbefa390f82b586b",
+      "size": "8506628",
+      "set_code": "0x8392d8030680b6a2465d449283347c3c93bc5b3b9b6fe2362a85bb0eee5dfe5a",
+      "authorize_upgrade": "0xd13d56ae51d0c66c337bea5f9e449fd68efa7f4712d55c702845ec9533214e68",
+      "ipfs": "Qmas4zqfByctzaqvFWf9tQbbFDhCpuzouEskDqH1Y5YwKh",
+      "blake2_256": "0xc87522ba7805f283fbdfd2f8593382adc77d71fb9f56079deee7b083056a5ae8",
       "version": "x3-chain-20 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     },
     "compressed": {
-      "size": "1463589",
-      "set_code": "0x61d108d9e76640c8c1b9f31ec9ffc607fea73e7703cebb48e1bc927eb9996cd4",
-      "authorize_upgrade": "0x5e96019fab76efbfe91681f1950c4002ed008b652bde39d0c21e2b6b163f546b",
-      "ipfs": "Qmdp7s1mi779kNJ77Wm5C9qX1U4juF9wWfvvKhjYAt8DkC",
-      "blake2_256": "0x1b962dade1014de458f8a6c0d6cb6661363c70cb58537558134bcc2403d77da8",
+      "size": "1463682",
+      "set_code": "0xedb8c8e221b92ef187142b654724a10a98a01ea6842102ba924dd0f241e13ad5",
+      "authorize_upgrade": "0x2e68c75df10b4d04c1433921a156c1bc590f276f767127eed89f7a95e9a96620",
+      "ipfs": "QmSCzyRfNiiDuZyFCDnK9A9PypFu8GQgJhwk985rY7oRw6",
+      "blake2_256": "0x384880a60591784475d12fc5a10be74dcd0056442ba5681604e4fa8d62473a8a",
       "version": "x3-chain-20 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     }
