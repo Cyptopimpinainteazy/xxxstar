@@ -1,0 +1,43 @@
+# Fuzz targets that are placeholders rather than fuzzers.
+#
+# A target is listed here when it contains `TODO` — this repository's own marker for unfinished
+# work — or when its `fuzz/Cargo.toml` does not exist, which makes it unbuildable by
+# construction. `scripts/check-fuzz-targets.py` reads this file and fails when a target that is
+# not listed becomes a placeholder, or when a listed one is fixed or removed (so the file cannot
+# describe a tree that no longer exists).
+#
+# The list may only shrink. It does NOT mean the other targets are good: it means they do not
+# carry the marker. See .ai/reports/fuzz-suite-20260925.md for what the suite actually is.
+
+crates/x3-intent/fuzz/fuzz_targets/intent_decode.rs
+crates/x3-proof/fuzz/fuzz_targets/bridge_proof_verify.rs
+pallets/agent-accounts/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/agent-memory/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/atomic-trade-engine/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/cross-chain-validator/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/depin-marketplace/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/evolution-core/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/fraud-proofs/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/governance/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/meme-overlord/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/private-execution/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/svm-runtime/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/swarm/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/treasury/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-account-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-asset-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-automation/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-coin/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-da/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-domain-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-invariants/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-inventory/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-jury-anchor/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-kernel/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-reservation/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-sequencer/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-slash/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-solvency/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-token-factory/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-verifier/fuzz/fuzz_targets/fuzz_codec_parsing.rs
+pallets/x3-wallet-pallet/fuzz/fuzz_targets/fuzz_codec_parsing.rs

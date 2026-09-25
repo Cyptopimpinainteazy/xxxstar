@@ -311,6 +311,13 @@ GATES_FAST=(
   # `tests/wire_format_robustness.rs` (truncations, single-byte mutations, each header gate, and a
   # payload claiming a four-billion-element vector) run in under a second.
   "test x3-packet-schema:cargo test -p x3-packet-schema"
+  # The fuzz suite is nominal and unbuildable: 48 tracked targets, 32 of them carrying this
+  # repository's own `TODO` marker or living in a directory with no `fuzz/Cargo.toml` at all, and
+  # none that calls a decoder — measured in `.ai/reports/fuzz-suite-20260925.md`. A gate that failed
+  # on all 32 would be a gate that cannot be shipped, so this one is a ratchet: it fails when a
+  # target that is not on `security/fuzz-placeholder-baseline.txt` becomes a placeholder, and when a
+  # listed one is fixed. The list may only shrink.
+  "fuzz targets:python3 scripts/check-fuzz-targets.py"
   # `x3-cross-vm-bridge` holds the Merkle proof validator the bridge settles against, and like the
   # packet schema above it was reachable only through `test workspace` under `--deep`. Its 152 tests
   # include the Merkle-proof guards (`test_verify_empty_merkle_proof`,
