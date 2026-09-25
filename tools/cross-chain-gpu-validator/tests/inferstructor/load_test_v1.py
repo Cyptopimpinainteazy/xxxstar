@@ -4,6 +4,7 @@ GPU Acceleration Load Testing
 Ramps from 1K → 5K → 10K → 15K... until peak performance is found
 """
 
+import os
 import asyncio
 import aiohttp
 import time
@@ -14,7 +15,7 @@ import json
 
 # Configuration
 BRIDGE_URL = "http://localhost:9999/accelerate"
-API_KEY = "infra_3JDGhaxUOfLfyuFk-roJiR3FzgdgcipAH3vG5wpMzDo"
+API_KEY = os.environ["INFRASTRUCTURE_API_KEY"]
 CHAIN = "solana"
 
 # Load test progression

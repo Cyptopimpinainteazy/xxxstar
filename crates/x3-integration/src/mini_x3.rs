@@ -45,6 +45,9 @@ pub enum X3Error {
         found: u32,
     },
     UnexpectedEof,
+    /// A constant-pool entry declares a tag this loader does not know. The body is
+    /// malformed rather than truncated, and the module must not be executed.
+    InvalidConstTag(u8),
     InvalidOpcode(u8),
     DivisionByZero,
     GasExhausted,
@@ -273,9 +276,15 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
             0 => MiniConst::Integer(r.read_i64()?),
             1 => MiniConst::Float(r.read_f64()?),
             2 => {
+                // A string and a byte blob are both a length-prefixed byte run; tag 2 only
+                // promises the payload is UTF-8 text. This arm used to `skip` the payload and
+                // push an empty `Vec`, so every string constant executed as the empty value
+                // while `x3-backend` (std) handed the same module the real string. The payload
+                // is kept as bytes: `MiniValue` has no separate string case, and keeping it
+                // lossless costs nothing here.
                 let len = r.read_u32()? as usize;
-                r.skip(len)?;
-                MiniConst::Bytes(vec![])
+                let text = r.read_bytes(len)?;
+                MiniConst::Bytes(text)
             }
             3 => MiniConst::Bool(r.read_u8()? != 0),
             4 => {
@@ -283,7 +292,9 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
                 let b = r.read_bytes(len)?;
                 MiniConst::Bytes(b)
             }
-            _ => return Err(X3Error::UnexpectedEof),
+            // An unknown tag is a malformed body, not a truncated one; reporting EOF here sent
+            // callers looking for a byte that was never missing.
+            other => return Err(X3Error::InvalidConstTag(other)),
         };
         const_pool.push(c);
     }

@@ -24,7 +24,18 @@ IGNORE_PREFIXES = (
     "tests/phase_core/security/lib/forge-std/",
 )
 TEST_EXT = {".py", ".rs", ".ts", ".tsx", ".js"}
-SKIP_PATTERNS = [r"\.skip\(", r"pytest\.mark\.skip", r"#\[ignore\]", r"describe\.skip", r"xit\("]
+SKIP_PATTERNS = [
+    r"\.skip\(",
+    r"pytest\.mark\.skip",
+    r"#\[ignore\]",
+    r"describe\.skip",
+    # Jasmine's "x it". The bare `xit\(` this replaced also matched `sys.exit(main())`
+    # and `sys.exit(0)`, because an unanchored regex finds `xit(` inside `exit(` - so every
+    # Python script that exits through `sys.exit` was reported as a skipped test. The
+    # lookbehind keeps the real pattern (a standalone `xit(` call) and drops the false one:
+    # a preceding word character or a dot means this is `exit(`, not `xit(`.
+    r"(?<![\w.])xit\(",
+]
 WEAK_PATTERNS = [r"assert\s+true", r"assert\(true\)"]
 MAX_FILE_BYTES = 1_000_000
 
