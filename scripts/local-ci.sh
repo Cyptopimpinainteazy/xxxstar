@@ -235,6 +235,14 @@ GATES_FAST=(
   # file, line and pattern only — never the matched value, which would leak it into the CI log.
   "provider secret guard:bash scripts/check-no-provider-secrets.sh"
   "feature matrix check:python3 scripts/feature_matrix.py check"
+  # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
+  # `audit-artifacts/current/feature-status.json` are *derived* from FEATURE_REGISTRY.toml and
+  # FEATURE_MATRIX.toml by `scripts/x3_audit_matrix.py`. A derived readiness table that a human
+  # edits by hand is the shape of claim this repository keeps finding months later, so the
+  # generator gets a freshness gate next to the manifest it reads, exactly like the feature
+  # matrix above. The artifacts say what is unfinished; this keeps them from saying something
+  # the sources do not.
+  "audit matrix freshness:python3 scripts/x3_audit_matrix.py --check"
   # `make mainnet-check` stage 6b rebuilds the runtime and fails when it no
   # longer matches `docs/reports/runtime-wasm-hashes.json`. That is ten minutes
   # into a release, and runtime changes have landed without the record three
