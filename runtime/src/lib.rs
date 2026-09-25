@@ -3354,9 +3354,16 @@ mod benches {
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
     #[allow(unused_imports)]
     use pallet_x3_slash::Pallet as X3Slash;
+    // Added 2026-09-25: `pallet-x3-kernel`'s benchmark module compiles and its `submit_comit_v2`
+    // entry was a hand-written placeholder ("same base weight as submit_comit until benchmarks are
+    // re-run") that nothing could re-run, because the pallet was not registered here — the CLI
+    // answered "No benchmarks found which match your input".
+    #[allow(unused_imports)]
+    use pallet_x3_kernel::Pallet as AtlasKernel;
 
     frame_benchmarking::define_benchmarks!(
         [pallet_x3_atomic_kernel, X3AtomicKernel]
+        [pallet_x3_kernel, AtlasKernel]
         [pallet_x3_settlement_engine, X3SettlementEngine]
         [pallet_cross_chain_validator, CrossChainValidator]
         [pallet_x3_slash, X3Slash]

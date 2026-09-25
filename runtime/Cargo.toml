@@ -322,6 +322,45 @@ runtime-benchmarks = [
 	"pallet-x3-settlement-engine/runtime-benchmarks",
 	"pallet-cross-chain-validator/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+	# Measured 2026-09-25: 37 of the 52 runtime dependencies that declare a `runtime-benchmarks`
+	# feature compile with it on, and 15 do not — their benchmark modules have **never been
+	# compiled** (that cfg was enabled for none of them). Excluded here with their first error, so
+	# `--features runtime-benchmarks` builds for the rest: pallet-x3-coin (E0433 `std`),
+	# pallet-treasury (E0412 `BalanceOf`), pallet-depin-marketplace (E0599 `MinProviderStake::get`),
+	# pallet-private-execution (parse error), pallet-x3-automation (E0433 `std`),
+	# pallet-x3-oracle (missing `impl_test_function`), pallet-x3-agent-registry
+	# (`Balance::max_value`), pallet-x3-proof-carrying-agent (no `Config::RuntimeEvent`),
+	# pallet-x3-solvency / pallet-x3-reservation / pallet-x3-rebalance / pallet-x3-partner /
+	# pallet-x3-treasury-policy (E0046 `try_successful_origin`, the same one-line gap that made
+	# this build fail at pallet-x3-custody), pallet-x3-wallet-pallet and pallet-svm-runtime
+	# (not root-workspace packages: they need `--manifest-path`). Worst first: 14 of the 15 are
+	# real code, one is a command-line form, and the pattern is that nothing ever compiled them.
+	# Forwarded 2026-09-25: each of these declared a `runtime-benchmarks` feature that the
+	# runtime did not enable, so `cargo build --release --features runtime-benchmarks` failed with
+	# E0046 at the first one (`pallet-x3-custody`'s `EnsureOrigin`, whose benchmark-only
+	# `try_successful_origin` is behind that cfg) and the repo's own weight-regeneration command
+	# could not run. A pallet absent from this list is a pallet whose benchmarks are not compiled.
+	"pallet-meme-overlord/runtime-benchmarks",
+	"pallet-northern-swarm/runtime-benchmarks",
+	"pallet-x3-agent-law/runtime-benchmarks",
+	"pallet-x3-auction/runtime-benchmarks",
+	"pallet-x3-compute-market/runtime-benchmarks",
+	"pallet-x3-consensus/runtime-benchmarks",
+	"pallet-x3-cross-vm-router/runtime-benchmarks",
+	"pallet-x3-crosschain-gateway/runtime-benchmarks",
+	"pallet-x3-custody/runtime-benchmarks",
+	"pallet-x3-da/runtime-benchmarks",
+	"pallet-x3-dapp-hub/runtime-benchmarks",
+	"pallet-x3-dex/runtime-benchmarks",
+	"pallet-x3-flashloan/runtime-benchmarks",
+	"pallet-x3-inventory/runtime-benchmarks",
+	"pallet-x3-jury-anchor/runtime-benchmarks",
+	"pallet-x3-launchpad/runtime-benchmarks",
+	"pallet-x3-reconciliation/runtime-benchmarks",
+	"pallet-x3-sentinel/runtime-benchmarks",
+	"pallet-x3-sequencer/runtime-benchmarks",
+	"pallet-x3-token-factory/runtime-benchmarks",
+	"pallet-x3-wrapped/runtime-benchmarks",
 ]
 
 native = []
