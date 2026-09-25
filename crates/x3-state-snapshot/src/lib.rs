@@ -1224,10 +1224,7 @@ pub fn restore_snapshot(
     };
     for (key, value) in [
         ("x3SnapshotChainId", provenance.chain_id.clone()),
-        (
-            "x3SnapshotBlockNumber",
-            provenance.block_number.to_string(),
-        ),
+        ("x3SnapshotBlockNumber", provenance.block_number.to_string()),
         ("x3SnapshotBlockHash", provenance.block_hash.clone()),
         ("x3SnapshotStateRoot", provenance.state_root.clone()),
         (
@@ -1236,7 +1233,10 @@ pub fn restore_snapshot(
         ),
         ("x3SnapshotManifestHash", provenance.manifest_hash.clone()),
         ("x3SnapshotChunkCount", provenance.chunk_count.to_string()),
-        ("x3SnapshotStateEntries", provenance.state_entries.to_string()),
+        (
+            "x3SnapshotStateEntries",
+            provenance.state_entries.to_string(),
+        ),
         ("x3SnapshotTrieLayout", provenance.trie_layout.clone()),
     ] {
         properties.insert(key.to_string(), serde_json::Value::String(value));

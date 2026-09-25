@@ -808,7 +808,10 @@ fn a_restored_spec_reproduces_exactly_the_state_that_was_verified() {
     assert_eq!(provenance.state_entries, entries.len() as u64);
     assert_eq!(provenance.chunk_count, manifest.chunk_count);
     assert_eq!(provenance.block_hash, BLOCK_HASH);
-    assert_eq!(provenance.manifest_hash, manifest_hash(&manifest).expect("hash"));
+    assert_eq!(
+        provenance.manifest_hash,
+        manifest_hash(&manifest).expect("hash")
+    );
 
     // Read it back through the reader the exporter uses, and hash it again: the
     // spec handed to the operator is the state the snapshot verified.
@@ -999,5 +1002,8 @@ fn a_template_contributes_metadata_but_never_state() {
     // The template's state is gone; only the snapshot's entries remain.
     let top = top_of(&spec);
     assert_eq!(top.as_object().expect("top").len(), entries.len());
-    assert!(top.get("0xdead").is_none(), "template state must be replaced");
+    assert!(
+        top.get("0xdead").is_none(),
+        "template state must be replaced"
+    );
 }

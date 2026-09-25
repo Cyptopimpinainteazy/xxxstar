@@ -621,7 +621,10 @@ fn runtime_api_works() {
         assert_eq!(X3Coin::get_total_supply(), 8_888_888_888_000_000_000_000);
 
         // Test treasury balance
-        assert_eq!(X3Coin::get_treasury_balance(), 2_222_222_222_000_000_000_000);
+        assert_eq!(
+            X3Coin::get_treasury_balance(),
+            2_222_222_222_000_000_000_000
+        );
 
         // Test bonus pool balance
         assert_eq!(

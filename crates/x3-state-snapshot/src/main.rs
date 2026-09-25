@@ -39,9 +39,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use x3_state_snapshot::{
-    compute_state_root, manifest_hash, state_entries_from_raw_spec,
-    restore_snapshot, verify_snapshot_with_state_root, write_snapshot, RestoreRequest,
-    SnapshotBuilder, SnapshotManifest, TrieVersion, TrustedAnchor,
+    compute_state_root, manifest_hash, restore_snapshot, state_entries_from_raw_spec,
+    verify_snapshot_with_state_root, write_snapshot, RestoreRequest, SnapshotBuilder,
+    SnapshotManifest, TrieVersion, TrustedAnchor,
 };
 
 /// Default chunk size for a freshly built snapshot (4 MiB).
@@ -516,7 +516,11 @@ fn write_spec_atomically(path: &Path, spec: &serde_json::Value, force: bool) -> 
         .map_err(|err| format!("cannot write {}: {err}", partial.display()))?;
     std::fs::rename(&partial, path).map_err(|err| {
         let _ = std::fs::remove_file(&partial);
-        format!("cannot move {} to {}: {err}", partial.display(), path.display())
+        format!(
+            "cannot move {} to {}: {err}",
+            partial.display(),
+            path.display()
+        )
     })
 }
 
@@ -539,20 +543,19 @@ fn restore(args: &[String]) -> ExitCode {
     // Unlike `verify`, restore has no self-consistency-only mode: the bytes it
     // produces become a validator's database, so the chain, block, root and
     // runtime all have to come from consensus rather than from the snapshot.
-    let (chain_id, block_hash, state_root, runtime_version) = match (
-        parsed.chain_id.as_deref(),
-        parsed.block_hash.as_deref(),
-        parsed.state_root.as_deref(),
-        parsed.runtime_version,
-    ) {
-        (Some(chain), Some(block), Some(root), Some(version)) => (chain, block, root, version),
-        _ => {
-            return fail_usage(
+    let (chain_id, block_hash, state_root, runtime_version) =
+        match (
+            parsed.chain_id.as_deref(),
+            parsed.block_hash.as_deref(),
+            parsed.state_root.as_deref(),
+            parsed.runtime_version,
+        ) {
+            (Some(chain), Some(block), Some(root), Some(version)) => (chain, block, root, version),
+            _ => return fail_usage(
                 "restore needs --chain-id, --block-hash, --state-root and --runtime-version; a \
                  restore that cannot name the block it is rebuilding is not a restore",
-            )
-        }
-    };
+            ),
+        };
 
     let manifest = match load_manifest(manifest_path) {
         Ok(manifest) => manifest,
@@ -613,7 +616,10 @@ fn restore(args: &[String]) -> ExitCode {
             .name
             .clone()
             .unwrap_or_else(|| format!("X3 restored state at block {}", manifest.block_number)),
-        spec_id: parsed.id.clone().unwrap_or_else(|| manifest.chain_id.clone()),
+        spec_id: parsed
+            .id
+            .clone()
+            .unwrap_or_else(|| manifest.chain_id.clone()),
         template: template.as_ref(),
     };
 
@@ -644,7 +650,10 @@ fn restore(args: &[String]) -> ExitCode {
         provenance.trie_layout
     );
     println!("  block hash  {}", provenance.block_hash);
-    println!("  state root  {} (recomputed from the snapshot's own bytes)", provenance.state_root);
+    println!(
+        "  state root  {} (recomputed from the snapshot's own bytes)",
+        provenance.state_root
+    );
     println!("  manifest    {}", provenance.manifest_hash);
     println!(
         "  boot a node with `--chain {}` to build a database from this state",
