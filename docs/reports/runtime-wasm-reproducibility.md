@@ -189,6 +189,16 @@ bytes**:
   validates can no longer be refused at execution for a reason validation could have seen. The
   bytes move: compact 8,506,630 bytes (was 8,506,628), compressed 1,463,693 (was 1,463,682). Two
   from-scratch builds agree.
+* `a7ff06572` — the runtime's build script stops embedding a WASM blob from another feature set.
+  `substrate-wasm-builder` decides freshness from source timestamps and this crate's feature set is
+  not a source file, so a blob built with `runtime-benchmarks` survived a build without it and the
+  node embedded a runtime whose host functions it does not provide — `target/release/x3-chain-node`
+  could not start, on any `--chain`. The build script now reads its feature sidecar *before* the
+  build as well, and removes the stale outputs so the builder has to produce one for this feature
+  set. **The bytes do not move**: the new code runs only on the host path (`TARGET` is
+  `wasm32-unknown-unknown` inside the WASM build, where the script returns early), so this is a
+  revision-only record. compact 8,506,630 bytes, compressed 1,463,693, unchanged. Two from-scratch
+  builds agree.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
