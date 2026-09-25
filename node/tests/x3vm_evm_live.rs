@@ -1077,11 +1077,13 @@ fn real_evm_receipt_proof_is_accepted_against_the_attested_header() {
         assert_x3_dispatch_succeeded(&alice, &early_block, &early_signed);
     } else {
         let early_error = x3_dispatch_error(&alice, &early_block, &early_signed);
-        // Pallet 31 is the settlement engine, and its error index 40 is
-        // `CrossDomainProofUnverified` (the runtime carries no error messages, so
-        // the code is what identifies it).
+        // The runtime carries no error messages, so the encoded variant is what
+        // identifies the reason — read off the pallet rather than written down.
+        let unverified = settlement_error_text(
+            pallet_x3_settlement_engine::Error::<x3_chain_runtime::Runtime>::CrossDomainProofUnverified,
+        );
         assert!(
-            early_error.contains("index: 31, error: [40, 0, 0, 0]"),
+            early_error.contains(&unverified),
             "under the strict posture a bundle for an external domain with no verified \
              proof must be refused by `CrossDomainProofUnverified`, got: {early_error}"
         );
@@ -1124,8 +1126,11 @@ fn real_evm_receipt_proof_is_accepted_against_the_attested_header() {
         assert_x3_dispatch_succeeded(&alice, &wrong_block, &wrong_signed);
     } else {
         let wrong_error = x3_dispatch_error(&alice, &wrong_block, &wrong_signed);
+        let unverified = settlement_error_text(
+            pallet_x3_settlement_engine::Error::<x3_chain_runtime::Runtime>::CrossDomainProofUnverified,
+        );
         assert!(
-            wrong_error.contains("index: 31, error: [40, 0, 0, 0]"),
+            wrong_error.contains(&unverified),
             "the bundle's tx_id has to be the identity submit_proof recorded (the receipt \
              hash): naming the transaction hash leaves the bundle unverified, got: {wrong_error}"
         );
@@ -1149,6 +1154,33 @@ fn real_evm_receipt_proof_is_accepted_against_the_attested_header() {
 }
 
 /// The dispatch error of a finalized extrinsic, as text.
+/// The exact `ModuleError` text the runtime renders for a settlement-engine error.
+///
+/// Both halves are derived from the pallet rather than written down. A pallet error's
+/// index is its position in the `Error` enum, so a literal rots the moment a variant is
+/// inserted above it: this file asserted `index: 31, error: [40, 0, 0, 0]` for
+/// `CrossDomainProofUnverified` after the BTC-header and adaptor-signature variants had
+/// moved that variant to 50, which made the strict-posture test report a failure against
+/// a runtime that was answering exactly as intended. Deriving the index from
+/// `PalletInfoAccess` and the bytes from the variant's own `Encode` removes the constant
+/// instead of re-typing it, and the assertion still fails if the runtime refuses for any
+/// other reason.
+fn settlement_error_text(
+    error: pallet_x3_settlement_engine::Error<x3_chain_runtime::Runtime>,
+) -> String {
+    use frame_support::traits::PalletInfoAccess;
+    // `ModuleError` carries the error as a fixed `[u8; 4]`, the encoded variant padded
+    // with zeros, which is what the RPC renders. A bare `encode()` is one byte long for a
+    // unit variant and prints `[50]`, so the padding is part of matching the text.
+    let mut bytes = error.encode();
+    bytes.resize(4, 0);
+    format!(
+        "index: {}, error: {:?}",
+        pallet_x3_settlement_engine::Pallet::<x3_chain_runtime::Runtime>::index(),
+        bytes
+    )
+}
+
 fn x3_dispatch_error(signer: &X3RuntimeSigner, block_hash: &str, signed: &str) -> String {
     let mut rpc = RpcClient::new(X3_RPC.into(), 0);
     let index = x3_extrinsic_index_in_block(&mut rpc, block_hash, signed)
