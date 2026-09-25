@@ -8012,3 +8012,44 @@ decision needs.
    argument in both directions).
 2. Resolve the orphan tree, which would empty the baseline entirely.
 3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
+
+## 2026-09-25 (forty-ninth pass) — the last ungated registry entry, and a comment that contradicted itself
+
+### What closed
+- **`x3_htlc` was not a deletion decision and not a pointer move — it was a missing gate.** The tree is
+  a member of the nested `X3-contracts/svm` workspace (its own `Cargo.toml`/`Anchor.toml` list it), and
+  nothing in the *root* repository calls it. Its seven unit tests now run under `test x3-htlc`:
+  `CARGO_TARGET_DIR=/tmp/x3-nested-x3-htlc cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc`
+  (48s cold, 7 tests). The separate target dir is the same reason `nested workspaces` names one.
+- **The registry comment about that row contradicted itself, and both halves were wrong.**
+  `FEATURE_REGISTRY.toml` said "no script, workflow or crate in the repo builds or runs" the tree, then
+  cited `173fcec2b made it CI-enforced via .github/workflows/svm-htlc.yml`. That workflow is not in this
+  tree — it lived on the unmerged `fix/svm-htlc-native-custody-master` branch (see
+  `.ai/runlogs/repo-consolidation-20260917_inventory.log`) — and the tests were running nowhere locally
+  either. The workflow that *does* exist, `.github/workflows/x3vm-svm-live-lifecycle.yml`, gates the live
+  `programs/svm/x3_atomic_swap` program. The comment now states the measured facts, including that this
+  tree still has no localnet lifecycle of its own.
+- **The checker learned the nested-workspace form**: a `cargo test` whose `--manifest-path` is the
+  directory or one of its ancestors, selecting that package with `-p` — with the ancestor check so a
+  same-named package in another workspace cannot count. `KNOWN_UNGATED` is now **empty** and says it
+  must stay empty.
+
+### Measured at `e249e8b26`
+- `bash scripts/local-ci.sh` -> **50 of 50 gates PASS**. The gate count went 34 -> 50 across this
+  session's work (kernel, supply-ledger, router, registry, x3-integration, runtime, dex, lp-locker,
+  token-factory, sentinel, wallet, wrapped, atomic-trade-engine, x3-bench, x3-htlc, plus the checker).
+- `registry tests are gated`: 17 registry features cite a crate a gate tests, **0** ungated, 1 lists no
+  test names (`x3_swarm_core`, whose previously-claimed tests the registry records as fictional), 3 are
+  not cargo crates (two shell gates and the Tauri app).
+
+### Still open
+1. `submit_comit_v2`'s benchmark re-run — the last locally-actionable item on X3-LANG-004.
+2. `test workspace` (green, 632s) is still opt-in; the promotion decision needs a number, and it has one.
+3. Live-chain upgrade rehearsal (needs a release build + subxt); external-bridge half of X3-XVM-002 and
+   concurrent multi-validator traffic; rotate the bridge API key in git history.
+
+### Next task seed
+1. Re-run `submit_comit_v2`'s benchmark, or record the decision not to (weights regenerated on a
+   non-reference host are a real argument in both directions) — either way it stops being an open
+   question.
+2. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
