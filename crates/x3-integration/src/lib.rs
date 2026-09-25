@@ -50,9 +50,6 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::{string::String, vec, vec::Vec};
-
 pub mod error;
 pub mod executor;
 pub mod hostcalls;
@@ -60,6 +57,12 @@ pub mod mini_x3;
 pub mod types;
 
 #[cfg(feature = "compile")]
+// The bridge compiles `.x3` source, and the compiler is a `std` dependency of this crate (see the
+// `std` feature in Cargo.toml). Declared unconditionally, the module's `use x3_compiler::...` was an
+// unresolved import in the `no_std` build, so the crate the kernel adapters link could not be built
+// for the runtime at all: `cargo check -p x3-x3-integration --no-default-features` failed with
+// E0432 on master. The rest of the crate — the decoder and both executors — is `no_std`.
+#[cfg(feature = "std")]
 pub mod compiler_bridge;
 
 pub use error::{X3IntegrationError, X3Result};

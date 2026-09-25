@@ -352,6 +352,12 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
 pub struct X3ExecResult {
     pub return_val: MiniValue,
     pub gas_used: u64,
+    /// Instructions executed.
+    ///
+    /// This interpreter charges one gas per instruction, so a receipt built from `gas_used` looked
+    /// plausible while reporting a gas figure under an instruction name; the two are counted
+    /// separately now (TICKET-130).
+    pub instructions_executed: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -374,6 +380,8 @@ struct Vm<'m> {
     call_stack: Vec<CallFrame>,
     globals: Vec<MiniValue>,
     gas_used: u64,
+    /// Instructions executed, counted next to gas rather than inferred from it.
+    instructions_executed: u64,
     gas_limit: u64,
 }
 
@@ -403,6 +411,7 @@ impl<'m> Vm<'m> {
             call_stack: Vec::with_capacity(MAX_DEPTH),
             globals,
             gas_used: 0,
+            instructions_executed: 0,
             gas_limit,
         }
     }
@@ -451,6 +460,7 @@ impl<'m> Vm<'m> {
 
             let op = self.module.code[ip];
             self.gas_used += 1;
+            self.instructions_executed += 1;
 
             let step = self.exec(op, ip)?;
 
@@ -1226,6 +1236,7 @@ pub fn execute_x3bc(payload: &[u8], gas_limit: u64) -> Result<X3ExecResult, X3Er
     Ok(X3ExecResult {
         return_val: ret.unwrap_or(MiniValue::Unit),
         gas_used: vm.gas_used,
+        instructions_executed: vm.instructions_executed,
     })
 }
 

@@ -298,6 +298,15 @@ impl VM {
         self.gas_used
     }
 
+    /// Instructions executed so far.
+    ///
+    /// `ExecutionResult` carries this for a completed call; the accessor is for the paths that
+    /// return an error, where the receipt still has to report the work that did happen rather than
+    /// zero (TICKET-130).
+    pub fn instruction_count(&self) -> u64 {
+        self.instruction_count
+    }
+
     /// Set a register value directly.
     ///
     /// Useful for testing or pre-initializing registers before execution.

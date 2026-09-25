@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `a3fcf8f35283c5fd…` — the artifacts move when
+Source digest: `35c8e14e2a21f160…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -137,7 +137,7 @@ fails when they do not match.
 | MTX-X3-GPU-015 | gpu_performance | Benchmark regression CI gate: Need benchmark corpus tied to launch SLOs | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 75% (no named test list on this row) | open |
 | MTX-X3-GPU-016 | gpu_performance | GPU Blake2b batching: No verified accelerator kernel | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | STUB · tested score 10% (no named test list on this row) | open |
 | MTX-X3-GPU-017 | gpu_performance | GPU Merkle-root acceleration: No verified accelerator kernel | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | STUB · tested score 10% (no named test list on this row) | open |
-| MTX-X3-LANG-001 | language_trading | Compile→encode→decode→execute→receipt E2E: Genuine E2E test still required | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 10% (no named test list on this row) | open |
+| MTX-X3-LANG-001 | language_trading | Compile→encode→decode→execute→receipt E2E: The E2E path is proven for the operand kinds the sweep covers; the compiler's remaining shapes (loops, match, floats, strings, host calls) are not in it, and the optimizer is order-sensitive: moving the entry function in front of it made fo… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 55% (no named test list on this row) | open |
 | MTX-X3-LANG-002 | language_trading | Economic replay validation in receipts: Receipts need replay-economic validation | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 15% (no named test list on this row) | open |
 | MTX-X3-LANG-003 | language_trading | Signed / attested trading receipts: Receipt signatures/attestations incomplete | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 15% (no named test list on this row) | open |
 | MTX-X3-LANG-004 | language_trading | Bytecode routing to atomic kernel: No test drives a compiled program's call into the atomic kernel: the bridge proves compile → runtime-loadable bytecode, and the route from there to `X3AtomicKernel` is the open half | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 20% (no named test list on this row) | open |

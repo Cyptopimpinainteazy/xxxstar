@@ -41,6 +41,9 @@ pub struct BytecodeEmitter {
     current_span: Option<Span>,
     /// Source map entries (code_offset, line, column).
     source_map: Vec<(u32, u16, u16)>,
+    /// The first register that does not fit in the one byte the format gives a register operand.
+    /// Latched by `emit_reg` and reported by `finalize`, rather than truncated.
+    register_overflow: Option<u16>,
 }
 
 impl BytecodeEmitter {
@@ -53,6 +56,7 @@ impl BytecodeEmitter {
             next_label: 0,
             current_span: None,
             source_map: Vec::new(),
+            register_overflow: None,
         }
     }
 
@@ -112,6 +116,15 @@ impl BytecodeEmitter {
             self.code[fwd.patch_offset + 3] = target_bytes[3];
         }
         self.forward_refs.clear();
+        if let Some(reg) = self.register_overflow {
+            return Err(BackendError::new(
+                BackendErrorKind::RegisterOverflow {
+                    max: u8::MAX as u16,
+                },
+                self.current_span.unwrap_or_else(Span::dummy),
+            ));
+        }
+
         Ok(())
     }
 
@@ -135,8 +148,26 @@ impl BytecodeEmitter {
         self.code.push(value as u8);
     }
 
+    /// Emit a register operand — **one byte**, the width the runtime reads.
+    ///
+    /// This wrote `reg.0` as a `u16` (two bytes) while both readers of the format take one byte:
+    /// the interpreter decodes `[op][dst:u8][...]` (`crates/x3-vm/src/vm.rs`) and the verifier's
+    /// operand table is documented as `[op][dst:u8]` (`crates/x3-vm/src/verifier.rs`). Every
+    /// emitted register was therefore a byte longer than the reader expected, so the reader walked
+    /// into the middle of the instruction: measured, `fn main() -> i64 { return 42; }` compiled to
+    /// `18 00 00 2a 05 00 00` and the verifier called byte 3 — the value, `0x2a` — an invalid
+    /// opcode, while `return 1` produced a stream whose byte 3 (`0x01`) it read as `LoadConst` and
+    /// then ran out of operands. No program the compiler produced could be verified or executed
+    /// (TICKET-130).
+    ///
+    /// The runtime's register file is `MAX_REGISTERS` = 256 entries, so a register that does not fit
+    /// in a byte cannot be encoded at all. It is latched and reported by `finalize` rather than
+    /// truncated: writing the low byte would silently address a different register.
     fn emit_reg(&mut self, reg: Register) {
-        self.emit_u16(reg.0);
+        if reg.0 > u8::MAX as u16 && self.register_overflow.is_none() {
+            self.register_overflow = Some(reg.0);
+        }
+        self.emit_byte(reg.0 as u8);
     }
 
     fn emit_const(&mut self, idx: ConstIdx) {

@@ -1,21 +1,37 @@
 # Language / Trading feature matrix fragment.
 
 [[feature]]
-# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/tests/test_e2e_examples.rs, x3-lang/vm/src/executor.rs
+# Re-measured 2026-09-24 (TICKET-130). The row's blocker asked for a genuine E2E test and the chain
+# it names did not actually work: the emitter wrote register operands as two bytes while the
+# interpreter and the verifier read one, so every compiled program failed verification (measured:
+# `fn main() -> i64 { return 42; }` compiled to `18 00 00 2a 05 00 00` and the verifier called byte 3
+# an invalid opcode). Fixed in this commit together with the receipt's instruction count (always 0),
+# the `main`-is-function-0 entry contract, and the crate's `no_std` build; the tests below are the
+# evidence and were written to fail first.
+# Scope of the claim: the pipeline is proven for the operand kinds the sweep covers (literal,
+# arithmetic, local, constant-pool index, branch, function call). Loops, match, floats, strings and
+# host calls are not in it yet, which is what keeps this row short of COMPLETE.
 id = "X3-LANG-001"
 name = "Compile→encode→decode→execute→receipt E2E"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 30
-tested = 10
-mainnet_ready = 15
+paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x3-compiler"]
+implemented = 55
+tested = 55
+mainnet_ready = 20
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Genuine E2E test still required"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #10"]
+blockers = ["The E2E path is proven for the operand kinds the sweep covers; the compiler's remaining shapes (loops, match, floats, strings, host calls) are not in it, and the optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"]
+required_tests = [
+  "compile_encode_decode_execute_receipt_end_to_end",
+  "every_operand_kind_compiles_verifies_and_executes",
+  "compile_source_emits_runtime_loadable_bytecode",
+  "compile_source_rejects_invalid_source",
+]
+test_evidence = ["crates/x3-integration/tests/compiler_bridge.rs: four tests, green; the sweep drives seven program shapes through compile → both readers → on-chain executor → receipt and asserts the receipt reports the value the source states"]
+evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "crates/x3-backend/src/emit.rs", "note: Trading Core v1 gap #10"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/trading.rs, x3-lang/compiler/tests/

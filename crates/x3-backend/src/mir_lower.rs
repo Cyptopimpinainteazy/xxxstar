@@ -117,12 +117,12 @@ impl MirBytecodeCompiler {
             .params
             .iter()
             .enumerate()
-            .map(|(i, v)| {
-                let reg = self.allocate_reg();
+            .map(|(i, v)| -> BackendResult<(SymbolId, String)> {
+                let reg = self.allocate_reg()?;
                 self.value_regs.insert(*v, reg);
-                (SymbolId(i), format!("param_{i}"))
+                Ok((SymbolId(i), format!("param_{i}")))
             })
-            .collect();
+            .collect::<BackendResult<Vec<(SymbolId, String)>>>()?;
 
         // Begin function in layout
         let name = format!("fn_{}", func.symbol.0);
@@ -178,7 +178,7 @@ impl MirBytecodeCompiler {
     fn compile_statement(&mut self, stmt: &MirStatement) -> BackendResult<()> {
         match stmt {
             MirStatement::Assign { target, rhs } => {
-                let dst = self.get_or_alloc_reg(*target);
+                let dst = self.get_or_alloc_reg(*target)?;
                 match rhs {
                     MirRhs::Literal(lit) => {
                         self.compile_literal(lit, dst)?;
@@ -376,20 +376,34 @@ impl MirBytecodeCompiler {
     }
 
     /// Allocate a new register.
-    fn allocate_reg(&mut self) -> Register {
+    /// Allocate the next register, or refuse when the register file is exhausted.
+    ///
+    /// The runtime addresses registers with one byte and its register file holds
+    /// `x3_vm::MAX_REGISTERS` = 256 entries, so a 257th register cannot be encoded. This used to
+    /// hand out `Register(256)` and let the emitter truncate it to `0`, so the program read and
+    /// wrote register 0 instead — a wrong answer, not a refusal. TICKET-130.
+    fn allocate_reg(&mut self) -> BackendResult<Register> {
+        if self.next_reg > u8::MAX as u16 {
+            return Err(BackendError::new(
+                BackendErrorKind::RegisterOverflow {
+                    max: u8::MAX as u16,
+                },
+                self.current_span,
+            ));
+        }
         let reg = Register(self.next_reg);
         self.next_reg += 1;
-        reg
+        Ok(reg)
     }
 
     /// Get or allocate register for a MIR value.
-    fn get_or_alloc_reg(&mut self, val: MirValue) -> Register {
+    fn get_or_alloc_reg(&mut self, val: MirValue) -> BackendResult<Register> {
         if let Some(&reg) = self.value_regs.get(&val) {
-            reg
+            Ok(reg)
         } else {
-            let reg = self.allocate_reg();
+            let reg = self.allocate_reg()?;
             self.value_regs.insert(val, reg);
-            reg
+            Ok(reg)
         }
     }
 

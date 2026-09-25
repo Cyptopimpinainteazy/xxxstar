@@ -4,7 +4,7 @@
 //! the X3 Kernel pallet's execution interface.
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::ToString, vec, vec::Vec};
+use alloc::{format, vec};
 
 use sp_core::H256;
 
@@ -146,7 +146,9 @@ impl X3Executor {
                     logs: vec![], // Hostcall log collection deferred to runtime integration
                     state_changes: vec![], // Hostcall state change collection deferred to runtime integration
                     function_index: 0,
-                    instructions_executed: 0, // Instruction counting requires VM instrumentation
+                    // The VM counts these; the field used to say counting needed instrumentation it
+                    // already had, so every receipt reported zero instructions (TICKET-130).
+                    instructions_executed: vm.instruction_count(),
                 })
             }
             Err(vm_err) => {
@@ -165,7 +167,9 @@ impl X3Executor {
                     logs: vec![],
                     state_changes: vec![],
                     function_index: 0,
-                    instructions_executed: 0, // Instruction counting requires VM instrumentation
+                    // The VM counts these; the field used to say counting needed instrumentation it
+                    // already had, so every receipt reported zero instructions (TICKET-130).
+                    instructions_executed: vm.instruction_count(),
                 })
             }
         }
@@ -187,7 +191,7 @@ impl X3Executor {
                 logs: vec![],
                 state_changes: vec![],
                 function_index: 0,
-                instructions_executed: res.gas_used,
+                instructions_executed: res.instructions_executed,
             }),
             Err(mini_x3::X3Error::GasExhausted) => Ok(X3ExecutionReceipt {
                 success: false,
@@ -196,6 +200,9 @@ impl X3Executor {
                 logs: vec![],
                 state_changes: vec![],
                 function_index: 0,
+                // Not a stand-in: this interpreter charges exactly one gas per instruction
+                // (`mini_x3::Vm::run`), so at exhaustion the count is the limit. The field used to
+                // carry the gas figure on *successful* runs too, where that equality does not hold.
                 instructions_executed: config.gas_limit,
             }),
             Err(e) => Err(X3IntegrationError::ExecutionFailed(format!("{:?}", e))),
