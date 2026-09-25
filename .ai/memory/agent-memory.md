@@ -7580,3 +7580,68 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
    run before but not on this revision; the 7-server network is what closes the largest blocker.
 5. `docs/reports/FEATURE_READINESS_MATRIX.md` (2026-06-10) still claims all five verifiers accept and
    cites `crates/x3-verification-router/src/strategies/evm.rs`, which does not exist.
+
+## 2026-09-25 (forty-first pass) — the kernel could not execute a program, and why the pallet suite was green anyway
+
+### The defect (P0, X3Lang's runtime path)
+- `submit_comit_v2` required its `x3_payload` to deserialize as an **`X3VmPacket`** and then handed
+  those same bytes to `T::X3Adapter::execute`, which parses **X3BC**. A packet is a semantic
+  operation (`AtomicCross` / `Conditional` / `Transfer`); `X3Executor::execute` accepts nothing else
+  and there is no packet→program bridge anywhere. So on any chain with a real adapter
+  (`X3VmAdapter` natively, `WasmX3Adapter` in the wasm build) *every* non-empty X3 payload died with
+  `X3ExecutionFailed`, and a program compiled from `.x3` source was refused before that with
+  `InvalidX3VmPacket`.
+- Reproduced at the real runtime before the fix, dispatching a program compiled in the test:
+  `Module(ModuleError { index: 11, error: [7, 0, 0, 0], message: Some("InvalidX3VmPacket") })`.
+- **Why 216 pallet tests were green:** `mock.rs` configures `TestX3Adapter`, which fabricates a
+  receipt — and it had been *adjusted to the packet shape* (its own comment computes the offset of
+  the recipient byte at 25 "with Phase-1.4 strict-packet validation the executor receives the
+  SCALE-encoded packet, not the raw intent bytes"). A fabricated adapter does not merely hide a
+  defect; here it was fitted around one.
+- Fix (`bad5792f5`): the X3 payload *is* the program, and validation is the adapter's own
+  `validate` (envelope magic, version gate, checksum) — the component that executes it. Nothing else
+  about the v2 path changed.
+- Evidence (`runtime/src/tests.rs`, against the real `Runtime`):
+  `a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_recorded` (compiles in the
+  test, dispatches as a signed extrinsic, asserts `SubmittedComits` + nonce moved) and
+  `a_corrupted_x3_program_is_refused_by_the_runtime_path` (refusal **and** no comit record left).
+
+### Still open on that row (recorded in X3-LANG-004, not hidden)
+- The dispatch is proven in a `TestExternalities`, not on a running chain with finality.
+- **The X3 execution receipt is not persisted.** Only the comit id, the nonce and the fee deduction
+  reach storage; `EvmTransactionReceipts` has no X3 equivalent, so a program's result cannot be
+  re-read from chain state. Adding the storage item is small, but it adds a write to a dispatch whose
+  weight is already declared by `WeightInfo`, so it needs the benchmark re-run (or an explicit,
+  argued weight) in the same change — not a silent under-count.
+- An old artifact executed against an upgraded VM version is untested.
+
+### The lesson that cost two builds
+- **A lockfile check means nothing until the lockfile is committed.** Adding `x3-x3-integration` as a
+  runtime *dev*-dependency updated `Cargo.lock`; `cargo metadata --locked` passed in the dirty
+  worktree (cargo had already rewritten the file there) while the srtool container, building a clean
+  checkout with `--locked`, failed with `cannot update the lock file /build/Cargo.lock`. Commit the
+  lock, then re-check. Same class as the `sp-io` case one pass earlier, with the extra twist that the
+  working tree had already absorbed the fix.
+- The srtool recipe still holds: mode-700 repo directory → `git worktree add /tmp/<name> HEAD`,
+  `chmod 755` + `chmod -R a+rX`, run `./scripts/update-runtime-hashes.sh` there (~13 min per build,
+  two builds must agree), copy `docs/reports/runtime-wasm-hashes.json` back, add an entry to
+  `runtime-wasm-reproducibility.md`, remove the copy with a root container (`docker run --rm -u 0:0
+  -v /tmp/<name>:/x alpine sh -c 'cd /x && rm -rf -- * .[!.]*'`) because the container owns those
+  files.
+
+### Measured at `cf69a86a02`
+- `bash scripts/local-ci.sh --live --cross --jobs 3` -> **43 of 43 gates PASS** (fast + live + all
+  five cross-domain incl. both strict postures).
+- `cargo test -p pallet-x3-kernel` 216 passed; `--test x3_adapter_route` 2 passed;
+  `cargo test -p x3-chain-runtime --lib` green (52 tests incl. the two new ones).
+- Runtime WASM re-attested: compact 8,489,301 / `0x4745f691…`, compressed 1,460,962 / `0x0132e360…`,
+  revision `496242b64`, two builds agreeing.
+
+### Next task seed
+1. Persist the X3 execution receipt (new storage map + the weight/benchmark decision above) so the
+   program's result is re-readable and the "verifiable receipt" step of the X3Lang pipeline is real.
+2. Live-node version of the dispatch test: submit a compiled program to a running node, read the
+   receipt from finalized state (the `--live` gates already boot nodes; the test harness exists in
+   `node/tests/x3vm_live_lifecycle.rs`).
+3. Rotate the infrastructure bridge API key still present in git history.
+4. The 7-server network: `--failure` and `--testnet` on this revision, then a 24h soak.
