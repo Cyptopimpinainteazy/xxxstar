@@ -416,6 +416,12 @@ fn a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_record
             pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
             "and be stamped with the kernel's receipt version"
         );
+
+        // The client-facing accessor for this receipt is a runtime API, and runtime APIs are
+        // invocable only through a client-side executor (see the note above
+        // `native_supply_contract_tests` in lib.rs). That wire-level assertion lives in the live
+        // test, which calls `state_call` for the API by name — see
+        // `node/tests/x3vm_live_lifecycle.rs::a_compiled_x3_program_is_finalized_and_its_receipt_is_readable`.
     });
 }
 

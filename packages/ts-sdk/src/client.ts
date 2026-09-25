@@ -279,7 +279,7 @@ export class AtlasSphereClient {
 
     try {
       const result = await this.api!.rpc.state.call(
-        'AtlasKernelApi_get_canonical_balance',
+        'AtlasKernelRuntimeApi_get_canonical_balance',
         this.api!.createType('(AccountId, u32)', [account, assetId]).toHex()
       );
 

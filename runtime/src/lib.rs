@@ -3985,6 +3985,19 @@ impl_runtime_apis! {
                 .map(|receipt| receipt.encode())
         }
 
+        // X3 (stable2512): the X3 domain's receipt accessor. `submit_comit_v2` stores the receipt
+        // under the comit id; this is how a client asks the chain what a comit executed.
+        fn get_x3_execution_receipt(comit_id: Vec<u8>) -> Option<Vec<u8>> {
+            use codec::Encode;
+            if comit_id.len() != 32 {
+                return None;
+            }
+            let mut id_bytes = [0u8; 32];
+            id_bytes.copy_from_slice(&comit_id[..32]);
+            pallet_x3_kernel::X3ExecutionReceipts::<Runtime>::get(sp_core::H256::from(id_bytes))
+                .map(|receipt| receipt.encode())
+        }
+
         fn get_evm_transaction_by_hash(tx_hash: Vec<u8>) -> Option<Vec<u8>> {
             let hash = decode_evm_tx_hash(&tx_hash)?;
             pallet_x3_kernel::EvmTransactions::<Runtime>::get(&hash)

@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `8df4e23ca740a4ce…` — the artifacts move when
+Source digest: `c68bf8ee836c9262…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -174,7 +174,7 @@ fails when they do not match.
 | MTX-X3-RT-007 | runtime_core | Halt blocks new atomic bundles: Needs explicit regression test | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-008 | runtime_core | X3 runtime: Full mainnet proof depends on weights, upgrades, and network testing | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-009 | runtime_core | Forbidden experimental compile guards: Must keep mainnet and experimental feature graphs separated | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · 8 named tests in FEATURE_REGISTRY | open |
-| MTX-X3-RT-010 | runtime_core | Runtime API surface: Historical compile issues require exact current proof | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
+| MTX-X3-RT-010 | runtime_core | Runtime API surface: **CLOSED 2026-09-25 — the kernel's API surface is declared once, and one of its accessors is now proven over the wire.** `pallets/x3-kernel/src/runtime_api.rs` declared a second trait (`AtlasKernelApi`) that no `mod` declaration ever compil… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-011 | runtime_core | Token class / fixed supply model: Supply invariants still incomplete | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-012 | runtime_core | Agent-law runtime guard: Needs broader governance/adversarial coverage | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 55% (no named test list on this row) | open |
 | MTX-X3-SEC-001 | security_proofgate | Reproducible srtool runtime build: Measured locally, 2026-09-22: `./scripts/update-runtime-hashes.sh` builds the runtime twice from scratch in the pinned srtool image and refuses to write unless the two builds agree byte for byte. Run three times in one session (`93fe86c9bd`… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 70% (no named test list on this row) | open |

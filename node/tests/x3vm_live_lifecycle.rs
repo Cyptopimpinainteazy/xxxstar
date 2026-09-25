@@ -301,6 +301,51 @@ fn a_compiled_x3_program_is_finalized_and_its_receipt_is_readable() {
         pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
         "and be stamped with the kernel's receipt version"
     );
+
+    // 5. And a *client* can read it, by name, over the wire: this is the runtime API the SDK calls
+    //    through `state_call`, so the accessor is wired rather than merely declared.
+    let via_api = x3_receipt_via_runtime_api(comit_id, &head)
+        .expect("the runtime API must return the receipt the chain stored");
+    assert_eq!(
+        via_api.return_data,
+        42i64.to_le_bytes().to_vec(),
+        "the receipt a client reads must carry the value the source states"
+    );
+    assert!(via_api.gas_used > 0);
+}
+
+/// Read a comit's X3 receipt through the runtime API a client calls.
+///
+/// `state_call` runs the runtime's API method in a client-side executor against the given block —
+/// the same path polkadot-js and the TS SDK use — so this asserts the accessor exists, is
+/// reachable by name, and returns what the chain stored. The runtime API takes
+/// `comit_id: Vec<u8>` and returns `Option<Vec<u8>>` (SCALE-encoded `ExecutionReceipt`), which is
+/// this crate's convention for receipt accessors.
+fn x3_receipt_via_runtime_api(
+    comit_id: H256,
+    block_hash: &str,
+) -> Option<pallet_x3_kernel::ExecutionReceipt> {
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    let encoded_input = comit_id.as_bytes().to_vec().encode();
+    let value = rpc
+        .call(
+            "state_call",
+            vec![
+                Value::String("AtlasKernelRuntimeApi_get_x3_execution_receipt".into()),
+                Value::String(format!("0x{}", hex::encode(encoded_input))),
+                Value::String(block_hash.to_string()),
+            ],
+        )
+        .expect("state_call")
+        .result?;
+    let raw = value.as_str().expect("state_call result hex");
+    let bytes = hex::decode(raw.trim_start_matches("0x")).expect("decode state_call hex");
+    let encoded_result: Option<Vec<u8>> =
+        Decode::decode(&mut &bytes[..]).expect("the API returns Option<Vec<u8>>");
+    encoded_result.map(|encoded| {
+        pallet_x3_kernel::ExecutionReceipt::decode(&mut &encoded[..])
+            .expect("the API's payload decodes as ExecutionReceipt")
+    })
 }
 
 /// Poll for the terminal `Refunded` state, returning the finalized head that

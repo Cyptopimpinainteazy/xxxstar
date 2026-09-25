@@ -158,17 +158,25 @@ id = "X3-RT-010"
 name = "Runtime API surface"
 subsystem = "runtime_core"
 source = "master"
-paths = ["runtime/src/lib.rs"]
-implemented = 75
-tested = 55
+paths = ["runtime/src/lib.rs", "pallets/x3-kernel/src/lib.rs", "node/tests/x3vm_live_lifecycle.rs"]
+implemented = 78
+tested = 62
 mainnet_ready = 55
 priority = "P1"
 confidence = "medium"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Historical compile issues require exact current proof"]
-evidence = ["runtime/src/lib.rs", "note: Node/runtime API integration exists"]
-
+blockers = [
+  "**CLOSED 2026-09-25 — the kernel's API surface is declared once, and one of its accessors is now proven over the wire.** `pallets/x3-kernel/src/runtime_api.rs` declared a second trait (`AtlasKernelApi`) that no `mod` declaration ever compiled while the real, implemented trait is `AtlasKernelRuntimeApi` (declared inline, implemented in `runtime/src/lib.rs`, and required by the node's RPC bounds). A client had already latched onto the dead one: `packages/ts-sdk/src/client.ts` called `AtlasKernelApi_get_canonical_balance`, a name that exists in no runtime metadata, so that SDK method could never succeed. The dead file is deleted, and the SDK now calls `AtlasKernelRuntimeApi_get_canonical_balance`. `AtlasKernelRuntimeApi` also gained `get_x3_execution_receipt`, so the X3 execution receipt the kernel persists is readable by a client rather than only by a test, and `node/tests/x3vm_live_lifecycle.rs` asserts it through `state_call` by name: fetch the finalized block, ask the runtime API for the receipt, decode it, and require the value the source states.",
+  "Still open on this row: exactly one accessor has a wire-level assertion — the other methods of this trait are exercised only by the node's RPC code compiling against the trait bound; the API has no `#[api_version]` and no documented compatibility policy for adding or changing methods (the repo's precedent is to add methods and note it in a comment, as done for `get_evm_transaction_logs` and now `get_x3_execution_receipt`); and there is no in-crate client harness, so a runtime-API assertion must go through a live node (the note above `native_supply_contract_tests` in `runtime/src/lib.rs` records that limitation).",
+]
+required_tests = [
+  "a_compiled_x3_program_is_finalized_and_its_receipt_is_readable",
+]
+test_evidence = [
+  "note: that test reads the receipt twice — once from storage at the finalized block, once through `state_call(\"AtlasKernelRuntimeApi_get_x3_execution_receipt\")`, the path a client uses (2026-09-25)",
+]
+evidence = ["runtime/src/lib.rs", "note: Node/runtime API integration exists", "note: 2026-09-25 - the duplicate uncompiled API trait file is deleted, the SDK calls the implemented API, and the kernel's receipt accessor is asserted over the wire"]
 [[feature]]
 id = "X3-RT-011"
 name = "Token class / fixed supply model"

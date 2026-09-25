@@ -4400,6 +4400,15 @@ sp_api::decl_runtime_apis! {
         /// Returns SCALE-encoded ExecutionReceipt bytes, or None if not found.
         fn get_evm_receipt(tx_hash: Vec<u8>) -> Option<Vec<u8>>;
 
+        /// Get the execution receipt of an X3 comit, by the comit id that produced it.
+        /// Returns SCALE-encoded `ExecutionReceipt` bytes, or None if the chain has none.
+        ///
+        /// The X3 domain stores its receipt under the comit id (`X3ExecutionReceipts`), the way the
+        /// EVM domain stores its own under the transaction hash. Without this a client could see
+        /// that a comit was finalized but not what it ran or what the program returned — the
+        /// receipt existed only for tests and for whoever read raw storage.
+        fn get_x3_execution_receipt(comit_id: Vec<u8>) -> Option<Vec<u8>>;
+
         /// Get EVM logs matching a filter.
         /// Filter is decoded as (from_block: u64, to_block: u64, address: Option<Vec<u8>>).
         /// Returns SCALE-encoded ExecutionLog entries.
