@@ -84,6 +84,15 @@ def _gate_commands() -> list[str]:
     return [m.group(1) for m in re.finditer(r'^\s*"[^"]+:(.*)"\s*$', LOCAL_CI.read_text(), re.M)]
 
 
+def _manifest_is_tested(manifest: Path) -> bool:
+    """Is there a gate whose command is a `cargo test` for this manifest?"""
+    relative = str(manifest.relative_to(ROOT))
+    for command in _gate_commands():
+        if "cargo test" in command and relative in command:
+            return True
+    return False
+
+
 def _gate_text() -> str:
     """Every gate command in one blob, for the "does a gate run something in this tree?" question."""
     return "\n".join(_gate_commands())
@@ -136,9 +145,15 @@ def main(argv: list[str] | None = None) -> int:
             not_a_crate.append((feature, target))
             continue
         # A nested workspace (`x3-lang/`) is gated through `--manifest-path`, which is a real gate.
-        # A gate that runs a script inside the target tree exercises it too — the SVM program is
-        # covered by `programs/svm/x3_atomic_swap/test-live-lifecycle.sh`, not by `cargo test`.
-        if manifest in manifests or target in _gate_text():
+        # A gate that *runs* something in the target tree exercises it even without cargo's test
+        # harness: the SVM program is covered by
+        # `programs/svm/x3_atomic_swap/test-live-lifecycle.sh`, which builds and drives it against a
+        # validator. Containment alone is not enough — `cargo check --all-targets --manifest-path
+        # <tree>` also names the tree and only *compiles* its tests, so a gate that merely mentions
+        # the directory must not count as running it.
+        runs_a_script_in_tree = re.search(rf"{re.escape(target)}/[\w./-]+\.sh", _gate_text()) is not None
+        tested_by_manifest = manifest in manifests and _manifest_is_tested(manifest)
+        if runs_a_script_in_tree or tested_by_manifest:
             covered.append((feature, member or f"{target} (gate runs this tree)"))
             continue
         if not required:
