@@ -7201,3 +7201,39 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   pass ran (a no-std bytecode string-constant fix, a readiness correction, removal of a committed
   bridge API key, a test-cheat-guard fix). Re-run the containment check before claiming "everything is
   merged" — the number moves.
+
+**2026-09-24 — no compiled `.x3` program could be verified or executed (TICKET-130)**
+
+- **The emitter and the runtime disagreed about register width.** `crates/x3-backend/src/emit.rs`'s
+  `emit_reg` wrote `reg.0` as a **u16**; the interpreter (`crates/x3-vm/src/vm.rs`, `[op][dst:u8][...]`)
+  and the verifier (`crates/x3-vm/src/verifier.rs`, operand table documented the same way) read **one
+  byte**. Every emitted register was a byte too long, so the reader walked into the middle of the
+  instruction: `fn main() -> i64 { return 42; }` compiled to `18 00 00 2a 05 00 00`, and the verifier
+  called byte 3 — the *value*, 0x2a — an invalid opcode; `return 1` produced a byte 3 of 0x01, which it
+  read as `LoadConst` and then ran out of operands. Nothing was ever executed correctly; the old test
+  passed because it only *parsed* the module (`BytecodeModule::from_bytes`) and never verified it.
+- **How to catch this class again:** a test that asserts a program's *value* through the whole chain,
+  with two programs that differ, and a sweep over the operand kinds (literal, arithmetic, local,
+  const-pool index, branch, call). Both live in `crates/x3-integration/tests/compiler_bridge.rs`. A
+  parse-only assertion, or a single program, passes on a broken framer.
+- **Grep the width at both ends before trusting a format.** `emit_u16(reg.0)` vs `read_u8(ip+1)` is one
+  line apart in two crates; `MAX_REGISTERS = 256` in the VM settles which side is right.
+- **A zero in a receipt is a claim.** `instructions_executed` was hardcoded to 0 with a comment saying
+  counting "requires VM instrumentation" that already existed (`ExecutionResult::instruction_count`),
+  and the kernel-side path reported *gas* under the instruction name. Fixed on both paths; the VM grew
+  `instruction_count()` for the error branch, and `mini_x3` counts instructions beside its gas.
+- **`main` has to be function 0** because the module format has no entry field and the executor calls
+  function 0. Reordering the MIR **before** the optimizer broke four of the compiler's own e2e
+  programs (`MIR value not found in register map`) — so the reorder runs **after** `optimize_mir`.
+  The latent hazard stands and is recorded in the X3-LANG-001 row: the optimizer's passes are
+  order-sensitive, and nothing says so.
+- **A `no_std` crate that cannot build is a gate nobody ran.** `cargo check -p x3-x3-integration
+  --no-default-features` failed with E0432 on master because `compiler_bridge` (which needs
+  `x3-compiler`, a `std` dependency) was declared unconditionally. Gated on `std`, imports cleaned,
+  both configurations now build warning-free.
+- **Readiness records move when the code moves.** X3-LANG-001 went STUB → PARTIAL (tested 10 → 55)
+  because the row's own blocker was met with named tests, and `scripts/x3_audit_matrix.py --check`
+  was run as part of landing. Regenerate whenever a canonical source changes; the gate fails otherwise.
+- Baseline discipline paid twice this turn: the two `x3-chain-node` failures and the four
+  `x3-compiler` e2e failures were separated from my change by running the same tests on a pristine
+  master worktree — one set pre-existed, the other was mine.
