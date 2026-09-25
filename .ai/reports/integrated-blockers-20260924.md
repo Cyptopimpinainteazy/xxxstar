@@ -42,8 +42,9 @@ exactly: `0x46b7cb9219500cbe54c5d32b216376e6e1f17acc874108cad18951214e5b4038`
 automates this against any node → MATCH.
 
 **Per-block storage, on a dev chain (measured, live `/metrics`):** ~215.6 bytes per
-block, ~1.44 extrinsics per block, ~262 ms block interval. Consequence: at 200 ms
-slots the raw block bodies are ~34 GB/year, **not** the ~1.58 TB/year the audit's
+block and ~1.44 extrinsics per block while idle; **893.9 bytes and 6.48 extrinsics
+per block under load**; **200 ms block interval** in both cases. Consequence: raw
+block bodies are ~34 GB/year at idle sizes, **not** the ~1.58 TB/year the audit's
 10 KB/block estimate implied. A dev chain is a floor, not a production workload.
 
 **Chain-level finalized TPS** (`system.remark`, loopback WebSocket — the cheapest
@@ -55,11 +56,24 @@ possible workload):
 | perf-mode, concurrency 128 | recovered | **581.7** (best ever recorded) | 0 |
 | 7-validator multiprocess, concurrency 1024 | recovered | **30.6** | **128,610 of 130,448 (98.6 %)** |
 | current code, debug build, 2 cores | measured 2026-09-24 | 38.2 | 0 |
+| **current code, release build, same host** | measured 2026-09-24 | **47.1 / 51.3** (two runs) | 0 |
 
 Two facts matter more than the peak: the sweep is **flat** (adding concurrency past
 32 makes it worse), and the multi-validator number is **~19x worse** than the
 single-host one. The repository's own comparison file also records
 `"winner": "solana"` against observed Solana mainnet (non-vote avg 1,279–1,480 TPS).
+
+**The February figures are not reproducible on the current dev chain.** Same loader,
+same nominal configuration (6 senders, concurrency 32, 20 s, loopback), release
+build: **47–51 finalized TPS**, where the February archive recorded **575.5**. A
+release build is only ~25–35 % faster than the debug build here (38.2 → 47–51), so
+the build profile was never the constraint. The block cadence is not the constraint
+either: the chain holds **200 ms** blocks. What it packs into them is — **6.48
+extrinsics per block**, i.e. ~32 tx/s of block space, against the ~115 per block
+that 575 TPS would require. Finding out why a 200 ms block carries ~6 remark
+extrinsics is the single highest-value throughput question this session surfaced,
+and it needs the attribution metrics below (or a txpool ready-queue metric, which
+the node does not export either).
 
 **100K TPS is not supported by any measurement here.** It is ~172x the best
 single-host figure and ~3,270x the 7-validator figure.
@@ -165,10 +179,17 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
 
 ## 4. What this document does not claim
 
-* No release-build number of any kind. Everything measured here is a debug build.
-* No production workload number: every TPS figure is `system.remark` on loopback.
-  Transfers, `.x3` execution, EVM, SVM and cross-VM paths have no chain-level
-  measurement at all.
-* No multi-node storage number. Every storage observation is a single dev node.
-* No claim that the snapshot format is complete: it verifies, exports and
+* **No production workload number.** Every TPS figure is `system.remark` on
+  loopback. Transfers, `.x3` execution, EVM, SVM and cross-VM paths have no
+  chain-level measurement at all.
+* **No multi-node throughput or storage number.** The 7-validator TPS figure is
+  from the recovered archive; every storage observation in this document is a
+  single dev node.
+* **No comparable-to-February number.** The release build was measured on this
+  2-core desktop, and the February host and build are unrecorded. 47–51 here versus
+  575 then is a discrepancy to explain, not a like-for-like regression figure.
+* **No claim that the snapshot format is complete:** it verifies, exports and
   cross-checks against a real chain root, and cannot yet restore.
+* **No reproducibility claim.** `srtool` is installed, but it builds inside Docker
+  and docker is absent on this machine, so the release-reproducibility gate has
+  never executed here.
