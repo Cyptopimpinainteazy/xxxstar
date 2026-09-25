@@ -144,8 +144,13 @@ sudo systemctl status x3-validator
 ### 2.4 Hardening
 
 ```bash
-# Run the hardening script
-sudo bash scripts/harden-validator.sh
+# See what it would do, without root and without changing anything
+bash scripts/harden-validator.sh --check --mgmt-cidr <your-management-cidr>
+
+# Run the hardening script (--mgmt-cidr is required: the SSH rule is scoped to it)
+sudo bash scripts/harden-validator.sh --mgmt-cidr <your-management-cidr>
+
+# The existing firewall rules are kept. Pass --reset-firewall to replace them.
 
 # This configures:
 # - Firewall (UFW): Ports 30333 (P2P), 22 (SSH only)

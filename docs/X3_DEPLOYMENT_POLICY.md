@@ -67,7 +67,8 @@ devops/
 1. Provision bare-metal or VPS with Ubuntu 24.04 LTS
 2. Mount NVMe storage at /var/lib/x3
 3. Run: sudo bash scripts/install-validator.sh --version v0.4.0-rc.1
-4. Run: sudo bash scripts/harden-validator.sh
+4. Run: sudo bash scripts/harden-validator.sh --mgmt-cidr <your-management-cidr>
+   (see the plan first with `bash scripts/harden-validator.sh --check --mgmt-cidr <cidr>`)
 5. Generate session keys: /usr/local/bin/x3-chain-node key generate
 6. Set node-key: /usr/local/bin/x3-chain-node key insert --key-type aura --suri <seed>
 7. Start: sudo systemctl start x3-validator

@@ -318,6 +318,13 @@ GATES_FAST=(
   # target that is not on `security/fuzz-placeholder-baseline.txt` becomes a placeholder, and when a
   # listed one is fixed. The list may only shrink.
   "fuzz targets:python3 scripts/check-fuzz-targets.py"
+  # `scripts/harden-validator.sh` is cited as evidence in `feature-matrix/consensus-l1.toml` and
+  # nothing ran it. It also used to apply `ufw --force reset` unconditionally and to pass the literal
+  # placeholder `source address="YOUR-MGMT-CIDR"` to `firewall-cmd`. It has a `--check` mode now (no
+  # root, writes nothing), and this gate exercises every branch it can take — ufw, firewalld with and
+  # without the management CIDR, no firewall tool, a malformed CIDR, an unknown argument, and the
+  # `--reset-firewall` opt-in — in under a second.
+  "harden-validator check:bash scripts/mainnet/harden_validator_gate.sh"
   # `x3-cross-vm-bridge` holds the Merkle proof validator the bridge settles against, and like the
   # packet schema above it was reachable only through `test workspace` under `--deep`. Its 152 tests
   # include the Merkle-proof guards (`test_verify_empty_merkle_proof`,
