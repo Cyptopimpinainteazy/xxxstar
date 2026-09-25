@@ -144,6 +144,11 @@ bytes**:
   returning "not implemented" and checks Ed25519/Sr25519 over a stated message. The bytes move:
   compact 8,488,288 bytes (was 8,485,072), compressed 1,460,543 (was 1,458,341). Two from-scratch
   builds agree.
+* `215c01fe6` — the X3 execution receipt is persisted. `submit_comit_v2` writes
+  `X3ExecutionReceipts[comit_id]` only for an accepted comit, `STORAGE_VERSION` moves 1 -> 2 (the map
+  starts empty; the migration only records the version), and the extra write is declared at the call
+  site. The bytes move: compact 8,496,845 bytes (was 8,489,301), compressed 1,461,148 (was 1,460,962).
+  Two from-scratch builds agree.
 * `496242b64` — the X3 payload convention is fixed: `submit_comit_v2` validated a routing packet and
   then handed those bytes to an adapter that parses X3BC, so no real chain could execute an X3
   program. The payload is the compiled program now and validation is the adapter's own. The bytes
