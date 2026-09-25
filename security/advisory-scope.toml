@@ -1,0 +1,41 @@
+# Verified advisory scope records.
+#
+# GitHub's Dependabot reports an advisory's *published* version range, which is
+# sometimes coarser than the regression that actually introduced the bug. When
+# that happens the alert cannot be cleared by a lockfile change, because the
+# versions this repository resolves are already outside the window that is
+# really vulnerable -- and nothing else in the tree would notice, since the
+# repository's own dependency gate is cargo-audit/cargo-deny against RustSec and
+# an advisory that lives only in the GitHub database has no RustSec id at all.
+#
+# `scripts/check-advisory-scope.py` reads this file and fails when:
+#
+#   * a resolved version of `package` falls inside `vulnerable_range`; or
+#   * the set of resolved versions drifts from `expected_resolved`, so a
+#     lockfile bump cannot silently turn a recorded judgement into a stale one.
+#
+# Every record needs `evidence`: a document *in this repository* showing how the
+# real window was established, and `published_range` so the difference between
+# the two is visible in the record rather than only in the discussion.
+
+[[advisory]]
+id = "GHSA-vxx9-2994-q338"
+cve = "CVE-2026-32314"
+ecosystem = "rust"
+package = "yamux"
+# What Dependabot/GitHub publish.
+published_range = "<0.13.10"
+# What is actually vulnerable: the guard ordering was broken by 0.13.9 (yanked
+# back into place by 0.13.10). 0.12.x and <=0.13.8 check the body length before
+# the inbound stream is created, so they never carried the panic.
+vulnerable_range = ">=0.13.9,<0.13.10"
+# Every lockfile in the tree that names yamux, resolved:
+#   Cargo.lock                       -> 0.12.1, 0.13.10   (the workspace that ships)
+#   crates/x3-sidecar/Cargo.lock     -> 0.12.1, 0.13.10
+#   patches/sc-rpc-server/Cargo.lock -> 0.12.1, 0.13.8    (a vendored crate's own
+#     stale lock; cargo ignores the lock of a path dependency, so it is recorded
+#     only because the gate is deliberately conservative about where it looks)
+# 0.13.8 matters here: it is on the safe side of the window too, so no lock in
+# the tree resolves a vulnerable yamux.
+expected_resolved = ["0.12.1", "0.13.8", "0.13.10"]
+evidence = "docs/security/GHSA-vxx9-2994-q338.md"

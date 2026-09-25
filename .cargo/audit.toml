@@ -1,4 +1,11 @@
 [advisories]
+# NOTE: this list can only name RustSec ids. An advisory that exists only in the
+# GitHub Advisory Database (a GHSA with no `RUSTSEC-` id) cannot be suppressed
+# here and is not visible to cargo-audit or cargo-deny at all, even when its crate
+# is compiled into the node. `security/advisory-scope.toml` records the ones that
+# have been verified against this tree, with the real vulnerable window and the
+# evidence for it, and `scripts/check-advisory-scope.py` enforces the record.
+#
 # IGNORED ADVISORIES
 #
 # These are suppressed because they're transitive dependencies pinned by

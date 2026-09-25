@@ -22,7 +22,7 @@ Measured per crate with `cargo tree -i <crate>@<version>` against this tree:
 
 | Crate | Version | Severity | In the resolved graph? | Pulled by |
 | --- | --- | --- | --- | --- |
-| `yamux` | 0.12.1 | high (GHSA-vxx9-2994-q338, remote panic on a malformed Data frame) | **yes** | `libp2p-yamux` → `libp2p 0.54.1` → `sc-network` |
+| `yamux` | 0.12.1 | high (GHSA-vxx9-2994-q338, remote panic on a malformed Data frame) — **re-verified: not exploitable here, see below** | **yes** | `libp2p-yamux` → `libp2p 0.54.1` → `sc-network` |
 | `hickory-proto` | 0.24.4 | high (GHSA-3v94-mw7p-v465, unbounded NSEC3 loop) + medium | **yes** | `hickory-resolver` → `libp2p-dns` → `sc-network` |
 | `evm` | 0.39.1 | medium (error return ignored) | **yes** | **our own** `crates/evm-integration` |
 | `ethereum` | 0.14.0 | medium (malleability check) | **yes** | via that `evm` |
@@ -34,9 +34,21 @@ The two that matter are the first two, and both are **transitive through polkado
 
 * `libp2p-yamux 0.46.0` depends on `yamux 0.12.1` **and** `yamux 0.13.3` unconditionally (both
   `[dependencies.yamux012]` / `[dependencies.yamux013]`, neither optional) and its non-test code holds
-  `Either<yamux012::Connection<C>, yamux013::Connection<C>>`, so the vulnerable copy is compiled into
+  `Either<yamux012::Connection<C>, yamux013::Connection<C>>`, so both copies are compiled into
   the node. RustSec has **zero** advisories for `yamux`, which is why the repository's own gate never
   said anything.
+
+  **Correction, added after this table was first written (2026-09-25).** The copy *is* compiled, but
+  it is not vulnerable, and neither is anything else here. The defect is a guard-*ordering* bug: the
+  oversized-body check moved to *after* `make_new_inbound_stream` in `0.13.9` (during the flow-control
+  refactor of PR 221) and back before it in `0.13.10`. Every `0.12.x` release — including the `0.12.1`
+  resolved here — checks the body length first, so it never carried the panic. The real vulnerable
+  window is `>=0.13.9,<0.13.10`, one release wide; the published `<0.13.10` is simply coarser, which
+  is why Dependabot reports a version that cannot be fixed by any lockfile change. Tags checked:
+  `yamux-v0.12.0`, `-v0.12.1`, `-v0.13.8` (guard first, safe), `-v0.13.9` (stream first, vulnerable),
+  `-v0.13.10` (guard first, fixed). Full evidence, including the lockfile-by-lockfile versions:
+  `docs/security/GHSA-vxx9-2994-q338.md`. Guarded from now on by
+  `security/advisory-scope.toml` + `scripts/check-advisory-scope.py` (fast gate `advisory scope`).
 * `hickory-proto 0.24.4` arrives through `libp2p-dns`; the high-severity NSEC3 advisory has **no patched
   version** at all (`no-fix` in Dependabot, and the DB confirms).
 
@@ -69,9 +81,14 @@ repository would notice a new high-severity advisory that RustSec has not import
 
 ## Follow-ups this produced
 
-1. **`yamux 0.12.1` — remote panic, reachable from peers.** Either bump libp2p via the SDK, or vendor a
-   backported `yamux` under `patches/` with a regression test for the malformed Data frame. Highest
-   priority of the set.
+1. ~~**`yamux 0.12.1` — remote panic, reachable from peers.** Either bump libp2p via the SDK, or vendor a
+   backported `yamux` under `patches/` with a regression test for the malformed Data frame.~~ **Closed
+   2026-09-25: not exploitable.** The resolved versions (`0.12.1`, `0.13.8`, `0.13.10` across the
+   tree's lockfiles) are all outside the real window `>=0.13.9,<0.13.10`; the published range was
+   coarser than the regression. No patch is needed, and no backport was vendored. What was missing was
+   a way to *record and enforce* that judgement, so `security/advisory-scope.toml` plus the
+   `advisory scope` gate fail the build if a future lockfile bump resolves `0.13.9` or drops a
+   version the record expects. See `docs/security/GHSA-vxx9-2994-q338.md`.
 2. **`hickory-proto 0.24.4` — unbounded NSEC3 loop, no upstream fix.** Needs a decision: accept with a
    written reason (it is DNS resolution inside libp2p), or pin/take over the resolver.
 3. **`evm 0.39.1` / `ethereum 0.14.0`** — ours; bump `crates/evm-integration` to the frontier line and

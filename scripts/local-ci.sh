@@ -242,6 +242,16 @@ GATES_FAST=(
   # read the repository, and removing it does not un-expose it. This scans `git ls-files` and prints
   # file, line and pattern only — never the matched value, which would leak it into the CI log.
   "provider secret guard:bash scripts/check-no-provider-secrets.sh"
+  # Dependabot and the repository's own dependency gate answer different questions: Dependabot
+  # compares against the *published* range in the GitHub Advisory Database, while cargo-audit /
+  # cargo-deny compare against RustSec. `GHSA-vxx9-2994-q338` (yamux, remote panic) lives only in the
+  # former -- it has a GHSA and a CVE identifier and no RustSec id at all -- and its published range
+  # `<0.13.10` also matches the whole 0.12 line, even though the guard-ordering defect it describes
+  # was introduced in 0.13.9 and never existed on 0.12.x. Nothing here would have noticed either way.
+  # This gate re-reads every lockfile in the tree on every run and fails if a resolved version lands
+  # inside a window recorded in `security/advisory-scope.toml`, or if the resolved set drifts from
+  # that record -- so a lockfile bump cannot quietly turn a verified judgement into a stale claim.
+  "advisory scope:python3 scripts/check-advisory-scope.py"
   "feature matrix check:python3 scripts/feature_matrix.py check"
   # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
   # `audit-artifacts/current/feature-status.json` are *derived* from FEATURE_REGISTRY.toml and
