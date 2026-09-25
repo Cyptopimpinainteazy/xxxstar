@@ -7164,3 +7164,40 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - The isolated `--no-default-features` configuration is **not** the same as the runtime's WASM graph
   (which enables serde/alloc), so a crate failing the former can still build the latter — and vice
   versa: only srtool builds the thing governance attests to.
+
+**2026-09-24 — everything on GitHub is on master; the six local branches that cannot be**
+
+- **The branch landscape is now: 19/19 remote refs contained in master, 364/370 local.** The merges
+  that did it: `feat/x3-prelaunch-economics-x3lang-cutover` (three merges, because it kept gaining
+  commits), `docs/public-testnet-alpha-execution-plan`, and the branch's
+  `import/x3-chain-master-salvage` prefix (its 8 commits are the first 8 of the 16 — one merge lands
+  both; check ancestry before merging a "second" branch).
+- **Six local branches cannot be merged and should not be:** they share **no common ancestor** with
+  master (`git merge-base` is empty), so `git diff master...branch` is undefined and any "merge" would
+  replace master's tree with an older snapshot. Measured: `t5/fix-annotations-20260522-1458` has 0
+  files master lacks; `fix-x3lang-python` is patch-equivalent for 68 of its 69 patches (the 69th is a
+  21,687-file baseline snapshot); `wip/consolidation-20260917/recovered-usb-clone` and
+  `your-task-branch` are `vendor/`-dominated snapshots (66.5k / 69.8k files); the other two are the
+  pre-rewrite lineage. Report: `.ai/reports/branch-consolidation-20260924.md`.
+- **A derived artifact must be regenerated on the branch it lands on.** `scripts/x3_audit_matrix.py`
+  pins its outputs to the sha256 of FEATURE_REGISTRY.toml + the matrix fragments, and the artifacts
+  that landed recorded a digest (`bf2f92fd…`) that matched a dirty tree, not master (`a4f506f9…`) —
+  so the freshness gate wired into `scripts/local-ci.sh` failed the moment they landed. Twice: the
+  second failure came from merging the *sources* (the readiness correction) without regenerating. The
+  rule: when a commit touches a canonical source of a generated artifact, regenerate in the same
+  merge, and run the artifact's own `--check` before pushing.
+- **Master was already red on `cargo fmt --all -- --check`** when this pass started (three files in
+  `crates/x3-state-snapshot` from PR #509). Fixed in `9a58c7495`; check a gate's colour *before*
+  blaming the merge for it — run it on a pristine worktree of the base.
+- **The full `cargo check --workspace --locked` cannot run in this container**: the runtime's wasm
+  build fails finding `std` for `wasm32v1-none` (`crypto-common 0.1.6`), identically on pristine
+  master. `SKIP_WASM_BUILD=1 cargo check --workspace --locked` is the gate that works here, and its
+  limitation (it does not prove the wasm path) has to be stated with it.
+- **Working practice that kept this safe:** all merges happened in a side worktree
+  (`git worktree add /tmp/x3-merge-wt master`) because the main worktree was on a live branch with 12
+  files of another agent's uncommitted work. That WIP was left untouched; its registry edits are what
+  the regenerated artifacts pick up when they land.
+- **The branch is live:** `feat/x3-prelaunch-economics-x3lang-cutover` gained four commits *while* this
+  pass ran (a no-std bytecode string-constant fix, a readiness correction, removal of a committed
+  bridge API key, a test-cheat-guard fix). Re-run the containment check before claiming "everything is
+  merged" — the number moves.
