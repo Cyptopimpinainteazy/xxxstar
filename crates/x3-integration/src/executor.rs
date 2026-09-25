@@ -12,7 +12,7 @@ use crate::error::{X3IntegrationError, X3Result};
 use crate::types::{X3ExecutionReceipt, X3GasConfig, X3Value};
 
 #[cfg(feature = "std")]
-use x3_vm::{Verifier, VerifyOptions, VM};
+use x3_vm::{BytecodeModule, VMConfig, Verifier, VerifyOptions, VM};
 
 /// Configuration for X3 executor
 #[derive(Clone, Debug)]
@@ -103,9 +103,27 @@ impl X3Executor {
         Verifier::verify_module_bytes(bytecode, &verify_opts)
             .map_err(|e| X3IntegrationError::VerificationFailed(format!("{:?}", e)))?;
 
-        // Step 2: Create VM
-        let mut vm = VM::from_bytes(bytecode)
+        // Step 2: Create the VM with the limits this call asked for.
+        //
+        // `VM::from_bytes` builds the VM with `VMConfig::default()`, so every field of
+        // `X3ExecutorConfig` was thrown away here: `on_chain()` (500_000 gas) and
+        // `simulation()` (10_000_000) both ran under the VM's own 1_000_000, and a caller
+        // that asked for *less* got more. The gas limit is the bound the caller is charged
+        // against and the one the pallet reports, so it has to be the bound the VM stops at.
+        // Measured before this fix: a 100-gas limit admitted a 2_000-instruction program and
+        // returned `success = true, gas_used = 2002`
+        // (`crates/x3-integration/tests/gas_accounting.rs`).
+        let module = BytecodeModule::from_bytes(bytecode)
             .map_err(|e| X3IntegrationError::InvalidBytecode(format!("{:?}", e)))?;
+        let mut vm = VM::with_config(
+            module,
+            VMConfig {
+                gas_limit: config.gas_limit,
+                max_call_depth: config.max_call_depth,
+                max_stack_size: config.max_stack_size,
+                trace: config.trace,
+            },
+        );
 
         // Step 3: Convert arguments to VM values
         let vm_args: Vec<x3_vm::Value> = args

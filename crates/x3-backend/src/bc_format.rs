@@ -695,7 +695,11 @@ impl BytecodeModule {
         ]) as usize;
         offset += 4;
 
-        let mut functions = Vec::with_capacity(count);
+        // Bounded by what is left in the module: a count is four bytes read from input,
+        // and an entry cannot be smaller than a byte, so without this a crafted count
+        // asks for a 159 GB allocation ("memory allocation of 171127603240 bytes
+        // failed", measured by crates/x3-integration/tests/bytecode_robustness.rs).
+        let mut functions = Vec::with_capacity(count.min(bytes.len().saturating_sub(offset)));
         for _ in 0..count {
             // Name
             if offset + 2 > bytes.len() {
@@ -785,7 +789,11 @@ impl BytecodeModule {
         ]) as usize;
         offset += 4;
 
-        let mut globals = Vec::with_capacity(count);
+        // Bounded by what is left in the module: a count is four bytes read from input,
+        // and an entry cannot be smaller than a byte, so without this a crafted count
+        // asks for a 159 GB allocation ("memory allocation of 171127603240 bytes
+        // failed", measured by crates/x3-integration/tests/bytecode_robustness.rs).
+        let mut globals = Vec::with_capacity(count.min(bytes.len().saturating_sub(offset)));
         for _ in 0..count {
             // Name
             if offset + 2 > bytes.len() {
@@ -854,7 +862,11 @@ impl BytecodeModule {
         ]) as usize;
         offset += 4;
 
-        let mut source_map = Vec::with_capacity(map_count);
+        // Bounded by what is left in the module: a count is four bytes read from input,
+        // and an entry cannot be smaller than a byte, so without this a crafted count
+        // asks for a 159 GB allocation ("memory allocation of 171127603240 bytes
+        // failed", measured by crates/x3-integration/tests/bytecode_robustness.rs).
+        let mut source_map = Vec::with_capacity(map_count.min(bytes.len().saturating_sub(offset)));
         for _ in 0..map_count {
             if offset + 8 > bytes.len() {
                 return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));

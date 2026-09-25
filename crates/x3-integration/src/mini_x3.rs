@@ -269,7 +269,13 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
 
     // Const pool
     let const_count = r.read_u32()? as usize;
-    let mut const_pool = Vec::with_capacity(const_count);
+    // `with_capacity` on a count read straight out of the module lets a four-byte
+    // field ask for a tens-of-gigabytes allocation: `const_count = 0xFF00_0001` aborted
+    // the on-chain reader with "memory allocation of 102676561944 bytes failed"
+    // (crates/x3-integration/tests/bytecode_robustness.rs). No entry is smaller than a
+    // byte, so the bytes that are left bound the count; the loop below still reports
+    // EOF on its own terms if the module is truncated.
+    let mut const_pool = Vec::with_capacity(const_count.min(r.remaining()));
     for _ in 0..const_count {
         let tag = r.read_u8()?;
         let c = match tag {
@@ -301,7 +307,13 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
 
     // Function table
     let func_count = r.read_u32()? as usize;
-    let mut functions = Vec::with_capacity(func_count);
+    // `with_capacity` on a count read straight out of the module lets a four-byte
+    // field ask for a tens-of-gigabytes allocation: `const_count = 0xFF00_0001` aborted
+    // the on-chain reader with "memory allocation of 102676561944 bytes failed"
+    // (crates/x3-integration/tests/bytecode_robustness.rs). No entry is smaller than a
+    // byte, so the bytes that are left bound the count; the loop below still reports
+    // EOF on its own terms if the module is truncated.
+    let mut functions = Vec::with_capacity(func_count.min(r.remaining()));
     for _ in 0..func_count {
         let name_len = r.read_u16()? as usize;
         r.skip(name_len)?; // skip name
@@ -319,7 +331,13 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
 
     // Global table
     let global_count = r.read_u32()? as usize;
-    let mut globals = Vec::with_capacity(global_count);
+    // `with_capacity` on a count read straight out of the module lets a four-byte
+    // field ask for a tens-of-gigabytes allocation: `const_count = 0xFF00_0001` aborted
+    // the on-chain reader with "memory allocation of 102676561944 bytes failed"
+    // (crates/x3-integration/tests/bytecode_robustness.rs). No entry is smaller than a
+    // byte, so the bytes that are left bound the count; the loop below still reports
+    // EOF on its own terms if the module is truncated.
+    let mut globals = Vec::with_capacity(global_count.min(r.remaining()));
     for _ in 0..global_count {
         let name_len = r.read_u16()? as usize;
         r.skip(name_len)?;
@@ -562,8 +580,11 @@ impl<'m> Vm<'m> {
                 if self.call_stack.len() >= MAX_DEPTH {
                     return Err(X3Error::StackOverflow);
                 }
-                // collect args (from caller base)
-                let mut args = Vec::with_capacity(argc);
+                // collect args (from caller base). `argc` is a u16 read out of the code
+                // stream, so this cannot ask for gigabytes the way the table counts above
+                // could, but it is still an allocation sized by input: the register file is
+                // the real bound, and the loop below refuses an index outside it.
+                let mut args = Vec::with_capacity(argc.min(MAX_REGS));
                 for i in 0..argc {
                     let ar = self.r8(ip + 8 + i)? as usize;
                     args.push(self.regs[self.resolve(ar)].clone());
