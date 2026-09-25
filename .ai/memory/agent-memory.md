@@ -8099,3 +8099,46 @@ must likewise be valid packets (`verify_payloads_v2`).
 1. Write the `submit_comit_v2` benchmark — it is now the only thing standing between the kernel's weight
    table and measured numbers.
 2. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
+
+## 2026-09-25 (fifty-first pass) — the 115 Dependabot alerts, decomposed; and the two that are reachable
+
+### How to read dependency-security signal in this repository
+- `gh api --paginate "repos/Cyptopimpinainteazy/xxxstar/dependabot/alerts?state=open&per_page=100"`
+  works (gh is authenticated as Cyptopimpinainteazy). Note: **`page=` is rejected** for this endpoint —
+  use `--paginate` (cursor-based).
+- The repository's own gate is `cargo-audit`/`cargo-deny` against **RustSec**; Dependabot reports the
+  **GitHub Advisory Database**. The sets differ: after cloning `rustsec/advisory-db` (1,251
+  advisories), `GHSA-vxx9-2994-q338` (yamux) and `GHSA-27wg-99g8-2v4v` (evm) are **not in RustSec at
+  all**; hickory-proto's, lru's and idna's are. So "33 allowed warnings" in the status doc and
+  Dependabot's 115 answer different questions — and nothing here notices a new GHSA RustSec has not
+  imported.
+- Reachability is the triage step, not severity: `cargo tree -i <crate>@<version>` (bare names fail
+  with "multiple packages named X" when the lock holds two copies — pass `@version`).
+
+### What the 115 are
+87 npm (`x3-app-store/backend` 41, `frontend` 37, plus explorer/SDK projects) and 28 Rust. Rust:
+**reachable** — `yamux 0.12.1` (high, remote panic on a malformed Data frame; `libp2p-yamux 0.46`
+depends on yamux 0.12 *and* 0.13 unconditionally and holds `Either<yamux012::Connection,
+yamux013::Connection>` in non-test code), `hickory-proto 0.24.4` (high, unbounded NSEC3 loop, **no
+upstream fix**), `evm 0.39.1`/`ethereum 0.14.0` (ours, via `crates/evm-integration`), `serde_with`,
+`lru`, `rand`; **not in the default graph** — libp2p-gossipsub, libp2p-quic, rustls-webpki 0.101.7,
+ring 0.16.20, protobuf 2.28.0, ed25519-dalek 1.0.1, idna 0.1.5, borsh, jsonwebtoken, atty, git2.
+Both reachable highs are transitive through polkadot-sdk's libp2p, so no lockfile update fixes them;
+the fixing versions are on new major lines. This repo already vendors pinned crates under `patches/`
+for exactly this shape of problem, so a backported yamux is established practice, not a new mechanism.
+
+Report: `.ai/reports/dependabot-triage-20260925.md`.
+
+### Push state (2026-09-25)
+- Branch `feat/x3-prelaunch-economics-x3lang-cutover` is on origin at `609943d2c` (upstream set).
+- Local `master` was fast-forwarded to `origin/master`.
+- `codex/x3-economic-safety-kernel` is **not** pushed: it is 45 ahead but **309 behind** its remote, so
+  pushing needs `--force` (declined without explicit approval). `docs/matrix-third-pass` was pushed.
+
+### Next task seed
+1. `yamux 0.12.1` — vendor a backported fix under `patches/` (with a malformed-Data-frame regression
+   test) or bump libp2p through the SDK. Highest-priority security item found so far.
+2. `hickory-proto 0.24.4` — no upstream fix; needs a written risk decision.
+3. `crates/evm-integration`: bump `evm` to the frontier line (0.43.4) and verify the EVM path.
+4. A GitHub-advisory gate (or a scheduled `gh api` job) so a new high-severity GHSA fails something.
+5. npm: `npm audit fix` in `x3-app-store/{frontend,backend}` and the smaller JS projects.
