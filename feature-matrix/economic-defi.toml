@@ -23,32 +23,55 @@ name = "Pending supply returns-to-zero invariant"
 subsystem = "economic_defi"
 source = "master"
 paths = ["pallets/x3-supply-ledger/src/lib.rs"]
-implemented = 55
-tested = 25
-mainnet_ready = 30
+implemented = 60
+tested = 78
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs property tests across success/refund/rollback"]
-evidence = ["pallets/x3-supply-ledger/src/lib.rs", "note: Registry corrections call out missing supply invariant tests"]
-
+blockers = [
+  "**CLOSED 2026-09-25 — the invariant is proven on the transitions, not on a struct.** The pallet had no mock runtime, so `SupplyLedgerWrite` (`debit_source_to_pending`, `credit_destination_from_pending`, `refund_pending_to_source`) — the three calls every cross-domain operation goes through — had no test at all; the S0-1 file builds `SupplyLedger` values by hand and says in a note that it needs a runtime. `pallets/x3-supply-ledger/src/mock.rs` supplies one, and `tests_conservation.rs` drives the real paths: pending returns to zero after every settle or refund (`pending_supply_returns_to_zero_when_every_leg_is_resolved`), and 200 random leg sequences never leave it accumulating (`prop_random_leg_sequences_conserve_supply`). A refused transition leaves the ledger byte-for-byte identical, so a failed leg cannot strand or duplicate supply.",
+  "Still open on this row: the invariant is proven for one ledger view in one process — not under concurrent cross-domain traffic on a multi-validator network, and not against each bridge's own observation path (that is X3-XVM-002). The pallet's suite also ran in no gate until 2026-09-25, when `test x3-supply-ledger` was added to the fast set.",
+]
+required_tests = [
+  "pending_supply_returns_to_zero_when_every_leg_is_resolved",
+  "prop_random_leg_sequences_conserve_supply",
+  "a_refused_transition_does_not_mutate_the_ledger",
+]
+test_evidence = [
+  "note: all three are in pallets/x3-supply-ledger/src/tests_conservation.rs, run by the `test x3-supply-ledger` gate (2026-09-25)",
+]
+evidence = ["pallets/x3-supply-ledger/src/lib.rs", "note: Registry corrections call out missing supply invariant tests", "note: 2026-09-25 - the transitions are now driven by a real test runtime and a property suite"]
+registry_feature = "atomic_kernel"
 [[feature]]
 id = "X3-ECO-003"
 name = "Supply conservation ledger"
 subsystem = "economic_defi"
 source = "master"
 paths = ["pallets/x3-supply-ledger/src/lib.rs"]
-implemented = 60
-tested = 35
+implemented = 65
+tested = 72
 mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["End-to-end supply conservation remains P0"]
-evidence = ["pallets/x3-supply-ledger/src/lib.rs", "note: Independent audit previously scored supply ledger partial"]
-
+blockers = [
+  "**CLOSED 2026-09-25 at the ledger level.** The conservation law is `represented() = native + evm + svm + external_locked + pending` never exceeding the canonical ceiling, and every transition being a relabelling rather than a creation: debit moves source -> pending, credit moves pending -> destination, refund moves pending -> source. `tests_conservation.rs` asserts exactly that after every step of the success path (native -> EVM), the external route (native -> `external_locked`), the rollback path (debit then refund restores the ledger bit-for-bit), the duplicate-settle case (a replayed settle is refused), the halt/pause cases (new legs refused, refunds still allowed), and 200 random leg sequences. The mint path's own conservation is covered too: a governance mint raises the ceiling with the supply, and a replayed nonce moves neither.",
+  "Still open, and why `mainnet_ready` does not move: this is one asset ledger in one process. Nothing here exercises a *real* external bridge observation (a lock on another chain being seen and recorded), concurrent cross-domain traffic under a multi-validator network, or the router's own accounting against the ledger — the row's original 'end-to-end supply conservation remains P0' is only half closed, and the other half is X3-XVM-002's.",
+]
+required_tests = [
+  "every_leg_of_the_lifecycle_conserves_the_represented_total",
+  "a_replayed_mint_nonce_cannot_mint_twice",
+  "prop_random_leg_sequences_conserve_supply",
+  "a_halt_or_a_pause_blocks_new_legs_but_still_lets_the_pending_one_come_back",
+]
+test_evidence = [
+  "note: all four are in pallets/x3-supply-ledger/src/tests_conservation.rs, run by the `test x3-supply-ledger` gate (2026-09-25)",
+]
+evidence = ["pallets/x3-supply-ledger/src/lib.rs", "note: Independent audit previously scored supply ledger partial", "note: 2026-09-25 - the ledger's conservation law is asserted on the real transition functions, including refusal-immutability"]
+registry_feature = "atomic_kernel"
 [[feature]]
 id = "X3-ECO-004"
 name = "Wallet recovery flow"

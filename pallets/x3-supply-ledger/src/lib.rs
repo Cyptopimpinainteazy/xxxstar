@@ -24,7 +24,11 @@
 pub use pallet::*;
 
 pub mod mint_idempotency;
+#[cfg(test)]
+mod mock;
 pub mod supply_verification;
+#[cfg(test)]
+mod tests_conservation;
 #[cfg(test)]
 mod tests_halt;
 #[cfg(test)]

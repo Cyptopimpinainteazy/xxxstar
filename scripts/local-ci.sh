@@ -267,6 +267,12 @@ GATES_FAST=(
   # not exist: this one would have caught the packet-vs-program payload defect if anything had run it
   # with a real adapter, and it is where the 1 -> 2 storage migration's own test lives.
   "test x3-kernel:cargo test -p pallet-x3-kernel"
+  # `pallet-x3-supply-ledger` holds the king invariant — represented supply never exceeds the
+  # canonical ceiling — and its suite was in no gate list either. It also had no mock runtime at all
+  # until 2026-09-25: the S0-1 tests build `SupplyLedger` structs by hand, so the three transition
+  # functions every cross-domain operation runs through were untested. They are covered now, and this
+  # gate is what keeps them covered.
+  "test x3-supply-ledger:cargo test -p pallet-x3-supply-ledger"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
   # The snapshot format is the trust boundary for state sync: a mirror must not

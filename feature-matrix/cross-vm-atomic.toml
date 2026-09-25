@@ -23,13 +23,15 @@ subsystem = "cross_vm_atomic"
 source = "master"
 paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
 implemented = 85
-tested = 72
+tested = 78
 mainnet_ready = 68
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs global conservation proof across all bridges"]
+blockers = [
+  "**Half closed 2026-09-25 — the ledger side is proven, the bridge side is not.** The ledger transitions that carry pending supply are now asserted for all four domain ids, including the external one (`DomainId::Ethereum` -> `external_locked_supply`), with the represented total unchanged by every success and unchanged *state* left by every refusal (`pallets/x3-supply-ledger/src/tests_conservation.rs`, run by the `test x3-supply-ledger` gate). What the row asked for and still lacks is the other half: each bridge's own observe-and-record path feeding those transitions with evidence from a real external chain, and the router's accounting reconciled against the ledger under concurrent traffic."
+]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Router invariant suite covers pending supply behavior"]
 
 [[feature]]
