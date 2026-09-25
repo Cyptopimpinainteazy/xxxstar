@@ -24,8 +24,8 @@ Measured per crate with `cargo tree -i <crate>@<version>` against this tree:
 | --- | --- | --- | --- | --- |
 | `yamux` | 0.12.1 | high (GHSA-vxx9-2994-q338, remote panic on a malformed Data frame) — **re-verified: not exploitable here, see below** | **yes** | `libp2p-yamux` → `libp2p 0.54.1` → `sc-network` |
 | `hickory-proto` | 0.24.4 | high (GHSA-3v94-mw7p-v465, unbounded NSEC3 loop) + medium | **yes** | `hickory-resolver` → `libp2p-dns` → `sc-network` |
-| `evm` | 0.39.1 | medium (error return ignored) | **yes** | **our own** `crates/evm-integration` |
-| `ethereum` | 0.14.0 | medium (malleability check) | **yes** | via that `evm` |
+| `evm` | 0.39.1 | medium (error return ignored) | **yes** — **closed 2026-09-25, see below** | **our own** `crates/evm-integration` |
+| `ethereum` | 0.14.0 | medium (malleability check) | **yes** — **closed 2026-09-25, see below** | via that `evm` |
 | `serde_with` | 3.21.0 | medium | yes | `sc-network-types` |
 | `lru`, `rand` | several | low | yes (various copies) | tracing-log, libp2p-identify, jsonrpc, ark-std |
 | `libp2p-gossipsub`, `libp2p-quic`, `rustls-webpki 0.101.7`, `ring 0.16.20`, `protobuf 2.28.0`, `ed25519-dalek 1.0.1`, `idna 0.1.5`, `borsh`, `jsonwebtoken`, `atty`, `git2`, `hickory-proto 0.26.3` | — | mixed | **no** (absent from the default graph) | stale lock entries or non-default features/targets |
@@ -63,6 +63,30 @@ The one gap that is *ours to fix* is `evm 0.39.1` / `ethereum 0.14.0`: they come
 uses (`evm 0.43.4`, also present in the lock) aligns the two EVM implementations and clears both
 advisories — a real upgrade of ~2,900 lines' dependency surface, so it needs its own verification pass.
 
+**Done, 2026-09-25.** `crates/evm-integration` now depends on `rust-ethereum/evm.git` `branch =
+"v0.x"` — Frontier's spec, verbatim — and the lock resolves a single `evm 0.43.4`. Matching the
+*source spec* on the new organisation rather than pinning a `rev` is what unified the graph: a
+rev-pinned URL is a different git SourceId from the one `pallet-evm` uses, so cargo compiled two
+copies of the interpreter instead of one, which is also why the first attempt at this port hit 18
+type errors and why `primitive-types` had to move to 0.13.1 (`evm::H160`/`U256` *are*
+primitive-types types).
+
+Verifying it turned up the more serious finding: **`mini_evm::execute_evm` — the function the
+runtime actually executes EVM through — had no test**, so the interpreter could have changed
+behaviour silently. The crate's unit tests covered config, gas estimation and the state-root helper;
+`pallets/x3-kernel`'s tests drive `TestEvmAdapter`, a mock; and the only two files that ran EVM
+bytecode, `crates/evm-integration/tests/{integration,erc20_integration}.rs`, each began with
+`#![cfg(any())]` — a permanently false cfg, so `cargo test` reported "0 tests" for them rather than
+"ignored", and both had drifted off the current `EvmExecutor::execute` signature so they could not
+simply be un-commented. A report (`reports/rc3/…`) even cited `tests/integration.rs` as evidence that
+EVM integration was "Complete".
+
+Both files are real tests now, 13 unit tests drive real bytecode through `execute_evm` (including a
+CREATE-then-CALL test and an identity-precompile test with a negative control), and two gates keep
+them running: `test x3-evm-integration` and `test x3-evm-integration frontier`. The optional
+`frontier` feature builds for the first time as a side effect of the unification, which also brings
+two `frontier.rs` tests into existence that had never been compiled.
+
 ## The tooling gap this triage found
 
 The repository's own dependency gate cannot see part of what GitHub reports. Checked by cloning
@@ -91,8 +115,11 @@ repository would notice a new high-severity advisory that RustSec has not import
    version the record expects. See `docs/security/GHSA-vxx9-2994-q338.md`.
 2. **`hickory-proto 0.24.4` — unbounded NSEC3 loop, no upstream fix.** Needs a decision: accept with a
    written reason (it is DNS resolution inside libp2p), or pin/take over the resolver.
-3. **`evm 0.39.1` / `ethereum 0.14.0`** — ours; bump `crates/evm-integration` to the frontier line and
-   verify the EVM path end to end (`cargo test -p x3-evm-integration`, the EVM lifecycle gate).
+3. ~~**`evm 0.39.1` / `ethereum 0.14.0`** — ours; bump `crates/evm-integration` to the frontier line and
+   verify the EVM path end to end.~~ **Closed 2026-09-25.** Repointed to `rust-ethereum/evm.git`
+   `v0.x` (Frontier's spec, so the graph unifies on one copy), `primitive-types` to 0.13.1, and the
+   missing coverage written: `execute_evm` and both integration files are tested and gated. The
+   runtime wasm hash was re-attested because `pallet-x3-kernel` is in the runtime's graph.
 4. **A GitHub-advisory gate**, so the next high-severity GHSA in the Rust graph fails something.
 5. **npm (87 alerts)** — `x3-app-store` frontend/backend and the smaller JS projects; lockfile bumps
    with `npm audit fix` plus their own tests. Not chain-critical, but 1 critical + several high.

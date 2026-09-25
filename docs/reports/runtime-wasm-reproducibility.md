@@ -162,6 +162,15 @@ bytes**:
   program. The payload is the compiled program now and validation is the adapter's own. The bytes
   move: compact 8,489,301 bytes (was 8,488,288), compressed 1,460,962 (was 1,460,543). Two
   from-scratch builds agree.
+* `6b3e241eb` — the EVM interpreter the runtime executes is the maintained crate.
+  `crates/evm-integration` pinned `evm` to a rev of `rust-blockchain/evm`, which the upstream project
+  has left, so the node compiled two interpreters: ours (`evm 0.39.1` + `ethereum 0.14.0`, the pair
+  carrying the Dependabot advisories) and Frontier's (`evm 0.43.4`). It depends on
+  `rust-ethereum/evm.git` `branch = "v0.x"` now — Frontier's spec verbatim, because a `rev` is a
+  different git SourceId and would have kept the second copy of the interpreter in the node.
+  `mini_evm::execute_evm`, which had no test at all, now has 13 unit tests plus five across the two
+  `tests/` files that had been disabled by `#![cfg(any())]`. The bytes move: compact 8,506,569 bytes
+  (was 8,501,495), compressed 1,463,589 (was 1,461,704). Two from-scratch builds agree.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
