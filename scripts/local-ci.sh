@@ -214,6 +214,13 @@ GATES_FAST=(
   "invariant registry:python3 scripts/check-invariant-registry.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
+  # `check-readiness-consistency.sh` proves every `required_tests` name in the registry *exists* as
+  # a function. Nothing asked whether anything ever *runs* it. Five suites answered "no" on
+  # 2026-09-25 (the kernel pallet, the supply ledger, the cross-VM router, x3-x3-integration and the
+  # runtime crate itself), each of them cited as evidence in the registry. This gate resolves each
+  # registry target to a workspace member and requires a gate to test it, with a KNOWN_UNGATED list
+  # that may only shrink — so the sixth instance fails the build instead of waiting to be noticed.
+  "registry tests are gated:python3 scripts/check-registry-tests-are-gated.py"
   "economic model:bash scripts/mainnet/x3_economic_model_gate.sh --quiet"
   # A `migrations.rs` whose crate never declares the module is uncompiled,
   # untested dead weight that looks exactly like the real thing. Five such files
