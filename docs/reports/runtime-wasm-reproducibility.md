@@ -137,6 +137,13 @@ bytes**:
   compact 8,485,072 bytes (was 8,482,928), compressed 1,458,341 (was 1,459,662) — the compressed
   artifact shrinks while the compact one grows, which is exactly why the record is rebuilt rather
   than reasoned about. Two from-scratch builds agree.
+* `877c37035` — the confidential-execution attestation is verified rather than merely non-empty,
+  and the wallet's signature verification is real. `pallet-private-execution` gains a required
+  `TeeAttestationVerifier` whose shipped default refuses every report, so the runtime registers no
+  confidential validators instead of accepting `vec![1]`; the wallet crate's verifier stops
+  returning "not implemented" and checks Ed25519/Sr25519 over a stated message. The bytes move:
+  compact 8,488,288 bytes (was 8,485,072), compressed 1,460,543 (was 1,458,341). Two from-scratch
+  builds agree.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
