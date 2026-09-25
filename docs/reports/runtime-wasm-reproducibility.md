@@ -144,6 +144,14 @@ bytes**:
   returning "not implemented" and checks Ed25519/Sr25519 over a stated message. The bytes move:
   compact 8,488,288 bytes (was 8,485,072), compressed 1,460,543 (was 1,458,341). Two from-scratch
   builds agree.
+* `3e3ecb8a6` — the kernel's API surface is consolidated and the X3 receipt gains a client accessor.
+  `pallets/x3-kernel/src/runtime_api.rs` (a second, uncompiled trait declaration) is deleted, the TS
+  SDK calls `AtlasKernelRuntimeApi_get_canonical_balance` instead of a method no runtime metadata has,
+  and `AtlasKernelRuntimeApi` gains `get_x3_execution_receipt`, asserted over the wire by
+  `state_call` in the live lifecycle test. The bytes move: compact 8,501,495 bytes (was 8,496,845),
+  compressed 1,461,704 (was 1,461,148). Two from-scratch builds agree — and the compressed BLAKE2_256
+  (`0xd0996f91...`) matches the cache-mounted single build taken before the record was written, which
+  is a second check that mounting a cargo cache does not change the artifact.
 * `215c01fe6` — the X3 execution receipt is persisted. `submit_comit_v2` writes
   `X3ExecutionReceipts[comit_id]` only for an accepted comit, `STORAGE_VERSION` moves 1 -> 2 (the map
   starts empty; the migration only records the version), and the extra write is declared at the call
