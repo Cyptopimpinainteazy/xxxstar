@@ -63,17 +63,33 @@ Two facts matter more than the peak: the sweep is **flat** (adding concurrency p
 single-host one. The repository's own comparison file also records
 `"winner": "solana"` against observed Solana mainnet (non-vote avg 1,279–1,480 TPS).
 
-**The February figures are not reproducible on the current dev chain.** Same loader,
-same nominal configuration (6 senders, concurrency 32, 20 s, loopback), release
-build: **47–51 finalized TPS**, where the February archive recorded **575.5**. A
-release build is only ~25–35 % faster than the debug build here (38.2 → 47–51), so
-the build profile was never the constraint. The block cadence is not the constraint
-either: the chain holds **200 ms** blocks. What it packs into them is — **6.48
-extrinsics per block**, i.e. ~32 tx/s of block space, against the ~115 per block
-that 575 TPS would require. Finding out why a 200 ms block carries ~6 remark
-extrinsics is the single highest-value throughput question this session surfaced,
-and it needs the attribution metrics below (or a txpool ready-queue metric, which
-the node does not export either).
+**The February figures are not reproducible here — and the limit is the load
+generator, not the chain.** Same loader, same nominal configuration (6 senders,
+concurrency 32, 20 s, loopback), release build: **47–51 finalized TPS** where the
+archive recorded **575.5**. Three candidate explanations were tested and two are
+excluded by measurement:
+
+* *build profile* — release is only 25–35 % faster than debug here (38.2 → 47–51);
+* *block cadence* — the chain holds **200 ms** blocks, exactly the target;
+* *block space* — **excluded**. The txpool drained at least as fast as it filled:
+  `submitted_transactions` +1106 against `block_transactions_pruned` +1309 over the
+  same window, 0 failures, 0 invalid. The chain included everything it was offered,
+  so **6.48 extrinsics per block is the load, not the capacity**.
+
+What moves the number is the number of signers, not concurrency:
+
+| senders | concurrency | finalized TPS |
+|---|---|---|
+| 6 | 32 / 128 / 512 | 50.5 / 46.1 / 53.1 |
+| 24 | 256 | 77.0 |
+| 48 | 512 | 99.6 |
+
+A 16x increase in concurrency changes nothing; quadrupling and then doubling the
+signer count raises it steadily. That is the signature of a **client-bound**
+measurement: the JavaScript load generator signs and submits from the same two
+cores the node is using. The ceiling measured here is therefore the harness's, and
+**the chain's own ceiling is still unmeasured** — including whether it is anywhere
+near the 575 the February host recorded.
 
 **100K TPS is not supported by any measurement here.** It is ~172x the best
 single-host figure and ~3,270x the 7-validator figure.
@@ -186,8 +202,10 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
   from the recovered archive; every storage observation in this document is a
   single dev node.
 * **No comparable-to-February number.** The release build was measured on this
-  2-core desktop, and the February host and build are unrecorded. 47–51 here versus
-  575 then is a discrepancy to explain, not a like-for-like regression figure.
+  2-core desktop, where the load generator competes with the node for both cores.
+  47–51 here versus 575 then is a harness-capacity difference, not a like-for-like
+  regression figure — and disentangling the two needs a load host that is not the
+  node's host.
 * **No claim that the snapshot format is complete:** it verifies, exports and
   cross-checks against a real chain root, and cannot yet restore.
 * **No reproducibility claim.** `srtool` is installed, but it builds inside Docker
