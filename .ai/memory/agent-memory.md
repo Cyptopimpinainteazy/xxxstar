@@ -8053,3 +8053,49 @@ decision needs.
    non-reference host are a real argument in both directions) — either way it stops being an open
    question.
 2. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
+
+## 2026-09-25 (fiftieth pass) — the weights path was broken in five places, and `submit_comit_v2` has no benchmark
+
+### The chain of findings (each one only visible after fixing the previous)
+1. **`cargo build --release --features runtime-benchmarks` did not compile at all** — `E0046 missing
+   try_successful_origin` at `pallets/x3-custody/src/lib.rs:249`. The method exists behind
+   `#[cfg(feature = "runtime-benchmarks")]`; the runtime never forwarded that feature to the pallet.
+2. **19 of the 52 runtime dependencies with a `runtime-benchmarks` feature had never compiled with it**
+   (15 std, 4 more in the wasm build). `runtime/Cargo.toml` now forwards the 33 that compile and names
+   the 19 that do not, each with its first error. Recurring shapes: `E0046 try_successful_origin`
+   (solvency, reservation, rebalance, partner, treasury-policy), `E0433 std` / undeclared `Box`
+   (x3-coin, x3-automation, governance, agent-accounts, agent-memory), and one parse error.
+3. **`pallet_x3_kernel` was not in `define_benchmarks!`**, so the CLI said "No benchmarks found". The
+   alias in that macro must be the **`construct_runtime!` name** (`AtlasKernel`), because
+   `list_benchmarks!`/`add_benchmarks!` expand at crate root where only that name exists.
+4. **A stale `wbuild` blob answers with the previous benchmark list.** `wasm-builder` did not rebuild
+   when only runtime sources changed; `rm -rf target/release/wbuild/x3-chain-runtime` then rebuild is
+   what made new registrations visible. Anyone measuring weights must force that.
+5. **`submit_comit_v2` has no benchmark** — the kernel's module defines nine extrinsics, and it is not
+   one. So the weights entry is not "un-run", it is a hand-written copy of `submit_comit`'s cost.
+
+### What this means for the next agent
+Writing the missing benchmark needs a **real compiled X3BC payload fixture**: the runtime's adapter
+validates the x3 payload (magic/version/checksum), while the pallet's mock `TestX3Adapter` accepts
+anything — so a synthetic fixture would pass against the mock and fail on the chain. EVM/SVM payloads
+must likewise be valid packets (`verify_payloads_v2`).
+
+### Measured at `f4357ae025`
+- `bash scripts/local-ci.sh` -> 50 of 50 gates PASS; `cargo check --workspace`, runtime tests (53),
+  kernel tests (218) all green — the forwards and the `benches` module are behind `runtime-benchmarks`,
+  so the **default build and wasm are unchanged**.
+- The benchmark CLI now lists the kernel's nine benchmarks (was: none). Full write-up:
+  `.ai/reports/benchmark-regeneration-20260925.md`.
+
+### Still open
+1. Write the `submit_comit_v2` benchmark (compiled X3BC fixture + valid packet payloads), then generate
+   its weight and delete the placeholder comment.
+2. Fix the 19 never-compiled benchmark modules, or record per pallet why not.
+3. `wasm-builder` staleness deserves a note in the release docs or a gate.
+4. Multi-validator evidence, live-chain upgrade rehearsal, external-bridge half of X3-XVM-002; rotate
+   the bridge API key in git history.
+
+### Next task seed
+1. Write the `submit_comit_v2` benchmark — it is now the only thing standing between the kernel's weight
+   table and measured numbers.
+2. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
