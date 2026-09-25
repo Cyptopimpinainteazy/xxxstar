@@ -31,6 +31,7 @@ Eleven commits across four pull requests: #501, #503, #504, #505 — then #506
 | per-block metrics | `x3_imported_block_bytes`, `x3_imported_block_extrinsics`, `x3_block_interval_seconds` | measured live (below) |
 | runtime attribution | #513: `node/src/timed_executor.rs` — `x3_runtime_call_seconds{method}`, `x3_runtime_calls_total{method}`, `x3_runtime_call_errors_total{method}`, `x3_runtime_version_seconds`; `scripts/proof/runtime-attribution.py` | 3 unit tests; measured live under load (§2) |
 | failure drills | `scripts/mainnet/prove-crash-consistency.sh` (SIGKILL + restart, 7/7) and `prove-disk-full-authoring.sh` (real ENOSPC on a namespaced tmpfs); authoring pauses below the disk floor instead of reporting it | measured (§2) |
+| throughput attribution | `scripts/proof/block-fill.js` (per-block weight/byte fill and inclusion rate) and `scripts/proof/cpu-attribution.py` (core-seconds per process) | measured under load (§2) |
 | orchestrator | the exported-but-unused `ProofVerifier`/`VmExecutor` traits are now the adapters' real extension point; honest default preserved | `cargo test -p x3-orchestrator` 7 passed |
 | external-chains | Arbitrum test's anvil readiness loop retries instead of panicking | 4 passed, needs `anvil` |
 | tooling | pytest `testpaths`/`.kilo` fix, `tomli` fallback in two scripts, `requirements-dev.txt`, `proof_report` enforcement, explorer + super-ide dependency alignment | see §2 |
@@ -152,6 +153,46 @@ than 575 versus 47.
 single-host figure and ~3,270x the 7-validator figure — and the per-extrinsic
 arithmetic below puts it at a few hundred cores of execution capacity, which is a
 runtime-cost problem rather than a client or configuration one.
+
+**What the chain's own limits are (new), and why the TPS figures above are the
+harness's.** Every number in the table is a client's transactions reaching
+finality, which cannot see the difference between "the chain is full" and "the
+client stopped feeding it". Three measurements separate them.
+
+*Block fill, under load* (`scripts/proof/block-fill.js`, 48 senders, the same run
+that finalized 123.2 TPS wall):
+
+| the runtime's own limits | value |
+|---|---|
+| block weight budget | **150 ms** of ref_time (5 MB proof size) |
+| block length | 5 MB hard cap, 4.5 MB normal |
+| one signed `system.remark` | **0.3596 ms** of weight |
+| therefore, by weight | **417 extrinsics per block** → 2,024/s at this cadence |
+| measured blocks | 176 blocks / 36.3 s (4.85 blocks/s), mean **26.63 extrinsics**, mean **11.8 ms of weight = 7.9 % of the budget** |
+| measured bytes | mean 3,615 of 4,718,592 normal (**0.16 %**) |
+| chain inclusion rate | **129.2 extrinsics/s** |
+
+The chain was carrying 129 extrinsics/s at **8 % of its weight budget and 0.16 %
+of its byte budget**. It is not full.
+
+*Where the CPU went* (`scripts/proof/cpu-attribution.py`, 50 s window, single
+loader, 121.8 TPS wall): author node **15.67 core-seconds (15.7 % of the box)**,
+importing node **12.92 (12.9 %)**, load generator **30.47 (30.5 %)** — 59.1 % of
+the box in total. The generator costs more CPU than both nodes together, and
+nothing was saturated. Run with two generators (96 senders) the aggregate wall
+figure moved 121.8 → 127.6 TPS while box use went 59.1 % → 64.8 %, and each
+generator's own submit-window rate was 83–88/s: the chain absorbed everything
+offered (0 failed, ready queue empty) and the wall figures are deflated by each
+generator's 20 s finality tail.
+
+*The chain's own ceiling for this workload* is therefore set by single-threaded
+execution, not by weight: at the measured 1.556 ms per `BlockBuilder_apply_extrinsic`
+a 200 ms slot with a ~133 ms proposal window fits about **85 signed remarks per
+block, ≈ 410/s**, and the task needs ~156 core-seconds of execution per second of
+100 K TPS — about **156 cores of execution alone**, before networking, validation
+or the database. That is the honest answer to "can we push it harder": yes, well
+past 123, because the chain is at 8 % of its limits and the client is the
+constraint — but 100K TPS is a runtime-cost problem, not a configuration one.
 
 **Storage metrics that exist versus not** (measured by scraping a live
 `--prometheus-external` endpoint):
@@ -385,6 +426,12 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
   47–51 here versus 575 then is a harness-capacity difference, not a like-for-like
   regression figure — and disentangling the two needs a load host that is not the
   node's host.
+* **No claim that the chain's ceiling has been measured either.** The block-fill
+  measurements bound it from below (129 extrinsics/s at 8 % of the weight budget)
+  and from above by execution time (~410/s for signed remarks on this box), but no
+  client we have can supply enough work to reach it: the generator saturates
+  first. That still needs a load host that is not the node's host, or a workload
+  whose cost is not one signature per extrinsic.
 * **No claim that state sync is finished.** The snapshot format verifies,
   exports, cross-checks against real chain roots and restores into a bootable
   chain spec, but it is state *transport*: nothing installs that state behind a
