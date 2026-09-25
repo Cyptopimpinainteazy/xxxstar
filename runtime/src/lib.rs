@@ -2748,6 +2748,12 @@ impl pallet_private_execution::Config for Runtime {
     type MaxDiffsPerBlock = MaxDiffsPerBlock;
     type MaxEncryptedPayloadSize = MaxEncryptedPayloadSize;
     type AttestationValidityPeriod = AttestationValidityPeriod;
+    // PRIV-EXEC-004 (an attestation is verified before a validator joins the confidential
+    // set) cannot be honoured without a vendor trust root, and this runtime has none: the
+    // pallet's previous check was `!report.is_empty()`. The default refuses every report,
+    // which disables confidential-validator registration on this runtime rather than
+    // admitting any account that can sign and send a byte.
+    type AttestationVerifier = pallet_private_execution::RefuseAllAttestations;
     type ConfidentialValidatorShareBps = ConfidentialValidatorShareBps;
     type PrivateBurnShareBps = PrivateBurnShareBps;
     type PrivateStakerShareBps = PrivateStakerShareBps;

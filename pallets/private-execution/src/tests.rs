@@ -9,8 +9,10 @@ use frame_support::{assert_noop, assert_ok};
 use sp_core::H256;
 
 fn dummy_attestation() -> Vec<u8> {
-    // Non-empty = passes simplified verification
-    b"NVIDIA-CC-ATTESTATION-REPORT-V1-MOCK".to_vec()
+    // A labelled fixture, not "some non-empty bytes": `TestAttestationVerifier` accepts
+    // this prefix and refuses everything else, so a report the verifier does not
+    // recognise cannot register a validator just by existing.
+    b"TEST-TEE-QUOTE\x00nvidia-h100-test-fixture".to_vec()
 }
 
 fn dummy_enclave_key() -> [u8; 32] {
@@ -51,6 +53,57 @@ fn reject_unattested() {
         assert_eq!(att.status, EnclaveStatus::Verified);
         assert_eq!(PrivateExecution::confidential_validator_count(), 1);
     });
+}
+
+/// The behaviour this pallet shipped with: `verify_attestation` was
+/// `!report.is_empty()`, so any signed account could register as a confidential validator
+/// — and collect the confidential premium-fee share — with a single byte. A report that
+/// merely *looks* like an attestation must be refused too.
+#[test]
+fn a_plausible_report_the_verifier_does_not_recognise_is_refused() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(PrivateExecution::set_enabled(RuntimeOrigin::root(), true));
+
+        assert_noop!(
+            PrivateExecution::register_confidential_validator(
+                RuntimeOrigin::signed(1),
+                b"NVIDIA H100".to_vec(),
+                b"NVIDIA-CC-ATTESTATION-REPORT-V1".to_vec(),
+                dummy_enclave_key(),
+            ),
+            Error::<Test>::InvalidAttestation
+        );
+        assert_noop!(
+            PrivateExecution::register_confidential_validator(
+                RuntimeOrigin::signed(1),
+                b"NVIDIA H100".to_vec(),
+                vec![1],
+                dummy_enclave_key(),
+            ),
+            Error::<Test>::InvalidAttestation
+        );
+        assert_eq!(PrivateExecution::confidential_validator_count(), 0);
+    });
+}
+
+/// The posture the runtime configures: with no vendor trust root, the shipped default
+/// verifier refuses every report, so confidential-validator registration is disabled
+/// rather than open to anyone who can sign.
+#[test]
+fn the_shipped_verifier_refuses_every_report() {
+    use crate::{RefuseAllAttestations, TeeAttestationVerifier};
+    for report in [
+        &b""[..],
+        &b"x"[..],
+        &b"NVIDIA-CC-ATTESTATION-REPORT-V1"[..],
+        &[0xFFu8; 4096][..],
+    ] {
+        assert!(!RefuseAllAttestations::verify(
+            report,
+            b"NVIDIA H100",
+            &[7u8; 32]
+        ));
+    }
 }
 
 #[test]

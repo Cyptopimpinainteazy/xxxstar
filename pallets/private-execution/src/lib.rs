@@ -24,6 +24,36 @@
 
 pub use pallet::*;
 
+/// Verifies a confidential-computing attestation report against a trust root.
+///
+/// The pallet cannot check an NVIDIA CC (or any vendor) attestation chain by itself:
+/// that needs the vendor's trust root, a certificate chain and a signature check over
+/// the report, the GPU model and the enclave key. Until a chain configures a verifier
+/// that can do that, the shipped default refuses every report — which disables
+/// confidential-validator registration instead of accepting a non-empty byte string as
+/// proof. `register_confidential_validator` used to do exactly that: `verify_attestation`
+/// was `!report.is_empty()`, so any signed account could take a confidential slot and
+/// its premium-fee share with `vec![1]`.
+pub trait TeeAttestationVerifier {
+    /// `true` only when `report` is a genuine attestation for `gpu_model` and
+    /// `enclave_public_key`. Implementations must fail closed: anything they cannot
+    /// verify answers `false`.
+    fn verify(report: &[u8], gpu_model: &[u8], enclave_public_key: &[u8; 32]) -> bool;
+}
+
+/// The default verifier: refuse every report.
+///
+/// PRIV-EXEC-004 says an attestation is verified before a validator joins the
+/// confidential set. With no vendor verifier configured, the only honest way to keep
+/// that invariant is to refuse — the type name is the documentation.
+pub struct RefuseAllAttestations;
+
+impl TeeAttestationVerifier for RefuseAllAttestations {
+    fn verify(_report: &[u8], _gpu_model: &[u8], _enclave_public_key: &[u8; 32]) -> bool {
+        false
+    }
+}
+
 #[cfg(test)]
 mod mock;
 
@@ -113,6 +143,14 @@ pub mod pallet {
         /// Attestation validity period in blocks.
         #[pallet::constant]
         type AttestationValidityPeriod: Get<BlockNumberFor<Self>>;
+
+        /// How an attestation report is verified.
+        ///
+        /// Required, not optional: PRIV-EXEC-004 is only true when something can
+        /// actually verify the report. The shipped default (`RefuseAllAttestations`)
+        /// refuses everything, so a chain that has not implemented a vendor verifier
+        /// registers no confidential validators at all.
+        type AttestationVerifier: TeeAttestationVerifier;
 
         /// Revenue share to confidential validators (bps out of 10_000).
         #[pallet::constant]
@@ -343,9 +381,8 @@ pub mod pallet {
                 Error::<T>::MaxValidatorsReached
             );
 
-            // Verify attestation (simplified — real impl would verify NVIDIA CC report)
             ensure!(
-                Self::verify_attestation(&attestation_report),
+                Self::verify_attestation(&attestation_report, &gpu_model, &enclave_public_key),
                 Error::<T>::InvalidAttestation
             );
 
@@ -403,7 +440,11 @@ pub mod pallet {
                 let att = maybe_att.as_mut().ok_or(Error::<T>::ValidatorNotFound)?;
 
                 ensure!(
-                    Self::verify_attestation(&new_attestation_report),
+                    Self::verify_attestation(
+                        &new_attestation_report,
+                        att.gpu_model.as_slice(),
+                        &att.enclave_public_key
+                    ),
                     Error::<T>::InvalidAttestation
                 );
 
@@ -617,11 +658,18 @@ pub mod pallet {
             T::PalletId::get().into_account_truncating()
         }
 
-        /// Verify an attestation report.
-        /// In production this would verify the NVIDIA CC attestation chain.
-        /// For now, accepts any non-empty report.
-        fn verify_attestation(report: &[u8]) -> bool {
-            !report.is_empty()
+        /// Verify an attestation report through the configured verifier.
+        ///
+        /// This delegates rather than guessing: a report, a GPU model and an enclave key
+        /// are only bound together by the vendor's attestation chain, and the pallet has
+        /// no trust root to check it against. `T::AttestationVerifier` supplies one, and
+        /// its default refuses.
+        fn verify_attestation(
+            report: &[u8],
+            gpu_model: &[u8],
+            enclave_public_key: &[u8; 32],
+        ) -> bool {
+            T::AttestationVerifier::verify(report, gpu_model, enclave_public_key)
         }
 
         /// Distribute premium fees.

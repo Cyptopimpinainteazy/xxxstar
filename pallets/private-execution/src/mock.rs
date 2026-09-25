@@ -85,6 +85,23 @@ parameter_types! {
     pub const PrivateStakerShareBps: u16 = 1_500;          // 15%
 }
 
+/// The test verifier: recognises the labelled fixture this crate's tests build, and
+/// nothing else.
+///
+/// Its purpose is to let the pallet's tests drive the *verified* path end to end. It is
+/// deliberately not "accept anything non-empty" — the fixture has to look like a report
+/// and bind the GPU model and enclave key, so the tests would fail if the pallet stopped
+/// passing those through to the verifier.
+pub struct TestAttestationVerifier;
+
+impl pallet_private_execution::TeeAttestationVerifier for TestAttestationVerifier {
+    fn verify(report: &[u8], gpu_model: &[u8], enclave_public_key: &[u8; 32]) -> bool {
+        report.starts_with(b"TEST-TEE-QUOTE\x00")
+            && !gpu_model.is_empty()
+            && *enclave_public_key != [0u8; 32]
+    }
+}
+
 impl pallet_private_execution::Config for Test {
     type Currency = Balances;
     type BurnDestination = ();
@@ -99,6 +116,7 @@ impl pallet_private_execution::Config for Test {
     type ConfidentialValidatorShareBps = ConfidentialValidatorShareBps;
     type PrivateBurnShareBps = PrivateBurnShareBps;
     type PrivateStakerShareBps = PrivateStakerShareBps;
+    type AttestationVerifier = TestAttestationVerifier;
     type WeightInfo = ();
 }
 
