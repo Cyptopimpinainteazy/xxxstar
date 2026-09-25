@@ -100,6 +100,18 @@ everything it was offered again. Its measured inclusion rate was ~70 tx/s, which
 matches the wall figure of 73.2 and is the number to quote; 149.6 is the
 submit-window artifact described next.
 
+**Running more loader processes does not change it.** Three processes, 85 senders
+each (255 total, prefunded once via `ONLY_PREFUND=true` to avoid a nonce race),
+produced 3,418 finalized transactions, 0 failed, and an aggregate wall rate of
+**74.6 TPS** — against 73.2 for a single process with 192 senders. Across every
+configuration tried, from 6 senders in one process to 255 across three, the wall
+figure sits between **73 and 97 TPS**, and the pool never fills.
+
+The machine is the limit, and it says so: `nproc` is **2**, and the load average
+during these runs was **4.8–6.9**. The node and the load generator are competing for
+the same two cores. That is why every configuration converges on the same number —
+it is this box's capacity to run a node and a client at once, not a property of X3.
+
 **A metric caveat that applies to every TPS figure in this document.** The loader
 reports two numbers: `finalized_tps_submit_window`, which divides finalized
 transactions by the *submit* duration and ignores the finality wait, and
