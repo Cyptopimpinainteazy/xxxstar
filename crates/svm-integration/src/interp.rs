@@ -965,7 +965,13 @@ pub fn execute_bpf(
 
     match vm.run() {
         Ok(r0) => {
-            let compute_units = config.compute_unit_limit - vm.fuel;
+            // Fuel actually granted, not the caller's limit: the two differ whenever the
+            // limit is above MAX_INSN_FUEL, and subtracting from the caller's number counted
+            // the gap between them as if it had been burned. Measured before the fix: a
+            // two-instruction program under a 2_000_000 unit limit reported 1_000_002 units
+            // used (crates/svm-integration/tests/interpreter_robustness.rs), and the pallet
+            // charges the number this returns.
+            let compute_units = fuel - vm.fuel;
             let mut result = SvmExecutionResult {
                 success: r0 == 0, // Solana convention: 0 = success
                 output: r0.to_le_bytes().to_vec(),
@@ -988,7 +994,14 @@ pub fn validate_program(payload: &[u8]) -> SvmResult<()> {
         return Err(SvmError::InvalidPayload);
     }
     if payload.starts_with(b"\x7fELF") {
-        elf_find_text(payload).ok_or(SvmError::InvalidPayload)?;
+        // The same checks `execute_bpf` applies to the text section it finds. Validation is
+        // the pallet's precondition for execution, so a payload that validates must not be
+        // refused by execution for a reason validation could have seen: a `.text` that is
+        // empty or is not a whole number of 8-byte instructions is malformed either way.
+        let text = elf_find_text(payload).ok_or(SvmError::InvalidPayload)?;
+        if text.is_empty() || !text.len().is_multiple_of(8) {
+            return Err(SvmError::InvalidPayload);
+        }
         return Ok(());
     }
     if !payload.len().is_multiple_of(8) {
