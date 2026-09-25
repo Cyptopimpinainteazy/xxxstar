@@ -7320,3 +7320,26 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   needs an unknown (parameter) operand to reach the identity.
 - Corpus: 8 shapes through both engines (fib, loop_ops, match_cond, branch_fold, loop_sum, loop_break,
   loop_continue) plus the float test. Still unproven: match statements, strings, host calls.
+
+**2026-09-24 — the trading verifier was measured against PHASE 4, and one invariant was missing (TICKET-134)**
+
+- **Method that worked: one program per spec sentence.** PHASE 4 lists twelve invariants; writing one
+  adversarial program per invariant and running `x3c check` on each turned the row "Needs real stateful
+  verifier" (STUB) into a measured PARTIAL: seven invariants are enforced with named codes
+  (`X3E2107` for use-before-binding and for a binding/asset-type mismatch, `X3E4022` for a debt repaid
+  twice, `X3E4021` for an unfulfilled effect, `X3E4025` for a missing `all_debts_repaid` or an unknown
+  policy). One was not.
+- **The missing one: PHASE 4's "profit checks must occur after all required costs are known".** The
+  verifier tracked `has_net_profit_guard` — *presence*, never *position* — so a `require net_profit`
+  placed directly after the `borrow`, before any swap, checked clean. Fixed: the guard's index is
+  compared against the last borrow/swap/repay (bridges excluded — they move value without changing it),
+  refused with `X3E4023` naming both statement positions.
+- **A new verifier rule needs the whole workspace as its regression test**, not just the new case: 1316
+  tests pass after it, so nothing this tree used to accept is refused now. Run that before shipping a
+  rule that can only refuse.
+- The ledger's "Type: OPEN" lines under a "— CLOSED" heading are **preserved originals** ("Original
+  entry:"), not stale records — the x3lang ledger has no open tickets. Read the heading, not the line.
+- Checked-in reports go stale: `rustfmt --all --check` was red in x3-lang for four files
+  (`vm/src/trading.rs`, `vm/src/x3_lang_vm.rs`, `vm/tests/trading_execution.rs`,
+  `compiler/src/trading_semantic.rs`); verify a gate's colour with `git show HEAD:<file> | rustfmt
+  --check --edition 2021 -` before blaming your own change, and land the repair in its own commit.
