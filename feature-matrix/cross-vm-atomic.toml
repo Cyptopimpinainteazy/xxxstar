@@ -23,14 +23,21 @@ subsystem = "cross_vm_atomic"
 source = "master"
 paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
 implemented = 85
-tested = 78
+tested = 86
 mainnet_ready = 68
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "**Half closed 2026-09-25 — the ledger side is proven, the bridge side is not.** The ledger transitions that carry pending supply are now asserted for all four domain ids, including the external one (`DomainId::Ethereum` -> `external_locked_supply`), with the represented total unchanged by every success and unchanged *state* left by every refusal (`pallets/x3-supply-ledger/src/tests_conservation.rs`, run by the `test x3-supply-ledger` gate). What the row asked for and still lacks is the other half: each bridge's own observe-and-record path feeding those transitions with evidence from a real external chain, and the router's accounting reconciled against the ledger under concurrent traffic."
+  "**Two thirds closed 2026-09-25 — the ledger and the router are both proven, the external bridges are not.** The ledger's transitions are asserted for all four domain ids including the external one (`pallets/x3-supply-ledger/src/tests_conservation.rs`). The router's own suite, which wires the registry, the ledger and the router into one runtime, already proved the reconciliation and now runs in a gate: `test_x3_native_evm_svm_roundtrip_preserves_supply` (pending 50 while the leg is in flight, 0 once it completes, canonical ceiling unchanged, invariant checked at every point) and `test_failed_destination_credit_refunds_pending_supply` (an expired leg returns its pending supply to the source). `test x3-cross-vm-router` was added because those 81 tests ran in no gate list either. What the row still lacks is the half it named: each bridge's own observe-and-record path feeding those transitions with evidence from a real external chain, and the router's accounting reconciled under concurrent multi-validator traffic rather than in one externalities.",
+]
+required_tests = [
+  "test_x3_native_evm_svm_roundtrip_preserves_supply",
+  "test_failed_destination_credit_refunds_pending_supply",
+]
+test_evidence = [
+  "note: both are in pallets/x3-cross-vm-router/src/tests.rs and run under the `test x3-cross-vm-router` gate added 2026-09-25 (2026-09-25)",
 ]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Router invariant suite covers pending supply behavior"]
 
@@ -41,13 +48,22 @@ subsystem = "cross_vm_atomic"
 source = "master"
 paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
 implemented = 88
-tested = 78
+tested = 84
 mainnet_ready = 72
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Supply ledger broader system still partial"]
+blockers = [
+  "**Re-derived 2026-09-25.** The claim this row makes — canonical supply is preserved across every route — is asserted by the router suite that wires the registry, ledger and router into one runtime: `test_x3_native_evm_svm_roundtrip_preserves_supply` walks the native -> EVM -> SVM round trip and checks the invariant and the canonical ceiling at each leg, and `test_all_six_internal_routes_succeed` drives all six internal route pairs with the ledger behind them. Both were ungated until 2026-09-25, when `test x3-cross-vm-router` was added to the fast set. Still open: the external (non-X3VM) route pairs are refused at genesis by design and their real-chain counterparts are untested here, and nothing reconciles the router under concurrent multi-validator traffic.",
+]
+required_tests = [
+  "test_x3_native_evm_svm_roundtrip_preserves_supply",
+  "test_all_six_internal_routes_succeed",
+]
+test_evidence = [
+  "note: both are in pallets/x3-cross-vm-router/src/tests.rs and run under the `test x3-cross-vm-router` gate added 2026-09-25",
+]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes canonical supply never breaks"]
 
 [[feature]]

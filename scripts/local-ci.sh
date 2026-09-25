@@ -273,6 +273,13 @@ GATES_FAST=(
   # functions every cross-domain operation runs through were untested. They are covered now, and this
   # gate is what keeps them covered.
   "test x3-supply-ledger:cargo test -p pallet-x3-supply-ledger"
+  # The other two pallets of the same atomic path. `pallet-x3-cross-vm-router` owns the round trip
+  # the whole kernel exists for — the headline test is literally
+  # `test_x3_native_evm_svm_roundtrip_preserves_supply` — and, like the supply ledger and the kernel
+  # itself, its 81-test suite was in no gate list. `pallet-x3-asset-registry` gates every route and
+  # asset lifecycle decision those two depend on.
+  "test x3-cross-vm-router:cargo test -p pallet-x3-cross-vm-router"
+  "test x3-asset-registry:cargo test -p pallet-x3-asset-registry"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
   # The snapshot format is the trust boundary for state sync: a mirror must not

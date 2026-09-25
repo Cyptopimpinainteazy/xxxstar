@@ -1282,7 +1282,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 76,
+      "composite": 78,
       "confidence": "high",
       "evidence": [
         "pallets/x3-cross-vm-router/src/lib.rs",
@@ -1294,7 +1294,7 @@
       "live_tested": "LIVE_TESTNET",
       "mainnet_ready": 68,
       "missing_work": [
-        "**Half closed 2026-09-25 \u2014 the ledger side is proven, the bridge side is not.** The ledger transitions that carry pending supply are now asserted for all four domain ids, including the external one (`DomainId::Ethereum` -> `external_locked_supply`), with the represented total unchanged by every success and unchanged *state* left by every refusal (`pallets/x3-supply-ledger/src/tests_conservation.rs`, run by the `test x3-supply-ledger` gate). What the row asked for and still lacks is the other half: each bridge's own observe-and-record path feeding those transitions with evidence from a real external chain, and the router's accounting reconciled against the ledger under concurrent traffic."
+        "**Two thirds closed 2026-09-25 \u2014 the ledger and the router are both proven, the external bridges are not.** The ledger's transitions are asserted for all four domain ids including the external one (`pallets/x3-supply-ledger/src/tests_conservation.rs`). The router's own suite, which wires the registry, the ledger and the router into one runtime, already proved the reconciliation and now runs in a gate: `test_x3_native_evm_svm_roundtrip_preserves_supply` (pending 50 while the leg is in flight, 0 once it completes, canonical ceiling unchanged, invariant checked at every point) and `test_failed_destination_credit_refunds_pending_supply` (an expired leg returns its pending supply to the source). `test x3-cross-vm-router` was added because those 81 tests ran in no gate list either. What the row still lacks is the half it named: each bridge's own observe-and-record path feeding those transitions with evidence from a real external chain, and the router's accounting reconciled under concurrent multi-validator traffic rather than in one externalities."
       ],
       "name": "Pending-supply accounting",
       "paths": [
@@ -1305,13 +1305,13 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "cross_vm_atomic",
-      "tested": 78,
+      "tested": 86,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 79,
+      "composite": 81,
       "confidence": "high",
       "evidence": [
         "pallets/x3-cross-vm-router/src/lib.rs",
@@ -1323,7 +1323,7 @@
       "live_tested": "LIVE_TESTNET",
       "mainnet_ready": 72,
       "missing_work": [
-        "Supply ledger broader system still partial"
+        "**Re-derived 2026-09-25.** The claim this row makes \u2014 canonical supply is preserved across every route \u2014 is asserted by the router suite that wires the registry, ledger and router into one runtime: `test_x3_native_evm_svm_roundtrip_preserves_supply` walks the native -> EVM -> SVM round trip and checks the invariant and the canonical ceiling at each leg, and `test_all_six_internal_routes_succeed` drives all six internal route pairs with the ledger behind them. Both were ungated until 2026-09-25, when `test x3-cross-vm-router` was added to the fast set. Still open: the external (non-X3VM) route pairs are refused at genesis by design and their real-chain counterparts are untested here, and nothing reconciles the router under concurrent multi-validator traffic."
       ],
       "name": "Canonical supply preservation across routes",
       "paths": [
@@ -1334,7 +1334,7 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "cross_vm_atomic",
-      "tested": 78,
+      "tested": 84,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
@@ -4378,7 +4378,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "57cd00ce1ab48ac1ee0a2e3513479a9222dfd3427986ada65075fafc1c8de1fd",
+    "source_digest": "73e398c57f3f6ab0a08773ca1340a5b207aa084c2cf275f65f8a32f0b681dffc",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4386,7 +4386,7 @@
       "feature-matrix/claims-hygiene.toml": "38adfc42c2cfe602e3588afb5ee401319b27d4b2cbd824b7e262b46a552da389",
       "feature-matrix/consensus-l1.toml": "86b9d3871259ddee0dde4393b92ab67be0e5a4bccefd642d28c53d25ca8b4f82",
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
-      "feature-matrix/cross-vm-atomic.toml": "ca6b6d18e2c30271285d332902feab32f660a33c54a391b2748ec73106aedbf7",
+      "feature-matrix/cross-vm-atomic.toml": "bb43674a4bc6f2d3ca9c6af54eff3f40f509612377b0f9fd095ec956a054ef5f",
       "feature-matrix/economic-defi.toml": "34d83bfb027c88042f7b6f88b0552f2d6a4428c798360ccb432a893cf1b67743",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
       "feature-matrix/language-trading.toml": "eb2207dc3be3c6012fb6ebb1e8bcc7f8aeb16f2118718b4f6a3863cb4d1a8f02",
