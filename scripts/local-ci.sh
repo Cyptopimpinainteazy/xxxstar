@@ -252,6 +252,19 @@ GATES_FAST=(
   # inside a window recorded in `security/advisory-scope.toml`, or if the resolved set drifts from
   # that record -- so a lockfile bump cannot quietly turn a verified judgement into a stale claim.
   "advisory scope:python3 scripts/check-advisory-scope.py"
+  # The dependency gate `.cargo/audit.toml` and `deny.toml` were written for, and which no gate
+  # ever ran. `.cargo/audit.toml` carries a long ignore list with a reason per entry; nothing
+  # verified it, nothing noticed a new advisory, and nothing noticed an ignore that had gone
+  # stale. The first run found RUSTSEC-2026-0285: rustls 0.23.44 accepting TLS 1.3 handshake
+  # messages across encryption-level boundaries, unignored, in a crate that ships inside the
+  # node via futures-rustls -> libp2p-websocket -> libp2p -> sc-network -- with every other
+  # gate in this set green. Fixed by a one-version bump to 0.23.45.
+  #
+  # Cargo cannot see an advisory that lives only in the GitHub Advisory Database, because those
+  # have no RustSec id; `advisory scope` above covers that half. The two are complementary.
+  # The wrapper audits with --no-fetch (hermetic, ~1s) and fails when the local RustSec database
+  # is older than 45 days, so a database nobody refreshed cannot masquerade as a clean audit.
+  "dependency audit:bash scripts/check-dependency-audit.sh"
   "feature matrix check:python3 scripts/feature_matrix.py check"
   # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
   # `audit-artifacts/current/feature-status.json` are *derived* from FEATURE_REGISTRY.toml and
@@ -723,13 +736,20 @@ fi
 echo "local-ci $STAMP — root=$ROOT"
 echo "local-ci: ${#SELECTED[@]} gate(s), jobs=$JOBS, cargo-jobs=$CARGO_JOBS, $BRANCH@$HEAD_SHA ($DIRTY)"
 for note in "${NOTES[@]:-}"; do [ -n "$note" ] && echo "local-ci: note: $note"; done
-echo "local-ci: prereqs: $(for tool in cargo python3 node docker srtool; do if command -v "$tool" >/dev/null 2>&1; then printf '%s=ok ' "$tool"; else printf '%s=MISSING ' "$tool"; fi; done)"
+echo "local-ci: prereqs: $(for tool in cargo python3 node docker srtool cargo-audit; do if command -v "$tool" >/dev/null 2>&1; then printf '%s=ok ' "$tool"; else printf '%s=MISSING ' "$tool"; fi; done)"
 command -v srtool >/dev/null 2>&1 || cat <<'EOF'
 local-ci: note: srtool missing -> `--release` / `make mainnet-check` fails on its
 local-ci:       reproducibility section. This box has lost the binary more than
 local-ci:       once (something rewrites ~/.cargo/bin). Re-install it — the same
 local-ci:       pinned revision the self-hosted gate job uses — with:
 local-ci:         make srtool-install
+EOF
+command -v cargo-audit >/dev/null 2>&1 || [ -x "$HOME/.cargo/bin/cargo-audit" ] || cat <<'EOF'
+local-ci: note: cargo-audit missing -> the `dependency audit` gate fails, and the
+local-ci:       ignore list in .cargo/audit.toml goes unverified. Install it with:
+local-ci:         cargo install cargo-audit --locked
+local-ci:       (or the prebuilt musl binary -- the gnu one needs GLIBC_2.38+; see
+local-ci:        scripts/check-dependency-audit.sh for the exact commands)
 EOF
 echo "log: $LOG"
 

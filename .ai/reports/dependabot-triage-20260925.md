@@ -127,6 +127,15 @@ questions, and neither is the whole picture. A gate that reads GitHub advisories
 on new Dependabot alerts of `high`+ in the Rust graph) is the missing piece; today nothing in the
 repository would notice a new high-severity advisory that RustSec has not imported.
 
+**Status of that, 2026-09-25.** The RustSec half is now a gate: `dependency audit` runs
+`cargo-audit` against `.cargo/audit.toml`, which no gate had ever invoked — and its first run found
+`RUSTSEC-2026-0285` (rustls 0.23.44, TLS 1.3 handshake confusion in the libp2p websocket transport)
+unignored and shipping in the node. Fixed by a one-version bump to 0.23.45.
+`.ai/reports/dependency-audit-20260925.md` records the finding, the before/after audit output, and
+what the gate still does not cover. Advisory *records* for the GitHub-only half are enforced by
+`advisory scope`; a gate that notices a new GitHub-only advisory that has no record is still a
+ticket.
+
 ## Follow-ups this produced
 
 1. ~~**`yamux 0.12.1` — remote panic, reachable from peers.** Either bump libp2p via the SDK, or vendor a
