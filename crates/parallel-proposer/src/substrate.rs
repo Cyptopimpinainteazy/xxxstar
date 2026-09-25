@@ -18,7 +18,15 @@ use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, Hash as HashT, Header as HeaderT, SaturatedConversion},
     Digest, Percent,
 };
-use std::{marker::PhantomData, pin::Pin, sync::Arc, time};
+use std::{
+    marker::PhantomData,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time,
+};
 use x3_chain_runtime::{Address, UncheckedExtrinsic};
 
 /// Default block size limit in bytes used by the parallel proposer.
@@ -38,6 +46,7 @@ pub struct ParallelProposerFactory<A, B, C, PR> {
     telemetry: Option<TelemetryHandle>,
     include_proof_in_block_size_estimation: bool,
     predictor: Arc<ContentionPredictor>,
+    authoring_gate: Option<Arc<AtomicBool>>,
     _phantom: PhantomData<(B, PR)>,
 }
 
@@ -60,6 +69,7 @@ impl<A, B, C> ParallelProposerFactory<A, B, C, sp_consensus::DisableProofRecordi
             telemetry,
             include_proof_in_block_size_estimation: false,
             predictor,
+            authoring_gate: None,
             _phantom: PhantomData,
         }
     }
@@ -77,6 +87,23 @@ where
     /// Set soft deadline percentage.
     pub fn set_soft_deadline(&mut self, percent: Percent) {
         self.soft_deadline_percent = percent;
+    }
+
+    /// Attach a gate that can pause authoring without stopping the node.
+    ///
+    /// A node whose database volume is below its free-space floor has to stop
+    /// producing blocks: the block it is building cannot be written, and on this
+    /// chain the writes that follow a full disk take the GRANDPA voter down with
+    /// them. Removing the authority key is the SDK's usual way to stop authoring,
+    /// and `sc-keystore` exposes no way to remove one, so the proposer asks
+    /// instead: while the gate is closed every slot is skipped with an error, the
+    /// client stays up and serving, and the operator gets a log line saying why.
+    ///
+    /// The gate is an `AtomicBool` rather than a closure so the disk watchdog can
+    /// close it from another task without locking.
+    pub fn with_authoring_gate(mut self, gate: Arc<AtomicBool>) -> Self {
+        self.authoring_gate = Some(gate);
+        self
     }
 
     fn init_with_now(
@@ -103,6 +130,7 @@ where
             soft_deadline_percent: self.soft_deadline_percent,
             telemetry: self.telemetry.clone(),
             predictor: self.predictor.clone(),
+            authoring_gate: self.authoring_gate.clone(),
             _phantom: PhantomData,
         }
     }
@@ -145,7 +173,22 @@ pub struct ParallelProposer<B, Block: BlockT, C, A: TransactionPool, PR> {
     soft_deadline_percent: Percent,
     telemetry: Option<TelemetryHandle>,
     predictor: Arc<ContentionPredictor>,
+    authoring_gate: Option<Arc<AtomicBool>>,
     _phantom: PhantomData<(B, PR)>,
+}
+
+/// Why a proposer refused to build a block.
+const AUTHORING_PAUSED: &str =
+    "authoring is paused: free disk space is below the node's floor, so a block \
+     produced now could not be written. Free space (or raise X3_MIN_FREE_DISK_BYTES) \
+     and this node resumes by itself.";
+
+/// Whether this proposer's authoring gate is closed.
+///
+/// No gate at all means "always author": a node that never asked for the disk
+/// guard must not be paused by it.
+pub(crate) fn authoring_paused(gate: &Option<Arc<AtomicBool>>) -> bool {
+    gate.as_ref().is_some_and(|gate| !gate.load(Ordering::Relaxed))
 }
 
 impl<A, B, Block, C, PR> Proposer<Block> for ParallelProposer<B, Block, C, A, PR>
@@ -171,6 +214,21 @@ where
         max_duration: time::Duration,
         block_size_limit: Option<usize>,
     ) -> Self::Proposal {
+        // A closed gate means "do not author", not "stop the node": the error is
+        // returned for this slot only, so the consensus engine logs it and offers
+        // the next slot, and the node keeps answering RPC while the operator
+        // reclaims space. The proposer re-reads the gate every slot, which is
+        // what makes the pause reversible without a restart.
+        if authoring_paused(&self.authoring_gate) {
+            warn!(target: LOG_TARGET, "{AUTHORING_PAUSED}");
+            return async move {
+                Err(sp_blockchain::Error::Consensus(sp_consensus::Error::Other(
+                    AUTHORING_PAUSED.to_string().into(),
+                )))
+            }
+            .boxed();
+        }
+
         let (tx, rx) = oneshot::channel();
         let spawn_handle = self.spawn_handle.clone();
 
@@ -516,6 +574,26 @@ pub fn state_keys_from_metadata(metadata: &TxMetadata) -> Vec<StateKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_absent_gate_never_pauses_authoring() {
+        assert!(!authoring_paused(&None));
+    }
+
+    #[test]
+    fn the_gate_pauses_and_resumes_without_a_restart() {
+        let gate = Arc::new(AtomicBool::new(true));
+        let handle = Some(gate.clone());
+        assert!(!authoring_paused(&handle), "an open gate authors");
+
+        gate.store(false, Ordering::Relaxed);
+        assert!(authoring_paused(&handle), "a closed gate stops authoring");
+
+        // The same handle, read again: this is what makes the pause reversible
+        // inside one running node rather than a one-way latch.
+        gate.store(true, Ordering::Relaxed);
+        assert!(!authoring_paused(&handle), "reopening the gate resumes");
+    }
 
     #[test]
     fn state_key_projection_is_deterministic() {
