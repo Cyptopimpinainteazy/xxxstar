@@ -26069,6 +26069,7 @@ dependencies = [
  "x3-validator-attestation",
  "x3-verification-router",
  "x3-vm",
+ "x3-x3-integration",
 ]
 
 [[package]]
@@ -27250,6 +27251,7 @@ dependencies = [
  "pallet-transaction-payment",
  "pallet-x3-agent-law",
  "pallet-x3-invariants",
+ "pallet-x3-kernel",
  "pallet-x3-settlement-engine",
  "parity-scale-codec",
  "serde_json",

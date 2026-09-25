@@ -2816,38 +2816,40 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 57,
+      "composite": 61,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration",
         "note: Known .x3 integration requirement",
         "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23",
-        "note: 2026-09-25 - the pallet's X3 payload convention was wrong and the receipt was not persisted; runtime/src/tests.rs now proves both the dispatch and the stored receipt"
+        "note: 2026-09-25 - the pallet's X3 payload convention was wrong and the receipt was not persisted; the runtime pair proves dispatch and storage, the live test proves inclusion, finality and a readable receipt"
       ],
       "id": "X3-LANG-004",
-      "implemented": 75,
+      "implemented": 80,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "**CLOSED 2026-09-25 \u2014 an extrinsic now carries a compiled program through the pallet, and the pallet records it.** `submit_comit_v2` validated its `x3_payload` as an `X3VmPacket` and then handed those same bytes to `T::X3Adapter::execute`, which parses X3BC. A packet is a semantic operation, not bytecode, and the executor accepts nothing else, so on any chain with a real adapter (`X3VmAdapter`, or `WasmX3Adapter` in the wasm build) every non-empty X3 payload died with `X3ExecutionFailed` \u2014 while a program compiled from `.x3` source was refused earlier as `InvalidX3VmPacket`. Reproduced before the fix by dispatching a compiled program at the real runtime: `Module(ModuleError { index: 11, error: [7, 0, 0, 0], message: Some(\"InvalidX3VmPacket\") })`. The payload is now the program, and validation is the adapter's own (`T::X3Adapter::validate`: envelope magic, version gate, checksum) \u2014 the component that does the work. Evidence: `runtime/src/tests.rs` compiles a program from source, dispatches it as a signed extrinsic, and asserts the comit is recorded and the nonce moved; its corrupted-program twin asserts refusal and that no comit record is left.",
-        "**CLOSED 2026-09-25 \u2014 the execution receipt is persisted.** The X3 domain had no receipt storage at all (only EVM did), so a program's result existed in an event and a gas number and could not be read back. `X3ExecutionReceipts` is keyed by comit id and written only after every acceptance check, so a stored receipt always describes an accepted comit. The runtime test reads it back \u2014 success, `return_data` equal to the value the source states, `gas_used > 0`, the kernel's receipt version \u2014 and the refused twin asserts no receipt is left behind. `STORAGE_VERSION` moves 1\u21922, recorded by the migration the runtime already runs in its `Migrations` tuple (the map starts empty, so there is nothing to rewrite). The extra storage write is declared at the call site as `submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))` because the benchmark predates it: re-running that benchmark is what would let the hand-declaration go.",
-        "Still open on this row: the dispatch is proven in a runtime `TestExternalities`, not on a running chain with finality; the 1\u21922 storage migration has not been exercised by a runtime-upgrade rehearsal on a chain with state (the rehearsal gate exists \u2014 `scripts/mainnet/runtime_upgrade_rehearsal.sh`); an old artifact executed against an upgraded VM version is untested; and `submit_comit_v2`'s benchmark still needs re-running to replace the explicit write declaration."
+        "**CLOSED 2026-09-25 \u2014 an extrinsic now carries a compiled program through the pallet, and the pallet records it.** `submit_comit_v2` validated its `x3_payload` as an `X3VmPacket` and then handed those same bytes to `T::X3Adapter::execute`, which parses X3BC. A packet is a semantic operation, not bytecode, and the executor accepts nothing else, so on any chain with a real adapter (`X3VmAdapter`, or `WasmX3Adapter` in the wasm build) every non-empty X3 payload died with `X3ExecutionFailed` \u2014 while a program compiled from `.x3` source was refused earlier as `InvalidX3VmPacket`. Reproduced before the fix by dispatching a compiled program at the real runtime: `Module(ModuleError { index: 11, error: [7, 0, 0, 0], message: Some(\"InvalidX3VmPacket\") })`. The payload is now the program, and validation is the adapter's own (`T::X3Adapter::validate`: envelope magic, version gate, checksum) \u2014 the component that does the work.",
+        "**CLOSED 2026-09-25 \u2014 the execution receipt is persisted.** The X3 domain had no receipt storage at all (only EVM did), so a program's result existed in an event and a gas number and could not be read back. `X3ExecutionReceipts` is keyed by comit id and written only after every acceptance check, so a stored receipt always describes an accepted comit. `STORAGE_VERSION` moves 1\u21922, recorded by the migration the runtime already runs in its `Migrations` tuple (the map starts empty, so there is nothing to rewrite). The extra storage write is declared at the call site as `submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))` because the benchmark predates it.",
+        "**CLOSED 2026-09-25 \u2014 the whole route is proven on a running chain.** `node/tests/x3vm_live_lifecycle.rs` now boots the real dev node, authorizes the submitter through the council, **compiles the program from `.x3` source inside the test**, signs `submit_comit_v2` with it, waits for a finalized block that contains the extrinsic, asserts the dispatch did not fail, and then reads the receipt back out of finalized state \u2014 value, metered gas and the kernel's receipt version. That is source -> compiler -> X3BC -> adapter -> pallet extrinsic -> inclusion -> finality -> verifiable receipt, on a chain rather than in a `TestExternalities`.",
+        "Still open on this row: the network is one local node, so inclusion and finality are proven but *multi-validator* agreement is not; the 1\u21922 storage migration has not been exercised by a runtime-upgrade rehearsal on a chain with state (the rehearsal gate exists \u2014 `scripts/mainnet/runtime_upgrade_rehearsal.sh`); an old artifact executed against an upgraded VM version is untested; and `submit_comit_v2`'s benchmark still needs re-running to replace the explicit write declaration."
       ],
       "name": "Bytecode routing to atomic kernel",
       "paths": [
         "crates/x3-integration",
         "pallets/x3-kernel/src",
         "pallets/x3-kernel/tests",
-        "runtime/src/tests.rs"
+        "runtime/src/tests.rs",
+        "node/tests/x3vm_live_lifecycle.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 75,
-      "tests": "tested score 75% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4368,7 +4370,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "ad22b57de304781a4f99e5716b6f9516418b98a8c2125b87b097904ebee1aa7e",
+    "source_digest": "814c2c7b596bbc73f88d5935ffe6f278ebe6e4ddb4307efa32178b3196b4a14a",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4379,7 +4381,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "e8b92435ca96bef4e4bd7537b4312fc3effcfbe26ae89e26fa1816cc2927a99d",
+      "feature-matrix/language-trading.toml": "2b5ef2795110669221d7b3f80329f44291d9c4109b84fa6301b73828a9f10446",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",

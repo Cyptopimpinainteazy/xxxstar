@@ -208,6 +208,101 @@ fn intent_state_at(intent_id: H256, block_hash: &str) -> pallet_x3_settlement_en
     pallet_x3_settlement_engine::IntentState::decode(&mut &bytes[..]).expect("decode IntentState")
 }
 
+/// The storage key of a comit's X3 execution receipt.
+///
+/// `AtlasKernel::X3ExecutionReceipts` is a `Blake2_128Concat` map, so the key is the pallet and
+/// item prefix, then the 128-bit hash of the encoded key, then the key itself.
+fn x3_receipt_storage_key(comit_id: H256) -> String {
+    let mut key =
+        frame_support::storage::storage_prefix(b"AtlasKernel", b"X3ExecutionReceipts").to_vec();
+    let encoded = comit_id.encode();
+    key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
+    key.extend_from_slice(&encoded);
+    format!("0x{}", hex::encode(key))
+}
+
+/// Read a comit's X3 execution receipt *at* a block — `None` when the chain stored none.
+fn x3_receipt_at(comit_id: H256, block_hash: &str) -> Option<pallet_x3_kernel::ExecutionReceipt> {
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    let value = rpc
+        .call(
+            "state_getStorage",
+            vec![
+                Value::String(x3_receipt_storage_key(comit_id)),
+                Value::String(block_hash.to_string()),
+            ],
+        )
+        .expect("state_getStorage")
+        .result?;
+    let raw = value.as_str().expect("execution receipt storage hex");
+    let bytes = hex::decode(raw.trim_start_matches("0x")).expect("decode receipt hex");
+    Some(
+        pallet_x3_kernel::ExecutionReceipt::decode(&mut &bytes[..])
+            .expect("decode ExecutionReceipt"),
+    )
+}
+
+/// A program compiled from `.x3` source, dispatched to a running node, finalized, and read back.
+///
+/// The X3Lang row asked for exactly this: an artifact that travels
+/// source -> compiler -> X3BC -> the adapter the chain is configured with -> the kernel's extrinsic
+/// -> block inclusion -> finality, with the program's result readable from chain state afterwards.
+/// The runtime-level test proves the dispatch; this one proves it on a chain that actually
+/// finalizes blocks, which is a different claim.
+#[test]
+#[ignore = "boots the real X3 dev node, dispatches a compiled program, and reads its receipt"]
+fn a_compiled_x3_program_is_finalized_and_its_receipt_is_readable() {
+    let _node = spawn_dev_node();
+    wait_rpc(Duration::from_secs(180));
+
+    let chain_id = String::from("x3-local");
+    let alice_uri = dev_uri("Alice");
+    let alice = X3RuntimeSigner::from_uri(chain_id, RPC_URL.into(), &alice_uri).expect("signer");
+
+    // 1. The kernel only accepts comits from authorized accounts, and `authorize_account` is
+    //    governance-gated; on this chain the council is the route (threshold 1 executes now).
+    let authorize = alice
+        .sign_kernel_authorize_account(alice.account())
+        .expect("sign the council proposal");
+    assert!(!submit(&authorize).is_empty());
+    let (_, authorize_head) = wait_finalized(&authorize, Duration::from_secs(180));
+    assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
+
+    // 2. Compile the program in the test: this is the compiler's output, not a fixture blob.
+    let program = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 {\n    return 42;\n}\n",
+    )
+    .expect("the fixture must compile");
+    let comit_id = H256::from_low_u64_be(0x5317);
+
+    // 3. Submit it as a signed extrinsic and wait for a finalized block that contains it.
+    let signed = alice
+        .sign_kernel_submit_comit_v2(comit_id, program, 1_000_000)
+        .expect("sign the comit");
+    assert!(!submit(&signed).is_empty());
+    let (_, head) = wait_finalized(&signed, Duration::from_secs(180));
+    assert_dispatch_succeeded(&alice, &head, &signed);
+
+    // 4. And the result is in finalized state, not only in the node's memory.
+    let receipt = x3_receipt_at(comit_id, &head)
+        .expect("an accepted X3 comit must store its execution receipt");
+    assert!(
+        receipt.success,
+        "the fixture returns, so the receipt must succeed"
+    );
+    assert_eq!(
+        receipt.return_data,
+        42i64.to_le_bytes().to_vec(),
+        "the receipt must carry the value the source states"
+    );
+    assert!(receipt.gas_used > 0, "the receipt must report metered gas");
+    assert_eq!(
+        receipt.version,
+        pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
+        "and be stamped with the kernel's receipt version"
+    );
+}
+
 /// Poll for the terminal `Refunded` state, returning the finalized head that
 /// carries it. The runtime performs this transition from `on_initialize`, so a
 /// caller must not assume it has to drive the extrinsic itself.

@@ -14,6 +14,7 @@ path = "src/lib.rs"
 # Signing a runtime call is only correct against the runtime's own types, so this
 # crate compiles the runtime types rather than restating their order.
 x3-chain-runtime = { path = "../../runtime", features = ["std"] }
+pallet-x3-kernel = { path = "../../pallets/x3-kernel", features = ["std"] }
 pallet-x3-settlement-engine = { path = "../../pallets/x3-settlement-engine", default-features = false, features = ["std"] }
 pallet-x3-agent-law = { path = "../../pallets/x3-agent-law", default-features = false, features = ["std"] }
 pallet-x3-invariants = { path = "../../pallets/x3-invariants", default-features = false, features = ["std"] }

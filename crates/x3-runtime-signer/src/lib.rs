@@ -400,6 +400,79 @@ impl X3RuntimeSigner {
     /// how a chain whose administrative origin is Root-or-half-council bootstraps
     /// itself: this genesis configures no sudo key, and a signed account cannot be
     /// Root, so the council motion is the reachable path.
+    /// The kernel's per-account comit nonce (`AtlasKernel::Nonces`).
+    ///
+    /// This is the kernel's own replay counter, separate from the account nonce in the signed
+    /// extension: `submit_comit_v2` refuses any value that is not the next one, so a caller reads it
+    /// instead of guessing. Absent storage means "never submitted", which is deliberately different
+    /// from "the read failed" — the latter is an error, not a zero.
+    pub fn kernel_comit_nonce(&self) -> Result<u64, SwapError> {
+        let encoded = self.account().encode();
+        let mut key = storage_prefix(b"AtlasKernel", b"Nonces").to_vec();
+        key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
+        key.extend_from_slice(&encoded);
+
+        let result = self.rpc_call(
+            "state_getStorage",
+            vec![Value::String(format!("0x{}", hex::encode(key)))],
+        )?;
+        if result.is_null() {
+            return Ok(0);
+        }
+        let raw = result
+            .as_str()
+            .ok_or_else(|| SwapError::RpcError("kernel nonce storage was not hex".into()))?;
+        let bytes = hex::decode(raw.strip_prefix("0x").unwrap_or(raw))
+            .map_err(|e| SwapError::RpcError(format!("decode kernel nonce: {e}")))?;
+        u64::decode(&mut &bytes[..])
+            .map_err(|e| SwapError::RpcError(format!("decode kernel nonce value: {e}")))
+    }
+
+    /// Authorize an account to submit comits, through the council.
+    ///
+    /// `authorize_account` requires `GovernanceOrigin` — root or half the council on this runtime —
+    /// and no plain signed account is either. Threshold 1 executes in the proposal's own block, and
+    /// the signer has to be a council member (it is, on the dev chain every live test runs against).
+    pub fn sign_kernel_authorize_account(&self, account: AccountId) -> Result<String, SwapError> {
+        let call = RuntimeCall::AtlasKernel(pallet_x3_kernel::Call::<Runtime>::authorize_account {
+            account,
+        });
+        self.sign_council_propose(call, 1)
+    }
+
+    /// Sign a compiled X3 program through the kernel's comit route.
+    ///
+    /// `program` is the X3BC artifact — the thing `x3c` emits, not a routing packet. The kernel
+    /// validates it with the adapter configured to execute it, and stores the run's execution
+    /// receipt under `comit_id`, which is what makes the result readable from chain state after
+    /// finality rather than only visible in an event.
+    pub fn sign_kernel_submit_comit_v2(
+        &self,
+        comit_id: H256,
+        program: Vec<u8>,
+        fee: u128,
+    ) -> Result<String, SwapError> {
+        let nonce = self.kernel_comit_nonce()?;
+        let prepare_root = pallet_x3_kernel::Pallet::<Runtime>::compute_prepare_root_v2(
+            comit_id,
+            &[],
+            &[],
+            &program,
+            nonce,
+            fee,
+        );
+        let call = RuntimeCall::AtlasKernel(pallet_x3_kernel::Call::<Runtime>::submit_comit_v2 {
+            comit_id,
+            evm_payload: Vec::new(),
+            svm_payload: Vec::new(),
+            x3_payload: program,
+            nonce,
+            fee,
+            prepare_root,
+        });
+        self.signed_extrinsic(call)
+    }
+
     pub fn sign_council_propose(
         &self,
         call: RuntimeCall,
