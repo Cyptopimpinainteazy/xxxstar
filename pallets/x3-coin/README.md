@@ -13,18 +13,26 @@ The X3 Coin pallet manages the canonical X3 token on the X3 Chain, providing cro
 
 ## Tokenomics
 
-- **Total Supply**: 2,000,000,000 X3 (2 billion)
+Authoritative Alpha policy: [`docs/economics/X3_ALPHA_ECONOMIC_POLICY.md`](../../docs/economics/X3_ALPHA_ECONOMIC_POLICY.md).
+These constants live in `src/lib.rs` and are cross-checked against
+`deployment/genesis/x3-testnet-allocations.json` by `scripts/mainnet/x3_economic_model_gate.sh`;
+the two are not allowed to drift.
+
+- **Total Supply**: 8,888,888,888 X3 (fixed — no inflation path)
 - **Decimals**: 12
 - **Symbol**: X3
 - **Asset ID**: 0 (canonical)
 
 ### Allocation Breakdown
 
-- **Treasury**: 20% (400M X3) - Protocol development and operations
-- **Team & Advisors**: 15% (300M X3) - 1-year vesting with 6-month cliff
-- **Ecosystem**: 25% (500M X3) - Immediate distribution
-- **Liquidity**: 30% (600M X3) - Exchange listings and liquidity provision
-- **Bonus Pool**: 10% (200M X3) - Community rewards
+| Bucket | Amount | Purpose |
+| --- | --- | --- |
+| `treasury` | 2,222,222,222 X3 | protocol treasury |
+| `validators_staking` | 1,777,777,778 X3 | validator/security reserve (Alpha validator compensation) |
+| `ecosystem_grants` | 1,777,777,778 X3 | ecosystem development |
+| `presale_early_investors` | 1,333,333,333 X3 | presale |
+| `bonus_pool` | 888,888,889 X3 | community rewards |
+| `team_core_contributors` | 888,888,888 X3 | ~1-year vesting with ~6-month cliff |
 
 ## Configuration
 

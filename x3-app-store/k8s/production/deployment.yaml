@@ -1,0 +1,252 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x3-app-store-backend
+  namespace: x3-app-store
+  labels:
+    app: x3-app-store-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: x3-app-store-backend
+  template:
+    metadata:
+      labels:
+        app: x3-app-store-backend
+    spec:
+      containers:
+      - name: backend
+        image: x3-app-store-backend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: mongodb-uri
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: redis-url
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: github-token
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: jwt-secret
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: session-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x3-app-store-frontend
+  namespace: x3-app-store
+  labels:
+    app: x3-app-store-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: x3-app-store-frontend
+  template:
+    metadata:
+      labels:
+        app: x3-app-store-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: x3-app-store-frontend:latest
+        ports:
+        - containerPort: 3001
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: API_URL
+          value: "http://x3-app-store-backend:3000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x3-app-store-scraper
+  namespace: x3-app-store
+  labels:
+    app: x3-app-store-scraper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: x3-app-store-scraper
+  template:
+    metadata:
+      labels:
+        app: x3-app-store-scraper
+    spec:
+      containers:
+      - name: scraper
+        image: x3-app-store-scraper:latest
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: mongodb-uri
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: github-token
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - pgrep
+            - node
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x3-app-store-treasury
+  namespace: x3-app-store
+  labels:
+    app: x3-app-store-treasury
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: x3-app-store-treasury
+  template:
+    metadata:
+      labels:
+        app: x3-app-store-treasury
+    spec:
+      containers:
+      - name: treasury
+        image: x3-app-store-treasury:latest
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: mongodb-uri
+        - name: COINGECKO_API_URL
+          value: "https://api.coingecko.com/api/v3"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - pgrep
+            - node
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x3-app-store-manager
+  namespace: x3-app-store
+  labels:
+    app: x3-app-store-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: x3-app-store-manager
+  template:
+    metadata:
+      labels:
+        app: x3-app-store-manager
+    spec:
+      containers:
+      - name: manager
+        image: x3-app-store-manager:latest
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: x3-app-store-secrets
+              key: mongodb-uri
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - pgrep
+            - node
+          initialDelaySeconds: 30
+          periodSeconds: 10

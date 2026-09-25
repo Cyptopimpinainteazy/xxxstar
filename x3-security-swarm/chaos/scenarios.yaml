@@ -1,0 +1,29 @@
+scenarios:
+  - id: soft-probe-mempool-spam
+    class: soft_probe
+    target: mempool
+    objective: tune watcher sensitivity without causing state damage
+  - id: gas-timing-jitter
+    class: soft_probe
+    target: transaction_ordering
+    objective: test sequence anomaly detection and judge confidence stability
+  - id: dummy-flashloan-scaffold
+    class: structural
+    target: atomic_execution
+    objective: test exploit-pattern recognition before funds move
+  - id: reentrancy-staging
+    class: structural
+    target: contract_runtime
+    objective: test containment recommendation thresholds under realistic exploit scaffolds
+  - id: oracle-drift-simulation
+    class: structural
+    target: price_inputs
+    objective: verify pause and rollback behavior around bad external data
+  - id: governance-vote-flood
+    class: governance
+    target: proposal_pipeline
+    objective: test quorum resilience and false-positive poisoning resistance
+  - id: validator-bribery-simulation
+    class: governance
+    target: validator_set
+    objective: test attribution, containment, and evidence collection against collusion signals

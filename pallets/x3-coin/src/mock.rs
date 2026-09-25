@@ -203,9 +203,9 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .unwrap();
 
     pallet_x3_coin::GenesisConfig::<Test> {
-        team_allocations: vec![(2, 300_000_000_000_000_000_000_u128)],
-        ecosystem_allocations: vec![(3, 500_000_000_000_000_000_000_u128)],
-        liquidity_allocations: vec![(4, 600_000_000_000_000_000_000_u128)],
+        team_allocations: vec![(2, crate::X3_TEAM_ALLOCATION)],
+        ecosystem_allocations: vec![(3, crate::X3_ECOSYSTEM_ALLOCATION)],
+        presale_allocations: vec![(4, crate::X3_PRESALE_ALLOCATION)],
     }
     .assimilate_storage(&mut t)
     .unwrap();

@@ -1,0 +1,22 @@
+appeals:
+  permanent_sanctions_only: true
+  submission_window_hours: 72
+  review_board:
+    minimum_reviewers: 3
+    required_domains:
+      - protocol_security
+      - governance
+      - operations
+  required_evidence:
+    - evidence_hash
+    - incident_id
+    - sanction_reference
+    - challenge_basis
+  outcomes:
+    - uphold
+    - amend
+    - revoke
+  emergency_containment:
+    appealable: true
+    rollback_if_false_positive: true
+    rollback_window_minutes: 30

@@ -22,9 +22,28 @@ x3_broadcast = "LIVE_TESTNET"
 x3_grantsmith = "LIVE_TESTNET"
 x3_wallet_pallet = "LIVE_TESTNET"      # `make test-x3-wallet` wired
 
-# === Bridge-Enabled Public Testnet ===
-external_bridges_mainnet = "GUARDED_TESTNET"   # guarded — proof verification via NoOp validator in testnet
-btc_mainnet_gateway = "GUARDED_TESTNET"        # guarded — requires real signer quorum for mainnet
+# === External Bridge Exposure (public-testnet launch guardrail) ===
+#
+# These two keys describe *public exposure*, not code maturity: they are what
+# `scripts/mainnet/rc6_public_testnet_readiness.sh` reads and what
+# `LAUNCH_SCOPE.md` promises the public testnet. The paths they name are off at
+# genesis (`ExternalBridgesEnabled = false`), which is exactly what
+# FEATURE_REGISTRY.toml records as the [atomic_gateway] and [x3_wrapped]
+# blockers, so any other value here contradicts the canonical registry,
+# contradicts the RC6 guardrail ("External bridges must remain disabled for
+# initial public testnet"), and makes the RC6 gate fail.
+#
+# The previous values said GUARDED_TESTNET with the note "proof verification via
+# NoOp validator in testnet". That note was inaccurate and unsafe to keep in a
+# launch document. The router's quorum/EVM/Bitcoin strategies fail closed when
+# no real verifier is registered (`VerificationError::NotImplemented`, see
+# `crates/x3-verification-router/src/lib.rs`), and the permissive structural-only
+# path exists only under the `test-verifier` feature, which is a
+# dev-dependency-only feature that CI asserts cannot be combined with
+# `production`. Do not re-derive a "the chain checks nothing" claim from this
+# file.
+external_bridges_mainnet = "DISABLED_BLOCKED"  # off at genesis; RC6 public-testnet guardrail
+btc_mainnet_gateway = "DISABLED_BLOCKED"       # BTC domain is simulator-only (registry [btc_fortress_gateway] = SIM_TESTNET)
 
 # === Still Blocked (post-audit phase) ===
 ai_consensus = "DISABLED_BLOCKED"

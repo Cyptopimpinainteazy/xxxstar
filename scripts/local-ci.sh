@@ -213,6 +213,7 @@ GATES_FAST=(
   "invariant registry:python3 scripts/check-invariant-registry.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
+  "economic model:bash scripts/mainnet/x3_economic_model_gate.sh --quiet"
   # A `migrations.rs` whose crate never declares the module is uncompiled,
   # untested dead weight that looks exactly like the real thing. Five such files
   # were sitting under pallets when this gate was added.

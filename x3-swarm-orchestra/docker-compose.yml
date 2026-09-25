@@ -1,0 +1,164 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------
+  # 0. Core Infrastructure (Message Bus & Cache)
+  # ---------------------------------------------
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - x3-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - x3-net
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - x3-net
+
+  # ---------------------------------------------
+  # 1. TPS / GPU Validator Swarm
+  # ---------------------------------------------
+  gpu-validator-swarm:
+    build: 
+      context: ./validators/gpu-swarm
+      dockerfile: Dockerfile  
+    command: ["cargo", "run", "--bin", "x3_swarm_orchestrator"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - RUST_LOG=info
+      - SWARM_PORT=30333
+      - BENCH_MODE=true
+    ports:
+      - "30333:30333"
+    networks:
+      - x3-net
+    depends_on:
+      - kafka
+
+  # ---------------------------------------------
+  # 2. Arbitrage & Trading Bots
+  # ---------------------------------------------
+  quantum-swarm:
+    build:
+      context: ./arbitrage/quantum-swarm
+    command: ["cargo", "run", "--release", "--", "--config", "/app/config/swarm.toml"]
+    environment:
+      - RUST_LOG=info
+    depends_on:
+      - gpu-validator-swarm
+    networks:
+      - x3-net
+
+  atomic-swap-orchestrator:
+    build:
+      context: ./arbitrage/atomic-swap
+    command: ["cargo", "run", "--release"]
+    environment:
+      - RUST_LOG=debug
+    networks:
+      - x3-net
+  
+  # ---------------------------------------------
+  # 3. AI Agents (Python Swarm & Ralph)
+  # ---------------------------------------------
+  
+  # Local LLM Fallback
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - x3-net
+    # Optional GPU assignment if required
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  python-swarm-agent:
+    build:
+      context: ./ai-agents/python-swarm
+    command: ["python", "-m", "autonomic"]
+    environment:
+      # API Keys (OpenAI & OpenRouter Free Keys)
+      - API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=anthropic/claude-3-haiku:free
+      
+      # Fallback LLM Route (Local Ollama)
+      - OLLAMA_HOST=http://ollama:11434
+      - FALLBACK_LLM_PROVIDER=ollama
+      
+      # Core Infra
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    depends_on:
+      - redis
+      - kafka
+      - ollama
+    networks:
+      - x3-net
+
+  # ---------------------------------------------
+  # 4. Marketing & Paid Features (PostAutomation)
+  # ---------------------------------------------
+  marketing-post-automation:
+    build:
+      context: ./marketing/post-automation
+    command: ["npm", "run", "start"]
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_HOST=http://ollama:11434
+    ports:
+      - "4000:4000"
+    networks:
+      - x3-net
+
+  # ---------------------------------------------
+  # 5. Media & Video Creation
+  # ---------------------------------------------
+  swarm-media:
+    build:
+      context: ./video-creation/swarm-media
+    command: ["cargo", "run", "--release"]
+    networks:
+      - x3-net
+
+networks:
+  x3-net:
+    driver: bridge
+
+volumes:
+  swarm_data:

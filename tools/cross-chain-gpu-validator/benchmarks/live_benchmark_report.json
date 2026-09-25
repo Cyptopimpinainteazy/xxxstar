@@ -1,0 +1,8 @@
+{
+  "duration_seconds": 10,
+  "svm_tps_target": 1850000,
+  "evm_tps_target": 1000000,
+  "svm_processed": 18500000,
+  "evm_processed": 10000000,
+  "combined_tps": 2850000.0
+}

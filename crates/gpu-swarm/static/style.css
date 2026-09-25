@@ -1,0 +1,6 @@
+body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin: 20px; }
+.login, .dashboard { max-width: 720px; margin: 0 auto; }
+input { padding: 8px; width: 300px; }
+button { padding: 8px 12px; }
+.muted { color: #777; }
+.row { margin-top: 10px; }

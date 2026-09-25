@@ -839,3 +839,45 @@ fn test_phase_guards_block_out_of_order_mutators() {
         "out-of-order mutators must not advance the state machine"
     );
 }
+
+/// Audit Finding 2 regression: the session id must be a full-length digest.
+///
+/// The finding was that a truncated id derivation lets two swaps collide and
+/// overwrite each other in the keyed session store, which then misroutes claims
+/// and refunds. The id is derived from a freshly generated secret, so a real
+/// collision cannot be forced from the public API - what can be pinned is the
+/// shape that rules one out: `swap-` plus a full 32-byte digest, distinct for
+/// every swap, with one session stored per swap.
+#[test]
+fn audit_finding_2_session_ids_are_full_length_and_distinct() {
+    let mut coordinator = SwapCoordinator::with_default_config();
+    let now = 1_700_000_000u64;
+    let swaps = 64;
+
+    let mut seen = std::collections::HashSet::new();
+    for i in 0..swaps {
+        let (session_id, _, _) = coordinator
+            .setup_swap(VmTarget::Svm, VmTarget::Evm { chain_id: 1 }, vec![], now)
+            .expect("setup_swap");
+
+        assert!(
+            session_id.starts_with("swap-"),
+            "session id {i} lost its prefix: {session_id}"
+        );
+        assert_eq!(
+            session_id.len(),
+            "swap-".len() + 64,
+            "session id {i} is not a full 32-byte digest: {session_id}"
+        );
+        assert!(
+            seen.insert(session_id.clone()),
+            "session id repeated, so two swaps would share one key: {session_id}"
+        );
+    }
+
+    assert_eq!(
+        coordinator.session_count(),
+        swaps,
+        "every swap must keep its own session key"
+    );
+}

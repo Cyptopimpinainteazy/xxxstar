@@ -5,7 +5,7 @@ use crate::mock::{RuntimeEvent, RuntimeOrigin};
 use crate::types::{
     AssetSpec, BtcBlockHeader, ExternalChainId, IntentState, ProofType, SettlementProof, TokenId,
 };
-use crate::{Bonds, BondsByOwner, Error, Pallet, SettlementIntents};
+use crate::{Bonds, BondsByOwner, Error, IntentDeadlineIndex, Pallet, SettlementIntents};
 use frame_support::{assert_noop, assert_ok, traits::Hooks, BoundedVec};
 use sp_core::{ed25519, Pair, H256};
 use x3_atomic_swap::{
@@ -4897,4 +4897,68 @@ fn the_three_bitcoin_header_implementations_agree() {
         x3_bitcoin_vault::verify_merkle_proof(&txid_bytes, regtest_capture::TX_INDEX, &root, &flat),
         "and the vault does too, from the same txid, the same position and the same siblings"
     );
+}
+
+/// Regression for audit Finding 3 (expiration starvation).
+///
+/// `IntentDeadlineIndex` buckets hold 20 entries and `on_initialize` drains a
+/// whole bucket at once. Before the spill fix, a bare `try_push` silently
+/// dropped every intent past the 20th that shared a deadline block, leaving it
+/// with no automatic refund path at all. This asserts the burst is spread
+/// across buckets instead of being lost.
+#[test]
+fn audit_finding_3_deadline_index_spills_instead_of_dropping_bursts() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        // 3 makers x 9 intents = 27, all created in the same block with the same
+        // timeout, so every one of them resolves to the same deadline bucket.
+        // MaxPendingIntents is 10 per maker, so the burst is spread over makers.
+        let mut created = 0usize;
+        for maker in [10u64, 11, 12] {
+            for i in 0..9u8 {
+                let mut seed = [0u8; 32];
+                seed[0] = maker as u8;
+                seed[1] = i;
+                let secret_hash = H256::from(seed);
+
+                assert_ok!(Pallet::<Test>::create_intent(
+                    RuntimeOrigin::signed(maker),
+                    BOB,
+                    AssetSpec {
+                        chain: ExternalChainId::Ethereum,
+                        token: TokenId::Native,
+                        amount: 1_000,
+                    },
+                    AssetSpec {
+                        chain: ExternalChainId::Solana,
+                        token: TokenId::Native,
+                        amount: 500,
+                    },
+                    secret_hash,
+                    Some(600),
+                ));
+                created += 1;
+            }
+        }
+        assert_eq!(created, 27);
+
+        let buckets: Vec<_> = IntentDeadlineIndex::<Test>::iter()
+            .map(|(block, ids)| (block, ids.len()))
+            .collect();
+        let indexed: usize = buckets.iter().map(|(_, n)| *n).sum();
+
+        assert_eq!(
+            indexed, 27,
+            "every created intent must hold a reachable expiry slot"
+        );
+        assert!(
+            buckets.len() >= 2,
+            "a 27-intent burst must spill past the 20-entry base bucket, got {} bucket(s)",
+            buckets.len()
+        );
+        assert!(
+            buckets.iter().all(|(_, n)| *n <= 20),
+            "no bucket may exceed its 20-entry storage bound"
+        );
+    });
 }

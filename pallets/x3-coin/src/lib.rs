@@ -60,26 +60,53 @@ pub const X3_ASSET_ID: u32 = 0;
 /// X3 token symbol
 pub const X3_SYMBOL: &[u8] = b"X3";
 
-/// X3 token decimals
+/// X3 token decimals.
+///
+/// 12 is the unit the launch path already uses: `node/src/chain_spec.rs:23` endows genesis
+/// balances with `1 X3 = 10^12`, and this pallet's own genesis writes `X3_TOTAL_SUPPLY` in the
+/// same unit. The deployment manifest carried 18 until this change — documentation drift, not a
+/// second live convention. `scripts/mainnet/x3_economic_model_gate.sh` fails if they diverge again.
 pub const X3_DECIMALS: u8 = 12;
 
-/// Total X3 supply (2 billion tokens with 12 decimals)
-pub const X3_TOTAL_SUPPLY: u128 = 2_000_000_000 * 1_000_000_000_000; // 2B * 10^12
+/// Base units in one whole X3 (`10^X3_DECIMALS`).
+pub const X3_BASE_UNITS_PER_X3: u128 = 1_000_000_000_000;
 
-/// Treasury allocation (20% of total supply)
-pub const X3_TREASURY_ALLOCATION: u128 = X3_TOTAL_SUPPLY / 5;
+/// Canonical Alpha supply, in whole X3 — the single source of truth for supply.
+///
+/// Must equal `token.total_supply` in `deployment/genesis/x3-testnet-allocations.json`
+/// (`scripts/ci/verify_genesis_allocations_baseline.sh` pins that file as the deployment record).
+pub const X3_TOTAL_SUPPLY_X3: u128 = 8_888_888_888;
 
-/// Community bonus pool (10% of total supply)
-pub const X3_BONUS_POOL_ALLOCATION: u128 = X3_TOTAL_SUPPLY / 10;
+/// Total supply in base units: 8,888,888,888 X3 at 12 decimals.
+pub const X3_TOTAL_SUPPLY: u128 = X3_TOTAL_SUPPLY_X3 * X3_BASE_UNITS_PER_X3;
 
-/// Genesis allocation for team and advisors (15% of total supply)
-pub const X3_TEAM_ALLOCATION: u128 = X3_TOTAL_SUPPLY * 15 / 100;
+/// Genesis allocation buckets, in base units. The names mirror the deployment manifest's bucket
+/// keys so the gate can compare them mechanically instead of by eye.
+pub const X3_TREASURY_ALLOCATION: u128 = 2_222_222_222 * X3_BASE_UNITS_PER_X3;
+/// `validators_staking` in the manifest. Funds validator compensation for Alpha (see
+/// `docs/economics/X3_ALPHA_ECONOMIC_POLICY.md`); it is a reserve, not a staking reward pool.
+pub const X3_VALIDATOR_SECURITY_RESERVE: u128 = 1_777_777_778 * X3_BASE_UNITS_PER_X3;
+/// `ecosystem_grants` in the manifest.
+pub const X3_ECOSYSTEM_ALLOCATION: u128 = 1_777_777_778 * X3_BASE_UNITS_PER_X3;
+/// `presale_early_investors` in the manifest.
+pub const X3_PRESALE_ALLOCATION: u128 = 1_333_333_333 * X3_BASE_UNITS_PER_X3;
+/// `bonus_pool` in the manifest.
+pub const X3_BONUS_POOL_ALLOCATION: u128 = 888_888_889 * X3_BASE_UNITS_PER_X3;
+/// `team_core_contributors` in the manifest.
+pub const X3_TEAM_ALLOCATION: u128 = 888_888_888 * X3_BASE_UNITS_PER_X3;
 
-/// Genesis allocation for ecosystem development (25% of total supply)
-pub const X3_ECOSYSTEM_ALLOCATION: u128 = X3_TOTAL_SUPPLY * 25 / 100;
+/// Every genesis bucket, and nothing else, accounts for the whole supply.
+pub const X3_ALLOCATION_SUM: u128 = X3_TREASURY_ALLOCATION
+    + X3_VALIDATOR_SECURITY_RESERVE
+    + X3_ECOSYSTEM_ALLOCATION
+    + X3_PRESALE_ALLOCATION
+    + X3_BONUS_POOL_ALLOCATION
+    + X3_TEAM_ALLOCATION;
 
-/// Genesis allocation for liquidity and exchanges (30% of total supply)
-pub const X3_LIQUIDITY_ALLOCATION: u128 = X3_TOTAL_SUPPLY * 30 / 100;
+const _: () = assert!(
+    X3_ALLOCATION_SUM == X3_TOTAL_SUPPLY,
+    "genesis allocation buckets must sum to X3_TOTAL_SUPPLY"
+);
 
 /// Vesting period for team allocation (in blocks, ~1 year at 200ms blocks)
 pub const TEAM_VESTING_BLOCKS: u64 = 15_768_000; // 15,768,000 blocks ≈ 1 year
@@ -346,7 +373,9 @@ pub mod pallet {
         /// Ecosystem allocation accounts and amounts
         pub ecosystem_allocations: Vec<(T::AccountId, u128)>,
         /// Liquidity allocation accounts and amounts
-        pub liquidity_allocations: Vec<(T::AccountId, u128)>,
+        /// `presale_early_investors` in the deployment manifest. Named for the bucket, not
+        /// the venue, so the genesis config and the manifest read the same way.
+        pub presale_allocations: Vec<(T::AccountId, u128)>,
     }
 
     #[pallet::genesis_build]
@@ -387,7 +416,7 @@ pub mod pallet {
             }
 
             // Distribute liquidity allocations (no vesting)
-            for (account, amount) in &self.liquidity_allocations {
+            for (account, amount) in &self.presale_allocations {
                 Pallet::<T>::increase_canonical_balance(account, (*amount).saturated_into());
             }
 

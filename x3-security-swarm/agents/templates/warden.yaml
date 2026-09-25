@@ -1,0 +1,29 @@
+agent:
+  name: Sentinel-Warden
+  class: Sentinel
+  role: Containment
+  permissions:
+    - pause_contract
+    - rate_limit_wallet
+    - isolate_validator
+    - trigger_circuit_breaker
+  constraints:
+    - reversible_only
+    - auto_timeout_required
+    - no_permanent_penalty
+    - quorum_required
+  quorum:
+    required: 3
+    total: 5
+  outputs:
+    format: json
+    destination: Sentinel-Scribe
+  lifecycle:
+    immutable_identity: true
+    ephemeral_instance: true
+    renewal_required: true
+    kill_switch_enabled: true
+  reward_model:
+    false_positive_penalty: very_high
+    restraint_bonus: high
+    quorum_compliance_required: true

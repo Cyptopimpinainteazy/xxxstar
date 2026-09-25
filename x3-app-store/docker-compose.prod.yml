@@ -1,0 +1,156 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: x3-app-store-mongo-prod
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+      - MONGO_INITDB_DATABASE=x3-app-store
+    volumes:
+      - mongo-data-prod:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - x3-app-store-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: x3-app-store-redis-prod
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=password
+    volumes:
+      - redis-data-prod:/data
+    networks:
+      - x3-app-store-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: x3-app-store-backend-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/x3-app-store
+      - REDIS_URL=redis://:password@redis:6379
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - x3-app-store-network
+    restart: unless-stopped
+    command: npm start
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: x3-app-store-frontend-prod
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - x3-app-store-network
+    restart: unless-stopped
+    command: npm start
+
+  github-scraper:
+    build:
+      context: ./github-scraper
+      dockerfile: Dockerfile
+    container_name: x3-app-store-scraper-prod
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/x3-app-store
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    volumes:
+      - ./github-scraper:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+    networks:
+      - x3-app-store-network
+    restart: unless-stopped
+    command: node scraper.js
+
+  treasury:
+    build:
+      context: ./treasury
+      dockerfile: Dockerfile
+    container_name: x3-app-store-treasury-prod
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/x3-app-store
+      - COINGECKO_API_URL=https://api.coingecko.com/api/v3
+    volumes:
+      - ./treasury:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+    networks:
+      - x3-app-store-network
+    restart: unless-stopped
+    command: node treasury.js
+
+  app-store-manager:
+    build:
+      context: ./app-store-manager
+      dockerfile: Dockerfile
+    container_name: x3-app-store-manager-prod
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/x3-app-store
+    volumes:
+      - ./app-store-manager:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+    networks:
+      - x3-app-store-network
+    restart: unless-stopped
+    command: node manager.js
+
+  nginx:
+    image: nginx:alpine
+    container_name: x3-app-store-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - x3-app-store-network
+    restart: unless-stopped
+
+volumes:
+  mongo-data-prod:
+  redis-data-prod:
+
+networks:
+  x3-app-store-network:
+    driver: bridge

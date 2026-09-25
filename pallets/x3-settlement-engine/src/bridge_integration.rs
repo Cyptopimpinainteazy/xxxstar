@@ -82,13 +82,21 @@ pub trait CrossChainValidatorProvider {
         Self: Sized;
 }
 
-/// No-op implementation for testing without cross-chain-validator pallet
+/// Accept-all validator for tests and local development.
 ///
-/// Returns `true` for all proofs — useful for development/testing.
+/// Returns `true` for every proof. It used to be compiled into every build,
+/// which left an accept-all proof validator in the production binary even though
+/// nothing wired it up: an unaudited `impl CrossChainValidatorProvider` is one
+/// trait-bound away from accepting forged bridge proofs. It is now compiled only
+/// for tests, or with the `dev-proofs` feature, which is off by default and must
+/// never be enabled in a runtime that settles real value.
+///
 /// Production runtimes MUST implement the trait properly via
 /// pallet_cross_chain_validator integration.
+#[cfg(any(test, feature = "dev-proofs"))]
 pub struct NoOpCrossChainValidator;
 
+#[cfg(any(test, feature = "dev-proofs"))]
 impl CrossChainValidatorProvider for NoOpCrossChainValidator {
     fn verify_evm_proof(_: u64, _: H256, _: H256, _: H256) -> bool {
         // Accept all EVM proofs (dev/test only!)

@@ -179,32 +179,12 @@ fn critical_005_secrets_not_stored_plaintext() {
 
 // ============================================================================
 // CRITICAL-006: Timelock Safety Margin Not Enforced Atomically
+//
+// The arithmetic check that used to sit under this heading called no coordinator
+// code, so it passed with every timelock check in the state machine deleted. The
+// real test is state_machine::state_machine_regression_tests::
+// critical_006_coordinator_aborts_flash_execution_past_the_timelock.
 // ============================================================================
-
-#[tokio::test]
-async fn critical_006_timelock_checked_before_each_operation() {
-    // VERIFY: Timelock safety margin MUST be re-checked before each RPC call
-
-    let mut current_time = 1000u64;
-    let safety_margin_secs = 300u64;
-    let slow_timelock = 2000u64;
-
-    // Entry check
-    assert!(
-        current_time + safety_margin_secs < slow_timelock,
-        "Entry check passed"
-    );
-
-    // Simulate RPC call that takes 250 seconds
-    current_time += 250;
-
-    // RE-CHECK before continuing (REQUIRED FIX)
-    if current_time + safety_margin_secs >= slow_timelock {
-        panic!("❌ Safety margin violated mid-execution!");
-    }
-
-    println!("✓ CRITICAL-006: Timelock re-checked during async operations");
-}
 
 // ============================================================================
 // CRITICAL-007: Merkle Settlement Block Number Validation
