@@ -43,7 +43,10 @@ required_tests = [
   "compile_source_emits_runtime_loadable_bytecode",
   "compile_source_rejects_invalid_source",
 ]
-test_evidence = ["crates/x3-integration/tests/compiler_bridge.rs: six tests, green; the sweep drives eight program shapes through compile → both readers → on-chain executor → receipt and asserts the receipt reports the value the source states, and the float test asserts both the simulation result and the on-chain refusal"]
+test_evidence = [
+  "crates/x3-integration/tests/compiler_bridge.rs",
+  "note: six tests, green; the sweep drives eight program shapes through compile → both readers → on-chain executor → receipt and asserts the receipt reports the value the source states, and the float test asserts both the simulation result and the on-chain refusal",
+]
 evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "crates/x3-backend/src/emit.rs", "note: Trading Core v1 gap #10"]
 
 [[feature]]
@@ -146,7 +149,10 @@ required_tests = [
   "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
   "compile_encode_decode_execute_receipt_end_to_end",
 ]
-test_evidence = ["crates/x3-integration/tests/compiler_bridge.rs: the corpus test runs each fixture on both engines and requires the same value"]
+test_evidence = [
+  "crates/x3-integration/tests/compiler_bridge.rs",
+  "note: the corpus test runs each fixture on both engines and requires the same value",
+]
 evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "note: Trading Core v1 gap #4"]
 
 [[feature]]
@@ -189,6 +195,11 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Re-measured 2026-09-24: the exact E2E proof this row asked for exists — source to compiler to X3BC to both readers to both engines to receipt, six tests whose expectations are read off each source, plus the envelope body parity suite. The remaining half is the node's own use of that path, which is X3-LANG-004's residue"]
+required_tests = [
+  "compile_source_emits_runtime_loadable_bytecode",
+  "compile_source_rejects_invalid_source",
+]
+test_evidence = ["crates/x3-integration/tests/compiler_bridge.rs"]
 evidence = ["crates/x3-integration", "note: Known grant-track gap", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]
 
 [[feature]]

@@ -107,16 +107,17 @@ expect_restore_refused() {
 }
 
 # ── Build the verifier and the honest snapshot ──────────────────────────────
+# Build the verifier unless the caller named one.
+#
+# This used to prefer whatever `target/{release,debug}/x3-state-snapshot` already
+# existed and only build when neither did, which makes the gate a test of the last
+# build in the shared target dir rather than of this tree. Measured 2026-09-24: after
+# merging a commit that ADDED the `restore` subcommand, the gate ran a binary built at
+# 08:45 that morning, reported `error: expected a subcommand`, and failed two cases —
+# on a tree whose CLI had `restore` in it. A stale artifact is not evidence, and cargo
+# makes the honest version free: an up-to-date build is a fraction of a second.
 VERIFIER="${X3_SNAPSHOT_VERIFIER:-}"
 if [[ -z "$VERIFIER" ]]; then
-  for candidate in target/release/x3-state-snapshot target/debug/x3-state-snapshot; do
-    if [[ -x "$REPO_ROOT/$candidate" ]]; then
-      VERIFIER="$REPO_ROOT/$candidate"
-      break
-    fi
-  done
-fi
-if [[ -z "$VERIFIER" || ! -x "$VERIFIER" ]]; then
   say "building target/debug/x3-state-snapshot ..."
   if ! (cd "$REPO_ROOT" && SKIP_WASM_BUILD=1 cargo build -q -p x3-state-snapshot); then
     say "FAIL  could not build the verifier"

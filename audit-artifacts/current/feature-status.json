@@ -4362,7 +4362,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "58ad8c66de996a45a6ad94163917b26bfb286fcf814710d7f2b0e8a5019140e2",
+    "source_digest": "857b1e5881c2a346ba5fff1e3d54f6ab0278a030d9f38352ce6151d4de7c9aca",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4373,7 +4373,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "9ffa2017b9133f461e78fcf85b42b7be1a53e44bd9dc83179ff827832c4fffb3",
+      "feature-matrix/language-trading.toml": "555f4c9636cee8e51229f587472859208366328708d3a6a6728410ac99da1082",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",
