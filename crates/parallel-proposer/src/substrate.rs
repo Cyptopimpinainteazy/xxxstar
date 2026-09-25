@@ -188,7 +188,8 @@ const AUTHORING_PAUSED: &str =
 /// No gate at all means "always author": a node that never asked for the disk
 /// guard must not be paused by it.
 pub(crate) fn authoring_paused(gate: &Option<Arc<AtomicBool>>) -> bool {
-    gate.as_ref().is_some_and(|gate| !gate.load(Ordering::Relaxed))
+    gate.as_ref()
+        .is_some_and(|gate| !gate.load(Ordering::Relaxed))
 }
 
 impl<A, B, Block, C, PR> Proposer<Block> for ParallelProposer<B, Block, C, A, PR>

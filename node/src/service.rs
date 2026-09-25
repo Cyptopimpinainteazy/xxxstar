@@ -999,9 +999,8 @@ fn spawn_disk_watchdog(
     let is_authority = config.role.is_authority();
 
     // What the operator can see and alert on: 1 while authoring is paused.
-    let paused_gauge: Option<substrate_prometheus_endpoint::prometheus::IntGauge> = config
-        .prometheus_registry()
-        .and_then(|registry| {
+    let paused_gauge: Option<substrate_prometheus_endpoint::prometheus::IntGauge> =
+        config.prometheus_registry().and_then(|registry| {
             let gauge = substrate_prometheus_endpoint::prometheus::IntGauge::new(
                 "x3_authoring_paused",
                 "1 when the node has stopped authoring because free disk space is below its floor",
