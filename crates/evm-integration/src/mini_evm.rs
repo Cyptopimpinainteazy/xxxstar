@@ -133,7 +133,12 @@ pub fn execute_evm(
         to_evm_u256(value),  // value
         payload.to_vec(),    // call data
         gas_limit,
-        vec![], // access_list
+        vec![], // access_list (EIP-2930) — this path never pays for warm slots
+        // authorization_list (EIP-7702, Pectra): X3 executes plain calls, and a
+        // delegated-account authorization would let the payload's `caller` be
+        // overridden by the transaction itself. Empty, and it must stay empty
+        // unless the runtime gains an explicit, policy-checked use for it.
+        vec![],
     );
 
     let gas_used = executor.used_gas();
@@ -213,6 +218,11 @@ fn derive_target(payload: &[u8]) -> EvmH160 {
 }
 
 fn map_exit_reason(reason: &ExitReason, gas_used: u64) -> EvmError {
+    // `ExecutionFailed` carries a `u32` and `gas_used` is a `u64`. The old
+    // `gas_used as u32` wrapped silently, so an execution above ~4.29e9 gas
+    // reported a number that never happened — and the number is what a caller
+    // gets back for an unmapped failure. Saturate instead of truncating.
+    let gas_code = u32::try_from(gas_used).unwrap_or(u32::MAX);
     match reason {
         ExitReason::Revert(_) => EvmError::ExecutionReverted,
         ExitReason::Error(evm::ExitError::OutOfGas) => EvmError::OutOfGas,
@@ -220,7 +230,12 @@ fn map_exit_reason(reason: &ExitReason, gas_used: u64) -> EvmError {
         ExitReason::Error(evm::ExitError::StackUnderflow) => EvmError::StackUnderflow,
         ExitReason::Error(evm::ExitError::CreateCollision) => EvmError::CreateCollision,
         ExitReason::Error(evm::ExitError::InvalidCode(op)) => EvmError::InvalidOpcode(op.as_u8()),
-        _ => EvmError::ExecutionFailed(gas_used as u32),
+        // 0xFE has its own `ExitError` variant, so it used to fall through to
+        // `ExecutionFailed(gas)`: a contract that hit the designated invalid
+        // opcode was indistinguishable from any other unmapped failure. The
+        // byte is fixed by the spec, so report it as the invalid opcode it is.
+        ExitReason::Error(evm::ExitError::DesignatedInvalid) => EvmError::InvalidOpcode(0xFE),
+        _ => EvmError::ExecutionFailed(gas_code),
     }
 }
 
@@ -1223,4 +1238,245 @@ fn g(v: &mut [u64; 16], a: usize, b: usize, c: usize, d: usize, x: u64, y: u64) 
     v[d] = (v[d] ^ v[a]).rotate_right(16);
     v[c] = v[c].wrapping_add(v[d]);
     v[b] = (v[b] ^ v[c]).rotate_right(63);
+}
+
+// ---------------------------------------------------------------------------
+// Tests — real bytecode through the interpreter the runtime actually uses
+// ---------------------------------------------------------------------------
+//
+// `execute_evm` is the production EVM entry point: `x3-chain-runtime` wires
+// `pallet_x3_kernel::wasm_adapters::WasmEvmAdapter`, whose `execute` is a thin
+// forward into this function, and whose payload is a comit's EVM bytecode.
+//
+// Nothing in the tree called it before these tests. The crate's unit tests
+// covered config, gas estimation and the state-root helper; the pallet's tests
+// drive `TestEvmAdapter`, a mock; and the two files under `tests/` that *do*
+// execute EVM code were disabled by `#![cfg(any())]` at the top — a
+// permanently-false cfg, so `cargo test` printed "0 tests" for them rather than
+// "ignored". A dependency bump of the interpreter therefore had no test that
+// could have noticed a behavioural change.
+//
+// Every test below runs actual bytecode with defined semantics, so the
+// assertions fail if the interpreter, the precompile map, the caller/value
+// forwarding or the gas accounting changes.
+#[cfg(test)]
+mod execute_evm_tests {
+    use super::*;
+    use crate::EvmConfig;
+
+    /// `PUSH1 0x2a; PUSH1 0x00; MSTORE; PUSH1 0x20; PUSH1 0x00; RETURN`
+    const RETURN_0X2A: &[u8] = &[
+        0x60, 0x2a, // PUSH1 0x2a
+        0x60, 0x00, // PUSH1 0x00
+        0x52, // MSTORE
+        0x60, 0x20, // PUSH1 0x20 (size)
+        0x60, 0x00, // PUSH1 0x00 (offset)
+        0xf3, // RETURN
+    ];
+
+    /// `PUSH1 0x42; PUSH1 0x00; SSTORE; PUSH1 0x00; SLOAD; PUSH1 0x00; MSTORE;
+    /// PUSH1 0x20; PUSH1 0x00; RETURN` — writes storage, reads it back, returns it.
+    const SSTORE_THEN_SLOAD: &[u8] = &[
+        0x60, 0x42, // PUSH1 0x42 (value)
+        0x60, 0x00, // PUSH1 0x00 (key)
+        0x55, // SSTORE
+        0x60, 0x00, // PUSH1 0x00 (key)
+        0x54, // SLOAD
+        0x60, 0x00, // PUSH1 0x00 (offset)
+        0x52, // MSTORE
+        0x60, 0x20, // PUSH1 0x20 (size)
+        0x60, 0x00, // PUSH1 0x00 (offset)
+        0xf3, // RETURN
+    ];
+
+    fn caller() -> SpH160 {
+        SpH160::repeat_byte(0xAA)
+    }
+
+    fn run(code: &[u8]) -> EvmResult<EvmExecutionResult> {
+        execute_evm(code, caller(), SpU256::zero(), &EvmConfig::default())
+    }
+
+    /// Wrap a single opcode so the contract returns whatever it leaves on the
+    /// stack as one 32-byte word: `<op>; PUSH1 0x00; MSTORE; PUSH1 0x20;
+    /// PUSH1 0x00; RETURN`.
+    fn return_top_of_stack(opcode: u8) -> Vec<u8> {
+        vec![opcode, 0x60, 0x00, 0x52, 0x60, 0x20, 0x60, 0x00, 0xf3]
+    }
+
+    #[test]
+    fn executes_bytecode_and_returns_its_output() {
+        let result = run(RETURN_0X2A).expect("execution should succeed");
+        assert!(result.success);
+        assert_eq!(result.output.len(), 32, "RETURN of one word");
+        assert_eq!(&result.output[..31], &[0u8; 31], "value is right-aligned");
+        assert_eq!(result.output[31], 0x2a);
+        assert!(result.gas_used > 0, "real execution cannot cost zero gas");
+        assert_ne!(result.state_root, [0u8; 32]);
+    }
+
+    #[test]
+    fn storage_written_during_execution_is_readable_in_the_same_execution() {
+        let result = run(SSTORE_THEN_SLOAD).expect("SSTORE/SLOAD should succeed");
+        assert_eq!(
+            result.output[31], 0x42,
+            "SLOAD must return what SSTORE wrote"
+        );
+
+        // A cold zero-to-nonzero SSTORE costs 20_000 gas, so the round trip has to
+        // be strictly more expensive than storing nothing at all. This is what
+        // catches an interpreter that silently drops state instructions.
+        let plain = run(RETURN_0X2A).expect("execution should succeed");
+        assert!(
+            result.gas_used > plain.gas_used,
+            "SSTORE must be charged for: run={} plain={}",
+            result.gas_used,
+            plain.gas_used
+        );
+    }
+
+    #[test]
+    fn revert_is_reported_as_a_revert_and_not_as_success() {
+        // PUSH1 0x00; PUSH1 0x00; REVERT
+        let err = run(&[0x60, 0x00, 0x60, 0x00, 0xfd]).expect_err("REVERT must not succeed");
+        assert_eq!(err, EvmError::ExecutionReverted);
+    }
+
+    #[test]
+    fn a_gas_limit_below_the_intrinsic_cost_is_out_of_gas() {
+        let config = EvmConfig {
+            gas_limit: 100, // below the 21_000 intrinsic call cost
+            ..EvmConfig::default()
+        };
+        let err = execute_evm(RETURN_0X2A, caller(), SpU256::zero(), &config)
+            .expect_err("100 gas cannot pay for a call");
+        assert_eq!(err, EvmError::OutOfGas);
+    }
+
+    #[test]
+    fn the_designated_invalid_opcode_is_reported_as_invalid_code() {
+        // 0xfe is INVALID. SputnikVM surfaces it as `ExitError::DesignatedInvalid`,
+        // which used to fall through to `ExecutionFailed(gas)`.
+        let err = run(&[0xfe]).expect_err("INVALID must not succeed");
+        assert_eq!(err, EvmError::InvalidOpcode(0xfe));
+    }
+
+    #[test]
+    fn the_contract_sees_the_configured_caller() {
+        let result = run(&return_top_of_stack(0x33)).expect("CALLER should succeed");
+        assert_eq!(
+            &result.output[12..32],
+            caller().as_bytes(),
+            "CALLER must return the address passed to execute_evm"
+        );
+    }
+
+    #[test]
+    fn the_contract_sees_the_configured_call_value() {
+        let result = execute_evm(
+            &return_top_of_stack(0x34),
+            caller(),
+            SpU256::from(12_345u64),
+            &EvmConfig::default(),
+        )
+        .expect("CALLVALUE should succeed");
+        assert_eq!(&result.output[30..32], &[0x30, 0x39], "12_345 == 0x3039");
+    }
+
+    #[test]
+    fn the_code_is_deployed_at_the_derived_address_and_address_reports_it() {
+        let code = return_top_of_stack(0x30);
+        let result = run(&code).expect("ADDRESS should succeed");
+        assert_eq!(
+            &result.output[12..32],
+            derive_target(&code).as_bytes(),
+            "ADDRESS must be the address the code was seeded at"
+        );
+    }
+
+    #[test]
+    fn the_identity_precompile_copies_memory_through_a_real_call() {
+        // mem[0..32] = 0x2a, then CALL 0x04 (identity) copying 0..32 to 32..64,
+        // then return 32..64. A missing precompile leaves the output region zero,
+        // so this fails if the precompile map is not wired into the executor.
+        let code = [
+            0x60, 0x2a, 0x60, 0x00, 0x52, // PUSH1 0x2a; PUSH1 0x00; MSTORE
+            0x60, 0x20, // retLength
+            0x60, 0x20, // retOffset
+            0x60, 0x20, // argsLength
+            0x60, 0x00, // argsOffset
+            0x60, 0x00, // value
+            0x60, 0x04, // address = identity precompile
+            0x61, 0xff, 0xff, // gas
+            0xf1, // CALL
+            0x50, // POP the success flag
+            0x60, 0x20, 0x60, 0x20, 0xf3, // PUSH1 0x20; PUSH1 0x20; RETURN
+        ];
+        let result = run(&code).expect("CALL to a precompile should succeed");
+        assert_eq!(result.output.len(), 32);
+        assert_eq!(
+            result.output[31], 0x2a,
+            "identity precompile must have copied the input into the output region"
+        );
+
+        // Negative control: the identical call to an address with no precompile
+        // succeeds but copies nothing, so the output region stays zero. Without
+        // this, a `CALL` that never ran would also leave 0x2a in memory and the
+        // assertion above would pass for the wrong reason.
+        let mut no_precompile = code;
+        no_precompile[16] = 0x0a; // call address 0x0a instead of 0x04
+        let control = run(&no_precompile).expect("CALL to an empty account succeeds");
+        assert_eq!(
+            control.output[31], 0x00,
+            "an address with no precompile must not copy the input"
+        );
+    }
+
+    #[test]
+    fn gas_and_state_root_are_deterministic_for_identical_input() {
+        let first = run(RETURN_0X2A).expect("execution should succeed");
+        let second = run(RETURN_0X2A).expect("execution should succeed");
+        assert_eq!(first.gas_used, second.gas_used);
+        assert_eq!(first.state_root, second.state_root);
+    }
+
+    #[test]
+    fn the_state_root_commits_to_the_returned_data() {
+        let mut other = RETURN_0X2A.to_vec();
+        other[1] = 0x2b; // return 0x2b instead of 0x2a
+
+        let a = run(RETURN_0X2A).expect("execution should succeed");
+        let b = run(&other).expect("execution should succeed");
+        assert_eq!(b.output[31], 0x2b);
+        assert_ne!(
+            a.state_root, b.state_root,
+            "a different result must not produce the same state root"
+        );
+    }
+
+    #[test]
+    fn an_empty_payload_is_rejected_before_execution() {
+        assert_eq!(
+            run(&[]).expect_err("empty payload"),
+            EvmError::InvalidPayload
+        );
+    }
+
+    #[test]
+    fn the_state_root_depends_on_the_caller() {
+        let a = execute_evm(RETURN_0X2A, caller(), SpU256::zero(), &EvmConfig::default())
+            .expect("execution should succeed");
+        let b = execute_evm(
+            RETURN_0X2A,
+            SpH160::repeat_byte(0xBB),
+            SpU256::zero(),
+            &EvmConfig::default(),
+        )
+        .expect("execution should succeed");
+        assert_eq!(a.gas_used, b.gas_used, "the same code costs the same gas");
+        assert_ne!(
+            a.state_root, b.state_root,
+            "the caller is committed to the root"
+        );
+    }
 }

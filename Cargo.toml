@@ -429,8 +429,12 @@ contention-predictor = { path = "crates/contention-predictor" }
 private-mempool = { path = "crates/private-mempool" }
 confidential-gpu = { path = "crates/confidential-gpu" }
 
-# SputnikVM — no-std EVM interpreter (used by x3-evm-integration WASM path)
-evm = { git = "https://github.com/rust-blockchain/evm", rev = "b7b82c7e1fc57b7449d6dfa6826600de37cc1e65", default-features = false }
+# SputnikVM — no-std EVM interpreter (used by x3-evm-integration WASM path).
+# The spec must match Frontier's verbatim (`rust-ethereum/evm.git`, branch v0.x): the
+# upstream repo moved from `rust-blockchain/evm`, and a rev-pinned URL would give cargo a
+# *different* git SourceId from the one pallet-evm uses, compiling a second copy of the
+# interpreter into the node. Matching the branch unifies both onto one `evm` crate.
+evm = { git = "https://github.com/rust-ethereum/evm.git", branch = "v0.x", default-features = false }
 
 # Frontier EVM dependencies for real EVM execution
 pallet-evm = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }

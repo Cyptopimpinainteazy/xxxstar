@@ -1,78 +1,77 @@
-#![cfg(any())]
+//! Invariants of the production EVM execution boundary.
+//!
+//! This file previously began with `#![cfg(any())]` and so never compiled or ran;
+//! its one test drove `FrontierEvmExecutor` with a `0x01`-prefixed CREATE wrapper
+//! payload against an `EvmExecutor::execute` signature that no longer exists.
+//! The EVM path the runtime actually wires is `WasmEvmAdapter` ->
+//! `mini_evm::execute_evm`, and the properties worth pinning down at this
+//! boundary are the ones a caller can observe: what the contract sees as call
+//! data, and what one execution can and cannot see of another.
 
 use sp_core::{H160, U256};
-use x3_evm_integration::{EvmConfig, EvmExecutor, FrontierEvmExecutor};
+use x3_evm_integration::{mini_evm::execute_evm, EvmConfig};
 
-/// Integration test: deploy a minimal storage contract (constructor stores 0x42)
-/// whose runtime returns storage slot 0 on CALL. Verifies CREATE then CALL returns 0x42.
+fn caller() -> H160 {
+    H160::repeat_byte(0xAA)
+}
+
+fn run(code: &[u8]) -> x3_evm_integration::EvmExecutionResult {
+    execute_evm(code, caller(), U256::zero(), &EvmConfig::default())
+        .expect("execution should succeed")
+}
+
+/// `PUSH1 0x42; PUSH1 0x00; SSTORE` then return nothing.
+const WRITE_SLOT_ZERO: &[u8] = &[
+    0x60, 0x42, // PUSH1 0x42 (value)
+    0x60, 0x00, // PUSH1 0x00 (key)
+    0x55, // SSTORE
+    0x60, 0x00, // PUSH1 0x00 (size)
+    0x60, 0x00, // PUSH1 0x00 (offset)
+    0xf3, // RETURN
+];
+
+/// `PUSH1 0x00; SLOAD; PUSH1 0x00; MSTORE; PUSH1 0x20; PUSH1 0x00; RETURN` —
+/// returns storage slot 0 without writing it.
+const READ_SLOT_ZERO: &[u8] = &[
+    0x60, 0x00, // PUSH1 0x00 (key)
+    0x54, // SLOAD
+    0x60, 0x00, // PUSH1 0x00 (offset)
+    0x52, // MSTORE
+    0x60, 0x20, // PUSH1 0x20 (size)
+    0x60, 0x00, // PUSH1 0x00 (offset)
+    0xf3, // RETURN
+];
+
 #[test]
-fn integration_deploy_and_call_storage_contract() {
-    let executor = FrontierEvmExecutor;
+fn the_contract_sees_the_payload_as_call_data() {
+    // CALLDATASIZE; PUSH1 0x00; MSTORE; PUSH1 0x20; PUSH1 0x00; RETURN
+    let code = [0x36, 0x60, 0x00, 0x52, 0x60, 0x20, 0x60, 0x00, 0xf3];
+    let result = run(&code);
 
-    // Construction bytecode:
-    // constructor: SSTORE(0x42, 0x00) + CODECOPY(runtime) + RETURN(runtime)
-    // runtime: SLOAD(0x00) + RETURN(32)
-    let creation = vec![
-        // constructor: store 0x42 at slot 0
-        0x60, 0x42, // PUSH1 0x42
-        0x60, 0x00, // PUSH1 0x00
-        0x55, // SSTORE
-        // copy runtime (8 bytes) into memory and return it
-        0x60, 0x08, // PUSH1 0x08 (size)
-        0x60, 0x11, // PUSH1 0x11 (code offset - runtime starts after constructor)
-        0x60, 0x00, // PUSH1 0x00 (mem offset)
-        0x39, // CODECOPY
-        0x60, 0x00, // PUSH1 0x00 (mem offset)
-        0x60, 0x08, // PUSH1 0x08 (size)
-        0xF3, // RETURN
-        // ---- runtime (8 bytes) ----
-        0x60, 0x00, // PUSH1 0x00
-        0x54, // SLOAD
-        0x60, 0x20, // PUSH1 0x20
-        0x60, 0x00, // PUSH1 0x00
-        0xF3, // RETURN
-    ];
-
-    // Use same wrapper format as other integration tests: leading 0x01 = CREATE,
-    // then 8-byte value (0), then the initcode
-    let mut payload = vec![0x01u8];
-    payload.extend_from_slice(&0u64.to_be_bytes());
-    payload.extend_from_slice(&creation);
-
-    // Deploy contract
-    let r = executor
-        .execute(&payload, &[0xAAu8; 20], &EvmConfig::default())
-        .unwrap();
-    assert!(r.success, "contract CREATE should succeed");
-
-    // Expect returned output to contain the deployed address (20 bytes)
-    assert!(
-        r.output.len() >= 20,
-        "CREATE should return deployed address bytes"
-    );
-    let addr_bytes = &r.output[r.output.len().saturating_sub(20)..];
-    let contract_addr = H160::from_slice(addr_bytes);
-
-    // Now CALL the deployed contract (empty calldata) and expect 32-byte return with 0x42
-    let caller = H160::from_slice(&[0xAAu8; 20]);
-    let call_result = EvmExecutor::call(
-        &executor,
-        &[], // empty calldata -> runtime will SLOAD(slot 0) and RETURN
-        caller,
-        contract_addr,
-        U256::zero(),
-        &EvmConfig::default(),
-    )
-    .expect("call should succeed");
-
-    assert!(call_result.success, "call execution should succeed");
-    assert!(
-        call_result.output.len() >= 32,
-        "call should return 32-byte word"
-    );
-    // storage[0] was set to 0x42; check last byte
+    // The adapter passes the payload as *both* the code and the call data. That is
+    // load-bearing: a contract sized against CALLDATASIZE depends on it, and a
+    // change to pass empty call data would silently alter every such contract.
     assert_eq!(
-        call_result.output[31], 0x42u8,
-        "returned storage value must be 0x42"
+        result.output[31] as usize,
+        code.len(),
+        "CALLDATASIZE must be the payload length"
+    );
+}
+
+#[test]
+fn state_written_by_one_execution_is_invisible_to_the_next() {
+    // A real write, in its own execution.
+    let written = run(WRITE_SLOT_ZERO);
+    assert!(written.success);
+
+    // A *different* contract that only reads slot 0 must see a fresh backend, not
+    // the value the previous execution stored. The runtime re-executes from
+    // canonical ledger state each time; if this backend ever became persistent
+    // between calls, slot 0 would come back as 0x42 here.
+    let read_back = run(READ_SLOT_ZERO);
+    assert_eq!(read_back.output.len(), 32);
+    assert_eq!(
+        read_back.output[31], 0x00,
+        "executions must not share in-memory EVM state"
     );
 }

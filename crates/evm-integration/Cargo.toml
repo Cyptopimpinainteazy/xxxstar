@@ -20,7 +20,11 @@ pallet-evm = { workspace = true, default-features = false, optional = true }
 fp-evm = { workspace = true, default-features = false, optional = true }
 
 # EVM numeric types
-primitive-types = { version = "0.12.2", default-features = false }
+# Must track the `evm` crate's own primitive-types major: `evm::H160`/`U256` *are*
+# primitive-types types, so a 0.12 here would be a different type from the one the
+# interpreter returns. The boundary with sp-core (which stays on 0.12) is crossed by
+# bytes, in to_evm_u256/to_evm_h160 below.
+primitive-types = { version = "0.13.1", default-features = false }
 
 # Serialization
 parity-scale-codec = { workspace = true, default-features = false }

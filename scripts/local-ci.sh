@@ -301,6 +301,16 @@ GATES_FAST=(
   "test x3-wrapped:cargo test -p pallet-x3-wrapped"
   "test atomic-trade-engine:cargo test -p pallet-atomic-trade-engine"
   "test x3-bench:cargo test -p x3-bench"
+  # `x3-evm-integration` owns the EVM interpreter the runtime actually executes: `x3-chain-runtime`
+  # wires `pallet_x3_kernel::wasm_adapters::WasmEvmAdapter`, whose `execute` forwards into
+  # `mini_evm::execute_evm`. No gate ran its tests, and the only two files that executed EVM code
+  # began with `#![cfg(any())]` — a permanently false cfg, so `cargo test` printed "0 tests" for
+  # them rather than "ignored", and they had drifted off the current `EvmExecutor` signature so
+  # they could not simply be un-commented. Both are real tests now. Both feature sets are gated:
+  # the default (no_std) path that ships inside the runtime wasm, and the optional `frontier` path,
+  # where two further tests had never been compiled at all because no gate passed the feature.
+  "test x3-evm-integration:cargo test -p x3-evm-integration"
+  "test x3-evm-integration frontier:cargo test -p x3-evm-integration --features frontier"
   # `X3-contracts/svm/programs/x3_htlc` is a member of a *nested* workspace that the root does not
   # build, so its tests had never run here. The registry row cites it and used to cite a workflow
   # (`.github/workflows/svm-htlc.yml`) that is not in this tree at all. Its own target dir is named
