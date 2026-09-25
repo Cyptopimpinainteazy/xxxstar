@@ -280,6 +280,17 @@ GATES_FAST=(
   # functions every cross-domain operation runs through were untested. They are covered now, and this
   # gate is what keeps them covered.
   "test x3-supply-ledger:cargo test -p pallet-x3-supply-ledger"
+  # The rest of the registry's cited crates, which had no gate either. `registry tests are gated`
+  # found them (nine features in the KNOWN_UNGATED baseline); these eight suites pass today, so the
+  # baseline shrinks to the one entry that cannot be gated from here — the orphan `x3_htlc` tree.
+  "test x3-dex:cargo test -p pallet-x3-dex"
+  "test x3-lp-locker:cargo test -p pallet-x3-lp-locker"
+  "test x3-token-factory:cargo test -p pallet-x3-token-factory"
+  "test x3-sentinel:cargo test -p pallet-x3-sentinel"
+  "test x3-wallet-pallet:cargo test -p pallet-x3-wallet"
+  "test x3-wrapped:cargo test -p pallet-x3-wrapped"
+  "test atomic-trade-engine:cargo test -p pallet-atomic-trade-engine"
+  "test x3-bench:cargo test -p x3-bench"
   # The other two pallets of the same atomic path. `pallet-x3-cross-vm-router` owns the round trip
   # the whole kernel exists for — the headline test is literally
   # `test_x3_native_evm_svm_roundtrip_preserves_supply` — and, like the supply ledger and the kernel

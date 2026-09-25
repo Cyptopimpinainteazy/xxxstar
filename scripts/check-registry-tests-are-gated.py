@@ -52,17 +52,9 @@ LOCAL_CI = ROOT / "scripts" / "local-ci.sh"
 # Each one is recorded with the reason it is not gated yet, so the next reader inherits the decision
 # rather than the silence.
 KNOWN_UNGATED = {
-    # Measured 2026-09-25 with this script's `--list`. Each entry is a registry feature whose crate
-    # has a test suite and no fast gate: the registry cites it as evidence, and nothing runs it.
-    "atomic_lock": "pallets/x3-lp-locker has no gate yet",
-    "atomic_trade_engine": "pallets/atomic-trade-engine has no gate yet",
-    "axe": "pallets/x3-dex has no gate yet",
-    "x3_forge": "pallets/x3-token-factory has no gate yet",
+    # Measured 2026-09-25 with this script's `--list`. The other eight entries this list started with
+    # were gated the same day, which is the only direction this list is allowed to move.
     "x3_htlc": "X3-contracts/svm/programs/x3_htlc is an orphan tree (the registry row says so); the SVM HTLC on the live path is programs/svm/x3_atomic_swap, which its own gate exercises",
-    "x3_reactor": "crates/x3-bench has no gate yet",
-    "x3_sentinel": "pallets/x3-sentinel has no gate yet",
-    "x3_wallet_pallet": "pallets/x3-wallet-pallet has no gate yet",
-    "x3_wrapped": "pallets/x3-wrapped has no gate yet",
 }
 
 
