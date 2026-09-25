@@ -168,6 +168,9 @@ substrate-wasm-builder = { workspace = true }
 
 [dev-dependencies]
 sp-io = { workspace = true, features = ["std"] }
+# The runtime's tests compile real `.x3` source with the compiler the node uses;
+# `pallet-x3-kernel` already depends on this crate, so it is in the runtime's graph either way.
+x3-x3-integration = { path = "../crates/x3-integration", features = ["std", "compile"] }
 
 [features]
 # `tuples-96` was here and in `default`. It is on the `frame-support` dependency now,

@@ -89,23 +89,33 @@ id = "X3-LANG-004"
 name = "Bytecode routing to atomic kernel"
 subsystem = "language_trading"
 source = "master"
-paths = ["crates/x3-integration"]
-implemented = 65
-tested = 65
+paths = ["crates/x3-integration", "pallets/x3-kernel/src", "pallets/x3-kernel/tests", "runtime/src/tests.rs"]
+implemented = 70
+tested = 75
 mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["The production adapter the kernel is configured with (X3VmAdapter) is now driven by a test with a module compiled from .x3 source in the test: validate, estimate_gas, and the kernel's own ExecutionReceipt carrying the program's value, its metered gas and the receipt version, plus a corrupted module refused by both validate and execute (pallets/x3-kernel/tests/x3_adapter_route.rs, added 2026-09-24). What is not covered is an extrinsic dispatched through the pallet's storage with that adapter wired in: the pallet's own tests configure TestX3Adapter, which fabricates its receipt"]
+blockers = [
+  "**CLOSED 2026-09-25 — an extrinsic now carries a compiled program through the pallet, and the pallet records it.** `submit_comit_v2` validated its `x3_payload` as an `X3VmPacket` and then handed those same bytes to `T::X3Adapter::execute`, which parses X3BC. A packet is a semantic operation, not bytecode, and the executor accepts nothing else, so on any chain with a real adapter (`X3VmAdapter`, or `WasmX3Adapter` in the wasm build) every non-empty X3 payload died with `X3ExecutionFailed` — while a program compiled from `.x3` source was refused earlier as `InvalidX3VmPacket`. Reproduced before the fix by dispatching a compiled program at the real runtime: `Module(ModuleError { index: 11, error: [7, 0, 0, 0], message: Some(\"InvalidX3VmPacket\") })`. The payload is now the program, and validation is the adapter's own (`T::X3Adapter::validate`: envelope magic, version gate, checksum) — the component that does the work. Evidence: `runtime/src/tests.rs` compiles a program from source, dispatches it as a signed extrinsic, and asserts the comit is recorded and the nonce moved; its corrupted-program twin asserts refusal and that no comit record is left.",
+  "Still open on this row: the dispatch is proven in a runtime `TestExternalities`, not on a running chain with finality; the X3 execution receipt is **not persisted** — only the comit id, the nonce and the fee deduction reach storage, so a program's result cannot be re-read the way `EvmTransactionReceipts` allows for EVM; gas accounting is asserted through the adapter's receipt in-test rather than read back from chain state; and an old artifact executed against an upgraded VM version is untested.",
+]
 required_tests = [
   "compile_source_emits_runtime_loadable_bytecode",
   "compile_source_rejects_invalid_source",
   "test_execute_returns_42",
   "test_gas_exhausted",
+  "a_compiled_program_is_executed_by_the_production_adapter",
+  "the_production_adapter_refuses_a_corrupted_module",
+  "a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_recorded",
+  "a_corrupted_x3_program_is_refused_by_the_runtime_path",
 ]
-test_evidence = ["note: the four tests above are in crates/x3-integration (tests/compiler_bridge.rs, src/mini_x3.rs); measured on master 2026-09-23 (TICKET-101 third pass)"]
-evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
+test_evidence = [
+  "note: the first four tests are in crates/x3-integration (tests/compiler_bridge.rs, src/mini_x3.rs), measured on master 2026-09-23 (TICKET-101 third pass)",
+  "note: the adapter pair is pallets/x3-kernel/tests/x3_adapter_route.rs and the runtime pair is runtime/src/tests.rs; each compiles its program from `.x3` source inside the test (2026-09-25)",
+]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23", "note: 2026-09-25 - the pallet's X3 payload convention was wrong; runtime/src/tests.rs now proves the dispatch path"]
 registry_feature = "atomic_kernel"
 
 [[feature]]

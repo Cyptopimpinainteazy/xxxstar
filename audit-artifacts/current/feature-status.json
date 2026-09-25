@@ -2816,32 +2816,37 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 51,
+      "composite": 55,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration",
         "note: Known .x3 integration requirement",
-        "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"
+        "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23",
+        "note: 2026-09-25 - the pallet's X3 payload convention was wrong; runtime/src/tests.rs now proves the dispatch path"
       ],
       "id": "X3-LANG-004",
-      "implemented": 65,
+      "implemented": 70,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "The production adapter the kernel is configured with (X3VmAdapter) is now driven by a test with a module compiled from .x3 source in the test: validate, estimate_gas, and the kernel's own ExecutionReceipt carrying the program's value, its metered gas and the receipt version, plus a corrupted module refused by both validate and execute (pallets/x3-kernel/tests/x3_adapter_route.rs, added 2026-09-24). What is not covered is an extrinsic dispatched through the pallet's storage with that adapter wired in: the pallet's own tests configure TestX3Adapter, which fabricates its receipt"
+        "**CLOSED 2026-09-25 \u2014 an extrinsic now carries a compiled program through the pallet, and the pallet records it.** `submit_comit_v2` validated its `x3_payload` as an `X3VmPacket` and then handed those same bytes to `T::X3Adapter::execute`, which parses X3BC. A packet is a semantic operation, not bytecode, and the executor accepts nothing else, so on any chain with a real adapter (`X3VmAdapter`, or `WasmX3Adapter` in the wasm build) every non-empty X3 payload died with `X3ExecutionFailed` \u2014 while a program compiled from `.x3` source was refused earlier as `InvalidX3VmPacket`. Reproduced before the fix by dispatching a compiled program at the real runtime: `Module(ModuleError { index: 11, error: [7, 0, 0, 0], message: Some(\"InvalidX3VmPacket\") })`. The payload is now the program, and validation is the adapter's own (`T::X3Adapter::validate`: envelope magic, version gate, checksum) \u2014 the component that does the work. Evidence: `runtime/src/tests.rs` compiles a program from source, dispatches it as a signed extrinsic, and asserts the comit is recorded and the nonce moved; its corrupted-program twin asserts refusal and that no comit record is left.",
+        "Still open on this row: the dispatch is proven in a runtime `TestExternalities`, not on a running chain with finality; the X3 execution receipt is **not persisted** \u2014 only the comit id, the nonce and the fee deduction reach storage, so a program's result cannot be re-read the way `EvmTransactionReceipts` allows for EVM; gas accounting is asserted through the adapter's receipt in-test rather than read back from chain state; and an old artifact executed against an upgraded VM version is untested."
       ],
       "name": "Bytecode routing to atomic kernel",
       "paths": [
-        "crates/x3-integration"
+        "crates/x3-integration",
+        "pallets/x3-kernel/src",
+        "pallets/x3-kernel/tests",
+        "runtime/src/tests.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 65,
-      "tests": "tested score 65% (no named test list on this row)"
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4362,7 +4367,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "857b1e5881c2a346ba5fff1e3d54f6ab0278a030d9f38352ce6151d4de7c9aca",
+    "source_digest": "ec28c424a5427b27960a2ba33957014c282ef5f820f285b24112cbbb21d0bbfc",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4373,7 +4378,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "555f4c9636cee8e51229f587472859208366328708d3a6a6728410ac99da1082",
+      "feature-matrix/language-trading.toml": "584092dd7008e36209b12640217e1c951080995d1168a2a1d5c87a2241ad7151",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",

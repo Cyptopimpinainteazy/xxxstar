@@ -1734,17 +1734,13 @@ pub mod pallet {
             }
 
             if !x3_payload.is_empty() {
-                match deserialize_packet(&x3_payload) {
-                    Ok(packet) => {
-                        let domain_mask = get_domain_mask(&packet);
-                        if (domain_mask & 0b0100) == 0 {
-                            return Err(Error::<T>::InvalidX3VmPacket.into());
-                        }
-                    }
-                    Err(_) => {
-                        return Err(Error::<T>::InvalidX3VmPacket.into());
-                    }
-                }
+                // The X3 payload is the compiled program, and `T::X3Adapter` is the thing that
+                // verifies and executes it (envelope magic, version gate, checksum). Requiring an
+                // `X3VmPacket` here instead meant the pallet accepted only payloads that no real
+                // adapter can execute — a packet is a semantic operation, not X3BC bytecode — so
+                // every non-empty X3 payload failed with `X3ExecutionFailed` on a chain whose
+                // adapter is real. Validation now asks the component that will do the work.
+                T::X3Adapter::validate(&x3_payload).map_err(|_| Error::<T>::InvalidX3VmPacket)?;
             }
 
             Nonces::<T>::try_mutate(&who, |current_nonce| -> DispatchResult {

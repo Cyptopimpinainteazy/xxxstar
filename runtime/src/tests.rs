@@ -314,3 +314,133 @@ fn a_bundle_nonce_cannot_be_replayed() {
         );
     });
 }
+
+// ── the X3 domain, driven through the runtime's own dispatch ────────────────────────────────
+
+/// A genesis with one funded account, authorized to submit comits to the kernel.
+fn kernel_test_ext() -> sp_io::TestExternalities {
+    use sp_runtime::BuildStorage;
+
+    let submitter = account(7);
+    let storage = RuntimeGenesisConfig {
+        balances: BalancesConfig {
+            balances: vec![(submitter.clone(), 10_000 * X3)],
+            dev_accounts: None,
+        },
+        ..Default::default()
+    }
+    .build_storage()
+    .expect("the kernel test genesis must build");
+
+    let mut ext: sp_io::TestExternalities = storage.into();
+    ext.execute_with(|| {
+        System::set_block_number(1);
+        assert_ok!(pallet_x3_kernel::Pallet::<Runtime>::authorize_account(
+            RuntimeOrigin::root(),
+            submitter
+        ));
+    });
+    ext
+}
+
+/// A compiled `.x3` program, dispatched through the runtime, executes and is recorded.
+///
+/// This is the proof X3-LANG-004's row asked for and did not have: the pallet's own tests
+/// configure `TestX3Adapter`, which fabricates a receipt, so nothing showed whether a program
+/// compiled from source could travel the real route. It could not. `submit_comit_v2` validated
+/// its `x3_payload` as an `X3VmPacket` and then handed those same bytes to
+/// `T::X3Adapter::execute`, which parses X3BC bytecode — a packet is not a program, so on a
+/// chain with a real adapter (`X3VmAdapter`, or `WasmX3Adapter` in the wasm build) every
+/// non-empty X3 payload died with `X3ExecutionFailed`. The mock had been adjusted to the packet
+/// shape rather than the path being fixed, which is why the mismatch survived.
+#[test]
+fn a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_recorded() {
+    let submitter = account(7);
+    let program = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 {\n    return 42;\n}\n",
+    )
+    .expect("the fixture must compile");
+
+    kernel_test_ext().execute_with(|| {
+        let comit_id = H256::from_low_u64_be(0xC0FFEE);
+        let nonce = pallet_x3_kernel::Nonces::<Runtime>::get(submitter.clone());
+        // The kernel enforces a minimum-fee floor (`IncorrectFee` below it); the submitter is funded.
+        let fee: Balance = 1_000_000;
+        let prepare_root = pallet_x3_kernel::Pallet::<Runtime>::compute_prepare_root_v2(
+            comit_id,
+            &[],
+            &[],
+            &program,
+            nonce,
+            fee,
+        );
+
+        assert_ok!(pallet_x3_kernel::Pallet::<Runtime>::submit_comit_v2(
+            RuntimeOrigin::signed(submitter.clone()),
+            comit_id,
+            Vec::new(),
+            Vec::new(),
+            program.clone(),
+            nonce,
+            fee,
+            prepare_root,
+        ));
+
+        // Storage mutation: the chain recorded the comit and moved the submitter's nonce.
+        assert!(
+            pallet_x3_kernel::SubmittedComits::<Runtime>::get(comit_id).is_some(),
+            "an accepted comit must be recorded, or the same id could be replayed"
+        );
+        assert_eq!(
+            pallet_x3_kernel::Nonces::<Runtime>::get(submitter.clone()),
+            nonce + 1
+        );
+    });
+}
+
+/// The same dispatch with a corrupted program must be refused — and refused *before* the comit
+/// is recorded, because the adapter's verification is what makes the payload trustworthy.
+#[test]
+fn a_corrupted_x3_program_is_refused_by_the_runtime_path() {
+    let submitter = account(7);
+    let mut program = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 {\n    return 42;\n}\n",
+    )
+    .expect("the fixture must compile");
+    let last = program.len() - 1;
+    program[last] ^= 0xFF;
+
+    kernel_test_ext().execute_with(|| {
+        let comit_id = H256::from_low_u64_be(0x0BAD_C0DEu64);
+        let nonce = pallet_x3_kernel::Nonces::<Runtime>::get(submitter.clone());
+        // The kernel enforces a minimum-fee floor (`IncorrectFee` below it); the submitter is funded.
+        let fee: Balance = 1_000_000;
+        let prepare_root = pallet_x3_kernel::Pallet::<Runtime>::compute_prepare_root_v2(
+            comit_id,
+            &[],
+            &[],
+            &program,
+            nonce,
+            fee,
+        );
+
+        assert!(
+            pallet_x3_kernel::Pallet::<Runtime>::submit_comit_v2(
+                RuntimeOrigin::signed(submitter.clone()),
+                comit_id,
+                Vec::new(),
+                Vec::new(),
+                program.clone(),
+                nonce,
+                fee,
+                prepare_root,
+            )
+            .is_err(),
+            "a module whose bytes were edited must not be executed"
+        );
+        assert!(
+            pallet_x3_kernel::SubmittedComits::<Runtime>::get(comit_id).is_none(),
+            "a refused comit must leave no record that lets the id be reused"
+        );
+    });
+}
