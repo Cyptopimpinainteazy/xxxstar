@@ -206,10 +206,36 @@ constraint — but 100K TPS is a runtime-cost problem, not a configuration one.
   `db_commit_us`, `db_flush_us`, `state_growth_bytes` (host disk metrics are out of
   scope for a node).
 
-**Node default database.** Running the node with no `--database` flag logs
-`Database: ParityDb at <base>/chains/<chain>/paritydb/full`. The validator runbook
-said RocksDB was the default; that is corrected. Which backend *should* be the
-default is unmeasured.
+**Database backend and what it writes (new).** Running the node with no
+`--database` flag logs `Database: ParityDb at <base>/chains/<chain>/paritydb/full`.
+The validator runbook said RocksDB; that is corrected. The open question was
+"which backend *should* be the default", and the answer turns out to be
+different: **there is no second backend in this build.** `--database` accepts only
+`paritydb`, `auto` and `paritydb-experimental`, and the experimental value logs
+`"paritydb-experimental" database setting is deprecated and will be removed…
+use "paritydb"`. RocksDB is not compiled in, so a comparison needs a build change,
+not a flag.
+
+What the database *writes* is now measured (`scripts/proof/state-growth.py`),
+because the audit's disk-economics question had no number and block bodies are
+only part of it. Three like-for-like 3–4 minute windows on this box, all at the
+same 5 blocks/s cadence and all with a nearly idle chain:
+
+| database | chain age | written per block | written per second | per day at this rate |
+|---|---|---|---|---|
+| `paritydb` (default) | fresh | **26.86 KB** | 134.3 KB/s | **10.81 GiB** |
+| `paritydb-experimental` | fresh | 26.66 KB | 133.3 KB/s | 10.73 GiB |
+| `paritydb` (default) | ~5,000 blocks | **34.34 KB** | 171.7 KB/s | **13.82 GiB** |
+
+Three things follow. The two modes are the same implementation, as the deprecation
+warning says. Write volume grows with chain age — the same 180 s window costs
+27 KB/block for a 4 MB database and 34 KB/block for a 200 MB one, which is
+ParityDB's index and database churn rather than the state itself. And a *nearly
+idle* validator writes **10.8–13.8 GiB/day** at 5 blocks/s, against block bodies
+of 3.6 KB and a logical state that was ~1 MB at 6,290 blocks (excluding the
+runtime blob). Compaction reclaims periodically — one event freed 64.5 MB inside a
+2-minute window — so net disk usage is a sawtooth rather than a straight line,
+while the write volume is what a disk has to sustain.
 
 **Which stage actually costs the time (new).** The node could not answer this
 before: it timed a whole import and nothing inside it. `node/src/timed_executor.rs`
@@ -360,9 +386,13 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
    `state_growth_bytes`. Those live in `sc-client-db`'s commit and in the state
    machine behind the host functions, so they need either a backend patch or a
    host-function wrapper, not another executor wrapper.
-8. **`state_growth_bytes`.** Not measurable from the import notification; needs the
-   state diff. Block bodies turned out to be small (§2), so state growth is the
-   number that decides disk economics — and it is unmeasured.
+8. **`state_growth_bytes` — half closed.** The number the audit wanted now exists
+   at the database level: `scripts/proof/state-growth.py` measures writes, net
+   growth, the post-compaction floor and bytes per day, and §2 records 10.8–13.8
+   GiB/day at 5 blocks/s on a nearly idle chain. What is still missing is the
+   state-diff metric *inside* the node: `state_growth_bytes` per block, from which
+   the state's own share of those writes could be separated from ParityDB's index
+   churn. That needs the state diff, which the import notification does not carry.
 9. ~~**Snapshot restore path.**~~ **Closed by #509** and proven against a live
    chain (§2). The half that remains is the one this does not pretend to be: the
    restore writes a raw chain spec whose genesis *state* is block N's state, so a
