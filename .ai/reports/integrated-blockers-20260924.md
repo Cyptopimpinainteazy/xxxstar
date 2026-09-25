@@ -30,6 +30,7 @@ Eleven commits across four pull requests: #501, #503, #504, #505 — then #506
 | migrations | treasury/agent-memory/agent-accounts read the declared `STORAGE_VERSION`; five unreachable `migrations.rs` deleted; gate added | `scripts/ci/check_migration_modules_are_wired.sh` |
 | per-block metrics | `x3_imported_block_bytes`, `x3_imported_block_extrinsics`, `x3_block_interval_seconds` | measured live (below) |
 | runtime attribution | #513: `node/src/timed_executor.rs` — `x3_runtime_call_seconds{method}`, `x3_runtime_calls_total{method}`, `x3_runtime_call_errors_total{method}`, `x3_runtime_version_seconds`; `scripts/proof/runtime-attribution.py` | 3 unit tests; measured live under load (§2) |
+| failure drills | `scripts/mainnet/prove-crash-consistency.sh` (SIGKILL + restart, 7/7) and `prove-disk-full-authoring.sh` (real ENOSPC on a namespaced tmpfs); authoring pauses below the disk floor instead of reporting it | measured (§2) |
 | orchestrator | the exported-but-unused `ProofVerifier`/`VmExecutor` traits are now the adapters' real extension point; honest default preserved | `cargo test -p x3-orchestrator` 7 passed |
 | external-chains | Arbitrum test's anvil readiness loop retries instead of panicking | 4 passed, needs `anvil` |
 | tooling | pytest `testpaths`/`.kilo` fix, `tomli` fallback in two scripts, `requirements-dev.txt`, `proof_report` enforcement, explorer + super-ide dependency alignment | see §2 |
@@ -230,6 +231,48 @@ the same two cores. At this per-extrinsic cost, 100K TPS would need roughly
 **480 CPU-seconds of execution per second**, i.e. a few hundred cores of
 execution capacity, before any question about clients or networking arises.
 
+**Failure drills, run for the first time (new).** The audit's §14–15 asked what
+the chain does on power loss and on a full disk. Neither had been executed: the
+only restart script in the tree sends SIGTERM and then starts a node on a *fresh*
+base path, so it never opens the database that was interrupted. Both drills now
+exist and run unattended.
+
+`scripts/mainnet/prove-crash-consistency.sh` — SIGKILL (not SIGTERM) to an
+authoring node and to a full node importing from it, then **PASS 7/7**: the
+author came back on its own database with the same genesis, and the block it had
+finalized before the kill at the same height, the same hash and the same state
+root; the importer re-imported and agreed with the author on height 218 (same
+hash, same root, 433 blocks imported after restart).
+
+`scripts/mainnet/prove-disk-full-authoring.sh` — a real 256 MB filesystem created
+inside a private mount namespace (`unshare -Urm`, no root, nothing of the host's
+touched), filled until the writes fail. It found two things, one of which was
+fixed in the same pass:
+
+1. **The startup gate never ran on a fresh install.** `free_bytes()` needs the
+   path to exist, and `--base-path` is created by the database *after* the guard
+   runs, so the gate logged "could not measure … continuing without it" and
+   passed — on exactly the install onto a nearly full volume it exists to catch.
+   `free_bytes_for_new_path` now measures the nearest existing ancestor; the
+   drill's gate check went FAIL → PASS ("Refusing to start an authority node:
+   free disk space 268435456 bytes is at or below the 2013265920 byte floor").
+2. **The guard reported; it did not act.** With free space below the floor the
+   node authored 76 more blocks (71 → 147) and then **died** at true ENOSPC:
+   `Background worker error: IO Error: No space left on device (os error 28)`,
+   `GRANDPA voter error: could not complete a round on disk`. The authority is
+   now gated: the disk watchdog closes an `AtomicBool` that the proposer reads
+   every slot, so below the floor authoring pauses, the node keeps answering RPC
+   and logs `authoring paused`, and it resumes by itself when space returns. The
+   drill re-run shows blocks 20 → 20 across the pressure window, RPC alive, and
+   the pause line present.
+
+Still true after the fix, and recorded rather than hidden: at *true* ENOSPC (0
+bytes free) the node still dies — `sc-client-db`'s background worker fails and
+the service shuts down — and comes back only on a restart, which the drill
+verifies works from the same database (42 → 117 blocks after restart). The pause
+is what turns "author until the volume is full, then die" into "stop at the
+floor with a warning window".
+
 **Repository hygiene.** `python -m pytest` → 201 passed (was 1412 collection errors
 and zero tests run). `npm test`, `pnpm test`, `pnpm build` → exit 0. `cargo test
 --workspace --no-fail-fast` → 6,224 tests passed, 2 failed, and both failures are
@@ -287,11 +330,19 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
    path a validator joining at a height actually needs — is state/warp sync, and
    does not exist here. `export-state` also needs unpruned state or the head
    (measured).
-10. **Disk-pressure authoring stop.** The guard warns and gates startup, but does
-    not take an authority out of authoring. `sc-keystore`/`sp-keystore` expose **no
-    key-removal API**, so the usual mechanism is unavailable; this needs a
-    keystore-wrapper or `BlockImport` design, not a small patch.
-11. **Power-loss and disk-full drills.** None executed. The audit's §14–15.
+10. ~~**Disk-pressure authoring stop.**~~ **Closed in this pass.** The guard now
+    controls rather than reports: the disk watchdog closes an `AtomicBool` that
+    the proposer reads every slot, so below the floor authoring pauses, the node
+    keeps serving RPC, logs why, and resumes by itself. Proven by
+    `scripts/mainnet/prove-disk-full-authoring.sh`. The related gap is next.
+11. **Power-loss and disk-full drills — run, with two results still open.**
+    `scripts/mainnet/prove-crash-consistency.sh` (SIGKILL, 7/7) and
+    `scripts/mainnet/prove-disk-full-authoring.sh` (§2) both pass. What they
+    leave open: (a) at *true* ENOSPC the node still dies — `sc-client-db`'s
+    background worker fails and the service shuts down — and needs a manual
+    restart, which is verified to recover from the same database; (b) the drills
+    are two nodes on one host, not a validator being killed while the rest of a
+    quorum finalizes.
 12. **Storage-blob economics.** No storage deposit/rent/TTL mechanism exists, so
     state-bloat cost is unbounded for the attacker side of §22–23.
 
@@ -345,6 +396,10 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
   the same cores. The *split* (execution vs client) is the finding; the absolute
   milliseconds per extrinsic are this machine's, and the 400 TPS ceiling is
   arithmetic from them, not a measurement of a chain.
+* **No claim that a full disk is survivable.** The node pauses authoring at its
+  configured floor and is restartable from the same database afterwards, but at
+  zero bytes free it still dies, and the recovery is manual. A node that keeps
+  serving through ENOSPC needs work inside `sc-client-db`, not in this node.
 * **No reproducibility claim.** `srtool` is installed, but it builds inside Docker
   and docker is absent on this machine, so the release-reproducibility gate has
   never executed here.

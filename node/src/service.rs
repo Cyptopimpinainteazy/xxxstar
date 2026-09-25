@@ -839,7 +839,11 @@ fn enforce_disk_space_gate(config: &Configuration) -> Result<(), ServiceError> {
 
     let data_path = config.base_path.path();
 
-    match crate::disk_guard::free_bytes(data_path) {
+    // Measured at the nearest existing ancestor: on a validator's first start the
+    // base path does not exist yet, and measuring a missing path made this gate
+    // report a measurement failure and pass — on exactly the fresh install onto a
+    // nearly full volume that it is here to catch.
+    match crate::disk_guard::free_bytes_for_new_path(data_path) {
         Ok(free_bytes) => {
             let pressure = crate::disk_guard::classify(free_bytes, min_free_bytes);
             match crate::disk_guard::describe(pressure, free_bytes, min_free_bytes) {
@@ -981,7 +985,11 @@ fn log_pruning_policy(config: &Configuration) {
 /// authoring task's cooperation — but it turns a silent approach to `ENOSPC`
 /// into a loud, state-change-only operator signal, which is the part the
 /// storage audit found entirely missing.
-fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
+fn spawn_disk_watchdog(
+    task_manager: &TaskManager,
+    config: &Configuration,
+    authoring_gate: Arc<std::sync::atomic::AtomicBool>,
+) {
     let min_free_bytes = crate::disk_guard::min_free_bytes_from_env();
     if min_free_bytes == 0 {
         return;
@@ -990,6 +998,29 @@ fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
     let data_path = config.base_path.path().to_path_buf();
     let interval = crate::disk_guard::probe_interval_from_env();
     let is_authority = config.role.is_authority();
+
+    // What the operator can see and alert on: 1 while authoring is paused.
+    let paused_gauge: Option<substrate_prometheus_endpoint::prometheus::IntGauge> = config
+        .prometheus_registry()
+        .and_then(|registry| {
+            let gauge = substrate_prometheus_endpoint::prometheus::IntGauge::new(
+                "x3_authoring_paused",
+                "1 when the node has stopped authoring because free disk space is below its floor",
+            );
+            match gauge {
+                Ok(gauge) => match registry.register(Box::new(gauge.clone())) {
+                    Ok(()) => Some(gauge),
+                    Err(err) => {
+                        log::warn!("could not register x3_authoring_paused: {err}");
+                        None
+                    }
+                },
+                Err(err) => {
+                    log::warn!("could not build x3_authoring_paused: {err}");
+                    None
+                }
+            }
+        });
 
     task_manager
         .spawn_handle()
@@ -1002,7 +1033,7 @@ fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
             loop {
                 ticker.tick().await;
 
-                let Ok(free_bytes) = crate::disk_guard::free_bytes(&data_path) else {
+                let Ok(free_bytes) = crate::disk_guard::free_bytes_for_new_path(&data_path) else {
                     continue;
                 };
                 let pressure = crate::disk_guard::classify(free_bytes, min_free_bytes);
@@ -1021,6 +1052,29 @@ fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
                     } else {
                         log::warn!("💾 disk-space guard: {message}");
                     }
+                }
+
+                // A report is not a control. Below the floor an authority has to
+                // stop proposing: the block it is building now cannot be written,
+                // and the writes that follow a full volume take the GRANDPA voter
+                // down with them — measured on a real ENOSPC in
+                // `scripts/mainnet/prove-disk-full-authoring.sh`.
+                let should_pause = !pressure.is_authoring_safe() && is_authority;
+                if authoring_gate.swap(!should_pause, std::sync::atomic::Ordering::Relaxed)
+                    == should_pause
+                {
+                    // Only on a change: the gate flipped.
+                    if should_pause {
+                        log::error!(
+                            "💾 authoring paused: free disk space is below the floor. The node keeps \
+                             running and will resume authoring when space is reclaimed."
+                        );
+                    } else {
+                        log::warn!("💾 authoring resumed: free disk space is back above the floor");
+                    }
+                }
+                if let Some(gauge) = &paused_gauge {
+                    gauge.set(i64::from(should_pause));
                 }
 
                 last_reported = Some(pressure);
@@ -1165,7 +1219,12 @@ pub fn new_full_with_atomic_gateway<
         other: (grandpa_block_import, grandpa_link, mut telemetry),
     } = new_partial(&config)?;
 
-    spawn_disk_watchdog(&task_manager, &config);
+    // One gate, two users: the watchdog closes it when the disk falls below its
+    // floor, and the proposer reads it every slot. That is how "the guard
+    // reported it" becomes "the node stopped proposing", without stopping the
+    // node.
+    let authoring_gate = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    spawn_disk_watchdog(&task_manager, &config, authoring_gate.clone());
 
     // configure network protocols; GRANDPA may be disabled when using Flash Finality
     let mut net_config = sc_network::config::FullNetworkConfiguration::<
@@ -1489,7 +1548,8 @@ pub fn new_full_with_atomic_gateway<
                 prometheus_registry.as_ref(),
                 telemetry.as_ref().map(|x| x.handle()),
                 contention_predictor.clone(),
-            );
+            )
+            .with_authoring_gate(authoring_gate.clone());
 
         let slot_duration = sc_consensus_aura::slot_duration(&*client)?;
         let shared_poh_state_for_aura = shared_poh_state.clone();
