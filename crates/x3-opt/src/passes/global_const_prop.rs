@@ -200,7 +200,9 @@ impl Pass for GlobalConstPropPass {
                     };
                     let new_value = match rhs {
                         MirRhs::Literal(lit) => ConstLattice::Const(lit.clone()),
-                        MirRhs::Binary(op, left, right) => {
+                        MirRhs::Binary {
+                            op, left, right, ..
+                        } => {
                             let left_val = lattice.get(left).cloned().unwrap_or(ConstLattice::Top);
                             let right_val =
                                 lattice.get(right).cloned().unwrap_or(ConstLattice::Top);
@@ -281,7 +283,9 @@ impl Pass for GlobalConstPropPass {
                     }
                     if let MirStatement::Assign { rhs, .. } = stmt {
                         let new_rhs = match rhs {
-                            MirRhs::Binary(op, left, right) => {
+                            MirRhs::Binary {
+                                op, left, right, ..
+                            } => {
                                 let left_const = lattice.get(left).and_then(|v| v.as_const());
                                 let right_const = lattice.get(right).and_then(|v| v.as_const());
 
@@ -384,7 +388,12 @@ mod tests {
                 },
                 MirStatement::Assign {
                     target: MirValue(1),
-                    rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(2)),
+                    rhs: MirRhs::Binary {
+                        op: BinaryOp::Add,
+                        left: MirValue(0),
+                        right: MirValue(2),
+                        float: false,
+                    },
                 },
                 MirStatement::Assign {
                     target: MirValue(2),
@@ -431,7 +440,12 @@ mod tests {
                 },
                 MirStatement::Assign {
                     target: MirValue(2),
-                    rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
+                    rhs: MirRhs::Binary {
+                        op: BinaryOp::Add,
+                        left: MirValue(0),
+                        right: MirValue(1),
+                        float: false,
+                    },
                 },
             ],
             terminator: Some(MirTerminator::Return(Some(MirValue(2)))),

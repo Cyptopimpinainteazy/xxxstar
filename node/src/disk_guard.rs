@@ -134,6 +134,32 @@ pub fn free_bytes(path: &Path) -> std::io::Result<u64> {
     fs2::available_space(path)
 }
 
+/// Free bytes on the volume that will hold `path`, measured at the nearest
+/// ancestor that exists.
+///
+/// [`free_bytes`] needs the path to exist, and on a validator's *first* start it
+/// does not: `--base-path` is created by the database, after the guard has run.
+/// Measuring the nonexistent path makes the guard report a measurement failure
+/// and carry on, which silently switches it off exactly where it matters — a
+/// fresh install onto a volume that is already nearly full. Walking up to the
+/// directory that exists gives the number the operator needed.
+///
+/// The walk terminates: a path with no existing ancestor (a relative path on a
+/// volume that does not exist at all) falls back to the original call, so the
+/// error an unmeasurable path produces is unchanged.
+pub fn free_bytes_for_new_path(path: &Path) -> std::io::Result<u64> {
+    let mut candidate = path.to_path_buf();
+    loop {
+        if candidate.exists() {
+            return free_bytes(&candidate);
+        }
+        match candidate.parent() {
+            Some(parent) if parent != candidate.as_path() => candidate = parent.to_path_buf(),
+            _ => return free_bytes(path),
+        }
+    }
+}
+
 /// Operator-facing description of a pressure reading, if it needs saying.
 pub fn describe(pressure: DiskPressure, free_bytes: u64, min_free_bytes: u64) -> Option<String> {
     match pressure {
@@ -177,6 +203,35 @@ mod tests {
     fn classify_is_explicitly_disabled_by_a_zero_floor() {
         assert_eq!(classify(0, 0), DiskPressure::Disabled);
         assert_eq!(classify(u64::MAX, 0), DiskPressure::Disabled);
+    }
+
+    #[test]
+    fn a_base_path_that_does_not_exist_yet_is_measured_at_its_parent() {
+        // The first start of a validator: `--base-path` is created by the
+        // database, and the guard runs before that. Measuring the path itself
+        // fails, so the guard used to switch itself off on exactly the install
+        // it exists to protect.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join("not-created-yet").join("deeper");
+        assert!(!missing.exists());
+
+        assert_eq!(
+            free_bytes_for_new_path(&missing).expect("measured through the parent"),
+            free_bytes(dir.path()).expect("measured directly"),
+        );
+    }
+
+    #[test]
+    fn a_path_below_a_missing_volume_is_measured_at_the_ancestor_that_exists() {
+        // Nothing under /definitely/not/a/real exists, so the nearest existing
+        // ancestor is "/" — which is where a write to that path would land.
+        // Reporting that is more useful than refusing to answer, and it is
+        // bounded: the walk always terminates at an existing directory.
+        let missing = Path::new("/definitely/not/a/real/volume/x3-nonexistent");
+        assert_eq!(
+            free_bytes_for_new_path(missing).expect("measured at the nearest ancestor"),
+            free_bytes(Path::new("/")).expect("measured at /"),
+        );
     }
 
     #[test]

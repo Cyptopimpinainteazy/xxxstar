@@ -1,5 +1,7 @@
 # X3 Public Testnet Launch Plan
 
+> **Execution runbook:** See [PUBLIC_TESTNET_ALPHA_EXECUTION_PLAN.md](./PUBLIC_TESTNET_ALPHA_EXECUTION_PLAN.md) for the ordered P0/P1/P2 deployment plan, hardware-role map, acceptance commands, evidence layout, and Alpha go/no-go matrix.
+
 ## Scope
 
 - X3 internal settlement path only

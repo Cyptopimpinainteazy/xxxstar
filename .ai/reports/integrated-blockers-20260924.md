@@ -1,0 +1,452 @@
+# X3 integrated blockers — 2026-09-24
+
+One list of what stands between current `master` and Public Testnet Alpha / Mainnet
+RC, after the storage, RPC/data-plane and validator-operations audits. Every claim
+here is tagged with how it is known:
+
+* **measured** — a command was run in this repository on this date; the command is
+  given.
+* **recovered** — a recorded result found in the April-2026 archive, with its
+  provenance.
+* **assumed** — nobody has measured it; treat as unknown.
+
+Nothing here rests on "we think" or on a document that asserts a number without a
+producer.
+
+---
+
+## 1. Merged in this pass
+
+Eleven commits across four pull requests: #501, #503, #504, #505 — then #506
+(this document), #507, #508 (txpool gauges) and #509 (snapshot restore).
+
+| area | what landed | evidence |
+|---|---|---|
+| state snapshots | `crates/x3-state-snapshot`: manifest, chunk verifier, state-root recomputation, exporter, **restore**, `hash-manifest`/`root`/`build`/`verify`/`restore` CLI | 48 unit tests; `launch-gates/snapshot-murder-test.sh` 20/20; `scripts/mainnet/verify-snapshot-restore.sh` PASS |
+| snapshot root | recompute matches a **chain-produced** root | measured: header `0x46b7cb92…` vs rebuilt from the node's own `build-spec --chain dev --raw`, byte-identical (130 entries) |
+| node RPC | authority refuses `--rpc-methods unsafe` on a non-loopback listener | 5 unit tests; `sc_rpc_server::deny_unsafe` is address-independent for `Unsafe` |
+| node storage | free-space guard, startup gate, watchdog | `node/src/disk_guard.rs`, 9 unit tests |
+| RPC cost | `eth_getLogs`/`x3_getEvmLogs` block-range cap; both priced in the limiter | 4 + 2 unit tests |
+| migrations | treasury/agent-memory/agent-accounts read the declared `STORAGE_VERSION`; five unreachable `migrations.rs` deleted; gate added | `scripts/ci/check_migration_modules_are_wired.sh` |
+| per-block metrics | `x3_imported_block_bytes`, `x3_imported_block_extrinsics`, `x3_block_interval_seconds` | measured live (below) |
+| runtime attribution | #513: `node/src/timed_executor.rs` — `x3_runtime_call_seconds{method}`, `x3_runtime_calls_total{method}`, `x3_runtime_call_errors_total{method}`, `x3_runtime_version_seconds`; `scripts/proof/runtime-attribution.py` | 3 unit tests; measured live under load (§2) |
+| failure drills | `scripts/mainnet/prove-crash-consistency.sh` (SIGKILL + restart, 7/7) and `prove-disk-full-authoring.sh` (real ENOSPC on a namespaced tmpfs); authoring pauses below the disk floor instead of reporting it | measured (§2) |
+| throughput attribution | `scripts/proof/block-fill.js` (per-block weight/byte fill and inclusion rate) and `scripts/proof/cpu-attribution.py` (core-seconds per process) | measured under load (§2) |
+| orchestrator | the exported-but-unused `ProofVerifier`/`VmExecutor` traits are now the adapters' real extension point; honest default preserved | `cargo test -p x3-orchestrator` 7 passed |
+| external-chains | Arbitrum test's anvil readiness loop retries instead of panicking | 4 passed, needs `anvil` |
+| tooling | pytest `testpaths`/`.kilo` fix, `tomli` fallback in two scripts, `requirements-dev.txt`, `proof_report` enforcement, explorer + super-ide dependency alignment | see §2 |
+
+---
+
+## 2. Measurements established this session
+
+**State root.** `x3-state-snapshot` reproduces a chain-produced root exactly, at
+genesis (`0x46b7cb9219500cbe54c5d32b216376e6e1f17acc874108cad18951214e5b4038`,
+dev chain, spec_version 20) **and at a real block**: `export-state` at block 6290
+of a dev chain (12,526 entries) recomputes to that header's own root,
+`0xbe94def3c9cdaecc8ab5efb94e9a3a49a526dff6b881a1b35f7869de2c60ecbb`.
+`scripts/mainnet/verify-snapshot-root-against-chain.sh` automates the genesis
+comparison against any node → MATCH.
+
+**Snapshot restore, end to end against a running chain.** #509 closed the
+export/import pair. `scripts/mainnet/verify-snapshot-restore.sh` starts a chain,
+exports state at a real block, builds a snapshot anchored to it, restores it into
+a raw chain spec, and boots a second node from that spec — the node recomputes
+the chain's own state root out of its genesis header and reports the restored
+`:code`'s `spec_version`. A chunk with one flipped byte is refused and leaves no
+spec behind. `launch-gates/snapshot-murder-test.sh` went 13/13 → **20/20**, with
+the restore refusals (corrupt chunk, substituted state under a forged manifest,
+wrong chain, stale, and no silent overwrite of an existing spec) demonstrated on
+disk through the shipped binary.
+
+**Two limits found while proving it.** (a) A restored spec's genesis header is
+number 0 while its state is block N's, so a node booted from it serves that state
+and then refuses to author — `frame-system` panics, "Block number must be
+strictly increasing" (reproduced). Restored state is state *transport*, not a
+join-at-height path. (b) `export-state` on a node with bounded state pruning
+fails with `UnknownBlock("State already discarded")` for any block whose state has
+been pruned (reproduced at block 2616 of a node that had run for 10 h, and it
+succeeds at the head). A snapshot source has to archive state, or export at the
+head.
+
+**Per-block storage, on a dev chain (measured, live `/metrics`):** ~215.6 bytes per
+block and ~1.44 extrinsics per block while idle; **893.9 bytes and 6.48 extrinsics
+per block under load**; **200 ms block interval** in both cases. Consequence: raw
+block bodies are ~34 GB/year at idle sizes, **not** the ~1.58 TB/year the audit's
+10 KB/block estimate implied. A dev chain is a floor, not a production workload.
+
+**Chain-level finalized TPS** (`system.remark`, loopback WebSocket — the cheapest
+possible workload):
+
+| run | source | finalized TPS | failures |
+|---|---|---|---|
+| sweep, concurrency 16/32/64/96 | recovered (`benchmarks/tps-archive-2026-02/`) | 529.2 / **575.5** / 554.3 / 498.8 | 0 |
+| perf-mode, concurrency 128 | recovered | **581.7** (best ever recorded) | 0 |
+| 7-validator multiprocess, concurrency 1024 | recovered | **30.6** | **128,610 of 130,448 (98.6 %)** |
+| current code, debug build, 2 cores | measured 2026-09-24 | 38.2 | 0 |
+| **current code, release build, same host** | measured 2026-09-24 | **47.1 / 51.3** (two runs) | 0 |
+
+Two facts matter more than the peak: the sweep is **flat** (adding concurrency past
+32 makes it worse), and the multi-validator number is **~19x worse** than the
+single-host one. The repository's own comparison file also records
+`"winner": "solana"` against observed Solana mainnet (non-vote avg 1,279–1,480 TPS).
+
+**The February figures are not reproducible here — and the limit is the load
+generator, not the chain.** Same loader, same nominal configuration (6 senders,
+concurrency 32, 20 s, loopback), release build: **47–51 finalized TPS** where the
+archive recorded **575.5**. Three candidate explanations were tested and all three
+are excluded by measurement:
+
+* *build profile* — release is only 25–35 % faster than debug here (38.2 → 47–51);
+* *block cadence* — the chain holds **200 ms** blocks, exactly the target;
+* *block space* — **excluded**. The txpool drained at least as fast as it filled:
+  `submitted_transactions` +1106 against `block_transactions_pruned` +1309 over the
+  same window, 0 failures, 0 invalid. The chain included everything it was offered,
+  so **6.48 extrinsics per block is the load, not the capacity**.
+
+What moves the number is the number of signers, not concurrency:
+
+| senders | concurrency | finalized TPS |
+|---|---|---|
+| 6 | 32 / 128 / 512 | 50.5 / 46.1 / 53.1 |
+| 24 | 256 | 77.0 |
+| 48 | 512 | 99.6 |
+| 96 | 1024 | 91.4 |
+| 192 | 1024 | 149.6 (submit window) / 73.2 (wall) |
+
+A 16x increase in concurrency changes nothing; quadrupling and then doubling the
+signer count raises it steadily. That is the signature of a **client-bound**
+measurement: the JavaScript load generator signs and submits from the same two
+cores the node is using. The ceiling measured here is therefore the harness's, and
+**the chain's own ceiling is still unmeasured** — including whether it is anywhere
+near the 575 the February host recorded.
+
+At 192 senders the chain's own counters show **14.12 extrinsics per 200 ms block**
+(up from 6.48 at the light load), and once again **no backlog**: pool submissions
+3,082 against 3,318 included over the same window, 0 failed. The chain absorbed
+everything it was offered again. Its measured inclusion rate was ~70 tx/s, which
+matches the wall figure of 73.2 and is the number to quote; 149.6 is the
+submit-window artifact described next.
+
+**Running more loader processes does not change it.** Three processes, 85 senders
+each (255 total, prefunded once via `ONLY_PREFUND=true` to avoid a nonce race),
+produced 3,418 finalized transactions, 0 failed, and an aggregate wall rate of
+**74.6 TPS** — against 73.2 for a single process with 192 senders. Across every
+configuration tried, from 6 senders in one process to 255 across three, the wall
+figure sits between **73 and 97 TPS**, and the pool never fills.
+
+The machine is the limit, and it says so: `nproc` is **2**, and the load average
+during these runs was **4.8–6.9**. The node and the load generator are competing for
+the same two cores. That is why every configuration converges on the same number —
+it is this box's capacity to run a node and a client at once, not a property of X3.
+
+**A metric caveat that applies to every TPS figure in this document.** The loader
+reports two numbers: `finalized_tps_submit_window`, which divides finalized
+transactions by the *submit* duration and ignores the finality wait, and
+`finalized_tps_wall`, which divides by wall time including it. For a chain that
+keeps producing blocks while a backlog drains, only the wall figure describes
+steady state. The archive's headline 575.5 is a submit-window number — its own wall
+figure was 359.2 — so the February comparison is 359 versus 73, about 5x, rather
+than 575 versus 47.
+
+**100K TPS is not supported by any measurement here.** It is ~172x the best
+single-host figure and ~3,270x the 7-validator figure — and the per-extrinsic
+arithmetic below puts it at a few hundred cores of execution capacity, which is a
+runtime-cost problem rather than a client or configuration one.
+
+**What the chain's own limits are (new), and why the TPS figures above are the
+harness's.** Every number in the table is a client's transactions reaching
+finality, which cannot see the difference between "the chain is full" and "the
+client stopped feeding it". Three measurements separate them.
+
+*Block fill, under load* (`scripts/proof/block-fill.js`, 48 senders, the same run
+that finalized 123.2 TPS wall):
+
+| the runtime's own limits | value |
+|---|---|
+| block weight budget | **150 ms** of ref_time (5 MB proof size) |
+| block length | 5 MB hard cap, 4.5 MB normal |
+| one signed `system.remark` | **0.3596 ms** of weight |
+| therefore, by weight | **417 extrinsics per block** → 2,024/s at this cadence |
+| measured blocks | 176 blocks / 36.3 s (4.85 blocks/s), mean **26.63 extrinsics**, mean **11.8 ms of weight = 7.9 % of the budget** |
+| measured bytes | mean 3,615 of 4,718,592 normal (**0.16 %**) |
+| chain inclusion rate | **129.2 extrinsics/s** |
+
+The chain was carrying 129 extrinsics/s at **8 % of its weight budget and 0.16 %
+of its byte budget**. It is not full.
+
+*Where the CPU went* (`scripts/proof/cpu-attribution.py`, 50 s window, single
+loader, 121.8 TPS wall): author node **15.67 core-seconds (15.7 % of the box)**,
+importing node **12.92 (12.9 %)**, load generator **30.47 (30.5 %)** — 59.1 % of
+the box in total. The generator costs more CPU than both nodes together, and
+nothing was saturated. Run with two generators (96 senders) the aggregate wall
+figure moved 121.8 → 127.6 TPS while box use went 59.1 % → 64.8 %, and each
+generator's own submit-window rate was 83–88/s: the chain absorbed everything
+offered (0 failed, ready queue empty) and the wall figures are deflated by each
+generator's 20 s finality tail.
+
+*The chain's own ceiling for this workload* is therefore set by single-threaded
+execution, not by weight: at the measured 1.556 ms per `BlockBuilder_apply_extrinsic`
+a 200 ms slot with a ~133 ms proposal window fits about **85 signed remarks per
+block, ≈ 410/s**, and the task needs ~156 core-seconds of execution per second of
+100 K TPS — about **156 cores of execution alone**, before networking, validation
+or the database. That is the honest answer to "can we push it harder": yes, well
+past 123, because the chain is at 8 % of its limits and the client is the
+constraint — but 100K TPS is a runtime-cost problem, not a configuration one.
+
+**Storage metrics that exist versus not** (measured by scraping a live
+`--prometheus-external` endpoint):
+
+* present: `substrate_block_verification_and_import_time`, `substrate_block_height`,
+  `substrate_state_cache_bytes`, `substrate_database_cache_bytes`,
+  `trie_cache_{shared,local}_{hits,fetch_attempts}`, `trie_cache_shared_update_duration`,
+  the `x3_*` counters, and the three new per-block histograms.
+* absent: `storage_reads`, `storage_writes`, `storage_read_bytes`,
+  `storage_write_bytes`, `trie_nodes_read`, `trie_nodes_written`, `state_root_us`,
+  `db_commit_us`, `db_flush_us`, `state_growth_bytes` (host disk metrics are out of
+  scope for a node).
+
+**Node default database.** Running the node with no `--database` flag logs
+`Database: ParityDb at <base>/chains/<chain>/paritydb/full`. The validator runbook
+said RocksDB was the default; that is corrected. Which backend *should* be the
+default is unmeasured.
+
+**Which stage actually costs the time (new).** The node could not answer this
+before: it timed a whole import and nothing inside it. `node/src/timed_executor.rs`
+now wraps the code executor and times every runtime call, so the import splits
+into "the runtime ran" and "the client around it". Two nodes on this box — an
+authoring `--dev` node and a full node syncing from it — measured with
+`scripts/proof/runtime-attribution.py --window 70`, under 48 senders at
+**119.3 TPS wall, 0 failed, 11,380 finalized**:
+
+| stage | authoring node | importing node |
+|---|---|---|
+| blocks in the 70 s window | authored (not re-executed) | **350 imported**, 23.5 extrinsics / 3,184 B each |
+| `Core_execute_block` | n/a | 350 calls, **37.31 ms per block** |
+| whole import (`substrate_block_verification_and_import_time`) | not recorded (own blocks skip it) | **41.86 ms per block** |
+| **execution share of import** | — | **89.1 %** |
+| unattributed remainder (verification + state root + DB commit + notification) | — | **4.55 ms per block** |
+| `BlockBuilder_apply_extrinsic` | 9,526 calls, **1.556 ms each** | — |
+| `Core_initialize_block` / `finalize_block` / `inherent_extrinsics` | 1.386 / 4.469 / 0.238 ms per block | — |
+| `TaggedTransactionQueue_validate_transaction` | 11,147 calls, 0.963 ms each (10.7 s) | 13,842 calls, **0.716 ms each (9.9 s)** |
+| `x3_runtime_version_seconds` | 58,023 calls, 3.3 µs each | 44,421 calls, 1.3 µs each |
+| wall-time share | — | 20.9 % importing, 33.1 % inside the runtime |
+
+Idle, the same importer costs 5.04 ms per block of which 2.67 ms is execution
+(53 %): the split moves toward execution as the chain is loaded.
+
+Four things this establishes, and one it does not:
+
+1. **Block execution is the cost, not the database.** 89 % of import is wasm
+   execution; the state root plus the commit plus verification are 4.55 ms of a
+   41.86 ms block. Optimization effort belongs in the runtime.
+2. **The two independent paths agree**, which is the sanity check that makes the
+   number usable: authoring pays 1.556 ms per extrinsic in
+   `BlockBuilder_apply_extrinsic`, importing pays 1.59 ms per extrinsic inside
+   `Core_execute_block` (13.06 s of execution / 8,225 extrinsics). Same work,
+   2 % apart.
+3. **Transaction validation is not free and is not on the import path.** The
+   *importing* node spent 9.9 s of a 70 s window validating pool transactions
+   (0.716 ms each) — 14 % of wall time — because gossiped transactions are
+   validated there too. That is a client-side cost the import histogram never
+   shows.
+4. **A cumulative mean is a trap.** `x3_runtime_version_seconds` read 2.3 ms per
+   call five minutes after start and 1.3 µs per call in steady state: the first
+   call instantiates the runtime. Any number quoted from the cumulative counters
+   of a young node is measuring startup. `--window` exists for this reason.
+
+What it does not establish: `state_root_us`, `db_commit_us`, `db_flush_us`,
+storage read/write counts, trie node counts and `state_growth_bytes` still do not
+exist as metrics. They live inside the backend commit and the state machine, and
+the executor wrapper cannot see them; the 4.55 ms remainder is a bound on them,
+not a breakdown.
+
+**Arithmetic the attribution makes possible** (explicitly arithmetic, not a
+measurement — it assumes one thread per stage, no loader on the box, no network
+or disk cost): authoring plus importing the same extrinsic costs
+1.556 + 0.963 ms on the author and 1.59 + 0.716 ms on the importer, about
+**4.8 ms of CPU per finalized extrinsic** across the two-node system. On this
+2-core box that is a ceiling near **400 TPS** with the cores dedicated to the
+node — against 119.3 measured with the JavaScript load generator competing for
+the same two cores. At this per-extrinsic cost, 100K TPS would need roughly
+**480 CPU-seconds of execution per second**, i.e. a few hundred cores of
+execution capacity, before any question about clients or networking arises.
+
+**Failure drills, run for the first time (new).** The audit's §14–15 asked what
+the chain does on power loss and on a full disk. Neither had been executed: the
+only restart script in the tree sends SIGTERM and then starts a node on a *fresh*
+base path, so it never opens the database that was interrupted. Both drills now
+exist and run unattended.
+
+`scripts/mainnet/prove-crash-consistency.sh` — SIGKILL (not SIGTERM) to an
+authoring node and to a full node importing from it, then **PASS 7/7**: the
+author came back on its own database with the same genesis, and the block it had
+finalized before the kill at the same height, the same hash and the same state
+root; the importer re-imported and agreed with the author on height 218 (same
+hash, same root, 433 blocks imported after restart).
+
+`scripts/mainnet/prove-disk-full-authoring.sh` — a real 256 MB filesystem created
+inside a private mount namespace (`unshare -Urm`, no root, nothing of the host's
+touched), filled until the writes fail. It found two things, one of which was
+fixed in the same pass:
+
+1. **The startup gate never ran on a fresh install.** `free_bytes()` needs the
+   path to exist, and `--base-path` is created by the database *after* the guard
+   runs, so the gate logged "could not measure … continuing without it" and
+   passed — on exactly the install onto a nearly full volume it exists to catch.
+   `free_bytes_for_new_path` now measures the nearest existing ancestor; the
+   drill's gate check went FAIL → PASS ("Refusing to start an authority node:
+   free disk space 268435456 bytes is at or below the 2013265920 byte floor").
+2. **The guard reported; it did not act.** With free space below the floor the
+   node authored 76 more blocks (71 → 147) and then **died** at true ENOSPC:
+   `Background worker error: IO Error: No space left on device (os error 28)`,
+   `GRANDPA voter error: could not complete a round on disk`. The authority is
+   now gated: the disk watchdog closes an `AtomicBool` that the proposer reads
+   every slot, so below the floor authoring pauses, the node keeps answering RPC
+   and logs `authoring paused`, and it resumes by itself when space returns. The
+   drill re-run shows blocks 20 → 20 across the pressure window, RPC alive, and
+   the pause line present.
+
+Still true after the fix, and recorded rather than hidden: at *true* ENOSPC (0
+bytes free) the node still dies — `sc-client-db`'s background worker fails and
+the service shuts down — and comes back only on a restart, which the drill
+verifies works from the same database (42 → 117 blocks after restart). The pause
+is what turns "author until the volume is full, then die" into "stop at the
+floor with a warning window".
+
+**Repository hygiene.** `python -m pytest` → 201 passed (was 1412 collection errors
+and zero tests run). `npm test`, `pnpm test`, `pnpm build` → exit 0. `cargo test
+--workspace --no-fail-fast` → 6,224 tests passed, 2 failed, and both failures are
+the load-marginal throughput assertions in `x3-gpu-validator-swarm` (19.8K/38.1K
+TPS under load; the same file passes 7/7 when run alone on an idle box).
+
+---
+
+## 3. Open blockers
+
+### Infrastructure — cannot be closed in code
+
+1. **No deployable bootnodes.** `scripts/ci/check_deployable_bootnodes.sh` reports
+   4 findings: `deployment/chain-specs/x3-testnet-raw.json` is Live with **no**
+   bootNodes; `fresh/x3-testnet-plain.json` and the k8s ConfigMap carry `127.0.0.1`;
+   the ConfigMap is additionally a Live spec with an **empty `genesis.raw.top`**.
+   Every candidate hostname checked does not resolve
+   (`bootnode.testnet.atlas-sphere.io`, `bootnode.testnet.x3-chain.io`,
+   `rpc.testnet.atlas-sphere.io`). *Closes when real multiaddrs exist and the gate
+   is wired into `local-ci`.*
+2. **Release signing is claimed, not present.** `.artifacts/release-v1.1/` (v1.1.1,
+   commit `55d09edb6`) has checksums that verify, and `RELEASE_MANIFEST.json` says
+   `"signed": true` — but **no signature file exists anywhere in the bundle**.
+3. **The shipped release binary cannot start.** `--dev` panics
+   (`Authorities are already initialized!`); the bundled spec fails with
+   `SessionKeys_generate_session_keys is not found`. Both reproduced.
+4. **`solana-gpu-validator-v1.0.tar.gz` does not exist** on the archive drive that
+   holds the other April artifacts, confirming the ledger's `GAP-GPU-CLAIMS`.
+5. **`docker` and `srtool` are absent** on the machine used here, so the `--release`
+   and `make mainnet-check` gates cannot run at all. `make srtool-install` restores
+   `srtool`; `--release` failures that need reproducibility cannot be measured until
+   then.
+6. **WAN / geographic proof absent.** Every number in this document is loopback or
+   single-host. No evidence exists for 200 ms slots across WAN latency.
+
+### Code — reachable, not yet done
+
+7. **Attribution metrics — execution half closed (#513), client half open.** The
+   executor is wrapped (`node/src/timed_executor.rs`), so runtime call time is now measured
+   and the import splits into execution versus everything else: 89.1 % execution,
+   4.55 ms/block of remainder under load (§2). What is still missing is the
+   breakdown of that remainder — `state_root_us`, `db_commit_us`, `db_flush_us`,
+   `storage_reads`/`storage_writes`, `trie_nodes_read`/`trie_nodes_written`,
+   `state_growth_bytes`. Those live in `sc-client-db`'s commit and in the state
+   machine behind the host functions, so they need either a backend patch or a
+   host-function wrapper, not another executor wrapper.
+8. **`state_growth_bytes`.** Not measurable from the import notification; needs the
+   state diff. Block bodies turned out to be small (§2), so state growth is the
+   number that decides disk economics — and it is unmeasured.
+9. ~~**Snapshot restore path.**~~ **Closed by #509** and proven against a live
+   chain (§2). The half that remains is the one this does not pretend to be: the
+   restore writes a raw chain spec whose genesis *state* is block N's state, so a
+   node that boots from it recomputes the same root and then refuses to author
+   (its header is number 0). Installing that state behind block N's header — the
+   path a validator joining at a height actually needs — is state/warp sync, and
+   does not exist here. `export-state` also needs unpruned state or the head
+   (measured).
+10. ~~**Disk-pressure authoring stop.**~~ **Closed in this pass.** The guard now
+    controls rather than reports: the disk watchdog closes an `AtomicBool` that
+    the proposer reads every slot, so below the floor authoring pauses, the node
+    keeps serving RPC, logs why, and resumes by itself. Proven by
+    `scripts/mainnet/prove-disk-full-authoring.sh`. The related gap is next.
+11. **Power-loss and disk-full drills — run, with two results still open.**
+    `scripts/mainnet/prove-crash-consistency.sh` (SIGKILL, 7/7) and
+    `scripts/mainnet/prove-disk-full-authoring.sh` (§2) both pass. What they
+    leave open: (a) at *true* ENOSPC the node still dies — `sc-client-db`'s
+    background worker fails and the service shuts down — and needs a manual
+    restart, which is verified to recover from the same database; (b) the drills
+    are two nodes on one host, not a validator being killed while the rest of a
+    quorum finalizes.
+12. **Storage-blob economics.** No storage deposit/rent/TTL mechanism exists, so
+    state-bloat cost is unbounded for the attacker side of §22–23.
+
+### Repository artefacts that mislead
+
+13. **`crates/import-queue-wrapper` (616 lines) is wired into nothing.** The only
+    references anywhere are inside a stale nested `.kilo` checkout.
+14. **`substrate` is a symlink to `.`** (mode 120000, added by the 2026-09-03 bulk
+    snapshot `143f7a6b`). Nothing references `substrate/<path>`; it makes any
+    symlink-following tool count this 137 GB tree twice. The 127 GB behind it is
+    this workspace's own `target/`, not a second checkout.
+15. **`x3-gpu-validator-swarm`'s throughput assertions are load-marginal.** They fail
+    under contention and pass on an idle box. This is a maintainer decision —
+    benchmark assertions in the default test set — not something to silently
+    re-tune.
+
+### Documentation that still contradicts the code
+
+16. `LAUNCH_SCOPE.md` declares itself authoritative and supersedes
+    `CURRENT_MAINNET_STATUS.md`, which in turn declares `FEATURE_REGISTRY.toml`
+    canonical. Only the registry is checked by a gate
+    (`scripts/check-readiness-consistency.sh`).
+17. The GPU phase reports (`.artifacts/P4_GPU_TEST_PHASE{1,2}_REPORT.md`, 2026-03)
+    quote pure-Python CPU mocks against GPU targets — one threshold was explicitly
+    **lowered** to 1M hash/sec to pass — and state "100+ TPS CPU (GPU target:
+    >1000)". They are not evidence of accelerator throughput.
+
+---
+
+## 4. What this document does not claim
+
+* **No production workload number.** Every TPS figure is `system.remark` on
+  loopback. Transfers, `.x3` execution, EVM, SVM and cross-VM paths have no
+  chain-level measurement at all.
+* **No multi-node throughput or storage number.** The 7-validator TPS figure is
+  from the recovered archive; every storage observation in this document is a
+  single dev node.
+* **No comparable-to-February number.** The release build was measured on this
+  2-core desktop, where the load generator competes with the node for both cores.
+  47–51 here versus 575 then is a harness-capacity difference, not a like-for-like
+  regression figure — and disentangling the two needs a load host that is not the
+  node's host.
+* **No claim that the chain's ceiling has been measured either.** The block-fill
+  measurements bound it from below (129 extrinsics/s at 8 % of the weight budget)
+  and from above by execution time (~410/s for signed remarks on this box), but no
+  client we have can supply enough work to reach it: the generator saturates
+  first. That still needs a load host that is not the node's host, or a workload
+  whose cost is not one signature per extrinsic.
+* **No claim that state sync is finished.** The snapshot format verifies,
+  exports, cross-checks against real chain roots and restores into a bootable
+  chain spec, but it is state *transport*: nothing installs that state behind a
+  block header, so a validator still cannot join a running chain at height N with
+  it. Warp/state sync is the missing client-side half.
+* **No claim that the attribution generalizes.** Every runtime-call number in §2
+  is wall time measured on a 2-core desktop, with an authoring node and an
+  importing node on the same box, and a JavaScript load generator competing for
+  the same cores. The *split* (execution vs client) is the finding; the absolute
+  milliseconds per extrinsic are this machine's, and the 400 TPS ceiling is
+  arithmetic from them, not a measurement of a chain.
+* **No claim that a full disk is survivable.** The node pauses authoring at its
+  configured floor and is restartable from the same database afterwards, but at
+  zero bytes free it still dies, and the recovery is manual. A node that keeps
+  serving through ENOSPC needs work inside `sc-client-db`, not in this node.
+* **No reproducibility claim.** `srtool` is installed, but it builds inside Docker
+  and docker is absent on this machine, so the release-reproducibility gate has
+  never executed here.

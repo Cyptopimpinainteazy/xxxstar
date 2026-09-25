@@ -127,6 +127,20 @@ impl LayoutComputer {
         Ok(())
     }
 
+    /// Record how many registers the function's body actually used.
+    ///
+    /// `MirBytecodeCompiler` allocates registers with its own counter, so this layout's counter
+    /// stayed at "one per parameter" and every emitted `FunctionEntry` said `local_count: 0`. The
+    /// interpreters size a callee's frame from that number, so every call window started at its
+    /// caller's base and the callee's registers were the caller's: measured, the compiler's own
+    /// `fib.x3` executed and returned -80 instead of 55 (TICKET-131).
+    pub fn set_registers_used(&mut self, used: u16) {
+        if let Some(layout) = self.current_function.as_mut() {
+            layout.next_register = layout.next_register.max(used);
+            layout.max_register = layout.max_register.max(used.saturating_sub(1));
+        }
+    }
+
     /// Finish compiling current function.
     pub fn end_function(&mut self, return_type_tag: u8) -> Option<CompiledFunction> {
         let layout = self.current_function.take()?;
@@ -135,9 +149,13 @@ impl LayoutComputer {
             name: layout.name,
             entry_point: layout.entry_point,
             param_count: layout.param_count,
+            // Registers beyond the parameters: the locals and temporaries that make up the rest of
+            // the frame. The `1 +` this used to subtract assumed a reserved `r0` that this pipeline
+            // does not reserve — the compiler's first register *is* parameter 0 — so it was both
+            // wrong and zero.
             local_count: layout
                 .next_register
-                .saturating_sub(1 + layout.param_count as u16),
+                .saturating_sub(layout.param_count as u16),
             max_stack: layout.max_register + 1,
             return_type_tag,
         };

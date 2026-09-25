@@ -12,6 +12,12 @@
 # Every case below is applied to a real snapshot built from this repository's own
 # raw chain spec. The honest copy must verify; each mutation must be refused.
 #
+# The last group does the same for the *restore* direction, which is the half
+# that touches a validator's database: an honest snapshot has to come back out as
+# a chain spec whose state still hashes to the declared root, a corrupt or
+# substituted snapshot has to be refused, and a refused restore must leave no
+# chain spec behind for an operator to boot from.
+#
 # Usage: bash launch-gates/snapshot-murder-test.sh
 # Exit 0 = every case behaved correctly.
 set -uo pipefail
@@ -73,6 +79,30 @@ expect_ok() {
   else
     note_fail "$case_name (verifier refused the honest snapshot)"
     say "      output: $output"
+  fi
+}
+
+# expect_restore_refused <case> <manifest> <chunks-dir> <out-file> [args...]
+#
+# Refusing is not enough here: a refused restore must also leave nothing at the
+# output path, because whatever is at that path is what an operator boots.
+expect_restore_refused() {
+  local case_name="$1"
+  local manifest="$2"
+  local chunks="$3"
+  local out="$4"
+  shift 4
+
+  find "$out" -maxdepth 0 -delete 2>/dev/null || true
+
+  local output
+  if output="$("$VERIFIER" restore --manifest "$manifest" --chunks "$chunks" --out "$out" "$@" 2>&1)"; then
+    note_fail "$case_name (restore accepted it; it must refuse)"
+    say "      output: $output"
+  elif [[ -e "$out" ]]; then
+    note_fail "$case_name (refused, but still wrote a chain spec to $out)"
+  else
+    note_pass "$case_name"
   fi
 }
 
@@ -274,6 +304,51 @@ json.dump(forged, open(sys.argv[3], "w"), indent=2)
 PY
 
 expect_refused "substituted state with a forged, self-consistent manifest" "$C11/manifest.json" "$C11" "${ANCHOR[@]}"
+
+# ── Restore: the same inputs, judged at the other end of the pipe ───────────
+RESTORE_DIR="$WORK/restore"
+RESTORED_SPEC="$RESTORE_DIR/restored.json"
+mkdir -p "$RESTORE_DIR"
+
+if RESTORE_OUTPUT="$("$VERIFIER" restore --manifest "$HONEST/manifest.json" --chunks "$HONEST" \
+    --out "$RESTORED_SPEC" "${ANCHOR[@]}" 2>&1)"; then
+  REREAD_ROOT="$("$VERIFIER" root --from-raw-spec "$RESTORED_SPEC" 2>&1)"
+  if [[ "${REREAD_ROOT,,}" == "${STATE_ROOT,,}" ]]; then
+    note_pass "honest snapshot restores into a spec whose state hashes to the declared root"
+  else
+    note_fail "restored spec does not hash to the declared root"
+    say "      declared:   $STATE_ROOT"
+    say "      re-read:    $REREAD_ROOT"
+  fi
+else
+  note_fail "honest snapshot could not be restored"
+  say "      output: $RESTORE_OUTPUT"
+fi
+
+expect_restore_refused "restore refuses a corrupt chunk" "$C1/manifest.json" "$C1" \
+  "$RESTORE_DIR/from-corrupt.json" "${ANCHOR[@]}"
+expect_restore_refused "restore refuses substituted state under a forged manifest" "$C11/manifest.json" "$C11" \
+  "$RESTORE_DIR/from-forged.json" "${ANCHOR[@]}"
+expect_restore_refused "restore refuses a snapshot from another chain" "$HONEST/manifest.json" "$HONEST" \
+  "$RESTORE_DIR/from-other-chain.json" \
+  --chain-id "x3_mainnet" --block-hash "$BLOCK_HASH" --state-root "$STATE_ROOT" --runtime-version "$RUNTIME_VERSION"
+expect_restore_refused "restore refuses a stale snapshot" "$HONEST/manifest.json" "$HONEST" \
+  "$RESTORE_DIR/from-stale.json" "${ANCHOR[@]}" --min-block $((BLOCK_NUMBER + 1))
+
+# An existing chain spec is what a running node may already be using, so a
+# restore must not quietly replace it.
+if "$VERIFIER" restore --manifest "$HONEST/manifest.json" --chunks "$HONEST" \
+    --out "$RESTORED_SPEC" "${ANCHOR[@]}" > /dev/null 2>&1; then
+  note_fail "restore overwrote an existing chain spec without --force"
+else
+  note_pass "restore refuses to overwrite an existing chain spec"
+fi
+if "$VERIFIER" restore --manifest "$HONEST/manifest.json" --chunks "$HONEST" \
+    --out "$RESTORE_DIR/forced.json" "${ANCHOR[@]}" --force > /dev/null 2>&1; then
+  note_pass "restore replaces an existing chain spec when told to with --force"
+else
+  note_fail "restore refused --force"
+fi
 
 say ""
 say "murder test: $pass passed, $fail failed (workdir $WORK)"

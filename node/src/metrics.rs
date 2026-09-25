@@ -70,6 +70,37 @@ pub struct X3PrometheusMetrics {
     pub cross_vm_aborted: prometheus::Counter,
     /// Fee deductions
     pub fee_deductions: prometheus::Counter,
+    /// Serialised size of each imported block, in bytes.
+    ///
+    /// The storage audit's per-block metric list asks for `block_bytes`, and it
+    /// is what turns "blocks are small" into the disk arithmetic the audit
+    /// depends on: at 200 ms slots the chain produces ~157.7M blocks/year, so a
+    /// 10 KB block is 1.58 TB/year and a 50 KB block is 7.9 TB/year before any
+    /// state growth.
+    pub imported_block_bytes: prometheus::Histogram,
+    /// Extrinsics per imported block.
+    pub imported_block_extrinsics: prometheus::Histogram,
+    /// Wall-clock seconds between imported blocks.
+    ///
+    /// Distinct from the configured slot time: a chain that targets 200 ms and
+    /// lands on 900 ms has a throughput problem that block-height metrics alone
+    /// cannot show.
+    pub block_interval_seconds: prometheus::Histogram,
+    /// Transactions waiting in the pool's ready queue.
+    ///
+    /// This is the number that says whether the *chain* is the limit. During the
+    /// throughput sweep the only way to tell "the chain kept up" from "the client
+    /// could not offer more" was to snapshot two cumulative counters around a load
+    /// run and diff them. A live ready-queue gauge answers it with one scrape, and
+    /// a ready queue that *climbs and stays up* is the signal that block space has
+    /// become the constraint.
+    pub txpool_ready: prometheus::IntGauge,
+    /// Bytes of ready transaction encodings.
+    pub txpool_ready_bytes: prometheus::IntGauge,
+    /// Transactions in the future queue, i.e. held back by a nonce gap.
+    pub txpool_future: prometheus::IntGauge,
+    /// Bytes of future transaction encodings.
+    pub txpool_future_bytes: prometheus::IntGauge,
 }
 
 impl X3PrometheusMetrics {
@@ -122,6 +153,56 @@ impl X3PrometheusMetrics {
         let fee_deductions =
             prometheus::Counter::new("x3_fee_deductions_total", "Total number of fee deductions")?;
 
+        // Buckets are chosen for the questions the storage audit asks: "how big
+        // is a block, really" (1 KB .. 4 MB), "how full is a block" (0 .. 512
+        // extrinsics), and "what cadence does the chain actually hold" (10 ms ..
+        // 10 s).
+        let imported_block_bytes = prometheus::Histogram::with_opts(
+            prometheus::HistogramOpts::new(
+                "x3_imported_block_bytes",
+                "Serialised size of each imported block (header + extrinsics) in bytes",
+            )
+            .buckets(vec![
+                1_024.0,
+                4_096.0,
+                16_384.0,
+                65_536.0,
+                262_144.0,
+                1_048_576.0,
+                4_194_304.0,
+            ]),
+        )?;
+        let imported_block_extrinsics = prometheus::Histogram::with_opts(
+            prometheus::HistogramOpts::new(
+                "x3_imported_block_extrinsics",
+                "Number of extrinsics in each imported block",
+            )
+            .buckets(vec![0.0, 1.0, 8.0, 32.0, 128.0, 512.0, 2_048.0]),
+        )?;
+        let block_interval_seconds = prometheus::Histogram::with_opts(
+            prometheus::HistogramOpts::new(
+                "x3_block_interval_seconds",
+                "Wall-clock seconds between imported blocks",
+            )
+            .buckets(vec![0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0]),
+        )?;
+        let txpool_ready = prometheus::IntGauge::new(
+            "x3_txpool_ready",
+            "Transactions waiting in the pool's ready queue",
+        )?;
+        let txpool_ready_bytes = prometheus::IntGauge::new(
+            "x3_txpool_ready_bytes",
+            "Bytes of ready transaction encodings in the pool",
+        )?;
+        let txpool_future = prometheus::IntGauge::new(
+            "x3_txpool_future",
+            "Transactions in the pool's future queue (held by a nonce gap)",
+        )?;
+        let txpool_future_bytes = prometheus::IntGauge::new(
+            "x3_txpool_future_bytes",
+            "Bytes of future transaction encodings in the pool",
+        )?;
+
         registry.register(Box::new(blocks_produced.clone()))?;
         registry.register(Box::new(transactions_received.clone()))?;
         registry.register(Box::new(comits_submitted.clone()))?;
@@ -135,6 +216,13 @@ impl X3PrometheusMetrics {
         registry.register(Box::new(cross_vm_committed.clone()))?;
         registry.register(Box::new(cross_vm_aborted.clone()))?;
         registry.register(Box::new(fee_deductions.clone()))?;
+        registry.register(Box::new(imported_block_bytes.clone()))?;
+        registry.register(Box::new(imported_block_extrinsics.clone()))?;
+        registry.register(Box::new(block_interval_seconds.clone()))?;
+        registry.register(Box::new(txpool_ready.clone()))?;
+        registry.register(Box::new(txpool_ready_bytes.clone()))?;
+        registry.register(Box::new(txpool_future.clone()))?;
+        registry.register(Box::new(txpool_future_bytes.clone()))?;
 
         Ok(Self {
             blocks_produced,
@@ -150,6 +238,13 @@ impl X3PrometheusMetrics {
             cross_vm_committed,
             cross_vm_aborted,
             fee_deductions,
+            imported_block_bytes,
+            imported_block_extrinsics,
+            block_interval_seconds,
+            txpool_ready,
+            txpool_ready_bytes,
+            txpool_future,
+            txpool_future_bytes,
         })
     }
 }

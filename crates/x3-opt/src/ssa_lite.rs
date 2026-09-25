@@ -69,7 +69,12 @@ pub fn ssa_const_prop(ssa: &mut SsaFunction) -> bool {
                             }
                         }
                     }
-                    MirRhs::Binary(op, lhs, rhs_val) => {
+                    MirRhs::Binary {
+                        op,
+                        left: lhs,
+                        right: rhs_val,
+                        ..
+                    } => {
                         if let (Some(left), Some(right)) =
                             (known_constants.get(lhs), known_constants.get(rhs_val))
                         {
@@ -306,7 +311,12 @@ mod tests {
                     },
                     MirStatement::Assign {
                         target: MirValue(2),
-                        rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
+                        rhs: MirRhs::Binary {
+                            op: BinaryOp::Add,
+                            left: MirValue(0),
+                            right: MirValue(1),
+                            float: false,
+                        },
                     },
                 ],
                 terminator: Some(MirTerminator::Return(Some(MirValue(2)))),

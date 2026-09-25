@@ -6,9 +6,10 @@
 //! - Cross-VM communication (EVM/SVM bridge)
 //! - Cryptographic primitives
 
-#[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
-
+// Every item in this module is `#[cfg(feature = "std")]`: the hostcalls it registers reach Substrate
+// storage and events. The imports are gated the same way, so the `no_std` build — the one the kernel
+// adapters link — is warning-free instead of carrying imports nothing in it can use.
+#[cfg(feature = "std")]
 use sp_core::H256;
 
 #[cfg(feature = "std")]

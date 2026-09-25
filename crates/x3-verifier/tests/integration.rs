@@ -79,7 +79,12 @@ fn test_gas_analysis() {
             },
             MirStatement::Assign {
                 target: MirValue(2),
-                rhs: MirRhs::Binary(x3_ast::BinaryOp::Add, MirValue(0), MirValue(1)),
+                rhs: MirRhs::Binary {
+                    op: x3_ast::BinaryOp::Add,
+                    left: MirValue(0),
+                    right: MirValue(1),
+                    float: false,
+                },
             },
         ],
     );

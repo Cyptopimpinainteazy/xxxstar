@@ -1132,6 +1132,38 @@ impl BytecodeModule {
     }
 }
 
+#[cfg(test)]
+mod version_rule_parity {
+    //! The shared rule and this crate's rule have to agree version by version.
+    //!
+    //! They did not for a patch bump: `x3_common::bytecode::version_is_readable` compared
+    //! `version <= VERSION` (refusing `1.0.1`) while `VersionInfo::can_read` ignores the patch field
+    //! (accepting it) — and because the no-std reader that executes on chain uses the shared one, a
+    //! module the format calls compatible could be compiled and then refused where it matters
+    //! (TICKET-137). The list is written out rather than computed so no case is skipped.
+
+    use super::*;
+
+    #[test]
+    fn the_shared_version_rule_agrees_with_can_read() {
+        let current = VersionInfo::current();
+        for (label, packed) in [
+            ("the same version", VERSION),
+            ("a patch bump", VERSION + 1),
+            ("a minor bump", VERSION + 0x100),
+            ("a major bump", VERSION + 0x1_0000),
+            ("an older patch", VERSION.saturating_sub(1)),
+            ("an older minor", VERSION.saturating_sub(0x100)),
+        ] {
+            assert_eq!(
+                x3_common::bytecode::version_is_readable(packed),
+                current.can_read(VersionInfo::from_packed(packed)),
+                "the shared rule and `can_read` must agree about {label} (0x{packed:08x})"
+            );
+        }
+    }
+}
+
 impl Default for BytecodeModule {
     fn default() -> Self {
         Self::new()

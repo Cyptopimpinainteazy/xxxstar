@@ -5231,3 +5231,126 @@ Measured (`dest_chain`/`dest_asset`/`dest_receiver` against each source's `to` l
 solana/SOL/wallet; `staking_intent.x3` solana/stakedSOL/vault; `timeout_refund_minimal.x3`
 Solana/USDC/4Nd1mz… — all three were `x3`/`UNKNOWN`/`unknown` before.
 Regression: `compiler/tests/test_intent_endpoints.rs` pins the three fields on a cross-chain fixture.
+
+## TICKET-134 — PHASE 4's "profit checks after all costs are known" was not enforced — CLOSED
+Type: CLOSED in this commit (2026-09-24) · Subsystem: x3-lang/compiler (trading_verify)
+Found while attacking the trading verifier with one program per PHASE 4 invariant, which is the
+measurement X3-LANG-007's row was missing. The verifier recorded only *that* a `net_profit` guard
+exists (`has_net_profit_guard`), never *where* it is — so this program checked clean:
+
+```
+atomic trade T using P {
+    borrow 1_000 USDC from aave_v3 as debt
+    require net_profit >= 1_000 USDC        // before anything has produced a profit
+    let weth = swap debt.amount USDC -> ETH via uniswap_v3 min_out 1 ETH
+    repay debt
+    require all_debts_repaid
+    emit receipt
+}
+```
+
+Measured before: `x3c check` exit 0. The guard's position is now compared against the last
+borrow/swap/repay (the statements that change what the profit *is*), and a guard that runs earlier is
+refused with `X3E4023` naming both statement positions. A bridge is not counted: it moves value
+without changing it.
+After: the program above exits 1 with "checks `net_profit` at statement 2 but statement 5 still
+changes what the profit is"; the same guard moved after the `repay` checks clean; examples and the
+whole workspace suite are unaffected (1316 passed / 0 failed, 30 of them in the verifier's own file,
+which gained the pair as a test).
+
+Also measured in the same sweep, and each already enforced (evidence for X3-LANG-007):
+use-before-binding and binding/asset-type mismatch → `X3E2107` with the types named; the same debt
+repaid twice → `X3E4022` "repays debt 'debt' more than once"; an unfulfilled declared effect →
+`X3E4021`; a removed `all_debts_repaid` → `X3E4025`; an unknown risk policy → `X3E4025`.
+Not probed, and so still unproven for that row: BEGIN/END exactly once, position close-or-return,
+and ROLLBACK preserving declared invariants.
+
+## TICKET-135 — `receipt verify` accepted an unsigned receipt in mainnet mode — CLOSED
+Type: CLOSED in this commit (2026-09-24) · Subsystem: x3-lang/crates/x3-tools (x3c receipt verify)
+Found while measuring X3-LANG-003's row adversarially. The command's own message was honest — "receipt
+verified (hash + economic invariants; signer trust not requested)" — but **the mode never reached it**:
+`cmd_receipt_verify(input, trusted_specs)` took no `CompilationMode`, so `--mode mainnet` behaved exactly
+like dev and a receipt with **no attestation at all** was accepted on the path that settles real value.
+A hash is a self-consistency check that anyone can recompute over a forged receipt, so accepting it in
+mainnet mode converts "no signer evidence" into a success message.
+
+What changed: the mode reaches the command, and mainnet now requires `--trusted` — the operator has to
+name the key they trust, because a key carried inside the receipt is a restatement of the receipt's own
+claim, not a check.
+
+Measured, all four ways:
+  unsigned, dev                          -> verified (documented behaviour, unchanged)
+  unsigned, `--mode mainnet`             -> refused: "a mainnet receipt must be checked against a key you trust"
+  signed, `--mode mainnet` (no --trusted)-> refused, same reason
+  signed, `--mode mainnet --trusted <k>` -> "receipt verified with trusted signer attestation"
+Regression: `cli_receipt_verify_requires_a_trusted_key_on_mainnet` in `crates/x3-tools/tests/cli.rs`.
+
+## TICKET-136 — X3-LANG-002/003 measured: what the receipt pair does and does not prove — record
+Type: RECORD (2026-09-24), no code change beyond TICKET-135 · Subsystem: x3-lang/vm/trading + x3c
+Not a defect: the measurement the two rows were missing, kept here because it is the evidence their
+scores rest on.
+`receipt execute` produces a signed receipt from a real execution; `receipt verify --trusted <key>`
+requires and validates the attestation (a different key is refused by name, "attestor ... is not
+trusted"); editing a covered field breaks the hash and both `receipt verify` and `replay` refuse it,
+naming both hashes; `replay` refuses a receipt that is about another artifact, naming both artifact
+hashes. `replay` also states, in its own output, what it *cannot* check with the pair it was given: the
+risk ceilings the run enforced (the compiled policy does not travel beside the receipt), the finality
+references, and the host inputs. Those three sentences are the remaining honest limit of the pair, and
+they are what keeps X3-LANG-002 at PARTIAL rather than COMPLETE.
+
+## TICKET-137 — the two readers disagreed about a patch version — CLOSED
+Type: CLOSED in this commit (2026-09-24) · Subsystem: crates/x3-common + x3-integration
+Found by writing the body-section parity test X3-LANG-010's row asked for ("the other body sections
+still have no parity test"): a module declaring `1.0.1` was accepted by `x3-backend`'s
+`VersionInfo::can_read` (patch differences are compatible — the format's own semantic versioning says
+so) and **refused by the no-std reader that executes on chain**, whose shared rule compared
+`version <= VERSION`. A module the compiler's own rules call compatible could therefore be compiled and
+then refused where it matters.
+
+The shared rule now compares the same two fields `can_read` does (same major, no newer minor), and two
+tests pin it: `a_patch_bump_is_readable_and_a_minor_bump_is_not` in `x3-common`, and
+`version_rule_parity::the_shared_version_rule_agrees_with_can_read` in `x3-backend`, which compares the
+shared helper against `can_read` across six versions (same, patch, minor, major, older patch, older
+minor) written out rather than computed, because the drift happened in a case nobody had thought of.
+Clippy proved the bound is unreachable while `VERSION`'s minor is 0; the general comparison stays with
+a documented `allow`, because writing `==` would start refusing *older* minors the day the constant
+moves.
+
+Envelope parity now covers the whole body, not just the constant pool: function table (a callee at
+index 1 with a longer name, called with two arguments), global table (stored then loaded), trailing
+debug and metadata sections (both readers execute the same code; the checksum covers an edited
+trailing byte for both), plus the version cases above. Six tests in
+`crates/x3-integration/tests/bc_const_pool_parity.rs`.
+
+## TICKET-138 — X3-LANG-004/005/008 measured: three STUB rows, two of them already true — record
+Type: RECORD + one test added (2026-09-24) · Subsystem: crates/x3-integration, pallets/x3-kernel, x3-lang/vm
+Not a defect. The measurement these three rows were missing, kept here because it is the evidence their
+scores now rest on.
+
+**X3-LANG-004 (bytecode routing to atomic kernel).** The row said "No test drives a compiled program's
+call into the atomic kernel". The route exists — `X3VmAdapter` in `pallets/x3-kernel/src/adapters.rs`
+is what the kernel is configured with in production, and it delegates to
+`x3_x3_integration::X3Executor` — but the pallet's own tests configure `TestX3Adapter`, which fabricates
+a receipt. New test `pallets/x3-kernel/tests/x3_adapter_route.rs` drives the **production** adapter with
+a module compiled from `.x3` source in the test: two programs returning different values, `validate`,
+`estimate_gas`, and the kernel's own `ExecutionReceipt` with its value, its metered gas and its
+`EXECUTION_RECEIPT_VERSION` stamp; plus a corrupted module refused by both `validate` and `execute`. The
+`compile` feature of `x3-x3-integration` is a **dev-dependency** there: the kernel executes artifacts and
+never compiles source. Not covered: an extrinsic dispatched through the pallet's storage with that
+adapter wired in.
+
+**X3-LANG-005 (chain/capability version enforcement).** "Version gates incomplete" is contradicted:
+the compiled-policy version is checked against the host's policy version **before any host call** and
+refuses with `CapabilityVersionMismatch` (`vm/tests/trading_execution.rs`, which also asserts the host
+transaction never began); unknown economic-object versions fail closed with
+`UnsupportedVersion { object, version }` (`vm/tests/economic_types.rs`); capability manifests are
+checked per operation — a borrow's provider, a swap's venue, a bridge's adapter each have to be in the
+host's manifest (`vm/src/trading.rs`, `UnknownCapability`); and the envelope's own version/min-version
+are enforced by both readers (X3-LANG-010, TICKET-137). Not exercised: a live upgrade, an old artifact
+against a newer VM on a running chain.
+
+**X3-LANG-008 (`.x3` compile_source integration).** "PR recovery/rebase and exact E2E proof needed" is
+now met: the chain source → compiler → X3BC → both readers → both engines → receipt is proven by six
+tests in `crates/x3-integration/tests/compiler_bridge.rs` (values read off each source), and the
+envelope body parity suite covers the sections after the constant pool. What remains is the node's own
+use of that path, which is X3-LANG-004's residue above.

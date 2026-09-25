@@ -1,21 +1,50 @@
 # Language / Trading feature matrix fragment.
 
 [[feature]]
-# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/tests/test_e2e_examples.rs, x3-lang/vm/src/executor.rs
+# Re-measured 2026-09-24 (TICKET-130). The row's blocker asked for a genuine E2E test and the chain
+# it names did not actually work: the emitter wrote register operands as two bytes while the
+# interpreter and the verifier read one, so every compiled program failed verification (measured:
+# `fn main() -> i64 { return 42; }` compiled to `18 00 00 2a 05 00 00` and the verifier called byte 3
+# an invalid opcode). Fixed in this commit together with the receipt's instruction count (always 0),
+# the `main`-is-function-0 entry contract, and the crate's `no_std` build; the tests below are the
+# evidence and were written to fail first.
+# Scope of the claim (re-measured 2026-09-24, third pass): the pipeline is proven for the operand
+# kinds the sweep covers — literal, arithmetic, local, constant-pool index, branch, function call —
+# **and** for the compiler's own fixture corpus, which adds recursion (`fib(10)` = 55), several
+# functions with parameters, comparison chains, constant-folded branches and, since `loop_sum.x3`
+# (sum_to(5) = 15), `loop_break.x3` (21) and `loop_continue.x3` (12), a `while`/`loop` with a mutated
+# local, `break` and `continue`: that needed four fixes under it (mutated locals lowered as
+# register-model cells, DCE keeping stores, PRE not hoisting a computation above its own operand's
+# definition, and break/continue lowered instead of dropped by an empty match arm). Both engines
+# agree on every fixture. Floats have their own test and a policy: the backend now takes the float
+# opcode from a flag the MIR sets (it used to emit an integer add for `1.5 + 2.5` and fail with a
+# type error), the arithmetic is computed in simulation, and the on-chain path refuses float opcodes
+# by design (`deny_float_arithmetic` — platform-dependent rounding is not a deterministic state
+# transition), which the test asserts rather than assumes. Not proven: match statements, strings,
+# host calls. That list is what keeps this row short of COMPLETE.
 id = "X3-LANG-001"
 name = "Compile→encode→decode→execute→receipt E2E"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 30
-tested = 10
-mainnet_ready = 15
+paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x3-compiler", "crates/x3-mir", "crates/x3-opt"]
+implemented = 72
+tested = 78
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Genuine E2E test still required"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #10"]
+blockers = ["Proven for the swept operand kinds and the compiler's fixture corpus, including a `while` loop with a mutated local, `break`/`continue`, and float arithmetic with the on-chain refusal asserted; not proven for match statements, strings or host calls. The optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"]
+required_tests = [
+  "compile_encode_decode_execute_receipt_end_to_end",
+  "every_operand_kind_compiles_verifies_and_executes",
+  "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
+  "float_arithmetic_runs_in_simulation_and_is_refused_on_chain",
+  "compile_source_emits_runtime_loadable_bytecode",
+  "compile_source_rejects_invalid_source",
+]
+test_evidence = ["crates/x3-integration/tests/compiler_bridge.rs: six tests, green; the sweep drives eight program shapes through compile → both readers → on-chain executor → receipt and asserts the receipt reports the value the source states, and the float test asserts both the simulation result and the on-chain refusal"]
+evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "crates/x3-backend/src/emit.rs", "note: Trading Core v1 gap #10"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/trading.rs, x3-lang/compiler/tests/
@@ -23,15 +52,15 @@ id = "X3-LANG-002"
 name = "Economic replay validation in receipts"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 35
-tested = 15
-mainnet_ready = 20
+paths = ["x3-lang/vm/src/trading.rs", "x3-lang/crates/x3-tools/src/bin/x3c.rs"]
+implemented = 70
+tested = 70
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Receipts need replay-economic validation"]
+blockers = ["`x3c replay` re-checks the receipt's own economic figures (operation sequence, per-asset deltas, balances, costs, debt lifecycle, profit against the outcome) and refuses a receipt that is about another artifact, naming both hashes; it names what the pair cannot decide — the risk ceilings the run enforced (the compiled policy does not travel beside the receipt), the finality references and the host inputs — which is what keeps this row short of COMPLETE"]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
 
 [[feature]]
@@ -40,15 +69,15 @@ id = "X3-LANG-003"
 name = "Signed / attested trading receipts"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 35
-tested = 15
-mainnet_ready = 20
+paths = ["x3-lang/vm/src/trading.rs", "x3-lang/crates/x3-tools/src/bin/x3c.rs"]
+implemented = 75
+tested = 75
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Receipt signatures/attestations incomplete"]
+blockers = ["Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what is missing is a key registry or rotation story — keys are named per invocation"]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
 
 [[feature]]
@@ -58,14 +87,14 @@ name = "Bytecode routing to atomic kernel"
 subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration"]
-implemented = 40
-tested = 20
-mainnet_ready = 25
+implemented = 65
+tested = 65
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["No test drives a compiled program's call into the atomic kernel: the bridge proves compile → runtime-loadable bytecode, and the route from there to `X3AtomicKernel` is the open half"]
+blockers = ["The production adapter the kernel is configured with (X3VmAdapter) is now driven by a test with a module compiled from .x3 source in the test: validate, estimate_gas, and the kernel's own ExecutionReceipt carrying the program's value, its metered gas and the receipt version, plus a corrupted module refused by both validate and execute (pallets/x3-kernel/tests/x3_adapter_route.rs, added 2026-09-24). What is not covered is an extrinsic dispatched through the pallet's storage with that adapter wired in: the pallet's own tests configure TestX3Adapter, which fabricates its receipt"]
 required_tests = [
   "compile_source_emits_runtime_loadable_bytecode",
   "compile_source_rejects_invalid_source",
@@ -83,43 +112,61 @@ name = "Chain/capability version enforcement"
 subsystem = "language_trading"
 source = "master"
 paths = ["x3-lang/compiler"]
-implemented = 40
-tested = 20
-mainnet_ready = 25
+implemented = 65
+tested = 65
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Version gates incomplete"]
+blockers = ["Re-measured 2026-09-24: the gates exist and refuse by name with tests — the compiled-policy version is checked against the host's before any host call (CapabilityVersionMismatch, and the test asserts the host transaction never began), unknown economic-object versions fail closed (UnsupportedVersion { object, version }), capability manifests are checked per operation (a borrow's provider, a swap's venue, a bridge's adapter; UnknownCapability), and the envelope's version/min-version are enforced by both readers (X3-LANG-010). What is not exercised is a live upgrade: an old artifact against a newer VM on a running chain"]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7"]
 
 [[feature]]
-# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/bridge.rs (bytecode decode paths)
+# Re-measured 2026-09-24 (TICKET-131): the connection this row calls incomplete now has evidence.
+# `mini_x3` (the no-std decoder + interpreter the kernel adapters link) parses the module a compiler
+# emits, and executes it to the value the source states, for the compiler's four fixtures — checked
+# against the std executor's receipt in `crates/x3-integration/tests/compiler_bridge.rs`. What the
+# row still does not have is execution against the *kernel* (X3-LANG-004's open half) and any shape
+# beyond those fixtures.
 id = "X3-LANG-006"
 name = "Decoded bytecode → TradingVm execution"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 40
-tested = 20
+paths = ["crates/x3-integration", "crates/x3-vm"]
+implemented = 55
+tested = 60
 mainnet_ready = 25
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Decoder/executor connection incomplete"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #4"]
+blockers = ["Both engines decode and execute the compiler's fixture corpus to the source's values; not yet driven from the kernel, and not proven beyond those shapes"]
+required_tests = [
+  "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
+  "compile_encode_decode_execute_receipt_end_to_end",
+]
+test_evidence = ["crates/x3-integration/tests/compiler_bridge.rs: the corpus test runs each fixture on both engines and requires the same value"]
+evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "note: Trading Core v1 gap #4"]
 
 [[feature]]
-# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/ir.rs, x3-lang/compiler/tests/
+# Re-measured 2026-09-24 (TICKET-134): the verifier this row says is needed exists —
+# `x3-lang/compiler/src/trading_verify.rs`, with eight coded economic diagnostics (X3E4021..4028) and
+# a test naming each — and it was measured against PHASE 4's invariant list with one program per
+# invariant: use-before-binding and binding/asset-type mismatch (`X3E2107`, types named), the same debt
+# repaid twice (`X3E4022`), an unfulfilled declared effect (`X3E4021`), a removed `all_debts_repaid`
+# guard and an unknown risk policy (`X3E4025`) are all refused. One invariant was **not** enforced —
+# "profit checks must occur after all required costs are known" — and a guard placed before the swaps
+# checked clean; that is fixed and tested. Still unproven: BEGIN/END exactly once, position
+# close-or-return, ROLLBACK preserving declared invariants.
 id = "X3-LANG-007"
 name = "Stateful trading IR verifier"
 subsystem = "language_trading"
 source = "master"
 paths = ["x3-lang/compiler"]
-implemented = 40
-tested = 20
-mainnet_ready = 25
+implemented = 70
+tested = 70
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -134,31 +181,36 @@ name = ".x3 compile_source integration"
 subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration"]
-implemented = 45
-tested = 25
-mainnet_ready = 30
+implemented = 80
+tested = 80
+mainnet_ready = 40
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["PR recovery/rebase and exact E2E proof needed"]
+blockers = ["Re-measured 2026-09-24: the exact E2E proof this row asked for exists — source to compiler to X3BC to both readers to both engines to receipt, six tests whose expectations are read off each source, plus the envelope body parity suite. The remaining half is the node's own use of that path, which is X3-LANG-004's residue"]
 evidence = ["crates/x3-integration", "note: Known grant-track gap", "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22
 id = "X3-LANG-009"
-name = "Authenticated bytecode decoder"
+# Renamed 2026-09-24: the row was called "Authenticated bytecode decoder" while its own blocker said
+# "nothing here is authenticated" — an unkeyed checksum is a corruption check anyone can recompute.
+# No phase of the spec asks for a signature over the envelope (PHASE 46 asks that a receipt identify
+# the exact artifact, PHASE 47 for provenance), so the name is corrected to the code rather than a
+# signature invented for it; the gap stays visible in `blockers`.
+name = "Checksum-verified bytecode decoder"
 subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration"]
-implemented = 45
-tested = 25
+implemented = 60
+tested = 70
 mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. So the row's own name still claims more than the code does: there is no signature and no attestation. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"]
+blockers = ["**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. The row's **name no longer claims more than the code does** (it was renamed from 'Authenticated bytecode decoder' to 'Checksum-verified bytecode decoder' on 2026-09-24), but the gap it names is real: there is no signature and no attestation, and no phase of the spec asks for one over the envelope. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"]
 required_tests = ["test_invalid_magic", "test_parse_minimal_module"]
 test_evidence = ["note: the no-std decoder is crates/x3-integration/src/mini_x3.rs::parse_module, whose tests are test_invalid_magic / test_parse_minimal_module / test_execute_returns_42 / test_gas_exhausted; measured on master 2026-09-23"]
 evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
@@ -170,14 +222,14 @@ name = "Versioned runtime bytecode envelope"
 subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration"]
-implemented = 45
-tested = 25
-mainnet_ready = 30
+implemented = 80
+tested = 80
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Corrected 2026-09-24 against the code: TICKET-108 is closed by commit 6cc986b5d8. `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. The other body sections still have no parity test, and a checksum is not authentication (see X3-LANG-009)."]
+blockers = ["Both readers enforce the version and min-version, and the body parity this row asked for now covers the whole body (function table with a call and arguments, global table, trailing debug/metadata, and the version cases) — the parity work found and fixed a real divergence: a patch bump was accepted by x3-backend and refused by the no-std reader (TICKET-137). Still true from the old note:  `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. That gap is now closed for the rest of the body too: `bc_const_pool_parity.rs` drives the function table (a callee at index 1 with a longer name, called with two arguments), the global table (stored then loaded), the trailing debug and metadata sections, and the version bounds through both readers (added 2026-09-24, TICKET-137). What remains is the authentication note: a checksum is not authentication (see X3-LANG-009)."]
 required_tests = [
     "test_invalid_magic",
     "test_execute_returns_42",
@@ -187,6 +239,10 @@ required_tests = [
     "test_a_module_requiring_a_newer_loader_is_rejected",
     "a_string_constant_means_the_same_thing_to_both_readers",
     "an_unknown_constant_tag_fails_closed",
+    "a_call_with_arguments_means_the_same_thing_to_both_readers",
+    "a_global_stored_and_loaded_means_the_same_thing_to_both_readers",
+    "trailing_debug_info_and_metadata_do_not_change_what_runs",
+    "a_module_from_a_newer_compiler_or_needing_a_newer_loader_is_refused_by_both_readers",
 ]
-test_evidence = ["note: the format is defined in crates/x3-backend/src/bc_format.rs and re-implemented for no-std in crates/x3-integration/src/mini_x3.rs; measured on master 2026-09-23 (TICKET-101 third pass)", "note: cross-decoder parity for the constant pool added 2026-09-24; `cargo test -p x3-x3-integration` = 13 unit + 2 parity tests pass, `pallet-x3-kernel` = 216 pass"]
+test_evidence = ["note: the format is defined in crates/x3-backend/src/bc_format.rs and re-implemented for no-std in crates/x3-integration/src/mini_x3.rs; measured on master 2026-09-23 (TICKET-101 third pass)", "note: cross-decoder parity for the whole body added 2026-09-24 (constant pool, function table, global table, trailing sections, version bounds) — six tests in `crates/x3-integration/tests/bc_const_pool_parity.rs`; they found the patch-version divergence of TICKET-137"]
 evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]

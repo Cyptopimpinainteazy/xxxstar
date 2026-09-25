@@ -38,6 +38,12 @@
 //! malicious snapshot server, corrupt chunk, wrong state root, wrong block
 //! hash, wrong runtime version, stale snapshot, snapshot from another chain,
 //! incomplete snapshot.
+//!
+//! The same checks gate the other direction. [`restore_snapshot`] will not hand
+//! back a chain spec until the snapshot has passed them and until the spec it
+//! just built hashes back to the declared root, because a restore's output is
+//! what a node then builds its database from. A restore that is refused writes
+//! nothing: there is no "verified enough to boot".
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -1054,6 +1060,221 @@ fn decode_hex_field(what: &str, value: &str) -> Result<Vec<u8>, SnapshotError> {
     hex::decode(stripped).map_err(|err| SnapshotError::MalformedRawSpec {
         reason: format!("{what} {value:?} is not valid hex: {err}"),
     })
+}
+
+// ── Restore ─────────────────────────────────────────────────────────────────
+//
+// Restore is the mirror image of export, and it is the only path in this crate
+// that produces something a node will then boot from. It is therefore the most
+// conservative code here: nothing is handed back until the snapshot has passed
+// the *same* checks `verify` runs — the trusted anchor, per-chunk integrity, a
+// complete chunk set, and the state root recomputed from the snapshot's own
+// bytes — and until the chain spec that was just built hashes back to that same
+// declared root.
+//
+// Two things this deliberately does not do:
+//
+// * it does not merge restored state into a template's state. Merging produces a
+//   third state that neither the snapshot nor the chain can name, so a template
+//   contributes metadata only and the state is replaced wholesale;
+// * it does not treat a missing anchor as optional. `verify` permits a
+//   self-consistency-only run and says so loudly; a restore cannot, because its
+//   output is what a validator's database gets built from.
+
+/// Everything a restore has to be told besides the snapshot itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RestoreRequest<'a> {
+    /// Manifest read from the snapshot directory.
+    pub manifest: &'a SnapshotManifest,
+    /// Anchor from consensus the snapshot must match. Required: a restore that
+    /// cannot say which chain, block, root and runtime it is rebuilding is a
+    /// database overwrite with extra steps.
+    pub anchor: &'a TrustedAnchor<'a>,
+    /// Chunk slots, as read from the snapshot directory.
+    pub chunks: &'a [ChunkSlot],
+    /// Trie layout the declared state root is computed with.
+    pub version: TrieVersion,
+    /// `name` of the produced chain spec.
+    pub chain_name: String,
+    /// `id` of the produced chain spec.
+    pub spec_id: String,
+    /// Optional chain spec whose non-state metadata (`chainType`, bootnodes,
+    /// `protocolId`, telemetry, `properties`) is carried into the restored spec.
+    /// Its state, if it has any, is discarded.
+    pub template: Option<&'a serde_json::Value>,
+}
+
+/// Where the state in a restored chain spec came from.
+///
+/// This is written into the spec's `properties` as well as returned, so the
+/// provenance travels with the file an operator hands to a node.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RestoreProvenance {
+    /// Chain id the snapshot was anchored to.
+    pub chain_id: String,
+    /// Height of the block the state was taken at.
+    pub block_number: u64,
+    /// `0x`-prefixed hash of that block.
+    pub block_hash: String,
+    /// `0x`-prefixed state root, recomputed from the snapshot's bytes.
+    pub state_root: String,
+    /// Runtime `spec_version` that produced the state.
+    pub runtime_spec_version: u32,
+    /// Hash of the manifest the state was read from.
+    pub manifest_hash: String,
+    /// Number of chunks the state arrived in.
+    pub chunk_count: u64,
+    /// Number of storage entries written into the restored spec.
+    pub state_entries: u64,
+    /// Trie layout the state root was recomputed with (`V0` or `V1`).
+    pub trie_layout: String,
+}
+
+/// Turn a snapshot into a raw chain spec a node can boot from.
+///
+/// The snapshot is verified against `request.anchor` first, so the returned spec
+/// is by construction the state of the block the caller already trusts. The
+/// returned spec is re-read through the same reader the exporter uses
+/// ([`state_entries_from_raw_spec`]) and hashed once more, so a spec that does
+/// not reproduce the declared root is refused here rather than after a node has
+/// built its database from it.
+///
+/// The result is a *storage* reconstruction. It carries the runtime code because
+/// `:code` is part of the state, but it says nothing about whether the restored
+/// state should be treated as canonical — that decision belongs to consensus,
+/// and the `finality_proof` in the manifest is what consensus checks.
+pub fn restore_snapshot(
+    request: &RestoreRequest<'_>,
+) -> Result<(serde_json::Value, RestoreProvenance), SnapshotError> {
+    verify_snapshot_with_state_root(
+        request.manifest,
+        request.anchor,
+        request.chunks,
+        request.version,
+    )?;
+
+    let stream = concatenated_chunk_stream(request.manifest, request.chunks)?;
+    let entries = decode_state_entries(&stream)?;
+
+    let mut top = serde_json::Map::with_capacity(entries.len());
+    for (key, value) in &entries {
+        top.insert(
+            format!("0x{}", hex::encode(key)),
+            serde_json::Value::String(format!("0x{}", hex::encode(value))),
+        );
+    }
+
+    // Metadata from the template, copied field by field: a restored spec must not
+    // inherit anything that could be read as state or as a second genesis.
+    let mut spec = serde_json::Map::new();
+    if let Some(template) = request.template {
+        let object = template
+            .as_object()
+            .ok_or_else(|| SnapshotError::MalformedRawSpec {
+                reason: "template chain spec is not a JSON object".to_string(),
+            })?;
+        for field in [
+            "name",
+            "id",
+            "chainType",
+            "bootNodes",
+            "telemetryEndpoints",
+            "protocolId",
+            "forkId",
+            "properties",
+        ] {
+            if let Some(value) = object.get(field) {
+                spec.insert(field.to_string(), value.clone());
+            }
+        }
+    }
+
+    // The caller's name and id win over the template's, so a restored spec can
+    // never be mistaken for the spec it was templated from.
+    spec.insert(
+        "name".to_string(),
+        serde_json::Value::String(request.chain_name.clone()),
+    );
+    spec.insert(
+        "id".to_string(),
+        serde_json::Value::String(request.spec_id.clone()),
+    );
+    // A restored state is not a live chain. Anything else would have a node
+    // announce itself as mainnet while its database is at someone else's block.
+    spec.entry("chainType".to_string())
+        .or_insert_with(|| serde_json::Value::String("Local".to_string()));
+
+    let provenance = RestoreProvenance {
+        chain_id: request.manifest.chain_id.clone(),
+        block_number: request.manifest.block_number,
+        block_hash: request.manifest.block_hash.clone(),
+        state_root: request.manifest.state_root.clone(),
+        runtime_spec_version: request.manifest.runtime_spec_version,
+        manifest_hash: manifest_hash(request.manifest)?,
+        chunk_count: request.manifest.chunk_count,
+        state_entries: entries.len() as u64,
+        trie_layout: format!("{:?}", request.version),
+    };
+
+    // `properties` is the chain spec's own arbitrary-metadata bag, so provenance
+    // written here survives a round trip through the node's spec parser.
+    let mut properties = match spec.remove("properties") {
+        Some(serde_json::Value::Object(existing)) => existing,
+        _ => serde_json::Map::new(),
+    };
+    for (key, value) in [
+        ("x3SnapshotChainId", provenance.chain_id.clone()),
+        ("x3SnapshotBlockNumber", provenance.block_number.to_string()),
+        ("x3SnapshotBlockHash", provenance.block_hash.clone()),
+        ("x3SnapshotStateRoot", provenance.state_root.clone()),
+        (
+            "x3SnapshotRuntimeSpecVersion",
+            provenance.runtime_spec_version.to_string(),
+        ),
+        ("x3SnapshotManifestHash", provenance.manifest_hash.clone()),
+        ("x3SnapshotChunkCount", provenance.chunk_count.to_string()),
+        (
+            "x3SnapshotStateEntries",
+            provenance.state_entries.to_string(),
+        ),
+        ("x3SnapshotTrieLayout", provenance.trie_layout.clone()),
+    ] {
+        properties.insert(key.to_string(), serde_json::Value::String(value));
+    }
+    spec.insert(
+        "properties".to_string(),
+        serde_json::Value::Object(properties),
+    );
+
+    // Both halves of a raw genesis are always present: `RawGenesis` in
+    // `sc-chain-spec` denies unknown fields and requires `childrenDefault`, so a
+    // spec that omits it is not a spec the node can read at all.
+    spec.insert(
+        "genesis".to_string(),
+        serde_json::json!({
+            "raw": {
+                "top": serde_json::Value::Object(top),
+                "childrenDefault": serde_json::Map::new(),
+            }
+        }),
+    );
+
+    let spec = serde_json::Value::Object(spec);
+
+    // Last check before the spec is offered: read it back the way the exporter
+    // reads a spec and hash it again. This is what makes "the bytes we verified
+    // are the bytes we wrote" a property of this function rather than a claim
+    // about it.
+    let reread = state_entries_from_raw_spec(&spec)?;
+    let reread_root = compute_state_root(&reread, request.version)?;
+    if !hashes_equal(&request.manifest.state_root, &reread_root) {
+        return Err(SnapshotError::RecomputedStateRootMismatch {
+            declared: request.manifest.state_root.clone(),
+            recomputed: reread_root,
+        });
+    }
+
+    Ok((spec, provenance))
 }
 
 #[cfg(test)]

@@ -123,7 +123,9 @@ pub fn is_invariant(reg: usize, analysis: &InvariantAnalysis) -> bool {
 pub fn statement_operands(stmt: &MirStatement) -> Vec<usize> {
     match stmt {
         MirStatement::Assign { rhs, .. } => match rhs {
-            MirRhs::Binary(_, a, b) => vec![a.0, b.0],
+            MirRhs::Binary {
+                left: a, right: b, ..
+            } => vec![a.0, b.0],
             MirRhs::Unary(_, a) => vec![a.0],
             MirRhs::Literal(_) => Vec::new(),
             MirRhs::Call { args, .. } => args.iter().map(|v| v.0).collect(),

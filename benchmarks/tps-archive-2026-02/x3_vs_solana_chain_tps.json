@@ -1,0 +1,19 @@
+{
+  "timestamp_utc": "2026-02-19T23:22:55Z",
+  "x3_best_chain_test": {
+    "tx_type": "system.remark",
+    "duration_sec": 20,
+    "concurrency": 32,
+    "finalized_tps_submit_window": 575.5,
+    "finalized_tps_wall": 359.171
+  },
+  "solana_observed_mainnet": {
+    "sample_count": 20,
+    "total_tps_avg_20m": 3428.099,
+    "total_tps_peak_20m": 3675.783,
+    "non_vote_tps_avg_20m": 1480.214,
+    "non_vote_tps_peak_20m": 1715.583
+  },
+  "winner_by_peak_total_tps": "solana",
+  "winner_by_avg_total_tps": "solana"
+}

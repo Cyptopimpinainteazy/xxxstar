@@ -243,7 +243,7 @@ fn mir_statement_stats(stmt: &MirStatement) -> (&'static str, u64) {
                 UnaryOp::Negate => ("unary_neg", opcode_cost(BackendOpcode::NegI)),
                 UnaryOp::Not => ("unary_not", opcode_cost(BackendOpcode::LNot)),
             },
-            MirRhs::Binary(op, _, _) => match op {
+            MirRhs::Binary { op, .. } => match op {
                 BinaryOp::Add => ("binary_add", opcode_cost(BackendOpcode::AddI)),
                 BinaryOp::Sub => ("binary_sub", opcode_cost(BackendOpcode::SubI)),
                 BinaryOp::Mul | BinaryOp::Pow => ("binary_mul", opcode_cost(BackendOpcode::MulI)),

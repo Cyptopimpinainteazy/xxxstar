@@ -115,7 +115,7 @@ fn is_pure(rhs: &MirRhs) -> bool {
         MirRhs::Literal(_) => true,
 
         // All binary arithmetic and comparison ops are pure
-        MirRhs::Binary(op, _, _) => matches!(
+        MirRhs::Binary { op, .. } => matches!(
             op,
             BinaryOp::Add
                 | BinaryOp::Sub
@@ -171,7 +171,9 @@ fn operands_available_at(
 fn get_operands(rhs: &MirRhs) -> Vec<MirValue> {
     match rhs {
         MirRhs::Literal(_) => vec![],
-        MirRhs::Binary(_, a, b) => vec![*a, *b],
+        MirRhs::Binary {
+            left: a, right: b, ..
+        } => vec![*a, *b],
         MirRhs::Unary(_, v) => vec![*v],
         MirRhs::Call { args, .. } => args.clone(),
         MirRhs::Load { addr, .. } => vec![*addr],
@@ -323,11 +325,8 @@ mod tests {
                 id: MirBlockId(1),
                 statements: vec![MirStatement::Assign {
                     target: MirValue(1),
-                    rhs: MirRhs::Binary(
-                        BinaryOp::Add,
-                        MirValue(100), // Assume params
-                        MirValue(101),
-                    ),
+                    rhs: MirRhs::Binary { op: BinaryOp::Add, left: MirValue(100), right: // Assume params
+                        MirValue(101), float: false },
                 }],
                 terminator: Some(MirTerminator::Return(Some(MirValue(1)))),
             },
@@ -434,7 +433,12 @@ mod tests {
                     },
                     MirStatement::Assign {
                         target: MirValue(2),
-                        rhs: MirRhs::Binary(BinaryOp::Add, MirValue(1), MirValue(100)),
+                        rhs: MirRhs::Binary {
+                            op: BinaryOp::Add,
+                            left: MirValue(1),
+                            right: MirValue(100),
+                            float: false,
+                        },
                     },
                 ],
                 terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
@@ -475,16 +479,18 @@ mod tests {
     fn test_is_pure_classification() {
         // Test various RHS types
         assert!(is_pure(&MirRhs::Literal(Literal::Integer(1))));
-        assert!(is_pure(&MirRhs::Binary(
-            BinaryOp::Add,
-            MirValue(0),
-            MirValue(1)
-        )));
-        assert!(is_pure(&MirRhs::Binary(
-            BinaryOp::Mul,
-            MirValue(0),
-            MirValue(1)
-        )));
+        assert!(is_pure(&MirRhs::Binary {
+            op: BinaryOp::Add,
+            left: MirValue(0),
+            right: MirValue(1),
+            float: false
+        }));
+        assert!(is_pure(&MirRhs::Binary {
+            op: BinaryOp::Mul,
+            left: MirValue(0),
+            right: MirValue(1),
+            float: false
+        }));
         assert!(is_pure(&MirRhs::Unary(x3_ast::UnaryOp::Not, MirValue(0))));
 
         // Not pure

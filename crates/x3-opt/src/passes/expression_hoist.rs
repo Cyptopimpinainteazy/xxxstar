@@ -23,9 +23,12 @@ struct ExprKey(String);
 impl ExprKey {
     fn from_rhs(rhs: &MirRhs) -> Option<Self> {
         match rhs {
-            MirRhs::Binary(op, lhs, rhs) => {
-                Some(ExprKey(format!("binary({:?}, {:?}, {:?})", op, lhs, rhs)))
-            }
+            MirRhs::Binary {
+                op,
+                left: lhs,
+                right: rhs,
+                ..
+            } => Some(ExprKey(format!("binary({:?}, {:?}, {:?})", op, lhs, rhs))),
             MirRhs::Unary(op, val) => Some(ExprKey(format!("unary({:?}, {:?})", op, val))),
             MirRhs::Literal(_) => None, // literals don't benefit from hoisting
             MirRhs::Call { .. } => None, // calls may have side effects

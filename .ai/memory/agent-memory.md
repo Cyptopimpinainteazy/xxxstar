@@ -7165,6 +7165,254 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   (which enables serde/alloc), so a crate failing the former can still build the latter — and vice
   versa: only srtool builds the thing governance attests to.
 
+**2026-09-24 — everything on GitHub is on master; the six local branches that cannot be**
+
+- **The branch landscape is now: 19/19 remote refs contained in master, 364/370 local.** The merges
+  that did it: `feat/x3-prelaunch-economics-x3lang-cutover` (three merges, because it kept gaining
+  commits), `docs/public-testnet-alpha-execution-plan`, and the branch's
+  `import/x3-chain-master-salvage` prefix (its 8 commits are the first 8 of the 16 — one merge lands
+  both; check ancestry before merging a "second" branch).
+- **Six local branches cannot be merged and should not be:** they share **no common ancestor** with
+  master (`git merge-base` is empty), so `git diff master...branch` is undefined and any "merge" would
+  replace master's tree with an older snapshot. Measured: `t5/fix-annotations-20260522-1458` has 0
+  files master lacks; `fix-x3lang-python` is patch-equivalent for 68 of its 69 patches (the 69th is a
+  21,687-file baseline snapshot); `wip/consolidation-20260917/recovered-usb-clone` and
+  `your-task-branch` are `vendor/`-dominated snapshots (66.5k / 69.8k files); the other two are the
+  pre-rewrite lineage. Report: `.ai/reports/branch-consolidation-20260924.md`.
+- **A derived artifact must be regenerated on the branch it lands on.** `scripts/x3_audit_matrix.py`
+  pins its outputs to the sha256 of FEATURE_REGISTRY.toml + the matrix fragments, and the artifacts
+  that landed recorded a digest (`bf2f92fd…`) that matched a dirty tree, not master (`a4f506f9…`) —
+  so the freshness gate wired into `scripts/local-ci.sh` failed the moment they landed. Twice: the
+  second failure came from merging the *sources* (the readiness correction) without regenerating. The
+  rule: when a commit touches a canonical source of a generated artifact, regenerate in the same
+  merge, and run the artifact's own `--check` before pushing.
+- **Master was already red on `cargo fmt --all -- --check`** when this pass started (three files in
+  `crates/x3-state-snapshot` from PR #509). Fixed in `9a58c7495`; check a gate's colour *before*
+  blaming the merge for it — run it on a pristine worktree of the base.
+- **The full `cargo check --workspace --locked` cannot run in this container**: the runtime's wasm
+  build fails finding `std` for `wasm32v1-none` (`crypto-common 0.1.6`), identically on pristine
+  master. `SKIP_WASM_BUILD=1 cargo check --workspace --locked` is the gate that works here, and its
+  limitation (it does not prove the wasm path) has to be stated with it.
+- **Working practice that kept this safe:** all merges happened in a side worktree
+  (`git worktree add /tmp/x3-merge-wt master`) because the main worktree was on a live branch with 12
+  files of another agent's uncommitted work. That WIP was left untouched; its registry edits are what
+  the regenerated artifacts pick up when they land.
+- **The branch is live:** `feat/x3-prelaunch-economics-x3lang-cutover` gained four commits *while* this
+  pass ran (a no-std bytecode string-constant fix, a readiness correction, removal of a committed
+  bridge API key, a test-cheat-guard fix). Re-run the containment check before claiming "everything is
+  merged" — the number moves.
+
+**2026-09-24 — no compiled `.x3` program could be verified or executed (TICKET-130)**
+
+- **The emitter and the runtime disagreed about register width.** `crates/x3-backend/src/emit.rs`'s
+  `emit_reg` wrote `reg.0` as a **u16**; the interpreter (`crates/x3-vm/src/vm.rs`, `[op][dst:u8][...]`)
+  and the verifier (`crates/x3-vm/src/verifier.rs`, operand table documented the same way) read **one
+  byte**. Every emitted register was a byte too long, so the reader walked into the middle of the
+  instruction: `fn main() -> i64 { return 42; }` compiled to `18 00 00 2a 05 00 00`, and the verifier
+  called byte 3 — the *value*, 0x2a — an invalid opcode; `return 1` produced a byte 3 of 0x01, which it
+  read as `LoadConst` and then ran out of operands. Nothing was ever executed correctly; the old test
+  passed because it only *parsed* the module (`BytecodeModule::from_bytes`) and never verified it.
+- **How to catch this class again:** a test that asserts a program's *value* through the whole chain,
+  with two programs that differ, and a sweep over the operand kinds (literal, arithmetic, local,
+  const-pool index, branch, call). Both live in `crates/x3-integration/tests/compiler_bridge.rs`. A
+  parse-only assertion, or a single program, passes on a broken framer.
+- **Grep the width at both ends before trusting a format.** `emit_u16(reg.0)` vs `read_u8(ip+1)` is one
+  line apart in two crates; `MAX_REGISTERS = 256` in the VM settles which side is right.
+- **A zero in a receipt is a claim.** `instructions_executed` was hardcoded to 0 with a comment saying
+  counting "requires VM instrumentation" that already existed (`ExecutionResult::instruction_count`),
+  and the kernel-side path reported *gas* under the instruction name. Fixed on both paths; the VM grew
+  `instruction_count()` for the error branch, and `mini_x3` counts instructions beside its gas.
+- **`main` has to be function 0** because the module format has no entry field and the executor calls
+  function 0. Reordering the MIR **before** the optimizer broke four of the compiler's own e2e
+  programs (`MIR value not found in register map`) — so the reorder runs **after** `optimize_mir`.
+  The latent hazard stands and is recorded in the X3-LANG-001 row: the optimizer's passes are
+  order-sensitive, and nothing says so.
+- **A `no_std` crate that cannot build is a gate nobody ran.** `cargo check -p x3-x3-integration
+  --no-default-features` failed with E0432 on master because `compiler_bridge` (which needs
+  `x3-compiler`, a `std` dependency) was declared unconditionally. Gated on `std`, imports cleaned,
+  both configurations now build warning-free.
+- **Readiness records move when the code moves.** X3-LANG-001 went STUB → PARTIAL (tested 10 → 55)
+  because the row's own blocker was met with named tests, and `scripts/x3_audit_matrix.py --check`
+  was run as part of landing. Regenerate whenever a canonical source changes; the gate fails otherwise.
+- Baseline discipline paid twice this turn: the two `x3-chain-node` failures and the four
+  `x3-compiler` e2e failures were separated from my change by running the same tests on a pristine
+  master worktree — one set pre-existed, the other was mine.
+
+**2026-09-24 — frames, jumps and call results: the compiler's own fixtures had never run (TICKET-131)**
+
+- **The test that finds this class is a corpus test, not a unit test.** Driving the compiler's four
+  fixtures (`crates/x3-compiler/tests/fixtures/`) through compile → both readers → on-chain executor →
+  receipt turned up four more defects that the per-shape sweep could not see, because each one needs a
+  *call frame* or a *recursion*: the sweep's programs were single-function. Expected values read off
+  each source (fib(10)=55, loop_ops=16, match_cond=5, branch_fold=30) is what makes a wrong answer fail
+  instead of crashing.
+- **`local_count` was 0 for every function ever emitted.** `MirBytecodeCompiler` allocates registers
+  with its own counter; the `LayoutComputer` that builds `FunctionEntry` was never told, so the
+  interpreters sized every callee's window from 0 and the callee *shared its caller's registers*.
+  `fib.x3` ran and returned -80. Fix: the compiler reports its register use before `end_function`.
+- **Frame windows are `param_count + local_count`, not `local_count`.** Both interpreters used the
+  latter, which starts a callee inside its caller even once `local_count` is right.
+- **`JumpIf`/`JumpUnless` did not resolve the condition through the frame** while every other register
+  operand does — inside a callee they read the caller's register of that number. Grep for
+  `self.regs[` lines that do *not* go through `resolve_reg*` when auditing this class.
+- **A `Call`'s `dst` operand was decoded and dropped.** Both interpreters wrote the result to the
+  caller's `r0`; the compiler allocates whatever register it likes, so results read `Unit`. `Frame`
+  now carries `ret_dst`. Careful: the index is already absolute (`caller.base + ret_dst`) — resolving
+  it again adds the base twice, which is invisible at base 0 and wrong one frame in. That was my own
+  bug, caught by the recursion case.
+- **Three different call-depth limits.** `isolation::MAX_CALL_DEPTH = 10` (hardcoded), the executor's
+  `max_call_depth = 32`, the VM's `MAX_CALL_DEPTH = 64`. The smallest one governed and refused
+  `fib(10)`. The isolation context now takes the configured limit.
+- **Master's rustfmt gate went red again** (`node/src/service.rs`, `node/src/timed_executor.rs`
+  unformatted as committed — `git show HEAD:file | rustfmt --check --edition 2021 -` exits 1). Check
+  the gate's colour before attributing it to your change, and keep the repair in its own commit.
+- Method: when a test fails in the middle of a chain, print the *module* (function table + decoded
+  instruction stream via `Verifier::decode_all_instructions`) before reasoning about the source. Every
+  defect in this turn was visible in the emitted stream first.
+
+**2026-09-24 — loops run end to end (TICKET-132): three SSA assumptions and one dropped jump**
+
+- **A loop-carried variable cannot be an SSA value in this IR.** `while (i <= n) { total = total + i; i = i + 1; }`
+  bound *new* values in the compiler's name→value map, while the condition — lowered before the body — kept
+  reading the entry registers: the loop never terminated. Mutated names are now register-model **cells**
+  (`Load`/`Store` against a fixed register); never-assigned names stay pure values. Detection is a recursive
+  pre-pass over the body, so an assignment inside an `if` counts.
+- **That makes the MIR non-SSA, and passes that assume SSA break.** Two did:
+  - **DCE** treated a `Store` as pure because only `Call` counted as an effect, so it deleted the loop body
+    (the store's effect *is* the write). Stores are effects now.
+  - **PRE** hoists to the entry block without checking that the operands are available there, so it hoisted
+    `i <= n` above the `Load` of `i` — the loop tested the pre-loop value forever. The sibling pass
+    (`speculative_hoist::operands_available_at`) already had the rule; PRE now has it too.
+  - The optimizer's **fixpoint** is what exposed both: every pass alone was clean. Bisect order that worked:
+    run cumulative pass sets to a fixpoint and report values that are *used without a definition*, per
+    function (per function, because `value_regs` is cleared per function and a pooled check hides it).
+- **`break`/`continue` were an empty match arm** ("requires label resolution"): a program that wrote `break`
+  jumped nowhere and ran to `GasExhausted`. Lowered now with a stack of loop targets; a labelled or
+  out-of-loop `break` is **refused by name** rather than sent to the innermost loop.
+- **Probe first, then commit a fixture.** `loop_sum.x3` and `loop_break.x3` were measured through the chain
+  before they went into the corpus, so the commit never carried a failing case.
+- Corpus now: `fib` (recursion), `loop_ops` (calls), `match_cond` (comparison chains), `branch_fold`
+  (folding), `loop_sum`/`loop_break`/`loop_continue` (loops, break, continue) — each asserted against the
+  value its source computes, on both engines. Still unproven: match statements, floats, strings, host calls.
+
+**2026-09-24 — floats: the operator alone cannot choose the opcode (TICKET-133)**
+
+- The backend said it out loud: `// For now assume integer operations - a real compiler would track
+  types`. The language shares one `+` between `i64` and `f64`, so `1.5 + 2.5` compiled to an integer
+  add and the VM answered `TypeMismatch("i64", "F64(1.5)")`. Both engines already implemented every
+  float opcode; only the *choice* was missing.
+- **Plumb the flag in the value, not in a side table.** `MirRhs::Binary(op, l, r)` became
+  `MirRhs::Binary { op, left, right, float }`: the passes clone or destructure the rhs, so a field
+  travels with it, while a side table would need every pass to keep it in step (the failure mode this
+  repository has already paid for). 75 sites were rewritten mechanically; `cargo check --all-targets`
+  found the stragglers (a regex that excludes nested parentheses misses `MirValue(0)` arguments).
+- **The type checker has no float primitive**, so the flag cannot come from `HirExpr::ty`: the MIR
+  lowering derives it from a float literal, an operation on one, or a read of a cell that holds one,
+  and treats anything else (a call's result) as integer — a loud `TypeMismatch`, not silent arithmetic
+  on the wrong representation.
+- **`ForbiddenOnChain` for floats is the design, not a gap**: the verifier's on-chain options deny
+  float opcodes (`deny_float_arithmetic`) because platform-dependent rounding is not a deterministic
+  state transition. The test asserts both halves — simulation computes 7, on-chain refuses *with that
+  message* (so a parse or type error cannot masquerade as the intended refusal).
+- **Soundness rule found on the way**: `x * 0 => 0` matched a float zero, which is unsound (`x * 0.0`
+  is NaN for NaN `x`). The identity now needs an integer multiply. The first version of its unit test
+  was wrong in an instructive way: with *both* operands constant the fold is legitimate, so the test
+  needs an unknown (parameter) operand to reach the identity.
+- Corpus: 8 shapes through both engines (fib, loop_ops, match_cond, branch_fold, loop_sum, loop_break,
+  loop_continue) plus the float test. Still unproven: match statements, strings, host calls.
+
+**2026-09-24 — the trading verifier was measured against PHASE 4, and one invariant was missing (TICKET-134)**
+
+- **Method that worked: one program per spec sentence.** PHASE 4 lists twelve invariants; writing one
+  adversarial program per invariant and running `x3c check` on each turned the row "Needs real stateful
+  verifier" (STUB) into a measured PARTIAL: seven invariants are enforced with named codes
+  (`X3E2107` for use-before-binding and for a binding/asset-type mismatch, `X3E4022` for a debt repaid
+  twice, `X3E4021` for an unfulfilled effect, `X3E4025` for a missing `all_debts_repaid` or an unknown
+  policy). One was not.
+- **The missing one: PHASE 4's "profit checks must occur after all required costs are known".** The
+  verifier tracked `has_net_profit_guard` — *presence*, never *position* — so a `require net_profit`
+  placed directly after the `borrow`, before any swap, checked clean. Fixed: the guard's index is
+  compared against the last borrow/swap/repay (bridges excluded — they move value without changing it),
+  refused with `X3E4023` naming both statement positions.
+- **A new verifier rule needs the whole workspace as its regression test**, not just the new case: 1316
+  tests pass after it, so nothing this tree used to accept is refused now. Run that before shipping a
+  rule that can only refuse.
+- The ledger's "Type: OPEN" lines under a "— CLOSED" heading are **preserved originals** ("Original
+  entry:"), not stale records — the x3lang ledger has no open tickets. Read the heading, not the line.
+- Checked-in reports go stale: `rustfmt --all --check` was red in x3-lang for four files
+  (`vm/src/trading.rs`, `vm/src/x3_lang_vm.rs`, `vm/tests/trading_execution.rs`,
+  `compiler/src/trading_semantic.rs`); verify a gate's colour with `git show HEAD:<file> | rustfmt
+  --check --edition 2021 -` before blaming your own change, and land the repair in its own commit.
+
+**2026-09-24 — receipts measured: a fail-open mainnet default, and what the pair cannot prove (TICKET-135/136)**
+
+- **`receipt verify` accepted an unsigned receipt on mainnet.** The message was honest ("signer trust not
+  requested") but the mode never reached the command — `cmd_receipt_verify(input, trusted_specs)` had no
+  `CompilationMode` — so `--mode mainnet` behaved like dev on the path that settles value. Mainnet now
+  requires `--trusted`: the operator must name the key, because a key inside the receipt is a restatement
+  of the receipt's own claim, not a check. Four-way regression test (unsigned/signed × dev/mainnet).
+- **What the receipt pair proves, measured**: `receipt execute` signs from a real execution;
+  `--trusted` requires and validates the attestation (wrong key refused by name); editing a covered field
+  breaks the hash and both `receipt verify` and `replay` refuse it naming both hashes; `replay` refuses a
+  receipt about another artifact naming both artifact hashes. What it cannot decide, in its own output:
+  the risk ceilings the run enforced (the compiled policy does not travel with the receipt), the finality
+  references, the host inputs.
+- **The derived matrix is a real gate**: my first row edit cited `x3-lang/vm/trading.rs` (missing `src/`)
+  and the artifact came back with **BROKEN=2** — the state rule is "a cited path does not exist on disk".
+  Fixed the path, BROKEN back to 0. Cite paths that exist, and read the summary line the generator prints.
+- Working order that keeps paying: probe the CLI's *claims* adversarially (tamper, wrong key, wrong
+  artifact, wrong mode), record what it refuses and *why* it says it refuses, then write the row's scores
+  from that evidence rather than from the code's shape.
+
+**2026-09-24 — the two bytecode readers disagreed about a patch version (TICKET-137)**
+
+- **Parity between two readers of one format is a property to test section by section, not to assume.**
+  X3-LANG-010's row said "the other body sections still have no parity test"; writing them (function
+  table, global table, trailing debug/metadata, version bounds) found a real divergence: a module
+  declaring `1.0.1` was accepted by `x3-backend`'s `VersionInfo::can_read` (patch differences are
+  compatible by the format's own semantic versioning) and **refused by the no-std reader that executes
+  on chain**, whose shared helper compared `version <= VERSION`. The shared rule now compares the same
+  fields `can_read` does, and `version_rule_parity` in `x3-backend` compares the two rules across six
+  versions written out by hand — the drift happened in a case nobody had thought of.
+- **Clippy can be right and still be the wrong patch.** It proved the minor bound is unreachable while
+  `VERSION`'s minor is 0 and suggested `==`; writing `==` would start refusing *older* minors the day
+  that constant moves. The general comparison stays, with a documented `allow` and the reason.
+- **Function 0 is the entry, for both readers.** A hand-built module with the callee at index 0
+  "failed" parity because `execute_x3bc` runs function 0 — the ABI the compiler arranges (TICKET-130/131)
+  and the one `main` has to occupy. The parity test now says so in its own comment.
+- **A row's name is a claim.** X3-LANG-009 was called "Authenticated bytecode decoder" while its own
+  blocker said nothing is authenticated, and no phase of the spec asks for a signature over the
+  envelope (PHASE 46 = the receipt identifies the artifact; PHASE 47 = provenance). Renamed to
+  "Checksum-verified bytecode decoder"; the gap stays in `blockers`. When a name overclaims, correct the
+  name rather than invent the feature.
+- Tooling notes: an unescaped `"` inside a TOML basic string breaks the whole matrix ("Unclosed array")
+  — use single quotes inside; and `cargo fmt --all` in this repo regularly sweeps up *pre-existing*
+  formatting debt in files you never touched (`node/src/service.rs`, `crates/parallel-proposer/...`),
+  so check each stray file with `git show HEAD:<file> | rustfmt --check --edition 2021 -` and commit
+  the repair separately.
+
+**2026-09-24 — the kernel route had no test, and two "incomplete" rows were only unmeasured (TICKET-138)**
+
+- **The pallet's tests configure `TestX3Adapter`, which fabricates a receipt** — so the production
+  route (compiled artifact → `X3VmAdapter` → the kernel's `ExecutionReceipt`) had no test at all even
+  though the adapter exists and delegates to `x3_x3_integration::X3Executor`. New:
+  `pallets/x3-kernel/tests/x3_adapter_route.rs` compiles `.x3` source *in the test* and drives the
+  production adapter (validate, estimate_gas, receipt value/gas/version, corrupted module refused).
+  The `compile` feature of `x3-x3-integration` is a **dev**-dependency there, with the reason written
+  down: the kernel executes artifacts and never compiles source.
+- **"Version gates incomplete" was a measurement gap, not a code gap.** The gates exist with tests:
+  compiled-policy version vs the host's *before any host call* (`CapabilityVersionMismatch`; the test
+  also asserts the host transaction never began), unknown economic-object versions fail closed
+  (`UnsupportedVersion { object, version }`), capability manifests checked per operation
+  (`UnknownCapability` for a borrow's provider / a swap's venue / a bridge's adapter), and both
+  envelope readers enforce version + min-version.
+- **Check whether a "gap" is missing code or missing evidence before writing code.** Two of the three
+  STUB rows in this family needed only a measurement (and one needed a test); the fix for both was to
+  drive the existing path and record what it does.
+- Practical notes: the real adapters live in `adapters::real_adapters` (std-gated) and are re-exported
+  at the crate root as `pallet_x3_kernel::X3VmAdapter`; adding a dev-dependency on a crate the package
+  already depends on does not change `Cargo.lock`; and `cargo fmt --all` here still reaches files the
+  change has nothing to do with — check `git status` before staging.
 ## 2026-09-24 (thirty-ninth pass) — completion matrix, the live/cross tiers, and two silent divergences
 
 ### Environment facts a future agent needs first

@@ -62,6 +62,17 @@ impl Compiler {
         let ast = x3_parser::parse_program(source)
             .map_err(|e| CompilerError::Parser(format!("{:?}", e)))?;
 
+        // Where `main` sits among the functions, computed here because the AST is consumed by the
+        // HIR lowering below and the HIR keeps the same order (TICKET-130).
+        let entry_function_index = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                x3_ast::Item::Function(function) => Some(function),
+                _ => None,
+            })
+            .position(|function| function.name.name == "main");
+
         // Phase 2: Lower AST to HIR
         if options.verbose {
             eprintln!("  [2/5] Lowering to HIR...");
@@ -73,14 +84,38 @@ impl Compiler {
         if options.verbose {
             eprintln!("  [3/5] Lowering to MIR...");
         }
-        let mir_unoptimized =
+        let mut mir_unoptimized =
             MirLowerer::lower(&hir).map_err(|e| CompilerError::MirLowering(format!("{:?}", e)))?;
+
+        // The runtime's entry contract is the **function index**: `X3Executor::execute` calls
+        // function 0 as `main`, and the module format carries no entry-field to say otherwise. The
+        // lowering kept source order, so a program that declared a helper before `main` put the
+        // helper first and the executor called it instead — measured, `add(a: i64, b: i64)` followed
+        // by `main` failed with `ArgumentCountMismatch(2, 0)`, the callee being `add` (TICKET-130).
+        //
+        // `main` is the entry the gateway lowering already looks for, so it is the one moved to the
+        // front. The HIR keeps the AST's function order (both lower `Item::Function` in order), which
+        // is what makes the index the same on both sides.
 
         // Phase 4: Optimize MIR
         if options.verbose {
             eprintln!("  [4/6] Running optimizer ({:?})...", options.opt_level);
         }
         let (mir_optimized, opt_stats) = Self::optimize_mir(&mir_unoptimized, &options)?;
+
+        // The reorder happens **after** the optimizer, not before: the optimizer's passes are what
+        // walk this function list, and moving the entry in front of them changed their input order
+        // for programs with more than one function — measured, `fib.x3` then failed to compile with
+        // `MIR value MirValue(1) not found in register map` (four of the compiler's own e2e tests).
+        // The contract being met is about the emitted module's function table, which is built from
+        // this order, so reordering here is enough and the optimizer sees the program as written.
+        let mut mir_optimized = mir_optimized;
+        if let Some(entry) = entry_function_index {
+            if entry < mir_optimized.functions.len() {
+                let main = mir_optimized.functions.remove(entry);
+                mir_optimized.functions.insert(0, main);
+            }
+        }
 
         // Phase 5: Gas analysis and verification (optional)
         let (gas_report, verification_report) = if options.analyze_gas || options.verify_contract {

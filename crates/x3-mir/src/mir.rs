@@ -100,7 +100,19 @@ impl MirStatement {
 pub enum MirRhs {
     Literal(x3_common::Literal),
     Unary(UnaryOp, MirValue),
-    Binary(BinaryOp, MirValue, MirValue),
+    Binary {
+        op: BinaryOp,
+        left: MirValue,
+        right: MirValue,
+        /// Whether this operation is on floats, which decides the opcode: the language shares one
+        /// `+` between integers and floats, so the operator alone does not say which add to emit,
+        /// and the backend assumed integer — measured, `1.5 + 2.5` compiled to an integer add and
+        /// failed with `TypeMismatch("i64", "F64(1.5)")` (TICKET-133). The HIR carries the type, so
+        /// the flag is set where the operation is lowered; because passes clone or move the rhs, the
+        /// flag travels with the value instead of needing a side table every pass would have to know
+        /// about.
+        float: bool,
+    },
     Call {
         target: SymbolId,
         args: Vec<MirValue>,

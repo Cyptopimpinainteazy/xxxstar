@@ -82,3 +82,7 @@ try-runtime = [
 
 [dev-dependencies]
 proptest = "1.4"
+# The `compile` feature is dev-only on purpose: it exposes `compiler_bridge::compile_source`, which
+# pulls the compiler in, and the kernel never compiles source — it executes artifacts. The route test
+# below needs it to produce the artifact the production adapter is then driven with (X3-LANG-004).
+x3-x3-integration = { path = "../../crates/x3-integration", default-features = false, features = ["std", "compile"] }

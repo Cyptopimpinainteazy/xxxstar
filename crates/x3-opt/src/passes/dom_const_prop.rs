@@ -74,7 +74,9 @@ impl DomConstPropPass {
                         // Note: In a more sophisticated analysis, we would only kill
                         // values that could be aliased by the call's effects
                     }
-                    MirRhs::Binary(op, left, right) => {
+                    MirRhs::Binary {
+                        op, left, right, ..
+                    } => {
                         // Try to fold if both operands are known constants
                         let left_val = defs.get(left);
                         let right_val = defs.get(right);
@@ -316,7 +318,9 @@ impl Pass for DomConstPropPass {
                             local_constants.insert(target, ConstVal::Known(lit.clone()));
                             rhs.clone()
                         }
-                        MirRhs::Binary(op, left, right) => {
+                        MirRhs::Binary {
+                            op, left, right, ..
+                        } => {
                             let left_const = local_constants.get(left);
                             let right_const = local_constants.get(right);
 
@@ -430,7 +434,12 @@ mod tests {
                         },
                         MirStatement::Assign {
                             target: MirValue(2),
-                            rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Add,
+                                left: MirValue(0),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         },
                     ],
                     terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
@@ -497,7 +506,12 @@ mod tests {
                         },
                         MirStatement::Assign {
                             target: MirValue(1),
-                            rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(0), MirValue(10)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Mul,
+                                left: MirValue(0),
+                                right: MirValue(10),
+                                float: false,
+                            },
                         },
                     ],
                     terminator: Some(MirTerminator::Return(Some(MirValue(1)))),
@@ -511,7 +525,12 @@ mod tests {
                         },
                         MirStatement::Assign {
                             target: MirValue(2),
-                            rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(20)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Add,
+                                left: MirValue(0),
+                                right: MirValue(20),
+                                float: false,
+                            },
                         },
                     ],
                     terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
@@ -580,7 +599,12 @@ mod tests {
                         },
                         MirStatement::Assign {
                             target: MirValue(2),
-                            rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Add,
+                                left: MirValue(0),
+                                right: MirValue(1),
+                                float: false,
+                            },
                         },
                     ],
                     terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
@@ -603,7 +627,12 @@ mod tests {
         assert!(matches!(
             v2_stmt,
             MirStatement::Assign {
-                rhs: MirRhs::Binary(BinaryOp::Add, _, _),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Add,
+                    left: _,
+                    right: _,
+                    float: false
+                },
                 ..
             }
         ));

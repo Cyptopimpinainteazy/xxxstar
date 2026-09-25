@@ -4,6 +4,7 @@ use x3_common::Span;
 use x3_hir::hir::{AssignTarget, HirExpr, HirExprKind, HirFunction, HirModule, HirStmt, SymbolId};
 
 use crate::error::MirError;
+use crate::memory::MemoryModel;
 use crate::mir::*;
 
 /// Converts HIR into deterministic SSA-form MIR.
@@ -25,6 +26,32 @@ impl MirLowerer {
     }
 }
 
+/// Add every symbol `stmts` assigns to, recursing into branches and loop bodies.
+///
+/// A name assigned anywhere is a cell for the whole function (see `MirFunctionBuilder::mutated`).
+fn collect_mutated(stmts: &[HirStmt], out: &mut std::collections::HashSet<SymbolId>) {
+    for stmt in stmts {
+        match stmt {
+            HirStmt::Assign {
+                target: AssignTarget::Variable(symbol),
+                ..
+            } => {
+                out.insert(*symbol);
+            }
+            HirStmt::If {
+                then_block,
+                else_block,
+                ..
+            } => {
+                collect_mutated(then_block, out);
+                collect_mutated(else_block, out);
+            }
+            HirStmt::While { body, .. } => collect_mutated(body, out),
+            _ => {}
+        }
+    }
+}
+
 struct MirFunctionBuilder {
     symbol: SymbolId,
     span: Span,
@@ -32,7 +59,44 @@ struct MirFunctionBuilder {
     current_block: MirBlockId,
     params: Vec<MirValue>,
     value_map: HashMap<SymbolId, MirValue>,
+    /// Symbols the function assigns to, and the cell each one lives in.
+    ///
+    /// A name bound by `let` and never assigned is a value: the map says which, and SSA needs no
+    /// more. A name that *is* assigned cannot be one — the loop that assigns it jumps back to a
+    /// condition that was already lowered, and that condition reads a register, so the assignment
+    /// has to reach that register. Lowering a mutated name as a register-model cell does exactly
+    /// that: reads load from the cell and writes store into it, so the back-edge sees the new value.
+    /// Measured before this: `while (i <= n) { total = total + i; i = i + 1; }` compiled and then
+    /// looped forever, because the body wrote fresh temporaries the condition never read
+    /// (TICKET-132).
+    mutated: std::collections::HashSet<SymbolId>,
+    slots: HashMap<SymbolId, MirValue>,
+    /// Values this lowering knows hold a float.
+    ///
+    /// The type checker has no float primitive, so the flag cannot come from `HirExpr::ty`; it comes
+    /// from the expression that produced the value (a float literal, or an operation on one) and is
+    /// carried forward here. A float that arrives from somewhere this cannot see — a call's result —
+    /// is treated as an integer, which fails loudly at the opcode (`TypeMismatch`) rather than
+    /// silently computing on the wrong representation (TICKET-133).
+    float_values: std::collections::HashSet<MirValue>,
+    /// Whether each mutated name's cell holds a float, so a read of it keeps the flag.
+    slot_float: HashMap<SymbolId, bool>,
+    /// The loops this builder is inside, innermost last: where `break` and `continue` go.
+    ///
+    /// `break` and `continue` used to be matched to an empty arm — the comment said label
+    /// resolution was missing — so a program that wrote `break` jumped nowhere and looped until it
+    /// ran out of gas. Measured on `loop_break.x3`, which computes 21: `GasExhausted { used:
+    /// 1_000_000 }` (TICKET-132). An unlabelled break/continue targets the innermost loop; a
+    /// labelled one is refused rather than approximated.
+    loops: Vec<LoopTargets>,
     next_value: usize,
+}
+
+/// Where the innermost loop's `break` and `continue` go.
+#[derive(Clone, Copy)]
+struct LoopTargets {
+    break_to: MirBlockId,
+    continue_to: MirBlockId,
 }
 
 impl MirFunctionBuilder {
@@ -44,6 +108,11 @@ impl MirFunctionBuilder {
             current_block: MirBlockId(0),
             params: Vec::new(),
             value_map: HashMap::new(),
+            mutated: std::collections::HashSet::new(),
+            slots: HashMap::new(),
+            float_values: std::collections::HashSet::new(),
+            slot_float: HashMap::new(),
+            loops: Vec::new(),
             next_value: 0,
         };
         let entry = builder.create_block();
@@ -56,6 +125,15 @@ impl MirFunctionBuilder {
             let value = self.allocate_value();
             self.value_map.insert(param.symbol, value);
             self.params.push(value);
+        }
+        collect_mutated(&function.body, &mut self.mutated);
+        // A mutated parameter is a cell from the start: its incoming value is the cell's register.
+        for param in &function.params {
+            if self.mutated.contains(&param.symbol) {
+                if let Some(&value) = self.value_map.get(&param.symbol) {
+                    self.slots.insert(param.symbol, value);
+                }
+            }
         }
         self.lower_statements(&function.body)?;
         self.ensure_current_block_has_terminator();
@@ -79,6 +157,13 @@ impl MirFunctionBuilder {
         match statement {
             HirStmt::Let { symbol, value, .. } => {
                 let evaluated = self.lower_expr(value)?;
+                if self.mutated.contains(symbol) {
+                    // The initial value *is* the cell: it has a register, writes store into it and
+                    // reads load from it, so the loop's back-edge sees the current value.
+                    self.slots.insert(*symbol, evaluated);
+                    let is_float = self.float_values.contains(&evaluated);
+                    self.slot_float.insert(*symbol, is_float);
+                }
                 self.value_map.insert(*symbol, evaluated);
             }
             HirStmt::Assign {
@@ -94,7 +179,22 @@ impl MirFunctionBuilder {
                             )));
                         }
                         let evaluated = self.lower_expr(value)?;
-                        self.value_map.insert(*symbol, evaluated);
+                        if self.slots.contains_key(symbol) {
+                            let is_float = self.float_values.contains(&evaluated);
+                            self.slot_float.insert(*symbol, is_float);
+                        }
+                        if let Some(&cell) = self.slots.get(symbol) {
+                            // Store into the cell, do not just rename the value: the loop's
+                            // condition was lowered already and reads this register.
+                            let stored = self.emit_assignment(MirRhs::Store {
+                                model: MemoryModel::Register,
+                                addr: cell,
+                                val: evaluated,
+                            });
+                            self.value_map.insert(*symbol, stored);
+                        } else {
+                            self.value_map.insert(*symbol, evaluated);
+                        }
                     }
                     AssignTarget::Field { .. } | AssignTarget::Index { .. } => {
                         // Field/index assignments require type layout from checker
@@ -130,8 +230,37 @@ impl MirFunctionBuilder {
             } => {
                 self.lower_while(condition, body)?;
             }
-            HirStmt::Break { .. } | HirStmt::Continue { .. } => {
-                // Break/continue with labels requires label resolution
+            HirStmt::Break { label, .. } => {
+                if label.is_some() {
+                    return Err(MirError::new(
+                        "a labelled `break` is not lowered yet: only the innermost loop can be left,                          so this is refused rather than sent to the wrong loop",
+                    ));
+                }
+                let target = self
+                    .loops
+                    .last()
+                    .ok_or_else(|| MirError::new("`break` outside a loop"))?
+                    .break_to;
+                self.set_terminator(MirTerminator::Goto(target));
+                // Anything after the break is unreachable; it gets its own block, which the
+                // reachability pass then drops.
+                let next = self.create_block();
+                self.current_block = next;
+            }
+            HirStmt::Continue { label, .. } => {
+                if label.is_some() {
+                    return Err(MirError::new(
+                        "a labelled `continue` is not lowered yet: only the innermost loop can be                          continued, so this is refused rather than sent to the wrong loop",
+                    ));
+                }
+                let target = self
+                    .loops
+                    .last()
+                    .ok_or_else(|| MirError::new("`continue` outside a loop"))?
+                    .continue_to;
+                self.set_terminator(MirTerminator::Goto(target));
+                let next = self.create_block();
+                self.current_block = next;
             }
             HirStmt::AtomicBegin { block_id, .. } => {
                 self.push_atomic_begin(MirAtomicBlockId(block_id.0 as u16));
@@ -186,7 +315,12 @@ impl MirFunctionBuilder {
             else_block: merge_id,
         });
         self.current_block = body_id;
+        self.loops.push(LoopTargets {
+            break_to: merge_id,
+            continue_to: cond_id,
+        });
         self.lower_statements(body)?;
+        self.loops.pop();
         self.ensure_goto(cond_id);
         self.current_block = merge_id;
         Ok(())
@@ -194,16 +328,48 @@ impl MirFunctionBuilder {
 
     fn lower_expr(&mut self, expr: &HirExpr) -> Result<MirValue, MirError> {
         match &expr.kind {
-            HirExprKind::Literal(literal) => Ok(self.emit_literal(literal.clone())),
-            HirExprKind::Var(symbol) => self
-                .value_map
-                .get(symbol)
-                .copied()
-                .ok_or_else(|| MirError::new(format!("value for symbol {symbol:?} missing"))),
+            HirExprKind::Literal(literal) => {
+                let value = self.emit_literal(literal.clone());
+                if matches!(literal, x3_common::Literal::Float(_)) {
+                    self.float_values.insert(value);
+                }
+                Ok(value)
+            }
+            HirExprKind::Var(symbol) => {
+                // A mutated name is read from its cell, not from the value map: the map holds the
+                // value of the last assignment *as this lowering walked it*, and a loop body's
+                // reader may execute before an assignment the walk has already passed. Loading from
+                // the cell is what makes the loop see the current value (TICKET-132).
+                if let Some(&cell) = self.slots.get(symbol) {
+                    let loaded = self.emit_assignment(MirRhs::Load {
+                        model: MemoryModel::Register,
+                        addr: cell,
+                    });
+                    if *self.slot_float.get(symbol).unwrap_or(&false) {
+                        self.float_values.insert(loaded);
+                    }
+                    return Ok(loaded);
+                }
+                self.value_map
+                    .get(symbol)
+                    .copied()
+                    .ok_or_else(|| MirError::new(format!("value for symbol {symbol:?} missing")))
+            }
             HirExprKind::Binary { op, left, right } => {
                 let left_val = self.lower_expr(left)?;
                 let right_val = self.lower_expr(right)?;
-                Ok(self.emit_assignment(MirRhs::Binary(*op, left_val, right_val)))
+                let float =
+                    self.float_values.contains(&left_val) || self.float_values.contains(&right_val);
+                let value = self.emit_assignment(MirRhs::Binary {
+                    op: *op,
+                    left: left_val,
+                    right: right_val,
+                    float,
+                });
+                if float {
+                    self.float_values.insert(value);
+                }
+                Ok(value)
             }
             HirExprKind::Unary { op, operand } => {
                 let val = self.lower_expr(operand)?;

@@ -156,7 +156,12 @@ impl Pass for ConstantFoldPass {
                         }
 
                         // Fold binary operations
-                        MirRhs::Binary(op, left, right) => {
+                        MirRhs::Binary {
+                            op,
+                            left,
+                            right,
+                            float,
+                        } => {
                             let left_const = constants.get(left).cloned();
                             let right_const = constants.get(right).cloned();
 
@@ -176,8 +181,10 @@ impl Pass for ConstantFoldPass {
                                 (Some(l), None) => {
                                     use BinaryOp::*;
                                     match op {
-                                        // 0 * x => 0
-                                        Mul if Self::is_zero(&l) => {
+                                        // 0 * x => 0 — for **integers** only: a float zero does not
+                                        // absorb, because `x * 0.0` is NaN when `x` is NaN or infinite.
+                                        // The multiplication's own float flag says which this is.
+                                        Mul if !*float && Self::is_zero(&l) => {
                                             constants.insert(target, l.clone());
                                             changes += 1;
                                             MirRhs::Literal(l)
@@ -201,8 +208,8 @@ impl Pass for ConstantFoldPass {
                                 (None, Some(r)) => {
                                     use BinaryOp::*;
                                     match op {
-                                        // x * 0 => 0
-                                        Mul if Self::is_zero(&r) => {
+                                        // x * 0 => 0 — integers only, for the same reason as above.
+                                        Mul if !*float && Self::is_zero(&r) => {
                                             constants.insert(target, r.clone());
                                             changes += 1;
                                             MirRhs::Literal(r)
@@ -272,6 +279,75 @@ impl Pass for ConstantFoldPass {
 }
 
 #[cfg(test)]
+mod float_identity_tests {
+    use super::*;
+    use x3_common::{Literal, Span};
+    use x3_mir::{
+        MirBlock, MirBlockId, MirFunction, MirRhs, MirStatement, MirTerminator, MirValue, SymbolId,
+    };
+
+    /// `x * 0.0` must not be folded to `0.0`: with `x` unknown at compile time the integer identity
+    /// is unsound for floats — the product is NaN for a NaN `x` and NaN or infinite for an infinite
+    /// one — and the multiplication's float flag is what tells the two apart (TICKET-133).
+    ///
+    /// Both operands constant is a different case and folds legitimately (`2.5 * 0.0` *is* `0.0`),
+    /// which is why the left operand here is a parameter.
+    #[test]
+    fn a_float_zero_does_not_absorb_an_unknown_multiplication() {
+        let build = |zero: Literal, float: bool| MirModule {
+            functions: vec![MirFunction {
+                symbol: SymbolId(0),
+                params: vec![MirValue(0)],
+                entry: MirBlockId(0),
+                blocks: vec![MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![
+                        MirStatement::Assign {
+                            target: MirValue(1),
+                            rhs: MirRhs::Literal(zero),
+                        },
+                        MirStatement::Assign {
+                            target: MirValue(2),
+                            rhs: MirRhs::Binary {
+                                op: BinaryOp::Mul,
+                                left: MirValue(0),
+                                right: MirValue(1),
+                                float,
+                            },
+                        },
+                    ],
+                    terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
+                }],
+                span: Span::dummy(),
+            }],
+            span: Span::dummy(),
+        };
+
+        let mut floats = build(Literal::Float(0.0), true);
+        let _ = ConstantFoldPass::new().run(&mut floats).expect("run");
+        assert!(
+            matches!(
+                floats.functions[0].blocks[0].statements[1].rhs(),
+                Some(MirRhs::Binary { float: true, .. })
+            ),
+            "a float multiply by zero must survive optimization: {:?}",
+            floats.functions[0].blocks[0].statements[1]
+        );
+
+        let mut integers = build(Literal::Integer(0), false);
+        let _ = ConstantFoldPass::new().run(&mut integers).expect("run");
+        assert!(
+            matches!(
+                integers.functions[0].blocks[0].statements[1].rhs(),
+                Some(MirRhs::Literal(Literal::Integer(0)))
+            ),
+            "an integer multiply by zero still folds: {:?}",
+            integers.functions[0].blocks[0].statements[1]
+        );
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use x3_ast::BinaryOp;
@@ -315,7 +391,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(2),
-                rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Add,
+                    left: MirValue(0),
+                    right: MirValue(1),
+                    float: false,
+                },
             },
         ];
 
@@ -345,7 +426,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(1),
-                rhs: MirRhs::Binary(BinaryOp::LogicalAnd, MirValue(0), MirValue(99)), // v99 unknown
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::LogicalAnd,
+                    left: MirValue(0),
+                    right: MirValue(99),
+                    float: false,
+                }, // v99 unknown
             },
         ];
 
@@ -372,7 +458,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(1),
-                rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(0), MirValue(99)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Mul,
+                    left: MirValue(0),
+                    right: MirValue(99),
+                    float: false,
+                },
             },
         ];
 
@@ -431,7 +522,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(2),
-                rhs: MirRhs::Binary(BinaryOp::Less, MirValue(0), MirValue(1)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Less,
+                    left: MirValue(0),
+                    right: MirValue(1),
+                    float: false,
+                },
             },
         ];
 
@@ -463,7 +559,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(2),
-                rhs: MirRhs::Binary(BinaryOp::Div, MirValue(0), MirValue(1)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Div,
+                    left: MirValue(0),
+                    right: MirValue(1),
+                    float: false,
+                },
             },
         ];
 
@@ -476,7 +577,12 @@ mod tests {
         assert!(matches!(
             v2_stmt,
             MirStatement::Assign {
-                rhs: MirRhs::Binary(BinaryOp::Div, _, _),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Div,
+                    left: _,
+                    right: _,
+                    float: false
+                },
                 ..
             }
         ));
@@ -500,7 +606,12 @@ mod tests {
             },
             MirStatement::Assign {
                 target: MirValue(2),
-                rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
+                rhs: MirRhs::Binary {
+                    op: BinaryOp::Add,
+                    left: MirValue(0),
+                    right: MirValue(1),
+                    float: false,
+                },
             },
         ];
 

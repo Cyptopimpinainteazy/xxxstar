@@ -1,0 +1,9 @@
+// A float computation: 1.5 + 2.5 = 4.0 exactly, so the branch is taken and 7 is returned
+fn main() -> i64 {
+    let mut x = 1.5;
+    x = x + 2.5;
+    if (x == 4.0) {
+        return 7;
+    }
+    return 0;
+}

@@ -2,6 +2,7 @@ use crate::atomic_service::{AtomicGatewayCommand, AtomicGatewayService};
 use crate::flash_finality::FlashFinalityBridge;
 use crate::metrics::X3PrometheusMetrics;
 use crate::rpc_middleware::{RateLimitConfig, RateLimiter};
+use crate::timed_executor::RuntimeCallMetrics;
 use contention_predictor::{ContentionPredictor, PredictorConfig};
 use flash_finality::{FlashFinalityConfig, FlashFinalityGadget, FLASH_FINALITY_PROTOCOL_ID};
 use futures_util::StreamExt;
@@ -318,7 +319,11 @@ impl Default for GpuSidecarHealthMonitor {
 }
 
 /// Executor for X3 Chain — WASM-only in stable2512 (native eliminated).
-pub type Executor = sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>;
+///
+/// The wrapper adds per-runtime-call timing and changes nothing else; see
+/// [`crate::timed_executor`] for what that does and does not attribute.
+pub type Executor =
+    crate::timed_executor::TimedExecutor<sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>>;
 
 /// Full client type alias
 pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
@@ -573,8 +578,27 @@ pub fn new_partial(
         })
         .transpose()?;
 
-    // Create executor
-    let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor);
+    // Create executor, wrapped so every runtime call is timed. Whether
+    // "execution" is the bottleneck or the client around it is a question the
+    // node could not answer before this: it exported one number for a whole
+    // import. A node run without a Prometheus registry gets an untimed
+    // pass-through.
+    let runtime_call_metrics = config.prometheus_registry().and_then(|registry| {
+        match RuntimeCallMetrics::register(registry) {
+            Ok(metrics) => {
+                log::info!("📊 runtime call attribution metrics registered");
+                Some(Arc::new(metrics))
+            }
+            Err(err) => {
+                log::warn!("⚠️ failed to register runtime call metrics: {err}");
+                None
+            }
+        }
+    });
+    let executor = Executor::new(
+        sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor),
+        runtime_call_metrics,
+    );
 
     // Build partial components
     let (client, backend, keystore_container, task_manager) =
@@ -814,7 +838,11 @@ fn enforce_disk_space_gate(config: &Configuration) -> Result<(), ServiceError> {
 
     let data_path = config.base_path.path();
 
-    match crate::disk_guard::free_bytes(data_path) {
+    // Measured at the nearest existing ancestor: on a validator's first start the
+    // base path does not exist yet, and measuring a missing path made this gate
+    // report a measurement failure and pass — on exactly the fresh install onto a
+    // nearly full volume that it is here to catch.
+    match crate::disk_guard::free_bytes_for_new_path(data_path) {
         Ok(free_bytes) => {
             let pressure = crate::disk_guard::classify(free_bytes, min_free_bytes);
             match crate::disk_guard::describe(pressure, free_bytes, min_free_bytes) {
@@ -956,7 +984,11 @@ fn log_pruning_policy(config: &Configuration) {
 /// authoring task's cooperation — but it turns a silent approach to `ENOSPC`
 /// into a loud, state-change-only operator signal, which is the part the
 /// storage audit found entirely missing.
-fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
+fn spawn_disk_watchdog(
+    task_manager: &TaskManager,
+    config: &Configuration,
+    authoring_gate: Arc<std::sync::atomic::AtomicBool>,
+) {
     let min_free_bytes = crate::disk_guard::min_free_bytes_from_env();
     if min_free_bytes == 0 {
         return;
@@ -965,6 +997,28 @@ fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
     let data_path = config.base_path.path().to_path_buf();
     let interval = crate::disk_guard::probe_interval_from_env();
     let is_authority = config.role.is_authority();
+
+    // What the operator can see and alert on: 1 while authoring is paused.
+    let paused_gauge: Option<substrate_prometheus_endpoint::prometheus::IntGauge> =
+        config.prometheus_registry().and_then(|registry| {
+            let gauge = substrate_prometheus_endpoint::prometheus::IntGauge::new(
+                "x3_authoring_paused",
+                "1 when the node has stopped authoring because free disk space is below its floor",
+            );
+            match gauge {
+                Ok(gauge) => match registry.register(Box::new(gauge.clone())) {
+                    Ok(()) => Some(gauge),
+                    Err(err) => {
+                        log::warn!("could not register x3_authoring_paused: {err}");
+                        None
+                    }
+                },
+                Err(err) => {
+                    log::warn!("could not build x3_authoring_paused: {err}");
+                    None
+                }
+            }
+        });
 
     task_manager
         .spawn_handle()
@@ -977,7 +1031,7 @@ fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
             loop {
                 ticker.tick().await;
 
-                let Ok(free_bytes) = crate::disk_guard::free_bytes(&data_path) else {
+                let Ok(free_bytes) = crate::disk_guard::free_bytes_for_new_path(&data_path) else {
                     continue;
                 };
                 let pressure = crate::disk_guard::classify(free_bytes, min_free_bytes);
@@ -996,6 +1050,29 @@ fn spawn_disk_watchdog(task_manager: &TaskManager, config: &Configuration) {
                     } else {
                         log::warn!("💾 disk-space guard: {message}");
                     }
+                }
+
+                // A report is not a control. Below the floor an authority has to
+                // stop proposing: the block it is building now cannot be written,
+                // and the writes that follow a full volume take the GRANDPA voter
+                // down with them — measured on a real ENOSPC in
+                // `scripts/mainnet/prove-disk-full-authoring.sh`.
+                let should_pause = !pressure.is_authoring_safe() && is_authority;
+                if authoring_gate.swap(!should_pause, std::sync::atomic::Ordering::Relaxed)
+                    == should_pause
+                {
+                    // Only on a change: the gate flipped.
+                    if should_pause {
+                        log::error!(
+                            "💾 authoring paused: free disk space is below the floor. The node keeps \
+                             running and will resume authoring when space is reclaimed."
+                        );
+                    } else {
+                        log::warn!("💾 authoring resumed: free disk space is back above the floor");
+                    }
+                }
+                if let Some(gauge) = &paused_gauge {
+                    gauge.set(i64::from(should_pause));
                 }
 
                 last_reported = Some(pressure);
@@ -1140,7 +1217,12 @@ pub fn new_full_with_atomic_gateway<
         other: (grandpa_block_import, grandpa_link, mut telemetry),
     } = new_partial(&config)?;
 
-    spawn_disk_watchdog(&task_manager, &config);
+    // One gate, two users: the watchdog closes it when the disk falls below its
+    // floor, and the proposer reads it every slot. That is how "the guard
+    // reported it" becomes "the node stopped proposing", without stopping the
+    // node.
+    let authoring_gate = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    spawn_disk_watchdog(&task_manager, &config, authoring_gate.clone());
 
     // configure network protocols; GRANDPA may be disabled when using Flash Finality
     let mut net_config = sc_network::config::FullNetworkConfiguration::<
@@ -1464,7 +1546,8 @@ pub fn new_full_with_atomic_gateway<
                 prometheus_registry.as_ref(),
                 telemetry.as_ref().map(|x| x.handle()),
                 contention_predictor.clone(),
-            );
+            )
+            .with_authoring_gate(authoring_gate.clone());
 
         let slot_duration = sc_consensus_aura::slot_duration(&*client)?;
         let shared_poh_state_for_aura = shared_poh_state.clone();
@@ -1567,16 +1650,71 @@ pub fn new_full_with_atomic_gateway<
                 use futures_util::StreamExt;
 
                 let mut notifications = client.import_notification_stream();
+                let mut last_import: Option<std::time::Instant> = None;
                 while let Some(notification) = notifications.next().await {
                     let number: u64 = (*notification.header.number()).saturated_into();
                     if let Some(ref m) = metrics_for_import {
                         m.blocks_produced.inc();
+
+                        // Per-block storage metrics. The body costs one read from
+                        // the client we already hold — five a second on a chain
+                        // targeting 200 ms slots, against the state writes the
+                        // block has just made — and in exchange `block_bytes` and
+                        // the block cadence stop being assumptions. The audit's
+                        // disk arithmetic (157.7M blocks/year, so 10 KB/block is
+                        // 1.58 TB/year) needs exactly these two numbers to be
+                        // measured rather than estimated.
+                        if let Ok(Some(signed)) = client.block(notification.hash) {
+                            use codec::Encode;
+                            // `signed.block` is the header plus its extrinsics;
+                            // the justification is deliberately excluded, so this
+                            // is the block the chain produces rather than the
+                            // wrapper it is stored in.
+                            m.imported_block_bytes
+                                .observe(signed.block.encode().len() as f64);
+                            m.imported_block_extrinsics
+                                .observe(signed.block.extrinsics.len() as f64);
+                        }
+                        let now = std::time::Instant::now();
+                        if let Some(previous) = last_import {
+                            m.block_interval_seconds
+                                .observe(now.duration_since(previous).as_secs_f64());
+                        }
+                        last_import = Some(now);
                     }
                     // Purple color for block imported
                     log::info!(
                         "\x1b[35m📦 Block imported: #{} — syncing state\x1b[0m",
                         number
                     );
+                }
+            });
+    }
+
+    // Sample the transaction pool so "is the chain keeping up?" is answerable from
+    // one scrape. The throughput sweep could only establish that the pool drained
+    // as fast as it filled by snapshotting cumulative counters around a load run
+    // and differencing them; with a ready-queue gauge the same question is a
+    // one-line query, and a ready queue that climbs and stays up is the signal
+    // that block space has become the constraint rather than the client.
+    {
+        let pool = transaction_pool.clone();
+        let metrics_for_pool = x3_metrics.clone();
+        task_manager
+            .spawn_handle()
+            .spawn("txpool-metrics", None, async move {
+                let Some(metrics) = metrics_for_pool else {
+                    return;
+                };
+                let mut ticker = tokio::time::interval(std::time::Duration::from_secs(1));
+                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                loop {
+                    ticker.tick().await;
+                    let status = pool.status();
+                    metrics.txpool_ready.set(status.ready as i64);
+                    metrics.txpool_ready_bytes.set(status.ready_bytes as i64);
+                    metrics.txpool_future.set(status.future as i64);
+                    metrics.txpool_future_bytes.set(status.future_bytes as i64);
                 }
             });
     }
