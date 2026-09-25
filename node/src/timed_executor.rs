@@ -116,7 +116,9 @@ impl RuntimeCallMetrics {
     }
 
     fn observe(&self, method: &str, seconds: f64, failed: bool) {
-        self.call_seconds.with_label_values(&[method]).observe(seconds);
+        self.call_seconds
+            .with_label_values(&[method])
+            .observe(seconds);
         self.calls_total.with_label_values(&[method]).inc();
         if failed {
             self.call_errors_total.with_label_values(&[method]).inc();
@@ -330,7 +332,13 @@ mod tests {
         let mut ext = storage.ext();
 
         for _ in 0..3 {
-            let _ = executor.call(&mut ext, &code, "Core_execute_block", &[], CallContext::Onchain);
+            let _ = executor.call(
+                &mut ext,
+                &code,
+                "Core_execute_block",
+                &[],
+                CallContext::Onchain,
+            );
         }
         let _ = executor.call(
             &mut ext,

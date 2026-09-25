@@ -322,9 +322,8 @@ impl Default for GpuSidecarHealthMonitor {
 ///
 /// The wrapper adds per-runtime-call timing and changes nothing else; see
 /// [`crate::timed_executor`] for what that does and does not attribute.
-pub type Executor = crate::timed_executor::TimedExecutor<
-    sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>,
->;
+pub type Executor =
+    crate::timed_executor::TimedExecutor<sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>>;
 
 /// Full client type alias
 pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
