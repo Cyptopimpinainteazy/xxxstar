@@ -91,7 +91,7 @@ subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration", "pallets/x3-kernel/src", "pallets/x3-kernel/tests", "runtime/src/tests.rs", "node/tests/x3vm_live_lifecycle.rs"]
 implemented = 80
-tested = 88
+tested = 90
 mainnet_ready = 30
 priority = "P0"
 confidence = "high"
@@ -102,7 +102,8 @@ blockers = [
   "**CLOSED 2026-09-25 — the execution receipt is persisted.** The X3 domain had no receipt storage at all (only EVM did), so a program's result existed in an event and a gas number and could not be read back. `X3ExecutionReceipts` is keyed by comit id and written only after every acceptance check, so a stored receipt always describes an accepted comit. `STORAGE_VERSION` moves 1→2, recorded by the migration the runtime already runs in its `Migrations` tuple (the map starts empty, so there is nothing to rewrite). The extra storage write is declared at the call site as `submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))` because the benchmark predates it.",
   "**CLOSED 2026-09-25 — the whole route is proven on a running chain.** `node/tests/x3vm_live_lifecycle.rs` now boots the real dev node, authorizes the submitter through the council, **compiles the program from `.x3` source inside the test**, signs `submit_comit_v2` with it, waits for a finalized block that contains the extrinsic, asserts the dispatch did not fail, and then reads the receipt back out of finalized state — value, metered gas and the kernel's receipt version. That is source -> compiler -> X3BC -> adapter -> pallet extrinsic -> inclusion -> finality -> verifiable receipt, on a chain rather than in a `TestExternalities`.",
   "**CLOSED 2026-09-25 — old artifacts against the loader the chain runs.** `crates/x3-integration/tests/bytecode_version_compat.rs` builds a program with the compiler the node uses and then rewrites header fields the way a newer (or older) producer would, asserting every verdict by name: a patch bump (1.0.1) stays readable; a newer minor and the next major are refused as `UnsupportedVersion(v)` naming the version they declared; an artifact whose `min_version` demands a newer loader is refused by that demand; a body edited after compilation is refused as `ChecksumMismatch { expected, found }`; and the version gate is shown to run before execution. The tests are load-bearing: removing the version check from `mini_x3` turns exactly the three version-refusal tests red and leaves the rest green (measured, then restored). What this does *not* cover: no artifact produced by a genuinely older release exists in the repository, so the fixtures are header-rewritten rather than historical; and `x3-lang/`'s own version-byte gates (TICKET-097/137) are a separate pipeline with their own tests.",
-  "Still open on this row: the network is one local node, so inclusion and finality are proven but *multi-validator* agreement is not; the 1→2 storage migration has not been exercised by a runtime-upgrade rehearsal on a chain with state (the rehearsal gate exists — `scripts/mainnet/runtime_upgrade_rehearsal.sh`); and `submit_comit_v2`'s benchmark still needs re-running to replace the explicit write declaration.",
+  "**CLOSED 2026-09-25 at the runtime level — the 1→2 migration runs and preserves state.** `runtime/src/lib.rs`'s `runtime_upgrade_rehearsal` module already rehearsed the *versions*: every pallet wired into `Migrations` is rolled back to 0 against populated genesis state, the hooks run, and each must end at the version its code declares. What none of those proved is that an upgrade leaves the chain's data alone, so `the_kernel_upgrade_moves_the_version_without_touching_its_state` seeds kernel state (a canonical-ledger balance, a used comit nonce, an authorized submitter), rolls the kernel's on-chain version to 1, runs the real migration tuple, and requires the version to move *and* the state to come out identical — with both preconditions asserted so it cannot pass vacuously, and with a second run required to be a no-op. Load-bearing, measured: making the migration rewrite the ledger turns it red with `a version move must not rewrite the ledger` (then the file was restored byte-identically).",
+  "Still open on this row: the network is one local node, so inclusion and finality are proven but *multi-validator* agreement is not; the *live-chain* upgrade keeps its own open item — `scripts/mainnet/runtime_upgrade_rehearsal.sh` has not run, because it wants a release build and `subxt` (absent on this box) to submit the upgrade over RPC; and `submit_comit_v2`'s benchmark still needs re-running to replace the explicit write declaration.",
 ]
 required_tests = [
   "compile_source_emits_runtime_loadable_bytecode",
@@ -121,6 +122,7 @@ required_tests = [
   "an_artifact_that_demands_a_newer_loader_is_refused_by_name",
   "a_body_edit_is_refused_with_the_two_checksums",
   "the_version_gate_runs_before_execution",
+  "the_kernel_upgrade_moves_the_version_without_touching_its_state",
   "the_migration_records_storage_version_two",
   "the_receipt_map_starts_empty_on_an_upgraded_chain",
 ]
@@ -128,6 +130,7 @@ test_evidence = [
   "note: the first four tests are in crates/x3-integration (tests/compiler_bridge.rs, src/mini_x3.rs), measured on master 2026-09-23 (TICKET-101 third pass)",
   "note: the adapter pair is pallets/x3-kernel/tests/x3_adapter_route.rs and the runtime pair is runtime/src/tests.rs; each compiles its program from `.x3` source inside the test (2026-09-25). The runtime pair also reads the persisted receipt back from storage, and asserts none is written for a refused comit",
   "note: the live test is node/tests/x3vm_live_lifecycle.rs (run by the `X3-native lifecycles` gate with --ignored): it finalizes a compiled program's comit and reads the receipt from finalized state (2026-09-25)",
+  "note: the state-preservation rehearsal is runtime/src/lib.rs::runtime_upgrade_rehearsal::the_kernel_upgrade_moves_the_version_without_touching_its_state (2026-09-25)",
   "note: the seven version-matrix tests are crates/x3-integration/tests/bytecode_version_compat.rs, run by the `test x3-integration` gate added 2026-09-25, and were shown to fail when the version check is removed",
   "note: the two migration tests are in pallets/x3-kernel/src/migrations.rs and run under the `test x3-kernel` gate added 2026-09-25 (the pallet's suite was in no gate list before that)",
 ]

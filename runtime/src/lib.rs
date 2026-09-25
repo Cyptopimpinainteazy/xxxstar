@@ -5633,6 +5633,99 @@ mod runtime_upgrade_rehearsal {
         println!("migration rehearsal: {report:?} (rolled back to 0, upgraded back)");
     }
 
+    /// A version move is not a rewrite, and this runtime's last one is the kernel's 1 -> 2.
+    ///
+    /// The rehearsal above proves every migrated pallet *ends* at the version the code declares.
+    /// What none of them prove is that the upgrade left the chain's data alone — and the pallet this
+    /// runtime most recently moved (the kernel, when `submit_comit_v2` began persisting X3 execution
+    /// receipts) has state an upgrade must not touch. This seeds kernel state on an otherwise genesis
+    /// chain, rolls the kernel's on-chain version back to the one it was leaving, runs the real
+    /// migration tuple, and requires the state to come out identical.
+    ///
+    /// Both preconditions are asserted — the rollback took effect, and the seeded state is really
+    /// there — so this cannot pass by covering nothing.
+    #[test]
+    fn the_kernel_upgrade_moves_the_version_without_touching_its_state() {
+        use codec::{Decode, Encode};
+        use frame_support::traits::{OnRuntimeUpgrade, StorageVersion};
+
+        let mut ext = fresh_externalities();
+        ext.execute_with(|| {
+            let account = crate::AccountId::from([0x42u8; 32]);
+            let asset_id: crate::AssetId = 7;
+
+            // State a live chain would already hold: a ledger balance, a used comit nonce, and an
+            // authorized submitter.
+            pallet_x3_kernel::CanonicalLedger::<Runtime>::insert(&account, &asset_id, 12_345u128);
+            pallet_x3_kernel::Nonces::<Runtime>::insert(&account, 3u64);
+            pallet_x3_kernel::AuthorizedAccounts::<Runtime>::insert(&account, ());
+
+            // The layout this migration exists to leave.
+            StorageVersion::new(1).put::<crate::AtlasKernel>();
+            let before =
+                u16::decode(&mut &StorageVersion::get::<crate::AtlasKernel>().encode()[..])
+                    .expect("on-chain storage version must decode");
+            assert_eq!(
+                before, 1,
+                "the rollback must take effect, or this test proves nothing"
+            );
+
+            let ledger_before =
+                pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account, &asset_id);
+            let nonce_before = pallet_x3_kernel::Nonces::<Runtime>::get(&account);
+            let authorized_before =
+                pallet_x3_kernel::AuthorizedAccounts::<Runtime>::contains_key(&account);
+            assert_eq!(
+                ledger_before, 12_345u128,
+                "the seeded ledger state must be readable"
+            );
+            assert_eq!(nonce_before, 3u64);
+            assert!(authorized_before);
+
+            <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade();
+
+            let after = u16::decode(&mut &StorageVersion::get::<crate::AtlasKernel>().encode()[..])
+                .expect("on-chain storage version must decode");
+            assert!(
+                after > before,
+                "the kernel's migration must move the chain off the layout it was on \
+                 (was {before}, is {after})"
+            );
+            assert_eq!(
+                pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account, &asset_id),
+                ledger_before,
+                "a version move must not rewrite the ledger"
+            );
+            assert_eq!(
+                pallet_x3_kernel::Nonces::<Runtime>::get(&account),
+                nonce_before
+            );
+            assert_eq!(
+                pallet_x3_kernel::AuthorizedAccounts::<Runtime>::contains_key(&account),
+                authorized_before,
+                "and must not touch who is authorized"
+            );
+
+            // Idempotence: an operator who restarts a node mid-upgrade cannot corrupt state, and a
+            // chain already on the new layout must not pay for the migration again.
+            let second_run = <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade();
+            assert_eq!(
+                second_run,
+                Weight::zero(),
+                "an already-upgraded chain must do no work on a second run"
+            );
+            assert_eq!(
+                u16::decode(&mut &StorageVersion::get::<crate::AtlasKernel>().encode()[..])
+                    .expect("on-chain storage version must decode"),
+                after
+            );
+            assert_eq!(
+                pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account, &asset_id),
+                ledger_before
+            );
+        });
+    }
+
     /// Proof that the alignment check above can actually fail: a deliberately wrong
     /// on-chain version must be reported. Without this, a future refactor could
     /// turn the check into a no-op and every run would still be green.
