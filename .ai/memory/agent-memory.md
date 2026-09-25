@@ -7363,3 +7363,30 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Working order that keeps paying: probe the CLI's *claims* adversarially (tamper, wrong key, wrong
   artifact, wrong mode), record what it refuses and *why* it says it refuses, then write the row's scores
   from that evidence rather than from the code's shape.
+
+**2026-09-24 — the two bytecode readers disagreed about a patch version (TICKET-137)**
+
+- **Parity between two readers of one format is a property to test section by section, not to assume.**
+  X3-LANG-010's row said "the other body sections still have no parity test"; writing them (function
+  table, global table, trailing debug/metadata, version bounds) found a real divergence: a module
+  declaring `1.0.1` was accepted by `x3-backend`'s `VersionInfo::can_read` (patch differences are
+  compatible by the format's own semantic versioning) and **refused by the no-std reader that executes
+  on chain**, whose shared helper compared `version <= VERSION`. The shared rule now compares the same
+  fields `can_read` does, and `version_rule_parity` in `x3-backend` compares the two rules across six
+  versions written out by hand — the drift happened in a case nobody had thought of.
+- **Clippy can be right and still be the wrong patch.** It proved the minor bound is unreachable while
+  `VERSION`'s minor is 0 and suggested `==`; writing `==` would start refusing *older* minors the day
+  that constant moves. The general comparison stays, with a documented `allow` and the reason.
+- **Function 0 is the entry, for both readers.** A hand-built module with the callee at index 0
+  "failed" parity because `execute_x3bc` runs function 0 — the ABI the compiler arranges (TICKET-130/131)
+  and the one `main` has to occupy. The parity test now says so in its own comment.
+- **A row's name is a claim.** X3-LANG-009 was called "Authenticated bytecode decoder" while its own
+  blocker said nothing is authenticated, and no phase of the spec asks for a signature over the
+  envelope (PHASE 46 = the receipt identifies the artifact; PHASE 47 = provenance). Renamed to
+  "Checksum-verified bytecode decoder"; the gap stays in `blockers`. When a name overclaims, correct the
+  name rather than invent the feature.
+- Tooling notes: an unescaped `"` inside a TOML basic string breaks the whole matrix ("Unclosed array")
+  — use single quotes inside; and `cargo fmt --all` in this repo regularly sweeps up *pre-existing*
+  formatting debt in files you never touched (`node/src/service.rs`, `crates/parallel-proposer/...`),
+  so check each stray file with `git show HEAD:<file> | rustfmt --check --edition 2021 -` and commit
+  the repair separately.
