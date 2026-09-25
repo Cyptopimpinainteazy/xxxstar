@@ -46,10 +46,12 @@ def run_guard(flags_path: Path) -> subprocess.CompletedProcess:
 
 @pytest.fixture()
 def flags_fixture(tmp_path: Path) -> Path:
-    if not GUARD.is_file():
-        pytest.skip("readiness consistency guard script is not present")
-    if not FLAGS.is_file() or not REGISTRY.is_file():
-        pytest.skip("readiness source documents are not present")
+    # These files are tracked. Their absence means the checkout is broken, not
+    # that this test has nothing to check: skipping would have reported green for a
+    # tree in which the guard these tests exist to protect had gone missing.
+    assert GUARD.is_file(), f"readiness consistency guard script is missing: {GUARD}"
+    assert FLAGS.is_file(), f"TESTNET_FEATURE_FLAGS.toml is missing: {FLAGS}"
+    assert REGISTRY.is_file(), f"FEATURE_REGISTRY.toml is missing: {REGISTRY}"
     copy = tmp_path / "TESTNET_FEATURE_FLAGS.toml"
     shutil.copyfile(FLAGS, copy)
     return copy
