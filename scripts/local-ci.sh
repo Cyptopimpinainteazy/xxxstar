@@ -305,6 +305,17 @@ GATES_FAST=(
   # not exist: this one would have caught the packet-vs-program payload defect if anything had run it
   # with a real adapter, and it is where the 1 -> 2 storage migration's own test lives.
   "test x3-kernel:cargo test -p pallet-x3-kernel"
+  # `x3-packet-schema` is the comit path's wire format: `pallet-x3-kernel`'s packet adapters call
+  # `Packet::from_wire_format` on bytes a transaction carries. It was in no fast gate — a root
+  # workspace member, so `test workspace` covered it, but only under `--deep`. Its own 58 tests plus
+  # `tests/wire_format_robustness.rs` (truncations, single-byte mutations, each header gate, and a
+  # payload claiming a four-billion-element vector) run in under a second.
+  "test x3-packet-schema:cargo test -p x3-packet-schema"
+  # `x3-cross-vm-bridge` holds the Merkle proof validator the bridge settles against, and like the
+  # packet schema above it was reachable only through `test workspace` under `--deep`. Its 152 tests
+  # include the Merkle-proof guards (`test_verify_empty_merkle_proof`,
+  # `test_verify_too_short_merkle_proof`); a warm run is seconds, a cold one about a minute.
+  "test x3-cross-vm-bridge:cargo test -p x3-cross-vm-bridge"
   # `pallet-x3-supply-ledger` holds the king invariant — represented supply never exceeds the
   # canonical ceiling — and its suite was in no gate list either. It also had no mock runtime at all
   # until 2026-09-25: the S0-1 tests build `SupplyLedger` structs by hand, so the three transition
