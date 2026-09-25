@@ -113,11 +113,14 @@ required_tests = [
   "a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_recorded",
   "a_corrupted_x3_program_is_refused_by_the_runtime_path",
   "a_compiled_x3_program_is_finalized_and_its_receipt_is_readable",
+  "the_migration_records_storage_version_two",
+  "the_receipt_map_starts_empty_on_an_upgraded_chain",
 ]
 test_evidence = [
   "note: the first four tests are in crates/x3-integration (tests/compiler_bridge.rs, src/mini_x3.rs), measured on master 2026-09-23 (TICKET-101 third pass)",
   "note: the adapter pair is pallets/x3-kernel/tests/x3_adapter_route.rs and the runtime pair is runtime/src/tests.rs; each compiles its program from `.x3` source inside the test (2026-09-25). The runtime pair also reads the persisted receipt back from storage, and asserts none is written for a refused comit",
   "note: the live test is node/tests/x3vm_live_lifecycle.rs (run by the `X3-native lifecycles` gate with --ignored): it finalizes a compiled program's comit and reads the receipt from finalized state (2026-09-25)",
+  "note: the two migration tests are in pallets/x3-kernel/src/migrations.rs and run under the `test x3-kernel` gate added 2026-09-25 (the pallet's suite was in no gate list before that)",
 ]
 evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23", "note: 2026-09-25 - the pallet's X3 payload convention was wrong and the receipt was not persisted; the runtime pair proves dispatch and storage, the live test proves inclusion, finality and a readable receipt"]
 registry_feature = "atomic_kernel"

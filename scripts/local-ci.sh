@@ -261,6 +261,12 @@ GATES_FAST=(
   # were invisible to the CI of record.
   "test x3-lang python:pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_e2e_mocked.py"
   "test atomic-kernel:cargo test -p pallet-x3-atomic-kernel"
+  # `pallet-x3-kernel` is the pallet every X3 comit goes through — the atomic path, the X3 payload
+  # route and the execution receipts all live there — and its 218-test suite was in no gate list, so
+  # nothing ran it. A pallet whose tests only run when a human remembers is a pallet whose tests do
+  # not exist: this one would have caught the packet-vs-program payload defect if anything had run it
+  # with a real adapter, and it is where the 1 -> 2 storage migration's own test lives.
+  "test x3-kernel:cargo test -p pallet-x3-kernel"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
   # The snapshot format is the trust boundary for state sync: a mirror must not
