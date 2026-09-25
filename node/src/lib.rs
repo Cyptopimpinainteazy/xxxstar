@@ -41,6 +41,10 @@ pub mod disk_guard;
 /// Phase 7: Telemetry/Monitoring.
 pub mod metrics;
 
+/// Per-runtime-call timing, so a slow import can be attributed to runtime
+/// execution or to the client around it instead of being one opaque number.
+pub mod timed_executor;
+
 /// Chain specification constructors and utilities used to create X3 Chain
 /// network configurations.
 pub mod chain_spec;

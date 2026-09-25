@@ -2,6 +2,7 @@ use crate::atomic_service::{AtomicGatewayCommand, AtomicGatewayService};
 use crate::flash_finality::FlashFinalityBridge;
 use crate::metrics::X3PrometheusMetrics;
 use crate::rpc_middleware::{RateLimitConfig, RateLimiter};
+use crate::timed_executor::RuntimeCallMetrics;
 use contention_predictor::{ContentionPredictor, PredictorConfig};
 use flash_finality::{FlashFinalityConfig, FlashFinalityGadget, FLASH_FINALITY_PROTOCOL_ID};
 use futures_util::StreamExt;
@@ -318,7 +319,12 @@ impl Default for GpuSidecarHealthMonitor {
 }
 
 /// Executor for X3 Chain — WASM-only in stable2512 (native eliminated).
-pub type Executor = sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>;
+///
+/// The wrapper adds per-runtime-call timing and changes nothing else; see
+/// [`crate::timed_executor`] for what that does and does not attribute.
+pub type Executor = crate::timed_executor::TimedExecutor<
+    sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>,
+>;
 
 /// Full client type alias
 pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
@@ -573,8 +579,27 @@ pub fn new_partial(
         })
         .transpose()?;
 
-    // Create executor
-    let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor);
+    // Create executor, wrapped so every runtime call is timed. Whether
+    // "execution" is the bottleneck or the client around it is a question the
+    // node could not answer before this: it exported one number for a whole
+    // import. A node run without a Prometheus registry gets an untimed
+    // pass-through.
+    let runtime_call_metrics = config.prometheus_registry().and_then(|registry| {
+        match RuntimeCallMetrics::register(registry) {
+            Ok(metrics) => {
+                log::info!("📊 runtime call attribution metrics registered");
+                Some(Arc::new(metrics))
+            }
+            Err(err) => {
+                log::warn!("⚠️ failed to register runtime call metrics: {err}");
+                None
+            }
+        }
+    });
+    let executor = Executor::new(
+        sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor),
+        runtime_call_metrics,
+    );
 
     // Build partial components
     let (client, backend, keystore_container, task_manager) =

@@ -29,6 +29,7 @@ Eleven commits across four pull requests: #501, #503, #504, #505 — then #506
 | RPC cost | `eth_getLogs`/`x3_getEvmLogs` block-range cap; both priced in the limiter | 4 + 2 unit tests |
 | migrations | treasury/agent-memory/agent-accounts read the declared `STORAGE_VERSION`; five unreachable `migrations.rs` deleted; gate added | `scripts/ci/check_migration_modules_are_wired.sh` |
 | per-block metrics | `x3_imported_block_bytes`, `x3_imported_block_extrinsics`, `x3_block_interval_seconds` | measured live (below) |
+| runtime attribution | #513: `node/src/timed_executor.rs` — `x3_runtime_call_seconds{method}`, `x3_runtime_calls_total{method}`, `x3_runtime_call_errors_total{method}`, `x3_runtime_version_seconds`; `scripts/proof/runtime-attribution.py` | 3 unit tests; measured live under load (§2) |
 | orchestrator | the exported-but-unused `ProofVerifier`/`VmExecutor` traits are now the adapters' real extension point; honest default preserved | `cargo test -p x3-orchestrator` 7 passed |
 | external-chains | Arbitrum test's anvil readiness loop retries instead of panicking | 4 passed, needs `anvil` |
 | tooling | pytest `testpaths`/`.kilo` fix, `tomli` fallback in two scripts, `requirements-dev.txt`, `proof_report` enforcement, explorer + super-ide dependency alignment | see §2 |
@@ -147,7 +148,9 @@ figure was 359.2 — so the February comparison is 359 versus 73, about 5x, rath
 than 575 versus 47.
 
 **100K TPS is not supported by any measurement here.** It is ~172x the best
-single-host figure and ~3,270x the 7-validator figure.
+single-host figure and ~3,270x the 7-validator figure — and the per-extrinsic
+arithmetic below puts it at a few hundred cores of execution capacity, which is a
+runtime-cost problem rather than a client or configuration one.
 
 **Storage metrics that exist versus not** (measured by scraping a live
 `--prometheus-external` endpoint):
@@ -165,6 +168,67 @@ single-host figure and ~3,270x the 7-validator figure.
 `Database: ParityDb at <base>/chains/<chain>/paritydb/full`. The validator runbook
 said RocksDB was the default; that is corrected. Which backend *should* be the
 default is unmeasured.
+
+**Which stage actually costs the time (new).** The node could not answer this
+before: it timed a whole import and nothing inside it. `node/src/timed_executor.rs`
+now wraps the code executor and times every runtime call, so the import splits
+into "the runtime ran" and "the client around it". Two nodes on this box — an
+authoring `--dev` node and a full node syncing from it — measured with
+`scripts/proof/runtime-attribution.py --window 70`, under 48 senders at
+**119.3 TPS wall, 0 failed, 11,380 finalized**:
+
+| stage | authoring node | importing node |
+|---|---|---|
+| blocks in the 70 s window | authored (not re-executed) | **350 imported**, 23.5 extrinsics / 3,184 B each |
+| `Core_execute_block` | n/a | 350 calls, **37.31 ms per block** |
+| whole import (`substrate_block_verification_and_import_time`) | not recorded (own blocks skip it) | **41.86 ms per block** |
+| **execution share of import** | — | **89.1 %** |
+| unattributed remainder (verification + state root + DB commit + notification) | — | **4.55 ms per block** |
+| `BlockBuilder_apply_extrinsic` | 9,526 calls, **1.556 ms each** | — |
+| `Core_initialize_block` / `finalize_block` / `inherent_extrinsics` | 1.386 / 4.469 / 0.238 ms per block | — |
+| `TaggedTransactionQueue_validate_transaction` | 11,147 calls, 0.963 ms each (10.7 s) | 13,842 calls, **0.716 ms each (9.9 s)** |
+| `x3_runtime_version_seconds` | 58,023 calls, 3.3 µs each | 44,421 calls, 1.3 µs each |
+| wall-time share | — | 20.9 % importing, 33.1 % inside the runtime |
+
+Idle, the same importer costs 5.04 ms per block of which 2.67 ms is execution
+(53 %): the split moves toward execution as the chain is loaded.
+
+Four things this establishes, and one it does not:
+
+1. **Block execution is the cost, not the database.** 89 % of import is wasm
+   execution; the state root plus the commit plus verification are 4.55 ms of a
+   41.86 ms block. Optimization effort belongs in the runtime.
+2. **The two independent paths agree**, which is the sanity check that makes the
+   number usable: authoring pays 1.556 ms per extrinsic in
+   `BlockBuilder_apply_extrinsic`, importing pays 1.59 ms per extrinsic inside
+   `Core_execute_block` (13.06 s of execution / 8,225 extrinsics). Same work,
+   2 % apart.
+3. **Transaction validation is not free and is not on the import path.** The
+   *importing* node spent 9.9 s of a 70 s window validating pool transactions
+   (0.716 ms each) — 14 % of wall time — because gossiped transactions are
+   validated there too. That is a client-side cost the import histogram never
+   shows.
+4. **A cumulative mean is a trap.** `x3_runtime_version_seconds` read 2.3 ms per
+   call five minutes after start and 1.3 µs per call in steady state: the first
+   call instantiates the runtime. Any number quoted from the cumulative counters
+   of a young node is measuring startup. `--window` exists for this reason.
+
+What it does not establish: `state_root_us`, `db_commit_us`, `db_flush_us`,
+storage read/write counts, trie node counts and `state_growth_bytes` still do not
+exist as metrics. They live inside the backend commit and the state machine, and
+the executor wrapper cannot see them; the 4.55 ms remainder is a bound on them,
+not a breakdown.
+
+**Arithmetic the attribution makes possible** (explicitly arithmetic, not a
+measurement — it assumes one thread per stage, no loader on the box, no network
+or disk cost): authoring plus importing the same extrinsic costs
+1.556 + 0.963 ms on the author and 1.59 + 0.716 ms on the importer, about
+**4.8 ms of CPU per finalized extrinsic** across the two-node system. On this
+2-core box that is a ceiling near **400 TPS** with the cores dedicated to the
+node — against 119.3 measured with the JavaScript load generator competing for
+the same two cores. At this per-extrinsic cost, 100K TPS would need roughly
+**480 CPU-seconds of execution per second**, i.e. a few hundred cores of
+execution capacity, before any question about clients or networking arises.
 
 **Repository hygiene.** `python -m pytest` → 201 passed (was 1412 collection errors
 and zero tests run). `npm test`, `pnpm test`, `pnpm build` → exit 0. `cargo test
@@ -203,11 +267,15 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
 
 ### Code — reachable, not yet done
 
-7. **Attribution metrics.** The node times a whole import and nothing inside it. To
-   answer "which stage is the bottleneck" needs `execution_us`, `state_root_us`,
-   `db_commit_us` and storage read/write counts, which means wrapping the executor
-   or `BlockImport`, or patching the client. *This is the audit's §3 question and it
-   is still unanswerable.*
+7. **Attribution metrics — execution half closed (#513), client half open.** The
+   executor is wrapped (`node/src/timed_executor.rs`), so runtime call time is now measured
+   and the import splits into execution versus everything else: 89.1 % execution,
+   4.55 ms/block of remainder under load (§2). What is still missing is the
+   breakdown of that remainder — `state_root_us`, `db_commit_us`, `db_flush_us`,
+   `storage_reads`/`storage_writes`, `trie_nodes_read`/`trie_nodes_written`,
+   `state_growth_bytes`. Those live in `sc-client-db`'s commit and in the state
+   machine behind the host functions, so they need either a backend patch or a
+   host-function wrapper, not another executor wrapper.
 8. **`state_growth_bytes`.** Not measurable from the import notification; needs the
    state diff. Block bodies turned out to be small (§2), so state growth is the
    number that decides disk economics — and it is unmeasured.
@@ -271,6 +339,12 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
   chain spec, but it is state *transport*: nothing installs that state behind a
   block header, so a validator still cannot join a running chain at height N with
   it. Warp/state sync is the missing client-side half.
+* **No claim that the attribution generalizes.** Every runtime-call number in §2
+  is wall time measured on a 2-core desktop, with an authoring node and an
+  importing node on the same box, and a JavaScript load generator competing for
+  the same cores. The *split* (execution vs client) is the finding; the absolute
+  milliseconds per extrinsic are this machine's, and the 400 TPS ceiling is
+  arithmetic from them, not a measurement of a chain.
 * **No reproducibility claim.** `srtool` is installed, but it builds inside Docker
   and docker is absent on this machine, so the release-reproducibility gate has
   never executed here.
