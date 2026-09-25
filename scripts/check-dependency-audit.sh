@@ -1,23 +1,35 @@
 #!/usr/bin/env bash
 # Run the dependency-advisory gate this repository's configuration was written for.
 #
-# `.cargo/audit.toml` carries a long ignore list with reasons for each entry, `deny.toml`
-# mirrors it, and `.cargo/README.md` explains the vendoring setup -- but no gate ever
-# invoked cargo-audit or cargo-deny. An advisory could appear in the lockfile and nothing
-# in this repository would say so.
+# `.cargo/audit.toml` carries an ignore list with a reason per entry and `deny.toml`
+# mirrors it, but no gate ever invoked cargo-audit or cargo-deny. An advisory could
+# appear in the lockfile and nothing in this repository would say so.
 #
-# That is not hypothetical. The first run of this gate found RUSTSEC-2026-0285: rustls
-# 0.23.44 accepting TLS 1.3 handshake messages across encryption-level boundaries, in a
-# crate that ships inside the node through `futures-rustls` -> `libp2p-websocket` ->
-# `libp2p` -> `sc-network`. It was unignored and unfixed, and every gate in the fast set
-# was green with it present.
+# That is not hypothetical. The first run found RUSTSEC-2026-0285: rustls 0.23.44
+# accepting TLS 1.3 handshake messages across encryption-level boundaries, in a crate
+# that ships inside the node through `futures-rustls` -> `libp2p-websocket` ->
+# `libp2p` -> `sc-network`. It was unignored and unfixed, and every gate in the fast
+# set was green with it present.
 #
-# Cargo cannot see an advisory that lives only in the GitHub Advisory Database -- those
-# have no RustSec id and are covered by `scripts/check-advisory-scope.py`. The two gates
-# are complementary, not redundant.
+# Both tools run, because they answer different halves of the same question:
 #
-# The audit runs with `--no-fetch` so this gate is hermetic and takes about a second, and
-# the age of the local RustSec database is checked separately, as a failure rather than a
+#   cargo audit   audits every package in Cargo.lock against the RustSec database,
+#                 honouring `.cargo/audit.toml`. This is what catches an advisory in a
+#                 package the build does not actually reach.
+#
+#   cargo deny    builds a graph for the four targets in deny.toml's `[graph]` and,
+#                 with `-D advisory-not-detected`, fails when an ignore entry matches
+#                 nothing. That is the property that keeps the ignore lists from rotting:
+#                 this repository had 51 entries in one file and 35 in the other, of
+#                 which only 15 suppressed anything at all.
+#
+# Cargo cannot see an advisory that lives only in the GitHub Advisory Database, because
+# those have no RustSec id; `scripts/check-advisory-scope.py` (the `advisory scope` gate)
+# covers that half and cross-checks that the two ignore lists differ only where it says
+# they may.
+#
+# Both audits run without fetching, so this gate is hermetic and takes a few seconds, and
+# the age of the local RustSec database is checked separately as a failure rather than a
 # warning: a database nobody refreshed would turn this gate into exactly the kind of quiet
 # false green the repository keeps finding.
 set -euo pipefail
@@ -26,15 +38,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DB="${RUSTSEC_DB:-$HOME/.cargo/advisory-db}"
 MAX_AGE_DAYS="${RUSTSEC_DB_MAX_AGE_DAYS:-45}"
 
-AUDIT="$(command -v cargo-audit || true)"
-if [ -z "$AUDIT" ] && [ -x "$HOME/.cargo/bin/cargo-audit" ]; then
-  AUDIT="$HOME/.cargo/bin/cargo-audit"
-fi
+find_tool() {
+  command -v "$1" 2>/dev/null || { [ -x "$HOME/.cargo/bin/$1" ] && echo "$HOME/.cargo/bin/$1"; }
+}
 
+AUDIT="$(find_tool cargo-audit || true)"
+DENY="$(find_tool cargo-deny || true)"
+
+missing=0
 if [ -z "$AUDIT" ]; then
   cat >&2 <<'EOF'
-check-dependency-audit: cargo-audit is not installed, so the dependency ignore list
-check-dependency-audit: in .cargo/audit.toml is unverified.
+check-dependency-audit: cargo-audit is not installed, so the ignore list in
+check-dependency-audit: .cargo/audit.toml is unverified.
 
   cargo install cargo-audit --locked
 
@@ -45,11 +60,30 @@ check-dependency-audit: in .cargo/audit.toml is unverified.
   #   tar -xzf /tmp/x3-audit/*.tgz -C /tmp/x3-audit
   #   install -m 755 /tmp/x3-audit/*/cargo-audit ~/.cargo/bin/cargo-audit
 
-  # The binary is a cargo multicall, so it must be invoked as `cargo audit` (or
-  # `cargo-audit audit`); running `cargo-audit` with no subcommand prints cargo's help.
+  # The binary is a cargo multicall, so invoke it as `cargo audit` (or `cargo-audit audit`).
 EOF
-  exit 1
+  missing=1
 fi
+
+if [ -z "$DENY" ]; then
+  cat >&2 <<'EOF'
+check-dependency-audit: cargo-deny is not installed, so nothing checks that the
+check-dependency-audit: ignore lists in deny.toml and .cargo/audit.toml still match
+check-dependency-audit: anything.
+
+  cargo install cargo-deny --locked
+
+  # or the prebuilt static binary:
+  #   gh release download -R EmbarkStudios/cargo-deny 0.20.2 \
+  #     -p 'cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz*' -D /tmp/x3-deny
+  #   (cd /tmp/x3-deny && sha256sum -c *.sha256 && tar -xzf *.tar.gz)
+  #   install -m 755 /tmp/x3-deny/*/cargo-deny ~/.cargo/bin/cargo-deny
+
+  # Like cargo-audit, it is a cargo multicall: invoke it as `cargo deny ...`.
+EOF
+  missing=1
+fi
+[ "$missing" -eq 0 ] || exit 1
 
 if [ ! -d "$DB/.git" ]; then
   echo "check-dependency-audit: no RustSec database at $DB." >&2
@@ -69,6 +103,11 @@ if [ "$age_days" -gt "$MAX_AGE_DAYS" ]; then
   exit 1
 fi
 
-echo "check-dependency-audit: RustSec database ${db_date} (${age_days}d old), audit --no-fetch"
 cd "$ROOT"
+
+echo "check-dependency-audit: RustSec database ${db_date} (${age_days}d old)"
+echo "check-dependency-audit: cargo audit --no-fetch (every package in Cargo.lock)"
 "$AUDIT" audit --no-fetch
+
+echo "check-dependency-audit: cargo deny check advisories -D advisory-not-detected (built graph)"
+"$DENY" deny check advisories -D advisory-not-detected

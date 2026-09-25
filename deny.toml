@@ -9,84 +9,53 @@ targets = [
 
 [advisories]
 yanked = "warn"
-# Audit config at .cargo/audit.toml handles ignore list for cargo-audit.
-# NOTE: severity-threshold was removed in cargo-deny 0.16+; use ignore list in
-# .cargo/audit.toml to manage per-advisory severity instead.
+# Informational advisories are not failures, matching what `cargo audit` already does:
+# it reports `unmaintained`/`unsound`/`notice` as warnings and fails only on
+# vulnerabilities. Without this, cargo-deny fails on every unmaintained crate in the
+# graph, so the ignore list has to name each one by hand -- which is how it came to hold
+# 51 entries of which 39 no longer matched anything.
+unmaintained = "none"
+# `unsound` has no equivalent switch, so the four unsound advisories that are present in
+# this graph are named in the list below. A new one still fails the gate.
 #
-# cargo-deny uses its own [advisories] ignore list below (NOT read from
-# .cargo/audit.toml). Keep both lists in sync.
+# THIS LIST AND `.cargo/audit.toml`'s `ignore` MUST BE IDENTICAL; see that file's header
+# for why, and for the rule that an entry which stops matching is removed rather than
+# left in place.
+#
+# `-D advisory-not-detected` (used by the `dependency audit` gate) is what makes the
+# second half of that rule real: an ignore entry that matches nothing becomes an error.
 ignore = [
-    # ===== wasmtime 8.0.1 + 35.0.0 cluster (polkadot-sdk stable2512) =====
-    # Pinned via sp-wasm-interface v20.0.0 and vendored sc-executor-wasmtime.
-    "RUSTSEC-2026-0006",
-    "RUSTSEC-2026-0085",
-    "RUSTSEC-2026-0086",
-    "RUSTSEC-2026-0087",
-    "RUSTSEC-2026-0088",
-    "RUSTSEC-2026-0089",
-    "RUSTSEC-2026-0091",
-    "RUSTSEC-2026-0092",
-    "RUSTSEC-2026-0093",
-    "RUSTSEC-2026-0094",
-    "RUSTSEC-2026-0095",
-    "RUSTSEC-2026-0096",
-    "RUSTSEC-2026-0114",
-    "RUSTSEC-2026-0222",
-    "RUSTSEC-2026-0269",
+    # ---- Substrate / polkadot-sdk stable2512 pins ------------------------------
+    "RUSTSEC-2022-0093",   # ed25519-dalek 1.0.1 via ed25519-zebra -> sp-core; 2.2.0 also resolved
+    "RUSTSEC-2024-0344",   # curve25519-dalek 3.2.0, same Substrate path; timing side channel
+    "RUSTSEC-2024-0437",   # protobuf 2.28.0 via prometheus 0.13.4 (cross-chain-gpu-validator, sc-utils)
 
-    # ===== h2 0.3.27 + 0.4.15 (HTTP/2 server DoS, client-only in our usage) =====
-    "RUSTSEC-2026-0258",
+    # ---- legacy JSON-RPC / ethers 2.x path ------------------------------------
+    "RUSTSEC-2024-0421",   # idna 0.1.5 via url 1.7.2 -> jsonrpc-core-client 18 -> ethers 2.x
+    "RUSTSEC-2025-0009",   # ring 0.16.20 via jsonwebtoken 8 -> ethers 2.x -> x3-bot
 
-    # ===== rkyv 0.7.46 (workspace resolution ghost, not compiled) =====
-    "RUSTSEC-2026-0235",
-
-    # ===== Previously-known transitive pins =====
-    "RUSTSEC-2023-0091",
-    "RUSTSEC-2024-0438",
-    "RUSTSEC-2025-0118",
-    "RUSTSEC-2026-0020",
-    "RUSTSEC-2026-0021",
-    "RUSTSEC-2024-0344",
-    "RUSTSEC-2025-0009",
-    # hickory-proto: NSEC3 loop (not compiled here - no dnssec feature is enabled) and
-    # O(n^2) encoding (accepted; no consumer encodes attacker-shaped records). Both are
-    # recorded with evidence in security/advisory-scope.toml and enforced by
-    # scripts/check-advisory-scope.py, which also fails if these two lists diverge.
-    "RUSTSEC-2026-0118",
-    "RUSTSEC-2026-0119",
-    "RUSTSEC-2024-0421",
-    "RUSTSEC-2024-0437",
-    "RUSTSEC-2023-0071",
+    # ---- rustls 0.21 / hyper-rustls 0.24 (reqwest 0.11) -----------------------
     "RUSTSEC-2026-0098",
     "RUSTSEC-2026-0099",
-    "RUSTSEC-2026-0104",
-    "RUSTSEC-2026-0178",
-    "RUSTSEC-2025-0055",
-    "RUSTSEC-2022-0093",
+    "RUSTSEC-2026-0104",   # rustls-webpki 0.101.7; 0.103.15 is also resolved and clean
 
-    # ===== Solana runtime transitive pins (solana-runtime v3.0.0) =====
-    # These unmaintained/unsound crates are pulled by solana-runtime,
-    # which is a dev-test-only dependency for x3-svm-integration tests.
-    # Not compiled into production runtime. The solana_rbpf unsound is
-    # in test-only EbpfVm::invoke_function (no production caller).
-    "RUSTSEC-2026-0173",   # proc-macro-error2 (solana-runtime -> aquamarine)
-    "RUSTSEC-2026-0251",   # sized-chunks (solana-runtime -> im)
-    "RUSTSEC-2026-0191",   # solana_rbpf EbpfVm::invoke_function unsound (test-only)
-    "RUSTSEC-2025-0134",   # rustls-pemfile (reqwest transitive; pem parsing only)
-    "RUSTSEC-2024-0320",   # yaml-rust (config crate -> analytics-service only)
-    "RUSTSEC-2024-0370",   # proc-macro-error 1.0.4 (frame-executive -> aquamarine -> proc-macro-error; pinned by polkadot-sdk stable2512)
+    # ---- hickory-proto 0.24.4 / 0.25.2 ----------------------------------------
+    # Reachability per consumer: docs/security/GHSA-3v94-mw7p-v465.md and
+    # docs/security/GHSA-q2qq-hmj6-3wpp.md, enforced by the `advisory scope` gate.
+    "RUSTSEC-2026-0118",   # NSEC3 loop - not compiled here (no dnssec feature is enabled)
+    "RUSTSEC-2026-0119",   # O(n^2) encoding - accepted; nothing here encodes attacker-shaped records
 
-    # ===== Unmaintained transitive dependencies (not vulnerabilities) =====
-    "RUSTSEC-2021-0139",   # ansi_term
-    "RUSTSEC-2024-0384",   # instant
-    "RUSTSEC-2024-0388",   # derivative
-    "RUSTSEC-2024-0436",   # paste
-    "RUSTSEC-2025-0057",   # fxhash
-    "RUSTSEC-2025-0119",   # bincode 1.x
-    "RUSTSEC-2025-0141",   # bitmaps
-    "RUSTSEC-2025-0161",   # im
-    "RUSTSEC-2026-0247",   # libsecp256k1
-    "RUSTSEC-2026-0248",   # number_prefix
+    # ---- h2 0.3.27 ------------------------------------------------------------
+    "RUSTSEC-2026-0258",   # server-side DoS; this tree only runs the client half
+
+    # ---- unsound, with no upgrade path from this tree -------------------------
+    # cargo-deny treats `unsound` as an error and offers no policy switch for it, so
+    # these are named individually instead of waved through: a *new* unsound advisory
+    # still fails the gate.
+    "RUSTSEC-2022-0034",   # pkcs11 0.5.0 via custody-service; the advisory says no safe upgrade exists
+    "RUSTSEC-2026-0002",   # lru 0.12.5 IterMut aliasing; 0.12 is pinned by libp2p-identify 0.44/0.45
+    "RUSTSEC-2026-0253",   # lru LruCache::pop panic safety; same pin
+    "RUSTSEC-2026-0191",   # solana_rbpf 0.8.5 EbpfVm::invoke_function; dev/test-only path
 ]
 
 [bans]

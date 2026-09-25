@@ -191,6 +191,53 @@ def ignored_rustsec_ids():
     return lists
 
 
+# Advisories cargo-audit sees but cargo-deny never does.
+#
+# cargo-audit audits every package listed in Cargo.lock. cargo-deny builds a graph for
+# the four targets in deny.toml's `[graph]` and reports `advisory-not-detected` for an
+# ignore entry whose package is not in that graph. For a package that is in the lock but
+# in no configured target's graph -- a stale lock entry -- the two disagree by
+# construction: the ignore belongs in `.cargo/audit.toml` and must NOT be in deny.toml.
+#
+# Naming them here keeps that divergence from hiding a real gap. The split is checked in
+# both directions, so an entry cannot be left behind once the package leaves the lock,
+# and cannot be added without being named here with a reason.
+LOCK_ONLY_ADVISORIES = {
+    "RUSTSEC-2023-0071": (
+        "rsa 0.9.10, reached only through sqlx-mysql, which no crate in this workspace "
+        "enables (stale lock entry). No target in deny.toml's [graph] builds it."
+    ),
+}
+
+
+def check_ignore_list_split(audit_ids, deny_ids):
+    """The two ignore lists are allowed to differ only where LOCK_ONLY_ADVISORIES says."""
+    failures = []
+    only_deny = sorted(deny_ids - audit_ids)
+    if only_deny:
+        failures.append(
+            "deny.toml ignores %s, which .cargo/audit.toml does not; cargo-deny must not "
+            "suppress something cargo-audit is unaware of" % ", ".join(only_deny)
+        )
+    only_audit = audit_ids - deny_ids
+    undeclared = sorted(only_audit - set(LOCK_ONLY_ADVISORIES))
+    if undeclared:
+        failures.append(
+            "ignored in .cargo/audit.toml but absent from deny.toml and not declared "
+            "lock-only: %s; either add it to deny.toml or name it in "
+            "LOCK_ONLY_ADVISORIES with the reason it is unreachable there"
+            % ", ".join(undeclared)
+        )
+    obsolete = sorted(set(LOCK_ONLY_ADVISORIES) - only_audit)
+    if obsolete:
+        failures.append(
+            "LOCK_ONLY_ADVISORIES names %s, but that is no longer the split; remove the "
+            "entry (the advisory is either matched by cargo-deny now, or no longer "
+            "ignored at all)" % ", ".join(obsolete)
+        )
+    return failures
+
+
 def load_records():
     if not RECORDS.exists():
         sys.exit("check-advisory-scope: missing %s" % RECORDS.relative_to(ROOT))
@@ -258,6 +305,17 @@ def main():
     feature_tree = None
     feature_error = None
     ignore_lists = ignored_rustsec_ids()
+
+    audit_ids = ignore_lists.get(AUDIT_CONFIGS[0])
+    deny_ids = ignore_lists.get(AUDIT_CONFIGS[1])
+    if audit_ids is None or deny_ids is None:
+        failures.append(
+            "the ignore lists could not be read from both %s and %s"
+            % (AUDIT_CONFIGS[0].relative_to(ROOT), AUDIT_CONFIGS[1].relative_to(ROOT))
+        )
+    else:
+        failures.extend(check_ignore_list_split(audit_ids, deny_ids))
+
 
     for record in records:
         package = record["package"]

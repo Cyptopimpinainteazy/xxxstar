@@ -736,7 +736,7 @@ fi
 echo "local-ci $STAMP — root=$ROOT"
 echo "local-ci: ${#SELECTED[@]} gate(s), jobs=$JOBS, cargo-jobs=$CARGO_JOBS, $BRANCH@$HEAD_SHA ($DIRTY)"
 for note in "${NOTES[@]:-}"; do [ -n "$note" ] && echo "local-ci: note: $note"; done
-echo "local-ci: prereqs: $(for tool in cargo python3 node docker srtool cargo-audit; do if command -v "$tool" >/dev/null 2>&1; then printf '%s=ok ' "$tool"; else printf '%s=MISSING ' "$tool"; fi; done)"
+echo "local-ci: prereqs: $(for tool in cargo python3 node docker srtool cargo-audit cargo-deny; do if command -v "$tool" >/dev/null 2>&1; then printf '%s=ok ' "$tool"; else printf '%s=MISSING ' "$tool"; fi; done)"
 command -v srtool >/dev/null 2>&1 || cat <<'EOF'
 local-ci: note: srtool missing -> `--release` / `make mainnet-check` fails on its
 local-ci:       reproducibility section. This box has lost the binary more than
@@ -750,6 +750,14 @@ local-ci:       ignore list in .cargo/audit.toml goes unverified. Install it wit
 local-ci:         cargo install cargo-audit --locked
 local-ci:       (or the prebuilt musl binary -- the gnu one needs GLIBC_2.38+; see
 local-ci:        scripts/check-dependency-audit.sh for the exact commands)
+EOF
+command -v cargo-deny >/dev/null 2>&1 || [ -x "$HOME/.cargo/bin/cargo-deny" ] || cat <<'EOF'
+local-ci: note: cargo-deny missing -> the `dependency audit` gate fails, and nothing
+local-ci:       checks that the ignore lists still match anything. It is the tool that
+local-ci:       found 39 of deny.toml's 51 entries and 24 of .cargo/audit.toml's 35
+local-ci:       suppressing nothing. Install it with:
+local-ci:         cargo install cargo-deny --locked
+local-ci:       (or the prebuilt musl binary; see scripts/check-dependency-audit.sh)
 EOF
 echo "log: $LOG"
 
