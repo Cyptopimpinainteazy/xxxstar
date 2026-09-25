@@ -39,3 +39,56 @@ vulnerable_range = ">=0.13.9,<0.13.10"
 # the tree resolves a vulnerable yamux.
 expected_resolved = ["0.12.1", "0.13.8", "0.13.10"]
 evidence = "docs/security/GHSA-vxx9-2994-q338.md"
+
+# ---------------------------------------------------------------------------
+# hickory-proto — one crate, two advisories, two different answers.
+#
+# Both are compiled into the node, through two different networking backends:
+# `libp2p-dns` pulls hickory-resolver 0.24.4 (libp2p 0.54.1 -> sc-network), and
+# `litep2p` pulls hickory-resolver 0.25.2 (litep2p 0.13.3 -> sc-network). A
+# third copy, 0.26.3, belongs to this repository's own `x3-dns-server` and is
+# outside both windows. Neither advisory can be cleared by a lockfile change:
+# the 0.25 line ends at 0.25.2, and the fix for the second one is 0.26.1, which
+# `^0.24` and `^0.25` requirements cannot reach.
+# ---------------------------------------------------------------------------
+
+[[advisory]]
+id = "GHSA-3v94-mw7p-v465"
+rustsec = "RUSTSEC-2026-0118"
+ecosystem = "rust"
+package = "hickory-proto"
+# A resolved version IS inside this window; the record is not claiming otherwise.
+# It claims the window is not reachable in this graph, and `requires_absent_features`
+# is what makes that claim checkable instead of rhetorical.
+status = "unreachable"
+published_range = ">=0.25.0-alpha.3,<=0.25.2"
+vulnerable_range = ">=0.25.0-alpha.3,<=0.25.2"
+expected_resolved = ["0.24.1", "0.24.4", "0.25.2", "0.26.3"]
+# The advisory states its own precondition: reachable "when built with the
+# `dnssec-ring` or `dnssec-aws-lc-rs` feature and configured to perform DNSSEC
+# validation". hickory-proto declares the module behind exactly that cfg
+# (`#[cfg(any(feature = "dnssec-aws-lc-rs", feature = "dnssec-ring"))] pub mod
+# dnssec;`), and cargo tree -e features reports none of them, so DnssecDnsHandle
+# is not compiled into anything here. `dnssec-openssl` is listed because the
+# 0.24 line gates the same module on a plain `dnssec` feature that
+# `dnssec-openssl` also turns on.
+requires_absent_features = ["dnssec-ring", "dnssec-aws-lc-rs", "dnssec-openssl"]
+evidence = "docs/security/GHSA-3v94-mw7p-v465.md"
+
+[[advisory]]
+id = "GHSA-q2qq-hmj6-3wpp"
+rustsec = "RUSTSEC-2026-0119"
+ecosystem = "rust"
+package = "hickory-proto"
+status = "accepted_risk"
+published_range = ">=0.3.1,<=0.26.0"
+vulnerable_range = ">=0.3.1,<=0.26.0"
+expected_resolved = ["0.24.1", "0.24.4", "0.25.2", "0.26.3"]
+# The cost is in the message encoder, and no consumer here feeds it
+# attacker-shaped input: libp2p-mdns only ever parses (`Message::from_vec`), and
+# the stub resolver encodes its own single-question query. The record fails if
+# every resolved copy ever leaves this window, so the acceptance cannot outlive
+# the exposure -- the gate will demand this file be updated when a consumer
+# finally moves to 0.26.1+.
+accepted_reason = "O(n^2) name compression in BinEncoder; reachable only when encoding a message with many attacker-shaped records, which no consumer in this graph does - see the evidence document for the per-consumer call-path analysis."
+evidence = "docs/security/GHSA-q2qq-hmj6-3wpp.md"

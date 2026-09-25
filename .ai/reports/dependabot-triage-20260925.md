@@ -23,7 +23,7 @@ Measured per crate with `cargo tree -i <crate>@<version>` against this tree:
 | Crate | Version | Severity | In the resolved graph? | Pulled by |
 | --- | --- | --- | --- | --- |
 | `yamux` | 0.12.1 | high (GHSA-vxx9-2994-q338, remote panic on a malformed Data frame) — **re-verified: not exploitable here, see below** | **yes** | `libp2p-yamux` → `libp2p 0.54.1` → `sc-network` |
-| `hickory-proto` | 0.24.4 | high (GHSA-3v94-mw7p-v465, unbounded NSEC3 loop) + medium | **yes** | `hickory-resolver` → `libp2p-dns` → `sc-network` |
+| `hickory-proto` | 0.24.4 **and 0.25.2** | high (GHSA-3v94-mw7p-v465, unbounded NSEC3 loop) + medium (GHSA-q2qq-hmj6-3wpp, O(n^2) encoding) — **decided 2026-09-25, see below** | **yes** | `hickory-resolver` → `libp2p-dns` **and** → `litep2p` → `sc-network` |
 | `evm` | 0.39.1 | medium (error return ignored) | **yes** — **closed 2026-09-25, see below** | **our own** `crates/evm-integration` |
 | `ethereum` | 0.14.0 | medium (malleability check) | **yes** — **closed 2026-09-25, see below** | via that `evm` |
 | `serde_with` | 3.21.0 | medium | yes | `sc-network-types` |
@@ -49,8 +49,32 @@ The two that matter are the first two, and both are **transitive through polkado
   `-v0.13.10` (guard first, fixed). Full evidence, including the lockfile-by-lockfile versions:
   `docs/security/GHSA-vxx9-2994-q338.md`. Guarded from now on by
   `security/advisory-scope.toml` + `scripts/check-advisory-scope.py` (fast gate `advisory scope`).
-* `hickory-proto 0.24.4` arrives through `libp2p-dns`; the high-severity NSEC3 advisory has **no patched
-  version** at all (`no-fix` in Dependabot, and the DB confirms).
+* `hickory-proto` arrives twice, through two independent backends: `0.24.4` via `libp2p-dns`, and
+  `0.25.2` via `litep2p`. The high-severity NSEC3 advisory has **no patched version** on the affected
+  0.25 line: the newest `0.25.x` release is `0.25.2` itself, and the implementation moved to
+  `hickory-net` at 0.26.0.
+
+  **Decided, 2026-09-25.** The two advisories are different problems and get different answers, both
+  now recorded in `security/advisory-scope.toml` and enforced by the `advisory scope` gate:
+
+  * `GHSA-3v94-mw7p-v465` (high) is `unreachable`, not merely "accepted". The advisory states its
+    own precondition — reachable "when built with the `dnssec-ring` or `dnssec-aws-lc-rs` feature
+    and configured to perform DNSSEC validation" — and `hickory-proto` declares the module behind
+    exactly that cfg (`#[cfg(any(feature = "dnssec-aws-lc-rs", feature = "dnssec-ring"))] pub mod
+    dnssec;`). `cargo tree -e features` shows those features are enabled **nowhere** in this graph,
+    so `DnssecDnsHandle` and the closest-encloser loop are not compiled into any artifact we build.
+    The gate fails if a dnssec feature ever appears. `docs/security/GHSA-3v94-mw7p-v465.md`.
+  * `GHSA-q2qq-hmj6-3wpp` (medium) is an `accepted_risk` with a call-path analysis rather than an
+    assertion: the cost is in the message **encoder**, `libp2p-mdns` only ever parses
+    (`Message::from_vec`, and a search of its non-test sources for `to_vec`/`BinEncoder`/`emit(`
+    is empty), and the stub resolver encodes its own single-question query — one question
+    contributes no candidate labels, so the record-count amplification is not available. The
+    component that *does* encode arbitrary responses, our own `x3-dns-server`, pins
+    `hickory-proto = "=0.26.3"`, past the 0.26.1 fix.
+    `docs/security/GHSA-q2qq-hmj6-3wpp.md`.
+
+    The record is a ratchet in the other direction from the yamux one: it fails when **every**
+    resolved copy leaves the window, so the acceptance cannot outlive the exposure.
 
 Neither can be fixed by a lockfile update: the fixing versions are on new major lines (`yamux 0.13.x`,
 `hickory 0.26.x`) that `libp2p-yamux 0.46` / `libp2p-dns 0.42` do not accept. The two honest paths are
@@ -113,8 +137,14 @@ repository would notice a new high-severity advisory that RustSec has not import
    a way to *record and enforce* that judgement, so `security/advisory-scope.toml` plus the
    `advisory scope` gate fail the build if a future lockfile bump resolves `0.13.9` or drops a
    version the record expects. See `docs/security/GHSA-vxx9-2994-q338.md`.
-2. **`hickory-proto 0.24.4` — unbounded NSEC3 loop, no upstream fix.** Needs a decision: accept with a
-   written reason (it is DNS resolution inside libp2p), or pin/take over the resolver.
+2. ~~**`hickory-proto 0.24.4` — unbounded NSEC3 loop, no upstream fix.** Needs a decision: accept with a
+   written reason (it is DNS resolution inside libp2p), or pin/take over the resolver.~~ **Closed
+   2026-09-25.** The NSEC3 advisory is unreachable here — the vulnerable module is gated behind a
+   `dnssec*` feature and none is enabled — so it is recorded as `unreachable` and enforced, rather
+   than accepted. Its sibling `GHSA-q2qq-hmj6-3wpp` is a recorded, ratcheted `accepted_risk` with a
+   per-consumer call-path analysis. Both live in `security/advisory-scope.toml`; the `advisory
+   scope` gate also now requires each record's evidence document to exist and its RustSec id to be
+   ignored in **both** `.cargo/audit.toml` and `deny.toml`, which nothing checked before.
 3. ~~**`evm 0.39.1` / `ethereum 0.14.0`** — ours; bump `crates/evm-integration` to the frontier line and
    verify the EVM path end to end.~~ **Closed 2026-09-25.** Repointed to `rust-ethereum/evm.git`
    `v0.x` (Frontier's spec, so the graph unifies on one copy), `primitive-types` to 0.13.1, and the

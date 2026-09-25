@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
-"""Fail when a resolved dependency version falls inside a verified-vulnerable window.
+"""Check resolved versions and feature preconditions against verified advisories.
 
 GitHub's advisory metadata is sometimes coarser than the regression that actually
-produced the bug. `GHSA-vxx9-2994-q338` (yamux) publishes `<0.13.10`, which also
-matches the whole 0.12 line; the panic it describes was introduced in 0.13.9 and
-fixed in 0.13.10, so no 0.12.x release ever carried it. Dependabot reports the
-published range, cargo-audit has no RustSec id for that advisory at all, and
-nothing in this repository would have noticed that the resolved versions sit
-outside the window. That is the gap this check closes.
+produced the bug, and an advisory's stated precondition is sometimes a *feature*
+rather than a version. Three cases have come up in this tree, and each gets its
+own enforceable record kind:
 
-`security/advisory-scope.toml` records, per advisory, the window that is really
-vulnerable, the window GitHub publishes, the versions this repository resolves
-today, and the evidence for the distinction. This script fails when:
+  not_affected   no resolved version of the package falls inside the window that
+                 is really vulnerable (GHSA-vxx9-2994-q338: the yamux advisory
+                 publishes `<0.13.10`, but the guard-ordering defect only ever
+                 existed in 0.13.9).
 
-  * any resolved version of the package falls inside `vulnerable_range`; or
-  * the resolved set drifts from `expected_resolved`, so that a lockfile bump
-    cannot silently turn a recorded judgement into a stale one.
+  unreachable    a resolved version *is* inside the published window, but the
+                 advisory states a build-time precondition that this graph does
+                 not meet, so the vulnerable code is not compiled
+                 (GHSA-3v94-mw7p-v465: the NSEC3 loop lives in
+                 `DnssecDnsHandle`, behind `#[cfg(feature = "dnssec*")]`, and no
+                 dnssec feature is enabled anywhere here).
+
+  accepted_risk  a resolved version is inside the window and the code is built;
+                 the record carries the reason, and the check fails when the
+                 vulnerable version disappears -- so the acceptance cannot
+                 outlive the exposure it describes
+                 (GHSA-q2qq-hmj6-3wpp).
+
+Records also cross-check that their `rustsec` id is ignored in *both* ignore
+lists. `.cargo/audit.toml` and `deny.toml` each carry one, and the config itself
+says to keep them in sync; nothing enforced that until now.
 
 Usage:
   scripts/check-advisory-scope.py            # check, non-zero on drift
@@ -28,6 +39,7 @@ import argparse
 import os
 import pathlib
 import re
+import subprocess
 import sys
 
 try:  # Python 3.11+
@@ -43,18 +55,27 @@ except ModuleNotFoundError:  # pragma: no cover - 3.10 and older
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RECORDS = ROOT / "security" / "advisory-scope.toml"
-# Directories that hold build output, vendored crate sources, or another
-# agent's checkout rather than this tree's own manifests. Hidden directories are
-# skipped wholesale: `.git`, `.wt-*` agent worktrees, `.kilo/worktrees`, and
-# `.pre-edit-snapshot` all live there, and none of them is part of what a
-# release builds.
+AUDIT_CONFIGS = (ROOT / ".cargo" / "audit.toml", ROOT / "deny.toml")
+
+# Directories that hold build output, vendored crate sources, or another agent's
+# checkout rather than this tree's own manifests. Hidden directories are skipped
+# wholesale: `.git`, `.wt-*` agent worktrees, `.kilo/worktrees`, and
+# `.pre-edit-snapshot` all live there, and none of them is part of what a release
+# builds.
 SKIP_DIRS = {"target", "node_modules", "vendor"}
+
+STATUSES = {"not_affected", "unreachable", "accepted_risk"}
+
+# Advisories use pre-release bounds (`>=0.25.0-alpha.3`). The numeric part is what
+# decides every comparison in this tree, because no resolved version here carries a
+# pre-release tag; `main` refuses to compare at all if one ever does, rather than
+# silently ordering it wrong.
+_COMPARATOR = re.compile(r"^(>=|<=|>|<|=)?\s*(\d+(?:\.\d+)*)(?:-[0-9A-Za-z.-]+)?$")
+_FEATURE = re.compile(r'feature "([^"]+)"')
 
 
 def _is_skipped(name):
     return name.startswith(".") or name in SKIP_DIRS or name.endswith("-vendor")
-
-_COMPARATOR = re.compile(r"^(>=|<=|>|<|=)?\s*(\d+(?:\.\d+)*)$")
 
 
 def lockfiles():
@@ -119,6 +140,57 @@ def satisfies(version, spec):
     return True
 
 
+def feature_names(tree_text):
+    """Enabled feature names in `cargo tree -e features` output."""
+    return set(_FEATURE.findall(tree_text))
+
+
+def missing_features(tree_text, required):
+    return sorted(name for name in required if name not in feature_names(tree_text))
+
+
+def present_features(tree_text, forbidden):
+    return sorted(name for name in forbidden if name in feature_names(tree_text))
+
+
+def enabled_feature_tree():
+    """`cargo tree -e features --workspace` output, or an error string."""
+    try:
+        completed = subprocess.run(
+            ["cargo", "tree", "-e", "features", "--workspace", "--offline"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:  # cargo not installed
+        return None, f"could not run cargo: {error}"
+    if completed.returncode != 0:
+        tail = (completed.stderr or "").strip().splitlines()[-3:]
+        return None, "cargo tree -e features failed: " + " | ".join(tail)
+    return completed.stdout, None
+
+
+def ignored_rustsec_ids():
+    """The `advisories.ignore` list of every configured dependency gate."""
+    lists = {}
+    for path in AUDIT_CONFIGS:
+        if not path.exists():
+            lists[path] = None
+            continue
+        try:
+            document = tomllib.loads(path.read_text())
+        except tomllib.TOMLDecodeError as error:
+            lists[path] = None
+            print(
+                "check-advisory-scope: %s is not valid TOML: %s"
+                % (path.relative_to(ROOT), error),
+                file=sys.stderr,
+            )
+            continue
+        lists[path] = set(document.get("advisories", {}).get("ignore", []))
+    return lists
+
+
 def load_records():
     if not RECORDS.exists():
         sys.exit("check-advisory-scope: missing %s" % RECORDS.relative_to(ROOT))
@@ -127,6 +199,28 @@ def load_records():
     records = document.get("advisory", [])
     if not records:
         sys.exit("check-advisory-scope: security/advisory-scope.toml declares no [[advisory]] records")
+    problems = []
+    for record in records:
+        where = record.get("id", "<record with no id>")
+        status = record.get("status", "not_affected")
+        if status not in STATUSES:
+            problems.append("%s: unknown status %r" % (where, status))
+        for field in ("package", "published_range", "vulnerable_range", "evidence"):
+            if not record.get(field):
+                problems.append("%s: missing %s" % (where, field))
+        if status == "unreachable" and not record.get("requires_absent_features"):
+            problems.append(
+                "%s: status 'unreachable' needs requires_absent_features naming the "
+                "precondition the advisory states" % where
+            )
+        if status == "accepted_risk" and not record.get("accepted_reason"):
+            problems.append(
+                "%s: status 'accepted_risk' needs accepted_reason" % where
+            )
+    if problems:
+        for problem in problems:
+            print("check-advisory-scope: FAIL: " + problem, file=sys.stderr)
+        sys.exit(1)
     return records
 
 
@@ -139,12 +233,13 @@ def main():
     if args.list:
         for record in records:
             print(
-                "%s  %s  published=%s  vulnerable=%s  resolved=%s" % (
+                "%s  %-14s %-13s published=%-22s vulnerable=%-22s resolved=%s" % (
                     record["id"],
                     record["package"],
+                    record.get("status", "not_affected"),
                     record["published_range"],
                     record["vulnerable_range"],
-                    sorted(record["expected_resolved"], key=parse_version),
+                    sorted(record.get("expected_resolved", []), key=parse_version),
                 )
             )
         return 0
@@ -160,13 +255,66 @@ def main():
             resolved.setdefault(name, {}).setdefault(version, []).append(str(path.relative_to(ROOT)))
 
     failures = []
+    feature_tree = None
+    feature_error = None
+    ignore_lists = ignored_rustsec_ids()
+
     for record in records:
         package = record["package"]
+        status = record.get("status", "not_affected")
+        expected = record.get("expected_resolved")
         versions = sorted(resolved.get(package, {}), key=parse_version)
-        expected = sorted(set(record["expected_resolved"]), key=parse_version)
+        in_range = [v for v in versions if satisfies(parse_version(v), record["vulnerable_range"])]
 
-        for version in versions:
-            if satisfies(parse_version(version), record["vulnerable_range"]):
+        if record.get("rustsec"):
+            for path, ignored in ignore_lists.items():
+                if ignored is None:
+                    failures.append(
+                        "%s: %s could not be read, so its ignore list cannot be checked"
+                        % (record["id"], path.relative_to(ROOT))
+                    )
+                elif record["rustsec"] not in ignored:
+                    failures.append(
+                        "%s: %s is not in the ignore list of %s; the two dependency "
+                        "gates disagree about this advisory"
+                        % (record["id"], record["rustsec"], path.relative_to(ROOT))
+                    )
+
+        evidence_path = ROOT / record["evidence"]
+        if not evidence_path.exists():
+            failures.append(
+                "%s: the record cites %s, which does not exist - the justification is "
+                "missing" % (record["id"], record["evidence"])
+            )
+
+        if expected is not None:
+            if versions != sorted(set(expected), key=parse_version):
+                failures.append(
+                    "%s: %s resolves to %s but the record expects %s; re-verify the window "
+                    "and update %s (evidence: %s)" % (
+                        record["id"], package, versions or ["<absent>"],
+                        sorted(set(expected), key=parse_version),
+                        RECORDS.relative_to(ROOT), record["evidence"],
+                    )
+                )
+
+        if any("-" in v for v in versions) and any(
+            "-" in spec for spec in (record["published_range"], record["vulnerable_range"])
+        ):
+            failures.append(
+                "%s: %s resolves to a pre-release (%s) and the record's ranges use a "
+                "pre-release bound; this check compares numeric parts only and will not "
+                "guess at semver precedence here" % (
+                    record["id"], package, ", ".join(v for v in versions if "-" in v),
+                )
+            )
+
+        in_published = [
+            v for v in versions if satisfies(parse_version(v), record["published_range"])
+        ]
+
+        if status == "not_affected":
+            for version in in_range:
                 where = ", ".join(resolved[package][version])
                 failures.append(
                     "%s: resolved %s %s (%s) is inside the vulnerable window %s - see %s" % (
@@ -174,17 +322,33 @@ def main():
                         record["vulnerable_range"], record["evidence"],
                     )
                 )
-
-        if versions != expected:
-            failures.append(
-                "%s: %s resolves to %s but the record expects %s; re-verify the window and update "
-                "%s (evidence: %s)" % (
-                    record["id"], package, versions or ["<absent>"], expected,
-                    RECORDS.relative_to(ROOT), record["evidence"],
+        elif status == "accepted_risk":
+            if not in_range:
+                failures.append(
+                    "%s: no resolved %s version is inside %s any more, so the accepted risk "
+                    "no longer describes a real exposure; drop the record and the ignore "
+                    "entries it justifies, and update %s" % (
+                        record["id"], package, record["vulnerable_range"], record["evidence"],
+                    )
                 )
-            )
+        elif status == "unreachable":
+            if feature_tree is None and feature_error is None:
+                feature_tree, feature_error = enabled_feature_tree()
+            if feature_error:
+                failures.append(
+                    "%s: the record claims a feature precondition, but it could not be "
+                    "checked: %s" % (record["id"], feature_error)
+                )
+            else:
+                present = present_features(feature_tree, record["requires_absent_features"])
+                if present:
+                    failures.append(
+                        "%s: %s is enabled in this graph, which is the precondition the "
+                        "advisory names - the vulnerable code is compiled now; see %s"
+                        % (record["id"], ", ".join(present), record["evidence"])
+                    )
 
-        if not [v for v in versions if satisfies(parse_version(v), record["published_range"])]:
+        if not in_published:
             print(
                 "check-advisory-scope: note - no resolved %s version is inside the published range "
                 "%s any more; the record is kept as the reason the alert could not be acted on, "

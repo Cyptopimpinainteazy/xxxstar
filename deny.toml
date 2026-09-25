@@ -48,6 +48,10 @@ ignore = [
     "RUSTSEC-2026-0021",
     "RUSTSEC-2024-0344",
     "RUSTSEC-2025-0009",
+    # hickory-proto: NSEC3 loop (not compiled here - no dnssec feature is enabled) and
+    # O(n^2) encoding (accepted; no consumer encodes attacker-shaped records). Both are
+    # recorded with evidence in security/advisory-scope.toml and enforced by
+    # scripts/check-advisory-scope.py, which also fails if these two lists diverge.
     "RUSTSEC-2026-0118",
     "RUSTSEC-2026-0119",
     "RUSTSEC-2024-0421",

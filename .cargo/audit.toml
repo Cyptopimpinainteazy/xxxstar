@@ -52,9 +52,27 @@ ignore = [
     "RUSTSEC-2025-0009",
 
     # ===== hickory-proto v0.24.4 / v0.25.2 =====
-    # DNS resolution crate, pulled by Substrate/libp2p networking stack.
-    # CPU exhaustion / unbounded loop issues require attacker-controlled DNS.
-    # Validator nodes use trusted DNS infrastructure.
+    # Pulled by Substrate's libp2p stack through two backends: `libp2p-dns` takes
+    # hickory-resolver 0.24.4, `litep2p` takes 0.25.2. Neither can be moved off by a
+    # lockfile change (the 0.25 line ends at 0.25.2 and the second fix is 0.26.1), so
+    # both are recorded with evidence instead of a version bump:
+    #
+    #   RUSTSEC-2026-0118 (high, NSEC3 unbounded loop)
+    #     Not compiled here. The advisory's own precondition is a build feature, and
+    #     hickory-proto declares the module behind `#[cfg(feature = "dnssec*")]`; no
+    #     dnssec feature is enabled anywhere in this graph. Recorded as `unreachable`
+    #     in security/advisory-scope.toml and enforced by the `advisory scope` gate,
+    #     which fails if such a feature ever appears.
+    #     See docs/security/GHSA-3v94-mw7p-v465.md.
+    #
+    #   RUSTSEC-2026-0119 (medium, O(n^2) name compression while encoding)
+    #     Accepted risk: the cost is in the message encoder, libp2p-mdns only ever
+    #     parses (Message::from_vec), and the stub resolver encodes its own
+    #     single-question query. Our own DNS server encodes responses and is pinned
+    #     to the fixed 0.26.3 line. Recorded as `accepted_risk`; the gate fails if
+    #     every resolved copy ever leaves the window, so the acceptance cannot
+    #     outlive the exposure.
+    #     See docs/security/GHSA-q2qq-hmj6-3wpp.md.
     "RUSTSEC-2026-0118",
     "RUSTSEC-2026-0119",
 
