@@ -7872,3 +7872,56 @@ decision needs.
    the same class of gap.
 2. Re-run `submit_comit_v2`'s benchmark and retire the explicit write declaration.
 3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
+
+## 2026-09-25 (forty-sixth pass) — old artifacts against the loader the chain runs
+
+### What closed
+- **X3-LANG-004's "old artifact vs upgraded VM" bullet.** The gates existed in `mini_x3` (magic,
+  version range, the module's `min_version`, the body checksum — all defined once in
+  `x3-common::bytecode`) but nothing exercised them as a matrix over real artifacts.
+  `crates/x3-integration/tests/bytecode_version_compat.rs` compiles a program with the bridge the node
+  uses, rewrites header fields the way a newer/older producer would, and asserts each verdict **by
+  name**: patch bump readable (the TICKET-137 rule, in the runtime's own loader); newer minor and the
+  next major refused as `UnsupportedVersion(v)` naming the version; a `min_version` demand refused by
+  that demand (the field an *older* chain uses to refuse a newer artifact); a body edit refused as
+  `ChecksumMismatch { expected, found }`; the gate shown to run before execution; the loader's bounds
+  checked at compile time.
+- **Load-bearing, measured**: deleting the `version_is_readable` check from `mini_x3` turns exactly the
+  three version-refusal tests red and leaves the others green (min_version is a separate check). The
+  file was then restored byte-identically (verified with `git diff`).
+- **`test x3-integration` gate added** (`cargo test -p x3-x3-integration --features compile`): the crate
+  that *is* the chain's X3 execution path had its suite — compiler bridge, cross-decoder body parity,
+  and now this matrix — in no gate list. The `compile` feature must be named: without it the bridge
+  (and therefore these files) is `cfg`-ed out and the target runs zero tests.
+
+### Two process lessons
+- **`assert!` on a constant is a clippy error** (`assertions_on_constants`) and clippy is right: it can
+  never fail at run time. For bounds the code depends on, use `const _: () = assert!(..);` — it fails
+  the *build*, which is strictly stronger. If a predicate is a `const fn`, evaluate it into a local
+  first so the assertion is not a constant expression.
+- **Run `cargo fmt --all -- --check` as the last step before committing.** Patching a file with Python
+  after a format run and then amending left the format gate red twice in the same turn, and each cycle
+  costs a full fast-set run. Format after the last edit, then commit.
+- Related: on the `--features compile` target, only `cargo test -p x3-x3-integration --features compile`
+  runs this file; a plain `cargo test -p x3-x3-integration` reports "0 tests" for it, which looks like a
+  pass.
+
+### Measured at `329a275f4`
+- `bash scripts/local-ci.sh` -> **39 of 39 gates PASS** (38 before `test x3-integration`).
+- `test x3-integration` 6s: 13 + 6 + 8 + 6 tests (the 8 include the version matrix).
+- Row X3-LANG-004: compatibility bullet closed, tested 85 -> 88; the other three open items on that row
+  are unchanged (multi-validator, upgrade rehearsal, benchmark).
+
+### Still open
+1. `submit_comit_v2`'s benchmark re-run — the last locally-actionable item on X3-LANG-004.
+2. No chain-level upgrade rehearsal for the 1 -> 2 storage move (script exists; needs a release build
+   and subxt, which is absent).
+3. The external half of X3-XVM-002 (real external chain observation) and concurrent multi-validator
+   traffic. Rotate the bridge API key in git history.
+4. The default-vs-deep gate decision (`test workspace` green in 632s, still opt-in).
+
+### Next task seed
+1. Re-run `submit_comit_v2`'s benchmark (`cargo build --release --features runtime-benchmarks`, then
+   `benchmark pallet`) and retire the explicit write declaration — or record precisely why not
+   (machine-specific weights on a non-reference host is a real argument either way).
+2. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
