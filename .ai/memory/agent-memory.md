@@ -7705,3 +7705,65 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
    receipt is usable by something other than a test.
 3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak — the largest blocker left.
 4. Rotate the infrastructure bridge API key still present in git history.
+
+## 2026-09-25 (forty-third pass) — one runtime API, the receipt a client can read, and a build that stopped fetching
+
+### What closed
+- **`pallets/x3-kernel` declared its runtime API twice.** `src/runtime_api.rs` declared
+  `AtlasKernelApi`, but nothing ever compiled it (no `mod` declaration) — the real trait is
+  `AtlasKernelRuntimeApi`, declared inline, implemented in `runtime/src/lib.rs:3433` and required by
+  the node's RPC bounds. Deleted. It was not inert: `packages/ts-sdk/src/client.ts` called
+  `AtlasKernelApi_get_canonical_balance`, a name that exists in no runtime metadata, so
+  `getCanonicalBalance` could never have worked. The SDK now calls
+  `AtlasKernelRuntimeApi_get_canonical_balance`.
+- **`AtlasKernelRuntimeApi` gained `get_x3_execution_receipt`** (`comit_id: Vec<u8>`,
+  SCALE-encoded `ExecutionReceipt` out — the convention `get_evm_receipt`/`get_evm_transaction`
+  already used). Without it the X3 receipt was readable only from raw storage by a test.
+- **A runtime API cannot be called from an in-crate `TestExternalities`.** The repo says so above
+  `native_supply_contract_tests` in `runtime/src/lib.rs`, and I hit it: `<Runtime as ...>::method()`
+  does not typecheck because the generated call trait wants the client-side executor. The honest
+  assertion is a live `state_call` — `node/tests/x3vm_live_lifecycle.rs` now reads the receipt twice,
+  once from storage at the finalized block and once through
+  `state_call("AtlasKernelRuntimeApi_get_x3_execution_receipt", ...)`, and requires the same value.
+
+### The build that would not start
+- The pinned srtool image starts with an **empty cargo home**, so every re-attestation re-fetches
+  polkadot-sdk. Measured: 30+ minutes in `Updating git repository` with the host load at 0.27, while
+  the same host had an 815 MB cargo git cache on disk and reached GitHub in under a second. That is a
+  release-path failure, not a slow build.
+- **`SRTOOL_CARGO_GIT_CACHE=<host dir>`** now mounts a warm cache at the image's cargo git directory
+  for both docker invocations (`scripts/run-srtool.sh`). It is opt-in and documented, and it does not
+  change the artifact: the compressed BLAKE2_256 from a cache-mounted single build
+  (`0xd0996f91...`) is byte-for-byte the hash the scripted two-build run produced for the same
+  revision. Note the mount point is the image's CARGO_HOME subdirectory, the directory must be
+  world-readable (a path under a mode-750 home is not), and copying `~/.cargo/git` to /tmp takes
+  seconds.
+- Container-written files need the root-container recipe to remove
+  (`docker run --rm -u 0:0 -v <dir>:/x alpine sh -c 'cd /x && rm -rf -- * .[!.]*'`). A plain `rm -rf`
+  on that directory emits thousands of permission errors and removes nothing.
+- And the repeated trap: a `pgrep -f "<script name>"` inside the same command line matches its own
+  shell and kills it. Kill by PID, or match a pattern the command itself does not contain.
+
+### Measured at `9874cb29e`
+- `bash scripts/local-ci.sh --live --cross --jobs 3` -> **44 of 44 gates PASS** (35 fast + 9 live/cross;
+  `test x3-kernel` is one of the fast 35, `X3-native lifecycles` 197s ran all four ignored tests).
+- Runtime re-attested: compact 8,501,495 / `0x3f8d2a02…`, compressed 1,461,704 / `0xd0996f91…`,
+  revision `3e3ecb8a6`, two from-scratch builds agreeing.
+
+### Still open
+1. Only **one** accessor of `AtlasKernelRuntimeApi` has a wire-level assertion; the rest are proven
+   only by the node's RPC code compiling against the trait bound. There is no `#[api_version]` on the
+   trait and no documented compatibility policy — the repo's precedent is to add a method and note it
+   in a comment.
+2. `submit_comit_v2`'s benchmark still has not been re-run, so the receipt write stays hand-declared.
+3. The 1 -> 2 storage migration has not run in an upgrade rehearsal with state
+   (`scripts/mainnet/runtime_upgrade_rehearsal.sh` wants a release build and subxt, which is absent).
+4. Old artifact vs upgraded VM untested; multi-validator evidence absent (one host); the infrastructure
+   bridge API key in git history still needs rotating.
+
+### Next task seed
+1. Give the other `AtlasKernelRuntimeApi` methods one wire-level assertion each, or say in the trait
+   which ones are compile-time-only and why.
+2. Re-run `submit_comit_v2`'s benchmark (`cargo build --release --features runtime-benchmarks` +
+   `benchmark pallet`) and retire the explicit write declaration.
+3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
