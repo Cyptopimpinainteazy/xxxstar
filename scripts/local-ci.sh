@@ -285,6 +285,12 @@ GATES_FAST=(
   # parity test, and the bytecode version-compatibility matrix — needs the `compile` feature to
   # build at all, which is why the feature is named here rather than left to unification.
   "test x3-integration:cargo test -p x3-x3-integration --features compile"
+  # The runtime crate — the chain itself. Its 53 tests hold the settlement wiring, the atomic
+  # kernel's runtime-level tests, the compiled-program dispatch route and all three upgrade
+  # rehearsals, and **no gate ran them**: `FEATURE_REGISTRY.toml` lists the rehearsal test names as
+  # required evidence, `check-readiness-consistency.sh` proves those names exist, and nothing in the
+  # default set ever executed them. Measured cost: 22s including compile, 0.03s of test time.
+  "test runtime:cargo test -p x3-chain-runtime"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
   # The snapshot format is the trust boundary for state sync: a mirror must not
