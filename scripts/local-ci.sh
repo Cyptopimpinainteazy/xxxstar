@@ -350,6 +350,13 @@ GATES_FAST=(
   # parity test, and the bytecode version-compatibility matrix — needs the `compile` feature to
   # build at all, which is why the feature is named here rather than left to unification.
   "test x3-integration:cargo test -p x3-x3-integration --features compile"
+  # `x3-svm-integration` owns the SVM interpreter `pallet-x3-kernel` reaches on chain:
+  # `WasmSvmAdapter::execute` calls `interp_execute_bpf` and its `validate` calls
+  # `interp_validate_program`, both on account/instruction bytes a transaction supplies. No gate
+  # ran its tests, so the compute-accounting defect fixed in `6dbdbf051` (units reported against
+  # the caller's limit instead of the fuel actually granted) and the validate/execute disagreement
+  # about a malformed ELF were both invisible to the gate set.
+  "test x3-svm-integration:cargo test -p x3-svm-integration"
   # The runtime crate — the chain itself. Its 53 tests hold the settlement wiring, the atomic
   # kernel's runtime-level tests, the compiled-program dispatch route and all three upgrade
   # rehearsals, and **no gate ran them**: `FEATURE_REGISTRY.toml` lists the rehearsal test names as

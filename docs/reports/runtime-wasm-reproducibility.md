@@ -181,6 +181,14 @@ bytes**:
   102676561944 bytes failed". Both are bounded by the remaining input now. The bytes move:
   compact 8,506,628 bytes (was 8,506,569), compressed 1,463,682 (was 1,463,589). Two
   from-scratch builds agree.
+* `6dbdbf051` — the SVM interpreter charges what it burned. `execute_bpf` caps its fuel at
+  MAX_INSN_FUEL and then reported `config.compute_unit_limit - vm.fuel`, so any limit above the
+  cap counted the gap as spent: a two-instruction program under a 2,000,000 unit limit reported
+  1,000,002 units, and the pallet charges that number. It reports against the fuel actually granted
+  now, and `validate_program` applies the same `.text` checks `execute_bpf` does, so a payload that
+  validates can no longer be refused at execution for a reason validation could have seen. The
+  bytes move: compact 8,506,630 bytes (was 8,506,628), compressed 1,463,693 (was 1,463,682). Two
+  from-scratch builds agree.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
