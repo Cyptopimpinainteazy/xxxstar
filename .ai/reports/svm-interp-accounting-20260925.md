@@ -6,6 +6,16 @@ two passes found a gas limit that was never applied (`X3Executor`) and two reade
 from an untrusted count (`mini_x3`, `x3-backend`). This one found a compute figure that was wrong
 whenever the caller's limit was above the interpreter's own cap.
 
+**Correction, added 2026-09-25 after the gate census.** An earlier draft of this report said the crate
+had "no gate" and that the defects were found "within minutes of the suite being run for the first
+time". Both halves are wrong. `x3-svm-integration` is a root workspace member, so `test workspace:`
+in `GATES_DEEP` (`cargo test --workspace`) runs it; what it lacked was a *fast-set* gate. And the 33
+existing tests passed with both defects present — they were found by the new tests in this file, not
+by running the old ones. The distinction matters: a suite that runs and does not check the thing that
+is broken is a different problem from a suite that never runs at all. The second is what
+`scripts/check-crate-tests-are-gated.py` was written to find, and the census below is why it is
+shipped as a measurement tool rather than a gate.
+
 ## What was checked first, and was already right
 
 The interpreter's handling of untrusted bytes is careful, and worth recording as such:

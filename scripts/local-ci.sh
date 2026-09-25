@@ -352,10 +352,14 @@ GATES_FAST=(
   "test x3-integration:cargo test -p x3-x3-integration --features compile"
   # `x3-svm-integration` owns the SVM interpreter `pallet-x3-kernel` reaches on chain:
   # `WasmSvmAdapter::execute` calls `interp_execute_bpf` and its `validate` calls
-  # `interp_validate_program`, both on account/instruction bytes a transaction supplies. No gate
-  # ran its tests, so the compute-accounting defect fixed in `6dbdbf051` (units reported against
-  # the caller's limit instead of the fuel actually granted) and the validate/execute disagreement
-  # about a malformed ELF were both invisible to the gate set.
+  # `interp_validate_program`, both on account/instruction bytes a transaction supplies.
+  #
+  # CORRECTION (2026-09-25): an earlier note here said "no gate ran its tests". That was wrong —
+  # the crate is a root workspace member, so `test workspace` in `GATES_DEEP` runs it. The defects
+  # fixed in `6dbdbf051` (units reported against the caller's limit instead of the fuel actually
+  # granted; a validator that accepted an ELF its executor refused) survived because no *existing*
+  # test covered either, not because no gate ran. This gate puts the suite in the fast set so it
+  # runs on every push rather than only under `--deep`.
   "test x3-svm-integration:cargo test -p x3-svm-integration"
   # The runtime crate — the chain itself. Its 53 tests hold the settlement wiring, the atomic
   # kernel's runtime-level tests, the compiled-program dispatch route and all three upgrade
@@ -416,7 +420,14 @@ GATES_FAST=(
   # runs every target. `SKIP_WASM_BUILD=1` because the library pulls `x3-rpc` for
   # its types, which pulls the runtime — this check needs the types, not the
   # embedded blob, and the blob is built by the root workspace gates anyway.
-  "nested workspaces:for d in crates/x3-swarm-core services/x3-swarm-api services/x3-swarm-worker services/x3-solvency-sidecar; do echo \"== \$d\"; CARGO_TARGET_DIR=\"/tmp/x3-nested-\$(basename \"\$d\")\" cargo check --locked --all-targets --manifest-path \"\$d/Cargo.toml\" || exit 1; done; echo '== crates/x3-sidecar (all targets; runtime wasm skipped)'; SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml || exit 1"
+  "nested workspaces:for d in services/x3-swarm-api services/x3-swarm-worker services/x3-solvency-sidecar; do echo \"== \$d\"; CARGO_TARGET_DIR=\"/tmp/x3-nested-\$(basename \"\$d\")\" cargo check --locked --all-targets --manifest-path \"\$d/Cargo.toml\" || exit 1; done; echo '== crates/x3-sidecar (all targets; runtime wasm skipped)'; SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml || exit 1"
+  # `x3-swarm-core` was in the loop above, where it was `cargo check --all-targets` — which compiles
+  # a crate's tests and runs none of them. Measured 2026-09-25: 69 test attributes, all passing, in
+  # about eight seconds. It gets a `cargo test` of its own. The other three stay on `check`: the API
+  # and worker have no tests at all, and the solvency sidecar's suite contains a test
+  # (`state::tests::record_fill_time_ema_after_window`) that runs for minutes, which is a finding in
+  # its own right rather than something to put in the fast set.
+  "test x3-swarm-core:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-core cargo test --locked --all-targets --manifest-path crates/x3-swarm-core/Cargo.toml"
   # `AGENTS.md` asks for `pnpm test`, `pnpm build` and `npm test` before any
   # task is called complete. Nothing in this harness ran any of them, and
   # nothing else did either: **412 tests across twelve JS projects** had never
