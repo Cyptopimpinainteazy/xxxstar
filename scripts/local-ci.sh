@@ -21,7 +21,8 @@
 #   scripts/local-ci.sh --list          # show the gate list without running it
 #
 # Scheduling and scoping (added for the pre-push hook and for triage):
-#   --jobs N          run N gates at once (default 3, or X3_LOCAL_CI_JOBS)
+#   --jobs N          run N gates at once (default 3, or X3_LOCAL_CI_JOBS). The gates that
+#                     bind fixed host ports run one at a time regardless - see SERIAL_GATES.
 #   --cargo-jobs N    CARGO_BUILD_JOBS for every gate (default 10, or the env var)
 #   --only a,b        run exactly these gate slugs (see --list)
 #   --skip a,b        drop these gate slugs; the summary records the skip loudly
@@ -755,6 +756,43 @@ run_gate() {
   fi
 }
 
+# Gates that bind fixed host ports cannot share the box with each other.
+#
+# Every live and cross-domain gate boots the X3 dev chain on 19945 with its metrics
+# exporter on 9615 (anvil on 18545, the solana validator on 18999), and none of them
+# parameterises those ports. Measured with `--jobs 2` on 2026-09-24: the strict
+# cross-domain EVM gate failed with
+#   `Thread 'tokio-rt-worker' panicked at 'error binding to 127.0.0.1:9615: Address
+#    already in use (os error 98)'`
+# followed by `Connection reset by peer` on 19945, while its sibling held the port —
+# and the same gate passes alone in 223s. A second node losing the bind talks past the
+# first one, so the failure is not even reliably loud.
+#
+# Serialising nine gates costs a few minutes on a full `--all` run. A false red costs
+# the trust the entire gate list depends on, and this list is the repository's own
+# proof command, so the minutes are the cheaper half of that trade. This is the
+# smallest correct fix: the alternative is a per-gate port allocation, which means
+# threading a port block through nine scripts and every test constant they drive.
+SERIAL_GATES=(
+  "local node smoke"
+  "local network smoke"
+  "EVM contract lifecycle"
+  "SVM contract lifecycle"
+  "X3-native lifecycles"
+  "cross-domain EVM"
+  "cross-domain SVM"
+  "cross-domain EVM (strict posture)"
+  "cross-domain SVM (strict posture)"
+)
+
+is_serial_gate() {
+  local candidate="$1" entry
+  for entry in "${SERIAL_GATES[@]}"; do
+    [ "$entry" = "$candidate" ] && return 0
+  done
+  return 1
+}
+
 any_failed() {
   local file
   for file in "$LOG_DIR"/local-ci-"$STAMP"-*.status; do
@@ -780,6 +818,18 @@ for spec in "${SELECTED[@]}"; do
     exit 2
   fi
   SEEN_SLUG[$slug]=1
+  # A port-binding gate drains the pool first and then runs in the foreground, so the
+  # box is its own for the whole gate whatever --jobs says.
+  if is_serial_gate "$name"; then
+    wait 2>/dev/null
+    if [ "$FAIL_FAST" = 1 ] && any_failed; then
+      echo "local-ci: --fail-fast triggered — stopping remaining gates"
+      kill_running
+      break
+    fi
+    run_gate "$name" "$slug" "$cmd"
+    continue
+  fi
   while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do
     wait -n
     if [ "$FAIL_FAST" = 1 ] && any_failed; then
