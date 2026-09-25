@@ -7925,3 +7925,48 @@ decision needs.
    `benchmark pallet`) and retire the explicit write declaration — or record precisely why not
    (machine-specific weights on a non-reference host is a real argument either way).
 2. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
+
+## 2026-09-25 (forty-seventh pass) — the upgrade rehearsal with state, and the runtime's own tests had no gate
+
+### What closed
+- **X3-LANG-004's upgrade-rehearsal item, at the runtime level.** `runtime_upgrade_rehearsal` already
+  covered *versions* (roll every migrated pallet back to 0 against populated genesis, run the hooks,
+  require the declared version). Nothing covered the other half of an upgrade's promise — that it
+  leaves data alone — so `the_kernel_upgrade_moves_the_version_without_touching_its_state` seeds kernel
+  state (canonical-ledger balance, used comit nonce, authorized submitter), rolls the kernel to
+  version 1, runs the real `Migrations` tuple, and requires the version to move **and** the state to
+  come out identical, with both preconditions asserted (so it cannot pass vacuously) and a second run
+  required to be a no-op. Falsified: making the migration rewrite the ledger turns it red with
+  `a version move must not rewrite the ledger`; restored byte-identically.
+- **The largest gate hole so far: no gate ran `cargo test -p x3-chain-runtime`.** The runtime crate is
+  the chain, and its 53 tests hold the settlement wiring, the atomic kernel's runtime-level tests, the
+  compiled-program dispatch route, the receipt read-back, and all three upgrade rehearsals — the very
+  names `FEATURE_REGISTRY.toml` lists as required evidence. `check-readiness-consistency.sh` proves
+  those names *exist*; nothing in the default set ever *ran* them. Added `test runtime` (22s standalone,
+  49s inside the gate).
+- **The generalisable lesson**: the registry's `required_tests` are name-checked, not executed. Five
+  times this session a suite existed, was cited as evidence, and ran in no gate (kernel, supply-ledger,
+  router, x3-integration, runtime). A cheap checker — parse the registry, map each `crate_or_service`
+  to a workspace member via `cargo metadata`, and require that member to appear in some
+  `cargo test -p` gate, with a known-ungated baseline that may only shrink — would stop the sixth.
+
+### Measured at `f3d80c2e2`
+- `bash scripts/local-ci.sh` -> **40 of 40 gates PASS** (34 when this gate work started; the session
+  added kernel, supply-ledger, router, asset-registry, x3-integration, runtime).
+- `test runtime` 49s: 53 tests. `test x3-integration` 6s: 33 tests. `test x3-cross-vm-router`: 81.
+  `test x3-supply-ledger`: 41. `test x3-kernel`: 218.
+- Row X3-LANG-004: upgrade-rehearsal bullet closed, tested 88 -> 90. Remaining on it: the *live-chain*
+  rehearsal (`scripts/mainnet/runtime_upgrade_rehearsal.sh` wants a release build and `subxt`) and the
+  benchmark.
+
+### Still open
+1. `submit_comit_v2`'s benchmark re-run — now the *last* locally-actionable item on X3-LANG-004.
+2. The registry-vs-gates checker described above (prevents the next instance of the recurring hole).
+3. Live-chain upgrade rehearsal; external half of X3-XVM-002; concurrent multi-validator traffic.
+4. Rotate the bridge API key in git history. The default-vs-deep gate decision.
+
+### Next task seed
+1. Write `scripts/check-registry-tests-are-gated.py` with a shrinking known-baseline, and add it to
+   the fast set — then the "which suite is not run" question is answered by a gate instead of by me.
+2. Re-run `submit_comit_v2`'s benchmark, or record why not.
+3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
