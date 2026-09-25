@@ -91,5 +91,8 @@ try-runtime = [
     "frame-support/try-runtime",
 ]
 dev-bypass = []
+# Enables the accept-all `bridge_integration::NoOpCrossChainValidator` outside
+# tests. Off by default; never enable it in a runtime that settles real value.
+dev-proofs = []
 dev = []
 testnet = []
