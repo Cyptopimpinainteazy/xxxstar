@@ -752,3 +752,252 @@ fn verification_detects_state_swapped_in_under_a_copied_manifest() {
         "substituted state must not survive the full check either"
     );
 }
+
+// ── Restore ─────────────────────────────────────────────────────────────────
+
+/// A snapshot of three real entries, anchored to the root its own bytes produce.
+fn restorable_snapshot() -> (SnapshotManifest, Vec<ChunkSlot>, String, Vec<StateEntry>) {
+    let entries = entries();
+    let root = compute_state_root(&entries, TrieVersion::V1).expect("compute");
+
+    let mut builder = builder();
+    builder.state_root = root.clone();
+    let (manifest, chunks) = builder.build(&entries).expect("build");
+
+    (
+        manifest,
+        chunks.into_iter().map(Some).collect(),
+        root,
+        entries,
+    )
+}
+
+fn restore_request<'a>(
+    manifest: &'a SnapshotManifest,
+    anchor: &'a TrustedAnchor<'a>,
+    chunks: &'a [ChunkSlot],
+) -> RestoreRequest<'a> {
+    RestoreRequest {
+        manifest,
+        anchor,
+        chunks,
+        version: TrieVersion::V1,
+        chain_name: "x3 restored".to_string(),
+        spec_id: "x3_restored".to_string(),
+        template: None,
+    }
+}
+
+/// The hex map a raw spec carries, for comparing state without caring about order.
+fn top_of(spec: &serde_json::Value) -> serde_json::Value {
+    spec["genesis"]["raw"]["top"].clone()
+}
+
+#[test]
+fn a_restored_spec_reproduces_exactly_the_state_that_was_verified() {
+    let (manifest, chunks, root, entries) = restorable_snapshot();
+    let anchor = TrustedAnchor {
+        state_root: &root,
+        ..anchor(None)
+    };
+
+    let (spec, provenance) =
+        restore_snapshot(&restore_request(&manifest, &anchor, &chunks)).expect("restore");
+
+    assert_eq!(provenance.state_root, root);
+    assert_eq!(provenance.state_entries, entries.len() as u64);
+    assert_eq!(provenance.chunk_count, manifest.chunk_count);
+    assert_eq!(provenance.block_hash, BLOCK_HASH);
+    assert_eq!(provenance.manifest_hash, manifest_hash(&manifest).expect("hash"));
+
+    // Read it back through the reader the exporter uses, and hash it again: the
+    // spec handed to the operator is the state the snapshot verified.
+    let reread = state_entries_from_raw_spec(&spec).expect("re-read restored spec");
+    // The spec carries the same pairs, in canonical key order — a raw spec is a
+    // map, so entry order is not part of either side of this comparison.
+    let mut sorted_reread = reread.clone();
+    sorted_reread.sort();
+    let mut sorted_entries = entries.clone();
+    sorted_entries.sort();
+    assert_eq!(
+        sorted_reread, sorted_entries,
+        "the restored spec must carry the same pairs"
+    );
+    assert_eq!(
+        compute_state_root(&reread, TrieVersion::V1).expect("root"),
+        root
+    );
+
+    // `RawGenesis` denies unknown fields and requires both halves, so both must
+    // be there or the node cannot read the spec at all.
+    assert_eq!(top_of(&spec).as_object().expect("top").len(), entries.len());
+    assert_eq!(
+        spec["genesis"]["raw"]["childrenDefault"],
+        serde_json::json!({})
+    );
+}
+
+#[test]
+fn a_restored_spec_records_where_its_state_came_from() {
+    let (manifest, chunks, root, _) = restorable_snapshot();
+    let anchor = TrustedAnchor {
+        state_root: &root,
+        ..anchor(None)
+    };
+
+    let (spec, _) =
+        restore_snapshot(&restore_request(&manifest, &anchor, &chunks)).expect("restore");
+
+    // The provenance travels inside the spec, so it cannot be separated from the
+    // state it describes by copying one file.
+    let properties = spec["properties"].as_object().expect("properties");
+    assert_eq!(properties["x3SnapshotChainId"], CHAIN_ID);
+    assert_eq!(properties["x3SnapshotBlockNumber"], "4242");
+    assert_eq!(properties["x3SnapshotBlockHash"], BLOCK_HASH);
+    assert_eq!(properties["x3SnapshotStateRoot"], root);
+    assert_eq!(properties["x3SnapshotRuntimeSpecVersion"], "23");
+    assert_eq!(properties["x3SnapshotTrieLayout"], "V1");
+
+    // And it does not claim to be a live chain.
+    assert_eq!(spec["chainType"], "Local");
+    assert_eq!(spec["name"], "x3 restored");
+    assert_eq!(spec["id"], "x3_restored");
+}
+
+#[test]
+fn restoring_a_tampered_chunk_is_refused_before_any_spec_exists() {
+    let (manifest, mut chunks, root, _) = restorable_snapshot();
+    let anchor = TrustedAnchor {
+        state_root: &root,
+        ..anchor(None)
+    };
+
+    chunks[1] = Some(vec![0xff; 16]);
+
+    match restore_snapshot(&restore_request(&manifest, &anchor, &chunks)) {
+        Err(SnapshotError::ChunkHashMismatch { index, .. }) => assert_eq!(index, 1),
+        other => panic!("expected the tampered chunk to be refused, got {other:?}"),
+    }
+}
+
+#[test]
+fn restoring_an_incomplete_snapshot_is_refused() {
+    let (manifest, mut chunks, root, _) = restorable_snapshot();
+    let anchor = TrustedAnchor {
+        state_root: &root,
+        ..anchor(None)
+    };
+
+    chunks[2] = None;
+
+    assert!(matches!(
+        restore_snapshot(&restore_request(&manifest, &anchor, &chunks)),
+        Err(SnapshotError::MissingChunk { index: 2 })
+    ));
+}
+
+#[test]
+fn restoring_a_snapshot_anchored_to_another_chain_is_refused() {
+    let (manifest, chunks, root, _) = restorable_snapshot();
+    let anchor = TrustedAnchor {
+        chain_id: "x3_mainnet",
+        state_root: &root,
+        ..anchor(None)
+    };
+
+    assert!(matches!(
+        restore_snapshot(&restore_request(&manifest, &anchor, &chunks)),
+        Err(SnapshotError::WrongChain { .. })
+    ));
+}
+
+#[test]
+fn restoring_a_snapshot_that_is_older_than_the_callers_floor_is_refused() {
+    let (manifest, chunks, root, _) = restorable_snapshot();
+    let anchor = TrustedAnchor {
+        state_root: &root,
+        minimum_block_number: manifest.block_number + 1,
+        ..anchor(None)
+    };
+
+    assert!(matches!(
+        restore_snapshot(&restore_request(&manifest, &anchor, &chunks)),
+        Err(SnapshotError::Stale { .. })
+    ));
+}
+
+#[test]
+fn restoring_state_swapped_in_under_a_copied_manifest_is_refused() {
+    // The mirror keeps every piece of metadata and serves different state: the
+    // manifest is self-consistent, the chunks hash to what it commits to, and it
+    // is only the root recomputed from the entries that gives it away.
+    let (mut manifest, chunks, _, _) = restorable_snapshot();
+    manifest.state_root =
+        "0x2222222222222222222222222222222222222222222222222222222222222222".to_string();
+
+    let anchor = TrustedAnchor {
+        state_root: &manifest.state_root,
+        ..anchor(None)
+    };
+
+    assert!(matches!(
+        restore_snapshot(&restore_request(&manifest, &anchor, &chunks)),
+        Err(SnapshotError::RecomputedStateRootMismatch { .. })
+    ));
+}
+
+#[test]
+fn a_template_contributes_metadata_but_never_state() {
+    let (manifest, chunks, root, entries) = restorable_snapshot();
+    let anchor = TrustedAnchor {
+        state_root: &root,
+        ..anchor(None)
+    };
+
+    // A template that carries its own, different state: a restore must replace it
+    // rather than merge it, or the result would be a third state that neither the
+    // snapshot nor the chain can name.
+    let template = serde_json::json!({
+        "name": "X3 Testnet",
+        "id": "x3_testnet_alpha",
+        "chainType": "Live",
+        "bootNodes": ["/ip4/203.0.113.7/tcp/30333/p2p/12D3KooWabcdef"],
+        "telemetryEndpoints": null,
+        "protocolId": "x3",
+        "properties": { "tokenSymbol": "X3", "tokenDecimals": 12 },
+        "genesis": {
+            "raw": {
+                "top": { "0xdead": "0xbeef" },
+                "childrenDefault": {}
+            }
+        }
+    });
+
+    let mut request = restore_request(&manifest, &anchor, &chunks);
+    request.template = Some(&template);
+    request.chain_name = "X3 Testnet snapshot at 4242".to_string();
+    request.spec_id = "x3_testnet_alpha_snapshot".to_string();
+
+    let (spec, _) = restore_snapshot(&request).expect("restore");
+
+    // Metadata carried over ...
+    assert_eq!(spec["chainType"], "Live");
+    assert_eq!(spec["protocolId"], "x3");
+    assert_eq!(
+        spec["bootNodes"][0],
+        "/ip4/203.0.113.7/tcp/30333/p2p/12D3KooWabcdef"
+    );
+    assert_eq!(spec["properties"]["tokenSymbol"], "X3");
+    // ... and merged with provenance, not overwritten by it.
+    assert_eq!(spec["properties"]["x3SnapshotStateRoot"], root);
+    // ... but the template's name/id are replaced, so a restored spec cannot be
+    // mistaken for the chain it was templated from.
+    assert_eq!(spec["name"], "X3 Testnet snapshot at 4242");
+    assert_eq!(spec["id"], "x3_testnet_alpha_snapshot");
+    assert_ne!(spec["id"], template["id"]);
+
+    // The template's state is gone; only the snapshot's entries remain.
+    let top = top_of(&spec);
+    assert_eq!(top.as_object().expect("top").len(), entries.len());
+    assert!(top.get("0xdead").is_none(), "template state must be replaced");
+}
