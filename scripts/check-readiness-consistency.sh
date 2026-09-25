@@ -15,8 +15,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-REGISTRY="$REPO_ROOT/FEATURE_REGISTRY.toml"
-FLAGS="$REPO_ROOT/TESTNET_FEATURE_FLAGS.toml"
+# `X3_READINESS_REGISTRY` / `X3_READINESS_FLAGS` are documented test hooks: the
+# regression test for this script (tests/test_readiness_flag_consistency.py)
+# points them at fixture copies so it can assert that a contradictory flags file
+# is rejected without mutating the canonical files. Defaults are canonical.
+REGISTRY="${X3_READINESS_REGISTRY:-$REPO_ROOT/FEATURE_REGISTRY.toml}"
+FLAGS="${X3_READINESS_FLAGS:-$REPO_ROOT/TESTNET_FEATURE_FLAGS.toml}"
 
 if [[ ! -f "$REGISTRY" ]]; then
   echo "FAIL: FEATURE_REGISTRY.toml not found at $REGISTRY"
@@ -204,7 +208,7 @@ echo ""
 # --- Cross-check TESTNET_FEATURE_FLAGS.toml against registry modes ---
 if [[ -f "$FLAGS" ]]; then
   echo "--- Checking TESTNET_FEATURE_FLAGS.toml vs registry modes ---"
-  while IFS= read -r line; do
+  while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" =~ ^([a-z_]+)[[:space:]]*=[[:space:]]*\"([A-Z_]+)\" ]]; then
       feat="${BASH_REMATCH[1]}"
       flag_mode="${BASH_REMATCH[2]}"
@@ -223,6 +227,77 @@ if [[ -f "$FLAGS" ]]; then
       fi
     fi
   done < "$FLAGS"
+fi
+
+# --- Keys the loop above cannot see ----------------------------------------
+# The mode cross-check uses `^([a-z_]+)`, which does not match a key containing
+# a digit, so `x3_forge`, `x3_reactor`, `x3_sentinel` and `x3_wallet_pallet`
+# were never compared at all. It is also a no-op for a flags key with no
+# registry section (`get_mode` returns nothing), which is how
+# `external_bridges_mainnet = "GUARDED_TESTNET"` and the registry's
+# "disabled at genesis" record for the same path coexisted while this script
+# still printed PASS. Close both holes.
+#
+# Keys that intentionally have no registry section of their own:
+#   x3_swarm              -> scored in the registry as [x3_swarm_core]
+#   external_bridges_mainnet, btc_mainnet_gateway
+#                         -> the public-testnet exposure axis; additionally
+#                            enforced by the genesis-gate invariant below
+#   x3_broadcast, x3_grantsmith, ai_consensus, auto_mainnet_deploy
+#                         -> off-chain tooling/service wiring, not a registry
+#                            subsystem
+# Any *new* unmatched key is a violation: add the registry section, or declare
+# it here on purpose.
+FLAG_KEYS_WITHOUT_REGISTRY_SECTION="x3_swarm x3_broadcast x3_grantsmith ai_consensus auto_mainnet_deploy external_bridges_mainnet btc_mainnet_gateway"
+if [[ -f "$FLAGS" ]]; then
+  echo "--- Checking flag keys the mode cross-check cannot compare ---"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ ^([a-z0-9_]+)[[:space:]]*=[[:space:]]*\"([A-Z_]+)\" ]]; then
+      feat="${BASH_REMATCH[1]}"
+      flag_mode="${BASH_REMATCH[2]}"
+      registry_mode=$(get_mode "$feat")
+      if [[ -n "$registry_mode" && "$registry_mode" != "UNKNOWN" ]]; then
+        # A digit-free key was already compared by the loop above.
+        if [[ "$feat" == *[0-9]* && "$flag_mode" != "$registry_mode" ]]; then
+          echo "  VIOLATION: Feature '$feat' has mode '$flag_mode' in TESTNET_FEATURE_FLAGS.toml but '$registry_mode' in FEATURE_REGISTRY.toml"
+          VIOLATIONS=$((VIOLATIONS + 1))
+        fi
+        continue
+      fi
+      case " $FLAG_KEYS_WITHOUT_REGISTRY_SECTION " in
+        *" $feat "*)
+          echo "  NOTE: flag '$feat' is declared as having no registry section"
+          ;;
+        *)
+          echo "  VIOLATION: flag '$feat' has no FEATURE_REGISTRY.toml section and is not declared in FLAG_KEYS_WITHOUT_REGISTRY_SECTION"
+          VIOLATIONS=$((VIOLATIONS + 1))
+          ;;
+      esac
+    fi
+  done < "$FLAGS"
+fi
+
+# --- External-bridge exposure must match the registry's genesis gate --------
+# `external_bridges_mainnet` and `btc_mainnet_gateway` say how much *external*
+# bridge surface the public testnet exposes. Neither has a registry section, so
+# nothing above ties them to the registry's record that
+# `ExternalBridgesEnabled = false` at genesis. Check that invariant by meaning,
+# not by key name: while the registry records the external-bridge path as off at
+# genesis, no flags key may claim it is live or guarded.
+if [[ -f "$FLAGS" ]]; then
+  echo "--- Checking external-bridge exposure against the registry genesis gate ---"
+  if grep -qi 'disabled at genesis' "$REGISTRY"; then
+    for bridge_key in external_bridges_mainnet btc_mainnet_gateway; do
+      bridge_mode=$(sed -nE "s/^${bridge_key}[[:space:]]*=[[:space:]]*\"([A-Z_]+)\".*/\1/p" "$FLAGS" | head -1)
+      if [[ -z "$bridge_mode" ]]; then
+        continue
+      fi
+      if [[ "$bridge_mode" != "DISABLED_BLOCKED" ]]; then
+        echo "  VIOLATION: '$bridge_key = \"$bridge_mode\"' contradicts FEATURE_REGISTRY.toml, which records the external-bridge path as disabled at genesis (LAUNCH_SCOPE.md; RC6 guardrail). Use DISABLED_BLOCKED until governance lifts the genesis gate."
+        VIOLATIONS=$((VIOLATIONS + 1))
+      fi
+    done
+  fi
 fi
 
 # --- Check CURRENT_MAINNET_STATUS.md ---

@@ -1,7 +1,7 @@
 # X3 Testnet Readiness Report
 
 **Generated:** 2026-06-16T03:45:00-06:00
-**Status:** Bridge-Enabled Public Testnet — GO conditioned on staging rehearsal
+**Status:** External Bridges DISABLED — package readiness governed by `scripts/mainnet/rc6_public_testnet_readiness.sh` (RC6 verdict is the gate, not this report)
 **Authoritative scope:** LAUNCH_SCOPE.md v1.1
 
 ---
@@ -21,8 +21,8 @@
 | x3_forge | GUARDED_TESTNET | unit | CI-gated | none | 65 | 0 |
 | x3_sentinel | GUARDED_TESTNET | unit | CI-gated | alertmanager | 70 | 0 |
 | x3_swarm | GUARDED_TESTNET | unit | CI-gated | none | 65 | 0 |
-| external_bridges_mainnet | GUARDED_TESTNET | Foundry + relayer | deploy-gated | relayer counters | 60 | EVM deploy + verify pending |
-| btc_mainnet_gateway | SIM_TESTNET | simulator only | none | none | 25 | needs regtest/signet |
+| external_bridges_mainnet | DISABLED_BLOCKED | Foundry + relayer | deploy-gated | relayer counters | 60 | Off at genesis (`ExternalBridgesEnabled = false`); RC6 guardrail keeps it off for the public testnet |
+| btc_mainnet_gateway | DISABLED_BLOCKED | simulator only | none | none | 25 | BTC domain is simulator-only (registry `[btc_fortress_gateway]` = SIM_TESTNET) |
 | ai_consensus | DISABLED_BLOCKED | none | none | none | 0 | blocked post-audit |
 | auto_mainnet_deploy | DISABLED_BLOCKED | none | none | none | 0 | blocked post-audit |
 
