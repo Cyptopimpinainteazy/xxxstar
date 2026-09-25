@@ -265,6 +265,14 @@ GATES_FAST=(
   # The wrapper audits with --no-fetch (hermetic, ~1s) and fails when the local RustSec database
   # is older than 45 days, so a database nobody refreshed cannot masquerade as a clean audit.
   "dependency audit:bash scripts/check-dependency-audit.sh"
+  # The JS half of the same question. `npm audit` is what `.cargo/audit.toml` is for on the
+  # Rust side, and no gate ran it either: measured on 2026-09-25 across the 36 projects with
+  # a committed package-lock.json plus the pnpm one, 62 advisories sat in 8 projects --
+  # including a critical (websocket-driver) and nine highs (axios, form-data, picomatch,
+  # brace-expansion, ip-address) -- with every gate green. Seven of the eight are now clean
+  # and the eighth's remaining findings are all `low`, documented and ratcheted in
+  # security/npm-audit-baseline.json. critical/high can never be baselined.
+  "npm audit:python3 scripts/check-npm-audit.py"
   "feature matrix check:python3 scripts/feature_matrix.py check"
   # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
   # `audit-artifacts/current/feature-status.json` are *derived* from FEATURE_REGISTRY.toml and

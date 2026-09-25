@@ -1,0 +1,33 @@
+{
+  "_comment": "npm advisories this project has looked at and accepted. Written by scripts/check-npm-audit.py --update. critical and high findings can never appear here -- the gate fails on them unconditionally. An entry that stops being reported fails too, so the file cannot outlive the exposure it describes. Every entry was measured, not assumed: see .ai/reports/npm-audit-20260925.md.",
+  "allowed": {
+    "packages/polkawallet-bridge-adapter": {
+      "@acala-network/eth-providers": "low",
+      "@acala-network/eth-transactions": "low",
+      "@acala-network/sdk": "low",
+      "@digitalnative/type-definitions": "low",
+      "@ethersproject/abi": "low",
+      "@ethersproject/abstract-provider": "low",
+      "@ethersproject/abstract-signer": "low",
+      "@ethersproject/contracts": "low",
+      "@ethersproject/hash": "low",
+      "@ethersproject/hdnode": "low",
+      "@ethersproject/json-wallets": "low",
+      "@ethersproject/providers": "low",
+      "@ethersproject/signing-key": "low",
+      "@ethersproject/transactions": "low",
+      "@ethersproject/wallet": "low",
+      "@ethersproject/wordlists": "low",
+      "@polkadot/apps-config": "low",
+      "@polkadot/keyring": "low",
+      "@polkadot/metadata": "low",
+      "@polkadot/types": "low",
+      "@polkadot/types-known": "low",
+      "@polkadot/util-crypto": "low",
+      "@polkawallet/bridge": "low",
+      "elliptic": "low",
+      "ethers": "low",
+      "pontem-types-bundle": "low"
+    }
+  }
+}
