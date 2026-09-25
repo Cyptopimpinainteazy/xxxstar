@@ -52,9 +52,11 @@ LOCAL_CI = ROOT / "scripts" / "local-ci.sh"
 # Each one is recorded with the reason it is not gated yet, so the next reader inherits the decision
 # rather than the silence.
 KNOWN_UNGATED = {
-    # Measured 2026-09-25 with this script's `--list`. The other eight entries this list started with
-    # were gated the same day, which is the only direction this list is allowed to move.
-    "x3_htlc": "X3-contracts/svm/programs/x3_htlc is an orphan tree (the registry row says so); the SVM HTLC on the live path is programs/svm/x3_atomic_swap, which its own gate exercises",
+    # **Empty, and it must stay empty.** Every registry feature that cites a crate now has a gate that
+    # runs its tests: the nine this list started with on 2026-09-25 were closed the same day (eight by
+    # adding gates, `x3_htlc` by running the nested workspace's tests through `test x3-htlc`). A new
+    # entry here is a decision to ship a registry claim whose tests nothing runs, and the checker's
+    # message says so.
 }
 
 
@@ -74,6 +76,48 @@ def _metadata() -> dict:
 def _gate_commands() -> list[str]:
     """Every gate command in `scripts/local-ci.sh`, as written."""
     return [m.group(1) for m in re.finditer(r'^\s*"[^"]+:(.*)"\s*$', LOCAL_CI.read_text(), re.M)]
+
+
+def _nested_package_name(directory: Path) -> str | None:
+    """The package name a nested workspace's manifest gives this directory, if any."""
+    manifest = directory / "Cargo.toml"
+    if not manifest.is_file():
+        return None
+    proc = subprocess.run(
+        ["cargo", "metadata", "--no-deps", "--format-version", "1", "--manifest-path", str(manifest)],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    for package in json.loads(proc.stdout).get("packages", []):
+        if Path(package["manifest_path"]).parent.resolve() == directory:
+            return package["name"]
+    return None
+
+
+def _tested_as_nested_package(directory: Path) -> bool:
+    """Does a `cargo test` gate run this directory's package from a workspace containing it?
+
+    The nested `X3-contracts/svm` workspace is not in the root workspace, so its packages never appear
+    in root metadata. The gate for it names the *workspace* manifest and selects the package with
+    `-p`, which is the form this recognises — and it insists the named manifest is the directory itself
+    or one of its ancestors, so a same-named package in another workspace cannot count.
+    """
+    name = _nested_package_name(directory)
+    if name is None:
+        return False
+    for command in _gate_commands():
+        if "cargo test" not in command:
+            continue
+        match = re.search(r"--manifest-path[=\s]+([^\s]+)", command)
+        if match is None:
+            continue
+        workspace = (ROOT / match.group(1)).resolve().parent
+        if directory != workspace and workspace not in directory.parents:
+            continue
+        if re.search(rf"-p\s+{re.escape(name)}\b", command):
+            return True
+    return False
 
 
 def _manifest_is_tested(manifest: Path) -> bool:
@@ -145,7 +189,8 @@ def main(argv: list[str] | None = None) -> int:
         # the directory must not count as running it.
         runs_a_script_in_tree = re.search(rf"{re.escape(target)}/[\w./-]+\.sh", _gate_text()) is not None
         tested_by_manifest = manifest in manifests and _manifest_is_tested(manifest)
-        if runs_a_script_in_tree or tested_by_manifest:
+        tested_as_nested_package = _tested_as_nested_package(directory)
+        if runs_a_script_in_tree or tested_by_manifest or tested_as_nested_package:
             covered.append((feature, member or f"{target} (gate runs this tree)"))
             continue
         if not required:

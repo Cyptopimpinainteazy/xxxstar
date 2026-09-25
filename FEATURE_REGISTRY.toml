@@ -390,8 +390,8 @@ dangerous_paths = ["pallets/x3-wrapped", "runtime", "bridge authority", "council
 mode = "SIM_TESTNET"
 crate_or_service = "X3-contracts/svm/programs/x3_htlc"
 tauri_app = ""
-# This row describes a tree nothing else references: no script, workflow or crate
-# in the repo builds or runs `X3-contracts/svm/programs/x3_htlc`. The SVM HTLC
+# This tree is a member of the nested `X3-contracts/svm` workspace, and nothing in the root
+# repository calls it. The SVM HTLC
 # that IS on the live cross-VM path is `programs/svm/x3_atomic_swap`, which
 # `scripts/cross-domain-svm-gate.sh` builds with `cargo build-sbf`, deploys to a
 # real `solana-test-validator`, and exercises end to end — and which
@@ -402,9 +402,20 @@ tauri_app = ""
 #
 # The score here stays low on purpose: it is a statement about THIS tree, which
 # still has no localnet lifecycle for itself.
+# 2026-09-25 correction: this comment used to say "no script, workflow or crate in
+# the repo builds or runs" this tree, and in the same breath cited
+# `.github/workflows/svm-htlc.yml` as its enforcement. Both halves were wrong in
+# opposite directions. The workflow is not in this tree at all — it lived on the
+# unmerged `fix/svm-htlc-native-custody-master` branch, per
+# `.ai/runlogs/repo-consolidation-20260917_inventory.log` — and the tests were
+# running nowhere in the local gate set. `test x3-htlc` now runs them
+# (`cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc`: 7 tests,
+# measured green 2026-09-25), which `registry tests are gated` requires. The
+# workflow that does exist here, `.github/workflows/x3vm-svm-live-lifecycle.yml`,
+# gates the live `programs/svm/x3_atomic_swap` program, not this one.
+#
 # Verified 2026-09-11: `cargo test -p x3_htlc` = 7/7 passing (commit
-# 66da1221d added this coverage; 173fcec2b made it CI-enforced via
-# .github/workflows/svm-htlc.yml). Confirmed NOT called from
+# 66da1221d added the coverage). Confirmed NOT called from
 # crates/x3-atomic-swap or crates/cross-vm-coordinator — those files only
 # share the string "x3-htlc" as an unrelated hash-domain tag, not a real
 # caller relationship.

@@ -291,6 +291,12 @@ GATES_FAST=(
   "test x3-wrapped:cargo test -p pallet-x3-wrapped"
   "test atomic-trade-engine:cargo test -p pallet-atomic-trade-engine"
   "test x3-bench:cargo test -p x3-bench"
+  # `X3-contracts/svm/programs/x3_htlc` is a member of a *nested* workspace that the root does not
+  # build, so its tests had never run here. The registry row cites it and used to cite a workflow
+  # (`.github/workflows/svm-htlc.yml`) that is not in this tree at all. Its own target dir is named
+  # for the same reason `nested workspaces` names one: a second workspace sharing the root target
+  # walks cargo through rebuilds it does not need.
+  "test x3-htlc:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-htlc cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc"
   # The other two pallets of the same atomic path. `pallet-x3-cross-vm-router` owns the round trip
   # the whole kernel exists for — the headline test is literally
   # `test_x3_native_evm_svm_roundtrip_preserves_supply` — and, like the supply ledger and the kernel
