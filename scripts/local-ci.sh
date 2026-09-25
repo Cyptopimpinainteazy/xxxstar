@@ -338,6 +338,25 @@ GATES_FAST=(
   # for the same reason `nested workspaces` names one: a second workspace sharing the root target
   # walks cargo through rebuilds it does not need.
   "test x3-htlc:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-htlc cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc"
+  # The rest of the `X3-contracts/svm` workspace. `test x3-htlc` above selects one package out of it,
+  # so these five carried 79 test attributes that nothing ran — the census in
+  # `scripts/check-crate-tests-are-gated.py` is what found them, and all five pass in seconds:
+  # `x3-core` 12, `x3-vm-erc20` 11, `x3-receipt-verifier` 15, `x3-kernel-bridge` 21,
+  # `x3-external-gateway` 20. Each package is named here rather than left to a wildcard so a failure
+  # says which one, and so a reader can tell what the gate covers.
+  "test x3 svm programs:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-programs cargo test --locked --manifest-path X3-contracts/svm/Cargo.toml -p x3-core -p x3-vm-erc20 -p x3-receipt-verifier -p x3-kernel-bridge -p x3-external-gateway"
+  # Three more nested workspaces with suites that pass in seconds and nothing ran. `parity-core` and
+  # `gpu-parity-core` are the GPU/CPU agreement tests — the ones that would catch an accelerator
+  # returning a different verdict from the canonical verifier — and `adapters` is the chain-adapter
+  # workspace. The census found all three; `tests/loom-concurrency` is the one in this group that
+  # cannot be gated yet, because `cargo test --locked` there fails on a stale `Cargo.lock`.
+  "test x3 parity-core:env CARGO_TARGET_DIR=/tmp/x3-nested-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/parity-core/Cargo.toml"
+  "test x3 gpu-parity-core:env CARGO_TARGET_DIR=/tmp/x3-nested-gpu-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/gpu-parity-core/Cargo.toml"
+  "test x3-adapters:env CARGO_TARGET_DIR=/tmp/x3-nested-adapters cargo test --locked --all-targets --manifest-path adapters/Cargo.toml"
+  # `programs/svm/x3_atomic_swap` — the on-chain half of the SVM swap — covers both packages in its
+  # workspace. Ten tests pass; the three "ignored" a reader will see in the output are ```` ```ignore ````
+  # documentation examples, not disabled tests.
+  "test svm atomic swap:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-atomic cargo test --locked --manifest-path programs/svm/x3_atomic_swap/Cargo.toml"
   # The other two pallets of the same atomic path. `pallet-x3-cross-vm-router` owns the round trip
   # the whole kernel exists for — the headline test is literally
   # `test_x3_native_evm_svm_roundtrip_preserves_supply` — and, like the supply ledger and the kernel
@@ -420,7 +439,16 @@ GATES_FAST=(
   # runs every target. `SKIP_WASM_BUILD=1` because the library pulls `x3-rpc` for
   # its types, which pulls the runtime — this check needs the types, not the
   # embedded blob, and the blob is built by the root workspace gates anyway.
-  "nested workspaces:for d in services/x3-swarm-api services/x3-swarm-worker services/x3-solvency-sidecar; do echo \"== \$d\"; CARGO_TARGET_DIR=\"/tmp/x3-nested-\$(basename \"\$d\")\" cargo check --locked --all-targets --manifest-path \"\$d/Cargo.toml\" || exit 1; done; echo '== crates/x3-sidecar (all targets; runtime wasm skipped)'; SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml || exit 1"
+  # One entry per workspace, not a loop over four. A loop hides both things a gate list is for:
+  # which crate failed when it fails, and what it covers when a reader asks. The three on `check`
+  # have nothing to run — `x3-swarm-api` and `x3-swarm-worker` declare no tests, and
+  # `x3-solvency-sidecar`'s suite has `state::tests::record_fill_time_ema_after_window`, still running
+  # after 60 seconds — while `x3-sidecar` and `x3-swarm-core` (below) have suites that pass in
+  # seconds and are tested for real.
+  "check x3-swarm-api:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-api cargo check --locked --all-targets --manifest-path services/x3-swarm-api/Cargo.toml"
+  "check x3-swarm-worker:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-worker cargo check --locked --all-targets --manifest-path services/x3-swarm-worker/Cargo.toml"
+  "check x3-solvency-sidecar:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-solvency-sidecar cargo check --locked --all-targets --manifest-path services/x3-solvency-sidecar/Cargo.toml"
+  "test x3-sidecar:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml"
   # `x3-swarm-core` was in the loop above, where it was `cargo check --all-targets` — which compiles
   # a crate's tests and runs none of them. Measured 2026-09-25: 69 test attributes, all passing, in
   # about eight seconds. It gets a `cargo test` of its own. The other three stay on `check`: the API
@@ -439,7 +467,21 @@ GATES_FAST=(
   # **tracked** output (12 deleted + 4 modified files under the committed
   # `dist/` directories of apps/x3-desktop, packages/polkawallet-plugin and
   # packages/atomic-swap-sdk), so builds need their own tier.
-  "js sdk tests:for d in packages/ts-sdk packages/atomic-swap-sdk packages/blockchain-connector packages/x3-foundry-sdk packages/polkawallet-bridge-adapter packages/polkawallet-plugin apps/shared apps/wallet apps/inferstructor-dashboard apps/x3-desktop tests/wallet-integration; do echo \"== \$d\"; ( cd \"\$d\" && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test ) || exit 1; done; echo '== apps/x3-studio (pnpm)'; ( cd apps/x3-studio && { [ -d node_modules ] || corepack pnpm install --prefer-offline; } && corepack pnpm test ) || exit 1"
+  # One entry per package, for the same reason as the nested workspaces above: a loop over
+  # eleven directories reports "js sdk tests failed" and leaves the reader to find which one, and
+  # nothing outside the shell can tell which packages are covered. `apps/x3-studio` is pnpm.
+  "test js ts-sdk:cd packages/ts-sdk && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js atomic-swap-sdk:cd packages/atomic-swap-sdk && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js blockchain-connector:cd packages/blockchain-connector && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js x3-foundry-sdk:cd packages/x3-foundry-sdk && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js polkawallet-bridge-adapter:cd packages/polkawallet-bridge-adapter && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js polkawallet-plugin:cd packages/polkawallet-plugin && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js shared:cd apps/shared && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js wallet:cd apps/wallet && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js inferstructor-dashboard:cd apps/inferstructor-dashboard && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js x3-desktop:cd apps/x3-desktop && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js wallet-integration:cd tests/wallet-integration && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js x3-studio:cd apps/x3-studio && { [ -d node_modules ] || corepack pnpm install --prefer-offline; } && corepack pnpm test"
   # Two configurations of the proof-verification router, because the `--deep`
   # workspace build unifies `test-verifier` through the gateway pallet's
   # dev-dependency and would therefore never exercise the fail-closed posture.

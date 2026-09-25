@@ -18,9 +18,11 @@ shell is not something this script does reliably. Four ways it was wrong before 
   1. `--all-features` matched a `--all\b` pattern and made every crate look workspace-gated;
   2. a workspace-level `--manifest-path` gate (the form `test x3-lang` uses) names no `-p`, so its
      six crates were reported ungated — 1,300 tests of false positive;
-  3. the `nested workspaces` gate passes its manifest through a shell variable
-     (`--manifest-path "$d/Cargo.toml"`), which a regex over the command text cannot follow; the
-     loop expansion here is partial;
+  3. the `nested workspaces` gate passed its manifest through a shell variable
+     (`--manifest-path "$d/Cargo.toml"`), which a regex over the command text cannot follow. Both
+     loop-shaped gates were split into one entry per workspace on 2026-09-25 for exactly this reason,
+     so the hazard is historical — the loop expansion below is kept for anything that reintroduces
+     the form, and a gate list with none needs none;
   4. `cargo check --all-targets` compiles a crate's tests without running them, and counts as a
      gate in any text-matching scheme even though nothing executes.
 

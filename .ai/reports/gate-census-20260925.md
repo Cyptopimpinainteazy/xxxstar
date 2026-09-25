@@ -82,3 +82,75 @@ empty rather than filled with guesses.
    parity crates, `loom-concurrency`, the two fuzz workspaces, `x3-live-auditor`, `x3-regression-engine`
    and `svm-counter-test`. Each needs the same two questions the fast set answered for `x3-swarm-core`:
    does its suite pass, and how long does it take.
+
+---
+
+# Second pass, same day: the split, and what walking the list turned up
+
+## The loops are gone
+
+Both loop-shaped gates were replaced with one entry per workspace. `nested workspaces` became four
+entries (`check x3-swarm-api`, `check x3-swarm-worker`, `check x3-solvency-sidecar`, `test x3-sidecar`)
+and `js sdk tests` became twelve (eleven packages plus the pnpm `apps/x3-studio`). A loop hides the two
+things a gate list is for: *which* workspace failed when it fails, and *what it covers* when a reader
+asks. It is also the reason hazard 3 above existed at all — with no loops left, the census's gate
+reading is sound for every gate in the file.
+
+## Six gates added, each measured before it was added
+
+| gate | tests | what it was |
+| --- | --- | --- |
+| `test x3-swarm-core` | 69 | `cargo check --all-targets` in the nested loop: compiled, never ran |
+| `test x3 svm programs` | 12 + 11 + 15 + 21 + 20 across five packages | `test x3-htlc` selects one package out of `X3-contracts/svm`; these five were never run |
+| `test svm atomic swap` | 10 | `programs/svm/x3_atomic_swap`, both packages of its workspace |
+| `test x3 parity-core` | 6 | `X3-contracts/shared/parity-core` — the CPU/GPU agreement tests |
+| `test x3 gpu-parity-core` | 7 | same, GPU side |
+| `test x3-adapters` | 20 | `adapters/` had a workspace, a lock and a suite no gate named |
+
+That is **191 test attributes** moved from "nothing runs them" to gated on every push, at a cost of
+about a minute of wall clock (the five-package SVM gate is 46 s cold, the rest are seconds).
+
+The census after the walk: **22 → 11 ungated** crates outside the root workspace.
+
+## The eleven that remain, and why
+
+* `tests/loom-concurrency` (9) — **has no committed `Cargo.lock`**, so `cargo test --locked` fails
+  before it compiles anything.
+* `apps/x3-desktop/src-tauri` (63) and `apps/inferstructor-dashboard/src-tauri` — **stale committed
+  lockfiles**, same failure.
+* `services/x3-solvency-sidecar` (14) — a test that runs for minutes
+  (`state::tests::record_fill_time_ema_after_window`), which cannot go in a fast set as it stands.
+* `x3-live-auditor` (2) and `x3-regression-engine` (1) — the `x3-autonomic-core` tree.
+* `svm-counter-test` (1, twice), the two `pallet-*/fuzz` workspaces (1 each), and two patch-tree
+  crates the census's vendored-path filter does not catch (`sc-allocator`, `sp-maybe-compressed-blob`).
+
+## New measurement: 17 of 36 nested lockfiles are stale
+
+`cargo metadata --locked` over every committed lockfile outside the vendored trees:
+
+```
+committed lockfiles: 36
+of those, --locked FAILS: 17
+  13  pallets/*/fuzz/Cargo.lock
+   3  apps/*/src-tauri/Cargo.lock   (x3-desktop, inferstructor-dashboard, infra-structure/dashboard)
+   1  launch-gates/sources/pack-04-invariant/integration-tests/svm-counter-test/Cargo.lock
+```
+
+plus `tests/loom-concurrency`, which has no lockfile at all. That is 18 of 36 nested workspaces whose
+tests cannot be run with `--locked` as the tree stands — the same class this file recorded for the fuzz
+trees two cycles ago, now measured across all of them rather than one at a time.
+
+## Tickets
+
+1. **Decide what the 15 fuzz and Tauri workspaces are for.** Either they are built and gated, or they
+   are not, and the stale lockfiles go with them. Refreshing one cascades — measured earlier: the
+   narrowest `cargo update` in a fuzz workspace moved 525 packages to 637 — which is why this is a
+   decision, not a chore.
+2. **`tests/loom-concurrency` needs a committed lockfile**, or the directory needs a reason to exist
+   without one.
+3. **`services/x3-solvency-sidecar`'s minutes-long test** needs a fake clock, or the crate needs a gate
+   that is not the fast set.
+4. **Walk the last five crates** (`x3-live-auditor`, `x3-regression-engine`, `svm-counter-test` ×2,
+   `sc-allocator`) the same way this pass walked six: does the suite pass, how long does it take, then
+   gate it.
+
