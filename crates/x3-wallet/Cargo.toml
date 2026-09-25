@@ -10,18 +10,23 @@ parity-scale-codec = { workspace = true, features = ["derive"] }
 scale-info = { workspace = true, features = ["derive"], default-features = false }
 sp-std = { workspace = true, default-features = false }
 sp-core = { workspace = true, default-features = false }
+sp-io = { workspace = true, default-features = false }
 parking_lot = { version = "0.12", optional = true }
 tokio = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 hex = { workspace = true, optional = true }
 
 [dev-dependencies]
+# The tests sign with a real key so that "it verifies" means a signature was produced,
+# not that a byte string was accepted. Signing needs `full_crypto`.
+sp-core = { workspace = true, features = ["std", "full_crypto"] }
 
 [features]
 default = ["std"]
 std = [
     "sp-std/std",
     "sp-core/std",
+    "sp-io/std",
     "scale-info/std",
     "parking_lot",
     "tokio",

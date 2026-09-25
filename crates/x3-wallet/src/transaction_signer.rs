@@ -1,9 +1,18 @@
 /// Transaction Signer — Multi-signature transaction approval engine
 /// Sign, approve, and execute transactions with flexible approval workflows
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use sp_core::{ed25519, sr25519};
+use sp_io::crypto::{ed25519_verify, sr25519_verify};
 #[allow(unused_imports)]
 use sp_std::vec;
 use sp_std::vec::Vec;
+
+/// Domain separator for every message this module signs.
+///
+/// A signature is only meaningful against a stated message. Without a domain prefix the
+/// same bytes could be replayed against any other structure that happens to hash the
+/// same fields, so the prefix is part of the scheme rather than decoration.
+pub const SIGNING_DOMAIN: &[u8] = b"x3-wallet/multisig/v1";
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SigningTransaction {
@@ -143,19 +152,90 @@ impl TransactionSigner {
             is_valid: true,
         };
 
+        // Verify before recording anything. This used to accept any blob that was
+        // non-empty and at most 256 bytes, set `is_valid: true`, and count it toward
+        // `required_signatures` — so `execute_transaction` could be reached with
+        // signatures nobody had produced. A signature that does not verify must not
+        // move the counter.
+        if !Self::verify_signature(transaction, &signature)? {
+            return Err("Signature does not verify for this transaction");
+        }
+
         transaction.signature_count += 1;
         Ok(signature)
     }
 
-    /// Verify signature is valid
-    pub fn verify_signature(signature: &TransactionSignature) -> Result<bool, &'static str> {
+    /// The exact bytes a signer commits to.
+    ///
+    /// Every field a signer is agreeing to is bound here, in a fixed order, behind the
+    /// domain prefix. The mutable counters (`signature_count`, `is_executed`) are
+    /// deliberately excluded: they change as further signatures arrive, so binding them
+    /// would invalidate every earlier signature.
+    pub fn signing_message(transaction: &SigningTransaction) -> Vec<u8> {
+        let mut message = Vec::with_capacity(SIGNING_DOMAIN.len() + 32 * 3 + 16 + 8 + 4 + 8 * 3);
+        message.extend_from_slice(SIGNING_DOMAIN);
+        message.extend_from_slice(&transaction.id);
+        message.extend_from_slice(&transaction.creator);
+        message.extend_from_slice(&transaction.target);
+        message.extend_from_slice(&transaction.value.to_le_bytes());
+        message.extend_from_slice(&(transaction.data.len() as u32).to_le_bytes());
+        message.extend_from_slice(&transaction.data);
+        message.extend_from_slice(&transaction.nonce.to_le_bytes());
+        message.extend_from_slice(&transaction.required_signatures.to_le_bytes());
+        message.extend_from_slice(&transaction.created_block.to_le_bytes());
+        message.extend_from_slice(&transaction.expiry_block.to_le_bytes());
+        message
+    }
+
+    /// Verify a collected signature against the transaction it claims to authorise.
+    ///
+    /// Returns `Ok(true)` only when the signature is a real Ed25519 or Sr25519 signature
+    /// by `signature.signer` over [`Self::signing_message`]. An unknown scheme, a wrong
+    /// length, a signature for another transaction, and a transaction whose signed fields
+    /// have changed all come back `Ok(false)` or an error — never `Ok(true)`.
+    pub fn verify_signature(
+        transaction: &SigningTransaction,
+        signature: &TransactionSignature,
+    ) -> Result<bool, &'static str> {
         if signature.signature_data.is_empty() {
             return Err("Empty signature");
+        }
+        if signature.signature_data.len() > 256 {
+            return Err("Signature too large");
         }
         if !signature.is_valid {
             return Err("Signature marked invalid");
         }
-        Err("Cryptographic signature verification not implemented")
+        if signature.transaction_id != transaction.id {
+            return Err("Signature is for a different transaction");
+        }
+
+        Ok(Self::signature_verifies(
+            &Self::signing_message(transaction),
+            &signature.signer,
+            &signature.signature_data,
+        ))
+    }
+
+    /// True when `signature` (64 bytes) verifies over `message` for `signer`.
+    ///
+    /// Both supported schemes use 32-byte public keys and 64-byte signatures, so the
+    /// scheme is not recoverable from the bytes: the signature is accepted when either
+    /// verifier accepts it. That is not a weakening — an attacker who cannot produce a
+    /// valid Sr25519 *or* Ed25519 signature for the key still produces nothing usable.
+    fn signature_verifies(message: &[u8], signer: &[u8; 32], signature: &[u8]) -> bool {
+        let raw: [u8; 64] = match signature.try_into() {
+            Ok(raw) => raw,
+            Err(_) => return false,
+        };
+
+        let sr_signature = sr25519::Signature::from_raw(raw);
+        if sr25519_verify(&sr_signature, message, &sr25519::Public::from_raw(*signer)) {
+            return true;
+        }
+
+        let ed_signature = ed25519::Signature::from_raw(raw);
+        ed25519_verify(&ed_signature, message, &ed25519::Public::from_raw(*signer))
     }
 
     /// Check if transaction has enough signatures
@@ -232,6 +312,47 @@ impl TransactionSigner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sp_core::{ByteArray as _, Pair as _};
+
+    /// A deterministic signer: a real Sr25519 key pair, not a placeholder byte string.
+    fn signer(seed: u8) -> (sr25519::Pair, [u8; 32]) {
+        let pair = sr25519::Pair::from_seed(&[seed; 32]);
+        let public = pair.public().0;
+        (pair, public)
+    }
+
+    fn signature_bytes(transaction: &SigningTransaction, pair: &sr25519::Pair) -> Vec<u8> {
+        pair.sign(&TransactionSigner::signing_message(transaction))
+            .to_raw()
+            .to_vec()
+    }
+
+    /// Collect a real signature from a deterministic signer.
+    ///
+    /// Four tests in this module (threshold counting, execution, expiry, "signatures
+    /// needed") used to reach the threshold by passing `vec![255]` as the signature
+    /// data, which only worked while `add_signature` accepted any non-empty blob. They
+    /// still test what they were written for; they now reach it the way a caller has to.
+    fn authorise(transaction: &mut SigningTransaction, seed: u8) {
+        let (pair, public) = signer(seed);
+        let signature_data = signature_bytes(transaction, &pair);
+        TransactionSigner::add_signature(transaction, public, signature_data, 0)
+            .expect("a signature over the transaction itself verifies");
+    }
+
+    fn pending_transaction(required: u32) -> SigningTransaction {
+        TransactionSigner::create_transaction(
+            [1u8; 32],
+            [2u8; 32],
+            1000,
+            vec![1, 2, 3],
+            1,
+            required,
+            100,
+            0,
+        )
+        .expect("a well-formed transaction")
+    }
 
     #[test]
     fn test_create_transaction() {
@@ -288,13 +409,41 @@ mod tests {
 
     #[test]
     fn test_add_signature() {
-        let mut tx =
-            TransactionSigner::create_transaction([1u8; 32], [2u8; 32], 1000, vec![], 1, 2, 100, 0)
-                .unwrap();
+        let mut tx = pending_transaction(2);
+        let (pair, public) = signer(3);
+        let signature_data = signature_bytes(&tx, &pair);
 
-        let result = TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255, 254], 0);
+        let result = TransactionSigner::add_signature(&mut tx, public, signature_data, 0);
         assert!(result.is_ok());
         assert_eq!(tx.signature_count, 1);
+        assert!(result.unwrap().is_valid);
+    }
+
+    #[test]
+    fn test_add_signature_refuses_a_well_formed_but_forged_signature() {
+        let mut tx = pending_transaction(1);
+        let (_, public) = signer(3);
+
+        let result = TransactionSigner::add_signature(&mut tx, public, vec![0xAB; 64], 0);
+        assert!(result.is_err());
+        assert_eq!(
+            tx.signature_count, 0,
+            "a signature that does not verify must not count toward the threshold"
+        );
+    }
+
+    #[test]
+    fn test_add_signature_refuses_a_signature_for_another_transaction() {
+        let mut tx = pending_transaction(1);
+        let other =
+            TransactionSigner::create_transaction([9u8; 32], [2u8; 32], 42, vec![], 7, 1, 100, 0)
+                .expect("a well-formed transaction");
+        let (pair, public) = signer(4);
+        let signature_data = signature_bytes(&other, &pair);
+
+        let result = TransactionSigner::add_signature(&mut tx, public, signature_data, 0);
+        assert!(result.is_err());
+        assert_eq!(tx.signature_count, 0);
     }
 
     #[test]
@@ -320,34 +469,78 @@ mod tests {
 
     #[test]
     fn test_verify_signature() {
+        let tx = pending_transaction(1);
+        let (pair, public) = signer(5);
         let sig = TransactionSignature {
             id: [1u8; 32],
-            transaction_id: [2u8; 32],
-            signer: [3u8; 32],
-            signature_data: vec![255, 254],
+            transaction_id: tx.id,
+            signer: public,
+            signature_data: signature_bytes(&tx, &pair),
             signed_block: 0,
             is_valid: true,
         };
 
-        let result = TransactionSigner::verify_signature(&sig);
+        assert_eq!(TransactionSigner::verify_signature(&tx, &sig), Ok(true));
+    }
+
+    #[test]
+    fn test_verify_signature_rejects_a_tampered_transaction() {
+        let tx = pending_transaction(1);
+        let (pair, public) = signer(6);
+        let sig = TransactionSignature {
+            id: [1u8; 32],
+            transaction_id: tx.id,
+            signer: public,
+            signature_data: signature_bytes(&tx, &pair),
+            signed_block: 0,
+            is_valid: true,
+        };
+
+        let mut tampered = tx.clone();
+        tampered.value = tx.value + 1;
         assert_eq!(
-            result,
-            Err("Cryptographic signature verification not implemented")
+            TransactionSigner::verify_signature(&tampered, &sig),
+            Ok(false)
+        );
+
+        let mut retargeted = tx.clone();
+        retargeted.target = [7u8; 32];
+        assert_eq!(
+            TransactionSigner::verify_signature(&retargeted, &sig),
+            Ok(false)
         );
     }
 
     #[test]
-    fn test_verify_signature_invalid() {
+    fn test_verify_signature_rejects_a_signature_for_a_different_transaction() {
+        let tx = pending_transaction(1);
+        let (pair, public) = signer(7);
         let sig = TransactionSignature {
             id: [1u8; 32],
-            transaction_id: [2u8; 32],
-            signer: [3u8; 32],
-            signature_data: vec![255],
+            transaction_id: [0xEE; 32],
+            signer: public,
+            signature_data: signature_bytes(&tx, &pair),
+            signed_block: 0,
+            is_valid: true,
+        };
+
+        assert!(TransactionSigner::verify_signature(&tx, &sig).is_err());
+    }
+
+    #[test]
+    fn test_verify_signature_invalid() {
+        let tx = pending_transaction(1);
+        let (_, public) = signer(8);
+        let sig = TransactionSignature {
+            id: [1u8; 32],
+            transaction_id: tx.id,
+            signer: public,
+            signature_data: vec![255; 64],
             signed_block: 0,
             is_valid: false,
         };
 
-        let result = TransactionSigner::verify_signature(&sig);
+        let result = TransactionSigner::verify_signature(&tx, &sig);
         assert!(result.is_err());
     }
 
@@ -359,10 +552,10 @@ mod tests {
 
         assert!(!TransactionSigner::has_required_signatures(&tx));
 
-        TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255], 0).unwrap();
+        authorise(&mut tx, 3);
         assert!(!TransactionSigner::has_required_signatures(&tx));
 
-        TransactionSigner::add_signature(&mut tx, [4u8; 32], vec![255], 0).unwrap();
+        authorise(&mut tx, 4);
         assert!(TransactionSigner::has_required_signatures(&tx));
     }
 
@@ -372,7 +565,7 @@ mod tests {
             TransactionSigner::create_transaction([1u8; 32], [2u8; 32], 1000, vec![], 1, 1, 100, 0)
                 .unwrap();
 
-        TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255], 0).unwrap();
+        authorise(&mut tx, 3);
 
         let result = TransactionSigner::execute_transaction(&mut tx, 50);
         assert!(result.is_ok());
@@ -395,7 +588,7 @@ mod tests {
             TransactionSigner::create_transaction([1u8; 32], [2u8; 32], 1000, vec![], 1, 1, 100, 0)
                 .unwrap();
 
-        TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255], 0).unwrap();
+        authorise(&mut tx, 3);
 
         let result = TransactionSigner::execute_transaction(&mut tx, 101);
         assert!(result.is_err());
@@ -465,7 +658,7 @@ mod tests {
 
         assert_eq!(TransactionSigner::signatures_needed(&tx), 3);
 
-        TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255], 0).unwrap();
+        authorise(&mut tx, 3);
         assert_eq!(TransactionSigner::signatures_needed(&tx), 2);
     }
 
