@@ -5297,3 +5297,27 @@ hashes. `replay` also states, in its own output, what it *cannot* check with the
 risk ceilings the run enforced (the compiled policy does not travel beside the receipt), the finality
 references, and the host inputs. Those three sentences are the remaining honest limit of the pair, and
 they are what keeps X3-LANG-002 at PARTIAL rather than COMPLETE.
+
+## TICKET-137 — the two readers disagreed about a patch version — CLOSED
+Type: CLOSED in this commit (2026-09-24) · Subsystem: crates/x3-common + x3-integration
+Found by writing the body-section parity test X3-LANG-010's row asked for ("the other body sections
+still have no parity test"): a module declaring `1.0.1` was accepted by `x3-backend`'s
+`VersionInfo::can_read` (patch differences are compatible — the format's own semantic versioning says
+so) and **refused by the no-std reader that executes on chain**, whose shared rule compared
+`version <= VERSION`. A module the compiler's own rules call compatible could therefore be compiled and
+then refused where it matters.
+
+The shared rule now compares the same two fields `can_read` does (same major, no newer minor), and two
+tests pin it: `a_patch_bump_is_readable_and_a_minor_bump_is_not` in `x3-common`, and
+`version_rule_parity::the_shared_version_rule_agrees_with_can_read` in `x3-backend`, which compares the
+shared helper against `can_read` across six versions (same, patch, minor, major, older patch, older
+minor) written out rather than computed, because the drift happened in a case nobody had thought of.
+Clippy proved the bound is unreachable while `VERSION`'s minor is 0; the general comparison stays with
+a documented `allow`, because writing `==` would start refusing *older* minors the day the constant
+moves.
+
+Envelope parity now covers the whole body, not just the constant pool: function table (a callee at
+index 1 with a longer name, called with two arguments), global table (stored then loaded), trailing
+debug and metadata sections (both readers execute the same code; the checksum covers an edited
+trailing byte for both), plus the version cases above. Six tests in
+`crates/x3-integration/tests/bc_const_pool_parity.rs`.

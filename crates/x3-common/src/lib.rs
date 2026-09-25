@@ -240,11 +240,20 @@ pub mod bytecode {
 
     /// Is a module that declares `version` readable by this loader?
     ///
-    /// Equivalent to `VersionInfo::can_read` in `x3-backend` (same major, no newer minor), expressed
-    /// on the packed integer because the packing is order-preserving. `x3-backend`'s tests compare
-    /// the two so they cannot drift.
+    /// Same major, no newer minor — equivalent to `VersionInfo::can_read` in `x3-backend`, which
+    /// compares the same two fields. Patch differences are compatible: the format's own semantic
+    /// versioning says so ("patch version changes are bug fixes (fully compatible)"), and the
+    /// `version <= VERSION` this used to compare refused a *patch* bump — so `1.0.1` was accepted by
+    /// `x3-backend` and refused by the no-std reader that executes on chain, and a module the
+    /// compiler's own rules call compatible could not run (TICKET-137). `x3-backend`'s
+    /// `version_rule_parity` test compares this against `can_read` version by version.
+    // The lint is right that the bound is unreachable *today* — `VERSION`'s minor field is 0, so
+    // "no newer minor" and "the same minor" are the same test — but writing `==` would silently start
+    // refusing older minors the day `VERSION`'s minor moves, which is the bug this rule exists to
+    // avoid. The general comparison stays, with the reason the lint is answered here.
+    #[allow(clippy::absurd_extreme_comparisons)]
     pub const fn version_is_readable(version: u32) -> bool {
-        (version >> 16) == (VERSION >> 16) && version <= VERSION
+        (version >> 16) == (VERSION >> 16) && ((version >> 8) & 0xFF) <= ((VERSION >> 8) & 0xFF)
     }
 
     /// Does this loader satisfy a module that requires at least `min_version`?
@@ -266,6 +275,23 @@ pub mod bytecode {
             assert_ne!(checksum(b"ab"), checksum(b"ba"));
             assert_eq!(checksum(b"ab"), checksum(b"ab"));
             assert_eq!(checksum(&[]), 0);
+        }
+
+        #[test]
+        fn a_patch_bump_is_readable_and_a_minor_bump_is_not() {
+            // The field layout: major << 16 | minor << 8 | patch.
+            assert!(
+                version_is_readable(VERSION + 1),
+                "a patch bump is compatible"
+            );
+            assert!(
+                !version_is_readable(VERSION + 0x100),
+                "a newer minor is not readable by this loader"
+            );
+            assert!(
+                !version_is_readable(VERSION + 0x1_0000),
+                "a newer major is not readable by this loader"
+            );
         }
 
         #[test]

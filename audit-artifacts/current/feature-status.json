@@ -2964,7 +2964,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 34,
+      "composite": 50,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/src/mini_x3.rs",
@@ -2972,29 +2972,29 @@
         "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"
       ],
       "id": "X3-LANG-009",
-      "implemented": 45,
+      "implemented": 60,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. So the row's own name still claims more than the code does: there is no signature and no attestation. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"
+        "**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. The row's **name no longer claims more than the code does** (it was renamed from 'Authenticated bytecode decoder' to 'Checksum-verified bytecode decoder' on 2026-09-24), but the gap it names is real: there is no signature and no attestation, and no phase of the spec asks for one over the envelope. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"
       ],
-      "name": "Authenticated bytecode decoder",
+      "name": "Checksum-verified bytecode decoder",
       "paths": [
         "crates/x3-integration"
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 25,
-      "tests": "tested score 25% (no named test list on this row)"
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 34,
+      "composite": 66,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/src/mini_x3.rs",
@@ -3002,12 +3002,12 @@
         "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"
       ],
       "id": "X3-LANG-010",
-      "implemented": 45,
+      "implemented": 80,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 45,
       "missing_work": [
-        "Corrected 2026-09-24 against the code: TICKET-108 is closed by commit 6cc986b5d8. `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. The other body sections still have no parity test, and a checksum is not authentication (see X3-LANG-009)."
+        "Both readers enforce the version and min-version, and the body parity this row asked for now covers the whole body (function table with a call and arguments, global table, trailing debug/metadata, and the version cases) \u2014 the parity work found and fixed a real divergence: a patch bump was accepted by x3-backend and refused by the no-std reader (TICKET-137). Still true from the old note:  `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. That gap is now closed for the rest of the body too: `bc_const_pool_parity.rs` drives the function table (a callee at index 1 with a longer name, called with two arguments), the global table (stored then loaded), the trailing debug and metadata sections, and the version bounds through both readers (added 2026-09-24, TICKET-137). What remains is the authentication note: a checksum is not authentication (see X3-LANG-009)."
       ],
       "name": "Versioned runtime bytecode envelope",
       "paths": [
@@ -3015,11 +3015,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 25,
-      "tests": "tested score 25% (no named test list on this row)"
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4362,7 +4362,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "3544d5f0597123eacfff4af530820a1ef3cd047dc2a8b0f58c4c66d792bff1a0",
+    "source_digest": "449e8fcfa6e64141f4c6e2e7ff7f8e2c7335cacd97fce1bd452e281b2a297bfd",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4373,7 +4373,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "ebc1a099fea8466c44695e79325a0e21330b7d6a4ec03201fdb874a6aae66a0e",
+      "feature-matrix/language-trading.toml": "9e771b0f83df5acc916500beebb327213a25888bec21ac94ec4a87411af6a563",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",
@@ -4809,8 +4809,8 @@
       "FUNCTIONAL BUT UNHARDENED": 56,
       "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
-      "PARTIAL": 55,
-      "STUB": 16
+      "PARTIAL": 57,
+      "STUB": 14
     },
     "matrix_features": 145,
     "registry_features": 21,
