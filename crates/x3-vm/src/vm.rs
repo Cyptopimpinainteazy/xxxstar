@@ -152,6 +152,13 @@ pub struct Frame {
     pub ret_addr: usize,
     /// Function index.
     pub func_idx: usize,
+    /// Register **in the caller's frame** the callee's result is written to: the `dst` operand of
+    /// the `Call` that made this frame. The format documents it (`[op][dst:u8][func:u32]…`) and the
+    /// compiler emits it, but both interpreters used to ignore it and write the result to the
+    /// caller's `r0` instead, so a call whose result was allocated anywhere else read `Unit`:
+    /// measured, the compiler's own `fib.x3` failed with `TypeMismatch("i64", "Unit")` because
+    /// `fib(n - 1) + fib(n - 2)` reads the two results from their own registers (TICKET-131).
+    pub ret_dst: usize,
 }
 
 /// Execution result.
@@ -223,6 +230,10 @@ impl VM {
             globals.push(val);
         }
 
+        // The isolation context enforces the same depth limit the interpreter does; it used to
+        // enforce a private constant of 10 while the configuration said 32, so a program the
+        // executor admitted was refused nine calls in (TICKET-131).
+        let isolation_depth = config.max_call_depth as u32;
         Self {
             module,
             regs: vec![Value::Unit; MAX_REGISTERS],
@@ -236,7 +247,7 @@ impl VM {
             hostcalls: HostcallRegistry::with_standard(),
             instruction_count: 0,
             state_machine: StateMachine::new(),
-            isolation: IsolationContext::new([0u8; 32]),
+            isolation: IsolationContext::new([0u8; 32]).with_max_call_depth(isolation_depth),
             event_buffer: EventBuffer::new(),
             storage: VmStorage::new(),
             jit: JitCompiler::new(JitConfig::default()),
@@ -402,6 +413,9 @@ impl VM {
             base: 0,
             ret_addr: usize::MAX, // Sentinel for top-level return
             func_idx,
+            // Nothing reads this on the top-level return: the value is returned to the caller of
+            // `call_function`, not to a register.
+            ret_dst: 0,
         });
 
         // Execute
@@ -483,10 +497,20 @@ impl VM {
                         // Top-level return
                         return Ok(value);
                     }
-                    // Set return value in caller's r0 (respect caller base)
+                    // The value goes to the register the caller named in the `Call`'s `dst`
+                    // operand, resolved in the caller's frame — not unconditionally to its `r0`.
                     if let Some(v) = value {
                         if let Some(caller) = self.call_stack.last() {
-                            let idx = caller.base;
+                            // `caller.base + ret_dst` is already absolute: resolving it again would
+                            // add the base a second time, which is invisible at the top level (base
+                            // 0) and wrong one frame in — measured, `fib.x3` read `Unit` from the
+                            // register it expected a result in (TICKET-131).
+                            let idx = caller.base + frame.ret_dst;
+                            if idx >= self.regs.len() {
+                                return Err(
+                                    self.error_at(ip, VMErrorKind::RegisterOutOfBounds(idx as u16))
+                                );
+                            }
                             self.regs[idx] = v;
                         } else {
                             self.regs[0] = v;
@@ -520,7 +544,12 @@ impl VM {
             }
 
             Opcode::JumpIf => {
-                let cond_reg = self.read_u8(ip + 1)? as usize;
+                // Frame-relative, like every other register operand. These two arms indexed
+                // `self.regs[cond_reg]` directly, so inside a callee frame the condition was read
+                // from the *caller's* register of that number: measured, the compiler's own
+                // `match_cond.x3` failed with `TypeMismatch("bool", "Unit")` because the register it
+                // read belongs to another frame (TICKET-131).
+                let cond_reg = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
                 let target = self.read_u32(ip + 2)? as usize;
                 if self.regs[cond_reg].as_bool()? {
                     Ok(StepResult::Continue(target))
@@ -530,7 +559,8 @@ impl VM {
             }
 
             Opcode::JumpUnless => {
-                let cond_reg = self.read_u8(ip + 1)? as usize;
+                // Frame-relative, for the same reason as `JumpIf` (TICKET-131).
+                let cond_reg = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
                 let target = self.read_u32(ip + 2)? as usize;
                 if !self.regs[cond_reg].as_bool()? {
                     Ok(StepResult::Continue(target))
@@ -541,7 +571,7 @@ impl VM {
 
             Opcode::Call => {
                 // call dst:reg func:u32 argc:u16 [args:reg...]
-                let _dst = self.read_u8(ip + 1)? as usize; // dst currently unused; return is in r0
+                let dst = self.read_u8(ip + 1)? as usize;
                 let func_idx = self.read_u32(ip + 2)? as usize;
                 let argc = self.read_u16(ip + 6)? as usize;
 
@@ -585,14 +615,22 @@ impl VM {
                 let func = &self.module.functions[func_idx];
                 let ret_addr = ip + 8 + argc;
 
-                // Compute callee base: caller.base + caller.local_count (simple stack-frame window)
-                let caller_base = self.call_stack.last().map(|f| f.base).unwrap_or(0);
-                let caller_local_count = self
+                // The callee's window starts after the caller's **whole** frame: its parameters and
+                // its locals/temporaries. Using `local_count` alone started every callee inside its
+                // caller, so a recursive call overwrote the registers the caller was still using
+                // (TICKET-131).
+                let (caller_base, caller_footprint) = self
                     .call_stack
                     .last()
-                    .map(|f| self.module.functions[f.func_idx].local_count as usize)
-                    .unwrap_or(0);
-                let callee_base = caller_base + caller_local_count;
+                    .map(|f| {
+                        let entry = &self.module.functions[f.func_idx];
+                        (
+                            f.base,
+                            entry.param_count as usize + entry.local_count as usize,
+                        )
+                    })
+                    .unwrap_or((0, 0));
+                let callee_base = caller_base + caller_footprint;
 
                 // Bounds check for callee window
                 if callee_base + func.local_count as usize >= MAX_REGISTERS {
@@ -615,6 +653,7 @@ impl VM {
                     base: callee_base,
                     ret_addr,
                     func_idx,
+                    ret_dst: dst,
                 });
 
                 Ok(StepResult::Continue(func.entry_point as usize))

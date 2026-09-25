@@ -8,25 +8,30 @@
 # an invalid opcode). Fixed in this commit together with the receipt's instruction count (always 0),
 # the `main`-is-function-0 entry contract, and the crate's `no_std` build; the tests below are the
 # evidence and were written to fail first.
-# Scope of the claim: the pipeline is proven for the operand kinds the sweep covers (literal,
-# arithmetic, local, constant-pool index, branch, function call). Loops, match, floats, strings and
-# host calls are not in it yet, which is what keeps this row short of COMPLETE.
+# Scope of the claim (re-measured 2026-09-24, second pass): the pipeline is proven for the operand
+# kinds the sweep covers — literal, arithmetic, local, constant-pool index, branch, function call —
+# **and** for the compiler's own fixture corpus, which adds recursion (`fib(10)` = 55), several
+# functions with parameters, comparison chains and constant-folded branches, with both engines
+# agreeing on every fixture. Not proven: loops (the `loop_ops` fixture is arithmetic and says so in
+# its own header), match statements, floats, strings, host calls. That list is what keeps this row
+# short of COMPLETE.
 id = "X3-LANG-001"
 name = "Compile→encode→decode→execute→receipt E2E"
 subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x3-compiler"]
-implemented = 55
-tested = 55
-mainnet_ready = 20
+implemented = 65
+tested = 70
+mainnet_ready = 25
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["The E2E path is proven for the operand kinds the sweep covers; the compiler's remaining shapes (loops, match, floats, strings, host calls) are not in it, and the optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"]
+blockers = ["Proven for the swept operand kinds and the compiler's fixture corpus (recursion, calls, comparison chains, folded branches, both engines agreeing); not proven for loops, match, floats, strings or host calls. The optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"]
 required_tests = [
   "compile_encode_decode_execute_receipt_end_to_end",
   "every_operand_kind_compiles_verifies_and_executes",
+  "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
   "compile_source_emits_runtime_loadable_bytecode",
   "compile_source_rejects_invalid_source",
 ]
@@ -110,21 +115,31 @@ blockers = ["Version gates incomplete"]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7"]
 
 [[feature]]
-# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/bridge.rs (bytecode decode paths)
+# Re-measured 2026-09-24 (TICKET-131): the connection this row calls incomplete now has evidence.
+# `mini_x3` (the no-std decoder + interpreter the kernel adapters link) parses the module a compiler
+# emits, and executes it to the value the source states, for the compiler's four fixtures — checked
+# against the std executor's receipt in `crates/x3-integration/tests/compiler_bridge.rs`. What the
+# row still does not have is execution against the *kernel* (X3-LANG-004's open half) and any shape
+# beyond those fixtures.
 id = "X3-LANG-006"
 name = "Decoded bytecode → TradingVm execution"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 40
-tested = 20
+paths = ["crates/x3-integration", "crates/x3-vm"]
+implemented = 55
+tested = 60
 mainnet_ready = 25
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Decoder/executor connection incomplete"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #4"]
+blockers = ["Both engines decode and execute the compiler's fixture corpus to the source's values; not yet driven from the kernel, and not proven beyond those shapes"]
+required_tests = [
+  "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
+  "compile_encode_decode_execute_receipt_end_to_end",
+]
+test_evidence = ["crates/x3-integration/tests/compiler_bridge.rs: the corpus test runs each fixture on both engines and requires the same value"]
+evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "note: Trading Core v1 gap #4"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/ir.rs, x3-lang/compiler/tests/

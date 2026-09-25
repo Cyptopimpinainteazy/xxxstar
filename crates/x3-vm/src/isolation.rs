@@ -12,12 +12,21 @@ pub struct IsolationContext {
     memory: Vec<u8>,
     /// Call depth (for nested call enforcement).
     pub call_depth: u32,
+    /// The limit `enter_call` enforces; the VM sets it from its own configuration.
+    max_call_depth: u32,
 }
 
 /// Maximum linear memory per isolated context.
 pub const MAX_MEMORY_BYTES: usize = 65_536;
 
-/// Maximum nested call depth.
+/// Default maximum nested call depth for an isolation context that is not told otherwise.
+///
+/// This is a *default*, not the limit a run uses: the VM builds its context with the
+/// `max_call_depth` its configuration was given (`X3ExecutorConfig::on_chain` sets 32). The
+/// constant used to be the only limit, and it was 10 while the configuration said 32 — so a
+/// program the executor was told it could run got `CallDepthExceeded` after nine nested calls.
+/// Measured on the compiler's own `fib.x3`, which recurses eleven deep and is a fixture the
+/// compiler is expected to handle (TICKET-131).
 pub const MAX_CALL_DEPTH: u32 = 10;
 
 /// Errors from isolation operations.
@@ -38,7 +47,17 @@ impl IsolationContext {
             contract_addr,
             memory: Vec::new(),
             call_depth: 0,
+            max_call_depth: MAX_CALL_DEPTH,
         }
+    }
+
+    /// The same context, with the caller's own call-depth limit.
+    ///
+    /// The VM passes the limit it was configured with, so one number governs: a program the
+    /// executor admitted is not then refused by a second, smaller constant (TICKET-131).
+    pub fn with_max_call_depth(mut self, max_call_depth: u32) -> Self {
+        self.max_call_depth = max_call_depth;
+        self
     }
 
     /// Grow the memory by `additional` bytes.
@@ -82,7 +101,7 @@ impl IsolationContext {
 
     /// Enter a nested call. Increments depth.
     pub fn enter_call(&mut self) -> Result<(), IsolationError> {
-        if self.call_depth >= MAX_CALL_DEPTH {
+        if self.call_depth >= self.max_call_depth {
             return Err(IsolationError::CallDepthExceeded);
         }
         self.call_depth += 1;

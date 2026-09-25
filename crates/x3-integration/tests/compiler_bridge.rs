@@ -159,3 +159,109 @@ fn every_operand_kind_compiles_verifies_and_executes() {
         );
     }
 }
+
+/// The same chain over the compiler's own fixture corpus: recursion, several functions with
+/// parameters, chained comparisons and a constant-folded branch.
+///
+/// The fixtures under `crates/x3-compiler/tests/fixtures/` are the compiler's e2e inputs, so they are
+/// programs the compiler is already expected to handle — the question this asks is whether the
+/// *runtime* agrees, which is a different one. Each expected value is read off the source
+/// (`fib(10)` is 55, `classify(-5) + classify(0) + …` is 5), so a wrong answer fails rather than
+/// crashing, and a shape that frames differently (a recursive call, a chain of comparisons) fails
+/// here rather than in a user's program.
+#[test]
+fn the_compiler_fixture_corpus_executes_to_the_value_its_source_states() {
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../x3-compiler/tests/fixtures");
+    let cases: &[(&str, i64)] = &[
+        ("fib.x3", 55),         // fib(10)
+        ("loop_ops.x3", 16),    // sum_three(1,2,3) + multiply_accumulate(2,3,4)
+        ("match_cond.x3", 5),   // classify(-5)+classify(0)+classify(5)+classify(50)+classify(500)
+        ("branch_fold.x3", 30), // (5+10)*2, the branch that returns 999 is folded away
+    ];
+
+    // Every failing shape is collected and reported together: a corpus check that stops at the
+    // first failure hides how many shapes are broken, which is the number that decides whether the
+    // encodings agree in general or only for one program.
+    let mut failures: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+    for (name, expected) in cases {
+        let path = dir.join(name);
+        let source = match std::fs::read_to_string(&path) {
+            Ok(source) => source,
+            Err(error) => {
+                failures.push(format!("{name}: cannot read {}: {error}", path.display()));
+                continue;
+            }
+        };
+        let bytes = match compile_source(&source) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                failures.push(format!("{name}: must compile: {error}"));
+                continue;
+            }
+        };
+        if let Err(error) = mini_x3::validate_x3bc(&bytes) {
+            failures.push(format!(
+                "{name}: the runtime's reader must accept it: {error:?}"
+            ));
+            continue;
+        }
+        let receipt = match X3Executor::execute(&bytes, &[], X3ExecutorConfig::on_chain()) {
+            Ok(receipt) => receipt,
+            Err(error) => {
+                failures.push(format!("{name}: must verify and execute: {error:?}"));
+                continue;
+            }
+        };
+        if !receipt.success {
+            failures.push(format!(
+                "{name}: the VM said: {}",
+                String::from_utf8_lossy(&receipt.return_data)
+            ));
+            continue;
+        }
+        let got = match <[u8; 8]>::try_from(receipt.return_data.as_slice()) {
+            Ok(bytes) => i64::from_le_bytes(bytes),
+            Err(_) => {
+                failures.push(format!(
+                    "{name}: the receipt returned {} bytes, not an i64",
+                    receipt.return_data.len()
+                ));
+                continue;
+            }
+        };
+        if got != *expected {
+            failures.push(format!(
+                "{name}: the receipt reports {got}, the source computes {expected}"
+            ));
+            continue;
+        }
+        if receipt.instructions_executed == 0 {
+            failures.push(format!(
+                "{name}: a receipt that reports no instructions did not count them"
+            ));
+            continue;
+        }
+        // The kernel-side engine has to agree with the std one on the same artifact: they are two
+        // implementations of the format, and a program that runs on one and not the other is a
+        // disagreement to report, not a pass.
+        match mini_x3::execute_x3bc(&bytes, 1_000_000) {
+            Ok(result) => match result.return_val {
+                MiniValue::I64(value) if value == *expected => {}
+                other => failures.push(format!(
+                    "{name}: the kernel-side engine returned {other:?}, the source computes {expected}"
+                )),
+            },
+            Err(error) => failures.push(format!("{name}: the kernel-side engine refused it: {error:?}")),
+        }
+        checked += 1;
+    }
+    assert!(
+        failures.is_empty(),
+        "the compiler's own fixtures must run on the runtime ({} of {} ran):\n  {}",
+        checked,
+        cases.len(),
+        failures.join("\n  ")
+    );
+}

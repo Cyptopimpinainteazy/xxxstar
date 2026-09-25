@@ -369,6 +369,10 @@ struct CallFrame {
     base: usize,
     ret_addr: usize,
     func_idx: usize,
+    /// Register in the caller's frame the result is written to — the `Call`'s `dst` operand. Both
+    /// interpreters used to drop it and write the caller's `r0` instead; see the note on the std
+    /// VM's `Frame::ret_dst` (TICKET-131).
+    ret_dst: usize,
 }
 
 const MAX_REGS: usize = 256;
@@ -476,9 +480,18 @@ impl<'m> Vm<'m> {
                         return Ok(val); // top-level return
                     }
                     if let Some(v) = val {
-                        // Return value goes into r0 of the restored caller frame
-                        let base = self.call_stack.last().map(|f| f.base).unwrap_or(0);
-                        self.regs[base] = v;
+                        // The caller named the destination register in the `Call`'s `dst` operand;
+                        // it is frame-relative, like every other register operand.
+                        match self.call_stack.last() {
+                            Some(caller) => {
+                                let idx = caller.base + frame.ret_dst;
+                                if idx >= self.regs.len() {
+                                    return Err(X3Error::RegisterOutOfBounds);
+                                }
+                                self.regs[idx] = v;
+                            }
+                            None => self.regs[0] = v,
+                        }
                     }
                     if let Some(f) = self.call_stack.last_mut() {
                         f.ip = frame.ret_addr;
@@ -537,7 +550,7 @@ impl<'m> Vm<'m> {
             }
             0x04 => {
                 // Call
-                let _dst = self.r8(ip + 1)? as usize;
+                let dst = self.r8(ip + 1)? as usize;
                 let func_idx = self.r32(ip + 2)? as usize;
                 let argc = self.r16(ip + 6)? as usize;
                 let func = self
@@ -555,13 +568,20 @@ impl<'m> Vm<'m> {
                     let ar = self.r8(ip + 8 + i)? as usize;
                     args.push(self.regs[self.resolve(ar)].clone());
                 }
-                let caller_base = self.call_stack.last().map(|f| f.base).unwrap_or(0);
-                let caller_locals = self
+                // The callee's window starts after the caller's whole frame (params + locals), not
+                // after its locals alone: see the note in the std VM's `Call` arm (TICKET-131).
+                let (caller_base, caller_footprint) = self
                     .call_stack
                     .last()
-                    .map(|f| self.module.functions[f.func_idx].local_count as usize)
-                    .unwrap_or(0);
-                let callee_base = caller_base + caller_locals;
+                    .map(|f| {
+                        let entry = &self.module.functions[f.func_idx];
+                        (
+                            f.base,
+                            entry.param_count as usize + entry.local_count as usize,
+                        )
+                    })
+                    .unwrap_or((0, 0));
+                let callee_base = caller_base + caller_footprint;
                 if callee_base + func.local_count as usize >= MAX_REGS {
                     return Err(X3Error::RegisterOutOfBounds);
                 }
@@ -574,6 +594,7 @@ impl<'m> Vm<'m> {
                     base: callee_base,
                     ret_addr,
                     func_idx,
+                    ret_dst: dst,
                 });
                 Ok(Step::Continue(func.entry as usize))
             }
@@ -1227,6 +1248,7 @@ pub fn execute_x3bc(payload: &[u8], gas_limit: u64) -> Result<X3ExecResult, X3Er
     let mut vm = Vm::new(&module, gas_limit);
     let func_entry = module.functions[0].entry as usize;
     vm.call_stack.push(CallFrame {
+        ret_dst: 0,
         ip: func_entry,
         base: 0,
         ret_addr: usize::MAX,

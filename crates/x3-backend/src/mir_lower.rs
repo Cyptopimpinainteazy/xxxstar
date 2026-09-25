@@ -142,6 +142,8 @@ impl MirBytecodeCompiler {
 
         // End function - use TYPE_TAG_INT for simplicity (void=0, int=1)
         let return_type_tag = self.infer_return_type(func);
+        // The frame the interpreters will open for this function is sized from this.
+        self.layout.set_registers_used(self.next_reg);
         self.layout.end_function(return_type_tag);
 
         Ok(())
