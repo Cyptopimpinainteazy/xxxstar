@@ -12,10 +12,12 @@
 # kinds the sweep covers — literal, arithmetic, local, constant-pool index, branch, function call —
 # **and** for the compiler's own fixture corpus, which adds recursion (`fib(10)` = 55), several
 # functions with parameters, comparison chains, constant-folded branches and, since `loop_sum.x3`
-# (sum_to(5) = 15), a `while` loop with a mutated local: that needed three fixes under it (mutated
-# locals lowered as register-model cells, DCE keeping stores, PRE not hoisting a computation above
-# its own operand's definition). Both engines agree on every fixture. Not proven: match statements,
-# floats, strings, host calls. That list is what keeps this row short of COMPLETE.
+# (sum_to(5) = 15), `loop_break.x3` (21) and `loop_continue.x3` (12), a `while`/`loop` with a mutated
+# local, `break` and `continue`: that needed four fixes under it (mutated locals lowered as
+# register-model cells, DCE keeping stores, PRE not hoisting a computation above its own operand's
+# definition, and break/continue lowered instead of dropped by an empty match arm). Both engines
+# agree on every fixture. Not proven: match statements, floats, strings, host calls. That list is
+# what keeps this row short of COMPLETE.
 id = "X3-LANG-001"
 name = "Compile→encode→decode→execute→receipt E2E"
 subsystem = "language_trading"

@@ -174,11 +174,13 @@ fn the_compiler_fixture_corpus_executes_to_the_value_its_source_states() {
     let dir =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../x3-compiler/tests/fixtures");
     let cases: &[(&str, i64)] = &[
-        ("fib.x3", 55),         // fib(10)
-        ("loop_ops.x3", 16),    // sum_three(1,2,3) + multiply_accumulate(2,3,4)
-        ("match_cond.x3", 5),   // classify(-5)+classify(0)+classify(5)+classify(50)+classify(500)
-        ("branch_fold.x3", 30), // (5+10)*2, the branch that returns 999 is folded away
-        ("loop_sum.x3", 15),    // sum_to(5) = 1+2+3+4+5, which needs a loop back-edge
+        ("fib.x3", 55),           // fib(10)
+        ("loop_ops.x3", 16),      // sum_three(1,2,3) + multiply_accumulate(2,3,4)
+        ("match_cond.x3", 5),     // classify(-5)+classify(0)+classify(5)+classify(50)+classify(500)
+        ("branch_fold.x3", 30),   // (5+10)*2, the branch that returns 999 is folded away
+        ("loop_sum.x3", 15),      // sum_to(5) = 1+2+3+4+5, which needs a loop back-edge
+        ("loop_break.x3", 21),    // count_to(6) = 1+..+6, which needs `break` to leave the loop
+        ("loop_continue.x3", 12), // sum_except(5, 3) = 1+2+4+5, which needs `continue` to skip one
     ];
 
     // Every failing shape is collected and reported together: a corpus check that stops at the

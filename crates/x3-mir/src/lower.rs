@@ -71,7 +71,22 @@ struct MirFunctionBuilder {
     /// (TICKET-132).
     mutated: std::collections::HashSet<SymbolId>,
     slots: HashMap<SymbolId, MirValue>,
+    /// The loops this builder is inside, innermost last: where `break` and `continue` go.
+    ///
+    /// `break` and `continue` used to be matched to an empty arm — the comment said label
+    /// resolution was missing — so a program that wrote `break` jumped nowhere and looped until it
+    /// ran out of gas. Measured on `loop_break.x3`, which computes 21: `GasExhausted { used:
+    /// 1_000_000 }` (TICKET-132). An unlabelled break/continue targets the innermost loop; a
+    /// labelled one is refused rather than approximated.
+    loops: Vec<LoopTargets>,
     next_value: usize,
+}
+
+/// Where the innermost loop's `break` and `continue` go.
+#[derive(Clone, Copy)]
+struct LoopTargets {
+    break_to: MirBlockId,
+    continue_to: MirBlockId,
 }
 
 impl MirFunctionBuilder {
@@ -85,6 +100,7 @@ impl MirFunctionBuilder {
             value_map: HashMap::new(),
             mutated: std::collections::HashSet::new(),
             slots: HashMap::new(),
+            loops: Vec::new(),
             next_value: 0,
         };
         let entry = builder.create_block();
@@ -196,8 +212,37 @@ impl MirFunctionBuilder {
             } => {
                 self.lower_while(condition, body)?;
             }
-            HirStmt::Break { .. } | HirStmt::Continue { .. } => {
-                // Break/continue with labels requires label resolution
+            HirStmt::Break { label, .. } => {
+                if label.is_some() {
+                    return Err(MirError::new(
+                        "a labelled `break` is not lowered yet: only the innermost loop can be left,                          so this is refused rather than sent to the wrong loop",
+                    ));
+                }
+                let target = self
+                    .loops
+                    .last()
+                    .ok_or_else(|| MirError::new("`break` outside a loop"))?
+                    .break_to;
+                self.set_terminator(MirTerminator::Goto(target));
+                // Anything after the break is unreachable; it gets its own block, which the
+                // reachability pass then drops.
+                let next = self.create_block();
+                self.current_block = next;
+            }
+            HirStmt::Continue { label, .. } => {
+                if label.is_some() {
+                    return Err(MirError::new(
+                        "a labelled `continue` is not lowered yet: only the innermost loop can be                          continued, so this is refused rather than sent to the wrong loop",
+                    ));
+                }
+                let target = self
+                    .loops
+                    .last()
+                    .ok_or_else(|| MirError::new("`continue` outside a loop"))?
+                    .continue_to;
+                self.set_terminator(MirTerminator::Goto(target));
+                let next = self.create_block();
+                self.current_block = next;
             }
             HirStmt::AtomicBegin { block_id, .. } => {
                 self.push_atomic_begin(MirAtomicBlockId(block_id.0 as u16));
@@ -252,7 +297,12 @@ impl MirFunctionBuilder {
             else_block: merge_id,
         });
         self.current_block = body_id;
+        self.loops.push(LoopTargets {
+            break_to: merge_id,
+            continue_to: cond_id,
+        });
         self.lower_statements(body)?;
+        self.loops.pop();
         self.ensure_goto(cond_id);
         self.current_block = merge_id;
         Ok(())
