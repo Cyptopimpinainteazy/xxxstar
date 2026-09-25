@@ -7226,6 +7226,13 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   This is the same lesson as TICKET-108's hand-assembled fixtures, one layer up.
 - The queue's priority column is deliberately *not* the directive's P0-P4 call; it is a derived triage
   hint, because turning "is this launch-blocking?" into a numeric rule is a guess. Say so in the artifact.
+- **The live and cross-domain gates cannot run concurrently.** All nine boot the X3 dev chain on
+  19945 with metrics on 9615 (anvil 18545, solana validator 18999) and none parameterises the port, so
+  `--jobs N` produced a false red: `error binding to 127.0.0.1:9615: Address already in use`, then
+  `Connection reset by peer` on 19945. `scripts/local-ci.sh` now has a `SERIAL_GATES` list and runs
+  those gates alone, in the foreground, whatever `--jobs` says (measured after the fix: both strict
+  gates PASS 223s + 196s, sequentially). A "both passed" claim for these gates means in separate runs
+  or in one serialised run — never two at once.
 
 ### Blockers and open threats
 - **A bridge infrastructure API key was committed** by the import commits `3fdc95d6e` / `bb9610503`
