@@ -52,15 +52,15 @@ id = "X3-LANG-002"
 name = "Economic replay validation in receipts"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 35
-tested = 15
-mainnet_ready = 20
+paths = ["x3-lang/vm/src/trading.rs", "x3-lang/crates/x3-tools/src/bin/x3c.rs"]
+implemented = 70
+tested = 70
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Receipts need replay-economic validation"]
+blockers = ["`x3c replay` re-checks the receipt's own economic figures (operation sequence, per-asset deltas, balances, costs, debt lifecycle, profit against the outcome) and refuses a receipt that is about another artifact, naming both hashes; it names what the pair cannot decide — the risk ceilings the run enforced (the compiled policy does not travel beside the receipt), the finality references and the host inputs — which is what keeps this row short of COMPLETE"]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
 
 [[feature]]
@@ -69,15 +69,15 @@ id = "X3-LANG-003"
 name = "Signed / attested trading receipts"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 35
-tested = 15
-mainnet_ready = 20
+paths = ["x3-lang/vm/src/trading.rs", "x3-lang/crates/x3-tools/src/bin/x3c.rs"]
+implemented = 75
+tested = 75
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Receipt signatures/attestations incomplete"]
+blockers = ["Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what is missing is a key registry or rotation story — keys are named per invocation"]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
 
 [[feature]]

@@ -2756,60 +2756,62 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 24,
+      "composite": 54,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
         "note: Trading Core v1 gap #9"
       ],
       "id": "X3-LANG-002",
-      "implemented": 35,
+      "implemented": 70,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 20,
+      "mainnet_ready": 30,
       "missing_work": [
-        "Receipts need replay-economic validation"
+        "`x3c replay` re-checks the receipt's own economic figures (operation sequence, per-asset deltas, balances, costs, debt lifecycle, profit against the outcome) and refuses a receipt that is about another artifact, naming both hashes; it names what the pair cannot decide \u2014 the risk ceilings the run enforced (the compiled policy does not travel beside the receipt), the finality references and the host inputs \u2014 which is what keeps this row short of COMPLETE"
       ],
       "name": "Economic replay validation in receipts",
       "paths": [
-        "x3-lang/compiler"
+        "x3-lang/vm/src/trading.rs",
+        "x3-lang/crates/x3-tools/src/bin/x3c.rs"
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 15,
-      "tests": "tested score 15% (no named test list on this row)"
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 24,
+      "composite": 59,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
         "note: Trading Core v1 gap #9"
       ],
       "id": "X3-LANG-003",
-      "implemented": 35,
+      "implemented": 75,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 20,
+      "mainnet_ready": 35,
       "missing_work": [
-        "Receipt signatures/attestations incomplete"
+        "Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what is missing is a key registry or rotation story \u2014 keys are named per invocation"
       ],
       "name": "Signed / attested trading receipts",
       "paths": [
-        "x3-lang/compiler"
+        "x3-lang/vm/src/trading.rs",
+        "x3-lang/crates/x3-tools/src/bin/x3c.rs"
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 15,
-      "tests": "tested score 15% (no named test list on this row)"
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4360,7 +4362,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "d4ad05122253c9465727c1108e8434ff02673896a8674017d01ad2d345829e4a",
+    "source_digest": "3544d5f0597123eacfff4af530820a1ef3cd047dc2a8b0f58c4c66d792bff1a0",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4371,7 +4373,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "895b8f58dc75a81119c5a45fa6b6af55dd0b566ff7ec823a3009aa63b64c5304",
+      "feature-matrix/language-trading.toml": "ebc1a099fea8466c44695e79325a0e21330b7d6a4ec03201fdb874a6aae66a0e",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",
@@ -4807,8 +4809,8 @@
       "FUNCTIONAL BUT UNHARDENED": 56,
       "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
-      "PARTIAL": 53,
-      "STUB": 18
+      "PARTIAL": 55,
+      "STUB": 16
     },
     "matrix_features": 145,
     "registry_features": 21,

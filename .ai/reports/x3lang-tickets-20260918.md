@@ -5264,3 +5264,36 @@ repaid twice → `X3E4022` "repays debt 'debt' more than once"; an unfulfilled d
 `X3E4021`; a removed `all_debts_repaid` → `X3E4025`; an unknown risk policy → `X3E4025`.
 Not probed, and so still unproven for that row: BEGIN/END exactly once, position close-or-return,
 and ROLLBACK preserving declared invariants.
+
+## TICKET-135 — `receipt verify` accepted an unsigned receipt in mainnet mode — CLOSED
+Type: CLOSED in this commit (2026-09-24) · Subsystem: x3-lang/crates/x3-tools (x3c receipt verify)
+Found while measuring X3-LANG-003's row adversarially. The command's own message was honest — "receipt
+verified (hash + economic invariants; signer trust not requested)" — but **the mode never reached it**:
+`cmd_receipt_verify(input, trusted_specs)` took no `CompilationMode`, so `--mode mainnet` behaved exactly
+like dev and a receipt with **no attestation at all** was accepted on the path that settles real value.
+A hash is a self-consistency check that anyone can recompute over a forged receipt, so accepting it in
+mainnet mode converts "no signer evidence" into a success message.
+
+What changed: the mode reaches the command, and mainnet now requires `--trusted` — the operator has to
+name the key they trust, because a key carried inside the receipt is a restatement of the receipt's own
+claim, not a check.
+
+Measured, all four ways:
+  unsigned, dev                          -> verified (documented behaviour, unchanged)
+  unsigned, `--mode mainnet`             -> refused: "a mainnet receipt must be checked against a key you trust"
+  signed, `--mode mainnet` (no --trusted)-> refused, same reason
+  signed, `--mode mainnet --trusted <k>` -> "receipt verified with trusted signer attestation"
+Regression: `cli_receipt_verify_requires_a_trusted_key_on_mainnet` in `crates/x3-tools/tests/cli.rs`.
+
+## TICKET-136 — X3-LANG-002/003 measured: what the receipt pair does and does not prove — record
+Type: RECORD (2026-09-24), no code change beyond TICKET-135 · Subsystem: x3-lang/vm/trading + x3c
+Not a defect: the measurement the two rows were missing, kept here because it is the evidence their
+scores rest on.
+`receipt execute` produces a signed receipt from a real execution; `receipt verify --trusted <key>`
+requires and validates the attestation (a different key is refused by name, "attestor ... is not
+trusted"); editing a covered field breaks the hash and both `receipt verify` and `replay` refuse it,
+naming both hashes; `replay` refuses a receipt that is about another artifact, naming both artifact
+hashes. `replay` also states, in its own output, what it *cannot* check with the pair it was given: the
+risk ceilings the run enforced (the compiled policy does not travel beside the receipt), the finality
+references, and the host inputs. Those three sentences are the remaining honest limit of the pair, and
+they are what keeps X3-LANG-002 at PARTIAL rather than COMPLETE.
