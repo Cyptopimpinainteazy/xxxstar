@@ -280,6 +280,11 @@ GATES_FAST=(
   # asset lifecycle decision those two depend on.
   "test x3-cross-vm-router:cargo test -p pallet-x3-cross-vm-router"
   "test x3-asset-registry:cargo test -p pallet-x3-asset-registry"
+  # `x3-x3-integration` is the crate the chain executes X3 bytecode through (`mini_x3` and the
+  # adapters `pallets/x3-kernel` calls). Its suite — the compiler bridge, the cross-decoder body
+  # parity test, and the bytecode version-compatibility matrix — needs the `compile` feature to
+  # build at all, which is why the feature is named here rather than left to unification.
+  "test x3-integration:cargo test -p x3-x3-integration --features compile"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
   # The snapshot format is the trust boundary for state sync: a mirror must not

@@ -2820,7 +2820,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 61,
+      "composite": 62,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration",
@@ -2837,7 +2837,8 @@
         "**CLOSED 2026-09-25 \u2014 an extrinsic now carries a compiled program through the pallet, and the pallet records it.** `submit_comit_v2` validated its `x3_payload` as an `X3VmPacket` and then handed those same bytes to `T::X3Adapter::execute`, which parses X3BC. A packet is a semantic operation, not bytecode, and the executor accepts nothing else, so on any chain with a real adapter (`X3VmAdapter`, or `WasmX3Adapter` in the wasm build) every non-empty X3 payload died with `X3ExecutionFailed` \u2014 while a program compiled from `.x3` source was refused earlier as `InvalidX3VmPacket`. Reproduced before the fix by dispatching a compiled program at the real runtime: `Module(ModuleError { index: 11, error: [7, 0, 0, 0], message: Some(\"InvalidX3VmPacket\") })`. The payload is now the program, and validation is the adapter's own (`T::X3Adapter::validate`: envelope magic, version gate, checksum) \u2014 the component that does the work.",
         "**CLOSED 2026-09-25 \u2014 the execution receipt is persisted.** The X3 domain had no receipt storage at all (only EVM did), so a program's result existed in an event and a gas number and could not be read back. `X3ExecutionReceipts` is keyed by comit id and written only after every acceptance check, so a stored receipt always describes an accepted comit. `STORAGE_VERSION` moves 1\u21922, recorded by the migration the runtime already runs in its `Migrations` tuple (the map starts empty, so there is nothing to rewrite). The extra storage write is declared at the call site as `submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))` because the benchmark predates it.",
         "**CLOSED 2026-09-25 \u2014 the whole route is proven on a running chain.** `node/tests/x3vm_live_lifecycle.rs` now boots the real dev node, authorizes the submitter through the council, **compiles the program from `.x3` source inside the test**, signs `submit_comit_v2` with it, waits for a finalized block that contains the extrinsic, asserts the dispatch did not fail, and then reads the receipt back out of finalized state \u2014 value, metered gas and the kernel's receipt version. That is source -> compiler -> X3BC -> adapter -> pallet extrinsic -> inclusion -> finality -> verifiable receipt, on a chain rather than in a `TestExternalities`.",
-        "Still open on this row: the network is one local node, so inclusion and finality are proven but *multi-validator* agreement is not; the 1\u21922 storage migration has not been exercised by a runtime-upgrade rehearsal on a chain with state (the rehearsal gate exists \u2014 `scripts/mainnet/runtime_upgrade_rehearsal.sh`); an old artifact executed against an upgraded VM version is untested; and `submit_comit_v2`'s benchmark still needs re-running to replace the explicit write declaration."
+        "**CLOSED 2026-09-25 \u2014 old artifacts against the loader the chain runs.** `crates/x3-integration/tests/bytecode_version_compat.rs` builds a program with the compiler the node uses and then rewrites header fields the way a newer (or older) producer would, asserting every verdict by name: a patch bump (1.0.1) stays readable; a newer minor and the next major are refused as `UnsupportedVersion(v)` naming the version they declared; an artifact whose `min_version` demands a newer loader is refused by that demand; a body edited after compilation is refused as `ChecksumMismatch { expected, found }`; and the version gate is shown to run before execution. The tests are load-bearing: removing the version check from `mini_x3` turns exactly the three version-refusal tests red and leaves the rest green (measured, then restored). What this does *not* cover: no artifact produced by a genuinely older release exists in the repository, so the fixtures are header-rewritten rather than historical; and `x3-lang/`'s own version-byte gates (TICKET-097/137) are a separate pipeline with their own tests.",
+        "Still open on this row: the network is one local node, so inclusion and finality are proven but *multi-validator* agreement is not; the 1\u21922 storage migration has not been exercised by a runtime-upgrade rehearsal on a chain with state (the rehearsal gate exists \u2014 `scripts/mainnet/runtime_upgrade_rehearsal.sh`); and `submit_comit_v2`'s benchmark still needs re-running to replace the explicit write declaration."
       ],
       "name": "Bytecode routing to atomic kernel",
       "paths": [
@@ -2852,8 +2853,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 85,
-      "tests": "tested score 85% (no named test list on this row)"
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4378,7 +4379,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "73e398c57f3f6ab0a08773ca1340a5b207aa084c2cf275f65f8a32f0b681dffc",
+    "source_digest": "bd2f18722b45209b28a276633dc7281a13c2000be9102e28630825a44394299a",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
@@ -4389,7 +4390,7 @@
       "feature-matrix/cross-vm-atomic.toml": "bb43674a4bc6f2d3ca9c6af54eff3f40f509612377b0f9fd095ec956a054ef5f",
       "feature-matrix/economic-defi.toml": "34d83bfb027c88042f7b6f88b0552f2d6a4428c798360ccb432a893cf1b67743",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "eb2207dc3be3c6012fb6ebb1e8bcc7f8aeb16f2118718b4f6a3863cb4d1a8f02",
+      "feature-matrix/language-trading.toml": "f3f26a33aca84c331a5efd8e500d4b72c118852a36bbf9b06b06ea3f2a2323eb",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "d36e103197c2d7bd4c4348365ed08875160353a43c98d8e5f42b1e54e64442e9",
