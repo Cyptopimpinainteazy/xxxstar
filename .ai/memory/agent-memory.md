@@ -7294,3 +7294,29 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Corpus now: `fib` (recursion), `loop_ops` (calls), `match_cond` (comparison chains), `branch_fold`
   (folding), `loop_sum`/`loop_break`/`loop_continue` (loops, break, continue) — each asserted against the
   value its source computes, on both engines. Still unproven: match statements, floats, strings, host calls.
+
+**2026-09-24 — floats: the operator alone cannot choose the opcode (TICKET-133)**
+
+- The backend said it out loud: `// For now assume integer operations - a real compiler would track
+  types`. The language shares one `+` between `i64` and `f64`, so `1.5 + 2.5` compiled to an integer
+  add and the VM answered `TypeMismatch("i64", "F64(1.5)")`. Both engines already implemented every
+  float opcode; only the *choice* was missing.
+- **Plumb the flag in the value, not in a side table.** `MirRhs::Binary(op, l, r)` became
+  `MirRhs::Binary { op, left, right, float }`: the passes clone or destructure the rhs, so a field
+  travels with it, while a side table would need every pass to keep it in step (the failure mode this
+  repository has already paid for). 75 sites were rewritten mechanically; `cargo check --all-targets`
+  found the stragglers (a regex that excludes nested parentheses misses `MirValue(0)` arguments).
+- **The type checker has no float primitive**, so the flag cannot come from `HirExpr::ty`: the MIR
+  lowering derives it from a float literal, an operation on one, or a read of a cell that holds one,
+  and treats anything else (a call's result) as integer — a loud `TypeMismatch`, not silent arithmetic
+  on the wrong representation.
+- **`ForbiddenOnChain` for floats is the design, not a gap**: the verifier's on-chain options deny
+  float opcodes (`deny_float_arithmetic`) because platform-dependent rounding is not a deterministic
+  state transition. The test asserts both halves — simulation computes 7, on-chain refuses *with that
+  message* (so a parse or type error cannot masquerade as the intended refusal).
+- **Soundness rule found on the way**: `x * 0 => 0` matched a float zero, which is unsound (`x * 0.0`
+  is NaN for NaN `x`). The identity now needs an integer multiply. The first version of its unit test
+  was wrong in an instructive way: with *both* operands constant the fold is legitimate, so the test
+  needs an unknown (parameter) operand to reach the identity.
+- Corpus: 8 shapes through both engines (fib, loop_ops, match_cond, branch_fold, loop_sum, loop_break,
+  loop_continue) plus the float test. Still unproven: match statements, strings, host calls.
