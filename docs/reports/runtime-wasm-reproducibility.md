@@ -144,6 +144,11 @@ bytes**:
   returning "not implemented" and checks Ed25519/Sr25519 over a stated message. The bytes move:
   compact 8,488,288 bytes (was 8,485,072), compressed 1,460,543 (was 1,458,341). Two from-scratch
   builds agree.
+* `496242b64` — the X3 payload convention is fixed: `submit_comit_v2` validated a routing packet and
+  then handed those bytes to an adapter that parses X3BC, so no real chain could execute an X3
+  program. The payload is the compiled program now and validation is the adapter's own. The bytes
+  move: compact 8,489,301 bytes (was 8,488,288), compressed 1,460,962 (was 1,460,543). Two
+  from-scratch builds agree.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
