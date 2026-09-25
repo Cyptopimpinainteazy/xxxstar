@@ -90,7 +90,7 @@ name = "Bytecode routing to atomic kernel"
 subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration", "pallets/x3-kernel/src", "pallets/x3-kernel/tests", "runtime/src/tests.rs"]
-implemented = 70
+implemented = 75
 tested = 75
 mainnet_ready = 30
 priority = "P0"
@@ -99,7 +99,8 @@ launch_scope = "core"
 claim_risk = false
 blockers = [
   "**CLOSED 2026-09-25 — an extrinsic now carries a compiled program through the pallet, and the pallet records it.** `submit_comit_v2` validated its `x3_payload` as an `X3VmPacket` and then handed those same bytes to `T::X3Adapter::execute`, which parses X3BC. A packet is a semantic operation, not bytecode, and the executor accepts nothing else, so on any chain with a real adapter (`X3VmAdapter`, or `WasmX3Adapter` in the wasm build) every non-empty X3 payload died with `X3ExecutionFailed` — while a program compiled from `.x3` source was refused earlier as `InvalidX3VmPacket`. Reproduced before the fix by dispatching a compiled program at the real runtime: `Module(ModuleError { index: 11, error: [7, 0, 0, 0], message: Some(\"InvalidX3VmPacket\") })`. The payload is now the program, and validation is the adapter's own (`T::X3Adapter::validate`: envelope magic, version gate, checksum) — the component that does the work. Evidence: `runtime/src/tests.rs` compiles a program from source, dispatches it as a signed extrinsic, and asserts the comit is recorded and the nonce moved; its corrupted-program twin asserts refusal and that no comit record is left.",
-  "Still open on this row: the dispatch is proven in a runtime `TestExternalities`, not on a running chain with finality; the X3 execution receipt is **not persisted** — only the comit id, the nonce and the fee deduction reach storage, so a program's result cannot be re-read the way `EvmTransactionReceipts` allows for EVM; gas accounting is asserted through the adapter's receipt in-test rather than read back from chain state; and an old artifact executed against an upgraded VM version is untested.",
+  "**CLOSED 2026-09-25 — the execution receipt is persisted.** The X3 domain had no receipt storage at all (only EVM did), so a program's result existed in an event and a gas number and could not be read back. `X3ExecutionReceipts` is keyed by comit id and written only after every acceptance check, so a stored receipt always describes an accepted comit. The runtime test reads it back — success, `return_data` equal to the value the source states, `gas_used > 0`, the kernel's receipt version — and the refused twin asserts no receipt is left behind. `STORAGE_VERSION` moves 1→2, recorded by the migration the runtime already runs in its `Migrations` tuple (the map starts empty, so there is nothing to rewrite). The extra storage write is declared at the call site as `submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))` because the benchmark predates it: re-running that benchmark is what would let the hand-declaration go.",
+  "Still open on this row: the dispatch is proven in a runtime `TestExternalities`, not on a running chain with finality; the 1→2 storage migration has not been exercised by a runtime-upgrade rehearsal on a chain with state (the rehearsal gate exists — `scripts/mainnet/runtime_upgrade_rehearsal.sh`); an old artifact executed against an upgraded VM version is untested; and `submit_comit_v2`'s benchmark still needs re-running to replace the explicit write declaration.",
 ]
 required_tests = [
   "compile_source_emits_runtime_loadable_bytecode",
@@ -113,9 +114,9 @@ required_tests = [
 ]
 test_evidence = [
   "note: the first four tests are in crates/x3-integration (tests/compiler_bridge.rs, src/mini_x3.rs), measured on master 2026-09-23 (TICKET-101 third pass)",
-  "note: the adapter pair is pallets/x3-kernel/tests/x3_adapter_route.rs and the runtime pair is runtime/src/tests.rs; each compiles its program from `.x3` source inside the test (2026-09-25)",
+  "note: the adapter pair is pallets/x3-kernel/tests/x3_adapter_route.rs and the runtime pair is runtime/src/tests.rs; each compiles its program from `.x3` source inside the test (2026-09-25). The runtime pair also reads the persisted receipt back from storage, and asserts none is written for a refused comit",
 ]
-evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23", "note: 2026-09-25 - the pallet's X3 payload convention was wrong; runtime/src/tests.rs now proves the dispatch path"]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23", "note: 2026-09-25 - the pallet's X3 payload convention was wrong and the receipt was not persisted; runtime/src/tests.rs now proves both the dispatch and the stored receipt"]
 registry_feature = "atomic_kernel"
 
 [[feature]]

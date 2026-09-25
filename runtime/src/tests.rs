@@ -395,6 +395,27 @@ fn a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_record
             pallet_x3_kernel::Nonces::<Runtime>::get(submitter.clone()),
             nonce + 1
         );
+
+        // The program's result is on-chain, not only in the event: this is the receipt step of the
+        // X3Lang pipeline, and without it "the program ran and returned 42" cannot be checked after
+        // the fact.
+        let receipt = pallet_x3_kernel::Pallet::<Runtime>::x3_execution_receipt(comit_id)
+            .expect("an accepted X3 comit must store its execution receipt");
+        assert!(
+            receipt.success,
+            "the fixture program returns, so the receipt succeeds"
+        );
+        assert_eq!(
+            receipt.return_data,
+            42i64.to_le_bytes().to_vec(),
+            "the receipt must carry the value the source states"
+        );
+        assert!(receipt.gas_used > 0, "the receipt must report metered gas");
+        assert_eq!(
+            receipt.version,
+            pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
+            "and be stamped with the kernel's receipt version"
+        );
     });
 }
 
@@ -441,6 +462,10 @@ fn a_corrupted_x3_program_is_refused_by_the_runtime_path() {
         assert!(
             pallet_x3_kernel::SubmittedComits::<Runtime>::get(comit_id).is_none(),
             "a refused comit must leave no record that lets the id be reused"
+        );
+        assert!(
+            pallet_x3_kernel::Pallet::<Runtime>::x3_execution_receipt(comit_id).is_none(),
+            "and it must not leave a receipt claiming a program it never ran"
         );
     });
 }

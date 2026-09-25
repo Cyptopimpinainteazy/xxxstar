@@ -665,6 +665,18 @@ pub mod pallet {
     pub type EvmTransactionReceipts<T: Config> =
         StorageMap<_, Blake2_128Concat, H256, ExecutionReceipt, OptionQuery>;
 
+    /// X3 execution receipts, keyed by the comit that produced them.
+    ///
+    /// The EVM domain stores its receipts (`EvmTransactionReceipts`); the X3 domain stored none, so
+    /// a program's result existed only in the dispatch event and in a gas number. A receipt that
+    /// cannot be read back afterwards is not evidence that the program ran — this is what makes
+    /// "this comit executed this program and it returned X" checkable from chain state.
+    #[pallet::storage]
+    #[pallet::unbounded]
+    #[pallet::getter(fn x3_execution_receipt)]
+    pub type X3ExecutionReceipts<T: Config> =
+        StorageMap<_, Blake2_128Concat, H256, ExecutionReceipt, OptionQuery>;
+
     /// EVM transactions keyed by transaction hash (keccak256 of raw tx).
     /// Stores full transaction data (including gas and input) for RPC compatibility.
     /// This is separate from receipts to allow querying transaction metadata without
@@ -1032,7 +1044,9 @@ pub mod pallet {
 
     use frame_support::traits::StorageVersion;
 
-    pub(crate) const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+    // 2: `submit_comit_v2` started persisting an X3 execution receipt (`X3ExecutionReceipts`).
+    // The map starts empty, so the migration only records the version — there is no data to move.
+    pub(crate) const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
     #[pallet::pallet]
     #[pallet::storage_version(STORAGE_VERSION)]
@@ -1665,7 +1679,12 @@ pub mod pallet {
         /// are rolled back. Runtime VM adapters MUST be transactional to guarantee rollback
         /// for VM state as well.
         #[pallet::call_index(9)]
-        #[pallet::weight(<T as Config>::WeightInfo::submit_comit_v2())]
+        // `submit_comit_v2`'s benchmark predates the X3 receipt write below, so that write is
+        // declared here rather than absorbed silently: an undeclared storage write is exactly the
+        // under-count that lets a block be built past its own limit.
+        #[pallet::weight(
+            <T as Config>::WeightInfo::submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))
+        )]
         pub fn submit_comit_v2(
             origin: OriginFor<T>,
             comit_id: H256,
@@ -1915,6 +1934,12 @@ pub mod pallet {
                 x3_receipt.as_ref(),
             ) {
                 return Err(Self::fail_with_reason(comit_id, reason));
+            }
+
+            // Only comits that passed every check above reach this point, so a stored receipt is
+            // always a receipt for an accepted comit.
+            if let Some(ref receipt) = x3_receipt {
+                X3ExecutionReceipts::<T>::insert(comit_id, receipt.clone());
             }
 
             SubmittedComits::<T>::insert(comit_id, current_block);
