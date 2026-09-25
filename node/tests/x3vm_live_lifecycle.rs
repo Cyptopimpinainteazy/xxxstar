@@ -836,3 +836,226 @@ fn real_local_node_refund_before_timeout_fails_closed() {
         "failed early refund must not mutate intent into Refunded"
     );
 }
+
+/// Spawn the dev node against a base path that outlives the process.
+///
+/// `spawn_dev_node` passes `--tmp`, so nothing in this file could prove anything about a node
+/// that stops and starts again — a temporary database is deleted with the process. `--base-path`
+/// overrides the `--tmp` that `--dev` implies (verified against the binary: it creates
+/// `<base-path>/chains/x3_chain_dev`), so this is the same chain with a database that persists.
+fn spawn_dev_node_at_base_path(base_path: &std::path::Path) -> NodeGuard {
+    let child = Command::new(env!("CARGO_BIN_EXE_x3-chain-node"))
+        .args([
+            "--dev",
+            "--base-path",
+            base_path.to_str().expect("base path is utf-8"),
+            "--rpc-port",
+            "19944",
+            "--port",
+            "30379",
+            "--no-telemetry",
+        ])
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .expect("spawn x3-chain-node --dev on a persistent base path");
+    NodeGuard(child)
+}
+
+/// A base path unique to this test process, removed when the guard drops.
+struct TempBasePath(std::path::PathBuf);
+
+impl TempBasePath {
+    fn new(label: &str) -> Self {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock")
+            .as_nanos();
+        let path =
+            std::env::temp_dir().join(format!("x3-live-{label}-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&path).expect("create the base path");
+        Self(path)
+    }
+}
+
+impl Drop for TempBasePath {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// How many finalized blocks contain this exact signed extrinsic, from `from` to the head.
+fn finalized_occurrences(signed: &str, from: u64) -> usize {
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    let head = finalized_head();
+    let head_number = header_number(&mut rpc, &head);
+    let mut count = 0;
+    for number in from..=head_number {
+        if let Some(hash) = block_hash_at(&mut rpc, number) {
+            if block_contains(&mut rpc, &hash, signed) {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+/// A finalized X3 comit is still there after the node process dies and starts again.
+///
+/// The directive's PRIORITY 1 list asks for restart behaviour, and the suite had a restart proof
+/// only at the relayer/adapter level (`real_local_node_timeout_reaches_finalized_refund_state`
+/// reopens a persisted proof ledger). That is a different claim from "the *chain* still has the
+/// comit after the chain node exits", which needs a node whose database survives it — hence
+/// `--base-path` instead of `--tmp`.
+#[test]
+#[ignore = "restarts the real X3 dev node and re-reads finalized state from its own database"]
+fn a_finalized_x3_comit_survives_a_node_restart() {
+    let base_path = TempBasePath::new("restart");
+
+    let chain_id = String::from("x3-local");
+    let alice_uri = dev_uri("Alice");
+    let comit_id = H256::from_low_u64_be(0x05E5_7A47);
+    let probe_comit_id = H256::from_low_u64_be(0x05E5_7A48);
+    let program = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 {\n    return 42;\n}\n",
+    )
+    .expect("the fixture must compile");
+
+    // ── run 1: authorize, submit, finalize, read, then stop the node ────────
+    let (first_number, before) = {
+        let _node = spawn_dev_node_at_base_path(&base_path.0);
+        wait_rpc(Duration::from_secs(180));
+
+        let alice = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+            .expect("signer");
+
+        let authorize = alice
+            .sign_kernel_authorize_account(alice.account())
+            .expect("sign the council proposal");
+        assert!(!submit(&authorize).is_empty());
+        let (_, authorize_head) = wait_finalized(&authorize, Duration::from_secs(180));
+        assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
+
+        let signed = alice
+            .sign_kernel_submit_comit_v2(comit_id, program.clone(), 1_000_000)
+            .expect("sign the comit");
+        assert!(!submit(&signed).is_empty());
+        let (number, head) = wait_finalized(&signed, Duration::from_secs(180));
+        assert_dispatch_succeeded(&alice, &head, &signed);
+
+        // Read it while the node is alive — this is the value the restarted node has to reproduce.
+        let before = x3_receipt_at(comit_id, &head)
+            .expect("the comit's receipt is in the database the node just wrote");
+        assert!(before.success, "the fixture program returns");
+        (number, before)
+        // `_node` drops here: the node process is killed and waited on.
+    };
+
+    // ── run 2: same base path, same ports, new process ──────────────────────
+    let _restarted = spawn_dev_node_at_base_path(&base_path.0);
+    wait_rpc(Duration::from_secs(180));
+
+    let alice = X3RuntimeSigner::from_uri(chain_id, RPC_URL.into(), &alice_uri)
+        .expect("signer after restart");
+
+    let restarted_head = finalized_head();
+    let restarted_number = header_number(&mut RpcClient::new(RPC_URL.into(), 0), &restarted_head);
+    assert!(
+        restarted_number >= first_number,
+        "the restarted node must resume at or past the finalized height it reached before \
+         restart (#{first_number}), not at genesis; it reported #{restarted_number}"
+    );
+
+    let after = x3_receipt_at(comit_id, &restarted_head)
+        .expect("a finalized comit must still be readable after the node restarts");
+    assert_eq!(
+        after.return_data, before.return_data,
+        "the restarted node must report the value the source stated, not a re-execution's opinion"
+    );
+    assert_eq!(after.gas_used, before.gas_used, "gas is state, not memory");
+    assert_eq!(after.version, before.version);
+
+    // ── and it is a running chain, not just a readable database ────────────
+    let probe = alice
+        .sign_kernel_submit_comit_v2(probe_comit_id, program, 1_000_000)
+        .expect("sign a comit on the restarted node");
+    assert!(!submit(&probe).is_empty());
+    let (probe_number, probe_head) = wait_finalized(&probe, Duration::from_secs(180));
+    assert!(
+        probe_number > first_number,
+        "the restarted chain must keep advancing: #{probe_number} is not past #{first_number}"
+    );
+    assert_dispatch_succeeded(&alice, &probe_head, &probe);
+}
+
+/// The same signed comit extrinsic, submitted again, is never mined twice.
+///
+/// PRIORITY 1 asks for replay rejection at the runtime path, and "the pool refused it" is not the
+/// same claim as "the chain did not finalize it twice": a transaction can be accepted by a pool
+/// and still be a replay if the chain lets it in. This asserts the chain-level property directly,
+/// by counting how many finalized blocks contain those exact bytes.
+#[test]
+#[ignore = "boots the real X3 dev node and proves a replayed comit extrinsic cannot be mined twice"]
+fn a_replayed_x3_comit_extrinsic_is_not_mined_twice() {
+    let _node = spawn_dev_node();
+    wait_rpc(Duration::from_secs(180));
+
+    let chain_id = String::from("x3-local");
+    let alice =
+        X3RuntimeSigner::from_uri(chain_id, RPC_URL.into(), &dev_uri("Alice")).expect("signer");
+
+    let authorize = alice
+        .sign_kernel_authorize_account(alice.account())
+        .expect("sign the council proposal");
+    assert!(!submit(&authorize).is_empty());
+    let (_, authorize_head) = wait_finalized(&authorize, Duration::from_secs(180));
+    assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
+
+    let program = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 {\n    return 42;\n}\n",
+    )
+    .expect("the fixture must compile");
+    let comit_id = H256::from_low_u64_be(0x002E_91A1);
+    let signed = alice
+        .sign_kernel_submit_comit_v2(comit_id, program, 1_000_000)
+        .expect("sign the comit");
+
+    assert!(!submit(&signed).is_empty());
+    let (number, head) = wait_finalized(&signed, Duration::from_secs(180));
+    assert_dispatch_succeeded(&alice, &head, &signed);
+    assert_eq!(
+        finalized_occurrences(&signed, number),
+        1,
+        "the extrinsic is mined exactly once to begin with — otherwise this test proves nothing"
+    );
+
+    // The identical bytes: same account, same nonce, same signature.
+    //
+    // A refusal reaches the client in one of three shapes — a transport-level JSON-RPC error, a
+    // response carrying an `error`, or an `Ok` the pool recognises as already-known. Which one is
+    // not the invariant, so it is reported rather than asserted; what the chain does with those
+    // bytes is asserted below, because that is the property a replay attack would break.
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    match rpc.call(
+        "author_submitExtrinsic",
+        vec![Value::String(signed.clone())],
+    ) {
+        Err(error) => println!("the pool refused the replay: {error}"),
+        Ok(response) => match response.error {
+            Some(error) => println!("the pool refused the replay: {error:?}"),
+            None => println!(
+                "the pool treated the replay as a known transaction (hash {:?})",
+                response.result
+            ),
+        },
+    }
+
+    // Whatever the pool said, give the chain time to prove it: a replayed extrinsic that reaches a
+    // second finalized block is the replay the nonce exists to prevent.
+    thread::sleep(Duration::from_secs(8));
+    assert_eq!(
+        finalized_occurrences(&signed, number),
+        1,
+        "a replayed signed extrinsic must not appear in a second finalized block"
+    );
+}
