@@ -158,7 +158,7 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["**Nothing here is authenticated.** There is no signature or digest of any kind in the X3BC envelope, so the row's own name claims more than the code does; the decoder validates structure, the magic, and gas accounting. TICKET-108"]
+blockers = ["**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. So the row's own name still claims more than the code does: there is no signature and no attestation. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"]
 required_tests = ["test_invalid_magic", "test_parse_minimal_module"]
 test_evidence = ["note: the no-std decoder is crates/x3-integration/src/mini_x3.rs::parse_module, whose tests are test_invalid_magic / test_parse_minimal_module / test_execute_returns_42 / test_gas_exhausted; measured on master 2026-09-23"]
 evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
@@ -177,7 +177,16 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["The envelope is versioned on paper and unchecked in the no-std decoder: `mini_x3::parse_module` skips the 20 header bytes after the magic — version, flags, checksum, min-version, feature flags — so a wrong-version or corrupted module is accepted when its structure parses. `x3-backend` writes a checksum over the body and neither reader verifies it. TICKET-108"]
-required_tests = ["test_invalid_magic", "test_execute_returns_42", "test_gas_exhausted"]
-test_evidence = ["note: the format is defined in crates/x3-backend/src/bc_format.rs and re-implemented for no-std in crates/x3-integration/src/mini_x3.rs; measured on master 2026-09-23 (TICKET-101 third pass)"]
+blockers = ["Corrected 2026-09-24 against the code: TICKET-108 is closed by commit 6cc986b5d8. `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. The other body sections still have no parity test, and a checksum is not authentication (see X3-LANG-009)."]
+required_tests = [
+    "test_invalid_magic",
+    "test_execute_returns_42",
+    "test_gas_exhausted",
+    "test_a_corrupted_body_is_rejected",
+    "test_a_future_format_version_is_rejected",
+    "test_a_module_requiring_a_newer_loader_is_rejected",
+    "a_string_constant_means_the_same_thing_to_both_readers",
+    "an_unknown_constant_tag_fails_closed",
+]
+test_evidence = ["note: the format is defined in crates/x3-backend/src/bc_format.rs and re-implemented for no-std in crates/x3-integration/src/mini_x3.rs; measured on master 2026-09-23 (TICKET-101 third pass)", "note: cross-decoder parity for the constant pool added 2026-09-24; `cargo test -p x3-x3-integration` = 13 unit + 2 parity tests pass, `pallet-x3-kernel` = 216 pass"]
 evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
