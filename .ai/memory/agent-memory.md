@@ -7767,3 +7767,64 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 2. Re-run `submit_comit_v2`'s benchmark (`cargo build --release --features runtime-benchmarks` +
    `benchmark pallet`) and retire the explicit write declaration.
 3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
+
+## 2026-09-25 (forty-fourth pass) — supply conservation proven on the transitions, and the gate-coverage measurement
+
+### What closed
+- **`pallet-x3-supply-ledger` had no mock runtime.** Its S0-1 suite builds `SupplyLedger` values by
+  hand and says in a note that running against one "requires mock.rs with runtime configuration", so
+  the three calls every cross-domain operation goes through — `debit_source_to_pending`,
+  `credit_destination_from_pending`, `refund_pending_to_source` (the `SupplyLedgerWrite` trait) — had
+  never been executed by a test. `src/mock.rs` is that runtime: an asset exists when the ledger holds
+  one for it, and a thread-local set marks assets paused so both halves of the transition gate are
+  reachable. The mock's supply governance is `EnsureSigned` so the mint path's account-nonce
+  idempotency is exercised.
+- **`src/tests_conservation.rs` asserts the two laws that make the ledger mean anything**: a
+  *successful* transition never changes the represented total (debit relabels source -> pending,
+  credit pending -> destination, refund pending -> source), and a *refused* transition leaves the
+  ledger byte-for-byte identical. Covered: the success route (native -> EVM), the external route
+  (native -> `external_locked_supply`), the rollback route (debit then refund restores the ledger),
+  duplicate settle refused, pending back to zero after every resolve, halt/pause refusing new legs
+  while refunds still work, a replayed mint nonce minting nothing, and **200 random leg sequences**
+  with the invariant re-checked after each step. 41 tests, all passing against unchanged code — this
+  was missing *evidence*, not a bug.
+- No runtime byte changed, so no WASM re-attestation was needed for this unit.
+
+### The systemic finding (worth acting on)
+The default fast set names only **8** packages with `cargo test -p`. The workspace has **194**
+members, so 186 suites (including `pallet-x3-supply-ledger`, `pallet-x3-cross-vm-router`,
+`pallet-x3-reconciliation`, `pallet-x3-dex`, `x3-vm`, `x3-compiler`, …) run only in the opt-in
+`--deep` gate, which is `env -u SKIP_WASM_BUILD cargo test --workspace`. Measured at `5940dc520`:
+
+    bash scripts/local-ci.sh --deep --only 'test-workspace' --jobs 1
+    PASS in 632s — 472 suites, 6468 passed, 0 failed, 54 ignored
+
+So the tree is green, but the *default* gate set is much narrower than it looks, and two of this
+session's findings (the kernel's packet-vs-program payload, the supply ledger's untested transitions)
+were exactly the kind of thing a workspace-wide run would have surfaced earlier. `clippy workspace
+--all-targets` compiles every test target but runs none of them — do not read a green clippy as
+"the tests ran". Deciding whether `test workspace` belongs in the default set is a gate-economics
+call (it roughly doubles the fast set and builds the WASM); the measurement above is what that
+decision needs.
+
+### Measured at `5940dc520`
+- `bash scripts/local-ci.sh` (fast set) -> **36 of 36 gates PASS** (was 35; `test x3-supply-ledger`
+  added).
+- `test x3-supply-ledger` -> 41 passed.
+- Workspace-wide suite -> 6468 passed / 0 failed (above).
+- Rows: X3-ECO-002 tested 25 -> 78, X3-ECO-003 tested 35 -> 72, X3-XVM-002 tested 72 -> 78. All three
+  keep `mainnet_ready` where it was: one ledger view in one process is not a multi-validator network
+  and not a real external bridge observation.
+
+### Still open
+1. X3-XVM-002's other half: each bridge's observe-and-record path feeding the ledger, and the
+   router's accounting reconciled against the ledger under concurrent traffic.
+2. `submit_comit_v2`'s benchmark still not re-run (the receipt write stays hand-declared).
+3. No chain-level upgrade rehearsal for the 1 -> 2 storage move; old artifact vs upgraded VM untested.
+4. One host: no multi-validator evidence. Rotate the bridge API key in git history.
+
+### Next task seed
+1. Reconcile the router's pending-supply view against the ledger in one test (the two halves of
+   X3-XVM-002 in one place), then decide the default-set question with the 632s measurement in hand.
+2. Re-run `submit_comit_v2`'s benchmark and retire the explicit write declaration.
+3. With the servers up: `--failure`, `--testnet`, 7-validator soak.
