@@ -1608,6 +1608,34 @@ pub fn new_full_with_atomic_gateway<
             });
     }
 
+    // Sample the transaction pool so "is the chain keeping up?" is answerable from
+    // one scrape. The throughput sweep could only establish that the pool drained
+    // as fast as it filled by snapshotting cumulative counters around a load run
+    // and differencing them; with a ready-queue gauge the same question is a
+    // one-line query, and a ready queue that climbs and stays up is the signal
+    // that block space has become the constraint rather than the client.
+    {
+        let pool = transaction_pool.clone();
+        let metrics_for_pool = x3_metrics.clone();
+        task_manager
+            .spawn_handle()
+            .spawn("txpool-metrics", None, async move {
+                let Some(metrics) = metrics_for_pool else {
+                    return;
+                };
+                let mut ticker = tokio::time::interval(std::time::Duration::from_secs(1));
+                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                loop {
+                    ticker.tick().await;
+                    let status = pool.status();
+                    metrics.txpool_ready.set(status.ready as i64);
+                    metrics.txpool_ready_bytes.set(status.ready_bytes as i64);
+                    metrics.txpool_future.set(status.future as i64);
+                    metrics.txpool_future_bytes.set(status.future_bytes as i64);
+                }
+            });
+    }
+
     {
         let client = client.clone();
         let predictor = predictor_for_heatmap.clone();

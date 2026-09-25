@@ -86,6 +86,21 @@ pub struct X3PrometheusMetrics {
     /// lands on 900 ms has a throughput problem that block-height metrics alone
     /// cannot show.
     pub block_interval_seconds: prometheus::Histogram,
+    /// Transactions waiting in the pool's ready queue.
+    ///
+    /// This is the number that says whether the *chain* is the limit. During the
+    /// throughput sweep the only way to tell "the chain kept up" from "the client
+    /// could not offer more" was to snapshot two cumulative counters around a load
+    /// run and diff them. A live ready-queue gauge answers it with one scrape, and
+    /// a ready queue that *climbs and stays up* is the signal that block space has
+    /// become the constraint.
+    pub txpool_ready: prometheus::IntGauge,
+    /// Bytes of ready transaction encodings.
+    pub txpool_ready_bytes: prometheus::IntGauge,
+    /// Transactions in the future queue, i.e. held back by a nonce gap.
+    pub txpool_future: prometheus::IntGauge,
+    /// Bytes of future transaction encodings.
+    pub txpool_future_bytes: prometheus::IntGauge,
 }
 
 impl X3PrometheusMetrics {
@@ -171,6 +186,22 @@ impl X3PrometheusMetrics {
             )
             .buckets(vec![0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0]),
         )?;
+        let txpool_ready = prometheus::IntGauge::new(
+            "x3_txpool_ready",
+            "Transactions waiting in the pool's ready queue",
+        )?;
+        let txpool_ready_bytes = prometheus::IntGauge::new(
+            "x3_txpool_ready_bytes",
+            "Bytes of ready transaction encodings in the pool",
+        )?;
+        let txpool_future = prometheus::IntGauge::new(
+            "x3_txpool_future",
+            "Transactions in the pool's future queue (held by a nonce gap)",
+        )?;
+        let txpool_future_bytes = prometheus::IntGauge::new(
+            "x3_txpool_future_bytes",
+            "Bytes of future transaction encodings in the pool",
+        )?;
 
         registry.register(Box::new(blocks_produced.clone()))?;
         registry.register(Box::new(transactions_received.clone()))?;
@@ -188,6 +219,10 @@ impl X3PrometheusMetrics {
         registry.register(Box::new(imported_block_bytes.clone()))?;
         registry.register(Box::new(imported_block_extrinsics.clone()))?;
         registry.register(Box::new(block_interval_seconds.clone()))?;
+        registry.register(Box::new(txpool_ready.clone()))?;
+        registry.register(Box::new(txpool_ready_bytes.clone()))?;
+        registry.register(Box::new(txpool_future.clone()))?;
+        registry.register(Box::new(txpool_future_bytes.clone()))?;
 
         Ok(Self {
             blocks_produced,
@@ -206,6 +241,10 @@ impl X3PrometheusMetrics {
             imported_block_bytes,
             imported_block_extrinsics,
             block_interval_seconds,
+            txpool_ready,
+            txpool_ready_bytes,
+            txpool_future,
+            txpool_future_bytes,
         })
     }
 }
