@@ -7645,3 +7645,63 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
    `node/tests/x3vm_live_lifecycle.rs`).
 3. Rotate the infrastructure bridge API key still present in git history.
 4. The 7-server network: `--failure` and `--testnet` on this revision, then a 24h soak.
+
+## 2026-09-25 (forty-second pass) — the X3 receipt is persisted and the whole route is proven on a chain
+
+### What closed
+- **`X3ExecutionReceipts` (comit id -> `ExecutionReceipt`) now exists and is written on the v2 path
+  only after every acceptance check**, so a stored receipt always describes an accepted comit. The
+  EVM domain had `EvmTransactionReceipts`; the X3 domain had nothing, so a program's result lived in
+  an event and a gas number and could not be re-read.
+- `STORAGE_VERSION` moved 1 -> 2. The map starts empty, so there is nothing to rewrite; the
+  migration the runtime already runs in its `Migrations` tuple records the version, which is what
+  lets an operator tell an upgraded chain from one on the old layout.
+- **The extra storage write is declared at the call site**:
+  `submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))`. The benchmark predates the write
+  and an undeclared write is exactly the under-count that lets a block be built past its own limit.
+  Re-running the benchmark is what would let the hand-declaration go — recorded on the row, not
+  implied.
+- **The live route is proven**: `node/tests/x3vm_live_lifecycle.rs` boots the dev node, authorizes
+  the submitter, compiles a program from `.x3` source *inside the test*, submits `submit_comit_v2`,
+  waits for the finalized block containing the extrinsic, asserts the dispatch succeeded, and reads
+  the receipt out of that block's state (value = the source's, gas > 0, kernel receipt version).
+  Gate evidence: `X3-native lifecycles` ran 4 tests, all passed, 197s.
+
+### Reusable facts
+- **The kernel's comit nonce is its own counter** (`AtlasKernel::Nonces`, `Blake2_128Concat` over the
+  account, `ValueQuery`), separate from the account nonce in the signed extension. The storage key is
+  `storage_prefix(b"AtlasKernel", b"Nonces") ++ blake2_128(encoded account) ++ encoded account`; the
+  same shape gives the receipt key under `b"X3ExecutionReceipts"`.
+- **`authorize_account` on the kernel is `EnsureRootOrHalfCouncil`**, and on the dev chain the council
+  route works from a plain signed account: `sign_council_propose(call, 1)` executes in the proposal's
+  own block. `X3RuntimeSigner::sign_kernel_authorize_account` wraps that. No sudo, no `--features dev`
+  gate change was needed — the EVM live test already used the same route for header submitters.
+- `X3RuntimeSigner` is the place to sign a call: `signed_extrinsic(RuntimeCall)` is the one signer
+  that mirrors the runtime's `SignedExtra` order. New callers add a method there rather than building
+  an extrinsic by hand.
+- **A dependency change needs its lockfile committed**: `node` gained the compiler bridge as a
+  dev-dependency and `x3-runtime-signer` gained `pallet-x3-kernel`; `Cargo.lock` moved with it. Last
+  time the reproducible build caught the uncommitted lock, so this time it went in with the change.
+
+### Two mistakes worth not repeating
+- **Backticks inside a double-quoted `git commit -m "..."` are command substitution.** A message
+  containing `` `TestExternalities` `` silently lost the word (`not in a :`). Write the message to a
+  file and use `git commit -F`, or single-quote it.
+- A Python heredoc building Rust source with `\n` escapes emits *literal* backslash-n into the file
+  (it broke an insertion at the file's own newline). Prefer real triple-quoted blocks, and re-read the
+  inserted region before compiling.
+
+### Open on X3-LANG-004 (unchanged by the closures)
+1. One local node: inclusion and finality are proven, **multi-validator agreement is not**.
+2. The 1 -> 2 storage migration has not run in an upgrade rehearsal on a chain with state
+   (`scripts/mainnet/runtime_upgrade_rehearsal.sh`).
+3. An old artifact executed against an upgraded VM version is untested.
+4. `submit_comit_v2`'s benchmark still needs re-running to replace the explicit write declaration.
+
+### Next task seed
+1. Run `scripts/mainnet/runtime_upgrade_rehearsal.sh` (or the `--variants` gate) and record whether
+   the 1 -> 2 version move survives a real upgrade with state.
+2. Take the X3 receipt out to a client: a runtime API / RPC that returns it by comit id, so the
+   receipt is usable by something other than a test.
+3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak — the largest blocker left.
+4. Rotate the infrastructure bridge API key still present in git history.
