@@ -1,0 +1,16 @@
+// E2E Test: a while loop that accumulates
+// Tests: loop back-edges, mutable locals, assignment in a body, comparison + arithmetic
+
+fn sum_to(n: i64) -> i64 {
+    let mut total = 0;
+    let mut i = 1;
+    while (i <= n) {
+        total = total + i;
+        i = i + 1;
+    }
+    return total;
+}
+
+fn main() -> i64 {
+    return sum_to(5);
+}

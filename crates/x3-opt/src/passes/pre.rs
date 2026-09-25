@@ -438,6 +438,18 @@ impl PrePass {
 
             let mut next_value = next_value_id(func);
 
+            // Where every value in this function is defined, so a hoist can check that its operands
+            // are available at the block it is hoisted *to* (below: the entry block).
+            let mut value_defs: BTreeMap<MirValue, MirBlockId> = BTreeMap::new();
+            for block in func.blocks.iter() {
+                for stmt in block.statements.iter() {
+                    if let Some(target) = stmt.target() {
+                        value_defs.insert(target, block.id);
+                    }
+                }
+            }
+            let entry_id = func.blocks[0].id;
+
             for (block_id, expr) in redundancies.iter() {
                 let Some(&b_idx) = block_index.get(block_id) else {
                     continue;
@@ -466,6 +478,19 @@ impl PrePass {
                 let Some(rhs) = rhs_clone else {
                     continue;
                 };
+
+                // The hoist target is the entry block (see the note above), so every operand has to
+                // be defined there already — an operand defined inside a loop is not, and hoisting a
+                // computation above its own operand's definition computes it from a register the
+                // defining instruction has not written yet. Measured: `while (i <= n)` had its
+                // comparison hoisted above the `Load` of `i`, so the loop tested the pre-loop value
+                // forever (TICKET-132). A parameter has no defining statement and is available.
+                let operands_ready = operands_of(&rhs)
+                    .into_iter()
+                    .all(|operand| value_defs.get(&operand).is_none_or(|def| *def == entry_id));
+                if !operands_ready {
+                    continue;
+                }
 
                 // Allocate or reuse a hoisted value for this expression
                 let hoisted_value = *hoisted_map.entry(expr.clone()).or_insert_with(|| {
@@ -686,6 +711,18 @@ impl Pass for PrePass {
             hoisted,
             "Hoisted redundant expressions",
         ))
+    }
+}
+
+/// The values an expression reads.
+fn operands_of(rhs: &MirRhs) -> Vec<MirValue> {
+    match rhs {
+        MirRhs::Literal(_) => vec![],
+        MirRhs::Unary(_, v) => vec![*v],
+        MirRhs::Binary(_, a, b) => vec![*a, *b],
+        MirRhs::Call { args, .. } => args.clone(),
+        MirRhs::Load { addr, .. } => vec![*addr],
+        MirRhs::Store { addr, val, .. } => vec![*addr, *val],
     }
 }
 

@@ -8,26 +8,27 @@
 # an invalid opcode). Fixed in this commit together with the receipt's instruction count (always 0),
 # the `main`-is-function-0 entry contract, and the crate's `no_std` build; the tests below are the
 # evidence and were written to fail first.
-# Scope of the claim (re-measured 2026-09-24, second pass): the pipeline is proven for the operand
+# Scope of the claim (re-measured 2026-09-24, third pass): the pipeline is proven for the operand
 # kinds the sweep covers — literal, arithmetic, local, constant-pool index, branch, function call —
 # **and** for the compiler's own fixture corpus, which adds recursion (`fib(10)` = 55), several
-# functions with parameters, comparison chains and constant-folded branches, with both engines
-# agreeing on every fixture. Not proven: loops (the `loop_ops` fixture is arithmetic and says so in
-# its own header), match statements, floats, strings, host calls. That list is what keeps this row
-# short of COMPLETE.
+# functions with parameters, comparison chains, constant-folded branches and, since `loop_sum.x3`
+# (sum_to(5) = 15), a `while` loop with a mutated local: that needed three fixes under it (mutated
+# locals lowered as register-model cells, DCE keeping stores, PRE not hoisting a computation above
+# its own operand's definition). Both engines agree on every fixture. Not proven: match statements,
+# floats, strings, host calls. That list is what keeps this row short of COMPLETE.
 id = "X3-LANG-001"
 name = "Compile→encode→decode→execute→receipt E2E"
 subsystem = "language_trading"
 source = "master"
-paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x3-compiler"]
-implemented = 65
-tested = 70
-mainnet_ready = 25
+paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x3-compiler", "crates/x3-mir", "crates/x3-opt"]
+implemented = 70
+tested = 75
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Proven for the swept operand kinds and the compiler's fixture corpus (recursion, calls, comparison chains, folded branches, both engines agreeing); not proven for loops, match, floats, strings or host calls. The optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"]
+blockers = ["Proven for the swept operand kinds and the compiler's fixture corpus, including a `while` loop with a mutated local on both engines; not proven for match statements, floats, strings or host calls. The optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"]
 required_tests = [
   "compile_encode_decode_execute_receipt_end_to_end",
   "every_operand_kind_compiles_verifies_and_executes",

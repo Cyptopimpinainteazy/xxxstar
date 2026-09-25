@@ -4,6 +4,7 @@ use x3_common::Span;
 use x3_hir::hir::{AssignTarget, HirExpr, HirExprKind, HirFunction, HirModule, HirStmt, SymbolId};
 
 use crate::error::MirError;
+use crate::memory::MemoryModel;
 use crate::mir::*;
 
 /// Converts HIR into deterministic SSA-form MIR.
@@ -25,6 +26,32 @@ impl MirLowerer {
     }
 }
 
+/// Add every symbol `stmts` assigns to, recursing into branches and loop bodies.
+///
+/// A name assigned anywhere is a cell for the whole function (see `MirFunctionBuilder::mutated`).
+fn collect_mutated(stmts: &[HirStmt], out: &mut std::collections::HashSet<SymbolId>) {
+    for stmt in stmts {
+        match stmt {
+            HirStmt::Assign {
+                target: AssignTarget::Variable(symbol),
+                ..
+            } => {
+                out.insert(*symbol);
+            }
+            HirStmt::If {
+                then_block,
+                else_block,
+                ..
+            } => {
+                collect_mutated(then_block, out);
+                collect_mutated(else_block, out);
+            }
+            HirStmt::While { body, .. } => collect_mutated(body, out),
+            _ => {}
+        }
+    }
+}
+
 struct MirFunctionBuilder {
     symbol: SymbolId,
     span: Span,
@@ -32,6 +59,18 @@ struct MirFunctionBuilder {
     current_block: MirBlockId,
     params: Vec<MirValue>,
     value_map: HashMap<SymbolId, MirValue>,
+    /// Symbols the function assigns to, and the cell each one lives in.
+    ///
+    /// A name bound by `let` and never assigned is a value: the map says which, and SSA needs no
+    /// more. A name that *is* assigned cannot be one — the loop that assigns it jumps back to a
+    /// condition that was already lowered, and that condition reads a register, so the assignment
+    /// has to reach that register. Lowering a mutated name as a register-model cell does exactly
+    /// that: reads load from the cell and writes store into it, so the back-edge sees the new value.
+    /// Measured before this: `while (i <= n) { total = total + i; i = i + 1; }` compiled and then
+    /// looped forever, because the body wrote fresh temporaries the condition never read
+    /// (TICKET-132).
+    mutated: std::collections::HashSet<SymbolId>,
+    slots: HashMap<SymbolId, MirValue>,
     next_value: usize,
 }
 
@@ -44,6 +83,8 @@ impl MirFunctionBuilder {
             current_block: MirBlockId(0),
             params: Vec::new(),
             value_map: HashMap::new(),
+            mutated: std::collections::HashSet::new(),
+            slots: HashMap::new(),
             next_value: 0,
         };
         let entry = builder.create_block();
@@ -56,6 +97,15 @@ impl MirFunctionBuilder {
             let value = self.allocate_value();
             self.value_map.insert(param.symbol, value);
             self.params.push(value);
+        }
+        collect_mutated(&function.body, &mut self.mutated);
+        // A mutated parameter is a cell from the start: its incoming value is the cell's register.
+        for param in &function.params {
+            if self.mutated.contains(&param.symbol) {
+                if let Some(&value) = self.value_map.get(&param.symbol) {
+                    self.slots.insert(param.symbol, value);
+                }
+            }
         }
         self.lower_statements(&function.body)?;
         self.ensure_current_block_has_terminator();
@@ -79,6 +129,11 @@ impl MirFunctionBuilder {
         match statement {
             HirStmt::Let { symbol, value, .. } => {
                 let evaluated = self.lower_expr(value)?;
+                if self.mutated.contains(symbol) {
+                    // The initial value *is* the cell: it has a register, writes store into it and
+                    // reads load from it, so the loop's back-edge sees the current value.
+                    self.slots.insert(*symbol, evaluated);
+                }
                 self.value_map.insert(*symbol, evaluated);
             }
             HirStmt::Assign {
@@ -94,7 +149,18 @@ impl MirFunctionBuilder {
                             )));
                         }
                         let evaluated = self.lower_expr(value)?;
-                        self.value_map.insert(*symbol, evaluated);
+                        if let Some(&cell) = self.slots.get(symbol) {
+                            // Store into the cell, do not just rename the value: the loop's
+                            // condition was lowered already and reads this register.
+                            let stored = self.emit_assignment(MirRhs::Store {
+                                model: MemoryModel::Register,
+                                addr: cell,
+                                val: evaluated,
+                            });
+                            self.value_map.insert(*symbol, stored);
+                        } else {
+                            self.value_map.insert(*symbol, evaluated);
+                        }
                     }
                     AssignTarget::Field { .. } | AssignTarget::Index { .. } => {
                         // Field/index assignments require type layout from checker
@@ -195,11 +261,22 @@ impl MirFunctionBuilder {
     fn lower_expr(&mut self, expr: &HirExpr) -> Result<MirValue, MirError> {
         match &expr.kind {
             HirExprKind::Literal(literal) => Ok(self.emit_literal(literal.clone())),
-            HirExprKind::Var(symbol) => self
-                .value_map
-                .get(symbol)
-                .copied()
-                .ok_or_else(|| MirError::new(format!("value for symbol {symbol:?} missing"))),
+            HirExprKind::Var(symbol) => {
+                // A mutated name is read from its cell, not from the value map: the map holds the
+                // value of the last assignment *as this lowering walked it*, and a loop body's
+                // reader may execute before an assignment the walk has already passed. Loading from
+                // the cell is what makes the loop see the current value (TICKET-132).
+                if let Some(&cell) = self.slots.get(symbol) {
+                    return Ok(self.emit_assignment(MirRhs::Load {
+                        model: MemoryModel::Register,
+                        addr: cell,
+                    }));
+                }
+                self.value_map
+                    .get(symbol)
+                    .copied()
+                    .ok_or_else(|| MirError::new(format!("value for symbol {symbol:?} missing")))
+            }
             HirExprKind::Binary { op, left, right } => {
                 let left_val = self.lower_expr(left)?;
                 let right_val = self.lower_expr(right)?;

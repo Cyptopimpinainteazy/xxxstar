@@ -94,11 +94,16 @@ impl Pass for DeadCodeEliminationPass {
             let removed_blocks = before_blocks - func.blocks.len();
             total_changes += removed_blocks;
 
+            // A statement is kept when it has an effect. A `Call` is one; so is a **`Store`** —
+            // its effect is the memory write, not the value it binds, and treating it as removable
+            // deleted the loop body of `while (i <= n) { total = total + i; i = i + 1; }`: measured,
+            // the emitted program had an empty body and looped forever (TICKET-132). A register-model
+            // store is what carries a mutated local from one iteration to the next.
             if run_dce(func, |stmt| {
                 matches!(
                     stmt,
                     MirStatement::Assign {
-                        rhs: MirRhs::Call { .. },
+                        rhs: MirRhs::Call { .. } | MirRhs::Store { .. },
                         ..
                     }
                 )

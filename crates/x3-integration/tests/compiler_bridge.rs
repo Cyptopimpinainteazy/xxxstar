@@ -178,6 +178,7 @@ fn the_compiler_fixture_corpus_executes_to_the_value_its_source_states() {
         ("loop_ops.x3", 16),    // sum_three(1,2,3) + multiply_accumulate(2,3,4)
         ("match_cond.x3", 5),   // classify(-5)+classify(0)+classify(5)+classify(50)+classify(500)
         ("branch_fold.x3", 30), // (5+10)*2, the branch that returns 999 is folded away
+        ("loop_sum.x3", 15),    // sum_to(5) = 1+2+3+4+5, which needs a loop back-edge
     ];
 
     // Every failing shape is collected and reported together: a corpus check that stops at the
