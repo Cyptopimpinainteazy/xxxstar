@@ -1,0 +1,4808 @@
+{
+  "features": [
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 34,
+      "confidence": "medium",
+      "evidence": [
+        "pallets/pallet-x3-control",
+        "note: 2026-09-19 joined the workspace and has 10 tests; its authority check had accepted ControlAuthority::Governance from any signed account and was fixed in the same change"
+      ],
+      "id": "X3-AGENT-001",
+      "implemented": 50,
+      "launch_scope": "dev_tooling",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "Privileged control surface needs security review"
+      ],
+      "name": "X3 control pallet",
+      "paths": [
+        "pallets/pallet-x3-control"
+      ],
+      "priority": "P2",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "agents_experimental",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 54,
+      "confidence": "high",
+      "evidence": [
+        "scripts/agent_guard.py",
+        "note: CI recovery strengthened agent_guard patterns"
+      ],
+      "id": "X3-AGENT-002",
+      "implemented": 65,
+      "launch_scope": "dev_tooling",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 45,
+      "missing_work": [
+        "Needs full policy enforcement and credential isolation proof"
+      ],
+      "name": "AI-generated code governance boundary",
+      "paths": [
+        "scripts/agent_guard.py"
+      ],
+      "priority": "P2",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "agents_experimental",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 19,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-swarm-core",
+        "note: FEATURE_REGISTRY explicitly records missing kill-switch test"
+      ],
+      "id": "X3-AGENT-003",
+      "implemented": 30,
+      "launch_scope": "dev_tooling",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 15,
+      "missing_work": [
+        "Previously claimed tests were fictional and removed"
+      ],
+      "name": "Agent kill-switch concept",
+      "paths": [
+        "crates/x3-swarm-core"
+      ],
+      "priority": "P3",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "agents_experimental",
+      "tested": 10,
+      "tests": "tested score 10% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": true,
+      "composite": 40,
+      "confidence": "high",
+      "evidence": [
+        "GPU_VALIDATOR_HONEST_AUDIT.md",
+        "docs/testnet-config/RELEASE-NOTES.md",
+        ".ai/reports/gpu-claims-hygiene-20260922.md",
+        "note: Honest GPU audit says no real GPU finalized-TPS benchmark; the release note that contradicted it has been rewritten and the orphan result artifacts are ticketed"
+      ],
+      "id": "X3-CLAIM-001",
+      "implemented": 55,
+      "launch_scope": "research",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "The current-performance wording is gone: `docs/testnet-config/RELEASE-NOTES.md` announced a released `solana-gpu-validator-v1.0.tar.gz` with \"Achieved: 2.75M TPS in lab, 1-5M TPS on testnet\" and a \"Guarantee: Minimum 100k TPS\", none of which exists in this repository (no `.cu`/`.ptx` file, no tarball, no TPS benchmark of any kind). It now states what is real, marks the figures as targets, and names the two orphan result files (`day10-validation-results.json`, `day10-hotfix-results.json`) that nothing here produces \u2014 TICKET-099",
+        "What remains is not wording: no GPU benchmark can run on this host (no compute device) and no GPU artifact is published, so any acceleration claim is still unverifiable here"
+      ],
+      "name": "Million-TPS GPU claims",
+      "paths": [
+        "GPU_VALIDATOR_HONEST_AUDIT.md",
+        "docs/testnet-config/RELEASE-NOTES.md"
+      ],
+      "priority": "P0",
+      "source": "claim_risk",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "claims_hygiene",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": true,
+      "composite": 14,
+      "confidence": "high",
+      "evidence": [
+        "CURRENT_MAINNET_STATUS.md",
+        "note: No complete fair-ordering/encrypted mempool proof"
+      ],
+      "id": "X3-CLAIM-002",
+      "implemented": 20,
+      "launch_scope": "research",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 10,
+      "missing_work": [
+        "Rename to MEV-resistant architecture under development"
+      ],
+      "name": "MEV-proof marketing claim",
+      "paths": [
+        "CURRENT_MAINNET_STATUS.md"
+      ],
+      "priority": "P0",
+      "source": "claim_risk",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "claims_hygiene",
+      "tested": 10,
+      "tests": "tested score 10% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": true,
+      "composite": 35,
+      "confidence": "high",
+      "evidence": [
+        "reports/atomic_crossvm_completion_audit.md",
+        "note: Audit identifies simulated adapters/placeholder proof verification in older path"
+      ],
+      "id": "X3-CLAIM-003",
+      "implemented": 45,
+      "launch_scope": "research",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 30,
+      "missing_work": [
+        "Distinguish internal cross-VM from external-chain settlement"
+      ],
+      "name": "Cross-chain complete claim",
+      "paths": [
+        "reports/atomic_crossvm_completion_audit.md"
+      ],
+      "priority": "P0",
+      "source": "claim_risk",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "claims_hygiene",
+      "tested": 30,
+      "tests": "tested score 30% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 77,
+      "confidence": "high",
+      "evidence": [
+        "scripts/testnet/run-7-validators-local.sh",
+        "scripts/testnet/build-x3-testnet-spec.py",
+        "scripts/local-network-smoke.sh",
+        "scripts/mainnet/make-fixture-live-spec.sh",
+        "note: 2026-09-22 first-hand \u2014 the launcher booted three validators on the shipped local3 plain spec (identity keys inserted through the node, no subkey) and all three agreed on finalized height 504 (0x8f1a0eba1bcba88bffe06df76c2df6a9d02616f7dacb58a68c3aed504c5e6222) with two peers each; the release gate's three-validator boots (shipped, production, testnet genesis) pass in the same pipeline"
+      ],
+      "id": "X3-L1-001",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "Every validator runs on one host: no independent operators, no geographic or administrative separation",
+        "No slashing, jailing or equivocation evidence from a multi-operator network \u2014 those paths have unit coverage only",
+        "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
+        "Era rotation is unexercised",
+        "Two hours on a quiet box now holds \u2014 one chain, agreement at three heights, +36,092 blocks per validator, peers 3 throughout, zero peer bans, no stall beyond 60s (`.ai/reports/soak-2h-idle-20260922.md`) \u2014 so the earlier failure was load-induced: a starved validator falls behind, repeats one block request, and the peer set bans it out, which turns a lag into a partition. What that experiment does **not** show is whether a loaded validator can recover, and nothing throttles a node that is behind its own import queue",
+        "Two hours, four validators, release and debug: consensus holds (one chain, agreement at three heights, +36,146 to +36,159 blocks per validator, peers 3, zero peer bans, no stall beyond 60s) and, with the state cache out of the measurement, memory holds too \u2014 worst growth 398 MiB against the 1 GiB bound (`<repo>/.wt-agent/soak-100b`, `.ai/reports/soak-2h-idle-20260922.md`). With the default 1 GiB state cache the same node grows ~1.75 GiB, which is configured memory rather than a leak, and the harness now says which cache size it ran with instead of failing every normally-configured node"
+      ],
+      "name": "Multi-validator authority network",
+      "paths": [
+        "scripts/testnet/run-7-validators-local.sh",
+        "scripts/testnet/build-x3-testnet-spec.py",
+        "scripts/local-network-smoke.sh",
+        "scripts/mainnet/make-fixture-live-spec.sh"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "consensus_l1",
+      "tested": 90,
+      "tests": "tested score 90% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 70,
+      "confidence": "medium",
+      "evidence": [
+        "scripts/testnet/inject-keystore.sh",
+        "node/src/validator_rotation.rs",
+        "pallets/x3-custody/src/lib.rs",
+        "scripts/harden-validator.sh",
+        "note: the on-chain `pallet_x3_custody` registry is now the single source of truth \u2014 `validator rotate` reads `ValidatorKeyRegistry`/`KeyRotationSchedule`, refuses an unregistered account by name, derives fresh Aura/GRANDPA session keys, and builds a signed `session.set_keys` extrinsic; the pallet's `rotate_validator_key` no longer copies the old due block onto the new key (late rotations now grant a fresh `current_block + KeyRotationPeriod`); the former in-memory `node/src/authority.rs` rotation manager (zero callers) was deleted"
+      ],
+      "id": "X3-L1-002",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 50,
+      "missing_work": [
+        "No live end-to-end rotation has run yet: the `validator rotate` operator command and the drill script exist and are unit-tested, but the drill has not been executed against a running network to prove the signed `session.setKeys` lands and the next due block moves",
+        "No key ceremony, backup or recovery runbook, and no HSM/KMS guidance for the operator keys",
+        "No external audit of the key paths"
+      ],
+      "name": "Validator key management",
+      "paths": [
+        "scripts/testnet/inject-keystore.sh",
+        "scripts/harden-validator.sh",
+        "scripts/install-validator.sh",
+        "scripts/generate-bootnode-keys.py",
+        "node/src/validator_rotation.rs",
+        "scripts/testnet/validator-rotation-drill.sh",
+        "pallets/x3-custody/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "consensus_l1",
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 48,
+      "confidence": "high",
+      "evidence": [
+        "pallets/evolution-core",
+        "note: Registry requires runtime_upgrade_rehearsal"
+      ],
+      "id": "X3-L1-003",
+      "implemented": 60,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 40,
+      "missing_work": [
+        "Needs automated full rehearsal with persisted state"
+      ],
+      "name": "Runtime upgrade rehearsal",
+      "paths": [
+        "pallets/evolution-core"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "consensus_l1",
+      "tested": 45,
+      "tests": "tested score 45% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 52,
+      "confidence": "high",
+      "evidence": [
+        "pallets/evolution-core",
+        "note: FEATURE_REGISTRY triforge_runtime = 65%"
+      ],
+      "id": "X3-L1-004",
+      "implemented": 65,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 45,
+      "missing_work": [
+        "No complete migration dry-run across all runtime variants"
+      ],
+      "name": "Runtime upgrade / migration framework",
+      "paths": [
+        "pallets/evolution-core"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "consensus_l1",
+      "tested": 45,
+      "tests": "tested score 45% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 62,
+      "confidence": "high",
+      "evidence": [
+        "node/src/chain_spec.rs",
+        "note: mainnet release gate checks production_config and tracked specs"
+      ],
+      "id": "X3-L1-005",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Genesis ceremony not completed"
+      ],
+      "name": "Chain-spec production configuration",
+      "paths": [
+        "node/src/chain_spec.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "consensus_l1",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 66,
+      "confidence": "high",
+      "evidence": [
+        "chain-specs/x3-local3-current-plain.json",
+        "note: mainnet gate parses tracked raw/plain genesis specs"
+      ],
+      "id": "X3-L1-006",
+      "implemented": 80,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Production artifacts require final ceremony and signed release lineage"
+      ],
+      "name": "Raw + plain chain-spec artifacts",
+      "paths": [
+        "chain-specs/x3-local3-current-plain.json"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "consensus_l1",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 76,
+      "confidence": "high",
+      "evidence": [
+        "node/src/service.rs",
+        "note: Real finalized-chain testing exists; current consensus uses GRANDPA"
+      ],
+      "id": "X3-L1-007",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 68,
+      "missing_work": [
+        "Cross-chain finality certificate integration remains incomplete in older audit evidence"
+      ],
+      "name": "GRANDPA finality",
+      "paths": [
+        "node/src/service.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "consensus_l1",
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 78,
+      "confidence": "high",
+      "evidence": [
+        "node/src/service.rs",
+        "note: Real node service wired to runtime and consensus"
+      ],
+      "id": "X3-L1-008",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 70,
+      "missing_work": [
+        "Needs multi-validator production proof and independent validator deployment"
+      ],
+      "name": "X3 chain node",
+      "paths": [
+        "node/src/service.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "consensus_l1",
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 79,
+      "confidence": "high",
+      "evidence": [
+        "node/src/service.rs",
+        "note: Production authoring path uses Aura"
+      ],
+      "id": "X3-L1-009",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Production topology and slot tuning need external validation"
+      ],
+      "name": "Aura block authoring",
+      "paths": [
+        "node/src/service.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "consensus_l1",
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 55,
+      "confidence": "high",
+      "evidence": [
+        "scripts/testnet/public-node-id.sh",
+        "scripts/testnet/build-x3-testnet-spec.py",
+        "scripts/mainnet/peer-id-from-ed25519-pubkey.py",
+        "docs/reports/PUBLIC_TESTNET_LAUNCH.md",
+        "note: 2026-09-22 \u2014 `public-node-id.sh` derives a stable publishable identity (same peer id across runs from the same 0600 key file); `PUBLIC_BOOTNODES=/dns4/\u2026/tcp/30333/p2p/\u2026` builds a spec carrying exactly that address; a three-validator network started from such a spec (with `SKIP_BOOTNODE_MEMBERSHIP_CHECK=1`, the multi-host case) came up on the configured ports, enforced the authority check, and formed a mesh through the launcher's CLI bootnode"
+      ],
+      "id": "X3-L1-010",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 40,
+      "missing_work": [
+        "No bootnode is *running* anywhere public: the tooling to create and publish one now exists (`public-node-id.sh` prints the peer id and `/dns4/\u2026` address from a backed-up key, and `PUBLIC_BOOTNODES` puts that address in the spec), but no host, DNS name or listener outside this machine does",
+        "No peer-reputation, ban-list or long-run connectivity tooling; discovery is the libp2p default plus reserved/bootnode wiring proven on one host",
+        "No monitoring of peer counts or of a bootnode's availability over time"
+      ],
+      "name": "Bootnode / peer discovery ops",
+      "paths": [
+        "scripts/testnet/public-node-id.sh",
+        "scripts/testnet/build-x3-testnet-spec.py",
+        "scripts/mainnet/peer-id-from-ed25519-pubkey.py",
+        "scripts/testnet/run-7-validators-local.sh",
+        "docs/reports/PUBLIC_TESTNET_LAUNCH.md"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "consensus_l1",
+      "tested": 50,
+      "tests": "tested score 50% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 55,
+      "confidence": "medium",
+      "evidence": [
+        "runtime/src/lib.rs",
+        "note: Runtime governance and authority configuration exist"
+      ],
+      "id": "X3-L1-011",
+      "implemented": 70,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 48,
+      "missing_work": [
+        "Operational governance process and validator churn proof incomplete"
+      ],
+      "name": "Validator set governance",
+      "paths": [
+        "runtime/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "consensus_l1",
+      "tested": 45,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 58,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-slash",
+        "note: Slash pallet included in mainnet release test packages"
+      ],
+      "id": "X3-L1-012",
+      "implemented": 70,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 50,
+      "missing_work": [
+        "Needs real validator-network fault and governance simulation"
+      ],
+      "name": "Validator slashing",
+      "paths": [
+        "pallets/x3-slash"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "consensus_l1",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 67,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-settlement-engine/src/btc_gateway.rs",
+        "pallets/x3-settlement-engine/src/lib.rs",
+        "crates/x3-bitcoin-vault/src/lib.rs",
+        "crates/x3-bridge/src/bitcoin_htlc.rs",
+        "crates/x3-bridge/src/btc_spv.rs",
+        "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22 with the named tests below"
+      ],
+      "id": "X3-XCHAIN-001",
+      "implemented": 80,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 45,
+      "missing_work": [
+        "Regtest is now real, testnet and mainnet are not: a live Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`, `.ai/reports/btc-regtest-capture-20260922.json`), but no coin has ever moved on a network anyone else can see, and no header from testnet or mainnet has been anchored",
+        "A chain can now be born anchored \u2014 `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12, including a live node serving the anchor and refusing a spec that lies) \u2014 but no *public* network has one pinned, and the header still arrives by an operator copying a hash rather than from a header source",
+        "The sender runs unattended now (`push-headers.mjs --loop --cursor \u2026`: batch pushes, an atomic cursor, catch-up after restarts, and it **stops** rather than skipping a refused range \u2014 the drill requires all of it, 6/6), but nothing runs against a public network yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
+        "No BTC signer quorum for withdrawals",
+        "BTC mainnet disabled by feature flag; no external audit"
+      ],
+      "name": "BTC Fortress gateway",
+      "paths": [
+        "pallets/x3-settlement-engine/src/btc_gateway.rs",
+        "crates/x3-bitcoin-vault/src/lib.rs",
+        "crates/x3-bridge/src/bitcoin_htlc.rs",
+        "crates/x3-bridge/src/btc_spv.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_chain",
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 64,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-bridge/src/bitcoin_htlc.rs",
+        "pallets/x3-settlement-engine/src/btc_gateway.rs",
+        "pallets/x3-settlement-engine/src/lib.rs",
+        "crates/x3-crosschain-intent/src/proof/btc.rs",
+        "note: HTLC script/address derivation, double-SHA256 merkle path over the tx index, and proof-of-work over Bitcoin's 80 wire bytes with negative/overflow/zero targets rejected"
+      ],
+      "id": "X3-XCHAIN-002",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "SIM_TESTNET",
+      "mainnet_ready": 40,
+      "missing_work": [
+        "No live Bitcoin run beyond regtest: the script builder, the merkle walk and the header chain are now exercised against a real regtest node's blocks (block 121's header, its merkle path and a confirmed transaction), and a dev chain can be born anchored on that block, but nothing has run against testnet or mainnet",
+        "The header chain the SPV check reads now bootstraps from a governance-anchored checkpoint (`anchor_btc_checkpoint`, spec_version 14) and extends only under Bitcoin's height/difficulty/timestamp rules, but no chain has anchored one yet, so the path is fail-closed and unexercised end to end",
+        "No signer quorum for withdrawals; no external audit",
+        "Three SPV implementations still exist \u2014 this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` \u2014 and only the pallet's is on the runtime path. They are now *tested against each other* on a real regtest block (`the_three_bitcoin_header_implementations_agree`), which is how the vault's merkle walk was found to be verifying a different tree (it ordered each pair by byte value instead of by the transaction's position, and is now position-aware). Consolidating them into one would remove the drift risk rather than detect it"
+      ],
+      "name": "Bitcoin HTLC script logic",
+      "paths": [
+        "crates/x3-bridge/src/bitcoin_htlc.rs",
+        "pallets/x3-settlement-engine/src/btc_gateway.rs",
+        "pallets/x3-settlement-engine/src/lib.rs",
+        "crates/x3-crosschain-intent/src/proof/btc.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_chain",
+      "tested": 75,
+      "tests": "24 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 51,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-relayer/src/submitter.rs",
+        "crates/x3-relayer/src/watchers/evm.rs",
+        "crates/x3-relayer/src/watchers/svm.rs",
+        "crates/x3-validator-attestation/src/lib.rs",
+        "crates/x3-bridge/src/cross_chain_proofs.rs",
+        "note: watchers compare confirmations to the configured finality threshold; EVM receipt proofs are produced by crates/x3-relayer/src/evm_receipt_proof.rs and verified through x3-verification-router; the submission path refuses with the origin rule rather than posting a payload no node accepts"
+      ],
+      "id": "X3-XCHAIN-003",
+      "implemented": 70,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "The relayer signs with a single key and says so: `svm_required_signatures: 1` with the comment that quorum enforcement \"belongs at the aggregator layer\" \u2014 and no aggregator exists in this workspace, so the production path is one signature",
+        "It cannot submit at all: the settlement engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused (`NotAuthorized`) \u2014 the authority path is an open decision",
+        "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
+        "No multi-operator relayer set: quorum is verified on the *verification* side (x3-validator-attestation, x3-bridge supermajority tests) but nothing in this crate produces one"
+      ],
+      "name": "Relayer framework",
+      "paths": [
+        "crates/x3-relayer/src/submitter.rs",
+        "crates/x3-relayer/src/relayer.rs",
+        "crates/x3-relayer/src/watchers",
+        "crates/x3-validator-attestation/src/lib.rs",
+        "crates/x3-bridge/src/cross_chain_proofs.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_chain",
+      "tested": 50,
+      "tests": "tested score 50% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 59,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-bridge/src/ethereum_bridge.rs",
+        "crates/x3-verification-router/src/evm_receipt.rs",
+        "crates/x3-relayer/src/evm_receipt_proof.rs",
+        "note: the 5-of-7 path verifies real ECDSA \u2014 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused \u2014 and the external proof the row called missing exists: anvil-backed EVM lifecycles run in the cross-domain gates, dev and strict posture, with receipts-trie inclusion and typed receipts verified through x3-verification-router"
+      ],
+      "id": "X3-XCHAIN-004",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 45,
+      "missing_work": [
+        "The lock-mint adapter is not wired into anything: `crates/x3-bridge/src/ethereum_bridge.rs` has no caller outside its own module, so no pallet or service enforces its checks in production yet",
+        "`burn_wrapped` takes the account to debit as an argument and verifies nothing about who is asking \u2014 the origin check has to come from whatever calls it, and nothing does; it is a theft primitive waiting for a caller",
+        "No live Ethereum deployment: the receipt proof path is exercised against anvil (including strict posture) and nothing has run against a public chain",
+        "The production signer policy for the 5-of-7 keys is the same gap as X3-L1-002 (no ceremony, rotation or HSM guidance)",
+        "No external audit"
+      ],
+      "name": "Ethereum bridge adapter",
+      "paths": [
+        "crates/x3-bridge/src/ethereum_bridge.rs",
+        "crates/x3-verification-router/src/evm_receipt.rs",
+        "crates/x3-relayer/src/evm_receipt_proof.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_chain",
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 52,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/finality.rs",
+        "note: Finality modules exist; older status flags GRANDPA cert gap"
+      ],
+      "id": "X3-XCHAIN-005",
+      "implemented": 68,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 42,
+      "missing_work": [
+        "Cross-chain finality certificate wiring incomplete"
+      ],
+      "name": "Finality proof model",
+      "paths": [
+        "crates/x3-atomic-swap/src/finality.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_chain",
+      "tested": 45,
+      "tests": "tested score 45% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 67,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/intent.rs",
+        "note: AtomicIntent and lifecycle modules identified in cross-VM audit"
+      ],
+      "id": "X3-XCHAIN-006",
+      "implemented": 82,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 58,
+      "missing_work": [
+        "External adapters and finality proof remain weaker than internal model"
+      ],
+      "name": "Atomic swap intent model",
+      "paths": [
+        "crates/x3-atomic-swap/src/intent.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_chain",
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 65,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/timeout.rs",
+        "note: Timeout engine identified in audit"
+      ],
+      "id": "X3-XCHAIN-007",
+      "implemented": 78,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 58,
+      "missing_work": [
+        "Needs real chain timeout/reorg testing"
+      ],
+      "name": "Atomic timeout engine",
+      "paths": [
+        "crates/x3-atomic-swap/src/timeout.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_chain",
+      "tested": 58,
+      "tests": "tested score 58% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 75,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-crosschain-gateway/src/lib.rs",
+        "pallets/x3-crosschain-gateway/src/lib.rs",
+        "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, and refuses unregistered/disabled routes; the off-chain crate mirrors the lifecycle with a circuit breaker, insurance and risk engine"
+      ],
+      "id": "X3-XCHAIN-008",
+      "implemented": 80,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 70,
+      "missing_work": [
+        "External bridge activation remains governance-guarded: the pallet's own note, and routes must be registered and enabled before anything moves",
+        "Nothing has run against a public external chain; the verification router's EVM/SVM verifiers are exercised against anvil and solana-test-validator in local gates",
+        "The withdrawal-id change (XOR \u2192 Blake2b) takes effect for new withdrawals only after this runtime is deployed (`spec_version` 13)",
+        "No external audit of the gateway crate or pallet"
+      ],
+      "name": "General external gateway",
+      "paths": [
+        "crates/x3-crosschain-gateway/src/lib.rs",
+        "pallets/x3-crosschain-gateway/src/lib.rs",
+        "pallets/x3-crosschain-gateway/src/tests.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 67,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/rpc_quorum.rs",
+        "note: Quorum types exported and used by security logic"
+      ],
+      "id": "X3-XCHAIN-009",
+      "implemented": 78,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Needs Byzantine provider and partition tests"
+      ],
+      "name": "RPC quorum oracle",
+      "paths": [
+        "crates/x3-atomic-swap/src/rpc_quorum.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 80,
+      "confidence": "high",
+      "evidence": [
+        "crates/cross-vm-coordinator/src/state_machine.rs",
+        "note: PR #166 persists operation journal; duplicate identical evidence becomes no-op",
+        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-XCHAIN-010",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 68,
+      "missing_work": [
+        "Strengthened exact-head production gate still pending"
+      ],
+      "name": "Cross-domain semantic idempotency",
+      "paths": [
+        "crates/cross-vm-coordinator/src/state_machine.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 70,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-gateway",
+        "note: Registry required test revoke_disables_gateway"
+      ],
+      "id": "X3-XCHAIN-011",
+      "implemented": 78,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 68,
+      "missing_work": [
+        "Needs incident-response drill"
+      ],
+      "name": "Gateway revoke / kill switch",
+      "paths": [
+        "crates/x3-gateway"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 71,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/rpc_quorum.rs",
+        "note: Secret-release design rejects rpc_quorum_agreed=false"
+      ],
+      "id": "X3-XCHAIN-012",
+      "implemented": 82,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 68,
+      "missing_work": [
+        "Needs live heterogeneous provider evidence"
+      ],
+      "name": "RPC disagreement fail-closed behavior",
+      "paths": [
+        "crates/x3-atomic-swap/src/rpc_quorum.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 62,
+      "tests": "tested score 62% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 76,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/secret_release.rs",
+        "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability",
+        "pr #162 merged 2026-09-13, pr #163 merged 2026-09-17; provenance recorded 2026-09-22; tests measured on master 2026-09-23"
+      ],
+      "id": "X3-XCHAIN-013",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 68,
+      "missing_work": [
+        "No live external-chain proof of the release path (TICKET-095): these tests exercise the chain-side firewall against constructed evidence, not a real EVM/SVM/BTC release"
+      ],
+      "name": "Secret-release firewall",
+      "paths": [
+        "crates/x3-atomic-swap"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 78,
+      "tests": "tested score 78% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 81,
+      "confidence": "high",
+      "evidence": [
+        "crates/cross-vm-coordinator/src/persistence.rs",
+        "note: PR #166 adversarial restart test",
+        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-XCHAIN-014",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 70,
+      "missing_work": [
+        "Needs real process/network restart drill"
+      ],
+      "name": "Coordinator restart recovery",
+      "paths": [
+        "crates/cross-vm-coordinator/src/persistence.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 79,
+      "confidence": "high",
+      "evidence": [
+        "crates/cross-vm-coordinator/src/persistence.rs",
+        "note: PR #166 tests exact persistence crash window",
+        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-XCHAIN-015",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 70,
+      "missing_work": [
+        "Needs merge plus long-running persistence fault injection"
+      ],
+      "name": "Split-write crash recovery",
+      "paths": [
+        "crates/cross-vm-coordinator/src/persistence.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 82,
+      "tests": "tested score 82% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 82,
+      "confidence": "high",
+      "evidence": [
+        "crates/cross-vm-coordinator/src/state_machine.rs",
+        "note: PR #166 returns IdempotencyConflict for mismatched evidence",
+        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-XCHAIN-016",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Pending production-gate proof"
+      ],
+      "name": "Conflicting retry rejection",
+      "paths": [
+        "crates/cross-vm-coordinator/src/state_machine.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 82,
+      "confidence": "high",
+      "evidence": [
+        "crates/cross-vm-coordinator/src/persistence.rs",
+        "note: secret hash -> owning session id",
+        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-XCHAIN-017",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Pending production-gate proof"
+      ],
+      "name": "Cross-session secret ownership",
+      "paths": [
+        "crates/cross-vm-coordinator/src/persistence.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 81,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/secret_release.rs",
+        "note: PR #162 checks chain-id and VM binding; #163 hardens the permit",
+        "pr #162 merged 2026-09-13, pr #163 merged 2026-09-17; tests measured on master 2026-09-23 (TICKET-101 third pass)"
+      ],
+      "id": "X3-XCHAIN-018",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "No live external-chain proof of the binding (TICKET-095): the chain-id and VM checks are exercised against constructed evidence only"
+      ],
+      "name": "Secret-release domain binding",
+      "paths": [
+        "crates/x3-atomic-swap"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 82,
+      "tests": "tested score 82% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 82,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap",
+        "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains",
+        "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-XCHAIN-019",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Pending merge/exact-head proof"
+      ],
+      "name": "Secret-release proof reuse rejection",
+      "paths": [
+        "crates/x3-atomic-swap"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 81,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap",
+        "note: PR #162 src/secret_release.rs rejects refunded destination evidence",
+        "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-XCHAIN-020",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Pending merge/exact-head proof"
+      ],
+      "name": "Secret-release refund rejection",
+      "paths": [
+        "crates/x3-atomic-swap"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 82,
+      "tests": "tested score 82% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 81,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/finality.rs",
+        "note: PR #162 binds the finality proof to the exact lock transaction and block; #163 hardens the permit",
+        "pr #162 merged 2026-09-13, pr #163 merged 2026-09-17; tests measured on master 2026-09-23 (TICKET-101 third pass)"
+      ],
+      "id": "X3-XCHAIN-021",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "No live external-chain proof of the binding (TICKET-095): the tx/block checks are exercised against constructed evidence only"
+      ],
+      "name": "Secret-release tx/block binding",
+      "paths": [
+        "crates/x3-atomic-swap"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_chain",
+      "tested": 82,
+      "tests": "tested score 82% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 58,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-atomic-swap/src/ledger.rs",
+        "note: Proof ledger module exists"
+      ],
+      "id": "X3-XCHAIN-022",
+      "implemented": 72,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 50,
+      "missing_work": [
+        "Needs durable multi-validator proof retention and replay audit"
+      ],
+      "name": "Atomic swap proof ledger",
+      "paths": [
+        "crates/x3-atomic-swap/src/ledger.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_chain",
+      "tested": 50,
+      "tests": "tested score 50% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 64,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-settlement-engine/src/lib.rs",
+        "note: Real settlement pallet with timeout/atomic integration"
+      ],
+      "id": "X3-XVM-001",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "SIM_TESTNET",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "Needs end-to-end external finality proof"
+      ],
+      "name": "Settlement engine",
+      "paths": [
+        "pallets/x3-settlement-engine/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 55,
+      "tests": "24 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 75,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: Router invariant suite covers pending supply behavior"
+      ],
+      "id": "X3-XVM-002",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 68,
+      "missing_work": [
+        "Needs global conservation proof across all bridges"
+      ],
+      "name": "Pending-supply accounting",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 72,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 79,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: required_tests includes canonical supply never breaks"
+      ],
+      "id": "X3-XVM-003",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Supply ledger broader system still partial"
+      ],
+      "name": "Canonical supply preservation across routes",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 78,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 77,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-settlement-engine/src/lib.rs",
+        "note: Code explicitly standardizes SHA-256 for EVM/SVM/X3 HTLC secrets"
+      ],
+      "id": "X3-XVM-004",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "SIM_TESTNET",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Needs cross-language fixture proof for every adapter"
+      ],
+      "name": "SHA-256 HTLC hash compatibility across VMs",
+      "paths": [
+        "pallets/x3-settlement-engine/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 65,
+      "tests": "24 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 85,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "programs/svm/x3_atomic_swap/src/lib.rs",
+        "scripts/cross-domain-svm-gate.sh",
+        "note: network-level external execution proof added 2026-09-22 \u2014 solana-test-validator + cargo build-sbf + the deployed SBF program, in dev and in strict posture (X3_STRICT_CROSS_DOMAIN_PROOFS=1, which refuses to start unless the chain reports the strict value)"
+      ],
+      "id": "X3-XVM-005",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 78,
+      "missing_work": [
+        "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
+        "A production relayer cannot submit the proof yet: pallets/x3-settlement-engine requires the intent party (who == intent.maker || who == intent.taker, NotAuthorized otherwise), so the submitting authority is an open decision",
+        "No external audit of the SVM program or of this route"
+      ],
+      "name": "EVM \u2192 SVM route",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "programs/svm/x3_atomic_swap/src/lib.rs",
+        "scripts/cross-domain-svm-gate.sh"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 88,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 82,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: required_tests includes test_expired_transfer_refunds_to_source"
+      ],
+      "id": "X3-XVM-006",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 78,
+      "missing_work": [
+        "Needs multi-validator timeout/recovery proof"
+      ],
+      "name": "Expired transfer refund",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 80,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 80,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: Audit notes bridge gate can flip false on invariant break"
+      ],
+      "id": "X3-XVM-007",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 78,
+      "missing_work": [
+        "Needs live fault-trigger test"
+      ],
+      "name": "External bridge circuit breaker",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 70,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 82,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: required_tests includes failed_destination_credit_refunds_pending_supply"
+      ],
+      "id": "X3-XVM-008",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 78,
+      "missing_work": [
+        "Needs persistence/crash injection around refund path"
+      ],
+      "name": "Failed destination credit refund",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 80,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 85,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "programs/svm/x3_atomic_swap/src/lib.rs",
+        "scripts/cross-domain-svm-gate.sh",
+        "note: network-level external execution proof added 2026-09-22 \u2014 the same validator-backed lifecycle that covers EVM \u2192 SVM, run in dev and strict posture; the SVM program is the one the gate builds with cargo build-sbf and deploys"
+      ],
+      "id": "X3-XVM-009",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 78,
+      "missing_work": [
+        "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
+        "A production relayer cannot submit the proof yet: pallets/x3-settlement-engine requires the intent party (who == intent.maker || who == intent.taker, NotAuthorized otherwise), so the submitting authority is an open decision",
+        "No external audit of the SVM program or of this route"
+      ],
+      "name": "SVM \u2192 EVM route",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "programs/svm/x3_atomic_swap/src/lib.rs",
+        "scripts/cross-domain-svm-gate.sh"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "cross_vm_atomic",
+      "tested": 88,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 86,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: required_tests includes duplicate_message_replay_rejected"
+      ],
+      "id": "X3-XVM-010",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 82,
+      "missing_work": [
+        "Needs distributed replay injection test"
+      ],
+      "name": "Cross-VM message replay rejection",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "cross_vm_atomic",
+      "tested": 85,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 86,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: required_tests includes duplicate nonce/message replay rejection"
+      ],
+      "id": "X3-XVM-011",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 82,
+      "missing_work": [
+        "Needs sustained adversarial replay testing across validators"
+      ],
+      "name": "Cross-VM nonce replay rejection",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "cross_vm_atomic",
+      "tested": 85,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 86,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: Native internal routing and supply tests"
+      ],
+      "id": "X3-XVM-012",
+      "implemented": 92,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 82,
+      "missing_work": [
+        "External boundary proof remains separate"
+      ],
+      "name": "EVM \u2192 X3 route",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "cross_vm_atomic",
+      "tested": 82,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 86,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: Native internal routing and supply tests"
+      ],
+      "id": "X3-XVM-013",
+      "implemented": 92,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 82,
+      "missing_work": [
+        "External boundary proof remains separate"
+      ],
+      "name": "SVM \u2192 X3 route",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "cross_vm_atomic",
+      "tested": 82,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 86,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: Native internal routing and supply tests"
+      ],
+      "id": "X3-XVM-014",
+      "implemented": 92,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 82,
+      "missing_work": [
+        "External boundary proof remains separate"
+      ],
+      "name": "X3 \u2192 EVM route",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "cross_vm_atomic",
+      "tested": 82,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 88,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "programs/svm/x3_atomic_swap/src/lib.rs",
+        "scripts/cross-domain-svm-gate.sh",
+        "note: the external boundary this row called separate is now exercised \u2014 X3VM lock + SVM HTLC lock/claim/refund against solana-test-validator with the deployed program, in dev and strict posture (2026-09-22)"
+      ],
+      "id": "X3-XVM-015",
+      "implemented": 92,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 82,
+      "missing_work": [
+        "The X3-side lock and the SVM-side lock are both exercised end to end against a real validator, but nothing has been deployed to devnet or mainnet",
+        "A production relayer cannot submit the settlement proof yet: the settlement engine requires the intent party, so the submitting authority is an open decision",
+        "No external audit"
+      ],
+      "name": "X3 \u2192 SVM route",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "programs/svm/x3_atomic_swap/src/lib.rs",
+        "scripts/cross-domain-svm-gate.sh"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "cross_vm_atomic",
+      "tested": 90,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 89,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: FEATURE_REGISTRY atomic_router = 88%; eight required tests listed"
+      ],
+      "id": "X3-XVM-016",
+      "implemented": 92,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 88,
+      "missing_work": [
+        "External bridge path intentionally disabled at genesis"
+      ],
+      "name": "Cross-VM atomic router",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "cross_vm_atomic",
+      "tested": 85,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 92,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: ExternalBridgesEnabled defaults false and is dispatch-gated"
+      ],
+      "id": "X3-XVM-017",
+      "implemented": 95,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 90,
+      "missing_work": [
+        "Operational governance activation process still required"
+      ],
+      "name": "External bridge pause-at-genesis",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "cross_vm_atomic",
+      "tested": 90,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 44,
+      "confidence": "medium",
+      "evidence": [
+        "pallets/x3-settlement-engine/src/lib.rs",
+        "note: Settlement code contains adaptor-signature secret extraction logic"
+      ],
+      "id": "X3-XVM-018",
+      "implemented": 60,
+      "launch_scope": "core",
+      "live_tested": "SIM_TESTNET",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "Needs cryptographic audit and production-path proof"
+      ],
+      "name": "Adaptor-signature settlement primitive",
+      "paths": [
+        "pallets/x3-settlement-engine/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "cross_vm_atomic",
+      "tested": 35,
+      "tests": "24 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 44,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-wallet-pallet",
+        "note: Registry explicitly flags biometric security review"
+      ],
+      "id": "X3-ECO-001",
+      "implemented": 60,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 30,
+      "missing_work": [
+        "Biometric template handling unaudited"
+      ],
+      "name": "Biometric wallet registration",
+      "paths": [
+        "pallets/x3-wallet-pallet"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "economic_defi",
+      "tested": 45,
+      "tests": "7 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 38,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-supply-ledger/src/lib.rs",
+        "note: Registry corrections call out missing supply invariant tests"
+      ],
+      "id": "X3-ECO-002",
+      "implemented": 55,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 30,
+      "missing_work": [
+        "Needs property tests across success/refund/rollback"
+      ],
+      "name": "Pending supply returns-to-zero invariant",
+      "paths": [
+        "pallets/x3-supply-ledger/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "economic_defi",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 44,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-supply-ledger/src/lib.rs",
+        "note: Independent audit previously scored supply ledger partial"
+      ],
+      "id": "X3-ECO-003",
+      "implemented": 60,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "End-to-end supply conservation remains P0"
+      ],
+      "name": "Supply conservation ledger",
+      "paths": [
+        "pallets/x3-supply-ledger/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "economic_defi",
+      "tested": 35,
+      "tests": "tested score 35% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 51,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-wallet-pallet",
+        "note: Registry required initiate_recovery_works"
+      ],
+      "id": "X3-ECO-004",
+      "implemented": 65,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 40,
+      "missing_work": [
+        "Recovery logic security review pending"
+      ],
+      "name": "Wallet recovery flow",
+      "paths": [
+        "pallets/x3-wallet-pallet"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "economic_defi",
+      "tested": 50,
+      "tests": "7 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 64,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-wallet-pallet",
+        "note: Registry lists add/remove minter root-only tests"
+      ],
+      "id": "X3-ECO-005",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Needs role-transition/governance tests"
+      ],
+      "name": "Minter authority management",
+      "paths": [
+        "pallets/x3-wallet-pallet"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "economic_defi",
+      "tested": 65,
+      "tests": "7 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 64,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-wallet-pallet",
+        "note: Registry required create_multisig_wallet_works"
+      ],
+      "id": "X3-ECO-006",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Needs external security review"
+      ],
+      "name": "Wallet multisig",
+      "paths": [
+        "pallets/x3-wallet-pallet"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "economic_defi",
+      "tested": 65,
+      "tests": "7 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 65,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-token-factory",
+        "note: Status doc says graduate() calls TokenFactoryCreate bridge"
+      ],
+      "id": "X3-ECO-007",
+      "implemented": 78,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "Needs full lifecycle CI proof"
+      ],
+      "name": "Launchpad \u2192 token factory integration",
+      "paths": [
+        "pallets/x3-token-factory"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 55,
+      "tests": "2 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 71,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-sentinel",
+        "note: required sentinel_checks_freeze_authority"
+      ],
+      "id": "X3-ECO-008",
+      "implemented": 80,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "No live governance simulation"
+      ],
+      "name": "Sentinel freeze-authority checks",
+      "paths": [
+        "pallets/x3-sentinel"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 75,
+      "tests": "2 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 71,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-sentinel",
+        "note: Registry says real pallet + tests now exist"
+      ],
+      "id": "X3-ECO-009",
+      "implemented": 80,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "No live governance simulation"
+      ],
+      "name": "Sentinel mint-authority checks",
+      "paths": [
+        "pallets/x3-sentinel"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 75,
+      "tests": "2 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 72,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-lp-locker",
+        "note: Status says full lib/mock/tests exist"
+      ],
+      "id": "X3-ECO-010",
+      "implemented": 82,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Launchpad \u2192 locker integration not verified in CI"
+      ],
+      "name": "LP locker",
+      "paths": [
+        "pallets/x3-lp-locker"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 70,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 76,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-lp-locker",
+        "note: Atomic Lock registry lists lock/unlock tests"
+      ],
+      "id": "X3-ECO-011",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 68,
+      "missing_work": [
+        "Needs timestamp/block-boundary fuzzing"
+      ],
+      "name": "Liquidity lock schedule",
+      "paths": [
+        "pallets/x3-lp-locker"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 75,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 75,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-dex",
+        "note: required axe_fee_accounting"
+      ],
+      "id": "X3-ECO-012",
+      "implemented": 82,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 70,
+      "missing_work": [
+        "Needs economic fuzzing"
+      ],
+      "name": "DEX fee accounting",
+      "paths": [
+        "pallets/x3-dex"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 72,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 78,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-lp-locker",
+        "note: required test early_unlock_rejected"
+      ],
+      "id": "X3-ECO-013",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 70,
+      "missing_work": [
+        "Needs governance bypass audit"
+      ],
+      "name": "Early unlock rejection",
+      "paths": [
+        "pallets/x3-lp-locker"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 78,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 77,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-dex",
+        "note: FEATURE_REGISTRY AXE=75; required axe_create_pool"
+      ],
+      "id": "X3-ECO-014",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "No concentrated liquidity or production liquidity stress test"
+      ],
+      "name": "AXE DEX pool creation",
+      "paths": [
+        "pallets/x3-dex"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 75,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 75,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-token-factory",
+        "note: FEATURE_REGISTRY x3_forge=75"
+      ],
+      "id": "X3-ECO-015",
+      "implemented": 82,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Sentinel score not fully wired into create origin"
+      ],
+      "name": "Token factory / X3 Forge",
+      "paths": [
+        "pallets/x3-token-factory"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "economic_defi",
+      "tested": 70,
+      "tests": "2 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 7,
+      "confidence": "high",
+      "evidence": [
+        "GPU_VALIDATOR_HONEST_AUDIT.md",
+        "note: Honest audit explicitly forbids GPU acceleration claim without real device"
+      ],
+      "id": "X3-GPU-001",
+      "implemented": 10,
+      "launch_scope": "research",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 5,
+      "missing_work": [
+        "No physical GPU benchmark showing finalized-TPS improvement"
+      ],
+      "name": "GPU finalized-TPS proof",
+      "paths": [
+        "GPU_VALIDATOR_HONEST_AUDIT.md"
+      ],
+      "priority": "P0",
+      "source": "research",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "gpu_performance",
+      "tested": 5,
+      "tests": "tested score 5% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 45,
+      "confidence": "high",
+      "evidence": [
+        "runtime/src/lib.rs",
+        "note: Benchmark infrastructure exists but weight coverage is incomplete"
+      ],
+      "id": "X3-GPU-002",
+      "implemented": 55,
+      "launch_scope": "guarded",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 40,
+      "missing_work": [
+        "Older audits found WeightInfo=() in several places"
+      ],
+      "name": "Production runtime weights",
+      "paths": [
+        "runtime/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "gpu_performance",
+      "tested": 40,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 62,
+      "confidence": "high",
+      "evidence": [
+        ".github/workflows/frame-benchmarking.yml",
+        "note: Frame benchmarking workflow exists and runs on active PR heads"
+      ],
+      "id": "X3-GPU-003",
+      "implemented": 70,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Generated production weights incomplete in older audits"
+      ],
+      "name": "FRAME benchmarking",
+      "paths": [
+        ".github/workflows/frame-benchmarking.yml"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "gpu_performance",
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 68,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: ParityMismatch and CPU recomputation architecture exists"
+      ],
+      "id": "X3-GPU-004",
+      "implemented": 80,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Needs real hardware equivalence evidence"
+      ],
+      "name": "GPU/CPU parity checking",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "gpu_performance",
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 86,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: CpuBackend is canonical implementation"
+      ],
+      "id": "X3-GPU-005",
+      "implemented": 95,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 80,
+      "missing_work": [
+        "Needs continuous parity tests against future GPU kernels"
+      ],
+      "name": "CPU consensus-truth backend",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "gpu_performance",
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 87,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: BackendUnavailable/KernelUnavailable errors; no fake success"
+      ],
+      "id": "X3-GPU-006",
+      "implemented": 95,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 82,
+      "missing_work": [
+        "Maintain strict mode coverage"
+      ],
+      "name": "Fail-closed unavailable accelerator backend",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "subsystem": "gpu_performance",
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 14,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: WGPU backend currently KernelUnavailable"
+      ],
+      "id": "X3-GPU-007",
+      "implemented": 20,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 10,
+      "missing_work": [
+        "No verified accelerator kernel in current backend"
+      ],
+      "name": "GPU Keccak256 batching",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "gpu_performance",
+      "tested": 10,
+      "tests": "tested score 10% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 14,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: WGPU backend currently KernelUnavailable"
+      ],
+      "id": "X3-GPU-008",
+      "implemented": 20,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 10,
+      "missing_work": [
+        "No verified accelerator kernel"
+      ],
+      "name": "GPU ed25519 verification",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "gpu_performance",
+      "tested": 10,
+      "tests": "tested score 10% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 14,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: Honest audit says no production GPU secp256k1 kernel"
+      ],
+      "id": "X3-GPU-009",
+      "implemented": 20,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 10,
+      "missing_work": [
+        "WGPU backend reports KernelUnavailable; old GPU crate simulates CPU"
+      ],
+      "name": "GPU secp256k1 verification",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "gpu_performance",
+      "tested": 10,
+      "tests": "tested score 10% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 68,
+      "confidence": "high",
+      "evidence": [
+        "GPU_VALIDATOR_HONEST_AUDIT.md",
+        "note: Measured ~51\u201354 sustained finalized TPS with zero failures"
+      ],
+      "id": "X3-GPU-010",
+      "implemented": 90,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "Single-authority result cannot stand in for production network"
+      ],
+      "name": "Single-authority finalized TPS baseline",
+      "paths": [
+        "GPU_VALIDATOR_HONEST_AUDIT.md"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "gpu_performance",
+      "tested": 90,
+      "tests": "tested score 90% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 54,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel-wgpu",
+        "note: Honest audit confirms real WGSL/wgpu device code compiles"
+      ],
+      "id": "X3-GPU-011",
+      "implemented": 70,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 40,
+      "missing_work": [
+        "Needs real physical GPU CI/run evidence"
+      ],
+      "name": "WGPU accelerator backend",
+      "paths": [
+        "crates/x3-accel-wgpu"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "gpu_performance",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 57,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel-wgpu",
+        "note: Real SHA-256 compute path called out by honest audit"
+      ],
+      "id": "X3-GPU-012",
+      "implemented": 75,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 42,
+      "missing_work": [
+        "No production validator GPU benchmark yet"
+      ],
+      "name": "WGPU SHA-256 compute kernel",
+      "paths": [
+        "crates/x3-accel-wgpu"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "gpu_performance",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 62,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-gpu-validator-swarm",
+        "note: Honest audit describes divergence detection, replay, quarantine, CPU fallback"
+      ],
+      "id": "X3-GPU-013",
+      "implemented": 75,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 50,
+      "missing_work": [
+        "Needs real GPU failure injection"
+      ],
+      "name": "GPU divergence quarantine / fallback",
+      "paths": [
+        "crates/x3-gpu-validator-swarm"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "gpu_performance",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 72,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: AccelBackend trait with CPU truth and fail-closed unavailable backend"
+      ],
+      "id": "X3-GPU-014",
+      "implemented": 85,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "Real accelerator coverage is incomplete"
+      ],
+      "name": "x3-accel backend abstraction",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "gpu_performance",
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 77,
+      "confidence": "high",
+      "evidence": [
+        ".github/workflows/benchmark-regression.yml",
+        "note: Exact-head benchmark regression workflow is active"
+      ],
+      "id": "X3-GPU-015",
+      "implemented": 85,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Need benchmark corpus tied to launch SLOs"
+      ],
+      "name": "Benchmark regression CI gate",
+      "paths": [
+        ".github/workflows/benchmark-regression.yml"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "gpu_performance",
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 14,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: WGPU backend currently KernelUnavailable"
+      ],
+      "id": "X3-GPU-016",
+      "implemented": 20,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 10,
+      "missing_work": [
+        "No verified accelerator kernel"
+      ],
+      "name": "GPU Blake2b batching",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P2",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "gpu_performance",
+      "tested": 10,
+      "tests": "tested score 10% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 14,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-accel/src/lib.rs",
+        "note: WGPU backend currently KernelUnavailable"
+      ],
+      "id": "X3-GPU-017",
+      "implemented": 20,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 10,
+      "missing_work": [
+        "No verified accelerator kernel"
+      ],
+      "name": "GPU Merkle-root acceleration",
+      "paths": [
+        "crates/x3-accel/src/lib.rs"
+      ],
+      "priority": "P2",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "gpu_performance",
+      "tested": 10,
+      "tests": "tested score 10% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 19,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 gap #10"
+      ],
+      "id": "X3-LANG-001",
+      "implemented": 30,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 15,
+      "missing_work": [
+        "Genuine E2E test still required"
+      ],
+      "name": "Compile\u2192encode\u2192decode\u2192execute\u2192receipt E2E",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 10,
+      "tests": "tested score 10% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 24,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 gap #9"
+      ],
+      "id": "X3-LANG-002",
+      "implemented": 35,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 20,
+      "missing_work": [
+        "Receipts need replay-economic validation"
+      ],
+      "name": "Economic replay validation in receipts",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 15,
+      "tests": "tested score 15% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 24,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 gap #9"
+      ],
+      "id": "X3-LANG-003",
+      "implemented": 35,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 20,
+      "missing_work": [
+        "Receipt signatures/attestations incomplete"
+      ],
+      "name": "Signed / attested trading receipts",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 15,
+      "tests": "tested score 15% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 29,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-integration",
+        "note: Known .x3 integration requirement",
+        "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"
+      ],
+      "id": "X3-LANG-004",
+      "implemented": 40,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "No test drives a compiled program's call into the atomic kernel: the bridge proves compile \u2192 runtime-loadable bytecode, and the route from there to `X3AtomicKernel` is the open half"
+      ],
+      "name": "Bytecode routing to atomic kernel",
+      "paths": [
+        "crates/x3-integration"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 20,
+      "tests": "tested score 20% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 29,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 gap #7"
+      ],
+      "id": "X3-LANG-005",
+      "implemented": 40,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "Version gates incomplete"
+      ],
+      "name": "Chain/capability version enforcement",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 20,
+      "tests": "tested score 20% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 29,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 gap #4"
+      ],
+      "id": "X3-LANG-006",
+      "implemented": 40,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "Decoder/executor connection incomplete"
+      ],
+      "name": "Decoded bytecode \u2192 TradingVm execution",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 20,
+      "tests": "tested score 20% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 29,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 gap #3"
+      ],
+      "id": "X3-LANG-007",
+      "implemented": 40,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "Needs real stateful verifier"
+      ],
+      "name": "Stateful trading IR verifier",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 20,
+      "tests": "tested score 20% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 34,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-integration",
+        "note: Known grant-track gap",
+        "PR #129 merged 2026-09-18; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-LANG-008",
+      "implemented": 45,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 30,
+      "missing_work": [
+        "PR recovery/rebase and exact E2E proof needed"
+      ],
+      "name": ".x3 compile_source integration",
+      "paths": [
+        "crates/x3-integration"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 34,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-integration/src/mini_x3.rs",
+        "note: Known .x3 integration requirement",
+        "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"
+      ],
+      "id": "X3-LANG-009",
+      "implemented": 45,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 30,
+      "missing_work": [
+        "**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. So the row's own name still claims more than the code does: there is no signature and no attestation. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"
+      ],
+      "name": "Authenticated bytecode decoder",
+      "paths": [
+        "crates/x3-integration"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 34,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-integration/src/mini_x3.rs",
+        "note: Known .x3 integration requirement",
+        "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"
+      ],
+      "id": "X3-LANG-010",
+      "implemented": 45,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 30,
+      "missing_work": [
+        "Corrected 2026-09-24 against the code: TICKET-108 is closed by commit 6cc986b5d8. `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. The other body sections still have no parity test, and a checksum is not authentication (see X3-LANG-009)."
+      ],
+      "name": "Versioned runtime bytecode envelope",
+      "paths": [
+        "crates/x3-integration"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "language_trading",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 25,
+      "confidence": "high",
+      "evidence": [
+        "crates/cross-vm-coordinator",
+        "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV"
+      ],
+      "id": "X3-MEV-001",
+      "implemented": 35,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 20,
+      "missing_work": [
+        "Needs threat model covering relayers, finality delays, and ordering"
+      ],
+      "name": "Cross-domain MEV protection",
+      "paths": [
+        "crates/cross-vm-coordinator"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "mev_privacy",
+      "tested": 18,
+      "tests": "tested score 18% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 31,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: One of verified Trading Core v1 gaps"
+      ],
+      "id": "X3-MEV-002",
+      "implemented": 45,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "Trading Core hardening still requires private-submission enforcement"
+      ],
+      "name": "Private transaction submission controls",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "research",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "mev_privacy",
+      "tested": 20,
+      "tests": "tested score 20% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 52,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 hardening item"
+      ],
+      "id": "X3-MEV-003",
+      "implemented": 65,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 45,
+      "missing_work": [
+        "Measured on master 2026-09-22: the compiler carries a `max_price_impact` policy (`x3-lang/compiler/src/trading_semantic.rs`, `trading_lowering.rs`) and the VM enforces price-impact and MEV-leakage ceilings against host-reported measurements, failing closed when the host reports nothing (`x3-lang/vm/tests/trading_execution.rs`: `price_impact_ceiling_is_enforced_when_host_reports_it`, `price_impact_ceiling_fails_closed_when_host_reports_nothing`, `mev_leakage_ceiling_is_enforced_when_host_reports_it`)",
+        "What that does not establish: the ceilings are only as good as the host's reported risk, and no run has measured them against a real venue or on a network \u2014 the tests drive a host double"
+      ],
+      "name": "Costs-before-profit evaluation",
+      "paths": [
+        "x3-lang/compiler",
+        "x3-lang/vm"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "mev_privacy",
+      "tested": 45,
+      "tests": "tested score 45% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 36,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 hardening item"
+      ],
+      "id": "X3-MEV-004",
+      "implemented": 50,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 30,
+      "missing_work": [
+        "Rollback semantics not yet fully proven"
+      ],
+      "name": "Transactional host rollback",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "mev_privacy",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 41,
+      "confidence": "high",
+      "evidence": [
+        "x3-lang/compiler",
+        "note: Trading Core v1 gap list"
+      ],
+      "id": "X3-MEV-005",
+      "implemented": 55,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "Hardening branch must enforce gas and capability versions"
+      ],
+      "name": "Gas / economic execution limits",
+      "paths": [
+        "x3-lang/compiler"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "mev_privacy",
+      "tested": 30,
+      "tests": "tested score 30% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 36,
+      "confidence": "high",
+      "evidence": [
+        "pallets/private-execution",
+        "note: Private execution and trading controls exist, but fair-ordering/encrypted mempool proof is incomplete"
+      ],
+      "id": "X3-MEV-006",
+      "implemented": 45,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "No complete formal MEV threat model; do not claim MEV-proof"
+      ],
+      "name": "MEV-resistant architecture",
+      "paths": [
+        "pallets/private-execution"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "mev_privacy",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 2,
+      "confidence": "high",
+      "evidence": [
+        "note: No sufficient master evidence found"
+      ],
+      "id": "X3-MEV-007",
+      "implemented": 5,
+      "launch_scope": "research",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 0,
+      "missing_work": [
+        "Not implemented as a verified production feature"
+      ],
+      "name": "Encrypted mempool / threshold encryption",
+      "paths": [],
+      "priority": "P1",
+      "source": "research",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "mev_privacy",
+      "tested": 0,
+      "tests": "tested score 0% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 8,
+      "confidence": "high",
+      "evidence": [
+        "note: No strong master evidence for fair ordering"
+      ],
+      "id": "X3-MEV-008",
+      "implemented": 15,
+      "launch_scope": "research",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 5,
+      "missing_work": [
+        "No production fair-ordering protocol identified"
+      ],
+      "name": "Fair transaction ordering",
+      "paths": [],
+      "priority": "P1",
+      "source": "research",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "mev_privacy",
+      "tested": 5,
+      "tests": "tested score 5% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 64,
+      "confidence": "high",
+      "evidence": [
+        "scripts/mainnet/genesis_ceremony.sh",
+        "scripts/testnet/testnet-ceremony.py",
+        "scripts/testnet/testnet-ceremony-drill.sh",
+        "scripts/testnet/build-x3-testnet-spec.py",
+        "note: 2026-09-22 first-hand \u2014 the drill records `X3 Chain Testnet` (Live, id x3_chain_testnet) with genesis 0xa1005528d8d6ec35693e37f8d72a85408067aabeca8fa7f8a6379184628000ad, spec sha256 a3cc9e39719fe017\u2026, 4 aura / 4 grandpa authorities and every validator's peer id + finalized height (273 at record time, 3 peers each); `verify` passes every check against the live network and fails a manifest whose genesis hash was tampered with. `genesis_ceremony.sh` (15.6 kB) remains the mainnet, tagged-commit half"
+      ],
+      "id": "X3-OPS-001",
+      "implemented": 85,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 45,
+      "missing_work": [
+        "The mainnet ceremony itself has not been run: `genesis_ceremony.sh` requires a tagged release commit and srtool, and no tag exists",
+        "The ceremony record exists but is only produced and checked locally: nothing publishes a signed manifest, and the recorded node binary is a debug build",
+        "The recorded launch is loopback (four validators on one host) and its bootnodes are /ip4/127.0.0.1/... entries"
+      ],
+      "name": "Genesis ceremony tooling",
+      "paths": [
+        "scripts/mainnet/genesis_ceremony.sh",
+        "scripts/testnet/testnet-ceremony.py",
+        "scripts/testnet/testnet-ceremony-drill.sh"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "operations_user_tools",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 40,
+      "confidence": "high",
+      "evidence": [
+        "scripts/snapshot-restore.sh",
+        "note: Independent audit previously scored snapshot/restore partial"
+      ],
+      "id": "X3-OPS-002",
+      "implemented": 55,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "Needs live restore drills and integrity verification"
+      ],
+      "name": "Snapshot / restore tooling",
+      "paths": [
+        "scripts/snapshot-restore.sh"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "operations_user_tools",
+      "tested": 25,
+      "tests": "tested score 25% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 62,
+      "confidence": "high",
+      "evidence": [
+        "scripts/mainnet/public_testnet_gate.sh",
+        "scripts/testnet/testnet-ceremony.py",
+        "scripts/local-ci.sh",
+        "docs/reports/PUBLIC_TESTNET_LAUNCH.md",
+        "note: two runnable gates \u2014 the 25.6 kB RPC gate (system_health, GRANDPA authorities, bridge storage, block height over `--rpc-base-url`) and the ceremony verifier (genesis hash, spec sha256, runtime version, authority set, peer ids, finality; seen to reject a tampered manifest) \u2014 plus a spec builder that takes published `PUBLIC_BOOTNODES` and a bootnode identity tool, so the operator path up to 'point the gate at a hosted endpoint' is written down and exercised; `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` PASS 290s"
+      ],
+      "id": "X3-OPS-003",
+      "implemented": 80,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 45,
+      "missing_work": [
+        "There is no public testnet to gate: measured 2026-09-22 \u2014 `rpc.testnet.x3-chain.io`, `faucet.testnet.x3-chain.io` and `bootnode.testnet.x3-chain.io` do not resolve (from a host whose DNS reaches github.com), `gh run list --workflow testnet-deploy.yml` is empty, and every step of docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md is unchecked",
+        "No hosting, DNS, TLS or monitoring is provisioned, so the gate has nothing to point at; its default is `http://localhost:9933`",
+        "The gate is RPC-only: it cannot see whether the network is *independently* operated, which is the property a public testnet exists to demonstrate",
+        "Both gates have only ever run against loopback networks on one host"
+      ],
+      "name": "Public testnet gate",
+      "paths": [
+        "scripts/mainnet/public_testnet_gate.sh",
+        "scripts/testnet/testnet-ceremony.py",
+        "scripts/testnet/testnet-ceremony-drill.sh",
+        "docs/reports/PUBLIC_TESTNET_LAUNCH.md"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "operations_user_tools",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 31,
+      "confidence": "high",
+      "evidence": [
+        "docs/reports/FUNCTIONAL_ROADMAP.md",
+        "note: Functional roadmap identifies telemetry as outstanding"
+      ],
+      "id": "X3-OPS-004",
+      "implemented": 40,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 30,
+      "missing_work": [
+        "Roadmap still lists telemetry integration as unfinished"
+      ],
+      "name": "Telemetry integration",
+      "paths": [
+        "docs/reports/FUNCTIONAL_ROADMAP.md"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "operations_user_tools",
+      "tested": 20,
+      "tests": "tested score 20% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 72,
+      "confidence": "high",
+      "evidence": [
+        "scripts/testnet/load-remarks-tps.js",
+        "note: Used for real finalized-TPS baseline"
+      ],
+      "id": "X3-OPS-005",
+      "implemented": 85,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Needs multi-validator load profiles"
+      ],
+      "name": "Load-generation TPS harness",
+      "paths": [
+        "scripts/testnet/load-remarks-tps.js"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "operations_user_tools",
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 64,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-wallet-pallet",
+        "note: FEATURE_REGISTRY x3_wallet_pallet=55"
+      ],
+      "id": "X3-OPS-006",
+      "implemented": 75,
+      "launch_scope": "guarded",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Security review of biometric/recovery pending"
+      ],
+      "name": "Wallet pallet",
+      "paths": [
+        "pallets/x3-wallet-pallet"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "operations_user_tools",
+      "tested": 62,
+      "tests": "7 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 70,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-gateway",
+        "note: Registry corrected health surfaces to /health,/readyz,/livez"
+      ],
+      "id": "X3-OPS-007",
+      "implemented": 80,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Needs deployed monitoring/SLO proof"
+      ],
+      "name": "Gateway /readyz health check",
+      "paths": [
+        "crates/x3-gateway"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "operations_user_tools",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 70,
+      "confidence": "high",
+      "evidence": [
+        "node/src/rpc_middleware.rs",
+        "note: Readiness snapshots cite rpc middleware evidence"
+      ],
+      "id": "X3-OPS-008",
+      "implemented": 78,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Production rate limits/abuse policies need external testing"
+      ],
+      "name": "RPC middleware",
+      "paths": [
+        "node/src/rpc_middleware.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "operations_user_tools",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 22,
+      "confidence": "high",
+      "evidence": [
+        "docs/X3_NEXT_TASKS.md",
+        "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low"
+      ],
+      "id": "X3-OPS-009",
+      "implemented": 30,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 20,
+      "missing_work": [
+        "No finished production explorer proven"
+      ],
+      "name": "Block explorer",
+      "paths": [
+        "docs/X3_NEXT_TASKS.md"
+      ],
+      "priority": "P2",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "operations_user_tools",
+      "tested": 15,
+      "tests": "tested score 15% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 26,
+      "confidence": "medium",
+      "evidence": [
+        "docs",
+        "note: Monitoring concepts present but operational proof incomplete"
+      ],
+      "id": "X3-OPS-010",
+      "implemented": 35,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "No complete canonical deployed monitoring stack proven"
+      ],
+      "name": "Prometheus/Grafana-style ops monitoring",
+      "paths": [
+        "docs"
+      ],
+      "priority": "P2",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
+      "subsystem": "operations_user_tools",
+      "tested": 15,
+      "tests": "tested score 15% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 40,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-atomic-kernel/src/lib.rs",
+        "note: Registry blocker explicitly calls out refund/recovery tests"
+      ],
+      "id": "X3-RT-001",
+      "implemented": 60,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 35,
+      "missing_work": [
+        "Required tests not yet proven in canonical registry"
+      ],
+      "name": "Halt permits recovery/refund paths",
+      "paths": [
+        "pallets/x3-atomic-kernel/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 20,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": true,
+      "composite": 45,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-atomic-kernel/src/lib.rs",
+        "note: FEATURE_REGISTRY corrected readiness to 40%"
+      ],
+      "id": "X3-RT-002",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "**Closed 2026-09-23 \u2014 bundle finalization is authorized now.** The unsigned `submit_finalization_result` extrinsic was removed: it was `ensure_none`, its off-chain marker (`x3fin:`) had no writer anywhere in this repository, and `do_finalize_bundle`'s certificate check compared the caller's input with the caller's own earlier input, so any account could finalize any `Executing` bundle. Finalization is the signed `finalize_atomic_bundle` (`X3LangOrigin`, an account the chain's genesis-authorized custody registry names) or `finalize_with_settlement` (`SettlementOrigin`). Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`; five tests in the pallet drive the finalization core, plus one that an unsigned origin cannot reach it at all.",
+        "Nine previously claimed invariant tests were removed as fictional; real invariant suite needed",
+        "The signed path's certificate still comes from an unsigned per-block anchor, which any peer can write first \u2014 the honest service can be made to finalize with a fabricated certificate (TICKET-107)"
+      ],
+      "name": "Atomic Kernel pallet",
+      "paths": [
+        "pallets/x3-atomic-kernel/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "runtime_core",
+      "tested": 35,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 60,
+      "confidence": "high",
+      "evidence": [
+        "runtime/src/lib.rs",
+        "note: Feature wired through node/runtime and production gate"
+      ],
+      "id": "X3-RT-003",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 50,
+      "missing_work": [
+        "Historical status documents show verification churn; exact-head proof still required"
+      ],
+      "name": "mainnet-rc1 feature mode",
+      "paths": [
+        "runtime/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 55,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 61,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-kernel/src/lib.rs",
+        "note: Kernel persists cross-VM state into canonical view"
+      ],
+      "id": "X3-RT-004",
+      "implemented": 78,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 52,
+      "missing_work": [
+        "Supply conservation across all failure paths needs stronger proof"
+      ],
+      "name": "Canonical state ledger updates",
+      "paths": [
+        "pallets/x3-kernel/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 50,
+      "tests": "tested score 50% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 64,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-atomic-kernel/src/lib.rs",
+        "note: Real submit_atomic_bundle path with EconomicHalt guard"
+      ],
+      "id": "X3-RT-005",
+      "implemented": 80,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Needs multi-validator adversarial lifecycle proof"
+      ],
+      "name": "Atomic bundle submission",
+      "paths": [
+        "pallets/x3-atomic-kernel/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 55,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 59,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-atomic-kernel/src/lib.rs",
+        "note: Real fail-closed guard exists and is reused across economic modules"
+      ],
+      "id": "X3-RT-006",
+      "implemented": 82,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Dedicated halt invariant tests incomplete"
+      ],
+      "name": "Economic Halt safety valve",
+      "paths": [
+        "pallets/x3-atomic-kernel/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 35,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 59,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-atomic-kernel/src/lib.rs",
+        "note: ensure! EconomicHalt guard in bundle submission"
+      ],
+      "id": "X3-RT-007",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Needs explicit regression test"
+      ],
+      "name": "Halt blocks new atomic bundles",
+      "paths": [
+        "pallets/x3-atomic-kernel/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 30,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 77,
+      "confidence": "high",
+      "evidence": [
+        "runtime/src/lib.rs",
+        "note: Large construct_runtime with mainnet-rc1 feature"
+      ],
+      "id": "X3-RT-008",
+      "implemented": 90,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 68,
+      "missing_work": [
+        "Full mainnet proof depends on weights, upgrades, and network testing"
+      ],
+      "name": "X3 runtime",
+      "paths": [
+        "runtime/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "runtime_core",
+      "tested": 75,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 73,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-cross-vm-router/src/lib.rs",
+        "note: Audit found compile_error! guards for mainnet-rc1/experimental features"
+      ],
+      "id": "X3-RT-009",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "LIVE_TESTNET",
+      "mainnet_ready": 70,
+      "missing_work": [
+        "Must keep mainnet and experimental feature graphs separated"
+      ],
+      "name": "Forbidden experimental compile guards",
+      "paths": [
+        "pallets/x3-cross-vm-router/src/lib.rs"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "runtime_core",
+      "tested": 60,
+      "tests": "8 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 62,
+      "confidence": "medium",
+      "evidence": [
+        "runtime/src/lib.rs",
+        "note: Node/runtime API integration exists"
+      ],
+      "id": "X3-RT-010",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Historical compile issues require exact current proof"
+      ],
+      "name": "Runtime API surface",
+      "paths": [
+        "runtime/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 55,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 62,
+      "confidence": "high",
+      "evidence": [
+        "runtime/src/lib.rs",
+        "note: TokenClass::FixedSupply and supply configuration exist"
+      ],
+      "id": "X3-RT-011",
+      "implemented": 78,
+      "launch_scope": "core",
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 55,
+      "missing_work": [
+        "Supply invariants still incomplete"
+      ],
+      "name": "Token class / fixed supply model",
+      "paths": [
+        "runtime/src/lib.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 50,
+      "tests": "3 named tests in FEATURE_REGISTRY"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 59,
+      "confidence": "high",
+      "evidence": [
+        "pallets/x3-agent-law",
+        "note: Status document records privacy tightening and passing tests"
+      ],
+      "id": "X3-RT-012",
+      "implemented": 72,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 50,
+      "missing_work": [
+        "Needs broader governance/adversarial coverage"
+      ],
+      "name": "Agent-law runtime guard",
+      "paths": [
+        "pallets/x3-agent-law"
+      ],
+      "priority": "P2",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "runtime_core",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 73,
+      "confidence": "high",
+      "evidence": [
+        "scripts/run-srtool.sh",
+        "scripts/update-runtime-hashes.sh",
+        "docs/reports/runtime-wasm-hashes.json",
+        ".github/workflows/production-gate.yml",
+        "note: two independent srtool builds per attestation, compared field by field, with the record carrying the runtime version and metadata; PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-SEC-001",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Measured locally, 2026-09-22: `./scripts/update-runtime-hashes.sh` builds the runtime twice from scratch in the pinned srtool image and refuses to write unless the two builds agree byte for byte. Run three times in one session (`93fe86c9bd`, `e74bb199f9`, `269d611d96`, `93d97edd34`, `2a4296b630`), agreeing every time. What is still missing is reproduction by a party that is not this machine, and an end-to-end `make mainnet-check` on a release candidate",
+        "Hosted `production-gate` workflow has run five times, all `workflow_dispatch`, all cancelled and never green (2026-09-19: 43m50s, 56m57s, 1h29m37s, 1h34m0s, 1h33m11s); the gate of record for this repository is local (`scripts/local-ci.sh`)"
+      ],
+      "name": "Reproducible srtool runtime build",
+      "paths": [
+        ".github/workflows/production-gate.yml"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 73,
+      "confidence": "high",
+      "evidence": [
+        "docs/reports/runtime-wasm-hashes.json",
+        "scripts/check-runtime-hash-freshness.py",
+        "scripts/update-runtime-hashes.sh",
+        ".github/workflows/production-gate.yml",
+        "note: branch records commit, BLAKE2-256, SHA-256, WASM size/path; PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-SEC-002",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "`docs/reports/runtime-wasm-hashes.json` records the revision, image digest, compact/compressed sizes, set_code, authorize_upgrade, IPFS CID and BLAKE2-256, plus the runtime version and metadata the artifact reports; `scripts/check-runtime-hash-freshness.py` fails a change that touches the runtime's dependency graph without moving the record, and it is wired into `local-ci` (it fired on this session's runtime changes and passed after each re-attestation)",
+        "Still missing: the release gate's own rebuild-and-compare (stage 6b) has not been run end to end on a release candidate, and no second party has reproduced the artifact",
+        "Hosted `production-gate` workflow has run five times, all `workflow_dispatch`, all cancelled and never green (2026-09-19: 43m50s, 56m57s, 1h29m37s, 1h34m0s, 1h33m11s); the gate of record for this repository is local (`scripts/local-ci.sh`)"
+      ],
+      "name": "Runtime artifact hash evidence",
+      "paths": [
+        ".github/workflows/production-gate.yml"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 72,
+      "confidence": "high",
+      "evidence": [
+        "scripts/mainnet_release_gate.py",
+        "note: Checks docs, builds, specs, critical tests, srtool prerequisites, secrets"
+      ],
+      "id": "X3-SEC-003",
+      "implemented": 82,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Must remain aligned with actual production build artifacts"
+      ],
+      "name": "Mainnet release audit script",
+      "paths": [
+        "scripts/mainnet_release_gate.py"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 74,
+      "confidence": "high",
+      "evidence": [
+        "scripts/mainnet_release_gate.py",
+        "scripts/local-ci.sh",
+        ".github/workflows/production-gate.yml",
+        "note: runs guard/tests/release build/audit/node build/mainnet check; PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+      ],
+      "id": "X3-SEC-004",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 62,
+      "missing_work": [
+        "The blocker this row carried \u2014 \"srtool hardening is on #166 branch, not master yet\" \u2014 is stale: #166 merged 2026-09-17 and the reproducible-build path is on master (`scripts/run-srtool.sh`, `scripts/update-runtime-hashes.sh`)",
+        "What is actually missing: the production gate has never completed a full run. Hosted `production-gate` has five runs, all cancelled, longest 1h34m, none green; `scripts/mainnet_release_gate.py` exists (31 KB) and has not been run end to end on a release candidate either. The local gate set that *does* run is `scripts/local-ci.sh`, green 30/30 on `bae40d46c8` on 2026-09-22 \u2014 but it is not this gate"
+      ],
+      "name": "Production gate",
+      "paths": [
+        ".github/workflows/production-gate.yml"
+      ],
+      "priority": "P0",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 53,
+      "confidence": "high",
+      "evidence": [
+        ".github/workflows/formal-verification.yml",
+        "note: Formal verification CI exists"
+      ],
+      "id": "X3-SEC-005",
+      "implemented": 65,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 45,
+      "missing_work": [
+        "Selected proof coverage only; K/toolchain reliability historically required repair"
+      ],
+      "name": "Formal verification workflow",
+      "paths": [
+        ".github/workflows/formal-verification.yml"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "security_proofgate",
+      "tested": 50,
+      "tests": "tested score 50% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 66,
+      "confidence": "high",
+      "evidence": [
+        ".github/workflows/codeql.yml",
+        "note: CI recovery retained supported CodeQL modes"
+      ],
+      "id": "X3-SEC-006",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "Not all languages/modes may be covered"
+      ],
+      "name": "CodeQL analysis",
+      "paths": [
+        ".github/workflows/codeql.yml"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 68,
+      "confidence": "high",
+      "evidence": [
+        ".github/workflows/proof-gates.yml",
+        "note: Automated proof verification workflow exists"
+      ],
+      "id": "X3-SEC-007",
+      "implemented": 78,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "Coverage does not equal whole-protocol formal proof"
+      ],
+      "name": "ProofForge gates",
+      "paths": [
+        ".github/workflows/proof-gates.yml"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 65,
+      "confidence": "medium",
+      "evidence": [
+        "scripts/x3-detect-test-cheats.sh",
+        "note: GPU audit references anti-cheat proof tooling"
+      ],
+      "id": "X3-SEC-008",
+      "implemented": 75,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 60,
+      "missing_work": [
+        "Needs broad language coverage and CI enforcement"
+      ],
+      "name": "Test-cheat / placeholder detection",
+      "paths": [
+        "scripts/x3-detect-test-cheats.sh"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 73,
+      "confidence": "high",
+      "evidence": [
+        "FEATURE_REGISTRY.toml",
+        "note: Registry corrected fictional rows and scores"
+      ],
+      "id": "X3-SEC-009",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Still incomplete as full inventory; several subsystems untracked"
+      ],
+      "name": "Feature registry truth source",
+      "paths": [
+        "FEATURE_REGISTRY.toml"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 70,
+      "confidence": "high",
+      "evidence": [
+        "scripts/mainnet_release_gate.py",
+        "note: Mainnet gate scans private keys/mnemonics/AWS-like keys"
+      ],
+      "id": "X3-SEC-010",
+      "implemented": 80,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Regex scanning is supplementary, not a full secret-management system"
+      ],
+      "name": "Forbidden-secret scanning",
+      "paths": [
+        "scripts/mainnet_release_gate.py"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 72,
+      "confidence": "high",
+      "evidence": [
+        "scripts_infrastructure/pr_supervisor.py",
+        "tests/test_pr_supervisor.py",
+        "note: Recent CI recovery added real PR integrity checks; enforcement is the script plus its test, run where the queue is operated"
+      ],
+      "id": "X3-SEC-011",
+      "implemented": 80,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 65,
+      "missing_work": [
+        "Needs continued exact-head enforcement"
+      ],
+      "name": "PR supervisor gate",
+      "paths": [
+        "scripts_infrastructure/pr_supervisor.py",
+        "tests/test_pr_supervisor.py"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 76,
+      "confidence": "high",
+      "evidence": [
+        "scripts/check-readiness-consistency.sh",
+        "note: Repo uses it to reject fictional registry paths/tests"
+      ],
+      "id": "X3-SEC-012",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 70,
+      "missing_work": [
+        "Needs continuous maintenance as feature registry evolves"
+      ],
+      "name": "Readiness consistency checker",
+      "paths": [
+        "scripts/check-readiness-consistency.sh"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 78,
+      "confidence": "high",
+      "evidence": [
+        ".github/workflows/semgrep.yml",
+        "note: Exact-head Semgrep checks active"
+      ],
+      "id": "X3-SEC-013",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Ruleset coverage needs periodic review"
+      ],
+      "name": "Semgrep scanning",
+      "paths": [
+        ".github/workflows/semgrep.yml"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 78,
+      "tests": "tested score 78% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 78,
+      "confidence": "high",
+      "evidence": [
+        ".github/workflows/trivy.yml",
+        "note: Exact-head Trivy checks active"
+      ],
+      "id": "X3-SEC-014",
+      "implemented": 85,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 72,
+      "missing_work": [
+        "Keep filesystem scope current"
+      ],
+      "name": "Trivy scanning",
+      "paths": [
+        ".github/workflows/trivy.yml"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 78,
+      "tests": "tested score 78% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
+      "composite": 81,
+      "confidence": "high",
+      "evidence": [
+        "scripts/local-ci.sh",
+        "Makefile",
+        "note: three workspace clippy gates with -D warnings, plus the x3-lang workspace target; verified PASS on 2026-09-22 (clippy workspace 774s, clippy runtime rc1 803s, clippy node rc1 1009s)"
+      ],
+      "id": "X3-SEC-015",
+      "implemented": 88,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 75,
+      "missing_work": [
+        "Keep -D warnings and avoid coverage weakening"
+      ],
+      "name": "Rust Clippy hard-fail gate",
+      "paths": [
+        "scripts/local-ci.sh",
+        "Makefile"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
+      "subsystem": "security_proofgate",
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
+    }
+  ],
+  "generated_from": {
+    "matrix": "FEATURE_MATRIX.toml",
+    "matrix_audit_date": "2026-09-12",
+    "registry": "FEATURE_REGISTRY.toml",
+    "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
+    "source_digest": "bf2f92fd398c5ce0f54fee5f20f99fa089c549096ff92cd0dbdb11ee7233e0a8",
+    "sources": {
+      "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
+      "FEATURE_REGISTRY.toml": "3d23adfd761d5392f064b83df94c16d5dd389bca0b49be7f41bbb8e5d433af52",
+      "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
+      "feature-matrix/claims-hygiene.toml": "38adfc42c2cfe602e3588afb5ee401319b27d4b2cbd824b7e262b46a552da389",
+      "feature-matrix/consensus-l1.toml": "86b9d3871259ddee0dde4393b92ab67be0e5a4bccefd642d28c53d25ca8b4f82",
+      "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
+      "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
+      "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
+      "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
+      "feature-matrix/language-trading.toml": "cb8113f2425c700ef560adab30f4c75bb78d3142e3c18820790ba63e8b68cf33",
+      "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
+      "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
+      "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",
+      "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
+    }
+  },
+  "registry": [
+    {
+      "blockers": [
+        "Gateway is guarded \u2014 ExternalBridgesEnabled = false at genesis (governance gate)"
+      ],
+      "crate_or_service": "pallets/x3-cross-vm-router",
+      "feature": "atomic_gateway",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "",
+      "readiness_score": 65,
+      "required_tests": [
+        "enabling_external_bridges_requires_documented_audit_gate",
+        "revoking_bridge_audit_gate_disables_external_bridges"
+      ]
+    },
+    {
+      "blockers": [
+        "**CLOSED 2026-09-23 \u2014 bundle finalization is authorized, and the unauthorised entry point is gone.** `submit_finalization_result` was `ensure_none` and its off-chain marker (`x3fin:`) had no writer anywhere in this repository; together with an equally unsigned certificate anchor it let any account finalize any `Executing` bundle with a proof nobody produced (TICKET-097). The call, its pool validation, its OCW branch, its weight entry, its benchmark and the settlement engine's marker path were removed. Finalization is now only `finalize_atomic_bundle` (`X3LangOrigin` \u2014 a genesis-named gateway account since spec 19) and `finalize_with_settlement` (`SettlementOrigin`), and the pallet's finalization tests drive that core. Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`. The score below is *not* re-measured here: raising it is TICKET-101's re-measurement, not an edit made in passing. Still open on this row: the signed path's certificate comes from an unsigned anchor any peer can write first (TICKET-107), and the halt/rollback paths have never been exercised on a multi-validator network.",
+        "Economic halt path now has dedicated single-node coverage (halt blocks new bundle submission with no state mutation; rollback/recovery stays open while halted and releases the whole bond) but has never been triggered in a multi-validator network",
+        "Bond accounting on rollback was fixed on 2026-09-18 and now has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason now asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. Still outstanding: an independent audit of this change, and exercising the halt and rollback paths on a multi-validator network"
+      ],
+      "crate_or_service": "pallets/x3-atomic-kernel",
+      "feature": "atomic_kernel",
+      "mode": "LIVE_TESTNET",
+      "proof_report": "",
+      "readiness_score": 35,
+      "required_tests": [
+        "economic_halt_blocks_bundle_submission",
+        "economic_halt_does_not_trap_pending_bundle_funds",
+        "rollback_execution_failed_charges_only_the_ten_percent_penalty",
+        "rollback_access_set_violation_charges_only_the_ten_percent_penalty",
+        "rollback_deadline_exceeded_slashes_the_whole_bond_once",
+        "rollback_rejects_callers_who_are_not_authorised_for_the_reason",
+        "rollback_deadline_exceeded_before_the_deadline_is_rejected",
+        "economic_halt_does_not_block_inflight_bundle_assignment"
+      ]
+    },
+    {
+      "blockers": [
+        "Cross-pallet integration (launchpad \u2192 LP locker) not verified in CI"
+      ],
+      "crate_or_service": "pallets/x3-lp-locker",
+      "feature": "atomic_lock",
+      "mode": "LIVE_TESTNET",
+      "proof_report": "reports/testnet_readiness_report.md",
+      "readiness_score": 68,
+      "required_tests": [
+        "lock_lp_creates_lock",
+        "unlock_lp_removes_lock_after_expiry",
+        "unlock_lp_rejects_before_expiry"
+      ]
+    },
+    {
+      "blockers": [
+        "External-bridge path disabled at genesis \u2014 governance gate, not code gap"
+      ],
+      "crate_or_service": "pallets/x3-cross-vm-router",
+      "feature": "atomic_router",
+      "mode": "LIVE_TESTNET",
+      "proof_report": "",
+      "readiness_score": 88,
+      "required_tests": [
+        "test_x3_native_evm_svm_roundtrip_preserves_supply",
+        "test_all_six_internal_routes_succeed",
+        "test_duplicate_nonce_rejected",
+        "test_failed_destination_credit_refunds_pending_supply",
+        "test_canonical_supply_never_breaks",
+        "test_duplicate_message_replay_rejected",
+        "test_expired_transfer_refunds_to_source",
+        "external_bridges_are_paused_at_genesis"
+      ]
+    },
+    {
+      "blockers": [
+        "No multi-validator or live-network run \u2014 48 passing tests are all mock-runtime unit tests"
+      ],
+      "crate_or_service": "pallets/atomic-trade-engine",
+      "feature": "atomic_trade_engine",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "reports/trading_core_v1_report.md",
+      "readiness_score": 70,
+      "required_tests": [
+        "execute_triple_vm_batch_via_kernel_comit_v2_works",
+        "kernel_comit_failure_is_rolled_back_but_batch_is_marked_failed",
+        "execute_fails_with_slippage_exceeded",
+        "create_batch_fails_with_expired_deadline",
+        "create_batch_fails_with_invalid_nonce",
+        "concurrent_batches_per_account",
+        "sync_pool_price_writes_oracle_observation"
+      ]
+    },
+    {
+      "blockers": [
+        "DEX uses EconomicHalt runtime governance; no compile-time feature gate removal needed",
+        "DEX does not implement concentrated liquidity or limit orders (not in scope for testnet)",
+        "Fee accounting is asserted through test_amm_calculations only; there is no dedicated fee-split test yet"
+      ],
+      "crate_or_service": "pallets/x3-dex",
+      "feature": "axe",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "reports/testnet_readiness_report.md",
+      "readiness_score": 75,
+      "required_tests": [
+        "create_pool_works",
+        "swap_works",
+        "test_amm_calculations"
+      ]
+    },
+    {
+      "blockers": [
+        "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, but nothing has run against testnet or mainnet and the deposit/withdrawal path has never moved a coin",
+        "The header chain bootstraps from a checkpoint (spec_version 14/15): `anchor_btc_checkpoint` pins one by root call, and a spec can now carry one in genesis (`btc_checkpoints`), so a chain can be born anchored and the live gate proves it (`scripts/testnet/btc-checkpoint-genesis-drill.sh`). No public network has one pinned, and the header still arrives by an operator copying a hash \u2014 there is no header source and no peer-sourced sync",
+        "No BTC signer quorum: withdrawals have no production multi-signer policy",
+        "BTC mainnet disabled by feature flag",
+        "No external audit of the gateway, the vault or the header check"
+      ],
+      "crate_or_service": "pallets/x3-settlement-engine",
+      "feature": "btc_fortress_gateway",
+      "mode": "SIM_TESTNET",
+      "proof_report": "",
+      "readiness_score": 45,
+      "required_tests": [
+        "btc_submit_header_refuses_targets_bitcoin_refuses",
+        "btc_block_hash_is_double_sha256_over_the_eighty_wire_bytes",
+        "btc_submit_header_refuses_a_header_that_misses_its_target",
+        "btc_settlement_proof_two_tx_block_with_merkle_path",
+        "btc_settlement_proof_naming_a_different_block_is_refused",
+        "btc_spv_proof_direct_round_trip",
+        "the_raw_spv_verifier_accepts_the_fixture_the_pallet_refuses",
+        "a_btc_header_chain_cannot_start_without_a_checkpoint",
+        "a_bitcoin_proof_cannot_use_a_header_this_chain_never_admitted",
+        "a_btc_checkpoint_height_cannot_be_re_pointed",
+        "a_btc_extension_must_be_contiguous_with_its_parent",
+        "a_btc_extension_cannot_change_difficulty_off_a_retarget_boundary",
+        "a_header_close_to_the_checkpoint_may_share_its_timestamp",
+        "a_header_below_the_median_of_its_eleven_ancestors_is_refused",
+        "submit_btc_proof_refuses_a_header_that_was_never_admitted",
+        "the_retarget_bound_bites_exactly_at_a_factor_of_four",
+        "a_real_bitcoin_block_hashes_to_the_hash_the_node_reported",
+        "a_real_bitcoin_merkle_path_verifies_against_a_real_block",
+        "a_real_regtest_chain_anchors_and_extends_through_the_pallets_rules",
+        "a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored",
+        "genesis_pins_a_bitcoin_checkpoint_and_admits_its_header",
+        "genesis_refuses_a_checkpoint_that_is_not_a_real_bitcoin_block",
+        "genesis_refuses_a_checkpoint_easier_than_the_networks_pow_limit",
+        "genesis_refuses_two_checkpoints_at_one_height"
+      ]
+    },
+    {
+      "blockers": [
+        "mainnet_rc_gate is manual approval, not automated"
+      ],
+      "crate_or_service": "scripts/mainnet/mainnet_rc_gate.sh",
+      "feature": "launch_gate",
+      "mode": "LIVE_TESTNET",
+      "proof_report": "",
+      "readiness_score": 55,
+      "required_tests": [
+        "testnet_rc_gate",
+        "mainnet_rc_gate"
+      ]
+    },
+    {
+      "blockers": [
+        "Dev-ops tooling \u2014 not part of blockchain runtime",
+        "Single test; no CI gate"
+      ],
+      "crate_or_service": "scripts/swarm/swarm_scan.sh",
+      "feature": "repo_scanner_agent",
+      "mode": "LIVE_TESTNET",
+      "proof_report": "",
+      "readiness_score": 25,
+      "required_tests": [
+        "swarm_scan_generates_report"
+      ]
+    },
+    {
+      "blockers": [
+        "The recomputed state root has never been compared against a root produced by a running chain: that needs `export-state` on a live node, which needs the embedded runtime WASM, which needs clang. Until then the claim is 'the SDK's own root function, cross-checked against the SDK's reference implementation', not 'matched a real chain root'.",
+        "The exporter consumes `export-state` output rather than reading the database directly, so the operator flow is export-state -> build -> verify, and nothing yet reads the trie straight out of RocksDB.",
+        "No snapshot has been produced from a chain larger than the repository's raw genesis fixture, so chunk counts, chunk sizes and wall-clock export timings at real state sizes are unmeasured."
+      ],
+      "crate_or_service": "crates/x3-state-snapshot",
+      "feature": "state_snapshot",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "",
+      "readiness_score": 55,
+      "required_tests": [
+        "the_recomputed_root_matches_the_state_machines_own_reference_implementation",
+        "a_snapshot_whose_bytes_do_not_produce_the_declared_root_is_refused",
+        "verification_detects_state_swapped_in_under_a_copied_manifest",
+        "a_snapshot_from_another_chain_is_refused",
+        "a_stale_snapshot_is_refused_when_the_caller_sets_a_floor",
+        "an_incomplete_snapshot_is_refused",
+        "a_corrupt_chunk_is_refused_at_the_chunk_that_is_wrong",
+        "exporting_the_same_state_twice_produces_the_same_manifest_hash"
+      ]
+    },
+    {
+      "blockers": [
+        "Deployed to a local validator only \u2014 no devnet or mainnet deployment has been performed",
+        "No external audit of the program",
+        "No production submitter: pallets/x3-settlement-engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused and the authority path is undecided"
+      ],
+      "crate_or_service": "programs/svm/x3_atomic_swap",
+      "feature": "svm_atomic_swap_htlc",
+      "mode": "LIVE_TESTNET",
+      "proof_report": "",
+      "readiness_score": 70,
+      "required_tests": [
+        "test_hash_verification",
+        "test_canonical_pda_validation_accepts_only_matching_swap_id",
+        "test_canonical_pda_bump_reconstructs_address",
+        "test_deserialize_rejects_short_buffer",
+        "test_htlc_account_roundtrip",
+        "test_create_htlc_params_unpack"
+      ]
+    },
+    {
+      "blockers": [
+        "Desktop UI only \u2014 not part of blockchain runtime",
+        "Dead buttons imply incomplete wiring",
+        "No CI gate; E2E report is manual",
+        "No automated test exists under apps/tauri-os: the previously cited dead_buttons_report / tauri_wiring_report were never test functions, they were report artifacts"
+      ],
+      "crate_or_service": "apps/tauri-os",
+      "feature": "tauri_os",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "",
+      "readiness_score": 15,
+      "required_tests": []
+    },
+    {
+      "blockers": [
+        "No multi-validator or live-network execution of a trading-core-v1 program has been performed \u2014 all 131 passing tests are single-process compiler/VM/CLI-level"
+      ],
+      "crate_or_service": "x3-lang",
+      "feature": "trading_core_v1",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "reports/trading_core_v1_report.md",
+      "readiness_score": 75,
+      "required_tests": [
+        "gas_ceiling_exceeded_rejects_even_though_profit_and_debts_are_fine",
+        "swap_across_declared_chains_is_rejected",
+        "solvent_invariant_catches_hidden_cost_in_an_asset_the_trade_never_touches",
+        "slippage_beyond_policy_ceiling_is_rejected",
+        "oracle_firewall_fails_closed_when_required_but_host_reports_no_sources",
+        "simulate_never_commits_even_when_every_guard_passes",
+        "cumulative_loss_ceiling_trips_only_once_prior_trades_are_summed_in",
+        "replay_ledger_rejects_the_identical_receipt_presented_twice",
+        "cli_receipt_verify_rejects_tampered_receipt",
+        "bridge_against_a_host_with_no_bridging_support_fails_closed"
+      ]
+    },
+    {
+      "blockers": [
+        "Migration dry-run is automated for all six runtime variants and passing against real genesis state: scripts/check-runtime-variants.sh runs runtime_upgrade_rehearsal per feature set, seeding each variant's actual genesis through frame_support::genesis_builder_helper (the plain functions behind the sp_api GenesisBuilder runtime API), then executing the same OnRuntimeUpgrade hooks an upgrade would (AllPalletsWithSystem + the Migrations tuple) and asserting the work fits inside a block",
+        "Storage-version alignment is checked as of runtime_upgrade_rehearsal_storage_versions: after the upgrade hooks run, every pallet in the all-variant intersection that declares an in-code storage version must have the same version on chain (21 pallets in the full variant; the test also fails if fewer than 5 are inspected, and runtime_upgrade_rehearsal_storage_version_check_has_teeth proves the check reports a deliberately wrong version)",
+        "The migration run-path is rehearsed too (runtime_upgrade_rehearsal_migrations_advance_behind_versions): each of the four pallets whose migration struct is wired into `Migrations` (AtlasKernel, Treasury, AgentMemory, AgentAccounts) is rolled back to storage version 0 (the rollback is asserted before the hooks run, so the test cannot pass vacuously), the upgrade hooks then run, and every pallet must end at the version the code declares \u2014 a migration dropped from the tuple or no longer matching its pallet's declared version fails here",
+        "Remaining gap: the rehearsal starts from *this* runtime's genesis, not from a previous runtime's exported state, so cross-version migration of historical state is still unverified \u2014 the try-runtime CLI that would do that is absent from the pinned Polkadot SDK"
+      ],
+      "crate_or_service": "runtime",
+      "feature": "triforge_runtime",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "",
+      "readiness_score": 80,
+      "required_tests": [
+        "runtime_upgrade_rehearsal",
+        "runtime_upgrade_rehearsal_storage_versions",
+        "runtime_upgrade_rehearsal_migrations_advance_behind_versions"
+      ]
+    },
+    {
+      "blockers": [
+        "Token factory uses EconomicHalt runtime governance (not compile-time gates)",
+        "Sentinel score check not yet wired into CreateTokenOrigin (optional hardening)"
+      ],
+      "crate_or_service": "pallets/x3-token-factory",
+      "feature": "x3_forge",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "reports/testnet_readiness_report.md",
+      "readiness_score": 75,
+      "required_tests": [
+        "test_01_create_fixed_supply_token_emits_event",
+        "test_sentinel_frozen_mint_authority_blocks_mint"
+      ]
+    },
+    {
+      "blockers": [
+        "Unit-tested pure logic only (timelock/preimage/PDA math) \u2014 no localnet/devnet on-chain integration test exercising a deployed program",
+        "Not wired into any live cross-VM route \u2014 no caller in the atomic router or cross-vm-coordinator yet"
+      ],
+      "crate_or_service": "X3-contracts/svm/programs/x3_htlc",
+      "feature": "x3_htlc",
+      "mode": "SIM_TESTNET",
+      "proof_report": "",
+      "readiness_score": 30,
+      "required_tests": [
+        "funded_htlc_expires_after_timelock",
+        "preimage_hash_matches_recorded_hashlock",
+        "timelock_cannot_exceed_seven_days",
+        "timelock_must_be_more_than_one_hour_out",
+        "htlc_pda_is_deterministic_and_distinct",
+        "htlc_vault_pda_derives_from_escrow_account"
+      ]
+    },
+    {
+      "blockers": [
+        "Benchmark infrastructure not in CI critical path",
+        "GPU benchmark path depends on optional sidecar",
+        "No test covers a benchmark job submit/publish path: the previously cited benchmark_job_submits / benchmark_result_publishes never existed anywhere in the repository. The crate's real tests cover report comparison and the compile pipeline only."
+      ],
+      "crate_or_service": "crates/x3-bench",
+      "feature": "x3_reactor",
+      "mode": "LIVE_TESTNET",
+      "proof_report": "",
+      "readiness_score": 40,
+      "required_tests": [
+        "create_and_compare_reports",
+        "test_compile_optimized"
+      ]
+    },
+    {
+      "blockers": [
+        "No live governance simulation"
+      ],
+      "crate_or_service": "pallets/x3-sentinel",
+      "feature": "x3_sentinel",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "reports/testnet_readiness_report.md",
+      "readiness_score": 50,
+      "required_tests": [
+        "sentinel_checks_mint_authority",
+        "sentinel_checks_freeze_authority"
+      ]
+    },
+    {
+      "blockers": [
+        "required_tests (swarm_agent_can_receive_task, swarm_agent_cannot_touch_forbidden_files, swarm_memory_records_lesson, swarm_kill_switch_stops_agents) were fictional \u2014 see CRITICAL-TOK-1; write real tests before re-adding them",
+        "Experimental \u2014 not in CI critical path",
+        "No multi-agent race-condition or partition-tolerance testing"
+      ],
+      "crate_or_service": "crates/x3-swarm-core",
+      "feature": "x3_swarm_core",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "",
+      "readiness_score": 25,
+      "required_tests": []
+    },
+    {
+      "blockers": [
+        "Biometric template and recovery logic have no security review"
+      ],
+      "crate_or_service": "pallets/x3-wallet-pallet",
+      "feature": "x3_wallet_pallet",
+      "mode": "LIVE_TESTNET",
+      "proof_report": "",
+      "readiness_score": 55,
+      "required_tests": [
+        "register_hardware_wallet_works",
+        "create_multisig_wallet_works",
+        "transfer_tokens_works",
+        "mint_tokens_authorized_only",
+        "add_remove_minter_root_only",
+        "register_biometric_works",
+        "initiate_recovery_works"
+      ]
+    },
+    {
+      "blockers": [
+        "External bridge deposits are disabled at genesis (ExternalBridgesEnabled=false per LAUNCH_SCOPE.md) \u2014 wrapped assets can only be minted via governance-gated RPC for testing, not from a real external-chain deposit",
+        "Two-of-two council quorum flow is verified by a manual script (scripts/testnet/verify-wrapped-council-flow.sh), not yet CI-enforced"
+      ],
+      "crate_or_service": "pallets/x3-wrapped",
+      "feature": "x3_wrapped",
+      "mode": "GUARDED_TESTNET",
+      "proof_report": "",
+      "readiness_score": 65,
+      "required_tests": [
+        "total_supply_invariant_holds_after_mixed_ops",
+        "mint_nonce_replay_rejected",
+        "mint_non_bridge_authority_rejected",
+        "register_asset_non_governance_rejected",
+        "mint_supply_cap_exceeded_rejected",
+        "burn_insufficient_balance_rejected"
+      ]
+    }
+  ],
+  "state_rules": [
+    {
+      "rule": "a cited path does not exist on disk, so the row cannot be built from",
+      "state": "BROKEN"
+    },
+    {
+      "rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "state": "NOT INTEGRATED"
+    },
+    {
+      "rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
+      "state": "COMPLETE"
+    },
+    {
+      "rule": "mainnet_ready >= 60",
+      "state": "FUNCTIONAL BUT UNHARDENED"
+    },
+    {
+      "rule": "implemented >= 50",
+      "state": "PARTIAL"
+    },
+    {
+      "rule": "implemented >= 20",
+      "state": "STUB"
+    },
+    {
+      "rule": "implemented < 20",
+      "state": "NOT STARTED"
+    }
+  ],
+  "summary": {
+    "by_state": {
+      "BROKEN": 0,
+      "COMPLETE": 10,
+      "FUNCTIONAL BUT UNHARDENED": 56,
+      "NOT INTEGRATED": 8,
+      "NOT STARTED": 0,
+      "PARTIAL": 50,
+      "STUB": 21
+    },
+    "matrix_features": 145,
+    "registry_features": 21,
+    "registry_max_readiness": 88,
+    "registry_mean_readiness": 55.29,
+    "registry_min_readiness": 15
+  }
+}
