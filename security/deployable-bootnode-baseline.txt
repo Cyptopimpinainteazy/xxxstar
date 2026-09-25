@@ -1,0 +1,13 @@
+# Deployable chain-spec problems that exist today. **This list may only shrink.**
+#
+# `scripts/ci/check_deployable_bootnodes.sh` answers "can a stranger join the
+# network these specs describe?", and the answer for the specs Dockerfile.validator
+# and k8s/02-configmaps.yaml ship was no, four times over. The problems need addresses
+# and a genesis that only a real ceremony can produce, so the gate cannot pass yet;
+# it is a ratchet instead, and it fails when a new problem appears or a listed one is
+# fixed (so the file cannot describe a tree that no longer exists).
+
+FAIL  deployment/chain-specs/fresh/x3-testnet-plain.json: bootNode /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWKFMTzsKNi3zF63vofq5gQFGaHapcGC7NXoTxDCqYo1H8 is on 127.0.0.1, which is only reachable from the host that wrote it
+FAIL  deployment/chain-specs/x3-testnet-raw.json: Live spec with no bootNodes — a node started from it can never discover a peer
+FAIL  k8s/02-configmaps.yaml:x3-testnet-raw.json: Live spec with an empty genesis.raw.top — there is no state to sync to
+FAIL  k8s/02-configmaps.yaml:x3-testnet-raw.json: bootNode /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWP1XsE2tRWDVyAMyCxeDUqsCvCGFKt7ZoCZk7Wn8BKWjU is on 127.0.0.1, which is only reachable from the host that wrote it

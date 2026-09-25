@@ -75,6 +75,37 @@ pub const WASM_BINARY_BLOATY: Option<&[u8]> = None;
     );
 }
 
+/// Remove the runtime build outputs so `substrate-wasm-builder` has to rebuild them.
+///
+/// Its own freshness check is based on source timestamps, and this crate's feature set is
+/// not a source file — so a blob built with `runtime-benchmarks` looks fresh to a build
+/// without it and gets embedded anyway. The node then fails to start with "runtime
+/// requires function imports which are not present on the host:
+/// env:ext_benchmarking_*". Measured on 2026-09-25: `target/release/x3-chain-node` was
+/// unrunnable for exactly that reason, and the sidecar written below said so only *after*
+/// the previous build had overwritten it with its own key.
+fn remove_stale_wasm_outputs(wasm: &Path) {
+    let mut removed = Vec::new();
+    for candidate in [
+        wasm.to_path_buf(),
+        wasm.with_file_name("x3_chain_runtime.compact.wasm"),
+        wasm.with_file_name("x3_chain_runtime.compact.compressed.wasm"),
+        sidecar_path(wasm),
+    ] {
+        if candidate.exists() && fs::remove_file(&candidate).is_ok() {
+            removed.push(candidate);
+        }
+    }
+    println!(
+        "cargo:warning=the cached runtime WASM was built for a different feature set; removed {} so it is rebuilt for this one",
+        removed
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+}
+
 fn cached_runtime_wasm_path() -> Option<PathBuf> {
     let profile = env::var("PROFILE").ok()?;
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").ok()?);
@@ -151,6 +182,19 @@ Rebuild the embedded runtime for this variant with `env -u SKIP_WASM_BUILD cargo
         }
         write_wasm_binary_stub("SKIP_WASM_BUILD is set; skipping runtime WASM build");
         return;
+    }
+
+    // `substrate-wasm-builder` will skip its build when the existing blob looks fresh, and
+    // "fresh" is decided from source timestamps, not from this crate's feature set. A blob
+    // built with `runtime-benchmarks` therefore survives a build without it, and the node
+    // embeds a runtime whose host functions it does not provide — the binary cannot start.
+    // The sidecar written at the end of this function is a *key*, so it has to be read
+    // before the build as well: a mismatch means the stale outputs go, which forces
+    // `build()` below to produce a blob for this feature set.
+    if let Some(existing) = cached_runtime_wasm_path() {
+        if cached_variant_matches(&existing, &enabled_features_key()).is_err() {
+            remove_stale_wasm_outputs(&existing);
+        }
     }
 
     // Always build WASM from source with correct flags

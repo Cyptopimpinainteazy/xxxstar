@@ -325,6 +325,14 @@ GATES_FAST=(
   # without the management CIDR, no firewall tool, a malformed CIDR, an unknown argument, and the
   # `--reset-firewall` opt-in — in under a second.
   "harden-validator check:bash scripts/mainnet/harden_validator_gate.sh"
+  # `scripts/ci/check_deployable_bootnodes.sh` answers a question no other gate asks: can a
+  # stranger join the network these specs describe? It answered "no" four times — a Live spec with
+  # an empty `bootNodes`, two bootNodes on `127.0.0.1`, and a Live spec with an empty
+  # `genesis.raw.top` — for the specs `Dockerfile.validator` and `k8s/02-configmaps.yaml` ship, and
+  # it was in no gate list, so nothing said so. Fixing them needs addresses and a genesis only a
+  # ceremony can produce, so the ratchet records the four and fails on a fifth or on one that is
+  # fixed.
+  "deployable bootnodes:bash scripts/ci/check_deployable_bootnodes_ratchet.sh"
   # `x3-cross-vm-bridge` holds the Merkle proof validator the bridge settles against, and like the
   # packet schema above it was reachable only through `test workspace` under `--deep`. Its 152 tests
   # include the Merkle-proof guards (`test_verify_empty_merkle_proof`,
