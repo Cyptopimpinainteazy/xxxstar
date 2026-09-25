@@ -24,6 +24,18 @@
 #   5. the bootnode port was 30333 while validator 0 listened on 9944.
 #   6. `pkill -f x3-chain-node` in cleanup killed *every* node on the host,
 #      including one the operator was running.
+#   7. and one the first fixed run found: `build-spec` *adds* a default bootnode
+#      (`/ip4/127.0.0.1/tcp/30333/p2p/NODE_PEER_ID`) when a spec declares none,
+#      so the generated spec named a peer id no process holds. libp2p then
+#      refused to start any validator that was also handed the real bootnode on
+#      that address — "the same bootnode is registered with two different peer
+#      ids". `--disable-default-bootnode` is the flag that means what this script
+#      already assumed, and the assertion below keeps the assumption honest.
+#   8. and one the second fixed run found: every validator bound the *default*
+#      Prometheus port 9615, so the second and third died on startup with
+#      `Address already in use (os error 98)` before their P2P listener existed.
+#      Validator 0 then sat at `Idle (0 peers)` forever, which reads exactly like
+#      a consensus failure and was three processes fighting over a metrics port.
 #
 # `scripts/mainnet/boot_local3.sh` had the working pattern all along: boot `local3`
 # with `--alice/--bob/--charlie`, read alice's real peer id out of her log, and
@@ -44,6 +56,9 @@ VALIDATOR_COUNT=3
 # P2P and RPC on disjoint ranges; validator 0 is the bootnode.
 P2P_PORTS=(30333 30334 30335)
 RPC_PORTS=(9944 9945 9946)
+# Disjoint metrics ports too: 9615 is the default, and three nodes that all take
+# it means only the first one survives startup.
+PROM_PORTS=(9615 9616 9617)
 NAMES=(alice bob charlie)
 FLAGS=(--alice --bob --charlie)
 
@@ -104,13 +119,19 @@ log_pass "node binary and jq present"
 
 # ── chain spec: local3, plain then raw ──────────────────────────────────────
 log_step "Generating the local3 chain spec"
-if ! "$BINARY" build-spec --chain local3 2>>"$PROOF_LOG" \
+if ! "$BINARY" build-spec --chain local3 --disable-default-bootnode 2>>"$PROOF_LOG" \
      | awk 'BEGIN{e=0} /^[[:space:]]*\{/ {e=1} e {print}' > "$TEST_DIR/plain.json"; then
   log_fail "build-spec --chain local3 failed"; exit 1
 fi
 jq -e 'type == "object"' "$TEST_DIR/plain.json" >/dev/null 2>&1 \
   || { log_fail "the plain spec is not valid JSON"; exit 1; }
-"$BINARY" build-spec --chain "$TEST_DIR/plain.json" --raw > "$TEST_DIR/raw.json" 2>>"$PROOF_LOG" \
+# The `local3` constructor declares no bootnodes, so any bootnode here is
+# `build-spec`'s default: a peer id derived from a key nothing holds, which
+# collides with the real bootnode every validator is pointed at below.
+jq -e '.bootNodes == []' "$TEST_DIR/plain.json" >/dev/null 2>&1 \
+  || { log_fail "the generated spec carries bootNodes; pass --disable-default-bootnode"; exit 1; }
+"$BINARY" build-spec --chain "$TEST_DIR/plain.json" --raw --disable-default-bootnode \
+  > "$TEST_DIR/raw.json" 2>>"$PROOF_LOG" \
   || { log_fail "could not convert the spec to raw"; exit 1; }
 jq -e 'type == "object"' "$TEST_DIR/raw.json" >/dev/null 2>&1 \
   || { log_fail "the raw spec is not valid JSON"; exit 1; }
@@ -123,6 +144,7 @@ log_step "Starting validator 0 (${NAMES[0]})"
   --base-path "$TEST_DIR/${NAMES[0]}" \
   --node-key-file "$(node_key_file "${NAMES[0]}")" \
   --port "${P2P_PORTS[0]}" --rpc-port "${RPC_PORTS[0]}" \
+  --prometheus-port "${PROM_PORTS[0]}" \
   --rpc-cors all --rpc-methods unsafe --validator \
   --log info > "$TEST_DIR/${NAMES[0]}.log" 2>&1 &
 PIDS+=($!)
@@ -148,6 +170,7 @@ for i in $(seq 1 $((VALIDATOR_COUNT - 1))); do
     --base-path "$TEST_DIR/${NAMES[$i]}" \
     --node-key-file "$(node_key_file "${NAMES[$i]}")" \
     --port "${P2P_PORTS[$i]}" --rpc-port "${RPC_PORTS[$i]}" \
+    --prometheus-port "${PROM_PORTS[$i]}" \
     --rpc-cors all --rpc-methods unsafe --validator \
     --bootnodes "$BOOTNODE_ADDR" \
     --log info > "$TEST_DIR/${NAMES[$i]}.log" 2>&1 &

@@ -2,9 +2,7 @@
   "name": "X3 Chain Local 3-Validator Testnet",
   "id": "x3_chain_local3",
   "chainType": "Local",
-  "bootNodes": [
-    "/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWSDG3ssm6N2oc6HLb4obWHDBeYG5J54nS5jTzj4mRpujM"
-  ],
+  "bootNodes": [],
   "telemetryEndpoints": null,
   "protocolId": "x3",
   "properties": null,

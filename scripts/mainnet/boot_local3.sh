@@ -9,6 +9,11 @@ PLAIN_SPEC="./chain-specs/x3-rc5-local3-plain.json"
 RAW_SPEC="./chain-specs/x3-rc5-local3-raw.json"
 LOG_DIR="./logs/local3"
 REGENERATE_CHAIN_SPEC="${REGENERATE_CHAIN_SPEC:-1}"
+# A network key per validator, generated once and kept. `--alice` supplies
+# *session* keys for the dev genesis, not a libp2p identity, so a base path that
+# has no network key yet makes the node exit with `NetworkKeyNotFound`. Keeping
+# the key also keeps each validator's peer id stable across restarts.
+NODE_KEY_DIR="${X3_LOCAL3_NODE_KEY_DIR:-./logs/local3/node-keys}"
 
 capture_build_spec_json() {
   local out_file="$1"
@@ -22,17 +27,31 @@ capture_build_spec_json() {
   jq -e 'type == "object"' "$out_file" >/dev/null 2>&1
 }
 
+# `build-spec` adds a default bootnode when a spec declares none, and that peer
+# id belongs to a key no process holds — so the generated spec advertises a
+# bootnode that cannot answer, and passing the real one on the same address makes
+# libp2p refuse to start. `--disable-default-bootnode` is passed at both call
+# sites below for that reason.
+node_key_file() {  # node_key_file <name> -> prints a path
+  local name="$1" file="$NODE_KEY_DIR/$1.nodekey"
+  mkdir -p "$NODE_KEY_DIR"
+  if [ ! -s "$file" ]; then
+    head -c 32 /dev/urandom | od -An -v -tx1 | tr -d ' \n' > "$file"
+  fi
+  printf '%s' "$file"
+}
+
 if [ ! -f "$BINARY" ]; then
   echo "ERROR: $BINARY not found. Run 'cargo build --release -p x3-chain-node' first."
   exit 1
 fi
 if [ "$REGENERATE_CHAIN_SPEC" = "1" ]; then
   mkdir -p ./chain-specs
-  if ! capture_build_spec_json "$PLAIN_SPEC" --chain local3; then
+  if ! capture_build_spec_json "$PLAIN_SPEC" --chain local3 --disable-default-bootnode; then
     echo "ERROR: failed to generate valid plain local3 chain spec"
     exit 1
   fi
-  if ! capture_build_spec_json "$RAW_SPEC" --chain "$PLAIN_SPEC" --raw; then
+  if ! capture_build_spec_json "$RAW_SPEC" --chain "$PLAIN_SPEC" --raw --disable-default-bootnode; then
     echo "ERROR: failed to generate valid raw local3 chain spec"
     exit 1
   fi
@@ -55,6 +74,8 @@ echo "=== Booting X3 local3 testnet ==="
   --chain "$RAW_SPEC" \
   --alice \
   --base-path /tmp/x3-alice \
+  --node-key-file "$(node_key_file alice)" \
+  --prometheus-port 9615 \
   --port 30333 \
   --rpc-port 9944 \
   --rpc-cors all \
@@ -85,6 +106,8 @@ echo "Alice bootnode: $ALICE_ADDR"
   --chain "$RAW_SPEC" \
   --bob \
   --base-path /tmp/x3-bob \
+  --node-key-file "$(node_key_file bob)" \
+  --prometheus-port 9616 \
   --port 30334 \
   --rpc-port 9945 \
   --rpc-cors all \
@@ -101,6 +124,8 @@ echo "Bob PID: $BOB_PID"
   --chain "$RAW_SPEC" \
   --charlie \
   --base-path /tmp/x3-charlie \
+  --node-key-file "$(node_key_file charlie)" \
+  --prometheus-port 9617 \
   --port 30335 \
   --rpc-port 9946 \
   --rpc-cors all \

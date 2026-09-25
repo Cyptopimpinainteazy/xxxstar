@@ -22,6 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 python3 - "$REPO_ROOT" <<'PY'
+import glob
 import ipaddress
 import json
 import os
@@ -115,6 +116,25 @@ if os.path.exists(configmap):
             check("k8s/02-configmaps.yaml:x3-testnet-raw.json", json.loads("\n".join(embedded)))
         except json.JSONDecodeError as err:
             failures.append(f"k8s/02-configmaps.yaml: embedded spec is not valid JSON ({err})")
+
+# 3. The specs checked in for the built-in `local3` chain. They are Local, not
+#    Live, so the rules above never reach them — and one of them carried a
+#    bootnode: `/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWSDG3ssm...`. Nobody typed
+#    that. `local_three_validator_config()` declares no bootnodes, so
+#    `build-spec --chain local3` injected its *default* one, whose peer id is
+#    derived from a key no process holds; every launcher that then passes
+#    `--bootnodes <alice>` on the same address dies with "the same bootnode is
+#    registered with two different peer ids". The constructor is the source of
+#    truth, so a bootnode here can only be drift.
+for path in sorted(glob.glob(os.path.join(repo_root, "chain-specs/x3-local3-*.json"))):
+    relative = os.path.relpath(path, repo_root)
+    spec = load(path)
+    bootnodes = spec.get("bootNodes") or []
+    if bootnodes:
+        failures.append(
+            f"{relative}: the local3 chain declares no bootNodes, so {bootnodes[0]!r} is "
+            f"build-spec's default peer id — nothing holds that key"
+        )
 
 for warning in warnings:
     print(f"WARN  {warning}")
