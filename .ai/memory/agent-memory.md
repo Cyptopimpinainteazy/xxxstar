@@ -8142,3 +8142,37 @@ Report: `.ai/reports/dependabot-triage-20260925.md`.
 3. `crates/evm-integration`: bump `evm` to the frontier line (0.43.4) and verify the EVM path.
 4. A GitHub-advisory gate (or a scheduled `gh api` job) so a new high-severity GHSA fails something.
 5. npm: `npm audit fix` in `x3-app-store/{frontend,backend}` and the smaller JS projects.
+
+## 2026-09-25 (fifty-second pass) — the work was on a branch, not on master; and the evm upgrade stopped at 18 errors
+
+### Where work actually lands (read this before "push everything")
+- The 2026-09-25 session's work was pushed to
+  `origin/feat/x3-prelaunch-economics-x3lang-cutover` and **not** to `master`, because this repository's
+  convention looked like "feature branch + auto-merge". The user looked at master and could not find it.
+  **Say which ref you are pushing to, or ask, when the request is "push everything".**
+- Fix applied: merged `origin/master` into the branch (clean), ran the fast set (50/50 PASS), then
+  `git push origin HEAD:master` — a **fast-forward**, because the merge made master an ancestor. Master
+  went `de498414d -> 90fcf5673`, gaining 46 commits; both refs now point at the same commit and
+  `git rev-list --left-right --count HEAD...origin/master` is `0 0`.
+- Pushing a branch and fast-forwarding master is the cheap way to publish a large body of work without
+  a merge commit on master, as long as the branch has already merged master in.
+
+### The `evm` dependency upgrade: attempted, parked
+- Goal: clear GHSA-27wg-99g8-2v4v (`evm 0.39.1`) and GHSA-3w94-vq2x-v5wr (`ethereum 0.14.0`), which
+  arrive from **our own** `crates/evm-integration` (not the SDK), by repointing the workspace pin from
+  `rust-blockchain/evm` rev `b7b82c7e` to the source/revision frontier already uses
+  (`rust-ethereum/evm`, rev `a656db90`, evm 0.43.4 + ethereum 0.18.2) — one implementation instead of two.
+- Result: **18 compile errors** in `crates/evm-integration` (E0277/E0308/E0599) — the API moved between
+  0.39 and 0.43 in the areas that matter to us (`MemoryVicinity`/`MemoryBackend`, `StackExecutor` and
+  its precompile plumbing). Reverted (`Cargo.toml`, `Cargo.lock` restored byte-identically) so the tree
+  stays green; the port is real work with its own verification (crate tests + the EVM lifecycle gate),
+  not a pin swap.
+- Next attempt should start from the error list: `cargo check -p x3-evm-integration --message-format
+  short` after the pin change prints all 18 in one pass.
+
+### Still open (unchanged priorities)
+1. `yamux 0.12.1` (remote panic, reachable from peers) — vendored backport or SDK bump.
+2. `hickory-proto 0.24.4` (no upstream fix) — written risk decision.
+3. `evm`/`ethereum` port as above.
+4. `submit_comit_v2` weight is still a placeholder (the benchmark exists but needs executable EVM/SVM
+   fixtures).
