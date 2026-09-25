@@ -7,6 +7,7 @@ Sends transactions in large batches that get split across 3 GPUs
 and processed via CUDA vectorized kernels.
 """
 
+import os
 import asyncio
 import aiohttp
 import time
@@ -16,7 +17,7 @@ from typing import List, Dict
 
 # Configuration
 BRIDGE_URL = "http://localhost:9999/accelerate/gpu-batch"
-API_KEY = "infra_3JDGhaxUOfLfyuFk-roJiR3FzgdgcipAH3vG5wpMzDo"
+API_KEY = os.environ["INFRASTRUCTURE_API_KEY"]
 CHAIN = "solana"
 TX_DATA_HEX = "48656c6c6f"
 

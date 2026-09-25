@@ -78,6 +78,25 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)apiKey:\s*config\.(apiKey|privateKey)",
     r"(?i)this\.config\.apiKey\s*=\s*undefined",
     r"(?i)key\.privateKey\b",
+    # `os.getenv` is the other half of reading a key from the environment, which
+    # the `os.environ.` entry above already excuses: `crates/gpu-swarm/src/
+    # social_agents.py` names the Twitter keys it wants and gets them from the
+    # process environment, hardcoding nothing.
+    r"(?i)\b(api[_-]?key|rpc[_-]?key)\b\s*[:=]\s*os\.getenv\(",
+    # The BIP39 *generator*. `admin.rs` mints a fresh mnemonic at request time
+    # (`crate::bip39::generate_mnemonic_12()`); the broad rule above reads any
+    # assignment to `mnemonic` as a hardcoded secret and flagged the call site.
+    r"(?i)\bmnemonic\s*=\s*crate::bip39::generate_mnemonic_12\(\)",
+    # A compose/service file passing an environment variable through. The
+    # existing `${VAR:-}` entry only covered the default-value spelling, so the
+    # plain `- API_KEY=${OPENAI_API_KEY}` line in
+    # `x3-swarm-orchestra/docker-compose.yml` looked like a literal.
+    r"(?i)\bAPI_KEY\b\s*=\s*\"?\$\{[A-Z0-9_]+\}\"?",
+    # A detector naming the marker it looks for, e.g. the quoted PEM header in
+    # `security/audit-sdk.sh`'s own SECRET_PATTERNS array. The line has to be the
+    # bare quoted marker: a real key's header line is unquoted and is followed by
+    # base64, so this cannot excuse one.
+    r'^\s*"-----BEGIN (EC|RSA|OPENSSH) PRIVATE KEY-----"\s*$',
 ]
 
 
@@ -85,9 +104,16 @@ def is_ignored_path(path: pathlib.Path) -> bool:
     rel = path.relative_to(ROOT).as_posix()
     if rel == "scripts/agent_guard.py":
         return True
-    return any(part in IGNORE_DIRS for part in path.parts) or any(
+    if any(part in IGNORE_DIRS for part in path.parts) or any(
         rel.startswith(prefix) for prefix in IGNORE_PREFIXES
-    )
+    ):
+        return True
+    # `Foo_files/` is what a browser writes when a page is saved for off-line
+    # reading: minified third-party JS, not source. The imported Hashlock audit
+    # reports under `docs/` ship exactly that, and `apiKey:` assignments inside a
+    # webpack bundle tripped the patterns. Only `docs/` is excused, and only for a
+    # `*_files/` directory, so a real secret committed anywhere else still fails.
+    return rel.startswith("docs/") and any(part.endswith("_files") for part in path.parts)
 
 
 def is_allowed_line(line: str) -> bool:
