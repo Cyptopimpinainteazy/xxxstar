@@ -2968,7 +2968,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. So the row's own name still claims more than the code does: there is no signature and no attestation. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"
+        "**Nothing here is authenticated.** There is no signature or digest of any kind in the X3BC envelope, so the row's own name claims more than the code does; the decoder validates structure, the magic, and gas accounting. TICKET-108"
       ],
       "name": "Authenticated bytecode decoder",
       "paths": [
@@ -2998,7 +2998,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "Corrected 2026-09-24 against the code: TICKET-108 is closed by commit 6cc986b5d8. `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. The other body sections still have no parity test, and a checksum is not authentication (see X3-LANG-009)."
+        "The envelope is versioned on paper and unchecked in the no-std decoder: `mini_x3::parse_module` skips the 20 header bytes after the magic \u2014 version, flags, checksum, min-version, feature flags \u2014 so a wrong-version or corrupted module is accepted when its structure parses. `x3-backend` writes a checksum over the body and neither reader verifies it. TICKET-108"
       ],
       "name": "Versioned runtime bytecode envelope",
       "paths": [
@@ -4353,10 +4353,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "bf2f92fd398c5ce0f54fee5f20f99fa089c549096ff92cd0dbdb11ee7233e0a8",
+    "source_digest": "a4f506f985d0a08df64eee0ea98718bf044c232f3ce2d8e355b9d6d972bd634d",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
-      "FEATURE_REGISTRY.toml": "3d23adfd761d5392f064b83df94c16d5dd389bca0b49be7f41bbb8e5d433af52",
+      "FEATURE_REGISTRY.toml": "37ffcaab66e2dec12a0f65f1dc37aae5a4838a01cfa92cc8e99c624a303d0c29",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
       "feature-matrix/claims-hygiene.toml": "38adfc42c2cfe602e3588afb5ee401319b27d4b2cbd824b7e262b46a552da389",
       "feature-matrix/consensus-l1.toml": "86b9d3871259ddee0dde4393b92ab67be0e5a4bccefd642d28c53d25ca8b4f82",
@@ -4364,7 +4364,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fefc328d4b84c0e395f2b508852ec1191f4a527dcf174a55590b65bed84aa957",
       "feature-matrix/economic-defi.toml": "60b799954f914a79df3e052b05496a6803a5eb96970a9b7d2d42604395d40531",
       "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
-      "feature-matrix/language-trading.toml": "cb8113f2425c700ef560adab30f4c75bb78d3142e3c18820790ba63e8b68cf33",
+      "feature-matrix/language-trading.toml": "763e03e3f460bcbfc8f9f4d77d5e4116531eab98d1fed5caaeda503cf8335a99",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
       "feature-matrix/runtime-core.toml": "f62653fe0e333212e15b0a393a557c8a4d69a9e945b3faaaf58fbdfd052c4ac7",
@@ -4549,19 +4549,23 @@
     },
     {
       "blockers": [
-        "The recomputed state root has never been compared against a root produced by a running chain: that needs `export-state` on a live node, which needs the embedded runtime WASM, which needs clang. Until then the claim is 'the SDK's own root function, cross-checked against the SDK's reference implementation', not 'matched a real chain root'.",
-        "The exporter consumes `export-state` output rather than reading the database directly, so the operator flow is export-state -> build -> verify, and nothing yet reads the trie straight out of RocksDB.",
-        "No snapshot has been produced from a chain larger than the repository's raw genesis fixture, so chunk counts, chunk sizes and wall-clock export timings at real state sizes are unmeasured."
+        "The exporter consumes `export-state` output rather than reading the database directly, so the operator flow is export-state -> build -> verify -> restore, and nothing yet reads the trie straight out of the database.",
+        "Restore produces a raw chain spec whose genesis state is block N's state, but nothing installs that state behind block N's header. A node booted from it recomputes the same state root and then refuses to author (`frame-system`: 'Block number must be strictly increasing') because its header is number 0. Joining a running chain at a height is state/warp sync and is a client-level path that does not exist here.",
+        "The largest state this has been exercised against is one dev chain: 12,526 entries (block 6290) and the repository's own 6 MB raw spec fixture (12 chunks at 256 KiB). Chunk counts, chunk sizes and export wall-clock at production state sizes are unmeasured, and `export-state` on a node with bounded state pruning fails with `UnknownBlock(\"State already discarded\")` for any block whose state has been pruned \u2014 a snapshot source has to archive state or export at the head."
       ],
       "crate_or_service": "crates/x3-state-snapshot",
       "feature": "state_snapshot",
       "mode": "GUARDED_TESTNET",
       "proof_report": "",
-      "readiness_score": 55,
+      "readiness_score": 70,
       "required_tests": [
         "the_recomputed_root_matches_the_state_machines_own_reference_implementation",
         "a_snapshot_whose_bytes_do_not_produce_the_declared_root_is_refused",
         "verification_detects_state_swapped_in_under_a_copied_manifest",
+        "a_restored_spec_reproduces_exactly_the_state_that_was_verified",
+        "restoring_state_swapped_in_under_a_copied_manifest_is_refused",
+        "restoring_a_tampered_chunk_is_refused_before_any_spec_exists",
+        "a_template_contributes_metadata_but_never_state",
         "a_snapshot_from_another_chain_is_refused",
         "a_stale_snapshot_is_refused_when_the_caller_sets_a_floor",
         "an_incomplete_snapshot_is_refused",
@@ -4802,7 +4806,7 @@
     "matrix_features": 145,
     "registry_features": 21,
     "registry_max_readiness": 88,
-    "registry_mean_readiness": 55.29,
+    "registry_mean_readiness": 56.0,
     "registry_min_readiness": 15
   }
 }
