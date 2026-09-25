@@ -7269,3 +7269,28 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Method: when a test fails in the middle of a chain, print the *module* (function table + decoded
   instruction stream via `Verifier::decode_all_instructions`) before reasoning about the source. Every
   defect in this turn was visible in the emitted stream first.
+
+**2026-09-24 — loops run end to end (TICKET-132): three SSA assumptions and one dropped jump**
+
+- **A loop-carried variable cannot be an SSA value in this IR.** `while (i <= n) { total = total + i; i = i + 1; }`
+  bound *new* values in the compiler's name→value map, while the condition — lowered before the body — kept
+  reading the entry registers: the loop never terminated. Mutated names are now register-model **cells**
+  (`Load`/`Store` against a fixed register); never-assigned names stay pure values. Detection is a recursive
+  pre-pass over the body, so an assignment inside an `if` counts.
+- **That makes the MIR non-SSA, and passes that assume SSA break.** Two did:
+  - **DCE** treated a `Store` as pure because only `Call` counted as an effect, so it deleted the loop body
+    (the store's effect *is* the write). Stores are effects now.
+  - **PRE** hoists to the entry block without checking that the operands are available there, so it hoisted
+    `i <= n` above the `Load` of `i` — the loop tested the pre-loop value forever. The sibling pass
+    (`speculative_hoist::operands_available_at`) already had the rule; PRE now has it too.
+  - The optimizer's **fixpoint** is what exposed both: every pass alone was clean. Bisect order that worked:
+    run cumulative pass sets to a fixpoint and report values that are *used without a definition*, per
+    function (per function, because `value_regs` is cleared per function and a pooled check hides it).
+- **`break`/`continue` were an empty match arm** ("requires label resolution"): a program that wrote `break`
+  jumped nowhere and ran to `GasExhausted`. Lowered now with a stack of loop targets; a labelled or
+  out-of-loop `break` is **refused by name** rather than sent to the innermost loop.
+- **Probe first, then commit a fixture.** `loop_sum.x3` and `loop_break.x3` were measured through the chain
+  before they went into the corpus, so the commit never carried a failing case.
+- Corpus now: `fib` (recursion), `loop_ops` (calls), `match_cond` (comparison chains), `branch_fold`
+  (folding), `loop_sum`/`loop_break`/`loop_continue` (loops, break, continue) — each asserted against the
+  value its source computes, on both engines. Still unproven: match statements, floats, strings, host calls.
