@@ -7970,3 +7970,45 @@ decision needs.
    the fast set — then the "which suite is not run" question is answered by a gate instead of by me.
 2. Re-run `submit_comit_v2`'s benchmark, or record why not.
 3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
+
+## 2026-09-25 (forty-eighth pass) — the gate that finds the gap, and the backlog it found
+
+### What closed
+- **`scripts/check-registry-tests-are-gated.py`**, wired as the `registry tests are gated` fast gate.
+  It resolves each `FEATURE_REGISTRY.toml` target through `cargo metadata`, collects what the gates
+  actually test (`cargo test -p`, `--manifest-path` from a `cargo test`, and gates that *run a script
+  inside the tree* — how SVM programs and the nested `x3-lang/` workspace are covered), and fails when
+  a registry feature's crate is tested by nothing. `KNOWN_UNGATED` may only shrink: a new ungated
+  citation fails, and so does a listed entry that has since been gated.
+- **It caught me first.** The initial rule counted "a gate command mentions this directory" as
+  coverage, which made `x3_swarm_core` look gated because `nested workspaces` runs
+  `cargo check --all-targets --manifest-path crates/x3-swarm-core/Cargo.toml` — that *compiles* test
+  targets and runs none. A checker satisfiable by a compile step would have reproduced the bug it
+  exists to find, so coverage now requires a test run or a script gate.
+- **Backlog closed the same day**: the checker reported nine ungated registry features; eight had
+  passing suites (x3-dex 14, x3-lp-locker 19, x3-token-factory 18, x3-sentinel 7, x3-wallet 17,
+  x3-wrapped 26, atomic-trade-engine 48, x3-bench 5 = 154 tests) and are now gates (2-5s each).
+  The baseline shrinks to one entry: the orphan `X3-contracts/svm/programs/x3_htlc` tree.
+- Falsified before wiring: adding a probe registry section pointing at an ungated crate makes the
+  checker exit 1 naming the feature and prescribing both fixes (probe removed, file restored).
+
+### Measured at `6d83b2af4`
+- `bash scripts/local-ci.sh` -> **49 of 49 gates PASS** (34 when this session's gate work started:
+  +kernel, +supply-ledger, +router, +registry, +x3-integration, +runtime, +dex, +lp-locker,
+  +token-factory, +sentinel, +wallet, +wrapped, +atomic-trade-engine, +x3-bench, +the checker).
+- Checker classification: 16 registry features cite a crate a gate tests, 1 on the baseline (the
+  orphan tree), 1 lists no test names (x3_swarm_core), 3 are not cargo crates (two shell gates and the
+  Tauri app).
+
+### Still open
+1. `submit_comit_v2`'s benchmark re-run — the last locally-actionable item on X3-LANG-004.
+2. Decide the orphan `x3_htlc` tree: delete it or point the registry row at the live program. It is the
+   only remaining KNOWN_UNGATED entry, and it is not a test problem but a "nothing references this" one.
+3. The `--deep` `test workspace` decision (green, 632s, opt-in).
+4. Multi-validator and external-bridge evidence; rotate the bridge API key in git history.
+
+### Next task seed
+1. Re-run `submit_comit_v2`'s benchmark, or record why not (machine-specific weights are a real
+   argument in both directions).
+2. Resolve the orphan tree, which would empty the baseline entirely.
+3. With the servers up: `--failure`, `--testnet`, then the 7-validator soak.
