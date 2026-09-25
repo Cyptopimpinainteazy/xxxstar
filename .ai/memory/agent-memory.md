@@ -7237,3 +7237,35 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 - Baseline discipline paid twice this turn: the two `x3-chain-node` failures and the four
   `x3-compiler` e2e failures were separated from my change by running the same tests on a pristine
   master worktree — one set pre-existed, the other was mine.
+
+**2026-09-24 — frames, jumps and call results: the compiler's own fixtures had never run (TICKET-131)**
+
+- **The test that finds this class is a corpus test, not a unit test.** Driving the compiler's four
+  fixtures (`crates/x3-compiler/tests/fixtures/`) through compile → both readers → on-chain executor →
+  receipt turned up four more defects that the per-shape sweep could not see, because each one needs a
+  *call frame* or a *recursion*: the sweep's programs were single-function. Expected values read off
+  each source (fib(10)=55, loop_ops=16, match_cond=5, branch_fold=30) is what makes a wrong answer fail
+  instead of crashing.
+- **`local_count` was 0 for every function ever emitted.** `MirBytecodeCompiler` allocates registers
+  with its own counter; the `LayoutComputer` that builds `FunctionEntry` was never told, so the
+  interpreters sized every callee's window from 0 and the callee *shared its caller's registers*.
+  `fib.x3` ran and returned -80. Fix: the compiler reports its register use before `end_function`.
+- **Frame windows are `param_count + local_count`, not `local_count`.** Both interpreters used the
+  latter, which starts a callee inside its caller even once `local_count` is right.
+- **`JumpIf`/`JumpUnless` did not resolve the condition through the frame** while every other register
+  operand does — inside a callee they read the caller's register of that number. Grep for
+  `self.regs[` lines that do *not* go through `resolve_reg*` when auditing this class.
+- **A `Call`'s `dst` operand was decoded and dropped.** Both interpreters wrote the result to the
+  caller's `r0`; the compiler allocates whatever register it likes, so results read `Unit`. `Frame`
+  now carries `ret_dst`. Careful: the index is already absolute (`caller.base + ret_dst`) — resolving
+  it again adds the base twice, which is invisible at base 0 and wrong one frame in. That was my own
+  bug, caught by the recursion case.
+- **Three different call-depth limits.** `isolation::MAX_CALL_DEPTH = 10` (hardcoded), the executor's
+  `max_call_depth = 32`, the VM's `MAX_CALL_DEPTH = 64`. The smallest one governed and refused
+  `fib(10)`. The isolation context now takes the configured limit.
+- **Master's rustfmt gate went red again** (`node/src/service.rs`, `node/src/timed_executor.rs`
+  unformatted as committed — `git show HEAD:file | rustfmt --check --edition 2021 -` exits 1). Check
+  the gate's colour before attributing it to your change, and keep the repair in its own commit.
+- Method: when a test fails in the middle of a chain, print the *module* (function table + decoded
+  instruction stream via `Verifier::decode_all_instructions`) before reasoning about the source. Every
+  defect in this turn was visible in the emitted stream first.
