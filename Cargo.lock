@@ -26196,6 +26196,7 @@ dependencies = [
  "x3-revenue-sharing",
  "x3-security-events",
  "x3-svm-integration",
+ "x3-x3-integration",
 ]
 
 [[package]]
