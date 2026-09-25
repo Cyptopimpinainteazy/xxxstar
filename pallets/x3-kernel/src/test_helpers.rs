@@ -21,6 +21,7 @@
 //! prepare_root matches what the kernel computes internally.
 
 use parity_scale_codec::Encode;
+use sp_std::vec::Vec;
 use x3_packet_schema::{EvmPacket, Packet, SvmPacket, X3VmPacket};
 
 /// Wrap a test's EVM "intent bytes" as a valid SCALE-encoded

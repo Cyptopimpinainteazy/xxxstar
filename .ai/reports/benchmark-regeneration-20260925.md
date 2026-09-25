@@ -66,3 +66,41 @@ work with its own correctness standard, not a copy of `submit_comit`'s body.
 2. Fix the 19 benchmark modules that have never compiled, or say per pallet why not.
 3. `wasm-builder` not tracking runtime source changes is a footgun for anyone measuring weights: the
    measured blob can be stale without any error. Worth a note in the release docs, or a gate.
+
+## Second pass (same day): the benchmark exists, and what it now stops on
+
+The missing `submit_comit_v2` benchmark is written, and the fixtures it needs are in place:
+
+* `pallets/x3-kernel/src/bench_fixtures.rs` holds a **compiled** X3 artifact (63 bytes, from
+  `fn main() -> i64 { return 42; }`) beside the source it came from, with two tests that run in the
+  pallet's suite: the bytes must equal `compile_source(source)` today, and the production adapter
+  (`X3VmAdapter::validate`) must accept them. A hand-written byte blob would not have been evidence —
+  TICKET-108 is the story of fixtures that were not what the compiler emits.
+* The benchmark module's EVM and SVM payload helpers now build **valid packets** through
+  `test_helpers` (shared with the benchmark build), instead of `0xa9059cbb` + zeros and ELF magic +
+  zeros. Measured before the change: `Benchmark pallet_x3_kernel::submit_comit failed:
+  InvalidEvmPacket`. That benchmark had been registered and had never run, so nothing had said so.
+* `runtime/src/lib.rs` registers `pallet-x3-kernel` for benchmarking, so both extrinsics are listed.
+
+With those in place the CLI runs both benchmarks and they fail at the **next** stage:
+
+```
+Benchmark pallet_x3_kernel::submit_comit    failed: SvmExecutionFailed
+Benchmark pallet_x3_kernel::submit_comit_v2 failed: SvmExecutionFailed
+```
+
+That is the real state of this benchmark module: its fixtures are *shaped* right now (they validate as
+packets) but they are not *executable* by the runtime's adapters. `submit_comit`/`submit_comit_v2`
+execute each non-empty payload through `T::EvmAdapter`/`T::SvmAdapter`, which on this runtime are the
+real adapters, not the mock: an EVM leg needs a signed RLP transaction and an SVM leg needs an
+instruction payload those adapters can run. So the weight table's `submit_comit_v2` entry stays a
+placeholder, and now for a *specific* reason rather than a vague one.
+
+### What the next pass needs
+
+1. An executable EVM fixture (a signed transaction the frontier stack accepts, with the benchmark
+   caller funded) and an executable SVM instruction payload for the runtime's SVM adapter.
+2. Then `benchmark pallet --pallet=pallet_x3_kernel --extrinsic=submit_comit_v2 --output=...` can
+   produce a real weight, and the placeholder comment in `weights.rs` can go.
+3. Until then, the honest statement in the row is: the benchmark exists, it is registered, and it
+   fails on the payload fixtures — not "it needs re-running".

@@ -106,6 +106,10 @@ pub use adapters::real_adapters::{FrontierEvmAdapter, RbpfSvmAdapter, X3VmAdapte
 #[cfg(feature = "runtime-benchmarks")]
 pub mod benchmarking;
 
+/// The compiled artifact the X3 benchmarks execute. Present outside `cfg(test)` because a
+/// benchmark needs it at runtime, and its provenance test runs with the pallet's suite.
+pub mod bench_fixtures;
+
 /// Auto-generated weight information for extrinsics.
 /// Regenerate using frame-benchmarking CLI.
 pub mod weights;
@@ -4473,7 +4477,10 @@ sp_api::decl_runtime_apis! {
 #[cfg(test)]
 mod mock;
 
-#[cfg(test)]
+// Shared with the benchmarks: they need the same valid packet shapes the tests build, because the
+// fixtures that were there before (`0xa9059cbb` + zeros, ELF magic + zeros) are raw bytes and the
+// kernel refuses a non-empty payload that is not a packet carrying its domain bit.
+#[cfg(any(test, feature = "runtime-benchmarks"))]
 mod test_helpers;
 
 #[cfg(test)]

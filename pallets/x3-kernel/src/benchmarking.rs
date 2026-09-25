@@ -23,21 +23,17 @@ use sp_std::vec;
 
 /// Helper to create a valid EVM payload for benchmarking
 fn create_evm_payload(size: u32) -> Vec<u8> {
-    // Simple EVM payload: transfer-like calldata
-    // 0xa9059cbb = transfer(address,uint256) selector
-    let mut payload = vec![0xa9, 0x05, 0x9c, 0xbb];
-    // Pad with zeros to reach desired size
-    payload.extend(vec![0u8; size.saturating_sub(4) as usize]);
-    payload
+    // A *packet*, not raw calldata. The previous body returned `0xa9059cbb` followed by zeros, and
+    // `submit_comit` refuses a non-empty payload that does not deserialize as a packet carrying the
+    // EVM domain bit — measured 2026-09-25 on this very benchmark: `InvalidEvmPacket`. It had been
+    // registered and never run, so nothing said so.
+    crate::test_helpers::wrap_evm_payload(&vec![0xAAu8; size.max(8) as usize])
 }
 
 /// Helper to create a valid SVM payload for benchmarking
 fn create_svm_payload(size: u32) -> Vec<u8> {
-    // Simple BPF program stub (minimal valid header)
-    // ELF magic + padding
-    let mut payload = vec![0x7f, 0x45, 0x4c, 0x46]; // ELF magic
-    payload.extend(vec![0u8; size.saturating_sub(4) as usize]);
-    payload
+    // Same correction as the EVM helper above: a packet, not a stub header.
+    crate::test_helpers::wrap_svm_payload(&vec![0xBBu8; size.max(8) as usize])
 }
 
 /// Helper to register an asset for testing
@@ -95,6 +91,56 @@ mod benchmarks {
         );
 
         // Verify: Comit was recorded
+        assert!(SubmittedComits::<T>::contains_key(comit_id));
+        Ok(())
+    }
+
+    /// Benchmark `submit_comit_v2` — the triple-VM path, including the X3 execution and the execution
+    /// receipt the pallet persists.
+    ///
+    /// Added 2026-09-25. This extrinsic had no benchmark at all, which is why its entry in
+    /// `weights.rs` is a hand-written copy of `submit_comit`'s cost with a comment saying so: there
+    /// was nothing to re-run. The X3 payload is a *compiled artifact*
+    /// (`crate::bench_fixtures::X3_PROGRAM_FIXTURE`), because the runtime's adapter validates the
+    /// envelope — a synthetic payload would have been accepted by the pallet's mock, whose
+    /// `TestX3Adapter::validate` answers `Ok(())` for anything, and refused on the chain.
+    #[benchmark]
+    fn submit_comit_v2() -> Result<(), BenchmarkError> {
+        let caller: T::AccountId = whitelisted_caller();
+        let amount = T::Currency::minimum_balance() * 1_000_000u32.into();
+        let _ = T::Currency::make_free_balance_be(&caller, amount);
+        AuthorizedAccounts::<T>::insert(&caller, ());
+
+        let evm_payload = create_evm_payload(1024);
+        let svm_payload = create_svm_payload(1024);
+        let x3_payload = crate::bench_fixtures::X3_PROGRAM_FIXTURE.to_vec();
+
+        let comit_id = H256::from_low_u64_be(2);
+        let nonce = Nonces::<T>::get(&caller);
+        let fee: T::Balance = 1_000u32.into();
+        // The dispatch checks this against the payloads it was handed, so the benchmark presents the
+        // same commitment the chain would compute.
+        let prepare_root = Pallet::<T>::compute_prepare_root_v2(
+            comit_id,
+            &evm_payload,
+            &svm_payload,
+            &x3_payload,
+            nonce,
+            fee,
+        );
+
+        #[extrinsic_call]
+        submit_comit_v2(
+            RawOrigin::Signed(caller.clone()),
+            comit_id,
+            evm_payload,
+            svm_payload,
+            x3_payload,
+            nonce,
+            fee,
+            prepare_root,
+        );
+
         assert!(SubmittedComits::<T>::contains_key(comit_id));
         Ok(())
     }
