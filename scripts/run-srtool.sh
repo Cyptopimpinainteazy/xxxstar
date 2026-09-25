@@ -38,6 +38,24 @@ LATEST_REPORT="$REPORT_DIR/latest.json"
 # are the same image (digest sha256:8638a668…); the rounded tag is what the
 # hosted production-gate workflow pins.
 SRTOOL_IMAGE="${SRTOOL_IMAGE:-paritytech/srtool:1.93.0-0.18.4}"
+# Optional: a cargo *git* cache to mount into the container.
+#
+# The image starts with an empty cargo home, so every build re-fetches polkadot-sdk (a large
+# repository) before it compiles anything. On a slow or throttled link that fetch is where the
+# build sits — measured 2026-09-25: 30+ minutes in "Updating git repository" with the host idle,
+# while the same host had an 815 MB cache on disk and could reach GitHub in under a second.
+# Pointing this at a copy of a warm `~/.cargo/git` makes the build network-free for the git
+# dependencies. It does not change the artifact: the same image, the same locked revisions, the
+# same compiler — only where cargo reads them from.
+#
+# The mount lands on the image's CARGO_HOME subdirectory (`/home/builder/cargo/git` for
+# paritytech/srtool). The directory must be readable by the container user (uid 1001), which a
+# path under a mode-750 home directory is not — copy it somewhere world-readable first.
+SRTOOL_CARGO_GIT_CACHE="${SRTOOL_CARGO_GIT_CACHE:-}"
+CACHE_MOUNT=()
+if [[ -n "$SRTOOL_CARGO_GIT_CACHE" ]]; then
+  CACHE_MOUNT=(-v "$SRTOOL_CARGO_GIT_CACHE":/home/builder/cargo/git)
+fi
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()    { echo -e "${CYAN}[srtool]${NC} $*"; }
@@ -63,6 +81,7 @@ print_help() {
     SRTOOL_PACKAGE      Runtime crate name       (default: $PACKAGE)
     SRTOOL_RUNTIME_DIR  Relative path to runtime (default: $RUNTIME_DIR)
     SRTOOL_IMAGE        Docker image + tag        (default: $SRTOOL_IMAGE)
+    SRTOOL_CARGO_GIT_CACHE  Host cargo git cache to mount (skips the polkadot-sdk re-fetch)
 
   OUTPUT FILES:
     .srtool-reports/latest.json          — most recent hash report (symlink)
@@ -203,6 +222,7 @@ cmd_build() {
       -e RUNTIME_DIR="$RUNTIME_DIR" \
       -e VERBOSE=1 \
       -v "$(pwd)":/build \
+      "${CACHE_MOUNT[@]}" \
       "$SRTOOL_IMAGE" \
       build \
       2>&1 | tee "$REPORT_FILE"
@@ -253,7 +273,7 @@ print(d.get('runtimes',{}).get('compact',{}).get('blake2_256','MISSING'))
     srtool build --app --json -p "$PACKAGE" --runtime-dir "$RUNTIME_DIR" 2>&1 | tee "$tmp_report"
   else
     docker run --rm -e PACKAGE="$PACKAGE" -e RUNTIME_DIR="$RUNTIME_DIR" \
-      -v "$(pwd)":/build "$SRTOOL_IMAGE" build 2>&1 | tee "$tmp_report"
+      -v "$(pwd)":/build "${CACHE_MOUNT[@]}" "$SRTOOL_IMAGE" build 2>&1 | tee "$tmp_report"
   fi
 
   local new_blake2
