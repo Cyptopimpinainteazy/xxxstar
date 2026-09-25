@@ -7502,3 +7502,81 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
 4. Run `scripts/local-ci.sh --failure` and `--testnet` at the current commit and record them; the
    queue's most repeated blocker is "never exercised on a multi-validator network".
 5. Re-run `x3_audit_matrix.py` after any `FEATURE_REGISTRY.toml`/matrix edit — the gate will tell you.
+
+## 2026-09-25 (fortieth pass) — merging GitHub master, two gates master was red on, and two fail-open checks
+
+### Environment facts
+- **The tool sandbox is still broken** (`bubblewrap ... mountinfo path is not absolute`): every
+  command needs `sandbox_permissions: "require_escalated"`, and `apply_patch` fails the same way.
+  Edits were made with assert-guarded Python replacements. `pkill -f "local-ci.sh ..."` kills
+  sibling agents' runs *and* the shell issuing it — kill by PID.
+- **srtool cannot read this repository directory**: `docker run -v "$PWD":/build` fails with
+  `cd: /build: Permission denied`, because `/home/lojak/Desktop/xxxstar-main` is mode **700** and the
+  image's builder uid does not match. Do not widen a home directory's permissions for a build
+  container. What works: `git worktree add /tmp/<name> HEAD`, `chmod 755` the copy and `chmod -R
+  a+rX` it, run `./scripts/update-runtime-hashes.sh` there, then copy
+  `docs/reports/runtime-wasm-hashes.json` back. Measured: two cold builds, ~13 min each, agreeing.
+- Containers do have network (static.crates.io answered, 403 on the directory index is normal).
+
+### What the merge found
+- `origin/master` had moved 62 commits ahead; this branch's work had already been merged into it.
+  Merging it back conflicted only in `.ai/memory/agent-memory.md` (an append; keep both sides).
+- **GitHub master itself was red on two gates**, both reproduced in a pristine worktree at
+  `origin/master`: `feature-matrix check` (3 errors) and `snapshot murder test` (18 passed / 2 failed).
+  - Two rows wrote evidence as `"path: <prose>"`, and the validator resolves the whole string as a
+    path. Measured: that shape appears **twice** in the matrix; the repository's own prose convention,
+    a `note:` entry, appears **184** times. The data was wrong, not the check. The third error was the
+    rule working: `X3-LANG-008` claimed `tested = 80` with no `required_tests` and no `test_evidence`.
+  - The murder test *preferred an existing* `target/{release,debug}/x3-state-snapshot` and only built
+    when neither existed, so it ran a binary from 08:45 that predated master's `restore` subcommand and
+    reported `error: expected a subcommand` against a tree that has it. It now builds unless the caller
+    names a verifier. **A stale artifact is not evidence.**
+
+### Two fail-open checks closed (this pass's real security work)
+- **`pallet-private-execution::verify_attestation` was `!report.is_empty()`** — with a comment saying
+  so — and both callers are signed extrinsics, so any account could register as a confidential
+  validator with `vec![1]` and take the premium-fee share. PRIV-EXEC-004 was not true of the pallet.
+  Fixed fail-closed: a required `TeeAttestationVerifier` config item, default `RefuseAllAttestations`,
+  which the runtime now configures. `verify_attestation` takes report + GPU model + enclave key,
+  because a real attestation chain binds all three. The mock verifier recognises one labelled fixture
+  (`TEST-TEE-QUOTE\x00...`), so the tests no longer encode the weakness.
+- **`x3-wallet::TransactionSigner` could not verify signatures** (`Err("...not implemented")`) and
+  `add_signature` never called it: any non-empty blob ≤256 bytes counted toward `required_signatures`
+  and was stamped `is_valid: true`. A unit test pinned the stub. Now `signing_message` states the
+  signed bytes (domain separator `x3-wallet/multisig/v1` + id/creator/target/value/data/nonce/
+  required_signatures/block window — deliberately excluding the mutable counters), `verify_signature`
+  checks Ed25519/Sr25519 via `sp_io`, and `add_signature` verifies *before* recording. 173 tests pass,
+  including forged, cross-transaction and tampered-value/target rejections. **Nothing calls
+  `TransactionSigner`, so this is a library defect fixed, not a production path hardened.**
+
+### Gate behaviour worth knowing
+- **The live and cross-domain gates cannot run concurrently**: all nine bind 19945 + metrics 9615
+  (anvil 18545, solana 18999). `--jobs` produced a false red (`Address already in use`, then
+  `Connection reset by peer`). `scripts/local-ci.sh` now has a `SERIAL_GATES` list and runs those gates
+  alone, in the foreground, whatever `--jobs` says.
+- **A dependency change needs its lockfiles**: adding `sp-io` to `crates/x3-wallet` made both the root
+  `Cargo.lock` and the nested `crates/x3-sidecar/Cargo.lock` stale; the `nested workspaces` gate caught
+  the second one. Regenerate both, or the next agent inherits a red gate.
+- **A runtime-graph change requires re-attesting the WASM record**; the gate that says so
+  (`runtime hash freshness`) is right, and the two-build agreement is the evidence. As of this pass:
+  compact 8,488,288 bytes / `0xa2356c13...`, compressed 1,460,543 / `0x308541a6...`, revision
+  `877c37035`.
+
+### Measured at the final commit (b6720207c5 unless noted)
+- 43-gate `--live --cross` run at the equivalent revision: **42 PASS, 1 FAIL** — the failure being the
+  runtime-hash record, now moved and verified green.
+- Full fast set at `b6720207c5`: **35/35 PASS**.
+- `cargo test --workspace --no-fail-fast` on the merged tree: **6450 passed, 0 failed, 53 ignored**.
+
+### Still open, in priority order
+1. **Rotate the infrastructure bridge API key** that is still in git history (`3fdc95d6e`, `bb9610503`).
+   Removing it from the tree does not revoke it.
+2. `X3-LANG-001` / `MTX-X3-LANG-004`: `.x3` source → receipt end-to-end on the runtime path, and
+   compiled bytecode driving `X3AtomicKernel`. The queue still lists them below `COMPLETE`.
+3. The rest of the X3BC body (functions, globals, code) has no cross-reader parity test — the reader
+   pair that just diverged twice (TICKET-108, then string constants, then a patch version) is the one
+   the runtime executes.
+4. Multi-validator evidence: everything on this box is one host. `--failure` and `--testnet` gates have
+   run before but not on this revision; the 7-server network is what closes the largest blocker.
+5. `docs/reports/FEATURE_READINESS_MATRIX.md` (2026-06-10) still claims all five verifiers accept and
+   cites `crates/x3-verification-router/src/strategies/evm.rs`, which does not exist.
