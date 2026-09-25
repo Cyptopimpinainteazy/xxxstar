@@ -7390,3 +7390,26 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   formatting debt in files you never touched (`node/src/service.rs`, `crates/parallel-proposer/...`),
   so check each stray file with `git show HEAD:<file> | rustfmt --check --edition 2021 -` and commit
   the repair separately.
+
+**2026-09-24 — the kernel route had no test, and two "incomplete" rows were only unmeasured (TICKET-138)**
+
+- **The pallet's tests configure `TestX3Adapter`, which fabricates a receipt** — so the production
+  route (compiled artifact → `X3VmAdapter` → the kernel's `ExecutionReceipt`) had no test at all even
+  though the adapter exists and delegates to `x3_x3_integration::X3Executor`. New:
+  `pallets/x3-kernel/tests/x3_adapter_route.rs` compiles `.x3` source *in the test* and drives the
+  production adapter (validate, estimate_gas, receipt value/gas/version, corrupted module refused).
+  The `compile` feature of `x3-x3-integration` is a **dev**-dependency there, with the reason written
+  down: the kernel executes artifacts and never compiles source.
+- **"Version gates incomplete" was a measurement gap, not a code gap.** The gates exist with tests:
+  compiled-policy version vs the host's *before any host call* (`CapabilityVersionMismatch`; the test
+  also asserts the host transaction never began), unknown economic-object versions fail closed
+  (`UnsupportedVersion { object, version }`), capability manifests checked per operation
+  (`UnknownCapability` for a borrow's provider / a swap's venue / a bridge's adapter), and both
+  envelope readers enforce version + min-version.
+- **Check whether a "gap" is missing code or missing evidence before writing code.** Two of the three
+  STUB rows in this family needed only a measurement (and one needed a test); the fix for both was to
+  drive the existing path and record what it does.
+- Practical notes: the real adapters live in `adapters::real_adapters` (std-gated) and are re-exported
+  at the crate root as `pallet_x3_kernel::X3VmAdapter`; adding a dev-dependency on a crate the package
+  already depends on does not change `Cargo.lock`; and `cargo fmt --all` here still reaches files the
+  change has nothing to do with — check `git status` before staging.
