@@ -8,6 +8,9 @@
 #   list:    bash scripts/snapshot-restore.sh list    [snapshot_dir]
 #   verify:  bash scripts/snapshot-restore.sh verify-snapshot <manifest.json> <chunks_dir> \
 #                [--chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n>]
+#   rebuild: bash scripts/snapshot-restore.sh rebuild <manifest.json> <chunks_dir> <out_spec.json> \
+#                --chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n> \
+#                [--from-spec <template.json>] [--state-version 0|1] [--force]
 #
 # Exit codes:
 #   0 — success
@@ -50,6 +53,8 @@ usage() {
     echo "  list:    bash scripts/snapshot-restore.sh list    [snapshot_dir]"
     echo "  verify:  bash scripts/snapshot-restore.sh verify-snapshot <manifest.json> <chunks_dir> \\"
     echo "               [--chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n>]"
+    echo "  rebuild: bash scripts/snapshot-restore.sh rebuild <manifest.json> <chunks_dir> <out_spec.json> \\"
+    echo "               --chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n>"
     exit 1
 }
 
@@ -307,6 +312,42 @@ case "$ACTION" in
             exit 1
         fi
         verify_snapshot_dir "$MANIFEST_PATH" "$CHUNKS_DIR" "${@:4}"
+        ;;
+    rebuild)
+        # The other half of `verify-snapshot`: write the verified state back out
+        # as a raw chain spec a node can boot from. Unlike `restore` above (which
+        # unpacks a tarball of a whole base path), this is the content-addressed
+        # path: the state is re-derived from the chunks, and the node recomputes
+        # the state root from the spec it is handed.
+        #
+        # The anchor is not optional here — the verifier refuses without it — so
+        # there is no way to rebuild state without saying which block it is.
+        MANIFEST_PATH="${2:-}"
+        CHUNKS_DIR="${3:-}"
+        OUT_SPEC="${4:-}"
+        if [[ -z "$MANIFEST_PATH" || -z "$CHUNKS_DIR" || -z "$OUT_SPEC" ]]; then
+            echo -e "${RED}❌ rebuild needs <manifest.json> <chunks_dir> <out_spec.json>${NC}"
+            exit 1
+        fi
+
+        REBUILD_VERIFIER=""
+        if ! REBUILD_VERIFIER="$(resolve_snapshot_verifier)"; then
+            echo -e "${RED}❌ x3-state-snapshot verifier not found${NC}"
+            echo "   Build it:   cargo build --release -p x3-state-snapshot"
+            echo "   Or set:     X3_SNAPSHOT_VERIFIER=/path/to/x3-state-snapshot"
+            exit 4
+        fi
+
+        if ! "$REBUILD_VERIFIER" restore --manifest "$MANIFEST_PATH" --chunks "$CHUNKS_DIR" \
+            --out "$OUT_SPEC" "${@:5}"; then
+            echo -e "${RED}❌ Refusing to rebuild: the snapshot did not verify against the anchor${NC}"
+            exit 4
+        fi
+        echo ""
+        echo -e "Booting a node from this spec gives a database built from that state:"
+        echo "   x3-chain-node --dev --chain $OUT_SPEC --base-path <fresh-base-path>"
+        echo "   (it is not joined to the source chain: the genesis header is number 0"
+        echo "    while the state is block N's, so it will refuse to author)"
         ;;
     *)
         usage

@@ -480,12 +480,14 @@ blockers = [
 ]
 dangerous_paths = ["programs/svm/x3_atomic_swap", "SVM domain", "hashlock and timelock logic", "PDA authority checks"]
 
-# ── 2026-09-24: state snapshot format, verifier and exporter ──
+# ── 2026-09-24: state snapshot format, verifier, exporter and restore ──
 # The storage audit (2026-09-24) found X3 had backup/restore tooling but no
 # snapshot *format*: nothing content-addressed, and nothing checkable against a
-# finalized state root. This row is that format, its verifier and its exporter
-# (`crates/x3-state-snapshot`), with 40 tests and both directions exercised end
-# to end on the repository's own 6 MB raw chain spec.
+# finalized state root. This row is that format, its verifier, its exporter and
+# its restore path (`crates/x3-state-snapshot`), with 48 tests and both
+# directions exercised end to end — the refusals on disk through the shipped
+# binary (`launch-gates/snapshot-murder-test.sh`, 20/20) and the restore against
+# a running chain (`scripts/mainnet/verify-snapshot-restore.sh`, PASS).
 #
 # Proven today: the chunk set must be complete and correctly ordered; every
 # chunk matches the hash the manifest committed to; the manifest hash is
@@ -497,9 +499,17 @@ dangerous_paths = ["programs/svm/x3_atomic_swap", "SVM domain", "hashlock and ti
 # different state root is refused even when the caller's anchor agrees with the
 # tampered manifest, because the bytes do not recompute to it.
 #
-# Not proven yet: the recomputed root has never been compared with a root
-# produced by a running chain, and the exporter consumes `export-state` output
-# rather than reading the database directly. Both are recorded below.
+# The recomputed root matches a root produced by a running chain, at a real
+# non-genesis block: `export-state` at block 6290 of a dev chain (12,526
+# entries) recomputes to the header's own `0xbe94def3…`, and the
+# `restore` direction turns a snapshot back into a raw chain spec that a node
+# boots from — that node then recomputes the same root out of its own genesis
+# header. A refused restore writes no chain spec at all.
+#
+# Not proven yet: the exporter consumes `export-state` output rather than
+# reading the trie out of the database directly, and nothing installs restored
+# state behind a block header, so this is state *transport*, not a join-at-height
+# path for a validator. Both are recorded below.
 [state_snapshot]
 mode = "GUARDED_TESTNET"
 crate_or_service = "crates/x3-state-snapshot"
@@ -507,6 +517,10 @@ required_tests = [
   "the_recomputed_root_matches_the_state_machines_own_reference_implementation",
   "a_snapshot_whose_bytes_do_not_produce_the_declared_root_is_refused",
   "verification_detects_state_swapped_in_under_a_copied_manifest",
+  "a_restored_spec_reproduces_exactly_the_state_that_was_verified",
+  "restoring_state_swapped_in_under_a_copied_manifest_is_refused",
+  "restoring_a_tampered_chunk_is_refused_before_any_spec_exists",
+  "a_template_contributes_metadata_but_never_state",
   "a_snapshot_from_another_chain_is_refused",
   "a_stale_snapshot_is_refused_when_the_caller_sets_a_floor",
   "an_incomplete_snapshot_is_refused",
@@ -514,11 +528,11 @@ required_tests = [
   "exporting_the_same_state_twice_produces_the_same_manifest_hash"
 ]
 proof_report = ""
-readiness_score = 55
+readiness_score = 70
 blockers = [
-  "The recomputed state root has never been compared against a root produced by a running chain: that needs `export-state` on a live node, which needs the embedded runtime WASM, which needs clang. Until then the claim is 'the SDK's own root function, cross-checked against the SDK's reference implementation', not 'matched a real chain root'.",
-  "The exporter consumes `export-state` output rather than reading the database directly, so the operator flow is export-state -> build -> verify, and nothing yet reads the trie straight out of RocksDB.",
-  "No snapshot has been produced from a chain larger than the repository's raw genesis fixture, so chunk counts, chunk sizes and wall-clock export timings at real state sizes are unmeasured."
+  "The exporter consumes `export-state` output rather than reading the database directly, so the operator flow is export-state -> build -> verify -> restore, and nothing yet reads the trie straight out of the database.",
+  "Restore produces a raw chain spec whose genesis state is block N's state, but nothing installs that state behind block N's header. A node booted from it recomputes the same state root and then refuses to author (`frame-system`: 'Block number must be strictly increasing') because its header is number 0. Joining a running chain at a height is state/warp sync and is a client-level path that does not exist here.",
+  "The largest state this has been exercised against is one dev chain: 12,526 entries (block 6290) and the repository's own 6 MB raw spec fixture (12 chunks at 256 KiB). Chunk counts, chunk sizes and export wall-clock at production state sizes are unmeasured, and `export-state` on a node with bounded state pruning fails with `UnknownBlock(\"State already discarded\")` for any block whose state has been pruned — a snapshot source has to archive state or export at the head."
 ]
 dangerous_paths = ["crates/x3-state-snapshot", "validator state sync", "restore path"]
 
