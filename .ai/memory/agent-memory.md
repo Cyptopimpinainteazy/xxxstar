@@ -7343,3 +7343,23 @@ The pile is closed as far as measurement can take it. Remaining unlanded work is
   (`vm/src/trading.rs`, `vm/src/x3_lang_vm.rs`, `vm/tests/trading_execution.rs`,
   `compiler/src/trading_semantic.rs`); verify a gate's colour with `git show HEAD:<file> | rustfmt
   --check --edition 2021 -` before blaming your own change, and land the repair in its own commit.
+
+**2026-09-24 — receipts measured: a fail-open mainnet default, and what the pair cannot prove (TICKET-135/136)**
+
+- **`receipt verify` accepted an unsigned receipt on mainnet.** The message was honest ("signer trust not
+  requested") but the mode never reached the command — `cmd_receipt_verify(input, trusted_specs)` had no
+  `CompilationMode` — so `--mode mainnet` behaved like dev on the path that settles value. Mainnet now
+  requires `--trusted`: the operator must name the key, because a key inside the receipt is a restatement
+  of the receipt's own claim, not a check. Four-way regression test (unsigned/signed × dev/mainnet).
+- **What the receipt pair proves, measured**: `receipt execute` signs from a real execution;
+  `--trusted` requires and validates the attestation (wrong key refused by name); editing a covered field
+  breaks the hash and both `receipt verify` and `replay` refuse it naming both hashes; `replay` refuses a
+  receipt about another artifact naming both artifact hashes. What it cannot decide, in its own output:
+  the risk ceilings the run enforced (the compiled policy does not travel with the receipt), the finality
+  references, the host inputs.
+- **The derived matrix is a real gate**: my first row edit cited `x3-lang/vm/trading.rs` (missing `src/`)
+  and the artifact came back with **BROKEN=2** — the state rule is "a cited path does not exist on disk".
+  Fixed the path, BROKEN back to 0. Cite paths that exist, and read the summary line the generator prints.
+- Working order that keeps paying: probe the CLI's *claims* adversarially (tamper, wrong key, wrong
+  artifact, wrong mode), record what it refuses and *why* it says it refuses, then write the row's scores
+  from that evidence rather than from the code's shape.
