@@ -29,7 +29,7 @@ Eleven commits across four pull requests: #501, #503, #504, #505 — then #506
 | RPC cost | `eth_getLogs`/`x3_getEvmLogs` block-range cap; both priced in the limiter | 4 + 2 unit tests |
 | migrations | treasury/agent-memory/agent-accounts read the declared `STORAGE_VERSION`; five unreachable `migrations.rs` deleted; gate added | `scripts/ci/check_migration_modules_are_wired.sh` |
 | per-block metrics | `x3_imported_block_bytes`, `x3_imported_block_extrinsics`, `x3_block_interval_seconds` | measured live (below) |
-| runtime attribution | `node/src/timed_executor.rs`: `x3_runtime_call_seconds{method}`, `x3_runtime_calls_total{method}`, `x3_runtime_call_errors_total{method}`, `x3_runtime_version_seconds`; `scripts/proof/runtime-attribution.py` | 3 unit tests; measured live under load (§2) |
+| runtime attribution | #513: `node/src/timed_executor.rs` — `x3_runtime_call_seconds{method}`, `x3_runtime_calls_total{method}`, `x3_runtime_call_errors_total{method}`, `x3_runtime_version_seconds`; `scripts/proof/runtime-attribution.py` | 3 unit tests; measured live under load (§2) |
 | orchestrator | the exported-but-unused `ProofVerifier`/`VmExecutor` traits are now the adapters' real extension point; honest default preserved | `cargo test -p x3-orchestrator` 7 passed |
 | external-chains | Arbitrum test's anvil readiness loop retries instead of panicking | 4 passed, needs `anvil` |
 | tooling | pytest `testpaths`/`.kilo` fix, `tomli` fallback in two scripts, `requirements-dev.txt`, `proof_report` enforcement, explorer + super-ide dependency alignment | see §2 |
@@ -267,8 +267,8 @@ TPS under load; the same file passes 7/7 when run alone on an idle box).
 
 ### Code — reachable, not yet done
 
-7. **Attribution metrics — execution half closed, client half open.** The executor
-   is wrapped (`node/src/timed_executor.rs`), so runtime call time is now measured
+7. **Attribution metrics — execution half closed (#513), client half open.** The
+   executor is wrapped (`node/src/timed_executor.rs`), so runtime call time is now measured
    and the import splits into execution versus everything else: 89.1 % execution,
    4.55 ms/block of remainder under load (§2). What is still missing is the
    breakdown of that remainder — `state_root_us`, `db_commit_us`, `db_flush_us`,
