@@ -586,6 +586,11 @@ GATES_LIVE=(
   # than three are observed. It also parses the checked-in scrape config and
   # Grafana dashboard so the operator artifacts cannot rot.
   "monitoring across validators:bash scripts/monitoring/local3-monitoring-check.sh --self-test"
+  # The other half of that bullet: every validator's *log* stream is collected under
+  # one queryable sink and shows its own identity, imports and finality. A node started
+  # without a log filter emits only warnings, so the check sets the level explicitly and
+  # asserts on what the stream says rather than on a file existing.
+  "logging across validators:bash scripts/monitoring/local3-logging-check.sh --self-test"
   # The snapshot bullet: export a running chain, restore it into a fresh base path,
   # and require the finalized height, the canonical hash at that height and every
   # storage entry to come back — with a control node on an empty database required
@@ -1043,6 +1048,7 @@ SERIAL_GATES=(
   "local node smoke"
   "local network smoke"
   "monitoring across validators"
+  "logging across validators"
   "snapshot restore across a live chain"
   "EVM contract lifecycle"
   "SVM contract lifecycle"
