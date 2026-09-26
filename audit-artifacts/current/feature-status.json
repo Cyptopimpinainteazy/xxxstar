@@ -85,7 +85,7 @@
       "state_rule": "implemented >= 20",
       "subsystem": "agents_experimental",
       "tested": 10,
-      "tests": "tested score 10% (no named test list on this row)"
+      "tests": "4 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -4421,10 +4421,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "c05de34a74b5abb094f7ac930b8846a9df5c521291b9c8641dd7695817489caa",
+    "source_digest": "27c7e50ea82bca11a6ec23ed5a04c54587d105725b85670791ac5509abb2830d",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
-      "FEATURE_REGISTRY.toml": "0904b8179e9168aa5739c75e81309aa771f0893a38e15935551ad825dd58e955",
+      "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
       "feature-matrix/claims-hygiene.toml": "e2101c3396a4b68a38e6f8ffc7245967fd1edaa05631080996a4a5d3c8bbd6e6",
       "feature-matrix/consensus-l1.toml": "86b9d3871259ddee0dde4393b92ab67be0e5a4bccefd642d28c53d25ca8b4f82",
@@ -4781,8 +4781,7 @@
     },
     {
       "blockers": [
-        "required_tests (swarm_agent_can_receive_task, swarm_agent_cannot_touch_forbidden_files, swarm_memory_records_lesson, swarm_kill_switch_stops_agents) were fictional \u2014 see CRITICAL-TOK-1; write real tests before re-adding them",
-        "Experimental \u2014 not in CI critical path",
+        "Experimental \u2014 its crate tests do run in the fast set (`test x3-swarm-core`), but crates/x3-swarm-core is excluded from the root workspace and is absent from the runtime dependency graph cargo metadata reports for x3-chain-runtime, so the swarm control plane is not on the deployed blockchain path",
         "No multi-agent race-condition or partition-tolerance testing"
       ],
       "crate_or_service": "crates/x3-swarm-core",
@@ -4790,7 +4789,12 @@
       "mode": "GUARDED_TESTNET",
       "proof_report": "",
       "readiness_score": 25,
-      "required_tests": []
+      "required_tests": [
+        "swarm_agent_can_receive_task",
+        "swarm_agent_cannot_touch_forbidden_files",
+        "swarm_memory_records_lesson",
+        "swarm_kill_switch_stops_agents"
+      ]
     },
     {
       "blockers": [

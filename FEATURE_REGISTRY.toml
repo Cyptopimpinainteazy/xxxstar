@@ -269,12 +269,21 @@ tauri_app = "SwarmCommand"
 # `reports/swarm_health_report.md` does not exist; citation cleared.
 proof_report = ""
 readiness_score = 25
-# CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names
-# previously listed here existed as real tests anywhere under crates/x3-swarm-core.
-required_tests = []
+# CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names previously
+# listed here existed as real test functions anywhere under crates/x3-swarm-core,
+# so they were removed rather than left as citations. Closed 2026-09-26: all four
+# are real tests in crates/x3-swarm-core/tests/agent_lifecycle.rs and they execute
+# in the fast set through the `test x3-swarm-core` gate in scripts/local-ci.sh
+# (`cargo test --locked --all-targets`). Measured: crate suite 73 passed, 0
+# failed, 0 ignored.
+required_tests = [
+  "swarm_agent_can_receive_task",
+  "swarm_agent_cannot_touch_forbidden_files",
+  "swarm_memory_records_lesson",
+  "swarm_kill_switch_stops_agents",
+]
 blockers = [
-  "required_tests (swarm_agent_can_receive_task, swarm_agent_cannot_touch_forbidden_files, swarm_memory_records_lesson, swarm_kill_switch_stops_agents) were fictional — see CRITICAL-TOK-1; write real tests before re-adding them",
-  "Experimental — not in CI critical path",
+  "Experimental — its crate tests do run in the fast set (`test x3-swarm-core`), but crates/x3-swarm-core is excluded from the root workspace and is absent from the runtime dependency graph cargo metadata reports for x3-chain-runtime, so the swarm control plane is not on the deployed blockchain path",
   "No multi-agent race-condition or partition-tolerance testing"
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]
