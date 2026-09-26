@@ -43,11 +43,12 @@
     }
   },
   "performance_expectations": {
-    "signature_verification": "825k sig/sec per GPU",
-    "poh_computation": "1.55M hash/sec",
-    "tx_validation": "1.8M tx/sec",
-    "overall_tps": "2M+ TPS with 3x GPUs",
-    "testnet_actual": "1-5M TPS (network dependent)"
+    "_note": "Unverified: every figure below was carried over from the withdrawn GPU release note (see RELEASE-NOTES.md and GAP-GPU-CLAIMS). No command in this repository measures any of them; the only benchmarks it does contain record signature and hash rates, not finalized-chain throughput. Treat them as targets at best.",
+    "signature_verification": "825k sig/sec per GPU (unverified vendor figure)",
+    "poh_computation": "1.55M hash/sec (unverified vendor figure)",
+    "tx_validation": "1.8M tx/sec (unverified vendor figure)",
+    "overall_tps": "2M+ TPS with 3x GPUs (unverified vendor figure)",
+    "testnet_actual": "1-5M TPS (network dependent) - unverified, no measurement exists"
   },
   "thermal_considerations": {
     "tjunction_max": "72\u00b0C (GTX 1070)",

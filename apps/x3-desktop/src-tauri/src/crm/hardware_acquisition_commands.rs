@@ -287,166 +287,151 @@ pub fn crm_generate_hardware_metrics_report(
     }
 }
 
-// Sample hardware acquisition templates
+// Sample hardware acquisition templates.
+//
+// Rewritten 2026-09-26. Every template here used to assert things this project cannot do
+// (each of these was an unverified claim, quoted only so it is not written again):
+//   * an unverified throughput figure - "100K TPS with 300ms finality"
+//   * "we can provide real-world performance data from a production network" - none exists
+//   * "we'll deploy 500+ GPUs" - no deployment is planned or funded
+//   * "committed minimum $500K/quarter purchase" and "projected $50M+ HW spend" - no budget
+//   * "X3 provides certified e-waste and IT surplus management services" - it does not
+//   * "NIST SP 800-88 compliant" - an unverified certification claim
+//   * "Payment within 48 hours" - no payment process exists
+// A human pastes these into an email to a vendor, so they are claims, not copy. What replaces
+// them states the stage the project is actually at.
 pub fn get_manufacturer_outreach_template() -> String {
     r#"
-Subject: Partnership Opportunity: X3 GPU-Accelerated Blockchain Infrastructure
+Subject: Research collaboration: GPU acceleration for a blockchain validator
 
 Dear [NAME],
 
-We're building X3, a high-performance GPU-accelerated blockchain validator network that processes cross-chain transactions at 100K TPS with 300ms finality.
+We are building X3, a research-stage blockchain project, and we want to measure whether GPU
+acceleration helps validator work. We are not asking you to fund us, and we are not claiming a
+number: no GPU benchmark has been run on this project yet, and this host has no compute device
+(see GPU_VALIDATOR_HONEST_AUDIT.md).
 
-Our infrastructure is built on [NVIDIA/AMD] GPUs, and we're scaling rapidly. We're reaching out to explore opportunities for collaboration:
+What we would value from a collaboration:
+1. Review of our kernels (infra-structure/validator/kernels/*.cu) by someone who writes better
+   ones than we do.
+2. Access to hardware so the comparison can actually be run, with the harness and the result
+   published either way - including if the answer is that there is no useful speedup.
+3. A joint note on what the benchmark does and does not prove.
 
-1. **Research Partnership** — Your latest GPU architecture would be an ideal fit for blockchain deterministic execution. We can provide real-world performance data from a production network.
+We are not offering revenue, partnership commitments or a testnet to showcase your platform,
+because none of those exist yet.
 
-2. **Hardware for Testing** — We'd welcome beta units of new GPU models for validation and integration testing. We'll provide detailed performance benchmarks and feedback.
-
-3. **Co-branded Initiative** — "GPU-Accelerated Finance" category positioning where your platform is showcased as the infrastructure backbone of X3.
-
-4. **Donation for Tax Credit** — If you have certified refurbished units, we can facilitate donation with full tax deduction documentation.
-
-Over the next 12 months, we'll deploy 500+ GPUs. A partnership now positions you at the infrastructure layer of the largest GPU-native blockchain ecosystem.
-
-Call or email to discuss. Happy to schedule a technical deep-dive with our CTO.
+If the honest version of that is interesting, we would like to talk.
 
 Best,
 [YOUR_NAME]
-X3 Head of Infrastructure
-x3network.io
+X3
 "#.to_string()
 }
 
 pub fn get_datacenter_liquidation_template() -> String {
     r#"
-Subject: High-Value Hardware Acquisition: End-of-Life Equipment Request
+Subject: End-of-life hardware: research use inquiry
 
 Hi [NAME],
 
-We're acquiring decommissioned data center equipment for repurposing in blockchain infrastructure. X3 runs validator nodes that require high-spec hardware, and your end-of-life inventory is exactly what we're looking for.
+We run a blockchain node project and are looking for used server hardware to test on. We are a
+small, unfunded-scale operation: we are asking about what is available and at what price, not
+placing a committed order.
 
-Specific interest:
-- NVIDIA A100 / H100 / RTX6000 Ada GPUs
-- AMD EPYC 7003/9004 series CPUs
-- DDR5 enterprise memory modules
-- High-bandwidth networking (InfiniBand, 400G+ Ethernet)
-- Redundant power supplies (Titanium rated)
+Hardware we are interested in:
+- Data-centre GPUs (any generation, used is fine)
+- Server CPUs (EPYC/Xeon, any generation)
+- DDR4/DDR5 ECC memory
+- 10G/25G/100G networking
 
-We can handle:
-✓ Ship-to-us logistics
-✓ Bulk acquisitions ($100K - $5M range)
-✓ Fast transactions (deal → payment within 48 hours)
-✓ Tax documentation for donation value
+Practical questions:
+- What is your current liquidation schedule?
+- Are items sold as-is, and is there any DOA window?
+- What would a realistic price be for a small quantity?
 
-Current need: 50+ units per month for the next 18 months.
-
-Let's connect this week. Can you share your current liquidation schedule?
+We have no purchase commitment, no tax-donation programme and no logistics arm - if you would
+rather not sell to a project of this size, that is a completely reasonable answer.
 
 [YOUR_NAME]
-X3 Logistics & Partnerships
+X3
 "#.to_string()
 }
 
 pub fn get_refurbisher_partnership_template() -> String {
     r#"
-Subject: B2B Partnership: Certified Refurbished Hardware Supply Agreement
+Subject: Refurbished hardware: pricing inquiry from a small research project
 
 Hi [NAME],
 
-We're interested in establishing an ongoing supply relationship for certified refurbished enterprise hardware.
+We are looking for used server hardware for a blockchain node project and would like to know
+what you can supply and at what price. We are not offering a supply agreement, a minimum volume
+or a payment guarantee - we are a research project, not a procurement organisation.
 
-X3 is a legitimate, VC-backed infrastructure company with projected $50M+ HW spend over 24 months. We're looking for reliable, long-term partners for:
+What we are looking for:
+- Data-centre GPUs (used, certified refurbished)
+- Server CPUs (Xeon/EPYC)
+- Enterprise SSDs
+- Networking equipment
 
-- Certified refurbished data center GPUs (A100, RTX6000, professional series)
-- Enterprise CPUs (Xeon, EPYC)
-- High-capacity enterprise SSDs
-- Network infrastructure
+What we can tell you honestly:
+- Any purchase would be for a small quantity, priced per unit
+- We pay on delivery or in advance, whatever you prefer, because we have no credit history with you
+- We are not VC-backed and cannot promise a spend profile
 
-Partnership terms we offer:
-• Committed minimum $500K/quarter purchase
-• Pre-agreed pricing with volume discounts
-• Fast payment (net 7-15 days)
-• Long-term contract (24+ months)
-• Marketing benefit: featured as official X3 hardware partner
-
-Your benefit:
-• Predictable revenue stream
-• Guaranteed volume
-• Association with cutting-edge infrastructure
-• Potential for co-marketing
-
-Let's discuss. Available for a call this week.
+If you would rather deal with a real data-centre operator, we understand.
 
 Regards,
 [YOUR_NAME]
-X3 Procurement
+X3
 "#.to_string()
 }
 
 pub fn get_university_donation_template() -> String {
     r#"
-Subject: Hardware Donation for Blockchain Research Lab
+Subject: Research collaboration on validator-network consensus
 
 Dear [PROFESSOR_NAME],
 
-X3 is funding research into GPU-accelerated blockchain consensus mechanisms and is looking for institutional partners.
+X3 is a blockchain execution project with an unusual problem set (cross-VM atomicity, a small
+domain-specific language, and a validator network that has only ever run on one host). We are
+writing to ask whether any of it is interesting to your group - not to propose that we fund you.
 
-We'd like to donate high-spec hardware to your lab for research purposes:
-- 2-4 NVIDIA A100 GPUs
-- Enterprise-grade CPU (Xeon/EPYC)
-- High-bandwidth networking
-- Supporting infrastructure
+What we could offer a lab, if it is useful:
+- The code and its failure log, including the parts that do not work
+- A reproducible harness for the things that do run (scripts/local-ci.sh)
+- Co-authorship on a paper only if the work earns it
 
-What we're looking for:
-✓ Research collaboration on consensus optimization
-✓ Publication co-authorship
-✓ Lab acknowledgment in whitepapers/talks
-✓ Potential internship/graduate student placements
+What we cannot offer:
+- Hardware donations, funding, or internship placements - none of that is in place
+- Any claim of production readiness, audits or external partners
 
-The hardware is certified refurbished, professionally tested, and comes with full tax deduction documentation.
-
-This is a win-win: you get world-class hardware for your research, and we gain academic credibility and external validation of our approach.
-
-Can we schedule a call to discuss?
+If that is interesting, or if it is obviously not, either answer helps us.
 
 Best regards,
 [YOUR_NAME]
-Head of Research Partnerships, X3
+X3
 "#.to_string()
 }
 
 pub fn get_corporate_it_surplus_template() -> String {
     r#"
-Subject: Acquisition Inquiry: IT Hardware Surplus / E-Waste Management
+Subject: IT surplus: what happens to decommissioned hardware?
 
 Hi [IT_DIRECTOR_NAME],
 
-X3 provides certified e-waste and IT surplus management services for enterprise equipment. If you're managing equipment decommissioning or data center consolidation, we can handle it.
+We are a small blockchain project looking for used server hardware. We are not an ITAD vendor
+and cannot certify anything: we do not offer data destruction, compliance paperwork, logistics or
+48-hour payment, because we do not do those things.
 
-We specialize in:
-- Data sanitization & destruction (NIST SP 800-88 compliant)
-- Refurbishment assessment
-- Remarketing valuable components
-- Full ITAD (IT Asset Disposition) compliance
+If you are decommissioning equipment, the two questions we would ask are:
+1. Do you resell it, and through whom?
+2. If not, what does your current disposal or donation process look like?
 
-We're actively acquiring:
-- GPU computing accelerators
-- High-end CPUs
-- Enterprise storage/networking
-- Professional workstations (NVIDIA, AMD Radeon)
-
-Process:
-1. You send inventory list
-2. We provide instant valuation quote
-3. Pickup arranged (we cover logistics)
-4. Payment within 48 hours
-5. Full chain-of-custody documentation
-
-Plus: We can donate non-sellable items to schools/NGOs with tax benefits.
-
-Got a refresh or consolidation coming up? Let's talk.
+If the answer is "we have a vendor", that is fine - we are not trying to displace it, only to find
+out whether anything would otherwise be scrapped.
 
 [YOUR_NAME]
-X3 Hardware Procurement
+X3
 "#.to_string()
 }

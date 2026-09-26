@@ -95,37 +95,41 @@ pub fn get_cloud_segment() -> OutreachSegment {
             "Lack of high-performance validator coordination".to_string(),
             "Missing deterministic execution for compute workloads".to_string(),
         ],
-        x3_positioning: "GPU Swarm Monetization & Validator Coordination Layer\n\nX3 enables:\n• Automatic GPU utilization optimization\n• Revenue-sharing validator deployment on your hardware\n• Cross-chain fast relay infrastructure\n• Compute yield + validator revenue hybrid model\n• Zero additional CapEx, pure revenue share".to_string(),
+        x3_positioning: "Validator coordination layer (a proposal, not an offer)\n\nWhat X3 has today:\n• A seven-validator X3 network that boots and finalizes on a single host\n• Internal cross-VM settlement behind an atomic router with a CI gate\n• A reproducible load harness in this repository (scripts/local-ci.sh)\n\nWhat X3 does not have yet, and this pitch must not imply:\n• GPU acceleration is research: no GPU benchmark has been run (X3-GPU-001)\n• external-chain settlement is disabled at genesis; only internal cross-VM legs run\n• no partner revenue, pilot result or validator yield has been measured - there are none to quote".to_string(),
         messaging_template: r#"Subject: GPU Monetization Partnership — X3 Infrastructure
 
 Hi [NAME],
 
-We're reaching out because [COMPANY] operates [GPU_TYPE] infrastructure, and we've identified a direct revenue opportunity.
+We're reaching out because [COMPANY] operates [GPU_TYPE] infrastructure. We are looking for partners to evaluate a proposal with, not to report results: nothing below is measured yet.
 
 X3 is building a high-performance compute coordination layer for validators and cross-chain execution. We're looking for strategic GPU partnerships where we can:
 
-1. Deploy validators on your existing hardware (revenue share: 60/40 to you)
-2. Route high-value compute jobs through your cluster (additional margin)
-3. Provide deterministic execution guarantees for AI agents (strategic positioning)
+1. Deploy validators on your existing hardware (proposed revenue share: 60/40 to you - a proposal, not an offer)
+2. Evaluate routing compute jobs through your cluster (proposed, nothing is routed today)
+3. Run verifiable execution for a defined subset of programs (the X3 compiler and VM verify the shapes they support; that is not a blanket guarantee)
 
-Our validator swarm has demonstrated:
-• 300ms cross-chain finality (vs 12s on Solana)
-• GPU utilization improvement from 65% → 92%
-• Compute revenue per GPU: $1200/month (current pilot)
+What we can actually show you, reproducible from the repository:
+• a seven-validator X3 network finalizing blocks on one host
+• internal cross-VM settlement; no external-chain settlement is enabled yet
+• a load harness we will run on your hardware with you, rather than quote a number at you
 
-Typical partnership structure:
+What we are not claiming, and will not put in a deck:
+• no GPU acceleration benchmark exists - no compute device has run one
+• no revenue, pilot or partner results - there are none to show yet
+
+Proposed partnership structure (a proposal, not an offer):
 • 18-month commitment minimum
 • 60% revenue share to operator
-• Dedicated monitoring + optimization
-• Auto-scaling validator count based on GPU availability
+• Dedicated monitoring (Prometheus/Grafana wired for seven validators today)
+• Auto-scaling validator count based on GPU availability (planned)
 
-Would a brief 30-min call be interesting to explore? I can walk through the economics and show current pilot results.
+Would a brief 30-min call be interesting to explore? I would rather show you the harness than a hero number.
 
 Best,
 [YOUR_NAME]
 X3 Infrastructure
 
-P.S. We have 3 regional partners already live, happy to provide references."#.to_string(),
+P.S. Ask for the run log and we will produce it: every number we quote should be one you can reproduce on your own hardware."#.to_string(),
     }
 }
 
@@ -154,40 +158,36 @@ pub fn get_ai_segment() -> OutreachSegment {
             "Co-Founder".to_string(),
         ],
         pain_points: vec![
-            "AI agents need deterministic execution guarantees".to_string(),
-            "Settlement layer latency bottlenecks agent coordination".to_string(),
-            "Multi-agent transactions require guaranteed finality".to_string(),
+            "Settlement latency slows agent coordination".to_string(),
+            "Cross-chain coordination needs a settlement layer with verifiable execution".to_string(),
+            "Ordering and MEV exposure are unresolved questions in most agent stacks".to_string(),
             "Inference cost overhead from slow settlement".to_string(),
-            "Lack of high-speed cross-chain execution for distributed agents".to_string(),
+            "No production-grade cross-chain execution for distributed agents".to_string(),
         ],
-        x3_positioning: "High-Speed Deterministic Settlement Layer for AI Agents\n\nX3 provides:\n• Sub-300ms cross-chain settlement (vs 12+ seconds standard)\n• Deterministic execution guarantees (no MEV/reorg risk)\n• GPU-coordinated transaction ordering\n• Native support for multi-agent transaction graphs\n• Economic finality with slashing penalties".to_string(),
-        messaging_template: r#"Subject: URGENT: Sub-300ms Settlement for [COMPANY] Agents
+        x3_positioning: "Settlement layer for agent workloads (research-preview; a proposal, not an offer)\n\nWhat X3 has today:\n• Internal cross-VM settlement on a seven-validator network, on one host\n• A compiler and VM that verify the program shapes they support\n• A reproducible load harness (scripts/local-ci.sh) instead of quoted numbers\n\nWhat X3 does not have, and this pitch must not imply:\n• no latency figure: nothing has measured cross-chain settlement latency\n• no MEV protection: fair ordering and encrypted submission are not implemented (X3-MEV-007/008)\n• no GPU coordination: no GPU benchmark has been run (X3-GPU-001)\n• no production network: external-chain settlement is disabled at genesis".to_string(),
+        messaging_template: r#"Subject: Settlement for [COMPANY] agents — a research preview, not a performance claim
 
 Hi [NAME],
 
-AI agents trading/coordinating across chains are blocked by settlement latency.
+AI agents coordinating across chains are blocked by settlement latency. We are building a settlement layer for that, and we are looking for partners to evaluate it — not to be shown numbers we cannot reproduce.
 
-X3 solves this. We're a GPU-coordinated execution layer delivering:
-• 300ms cross-chain finality (deterministic)
-• Sharded transaction ordering for parallel agent execution
-• MEV-resistant batch composition
-• Native multi-agent transaction support
+Where X3 is today:
+• internal cross-VM settlement runs on a seven-validator network on a single host
+• a compiler and VM verify a defined subset of programs before execution
+• a load harness lives in the repository, so any number can be reproduced on your hardware
 
-For autonomous trading systems, this means:
-• 40× faster settlement vs traditional chains
-• Guaranteed execution order (no front-running)
-• Better capital efficiency (less idle collateral)
-• Room for complex multi-step protocols
+What we are not claiming:
+• no MEV protection — fair ordering and encrypted submission are not implemented (X3-MEV-007/008)
+• no ordering guarantee and no front-running protection
+• no GPU acceleration — no GPU benchmark has been run
+• no production network — external-chain settlement is disabled at genesis
 
-Current performance:
-• 5,000 TPS baseline
-• 300ms P99 latency
-• Sub-$0.001 per transaction
-• Live in 3 production networks
+What we would like to do together:
+• run the harness against a workload you actually care about
+• report what it measures, including the parts that do not work
+• decide from there whether the direction is worth more of your time
 
-Your agents could execute multi-chain arbitrage strategy in 500ms instead of 15 seconds.
-
-Interested in a technical integration call?
+Interested in a technical call where the first thing we do is run something?
 
 [YOUR_NAME]
 X3 Infrastructure"#.to_string(),
@@ -225,35 +225,29 @@ pub fn get_quantum_segment() -> OutreachSegment {
             "Proof of PQC-resistant execution layer ecosystem".to_string(),
             "Government compliance requirements for quantum-resistant systems".to_string(),
         ],
-        x3_positioning: "Post-Quantum Secure Execution Infrastructure\n\nX3 is building:\n• Lattice-based signature integration roadmap (CRYSTALS-Dilithium)\n• PQC algorithm testbed for validator networks\n• Production-grade quantum-resistant consensus\n• Research collaboration framework with cryptographers\n• Government grant pathway for PQC infrastructure".to_string(),
-        messaging_template: r#"Subject: Post-Quantum Research Partnership Opportunity
+        x3_positioning: "Post-quantum research (research-stage; a proposal, not an offer)\n\nWhat X3 has today:\n• crates/quantum-crypto: signature and KEM plumbing for SPHINCS+/Dilithium/Kyber shapes, self-described in its own Cargo.toml as \"Research/simulated ... NOT audited post-quantum security\"\n• it is not wired into consensus or the runtime (no runtime dependency)\n\nWhat X3 does not have, and this pitch must not imply:\n• no production quantum-resistant consensus\n• no audited PQC implementation, no testnet running it\n• no grant, publication or partner committed".to_string(),
+        messaging_template: r#"Subject: Post-quantum research collaboration — an invitation, not a claim
 
 Hi [NAME],
 
-We're building production infrastructure for post-quantum cryptography, and we'd like to discuss a research collaboration.
+We are researching post-quantum cryptography for validator networks, and we would like to discuss a collaboration with people who know far more about it than we do.
 
-X3 is:
-• Integrating lattice-based signatures into validator networks
-• Creating a testbed for PQC algorithms at scale
-• Designing quantum-resistant cross-chain execution
-• Partnering with cryptography research labs
+Where X3 actually is:
+• crates/quantum-crypto holds signature/KEM plumbing for SPHINCS+/Dilithium/Kyber shapes
+• that crate's own manifest calls it research/simulated and explicitly not audited
+• nothing in it is wired into consensus, and no network runs it
 
-This is valuable for [COMPANY] because:
-1. Testbed access for PQC algorithm validation
-2. Production deployment experience (not just theory)
-3. Joint publication opportunity (algorithm performance paper)
-4. Government grant pathways (both entities eligible)
+What we would want from a collaboration:
+1. review of the existing plumbing, most of which we expect to be wrong
+2. help deciding whether any of it is worth carrying into a real design
+3. a joint view on what a PQC testbed would even need to prove
 
-Current roadmap:
-• Q2 2026: Dilithium signature integration complete
-• Q3 2026: Live PQC validator testnet
-• Q4 2026: Multi-algorithm comparison paper
-• Q1 2027: Government grant applications (NSF, NIST)
+Proposed roadmap (targets, nothing committed and no date is a promise):
+• target: review the current plumbing and delete what cannot be justified
+• target: a documented PQC design that a cryptographer would sign off on
+• target: papers and grant applications only after something is worth publishing
 
-We're looking for research partners who want:
-• Early access to PQC execution environment
-• Co-authorship on cryptographic security papers
-• NIST/NSF grant visibility
+We are looking for research partners who want an honest starting point rather than a finished story.
 
 Would a technical architecture discussion be useful?
 
@@ -263,26 +257,31 @@ X3 Infrastructure"#.to_string(),
 }
 
 // ================================================
-// CLOUD CONTACT DATABASE (Sample)
+// CLOUD CONTACT DATABASE (placeholder seed)
 // ================================================
+//
+// Every entry below is fictional. Until 2026-09-26 these lists named real people at real
+// organisations with invented personal addresses (`demis@deepmind.com`, `shor@mit.edu`,
+// `mmosca@uwaterloo.ca`, ...), which the desktop app's SMTP sender could then mail. Reserved
+// `example.com` addresses and obvious placeholders replace them. Do not fill these in with a
+// real person's address unless that person is the one who entered it.
 
 pub fn get_cloud_sample_contacts() -> Vec<ContactProfile> {
     vec![
         ContactProfile {
             id: Uuid::new_v4().to_string(),
-            name: "Sarah Chen".to_string(),
+            name: "Placeholder Cloud Contact 1".to_string(),
             title: "VP Infrastructure".to_string(),
-            company: "Genesis Data Center".to_string(),
+            company: "Example Regional Data Center (placeholder)".to_string(),
             company_type: "regional_datacenter".to_string(),
-            email: "sarah.chen@genesisdc.com".to_string(),
-            twitter_handle: Some("@sarahchen_infra".to_string()),
-            linkedin_url: Some("linkedin.com/in/sarahchen".to_string()),
+            email: "cloud-contact-1@example.com".to_string(),
+            twitter_handle: None,
+            linkedin_url: None,
             relevance_score: 92.0,
             vertical_fit: "cloud".to_string(),
             strategic_importance: "critical".to_string(),
             recent_activities: vec![
-                "Announced $50M GPU expansion".to_string(),
-                "Hired GPU Operations Director".to_string(),
+                "Placeholder activity — replace with something you verified yourself".to_string(),
             ],
             outreach_status: "not_contacted".to_string(),
             last_contact_date: None,
@@ -292,20 +291,18 @@ pub fn get_cloud_sample_contacts() -> Vec<ContactProfile> {
         },
         ContactProfile {
             id: Uuid::new_v4().to_string(),
-            name: "Marcus Rodriguez".to_string(),
+            name: "Placeholder Cloud Contact 2".to_string(),
             title: "CEO".to_string(),
-            company: "CoreWeave".to_string(),
+            company: "Example GPU Operator (placeholder)".to_string(),
             company_type: "gpu_farm".to_string(),
-            email: "marcus@coreweave.com".to_string(),
-            twitter_handle: Some("@marcusrodriguez".to_string()),
-            linkedin_url: Some("linkedin.com/in/marcusrodriguez".to_string()),
+            email: "cloud-contact-2@example.com".to_string(),
+            twitter_handle: None,
+            linkedin_url: None,
             relevance_score: 95.0,
             vertical_fit: "cloud".to_string(),
             strategic_importance: "critical".to_string(),
             recent_activities: vec![
-                "Raised $200M Series C".to_string(),
-                "Expanded to 5 new regions".to_string(),
-                "GPU utilization optimization announced".to_string(),
+                "Placeholder activity — replace with something you verified yourself".to_string(),
             ],
             outreach_status: "not_contacted".to_string(),
             last_contact_date: None,
@@ -317,26 +314,25 @@ pub fn get_cloud_sample_contacts() -> Vec<ContactProfile> {
 }
 
 // ================================================
-// AI CONTACT DATABASE (Sample)
+// AI CONTACT DATABASE (placeholder seed)
 // ================================================
 
 pub fn get_ai_sample_contacts() -> Vec<ContactProfile> {
     vec![
         ContactProfile {
             id: Uuid::new_v4().to_string(),
-            name: "Demis Hassabis".to_string(),
+            name: "Placeholder AI Contact 1".to_string(),
             title: "CEO".to_string(),
-            company: "DeepMind".to_string(),
+            company: "Example AI Research Lab (placeholder)".to_string(),
             company_type: "ai_research".to_string(),
-            email: "demis@deepmind.com".to_string(),
-            twitter_handle: Some("@demishassabis".to_string()),
-            linkedin_url: Some("linkedin.com/in/demishassabis".to_string()),
+            email: "ai-contact-1@example.com".to_string(),
+            twitter_handle: None,
+            linkedin_url: None,
             relevance_score: 88.0,
             vertical_fit: "ai".to_string(),
             strategic_importance: "high".to_string(),
             recent_activities: vec![
-                "Published AlphaFold breakthough".to_string(),
-                "Exploring agent-based research".to_string(),
+                "Placeholder activity — replace with something you verified yourself".to_string(),
             ],
             outreach_status: "not_contacted".to_string(),
             last_contact_date: None,
@@ -346,19 +342,18 @@ pub fn get_ai_sample_contacts() -> Vec<ContactProfile> {
         },
         ContactProfile {
             id: Uuid::new_v4().to_string(),
-            name: "Dario Amodei".to_string(),
+            name: "Placeholder AI Contact 2".to_string(),
             title: "CEO".to_string(),
-            company: "Anthropic".to_string(),
+            company: "Example Agent Platform (placeholder)".to_string(),
             company_type: "ai_startup".to_string(),
-            email: "dario@anthropic.com".to_string(),
-            twitter_handle: Some("@darioamodei".to_string()),
-            linkedin_url: Some("linkedin.com/in/darioamodei".to_string()),
+            email: "ai-contact-2@example.com".to_string(),
+            twitter_handle: None,
+            linkedin_url: None,
             relevance_score: 90.0,
             vertical_fit: "ai".to_string(),
             strategic_importance: "critical".to_string(),
             recent_activities: vec![
-                "Claude 4.0 released".to_string(),
-                "Exploring autonomous agent frameworks".to_string(),
+                "Placeholder activity — replace with something you verified yourself".to_string(),
             ],
             outreach_status: "not_contacted".to_string(),
             last_contact_date: None,
@@ -370,26 +365,25 @@ pub fn get_ai_sample_contacts() -> Vec<ContactProfile> {
 }
 
 // ================================================
-// QUANTUM CONTACT DATABASE (Sample)
+// QUANTUM CONTACT DATABASE (placeholder seed)
 // ================================================
 
 pub fn get_quantum_sample_contacts() -> Vec<ContactProfile> {
     vec![
         ContactProfile {
             id: Uuid::new_v4().to_string(),
-            name: "Peter Shor".to_string(),
+            name: "Placeholder PQC Contact 1".to_string(),
             title: "Principal Research Scientist".to_string(),
-            company: "MIT CSAIL".to_string(),
+            company: "Example University Lab (placeholder)".to_string(),
             company_type: "research_lab".to_string(),
-            email: "shor@mit.edu".to_string(),
+            email: "pqc-contact-1@example.com".to_string(),
             twitter_handle: None,
-            linkedin_url: Some("linkedin.com/in/petershor".to_string()),
+            linkedin_url: None,
             relevance_score: 85.0,
             vertical_fit: "quantum".to_string(),
             strategic_importance: "high".to_string(),
             recent_activities: vec![
-                "Published PQC algorithm paper".to_string(),
-                "Speaking at NIST cryptography conference".to_string(),
+                "Placeholder activity — replace with something you verified yourself".to_string(),
             ],
             outreach_status: "not_contacted".to_string(),
             last_contact_date: None,
@@ -399,19 +393,18 @@ pub fn get_quantum_sample_contacts() -> Vec<ContactProfile> {
         },
         ContactProfile {
             id: Uuid::new_v4().to_string(),
-            name: "Michele Mosca".to_string(),
+            name: "Placeholder PQC Contact 2".to_string(),
             title: "Director".to_string(),
-            company: "Institute for Quantum Computing (IQC)".to_string(),
+            company: "Example Cryptography Institute (placeholder)".to_string(),
             company_type: "research_lab".to_string(),
-            email: "mmosca@uwaterloo.ca".to_string(),
-            twitter_handle: Some("@michelemosca".to_string()),
-            linkedin_url: Some("linkedin.com/in/michelemosca".to_string()),
+            email: "pqc-contact-2@example.com".to_string(),
+            twitter_handle: None,
+            linkedin_url: None,
             relevance_score: 87.0,
             vertical_fit: "quantum".to_string(),
             strategic_importance: "critical".to_string(),
             recent_activities: vec![
-                "Launched post-quantum cryptography institute".to_string(),
-                "Consulting NSF on quantum-ready infrastructure".to_string(),
+                "Placeholder activity — replace with something you verified yourself".to_string(),
             ],
             outreach_status: "not_contacted".to_string(),
             last_contact_date: None,

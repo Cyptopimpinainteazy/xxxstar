@@ -359,8 +359,9 @@ off-chain storage; it does not. TICKET-098.
 ## GAP-GPU-CLAIMS — a release note for a release that does not exist — 2026-09-22
 
 `docs/testnet-config/RELEASE-NOTES.md` announced `solana-gpu-validator-v1.0.tar.gz` (269 MB, CUDA
-kernels), "Achieved: 2.75M TPS in lab, 1-5M TPS on testnet", "Guarantee: Minimum 100k TPS on Solana
-testnet" and "825k signatures/second per GPU". None of it is in this repository: no such artifact,
+kernels), and claimed an unverified "2.75M TPS in lab, 1-5M TPS on testnet" with an unverified
+"minimum 100k TPS on Solana testnet" and "825k signatures/second per GPU". None of it is in this
+repository: no such artifact,
 no `start-validator.sh`, no chain-level TPS measurement at all — and the one number that *is*
 traceable ("PoH GPU acceleration: 1.55M hashes/second") is the repository's own **CPU** sha256 rate
 from `tps_benchmark_results.json`, relabelled as GPU acceleration. The repository's own
@@ -818,3 +819,53 @@ the worktree. Evidence: `.ai/reports/tmp-not-durable-20260923.md`.
 Separately: the Codex sandbox stopped working for non-escalated commands after the sweep
 (`error building bubblewrap command: mountinfo path is not absolute`), so every command now needs
 escalation. Environment, not repository.
+
+## GAP-CLAIM-SURFACES — the retracted claim had moved somewhere nothing checked — 2026-09-26
+
+`X3-CLAIM-002` ("MEV-proof marketing claim", 20/10/10) instructed: rename it to "MEV-resistant
+architecture under development". Measured today, `CURRENT_MAINNET_STATUS.md` does not mention MEV at
+all — the instruction had been carried out, which is why the row read as half-closed. The claim had
+not gone away; it had moved into the desktop CRM's outbound templates and grown there:
+
+| where | what it asserted |
+| --- | --- |
+| `apps/x3-desktop/src-tauri/src/crm/outreach_system.rs` | "Deterministic execution guarantees (no MEV/reorg risk)", "Sub-300ms cross-chain settlement (vs 12+ seconds standard)", "300ms cross-chain finality (vs 12s on Solana)", "GPU utilization improvement from 65% → 92%", "Compute revenue per GPU: $1200/month (current pilot)", "5,000 TPS baseline", "300ms P99 latency", "Live in 3 production networks", "We have 3 regional partners already live", and a PQC roadmap whose first item ("Q2 2026: Dilithium signature integration complete") was already in the past and untrue |
+| `apps/x3-desktop/src-tauri/src/crm/hardware_acquisition_commands.rs` | unverified claims, quoted here only so they are not written again: a 100K TPS / 300ms finality figure, "real-world performance data from a production network", "we'll deploy 500+ GPUs", "committed minimum $500K/quarter purchase", "VC-backed ... projected $50M+ HW spend", "X3 provides certified e-waste and IT surplus management services", "NIST SP 800-88 compliant", "Payment within 48 hours" |
+| `apps/x3-desktop/src-tauri/src/crm/outreach_system.rs` (seeded contacts) | real people at real organisations — DeepMind, Anthropic, MIT CSAIL, the Institute for Quantum Computing, CoreWeave — with invented personal addresses (`demis@deepmind.com`, `dario@anthropic.com`, `shor@mit.edu`, `mmosca@uwaterloo.ca`) that `crm/smtp.rs` could mail |
+
+The distinction that matters is not "documentation vs code": these are strings a human pastes into
+an email to a company, which makes them the most expensive place in the repository to be wrong. The
+package's own manifest is evidence of which way it was pointing — `crates/quantum-crypto/Cargo.toml`
+says "Research/simulated ... NOT audited post-quantum security" while the outreach template sold
+"Production-grade quantum-resistant consensus".
+
+Fixed by rewriting the surfaces to what the project can show and replacing the seeded contacts with
+reserved-`example.com` placeholders, and then by making the rule a gate rather than a one-time edit:
+`scripts/ci/check-claims-hygiene.py` (gate `claims hygiene`, default set) reads 78 declared claim
+surfaces, tree-wide for phrases that are false in every context and surface-only for figures, and
+skips lines that qualify themselves. Measured load-bearing: appending
+`> MEV-proof ordering with 4,200 TPS finality.` to `CURRENT_MAINNET_STATUS.md` fails it on both
+rules; removing the line returns `OK - 6016 file(s) scanned, 78 claim surface(s), no unqualified
+claim`.
+
+**TICKET-138 — the desktop CRM is twelve modules, five of which are compiled.** `crm/mod.rs`
+declares `db`, `models`, `commands`, `smtp` and `agents`; `outreach_system.rs`,
+`hardware_acquisition_commands.rs`, `funding.rs`, `funding_war_plan*.rs`, `dorks*.rs`,
+`audit_tournament.rs`, `hardware_sources_db.rs` are neither compiled nor called by anything
+(`apps/x3-desktop/src-tauri` is also excluded from the cargo workspace, so nothing type-checks them).
+Honest text in an unreachable file is not a working feature. Acceptance: either declare the modules
+and give each a test that exercises what it claims, or delete them and the seeding functions with
+them; either way `cargo check` (in a workspace that includes the crate, or an explicit gate) must
+cover whatever remains. Do not "fix" this by re-enabling the modules without wiring their callers:
+an operator UI that seeds invented contacts is worse than one that ships none.
+
+**TICKET-139 — widen the claim scanner past the surfaces it declares.** The gate reads root
+markdown, `docs/testnet-config/` and the CRM. Roughly 150 further unqualified figures live outside
+that list and are, for now, only reported here: `docs/openspec/changes/p4-solana-gpu-acceleration/
+P4_IMPLEMENTATION_GUIDE.md` (15 hits, including unverified "100,000+ TPS" and unverified "250x faster settlement"),
+`benchmarks/tps-archive-2026-02/README.md`, `.planning/README.md` ("Public testnet running 100+
+nodes, 1000 TPS" - unverified), `.audit/CLAIMS_INVENTORY_AND_TRACKER.md` (an unverified "4,200 TPS" figure), `docs/runbooks/`,
+`infra-structure/`, `tests_phase4/`. Acceptance: decide per surface whether it is a claim surface
+or an evidence record; add the claim surfaces to the scanner and fix what it finds, and add the
+evidence records to a skip list with the reason written down. A surface list nobody revisits is how
+this gap happened the first time.

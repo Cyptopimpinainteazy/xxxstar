@@ -123,31 +123,41 @@
     {
       "benchmark": "\u2014",
       "claim_risk": true,
-      "composite": 14,
+      "composite": 69,
       "confidence": "high",
       "evidence": [
         "CURRENT_MAINNET_STATUS.md",
-        "note: No complete fair-ordering/encrypted mempool proof"
+        "apps/x3-desktop/src-tauri/src/crm/outreach_system.rs",
+        "apps/x3-desktop/src-tauri/src/crm/hardware_acquisition_commands.rs",
+        "scripts/ci/check-claims-hygiene.py",
+        "note: No complete fair-ordering/encrypted mempool proof, so the claim is removed rather than qualified: the surfaces now state that X3-MEV-007 and X3-MEV-008 are not implemented"
       ],
       "id": "X3-CLAIM-002",
-      "implemented": 20,
+      "implemented": 80,
       "launch_scope": "research",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 10,
+      "mainnet_ready": 55,
       "missing_work": [
-        "Rename to MEV-resistant architecture under development"
+        "Re-measured 2026-09-26: the row's instruction (\"rename to MEV-resistant architecture under development\") had already been carried out in `CURRENT_MAINNET_STATUS.md` \u2014 the file does not mention MEV at all \u2014 which is why the row looked half-closed. The claim had moved into the desktop CRM's outbound templates (`apps/x3-desktop/src-tauri/src/crm/`) and grown: \"Deterministic execution guarantees (no MEV/reorg risk)\", \"Sub-300ms cross-chain settlement (vs 12+ seconds standard)\", \"300ms cross-chain finality (vs 12s on Solana)\", \"5,000 TPS baseline\", \"Live in 3 production networks\", \"Compute revenue per GPU: $1200/month (current pilot)\", \"We have 3 regional partners already live\", \"processes cross-chain transactions at 100K TPS with 300ms finality\", \"committed minimum $500K/quarter purchase\", \"X3 provides certified e-waste and IT surplus management services\", \"NIST SP 800-88 compliant\" \u2014 plus six seeded contacts naming real people at real organisations (DeepMind, Anthropic, MIT CSAIL, IQC, CoreWeave) with invented personal addresses that the app's own SMTP sender could mail. All of it is rewritten to what the project can show; the seeded contacts are now reserved-`example.com` placeholders.",
+        "The gate is a scanner, not a proof of honesty: `scripts/ci/check-claims-hygiene.py` reads 78 declared claim surfaces (root markdown, `docs/testnet-config`, the CRM) tree-wide for phrases that are false in every context and on surfaces only for figures, skipping lines that qualify themselves. Its surface list is hand-maintained, so a new surface can be added without being scanned.",
+        "Outside the scanned surfaces there is a large legacy pile that still asserts unverifiable figures \u2014 `docs/openspec/changes/p4-solana-gpu-acceleration/`, `benchmarks/tps-archive-2026-02/`, `.planning/`, `.audit/`, `tests_phase4/`, `infra-structure/` and others \u2014 measured at roughly 150 further hits. They are ticketed rather than silently rewritten; widening the surface list is the way to close them (TICKET-139, TESTNET_GAP_LEDGER.md).",
+        "The CRM modules themselves are dead code: `apps/x3-desktop/src-tauri/src/crm/mod.rs` declares only `db`, `models`, `commands`, `smtp` and `agents`, so `outreach_system.rs`, `hardware_acquisition_commands.rs`, `funding*.rs`, `dorks*.rs`, `audit_tournament.rs` and `hardware_sources_db.rs` are neither compiled nor called (the crate is also excluded from the cargo workspace, so nothing type-checks them). Honest text in an unreachable file is still not a working feature; either wire it with tests or delete it (TICKET-138, TESTNET_GAP_LEDGER.md)."
       ],
       "name": "MEV-proof marketing claim",
       "paths": [
-        "CURRENT_MAINNET_STATUS.md"
+        "CURRENT_MAINNET_STATUS.md",
+        "apps/x3-desktop/src-tauri/src/crm/outreach_system.rs",
+        "apps/x3-desktop/src-tauri/src/crm/hardware_acquisition_commands.rs",
+        "docs/testnet-config/RELEASE-NOTES.md",
+        "scripts/ci/check-claims-hygiene.py"
       ],
       "priority": "P0",
       "source": "claim_risk",
       "state": "NOT INTEGRATED",
       "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
       "subsystem": "claims_hygiene",
-      "tested": 10,
-      "tests": "tested score 10% (no named test list on this row)"
+      "tested": 75,
+      "tests": "tested score 75% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4445,12 +4455,12 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "22b39aebb3c0dfd91f9d0acc9335d15a1ae8b9c7808998086f5d3a45467e621d",
+    "source_digest": "35f571cbcf480928c86e6afc2615b23a0f4f1d3b1957a7d47a001c61b0e7bf4c",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
-      "feature-matrix/claims-hygiene.toml": "e2101c3396a4b68a38e6f8ffc7245967fd1edaa05631080996a4a5d3c8bbd6e6",
+      "feature-matrix/claims-hygiene.toml": "19dc785653a9f76fb9a1d7e454e925fbadd78c8e7d1a10f6a5ddda4db5edbab4",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "ba968045e0f7d00c3223a4a0506ab1d4088b756c60444d8f88376d7be95dfd89",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",

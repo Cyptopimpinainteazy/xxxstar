@@ -44,15 +44,17 @@ Do not send funds. All claims require verification via audit reports, funding
 verification, and team verification."
 ```
 
-✅ Key metrics displayed:
-- 4,200 TPS
-- 0.4s finality
-- $14.7M raised
-- 312 investors
-- 1,847 validators
-- 4,821 token holders
-- $8.4M DAO treasury
-- 48 active grants
+✅ Key metrics displayed (this section verifies the landing page *renders* these strings; not
+one of the figures is produced by anything in this repository — see `X3-CLAIM-001` and
+`GAP-GPU-CLAIMS`; treat every number below as an unverified display value):
+- 4,200 TPS (unverified display value; no throughput measurement exists in this repository)
+- 0.4s finality (unverified display value; no latency measurement exists in this repository)
+- $14.7M raised (unverified display value; no raise record exists in this repository)
+- 312 investors (unverified display value; no investor register exists in this repository)
+- 1,847 validators (unverified display value; the largest network this repository builds is 7)
+- 4,821 token holders (unverified display value; no holder snapshot exists in this repository)
+- $8.4M DAO treasury (unverified display value; no treasury record exists in this repository)
+- 48 active grants (unverified display value; no grant ledger exists in this repository)
 
 ✅ Team section with credentials:
 - David K. (CEO, ex-Ethereum Foundation)

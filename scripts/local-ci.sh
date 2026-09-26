@@ -375,6 +375,16 @@ GATES_FAST=(
   # files it reports on, so a new over-claim fails here.
   "adapter readiness claims:python3 scripts/ci/check-adapter-readiness-claims.py"
   "test x3-atomic-swap adapter readiness:cargo test -p x3-atomic-swap --test adapter_readiness_truth"
+  # `X3-CLAIM-002` scored 20/10/10 against a claim that had already been renamed out of
+  # `CURRENT_MAINNET_STATUS.md` — because it had moved somewhere nothing checked: the desktop
+  # CRM's outbound templates, which asserted "300ms cross-chain finality (vs 12s on Solana)",
+  # "no MEV/reorg risk", "5,000 TPS baseline", "Live in 3 production networks" and
+  # "$1200/month (current pilot)", alongside seeded contacts naming real people at real
+  # organisations with invented personal addresses. The checker reads the surfaces a human
+  # reads or copies (root docs, docs/testnet-config, the CRM), tree-wide for phrases that are
+  # false in every context and surface-only for figures, and skips lines that qualify
+  # themselves. It is load-bearing: re-adding "MEV-proof" to CURRENT_MAINNET_STATUS.md fails it.
+  "claims hygiene:python3 scripts/ci/check-claims-hygiene.py"
   # `pallet-x3-supply-ledger` holds the king invariant — represented supply never exceeds the
   # canonical ceiling — and its suite was in no gate list either. It also had no mock runtime at all
   # until 2026-09-25: the S0-1 tests build `SupplyLedger` structs by hand, so the three transition

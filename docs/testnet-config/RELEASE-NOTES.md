@@ -3,12 +3,12 @@
 There is no release behind this file.
 
 It announced `solana-gpu-validator-v1.0.tar.gz` (269 MB) containing CUDA kernels (`.cu` + `.ptx`),
-with:
+with four numbers, none of which any command in this repository produces:
 
-> **Achieved**: 2.75M TPS in lab, 1-5M TPS on testnet (network dependent)
-> **Speedup**: 6,885x improvement from P3 baseline (400 TPS)
-> **Guarantee**: Minimum 100k TPS on Solana testnet
-> **Performance**: 825k signatures/second per GPU
+> **Achieved**: 2.75M TPS in lab, 1-5M TPS on testnet (network dependent) — withdrawn, unverified
+> **Speedup**: 6,885x improvement from P3 baseline (400 TPS) — withdrawn, unverified
+> **Guarantee**: Minimum 100k TPS on Solana testnet — withdrawn, unverified
+> **Performance**: 825k signatures/second per GPU — withdrawn, unverified
 
 None of those four lines survives contact with the repository:
 

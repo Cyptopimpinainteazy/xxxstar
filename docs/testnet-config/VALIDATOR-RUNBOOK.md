@@ -101,7 +101,7 @@
       "title": "Fallback Procedure",
       "subsections": [
         "10.1 If GPU fails: Disable GPU backend in config",
-        "10.2 CPU-only mode: Still 733k TPS available",
+        "10.2 CPU-only mode: the node runs on the CPU path. No CPU-mode throughput figure is produced by anything in this repository (the earlier 733k TPS figure was unverified and is withdrawn).",
         "10.3 Restart validator (will use CPU path)",
         "10.4 Investigate GPU issue while running CPU mode"
       ]
