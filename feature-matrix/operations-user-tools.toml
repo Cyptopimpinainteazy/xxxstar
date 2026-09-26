@@ -199,6 +199,17 @@ blockers = [
   "Still open: this is one host — seven validators, one Prometheus, one Grafana, one collector — with no retention policy, no alert rules and no multi-operator story, and the collector sink is a local directory rather than the store an operator would actually run (Loki, OpenSearch, a vendor).",
 ]
 evidence = ["docs", "note: Monitoring concepts present but operational proof incomplete"]
+# Both scales are exercised, and both have a negative control. The three-validator path and the
+# seven-validator path each boot a real network, scrape it, and then hold a validator out and
+# require the same check to fail — so a green line here is a run, not a design note.
+test_evidence = [
+  "scripts/monitoring/local3-monitoring-check.sh",
+  "scripts/monitoring/local3-logging-check.sh",
+  "scripts/monitoring/testnet7-observability-check.sh",
+  "monitoring/local3/prometheus-local3.yml",
+  "monitoring/local3/grafana-x3-validators.json",
+  "note: measured 2026-09-26 at seven validators (`observability across seven validators`, serial) — seven nodes named x3-testnet-node-01..07 on the testnet chain id, per-validator exporter answers with the build-info node label matching the validator it was scraped from, finalized height past genesis, mesh peer floor and a non-full-node role; then all seven agree on the canonical hash at a common finalized height, each of the seven collected log streams carries identity, imports and finality, and one aggregate query reaches all seven sources. A real Prometheus was started against a promtool-validated generated config and required to report all seven targets up, a real Grafana imported the dashboard this repository ships and returned one point per validator for one of that dashboard's own panel expressions, and a real collector was required to show records ingested for every validator, one attributable sink file per stream. `--self-test` holds one validator out of the scrape and out of the log collection and requires all four checks to drop to six, so the checks are known to be able to say no. The gate sets `X3_OBSERVABILITY_REQUIRE_REAL=1`, so a missing Prometheus, Grafana or collector is a failure that names the install rather than an informational line that reads like a pass. The log-level finding is part of the contract: a node started without a filter emits warnings only and no chain identity, so the collection requires the level.",
+]
 
 [[feature]]
 # Recorded 2026-09-25 against the code: `crates/x3-wallet` was cited by no row, run by no gate, and

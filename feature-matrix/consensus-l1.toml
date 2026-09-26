@@ -72,6 +72,16 @@ blockers = [
   "Still open: the seven physical validators do not exist, so this is a three-validator network on one host; the operator runbook for upgrading a real testnet is still unwritten, and the rehearsal upgrades a spec_version with no migration work to do (a migration that rewrites keys is a different rehearsal).",
 ]
 evidence = ["pallets/evolution-core", "note: Registry requires runtime_upgrade_rehearsal"]
+# The rehearsal is the test, and it is gated: `runtime upgrade through governance` (serial, ~60s).
+# It is the one place in this tree where a code swap actually goes through this runtime's only
+# Root-reaching dispatch, so the numbers quoted here are produced by a run rather than read off a
+# design note. The negative control lives in the same script.
+test_evidence = [
+  "scripts/mainnet/runtime_upgrade_rehearsal.sh",
+  "scripts/mainnet/build_runtime_upgrade_artifact.sh",
+  "scripts/mainnet/runtime_upgrade_governance_driver.cjs",
+  "note: measured 2026-09-26 — 13 checks PASS: the swap went through `governance.enact_proposal`, the spec version moved 20 -> 21, the `:code` hash changed, all three validators reported the new version, blocks and finality continued across the swap, and a transfer signed afterwards moved balance, so state persisted. The artifact it swaps in is built in a detached worktree with the version incremented by exactly one and nothing else touched, and the report records revision, both spec versions and sha256, which is how the 'old' runtime is known to be older. Negative control, also measured: pointing `X3_UPGRADE_WASM` at the blob the chain already runs makes the chain refuse the swap with `System::SpecVersionNeedsToIncrease` and the run exits 1, so the check that claims the version moved is known to be able to say no.",
+]
 registry_feature = "triforge_runtime"
 
 [[feature]]
@@ -92,6 +102,11 @@ blockers = [
   "Still open: the dry-run proves the migrations *run* against populated state; it does not prove a historical-state upgrade from a published release, because no published release exists to upgrade from on this box.",
 ]
 evidence = ["pallets/evolution-core", "note: FEATURE_REGISTRY triforge_runtime = 65%"]
+test_evidence = [
+  "scripts/check-runtime-variants.sh",
+  "scripts/local-ci.sh",
+  "note: measured 2026-09-26 — `runtime variant dry-runs` runs the variant rehearsal for every `construct_runtime!` variant and printed `runtime variant dry-run: all variants passed` (dev PASS, dev+frontier PASS, frontier PASS, mainnet-rc1 PASS, testnet PASS); the release gate runs the same rehearsal. The upgrade path on the row above is what exercises it end to end: the pallets listed in `Migrations` are rolled back to version 0, the hooks run, and each must end at the version its code declares — so a migration that silently does nothing fails the run instead of passing as a no-op.",
+]
 registry_feature = "triforge_runtime"
 
 [[feature]]
