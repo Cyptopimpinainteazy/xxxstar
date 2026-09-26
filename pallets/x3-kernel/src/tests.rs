@@ -2334,8 +2334,8 @@ fn a_pause_leaves_committed_state_readable_and_the_nonce_sequence_intact() {
             fee,
             prepare_root,
         ));
-        let stored = crate::SubmittedComits::<Test>::get(comit_id)
-            .expect("a submitted comit is recorded");
+        let stored =
+            crate::SubmittedComits::<Test>::get(comit_id).expect("a submitted comit is recorded");
         let nonce_after_submit = crate::Nonces::<Test>::get(ALICE);
 
         assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
