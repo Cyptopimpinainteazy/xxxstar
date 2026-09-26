@@ -192,6 +192,26 @@ cmd_build() {
   mkdir -p "$RUNTIME_DIR/target"
   chmod o+rwx "$RUNTIME_DIR/target"
 
+  # The mount has to be readable by the container's user, not just writable in `target`.
+  # srtool runs as `uid=1001(builder)`, so a checkout whose root is mode 700 (owner uid
+  # 1000) is mounted but cannot be entered — the container answers with
+  #
+  #   /srtool/build: line 12: cd: /build: Permission denied
+  #   !!! The RUNTIME_DIR 'runtime' does not look like a Cargo project …
+  #
+  # which reads like a broken runtime crate rather than a permission problem, and costs a
+  # full 10-minute build before it says so (measured 2026-09-26: `make mainnet-check`
+  # failed at stage 6b for this reason alone). Check it here, in a container, and name the
+  # fix instead.
+  if command -v docker >/dev/null 2>&1 && docker image inspect "$SRTOOL_IMAGE" >/dev/null 2>&1; then
+    if ! docker run --rm --user 1001 -v "$REPO_ROOT":/build "$SRTOOL_IMAGE" \
+           sh -c 'cd /build && test -r Cargo.toml' >/dev/null 2>&1; then
+      warn "the checkout is not readable by the srtool container's user (uid 1001):"
+      warn "  $(stat -c '%a %U:%G' "$REPO_ROOT") $REPO_ROOT"
+      die "make it traversable and readable, then retry: chmod o+rx '$REPO_ROOT' — the srtool image builds as uid 1001 and this checkout is $(stat -c '%a %U:%G' "$REPO_ROOT")"
+    fi
+  fi
+
   local mode
   mode=$(check_srtool)
 

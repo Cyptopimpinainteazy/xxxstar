@@ -1,5 +1,39 @@
 # Agent Memory — X3 Repo
 
+## 2026-09-26 — the public-testnet bullet set, and the traps in measuring it
+
+Round 2 is closed (see `.ai/reports/round2-integration-20260926.md` for the integration pass and
+its tickets). What is now true, and how to reproduce it:
+
+* **A seven-validator network runs on one host**, and it is the shape the testnet is specified at:
+  `X3_NODE_BIN=target/release/x3-chain-node OUT_DIR=<dir> python3 scripts/testnet/build-x3-testnet-spec.py 7`
+  then `COUNT=7 RPC_BASE=9944 P2P_BASE=30333 PROM_BASE=9615 BASE_DIR=<dir>
+  CHAIN_SPEC=<dir>/x3-testnet-plain.json KEYS_DIR=<dir>/validator-keys bash scripts/testnet/x3_testnet_up.sh --skip-build`.
+  The launcher *refuses* a spec whose authority count does not match `COUNT` — heed it, it is right.
+* **The soak carries load now**: `COUNT=7 LOAD_SECS=720 MINUTES=15 bash scripts/testnet/consensus-soak.sh`
+  (gate `load soak across validators`, opt-in `--soak`). Measured: 120 idle minutes, +35,940 blocks
+  per validator, worst RSS 463.6 MiB; and 40,699 finalized transactions at 542.7 TPS with a 0.0
+  error rate, no stall. `LOAD_SECS=0` is the old idle behaviour.
+* **GRANDPA's threshold is `n - (n-1)/3`, not "more than two thirds".** Three authorities need all
+  three, four need three, seven need five. A three-validator set with one node stopped keeps
+  *authoring* and cannot finalize — that is correct, and it is why any removal drill must either run
+  at ≥4 authorities or report the arithmetic instead of failing the chain.
+* **Drills and the public-testnet gate**: `scripts/mainnet/public_testnet_gate.sh` passes 14 of 15
+  criteria against a live seven-validator network; the 15th (`block_production_stable_72h`) is a SKIP
+  unless `X3_TESTNET_HOURS` is left at 72, and the verdict says `PASS with skipped criteria`. The
+  restart and removal drills are now real (they used to kill an arbitrary node on the host and call a
+  fresh dev node "recovery"); the gate no longer double-counts `cargo test` filters or reads
+  `peers + 1` as a validator count.
+* **Traps that cost hours here, so they are written down**: `cargo test` takes ONE positional test
+  name (`cargo test -p X a b` is an error, and a filter matching nothing exits 0); a node started
+  without a log filter emits warnings only, so per-validator logs are 13 banner lines;
+  `system_accountNextIndex` is the *pool's* view (use `AccountNonceApi_account_nonce` for inclusion);
+  pin every node port (`--rpc-port`, `--port`, `--prometheus-port`) or a node silently never reaches
+  RPC; a cold node AOT-compiles the runtime wasm and can take minutes under load; and two builds of
+  the same tree have different genesis hashes, so freeze one binary before spawning a set.
+* **Still hardware-blocked**: the seven *physical* servers, and therefore the 72-hour soak and the
+  upgrade on the live network. Everything above is one host.
+
 ## 🟥 2026-09-26 — READ FIRST IF YOU WERE SPAWNED WITH AN EMPTY MESSAGE
 
 **Your task is in `.ai/tasks/2026-09-26-round2-workstreams.md` (the current round) or
@@ -8311,3 +8345,69 @@ Report: `.ai/reports/dependabot-triage-20260925.md`.
   `fix/x3lang-finish` off origin/master `43099919a`. First target is the compiler stack under `crates/x3-{parser,typeck,hir,mir,opt,backend,vm,integration}`:
   the optimizer order-sensitivity (entry function placed before others breaks e2e programs), then differential opt-on/off
   tests and control-flow/register agreement. Still **not** touching `runtime/` or `pallets/x3-kernel/` until the live srtool build finishes.
+- **UPDATE (xxxstar-main-2d, 2026-09-26, branch `fix/x3lang-finish` in `/tmp/x3lang-finish`):** heads-up for whoever
+  re-attests the runtime — **this branch changes the wasm runtime** (`crates/x3-integration/src/mini_x3.rs` is the X3 engine
+  inside `WasmX3Adapter`, plus `pallets/x3-kernel/src/{wasm_adapters,adapters}.rs`). Found and fixed: `i64::MIN / -1` panicked
+  both engines; unchecked register indexing and an unbounded `argc` panicked mini_x3 on crafted payloads; `pos + n` wrapped on
+  wasm32 in the reader; mini_x3 faked results for EVM/SVM/GPU/context/emit/array opcodes (now `UnimplementedOpcode`);
+  `validate_x3bc` only parsed the header (now a full on-chain code validator); and the native runtime ran x3-vm while the wasm
+  runtime ran mini_x3 (both adapters now use `X3Executor::execute_on_chain`, one engine in every build). Compiler side (commit
+  `87fb36019`): mutable variables aliased their initialiser's register (wrong results at O0), PRE broke every program declaring
+  `main` first and nested loops at O2+. Evidence: `crates/x3-integration/tests/{differential,engine_hardening}.rs`.
+  The runtime-hash record will need a re-attestation after this merges; I will not touch `docs/reports/runtime-wasm-hashes.json`
+  while another srtool build is running.
+
+## 2026-09-26 (round-2 pass) — D/E/F landed; every result re-run by the integrator
+
+### What closed
+- **D — runtime upgrade rehearsed on the chain's own path.** `scripts/mainnet/runtime_upgrade_rehearsal.sh`
+  used to hand the swap to `subxt upgrade --suri //Alice`; `subxt` is not installed and `pallet_sudo`'s
+  key is unset, so every live step was `skip`ped and the script still printed
+  `runtime_upgrade_rehearsal: PASS — safe to proceed`. It now carries `system.set_code` through
+  `governance.enact_proposal` (the only dispatch in this runtime that reaches `RawOrigin::Root`) on
+  three live `local3` validators, and requires spec_version, `:code` hash, post-enactment finality and
+  a post-upgrade transfer to move. Gate: `runtime upgrade through governance`.
+- **E — external paths closed and machine-checked.** `x3-external-chains` (every external EVM adapter
+  plus the settlement verifier) ran in **no** `local-ci.sh` gate, so its refusals were not evidence.
+  `scripts/ci/check-external-paths-disabled.py` now holds the registry of five external paths and
+  requires, per path, the closed code gate + a refusal test + its gate wiring + a
+  `DISABLED_BLOCKED` flag. Gates: `external paths disabled`, `test x3-external-chains`.
+- **F — native supply conservation under distributed traffic.** `node/tests/supply_invariant_distributed.rs`
+  drives 15 concurrent fee-burning comits into all three validators and reads
+  `Σ(free+reserved) == TotalIssuance` from **each** validator's own state at one finalized block, with a
+  scratch `local3` genesis one unit over required to fail. Gate: `supply invariant across validators`.
+
+### Facts discovered that cost time and should not be re-derived
+- **Governance is the only route to Root on this chain.** `impl pallet_governance::Config` sets
+  `RuntimeUpgradeOrigin = EnsureRootOrHalfCouncil` in every variant; the sequence that works is
+  authorize voters (council motion) → `update_config(enactment_period=1)` → `submit_proposal(set_code)`
+  → three `vote(Aye)` → `fast_track(voting_period=0)` → `finalize_proposal`, all via council motions.
+- **This chain authors v5 extrinsics, so polkadot-js cannot decode `chain_getBlock`.** Decide success
+  from `system.events`, never from inclusion — inclusion is not success.
+- **`state_getKeys`, `state_getStorage` and `state_call` all accept an `at` block hash** on this node,
+  which is what makes "each validator's own view at one finalized block" checkable at all. Storage keys
+  are `storage_prefix` + `blake2_128_concat` — the rule `crates/x3-runtime-signer` already uses.
+- **`AtlasKernel::Nonces` only advances on inclusion.** Pacing comits on a wall-clock sleep gets the
+  later ones refused against a stale nonce **while still returning a pool transaction hash**, so a
+  pool-accepted hash must never be read as "it ran".
+- **A live multi-node gate that is not in `SERIAL_GATES` loses a port bind and then talks past the
+  other node** instead of failing loudly. Adding a chain-booting gate means adding it to *both* arrays.
+- **The runtime-hash record was already fresh for this diff**: `scripts/check-runtime-hash-freshness.py
+  --base origin/master` reports `none in the runtime's dependency graph — nothing to do`. An in-tree
+  srtool build as the file was being read is not evidence of a needed re-attestation.
+
+### Dead ends to avoid
+- Do not "fix" the rehearsal by installing `subxt` or reaching for sudo. Neither exists on the path
+  this chain has, and the old skip-shaped PASS is exactly the fake green the project forbids.
+- Do not point the rehearsal at `target/release/wbuild/.../x3_chain_runtime.compact.compressed.wasm`
+  expecting an upgrade — that is the blob the chain already runs, and the chain refuses it with
+  `System::SpecVersionNeedsToIncrease`. That refusal is the negative control, not the rehearsal.
+- Do not read the rehearsal's `PASS` as a claim about the 7-node testnet. It proves the upgrade path on
+  `local3`; the physical validators do not exist, and `docs/reports/runtime-wasm-hashes.json` remains the
+  canonical runtime record.
+
+### Next task seed
+- Set the EVM/SVM payload convention for `submit_comit_v2` (X3-LANG-004): make the payload the artifact
+  `T::EvmAdapter::validate` / `T::SvmAdapter::validate` accept, then re-attest the runtime in the same
+  commit. Note that another session (`xxxstar-main-2d`, branch `fix/x3lang-finish`) is mid-flight on the
+  compiler stack and **does** change wasm runtime bytes — coordinate before re-attesting.
