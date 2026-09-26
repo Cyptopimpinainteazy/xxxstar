@@ -15,10 +15,11 @@ This scanner classifies the *enclosing code* instead:
   pallet-call    the panic sits in a `#[pallet::call]` extrinsic body
   production     any other non-test code
 
-Lines inside `#[cfg(test)]` items, and commented-out lines, are excluded: they do
-not exist in the runtime or in a release node build. String literals and comments
-are stripped before brace counting so `format!("{{}}")` cannot end a test module
-early.
+Lines inside a `#[cfg(test)]` item — in any of the forms this repository writes,
+including `#[cfg(all(test, feature = "std"))]` and `#[cfg(any(test, feature =
+"dev-mock"))]` — and commented-out lines are excluded: they do not exist in the
+runtime or in a release node build. String literals and comments are stripped
+before brace counting so `format!("{{}}")` cannot end a test module early.
 
 Output: JSON on stdout. Exit status is 0 when the scan itself succeeded.
 """
@@ -109,7 +110,7 @@ def test_line_ranges(lines: list[str]) -> list[tuple[int, int]]:
     i = 0
     while i < len(lines):
         code, in_block_comment = strip_strings_and_comments(lines[i], in_block_comment)
-        if "#[cfg(test)]" not in code:
+        if not is_cfg_test_item(code):
             i += 1
             continue
         # Find the opening brace of the item this attribute belongs to.
@@ -132,12 +133,50 @@ def test_line_ranges(lines: list[str]) -> list[tuple[int, int]]:
         if not started:  # attribute without a body (e.g. on a `use`) — skip it
             i += 1
             continue
-        i = j + 1
-    return ranges
+        # Advance by one line, not to the end of the item: `#[cfg(test)]` attributes
+        # nest inside each other (a `#[cfg(all(test, …))]` helper inside a
+        # `#[cfg(test)] mod tests`), and jumping to the end of the *inner* item left
+        # the rest of the enclosing test module counted as production code — 1,589
+        # findings instead of 570 when this was first widened.
+        i += 1
+    ranges.sort()
+    merged: list[tuple[int, int]] = []
+    for start, end in ranges:
+        if merged and start <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+CFG_ATTRIBUTE = re.compile(r"#\[cfg\((?P<predicate>[^\n]*)\)\]")
+
+
+def is_cfg_test_item(code: str) -> bool:
+    """Does this line carry a `#[cfg(..)]` attribute that is true only under `test`?
+
+    `#[cfg(test)]` is the form the SDK templates use, and for a long time the only
+    one this scanner recognised. This repository also writes
+    `#[cfg(all(test, feature = "std"))]`, `#[cfg(all(test, feature = "std",
+    feature = "frontier"))]` and `#[cfg(any(test, feature = "dev-mock"))]`, and
+    each of those was counted as production code — the whole of
+    `runtime/src/lib.rs`'s test surface, 26 findings, among them.
+
+    `not(test)` is the opposite and is deliberately not matched: that is code
+    which exists *only* in a production build.
+    """
+    for match in CFG_ATTRIBUTE.finditer(code):
+        predicate = match.group("predicate")
+        if not re.search(r"\btest\b", predicate):
+            continue
+        if re.search(r"\bnot\s*\(\s*test\b", predicate):
+            continue
+        return True
+    return False
 
 
 CFG_TEST_MODULE = re.compile(
-    r"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*mod\s+([A-Za-z0-9_]+)\s*;"
+    r"#\[cfg\([^\n]*\btest\b[^\n]*\)\]\s*(?:#\[[^\n]*\]\s*)*mod\s+([A-Za-z0-9_]+)\s*;"
 )
 
 

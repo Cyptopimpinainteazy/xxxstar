@@ -213,6 +213,11 @@ GATES_FAST=(
   # nothing checking it and the tree stayed green.
   "invariant registry:python3 scripts/check-invariant-registry.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
+  # The panic ratchet is only as good as the scanner's idea of what test code is:
+  # it matched the literal `#[cfg(test)]`, so `#[cfg(all(test, feature = "std"))]`
+  # modules counted as production and the release gate read 570 against a 516
+  # baseline. This pins the classification and the empty result for runtime/src.
+  "panic scan self-test:python3 scripts/audit/panic_unwrap_self_test.py"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
   # `check-readiness-consistency.sh` validates `required_tests` in FEATURE_REGISTRY.toml. The matrix
   # fragments carry the same field and nothing checked them: X3-XVM-006 could cite
