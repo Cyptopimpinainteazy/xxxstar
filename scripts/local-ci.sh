@@ -685,6 +685,11 @@ GATES_DEEP=(
 # they are gates like any other.
 GATES_CROSS=(
   "X3-native lifecycles:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
+  # The multi-validator half of the X3Lang claim: a program compiled from `.x3`
+  # source is submitted to one validator and its receipt is read back from a
+  # different one, which finalized the same block. The single-node lifecycle above
+  # cannot say anything about agreement between validators.
+  "X3Lang across validators:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3lang_network_receipt -- --ignored --nocapture --test-threads=1"
   "cross-domain EVM:bash scripts/cross-domain-evm-gate.sh"
   # Same reason as the `SVM contract lifecycle` gate above: this one also runs
   # `cargo build-sbf`, which shells out to `cargo +1.89.0-sbpf-solana-v1.54` and
