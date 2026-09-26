@@ -200,6 +200,16 @@ bytes**:
   revision-only record. compact 8,506,630 bytes, compressed 1,463,693, unchanged. Two from-scratch
   builds agree.
 
+* `aaece429d` — the kernel stops calling a packet an execution. `submit_comit_v2` validates a
+  non-empty EVM/SVM payload as a SCALE-encoded `Packet` while the adapters execute their input as EVM
+  bytecode / eBPF, and a packet run as code halts on its own enum discriminant — `0x00` is EVM `STOP`
+  — so the chain recorded `success: true` with base gas for an operation that never ran
+  (`PayloadValidation`… measured: `WasmEvmAdapter::execute(wrap_evm_payload(&[0xAA; 64]), 6_000_000)`
+  returned success, 22,576 gas, for a 124-byte packet). All four adapter sites now refuse a packet by
+  name. This is a runtime change — `packet_adapters.rs` and `wasm_adapters.rs` are compiled into the
+  blob — so the bytes move: compact 8,508,157 bytes (was 8,506,630), compressed 1,463,840 (was
+  1,463,693). Two from-scratch builds agree.
+
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
 revision builds.
