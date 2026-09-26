@@ -780,6 +780,13 @@ impl X3VmAdapter for EvmAdapter {
     // ── Readiness ─────────────────────────────────────────────────────────
 
     fn readiness_score(&self) -> AdapterReadinessScore {
+        // Corrected 2026-09-26. This used to declare every chain-evidence capability true while the
+        // same file builds its lock, claim and refund proofs from `mock_tx_id(..)`, a "Simulated
+        // block number" and literal "mock proof" payloads, and `finality_status` returns a block
+        // hash derived from the number 42. `AdapterScoreboard` reports this struct verbatim, so the
+        // claim *was* the score: an adapter with no transport at all read as production-ready.
+        // `x3vm_htlc.rs` already declares these four false for exactly this reason, and
+        // `scripts/ci/check-adapter-readiness-claims.py` keeps the two in step.
         AdapterReadinessScore {
             adapter_name: "evm-htlc-adapter",
             vm_type: VmType::Evm,
@@ -787,12 +794,12 @@ impl X3VmAdapter for EvmAdapter {
             lock_path: true,
             claim_path: true,
             refund_path: true,
-            event_proof_extraction: true,
-            finality_proof: true,
-            rpc_indexer_support: true,
+            event_proof_extraction: false,
+            finality_proof: false,
+            rpc_indexer_support: false,
             timeout_safety: true,
             tests_implemented: true,
-            proof_ledger_integration: true,
+            proof_ledger_integration: false,
             ibc_support: false,
             cross_adapter_atomicity_test: false,
         }

@@ -156,7 +156,8 @@
       "confidence": "high",
       "evidence": [
         "reports/atomic_crossvm_completion_audit.md",
-        "note: Audit identifies simulated adapters/placeholder proof verification in older path"
+        "note: Audit identifies simulated adapters/placeholder proof verification in older path",
+        "note: 2026-09-26 - the audit's finding was reproduced in code: the adapters' self-declared readiness was the score, and it claimed evidence they fabricate"
       ],
       "id": "X3-CLAIM-003",
       "implemented": 45,
@@ -164,7 +165,8 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "Distinguish internal cross-VM from external-chain settlement"
+        "Distinguish internal cross-VM from external-chain settlement",
+        "**2026-09-26, corrected \u2014 the scoreboard fed the claim.** `AdapterScoreboard` reports each adapter's self-declared `readiness_score()` verbatim, and fourteen adapters declared `event_proof_extraction`, `finality_proof`, `rpc_indexer_support` and `proof_ledger_integration` true while building their lock, claim and refund proofs from `mock_tx_id(..)`, a \"Simulated block number\" and literal \"mock proof\" payloads, with `finality_status` returning a block hash derived from the number 42. The EVM and SVM adapters \u2014 the two VM types the roadmap targets next \u2014 now declare those four false, pinned by `crates/x3-atomic-swap/tests/adapter_readiness_truth.rs`, and the remaining twelve are on the shrinking `security/adapter-readiness-claims-baseline.txt`, enforced by `scripts/ci/check-adapter-readiness-claims.py` (measured load-bearing: re-declaring `finality_proof: true` on the EVM adapter fails both the checker and the test)."
       ],
       "name": "Cross-chain complete claim",
       "paths": [
@@ -4418,12 +4420,12 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "cf2c919d746d6249e7479a843d0c9a895c8cfd3d7b9121a1236bf6f5c343a842",
+    "source_digest": "8f0d5c493a9474ffd855079adfaebfbc6fd66af45b99d9bdce3a71db00cb94f1",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "0904b8179e9168aa5739c75e81309aa771f0893a38e15935551ad825dd58e955",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
-      "feature-matrix/claims-hygiene.toml": "38adfc42c2cfe602e3588afb5ee401319b27d4b2cbd824b7e262b46a552da389",
+      "feature-matrix/claims-hygiene.toml": "ff867b34bce7c324a2954cbdb541b374dd0277624e2d837bdae059232ecedf8c",
       "feature-matrix/consensus-l1.toml": "86b9d3871259ddee0dde4393b92ab67be0e5a4bccefd642d28c53d25ca8b4f82",
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
       "feature-matrix/cross-vm-atomic.toml": "bb43674a4bc6f2d3ca9c6af54eff3f40f509612377b0f9fd095ec956a054ef5f",

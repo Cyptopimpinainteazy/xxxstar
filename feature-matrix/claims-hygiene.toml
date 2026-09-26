@@ -48,5 +48,11 @@ priority = "P0"
 confidence = "high"
 launch_scope = "research"
 claim_risk = true
-blockers = ["Distinguish internal cross-VM from external-chain settlement"]
-evidence = ["reports/atomic_crossvm_completion_audit.md", "note: Audit identifies simulated adapters/placeholder proof verification in older path"]
+blockers = [
+  "Distinguish internal cross-VM from external-chain settlement",
+  "**2026-09-26, corrected — the scoreboard fed the claim.** `AdapterScoreboard` reports each adapter's self-declared `readiness_score()` verbatim, and fourteen adapters declared `event_proof_extraction`, `finality_proof`, `rpc_indexer_support` and `proof_ledger_integration` true while building their lock, claim and refund proofs from `mock_tx_id(..)`, a \"Simulated block number\" and literal \"mock proof\" payloads, with `finality_status` returning a block hash derived from the number 42. The EVM and SVM adapters — the two VM types the roadmap targets next — now declare those four false, pinned by `crates/x3-atomic-swap/tests/adapter_readiness_truth.rs`, and the remaining twelve are on the shrinking `security/adapter-readiness-claims-baseline.txt`, enforced by `scripts/ci/check-adapter-readiness-claims.py` (measured load-bearing: re-declaring `finality_proof: true` on the EVM adapter fails both the checker and the test).",
+]
+test_evidence = [
+  "note: `test x3-atomic-swap adapter readiness` runs crates/x3-atomic-swap/tests/adapter_readiness_truth.rs; the `adapter readiness claims` gate runs the checker against its baseline (2026-09-26)",
+]
+evidence = ["reports/atomic_crossvm_completion_audit.md", "note: Audit identifies simulated adapters/placeholder proof verification in older path", "note: 2026-09-26 - the audit's finding was reproduced in code: the adapters' self-declared readiness was the score, and it claimed evidence they fabricate"]

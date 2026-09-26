@@ -346,6 +346,13 @@ GATES_FAST=(
   # The check requires the verifier's shape now, measured load-bearing, and this gate keeps the
   # suite (111 lib tests plus its integration suites) running.
   "test x3-gpu-validator-swarm:cargo test -p x3-gpu-validator-swarm"
+  # `AdapterScoreboard` reports each adapter's self-declared `readiness_score()` verbatim, so an
+  # adapter that fabricates its lock/claim/refund proofs but declares `finality_proof` and friends
+  # true reports as production-ready for a chain it never contacts. Fourteen did; the EVM and SVM
+  # adapters are corrected and the rest are on the shrinking baseline. The checker reads the same
+  # files it reports on, so a new over-claim fails here.
+  "adapter readiness claims:python3 scripts/ci/check-adapter-readiness-claims.py"
+  "test x3-atomic-swap adapter readiness:cargo test -p x3-atomic-swap --test adapter_readiness_truth"
   # `pallet-x3-supply-ledger` holds the king invariant — represented supply never exceeds the
   # canonical ceiling — and its suite was in no gate list either. It also had no mock runtime at all
   # until 2026-09-25: the S0-1 tests build `SupplyLedger` structs by hand, so the three transition

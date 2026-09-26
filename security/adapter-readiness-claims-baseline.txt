@@ -1,0 +1,29 @@
+# Swap adapters whose `readiness_score()` claims chain evidence the same file fabricates.
+# **This list may only shrink.**
+#
+# `X3VmAdapter::readiness_score()` is a self-declaration and `AdapterScoreboard` reports it verbatim,
+# so a flag set true is a claim shown to whoever reads the scoreboard. Fourteen adapters declared
+# `event_proof_extraction` / `finality_proof` / `rpc_indexer_support` / `proof_ledger_integration`
+# true while building their lock, claim and refund proofs from `mock_tx_id(..)`, a "Simulated block
+# number" and literal "mock proof" payloads (`x3vm_htlc.rs` is the model: it declares them false, and
+# its non-simulation branch declares everything false).
+#
+# `scripts/ci/check-adapter-readiness-claims.py` fails when an adapter not on this list over-claims,
+# and when a listed one stops. The EVM and SVM adapters were corrected on 2026-09-26 because they are
+# the two VM types the roadmap targets next (live X3<->EVM, live X3<->SVM), which is why they are not
+# here; correcting the rest means either telling the truth in `readiness_score` (and updating the
+# scores their own tests pin, e.g. move_vm 80, cosmwasm 80/100, wasm_l1 90) or giving the adapter a
+# real evidence path.
+
+FAIL  crates/x3-atomic-swap/src/bitcoin_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/cairo_vm_htlc.rs: claims finality_proof while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/cosmwasm_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/fuel_htlc.rs: claims finality_proof while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/move_vm_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/near_htlc.rs: claims finality_proof while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/plutus_htlc.rs: claims finality_proof while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/polkadot_ink_htlc.rs: claims finality_proof while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/soroban_htlc.rs: claims finality_proof while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/substrate_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/ton_htlc.rs: claims finality_proof while fabricating chain evidence
+FAIL  crates/x3-atomic-swap/src/wasm_l1_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
