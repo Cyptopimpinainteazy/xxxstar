@@ -597,6 +597,59 @@ impl SignatureVerifier {
             return Vec::new();
         }
 
+        if let Some(mask) = Self::verify_on_gpu(txs) {
+            // A GPU batch that claims a different number of verdicts than it was given is not
+            // usable evidence about these transactions; fall through to the CPU reference.
+            if mask.len() == count {
+                return mask;
+            }
+            warn!(
+                "[ParallelProposer] GPU batch returned {} verdicts for {count} transactions; using CPU",
+                mask.len()
+            );
+        }
+
+        // CPU reference: the same check the CUDA kernel performs, run for real.
+        //
+        // This used to be `!tx.signature.is_empty() && tx.signature.len() >= 16`, i.e. any 16-byte
+        // string "verified" — and the result gates which transactions `create_proposal` is willing
+        // to put in a block. Verification is now the crate's canonical verifier
+        // (`x3_common::signing::verify_signature`), over the same triple the kernel is handed:
+        // 64-byte signature, 32-byte public key from `sender`, 32-byte message from `tx_hash`.
+        txs.par_iter().map(Self::verify_one).collect()
+    }
+
+    /// Verify one transaction's signature for real.
+    ///
+    /// Fails closed on every shape it cannot verify: a non-hex or wrong-length signature, a
+    /// `sender` that is not a 32-byte ed25519 public key, a `tx_hash` that is not a 32-byte
+    /// message. `ed25519` is the scheme the GPU kernel in this crate implements
+    /// (`ed25519_verify_batch_multi_gpu`), so CPU and GPU agree on what a valid signature is.
+    fn verify_one(tx: &TransactionMeta) -> bool {
+        let Ok(signature) = hex::decode(tx.signature.trim_start_matches("0x")) else {
+            return false;
+        };
+        let Ok(public_key) = hex::decode(tx.sender.trim_start_matches("0x")) else {
+            return false;
+        };
+        let Ok(message) = hex::decode(tx.tx_hash.trim_start_matches("0x")) else {
+            return false;
+        };
+        if signature.len() != 64 || public_key.len() != 32 || message.len() != 32 {
+            return false;
+        }
+        x3_common::signing::verify_signature(
+            &signature,
+            &message,
+            &public_key,
+            x3_common::KeyType::Ed25519,
+        )
+    }
+
+    /// The GPU path. `None` means "no verdict from the GPU" (library absent, symbol absent, or the
+    /// kernel reported failure), which is not the same as "these are valid".
+    fn verify_on_gpu(txs: &[TransactionMeta]) -> Option<Vec<bool>> {
+        let count = txs.len();
         // Attempt GPU offload if library is available
         if let Some(lib) = &*GPU_LIB {
             unsafe {
@@ -637,7 +690,7 @@ impl SignatureVerifier {
                             "[ParallelProposer] GPU verified {} signatures successfully",
                             count
                         );
-                        return results.iter().map(|&r| r == 1).collect();
+                        return Some(results.iter().map(|&r| r == 1).collect());
                     } else {
                         warn!("[ParallelProposer] GPU batch verification failed (res={}), falling back to CPU", res);
                     }
@@ -645,10 +698,7 @@ impl SignatureVerifier {
             }
         }
 
-        // CPU Fallback: Standard parallel verification using rayon
-        txs.par_iter()
-            .map(|tx| !tx.signature.is_empty() && tx.signature.len() >= 16)
-            .collect()
+        None
     }
 }
 
@@ -990,17 +1040,32 @@ pub fn find_undeclared_writes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use once_cell::sync::Lazy;
+    use x3_common::signing::{Ed25519Signer, PublicKey, Signature, Signer};
 
-    fn mk_tx(id: &str, signature: &str) -> TransactionMeta {
+    /// A deterministic ed25519 identity for the fixtures. `sender`, `tx_hash` and `signature` are
+    /// now a real (public key, message, signature) triple, because the proposer verifies them.
+    static TEST_SIGNER: Lazy<Ed25519Signer> = Lazy::new(|| Ed25519Signer::from_seed(&[0x42u8; 32]));
+
+    /// The 32-byte message a fixture transaction commits to, as hex. Kept derivable from the id so
+    /// tests can still name their transactions `tx-a`, `tx-1`, ….
+    fn tx_hash_for(id: &str) -> String {
+        hex::encode(blake3::hash(id.as_bytes()).as_bytes())
+    }
+
+    fn mk_tx(id: &str) -> TransactionMeta {
+        let message = blake3::hash(id.as_bytes());
+        let signature: Signature = TEST_SIGNER.sign(message.as_bytes());
+        let public_key: PublicKey = TEST_SIGNER.public_key();
         TransactionMeta {
-            tx_hash: id.to_string(),
-            sender: "0x01".to_string(),
+            tx_hash: tx_hash_for(id),
+            sender: hex::encode(public_key.as_bytes()),
             receiver: "0x02".to_string(),
             value: 10,
             gas_limit: 21_000,
             gas_price: 20_000_000,
             nonce: 1,
-            signature: signature.to_string(),
+            signature: hex::encode(signature.as_bytes()),
             contract_address: Some("0xCAFE".to_string()),
             timestamp: 1,
         }
@@ -1010,15 +1075,72 @@ mod tests {
         DeclaredAccess::legacy(reads, writes)
     }
 
+    /// The rule this replaces was `!tx.signature.is_empty() && tx.signature.len() >= 16`, and its
+    /// verdict decides which transactions `create_proposal` will put in a block.
+    #[test]
+    fn a_forged_signature_is_rejected_and_a_real_one_accepted() {
+        let honest = mk_tx("tx-honest");
+        assert!(
+            SignatureVerifier::verify_one(&honest),
+            "a correctly signed fixture must verify"
+        );
+
+        // The exact shape the retired check accepted: 16 hex characters of nothing.
+        let mut forged = honest.clone();
+        forged.signature = "0123456789abcdef".to_string();
+        assert!(
+            !SignatureVerifier::verify_one(&forged),
+            "16 bytes of junk must not count as a signature"
+        );
+
+        // A signature over a different message.
+        let mut replayed = honest.clone();
+        replayed.tx_hash = tx_hash_for("tx-other");
+        assert!(
+            !SignatureVerifier::verify_one(&replayed),
+            "a signature must not carry to another message"
+        );
+
+        // A signature attributed to another key.
+        let mut misattributed = honest.clone();
+        misattributed.sender = hex::encode([0x11u8; 32]);
+        assert!(
+            !SignatureVerifier::verify_one(&misattributed),
+            "a signature must not verify under a key that did not make it"
+        );
+
+        // Bytes that are not hex at all: refused, not decoded with `unwrap_or_default`.
+        let mut garbage = honest.clone();
+        garbage.signature = "zzzz".to_string();
+        assert!(!SignatureVerifier::verify_one(&garbage));
+        garbage.signature = String::new();
+        assert!(!SignatureVerifier::verify_one(&garbage));
+    }
+
+    /// A block must not be proposed from a pool of forged transactions.
+    #[tokio::test]
+    async fn a_proposal_refuses_a_pool_of_forged_signatures() {
+        let proposer = ParallelProposer::new(ProposalConfig::default());
+        let mut forged = mk_tx("tx-forged");
+        forged.signature = "0123456789abcdef".to_string();
+        proposer.submit_transaction(forged).await.unwrap();
+
+        let err = proposer
+            .create_proposal()
+            .await
+            .expect_err("a proposal must not be built from unverified transactions");
+        assert!(
+            err.to_string().contains("signature verification"),
+            "the refusal has to name the reason, got: {err}"
+        );
+    }
+
     // ── Existing tests ────────────────────────────────────────────────────────
 
     #[tokio::test]
     async fn missing_metadata_forces_serial_fallback() {
         let proposer = ParallelProposer::new(ProposalConfig::default());
-        proposer
-            .submit_transaction(mk_tx("tx-a", "0123456789abcdef"))
-            .await
-            .unwrap();
+        proposer.submit_transaction(mk_tx("tx-a")).await.unwrap();
 
         let proposal = proposer.create_proposal().await.unwrap();
         assert!(proposal.used_serial_fallback || !proposal.serial_fallback_txs.is_empty());
@@ -1033,18 +1155,12 @@ mod tests {
         });
 
         proposer
-            .submit_transaction_with_access(
-                mk_tx("tx-a", "0123456789abcdef"),
-                Some(mk_access(&["r:a"], &["w:a"])),
-            )
+            .submit_transaction_with_access(mk_tx("tx-a"), Some(mk_access(&["r:a"], &["w:a"])))
             .await
             .unwrap();
 
         proposer
-            .submit_transaction_with_access(
-                mk_tx("tx-b", "fedcba9876543210"),
-                Some(mk_access(&["r:b"], &["w:b"])),
-            )
+            .submit_transaction_with_access(mk_tx("tx-b"), Some(mk_access(&["r:b"], &["w:b"])))
             .await
             .unwrap();
 
@@ -1062,7 +1178,7 @@ mod tests {
 
         proposer
             .submit_transaction_with_access(
-                mk_tx("tx-a", "0123456789abcdef"),
+                mk_tx("tx-a"),
                 Some(mk_access(&["state:x"], &["state:x"])),
             )
             .await
@@ -1070,7 +1186,7 @@ mod tests {
 
         proposer
             .submit_transaction_with_access(
-                mk_tx("tx-b", "fedcba9876543210"),
+                mk_tx("tx-b"),
                 Some(mk_access(&["state:x"], &["state:x"])),
             )
             .await
@@ -1092,37 +1208,13 @@ mod tests {
     #[tokio::test]
     async fn determinism_same_txs_different_parallelism_same_state_root() {
         // Fixed tx set with declared non-overlapping access sets
-        let txs: Vec<(&str, &str, DeclaredAccess)> = vec![
-            (
-                "tx-1",
-                "sig1111111111111111",
-                mk_access(&["r:account:1"], &["w:balance:1"]),
-            ),
-            (
-                "tx-2",
-                "sig2222222222222222",
-                mk_access(&["r:account:2"], &["w:balance:2"]),
-            ),
-            (
-                "tx-3",
-                "sig3333333333333333",
-                mk_access(&["r:account:3"], &["w:balance:3"]),
-            ),
-            (
-                "tx-4",
-                "sig4444444444444444",
-                mk_access(&["r:account:4"], &["w:balance:4"]),
-            ),
-            (
-                "tx-5",
-                "sig5555555555555555",
-                mk_access(&["r:account:5"], &["w:balance:5"]),
-            ),
-            (
-                "tx-6",
-                "sig6666666666666666",
-                mk_access(&["r:account:6"], &["w:balance:6"]),
-            ),
+        let txs: Vec<(&str, DeclaredAccess)> = vec![
+            ("tx-1", mk_access(&["r:account:1"], &["w:balance:1"])),
+            ("tx-2", mk_access(&["r:account:2"], &["w:balance:2"])),
+            ("tx-3", mk_access(&["r:account:3"], &["w:balance:3"])),
+            ("tx-4", mk_access(&["r:account:4"], &["w:balance:4"])),
+            ("tx-5", mk_access(&["r:account:5"], &["w:balance:5"])),
+            ("tx-6", mk_access(&["r:account:6"], &["w:balance:6"])),
         ];
 
         let mut state_roots: Vec<String> = Vec::new();
@@ -1135,9 +1227,9 @@ mod tests {
                 ..ProposalConfig::default()
             });
 
-            for (id, sig, access) in &txs {
+            for (id, access) in &txs {
                 proposer
-                    .submit_transaction_with_access(mk_tx(id, sig), Some(access.clone()))
+                    .submit_transaction_with_access(mk_tx(id), Some(access.clone()))
                     .await
                     .unwrap();
             }
@@ -1158,8 +1250,8 @@ mod tests {
                 // Find the declared access for this tx
                 let access = txs
                     .iter()
-                    .find(|(id, _, _)| *id == tx_hash)
-                    .map(|(_, _, a)| a);
+                    .find(|(id, _)| tx_hash_for(id) == *tx_hash)
+                    .map(|(_, a)| a);
 
                 if let Some(a) = access {
                     for w in &a.writes {

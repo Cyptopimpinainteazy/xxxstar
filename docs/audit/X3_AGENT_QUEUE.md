@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `27c7e50ea82bca11…` — the artifacts move when
+Source digest: `2930e9a3f845d2fd…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 

@@ -71,43 +71,6 @@ impl ProofAggregator {
         self.validator_pubkeys.insert(validator_id, padded);
     }
 
-    fn attestation_signing_message(
-        receipt: &crate::gpu_receipt::GpuReceipt,
-        bundle_id: Hash,
-        finalized_block: u64,
-        legs_hash: Hash,
-    ) -> Vec<u8> {
-        use sha2::{Digest, Sha256};
-
-        let mut hasher = Sha256::new();
-        hasher.update(b"x3-validator-attestation-v1");
-        hasher.update(&receipt.kernel_hash);
-        hasher.update(&receipt.input_commitment);
-        hasher.update(&receipt.output_commitment);
-        hasher.update(&receipt.executor);
-        hasher.update(&receipt.gpu_cycles_used.to_le_bytes());
-        hasher.update(&bundle_id);
-        hasher.update(&finalized_block.to_le_bytes());
-        hasher.update(&legs_hash);
-        hasher.finalize().to_vec()
-    }
-
-    fn signature_from_bytes(signature: &[u8]) -> SwarmResult<crate::crypto::SignatureOutput> {
-        if signature.len() != crate::crypto::SIGNATURE_LENGTH {
-            return Err(SwarmError::VerificationFailed(format!(
-                "Invalid signature length: expected {}, got {}",
-                crate::crypto::SIGNATURE_LENGTH,
-                signature.len()
-            )));
-        }
-
-        let mut r = [0u8; 32];
-        let mut s = [0u8; 32];
-        r.copy_from_slice(&signature[..32]);
-        s.copy_from_slice(&signature[32..64]);
-        Ok(crate::crypto::SignatureOutput::new(r, s, signature[64]))
-    }
-
     fn verify_attestations(&self, proof: &UnifiedProof) -> SwarmResult<()> {
         for attestation in &proof.gpu_attestations {
             let pubkey = self
@@ -119,20 +82,20 @@ impl ProofAggregator {
                         attestation.validator_id
                     ))
                 })?;
-            let signature = Self::signature_from_bytes(&attestation.signature)?;
-            let msg = Self::attestation_signing_message(
+            crate::gpu_receipt::GpuReceiptValidator::verify_attestation_signature(
                 &attestation.receipt,
                 proof.header.bundle_id,
                 proof.header.finalized_block,
                 proof.header.legs_hash,
-            );
-
-            if !signature.verify(&msg, pubkey) {
-                return Err(SwarmError::VerificationFailed(format!(
-                    "Invalid attestation signature for validator {:?}",
+                &attestation.signature,
+                pubkey,
+            )
+            .map_err(|err| {
+                SwarmError::VerificationFailed(format!(
+                    "Invalid attestation signature for validator {:?}: {err}",
                     attestation.validator_id
-                )));
-            }
+                ))
+            })?;
         }
 
         Ok(())
@@ -397,7 +360,7 @@ mod tests {
             executor: validator_id,
             proof_type: ProofType::RecomputeA,
         };
-        let msg = ProofAggregator::attestation_signing_message(
+        let msg = crate::gpu_receipt::GpuReceiptValidator::attestation_message(
             &receipt,
             proof.header.bundle_id,
             proof.header.finalized_block,

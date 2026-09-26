@@ -72,17 +72,23 @@ impl IntegrationContext {
 mod tests {
     use super::*;
     use crate::{ConflictClass, VmLane};
+    use x3_common::signing::{Ed25519Signer, Signer};
 
     fn sample_tx(id: &str) -> TransactionMeta {
+        // A real (public key, message, signature) triple: `create_proposal` verifies it.
+        let signer = Ed25519Signer::from_seed(&[0x7Au8; 32]);
+        let message = blake3::hash(id.as_bytes());
+        let signature = signer.sign(message.as_bytes());
+        let public_key = signer.public_key();
         TransactionMeta {
-            tx_hash: id.to_string(),
-            sender: "0x1".to_string(),
+            tx_hash: hex::encode(message.as_bytes()),
+            sender: hex::encode(public_key.as_bytes()),
             receiver: "0x2".to_string(),
             value: 1,
             gas_limit: 21_000,
             gas_price: 1,
             nonce: 0,
-            signature: "0123456789abcdef".to_string(),
+            signature: hex::encode(signature.as_bytes()),
             contract_address: Some("0xabc".to_string()),
             timestamp: 1,
         }

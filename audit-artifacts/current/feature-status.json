@@ -2597,7 +2597,7 @@
       "missing_work": [
         "**CLOSED 2026-09-25 \u2014 `UnifiedProof::validate()` called any non-empty bytes an attestation.** `proof_integration.rs` asserted `is_valid` for proofs whose attestation signature was `vec![1, 2, 3, 4]` and `vec![9, 9, 9]`, while the crate's own verifier \u2014 `ProofAggregator::signature_from_bytes`, then `verify_attestations` against a registered public key \u2014 refuses anything that is not 65 bytes (`r || s || recovery`). A caller who only saw `ProofValidationResult::is_valid` was told a placeholder was evidence. The check now requires `crypto::SIGNATURE_LENGTH`, one named constant shared with the verifier so the two cannot drift, and it is measured load-bearing: reverting it to `is_empty()` turns exactly `validate_refuses_a_signature_that_is_not_the_shape_the_verifier_reads` red (110 passed, 1 failed, file restored).",
         "An empty attestation set stays a *warning*, on purpose, because the aggregator's flow is submit-first: `test_submit_proof` submits an unattested proof and expects it collected, and only `add_attestation` past `finality_threshold` moves the entry. `an_unattested_proof_is_collected_but_never_finalized` pins the other half \u2014 silence never becomes finality.",
-        "Still open: `GpuReceiptValidator::verify_signature` is a real Ed25519 verification over the receipt hash that **nothing calls** \u2014 it is defined and re-exported from `lib.rs`, and no path in this repository invokes it, so receipt-level signature checking is dead code rather than a control. It also uses a second signing convention (`pubkey || sig`, 96 bytes) where the aggregator uses `r || s || recovery` (65), and the two have never been reconciled.",
+        "**CLOSED 2026-09-26 \u2014 the second receipt convention is gone and the surviving one is wired.** `GpuReceiptValidator::verify_signature` accepted a 96-byte `pubkey || signature` blob and verified it over `kernel_hash` alone: the signature carried its own public key, so any caller could mint a passing one, and `output_commitment` \u2014 the field a validator is being asked to be honest about \u2014 could be rewritten under a valid signature. Nothing called it. `GpuReceiptValidator` now owns the one convention this crate uses (`attestation_message`: a domain tag over every receipt field plus bundle id, finalized block and legs hash; `parse_signature`: exactly 65 bytes, `r || s || recovery`; `verify_attestation_signature`: verified against the key the caller resolved from its own registry). `ProofAggregator::verify_attestations` and `Validator::signing_message` both call it instead of carrying byte-identical copies of the hash, so the signing and verifying sides cannot drift. Regression tests in `gpu_receipt.rs` pin the attack that the retired check allowed (`rewriting_the_output_commitment_breaks_the_signature` \u2014 measured load-bearing: unbinding `output_commitment` from the message turns exactly that test red) plus replay across block/bundle, a foreign key, and the retired 96-byte blob.",
         "Needs real GPU failure injection"
       ],
       "name": "GPU divergence quarantine / fallback",
@@ -4421,7 +4421,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "27c7e50ea82bca11a6ec23ed5a04c54587d105725b85670791ac5509abb2830d",
+    "source_digest": "2930e9a3f845d2fd73eafa35d1c19c99426f0d39a0d97c283d4b34e791cf9d31",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
@@ -4431,7 +4431,7 @@
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
       "feature-matrix/cross-vm-atomic.toml": "a9c578dffa246c06939ce6b1b5ab1dfeadd2fbe42cc523b8c421a383d67825b0",
       "feature-matrix/economic-defi.toml": "34d83bfb027c88042f7b6f88b0552f2d6a4428c798360ccb432a893cf1b67743",
-      "feature-matrix/gpu-performance.toml": "e8ee0032511dea19438afd4e9ed78b228e8b121c4c61855d2583b7d20cf7262f",
+      "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "d6c033a8657cd7b13d39cb6a3a09cf2476a4a4bf5367d996b3c4799327f0357b",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "75feb2b8b04dea7eb169c6bb17f0d38c2cfcc7ed9bc94e10b7b1732b0841ad14",

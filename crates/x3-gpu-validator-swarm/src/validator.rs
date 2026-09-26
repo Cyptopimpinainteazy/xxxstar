@@ -35,18 +35,13 @@ fn signing_message(
     finalized_block: u64,
     legs_hash: [u8; 32],
 ) -> Vec<u8> {
-    let mut hasher = Sha256::new();
-    hasher.update(b"x3-validator-attestation-v1");
-    hasher.update(&receipt.kernel_hash);
-    hasher.update(&receipt.input_commitment);
-    hasher.update(&receipt.output_commitment);
-    hasher.update(&receipt.executor);
-    hasher.update(&(receipt.gpu_cycles_used).to_le_bytes());
-    hasher.update(&bundle_id);
-    hasher.update(&finalized_block.to_le_bytes());
-    hasher.update(&legs_hash);
-    let digest = hasher.finalize();
-    digest.to_vec()
+    crate::gpu_receipt::GpuReceiptValidator::attestation_message(
+        receipt,
+        bundle_id,
+        finalized_block,
+        legs_hash,
+    )
+    .to_vec()
 }
 
 fn expand_home(path: &Path) -> PathBuf {

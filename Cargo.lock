@@ -12875,6 +12875,7 @@ dependencies = [
  "tracing",
  "uuid 1.21.0",
  "x3-chain-runtime",
+ "x3-common",
 ]
 
 [[package]]
