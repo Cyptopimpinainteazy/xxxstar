@@ -8231,3 +8231,54 @@ Report: `.ai/reports/dependabot-triage-20260925.md`.
   the adapters disagree today, which is why packets are now refused by name; the choice ripples through kernel
   tests, benchmark fixtures and the routing helpers. It is runtime-affecting, so it must be the last thing
   committed before a runtime re-attestation.
+
+## 2026-09-26 (fifty-third pass) — the runtime record was red, and the reason was a 0700 directory
+
+### What closed
+- **`runtime hash freshness`.** `aaece429d` (the EVM/SVM packet guard) moved three files in the
+  runtime's dependency graph without moving `docs/reports/runtime-wasm-hashes.json`, which the commit
+  message flagged and left red. Re-attested; the record now names `aaece429d` and the gate passes.
+  Full write-up: `.ai/reports/runtime-hash-reattestation-20260926.md`.
+- **The record was right and the doc was right — the JSON was the stale half.** The committed
+  `docs/reports/runtime-wasm-reproducibility.md` already claimed compact 8,508,157 / compressed
+  1,463,840 for `aaece429d`; three from-scratch srtool builds in `/tmp/x3-rt-rebuild` produce those
+  bytes and agree on every field when parsed with the release gate's own `_srtool_values`. When a
+  prose doc and the JSON disagree, parse the build reports before assuming which one is wrong.
+- **`wasm_adapters.rs` is in the blob; `runtime/src/lib.rs`'s `native_vm_adapters` is not.** The
+  adapter the wasm runtime instantiates is `#[cfg(not(all(feature = "std", feature = "frontier")))]
+  ...WasmEvmAdapter`, and the native adapters sit behind the opposite `cfg`. A change confined to
+  the native adapters is a revision-only record; a kernel change moves the bytes.
+
+### Environment facts worth keeping (these cost the most time)
+- **`chmod` the checkout root, or srtool cannot build.** `/home/lojak/Desktop/xxxstar-main` is mode
+  `0700`; the pinned image's `builder` user is uid 1001 and dies with `/srtool/build: line 12: cd:
+  /build: Permission denied`, leaving 922-byte reports (an `srtool-*.json` under 1 KB is a failure; a
+  successful report is ~65 KB). Reproduce with
+  `docker run --rm --user 1001:1001 -v "$PWD":/build alpine sh -c 'cd /build'`.
+  `chmod o+rx` on the root restores it; the mode-750 parent does not matter because docker resolves
+  the bind mount on the host.
+- **The image's cargo home is empty every run**, so without
+  `SRTOOL_CARGO_GIT_CACHE=<world-readable copy of ~/.cargo/git>` the build sits in "Updating git
+  repository" (a 1.3 GB hardlink copy to `/tmp` is enough; crates.io is still needed).
+- **A backgrounded build does not survive the shell that started it.** `nohup ... &` was killed and
+  left an orphan container mid-build. Use `setsid`, and check `docker ps` and `pgrep` afterwards.
+- **This box rewrites files under a running script** (issue #330). `bash scripts/local-ci.sh` aborted
+  at its summary with a `syntax error near unexpected token` on a line that is syntactically fine,
+  because `scripts/local-ci.sh`'s mtime moved mid-run while its content stayed identical to HEAD. A
+  run that dies there has still executed its gates — read the per-gate logs and re-run for a summary.
+- **Two agents were committing to this branch at once on 2026-09-25.** HEAD moved
+  `aaece429d -> 9d7a0656f` under this session, and the record change written here was committed by
+  the other session as `9d7a0656f chore(runtime): re-attest the WASM record for aaece429d`. Check
+  `git log`/`git status` before starting a long build on this box.
+
+### Still open
+1. `X3-LANG-004`: the EVM/SVM payload convention (unchanged, and the reason those two arms are inert).
+2. `yamux 0.12.1` reachable remote panic; `hickory-proto 0.24.4` needs a written risk decision.
+3. `evm 0.39.1` -> frontier's line: parked at 18 compile errors in `crates/evm-integration`.
+4. Live-chain upgrade rehearsal (needs a release build + `subxt`); multi-validator evidence; rotating
+   the bridge API key in git history.
+
+### Next task seed
+- Set the EVM/SVM payload convention for `submit_comit_v2` — the last locally-actionable item on
+  `X3-LANG-004` — by making the payload the artifact `T::EvmAdapter::validate` / `T::SvmAdapter::validate`
+  accept (the X3 arm's precedent), then re-attest the runtime once, in the same commit.
