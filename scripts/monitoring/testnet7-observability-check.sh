@@ -65,6 +65,40 @@ EXPECTED_PEERS=$(( COUNT - 1 ))
 CONNECTED_PEERS=$(( COUNT > 3 ? COUNT - 2 : COUNT - 1 ))
 HELD_OUT="${X3_OBSERVABILITY_DROP_VALIDATOR:-$COUNT}"   # self-test holds the last one out
 
+info() { printf '[obs7] %s\n' "$*"; }
+fail() { printf '[obs7] FAIL: %s\n' "$*" >&2; exit 1; }
+pass() { printf '[obs7] PASS: %s\n' "$*"; }
+
+# ── Port preflight ───────────────────────────────────────────────────────────
+# Every port this check binds is fixed: `RPC_BASE`, `P2P_BASE` and `PROM_BASE` for the validators,
+# plus Prometheus, Grafana and the collector on the three ports above `PROM_BASE`. Nothing
+# reserves them. So two invocations that overlap do not get two networks — they get *one*, and
+# each run's Prometheus scrapes whichever validators the other run started. Measured on
+# 2026-09-26, two concurrent runs of this check on this box: the second run printed
+# `PASS: a real Prometheus … scrapes 6 of 6 expected validators: all up` for a network it had not
+# started, and then its own Prometheus was killed by the other run's cleanup and the failure came
+# out as `Grafana reports datasource health 'ERROR'` — a message pointing at Grafana for a port
+# collision. A green line that was earned by someone else's nodes is the one outcome this check
+# must never produce, so refuse to start instead and say which port is taken. This runs before the
+# work directory is created, so a refusal leaves nothing behind.
+preflight_ports=()
+for _i in $(seq 0 $(( COUNT - 1 ))); do
+  preflight_ports+=("$(( RPC_BASE + _i ))" "$(( P2P_BASE + _i ))" "$(( PROM_BASE + _i ))")
+done
+preflight_ports+=("$(( PROM_BASE + 100 ))" "$(( PROM_BASE + 101 ))" "$(( PROM_BASE + 102 ))")
+_listening="$(ss -ltn 2>/dev/null | awk 'NR > 1 {print $4}' | sed 's/.*://')"
+busy_ports=()
+for _p in "${preflight_ports[@]}"; do
+  if grep -qx "$_p" <<<"$_listening"; then
+    _holder="$(ss -ltnp 2>/dev/null | awk -v port=":$_p" '$4 ~ port "$" {print $NF; exit}')"
+    busy_ports+=("$_p${_holder:+ held by $_holder}")
+  fi
+done
+if (( ${#busy_ports[@]} > 0 )); then
+  fail "port(s) already in use: ${busy_ports[*]} — this check binds fixed ports (validators on rpc $RPC_BASE, p2p $P2P_BASE, metrics $PROM_BASE, plus $(( PROM_BASE + 100 ))/$(( PROM_BASE + 101 ))/$(( PROM_BASE + 102 )) for Prometheus, Grafana and the collector), so a concurrent run would scrape this run's validators and this run would scrape its — a pass that was earned by another process's nodes. Stop the other run, or move this one with X3_OBSERVABILITY_RPC_BASE, X3_OBSERVABILITY_P2P_BASE and X3_OBSERVABILITY_PROM_BASE."
+fi
+info "ports free: rpc $RPC_BASE-$(( RPC_BASE + COUNT - 1 )), p2p $P2P_BASE-$(( P2P_BASE + COUNT - 1 )), metrics $PROM_BASE-$(( PROM_BASE + COUNT - 1 )), helpers $(( PROM_BASE + 100 ))/$(( PROM_BASE + 101 ))/$(( PROM_BASE + 102 ))"
+
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/x3-obs7.XXXXXX")"
 SPEC_DIR="$WORK_DIR/spec"
 BASE_DIR="$WORK_DIR/net"
@@ -72,10 +106,20 @@ LOG_DIR="$BASE_DIR/logs"
 SCRAPE_DIR="$WORK_DIR/metrics"
 mkdir -p "$SPEC_DIR" "$SCRAPE_DIR"
 
+# The helper processes this check starts, if it starts them. Declared here so one cleanup handles
+# every phase without each phase redefining the trap.
+PROM_PID=""
+GF_PID=""
+FB_PID=""
+# Only 1 when the whole check passed: a failing run keeps its work dir, and its logs, for the
+# reader. The missing half of this used to leave a `/tmp/x3-obs7.*` tree behind per run.
+CHECK_PASSED=0
 cleanup() {
-  # By the launcher's own pid files. Never `pkill -f x3-chain-node`: other gates' nodes are on
-  # this box, and this check owns only the set it started.
-  local f
+  local f pid
+  for pid in "$FB_PID" "$GF_PID" "$PROM_PID"; do
+    [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
+  done
+  # The launcher's pid files first…
   for f in "$BASE_DIR"/pids/node-*.pid; do
     [[ -f "$f" ]] || continue
     kill "$(cat "$f")" 2>/dev/null || true
@@ -85,12 +129,17 @@ cleanup() {
     [[ -f "$f" ]] || continue
     kill -9 "$(cat "$f")" 2>/dev/null || true
   done
+  # …then the same scoped sweep the launcher uses: a node whose pid file was lost is exactly the
+  # one a pid-file-only cleanup misses. `$BASE_DIR` is a `mktemp -d` path owned by this run, so
+  # this cannot reach another gate's validators (never a bare `pkill -f x3-chain-node`).
+  pkill -9 -f -- "--base-path $BASE_DIR/node-" 2>/dev/null || true
+  if [[ "$CHECK_PASSED" = 1 ]]; then
+    rm -rf "$WORK_DIR"
+  else
+    printf '[obs7] work dir kept for diagnosis: %s\n' "$WORK_DIR" >&2
+  fi
 }
 trap cleanup EXIT
-
-info() { printf '[obs7] %s\n' "$*"; }
-fail() { printf '[obs7] FAIL: %s\n' "$*" >&2; exit 1; }
-pass() { printf '[obs7] PASS: %s\n' "$*"; }
 
 rpc() { # <port> <method> [params]
   curl -s -m 8 -H 'Content-Type: application/json' \
@@ -242,19 +291,6 @@ if command -v prometheus >/dev/null 2>&1 && command -v promtool >/dev/null 2>&1;
     >"$WORK_DIR/prometheus.log" 2>&1 &
   PROM_PID=$!
   # It is started here, so it is stopped here — and only this one.
-  cleanup() {
-    local f
-    kill "$PROM_PID" 2>/dev/null || true
-    for f in "$BASE_DIR"/pids/node-*.pid; do
-      [[ -f "$f" ]] || continue
-      kill "$(cat "$f")" 2>/dev/null || true
-    done
-    sleep 2
-    for f in "$BASE_DIR"/pids/node-*.pid; do
-      [[ -f "$f" ]] || continue
-      kill -9 "$(cat "$f")" 2>/dev/null || true
-    done
-  }
 
   # `up{job=...} == 1` per target is the question: a Prometheus that started but cannot reach a
   # validator reports `up 0` for it, which is exactly what "live" must mean.
@@ -310,20 +346,6 @@ X3_DS_YAML
       grafana server --homepath "$GF_HOME" >"$WORK_DIR/grafana.log" 2>&1 &
       GF_PID=$!
       # Started here, stopped here — Grafana, Prometheus, and only this check's validators.
-      cleanup() {
-        local f
-        kill "$GF_PID" 2>/dev/null || true
-        kill "$PROM_PID" 2>/dev/null || true
-        for f in "$BASE_DIR"/pids/node-*.pid; do
-          [[ -f "$f" ]] || continue
-          kill "$(cat "$f")" 2>/dev/null || true
-        done
-        sleep 2
-        for f in "$BASE_DIR"/pids/node-*.pid; do
-          [[ -f "$f" ]] || continue
-          kill -9 "$(cat "$f")" 2>/dev/null || true
-        done
-      }
       gf_ready=0
       for _ in $(seq 1 60); do
         if curl -sf -m 3 "http://127.0.0.1:$GF_PORT/api/health" 2>/dev/null | grep -q '"database": *"ok"'; then
@@ -489,21 +511,6 @@ if command -v fluent-bit >/dev/null 2>&1; then
   fluent-bit -c "$FB_DIR/fluent-bit.conf" >"$FB_DIR/fluent-bit.log" 2>&1 &
   FB_PID=$!
   # Started here, stopped here.
-  cleanup() {
-    local f
-    kill "$FB_PID" 2>/dev/null || true
-    [[ -n "${GF_PID:-}" ]] && kill "$GF_PID" 2>/dev/null || true
-    [[ -n "${PROM_PID:-}" ]] && kill "$PROM_PID" 2>/dev/null || true
-    for f in "$BASE_DIR"/pids/node-*.pid; do
-      [[ -f "$f" ]] || continue
-      kill "$(cat "$f")" 2>/dev/null || true
-    done
-    sleep 2
-    for f in "$BASE_DIR"/pids/node-*.pid; do
-      [[ -f "$f" ]] || continue
-      kill -9 "$(cat "$f")" 2>/dev/null || true
-    done
-  }
   EXPECTED_INGESTED="$COUNT"
   [[ "$SELF_TEST" = 1 ]] && EXPECTED_INGESTED=$(( COUNT - 1 ))
   ingested=""
@@ -547,3 +554,5 @@ else
   [[ -n "${COLLECTOR_INGESTED:-}" && "$COLLECTOR_INGESTED" != 0 ]] && proven="$proven, a Fluent Bit collector ingested every stream"
   pass "all $COUNT validators: $proven"
 fi
+
+CHECK_PASSED=1
