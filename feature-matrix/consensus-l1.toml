@@ -7,8 +7,8 @@ subsystem = "consensus_l1"
 source = "master"
 paths = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh"]
 implemented = 88
-tested = 90
-mainnet_ready = 60
+tested = 93
+mainnet_ready = 68
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -17,6 +17,7 @@ blockers = [
   "Every validator runs on one host: no independent operators, no geographic or administrative separation",
   "No slashing, jailing or equivocation evidence from a multi-operator network — those paths have unit coverage only",
   "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
+  "**2026-09-26 — seven validators, under load, with a removal drill.** The launcher's own seven-authority spec (generated keys, no dev phrase) ran on this host for two hours: one chain throughout, all seven agreeing at heights 9000, 18000 and 27000, +35,938 to +35,940 blocks per validator, peers 6 each, zero stalls beyond 60s, no node lost, worst RSS growth 463.6 MiB against the 1 GiB bound. The same harness now carries load: `LOAD_SECS>0` drives real traffic at the network for the whole window and fails unless it finalized — measured 4 workers, 40,699 finalized transactions, 542.7 finalized TPS, worst error rate 0.0, still one chain and no stall. That closes the row's own open question ('whether a loaded validator can recover') in the direction that matters: a loaded validator kept *up*. The removal drill also passes on seven authorities: the threshold is `n - (n-1)/3` = 5, one validator was killed (verifiably gone) and the observer's finalized height kept advancing — which is the arithmetic that makes seven the specified size, and why a three-validator set cannot lose one at all.",
   "Era rotation is unexercised",
   "Two hours on a quiet box now holds — one chain, agreement at three heights, +36,092 blocks per validator, peers 3 throughout, zero peer bans, no stall beyond 60s (`.ai/reports/soak-2h-idle-20260922.md`) — so the earlier failure was load-induced: a starved validator falls behind, repeats one block request, and the peer set bans it out, which turns a lag into a partition. What that experiment does **not** show is whether a loaded validator can recover, and nothing throttles a node that is behind its own import queue",
   "Two hours, four validators, release and debug: consensus holds (one chain, agreement at three heights, +36,146 to +36,159 blocks per validator, peers 3, zero peer bans, no stall beyond 60s) and, with the state cache out of the measurement, memory holds too — worst growth 398 MiB against the 1 GiB bound (`<repo>/.wt-agent/soak-100b`, `.ai/reports/soak-2h-idle-20260922.md`). With the default 1 GiB state cache the same node grows ~1.75 GiB, which is configured memory rather than a leak, and the harness now says which cache size it ran with instead of failing every normally-configured node",

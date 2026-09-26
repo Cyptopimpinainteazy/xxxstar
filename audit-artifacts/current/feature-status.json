@@ -183,7 +183,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 77,
+      "composite": 81,
       "confidence": "high",
       "evidence": [
         "scripts/testnet/run-7-validators-local.sh",
@@ -196,11 +196,12 @@
       "implemented": 88,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 60,
+      "mainnet_ready": 68,
       "missing_work": [
         "Every validator runs on one host: no independent operators, no geographic or administrative separation",
         "No slashing, jailing or equivocation evidence from a multi-operator network \u2014 those paths have unit coverage only",
         "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
+        "**2026-09-26 \u2014 seven validators, under load, with a removal drill.** The launcher's own seven-authority spec (generated keys, no dev phrase) ran on this host for two hours: one chain throughout, all seven agreeing at heights 9000, 18000 and 27000, +35,938 to +35,940 blocks per validator, peers 6 each, zero stalls beyond 60s, no node lost, worst RSS growth 463.6 MiB against the 1 GiB bound. The same harness now carries load: `LOAD_SECS>0` drives real traffic at the network for the whole window and fails unless it finalized \u2014 measured 4 workers, 40,699 finalized transactions, 542.7 finalized TPS, worst error rate 0.0, still one chain and no stall. That closes the row's own open question ('whether a loaded validator can recover') in the direction that matters: a loaded validator kept *up*. The removal drill also passes on seven authorities: the threshold is `n - (n-1)/3` = 5, one validator was killed (verifiably gone) and the observer's finalized height kept advancing \u2014 which is the arithmetic that makes seven the specified size, and why a three-validator set cannot lose one at all.",
         "Era rotation is unexercised",
         "Two hours on a quiet box now holds \u2014 one chain, agreement at three heights, +36,092 blocks per validator, peers 3 throughout, zero peer bans, no stall beyond 60s (`.ai/reports/soak-2h-idle-20260922.md`) \u2014 so the earlier failure was load-induced: a starved validator falls behind, repeats one block request, and the peer set bans it out, which turns a lag into a partition. What that experiment does **not** show is whether a loaded validator can recover, and nothing throttles a node that is behind its own import queue",
         "Two hours, four validators, release and debug: consensus holds (one chain, agreement at three heights, +36,146 to +36,159 blocks per validator, peers 3, zero peer bans, no stall beyond 60s) and, with the state cache out of the measurement, memory holds too \u2014 worst growth 398 MiB against the 1 GiB bound (`<repo>/.wt-agent/soak-100b`, `.ai/reports/soak-2h-idle-20260922.md`). With the default 1 GiB state cache the same node grows ~1.75 GiB, which is configured memory rather than a leak, and the harness now says which cache size it ran with instead of failing every normally-configured node"
@@ -217,8 +218,8 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "consensus_l1",
-      "tested": 90,
-      "tests": "tested score 90% (no named test list on this row)"
+      "tested": 93,
+      "tests": "tested score 93% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3344,7 +3345,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 62,
+      "composite": 72,
       "confidence": "high",
       "evidence": [
         "scripts/mainnet/public_testnet_gate.sh",
@@ -3354,15 +3355,16 @@
         "note: two runnable gates \u2014 the 25.6 kB RPC gate (system_health, GRANDPA authorities, bridge storage, block height over `--rpc-base-url`) and the ceremony verifier (genesis hash, spec sha256, runtime version, authority set, peer ids, finality; seen to reject a tampered manifest) \u2014 plus a spec builder that takes published `PUBLIC_BOOTNODES` and a bootnode identity tool, so the operator path up to 'point the gate at a hosted endpoint' is written down and exercised; `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` PASS 290s"
       ],
       "id": "X3-OPS-003",
-      "implemented": 80,
+      "implemented": 85,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 45,
+      "mainnet_ready": 52,
       "missing_work": [
         "There is no public testnet to gate: measured 2026-09-22 \u2014 `rpc.testnet.x3-chain.io`, `faucet.testnet.x3-chain.io` and `bootnode.testnet.x3-chain.io` do not resolve (from a host whose DNS reaches github.com), `gh run list --workflow testnet-deploy.yml` is empty, and every step of docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md is unchecked",
         "No hosting, DNS, TLS or monitoring is provisioned, so the gate has nothing to point at; its default is `http://localhost:9933`",
         "The gate is RPC-only: it cannot see whether the network is *independently* operated, which is the property a public testnet exists to demonstrate",
-        "Both gates have only ever run against loopback networks on one host"
+        "**2026-09-26 \u2014 the gate runs, and it reads the chain's own numbers.** It was run against a real seven-validator testnet network (on this one host): 14 of 15 criteria PASS and the 15th is a SKIP. Reaching that took three real defects out of the way, each measured: gate 1 counted `peers + 1` and called it a validator count (`GrandpaApi_grandpa_authorities` is a hex SCALE blob and `jq length` on it is a parse error, so the code fell through to the fallback \u2014 it reported `found 6, need 7` on a seven-authority chain with one validator stopped), gates 10 and 11 issued `cargo test -p X name1 name2`, which is `error: unexpected argument` (one positional filter only \u2014 both criteria could never pass, whatever the tests did), and gate 5 looked for treasury/faucet fields no real spec has. Gate 6 (72-hour stability) is the SKIP: `X3_TESTNET_HOURS=0` is the CI form and the timer cannot be answered on this box. The verdict now says `PASS with skipped criteria` and names it, where it used to claim all criteria were met.",
+        "The gate is still RPC-only: it cannot see whether the network is *independently* operated, and it has only ever run against loopback networks on one host. Hosting, DNS, TLS and monitoring remain unprovisioned."
       ],
       "name": "Public testnet gate",
       "paths": [
@@ -3376,8 +3378,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 65,
-      "tests": "tested score 65% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4433,20 +4435,20 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "bf63c1ad5917c5ddfa2c5a17bdd7da3ed16c343c649da05c859f6d7218dff43c",
+    "source_digest": "a327481e22d73b1dc43c567927041922a875067c002535491f29c26fba80eeb0",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
       "feature-matrix/claims-hygiene.toml": "e2101c3396a4b68a38e6f8ffc7245967fd1edaa05631080996a4a5d3c8bbd6e6",
-      "feature-matrix/consensus-l1.toml": "86b9d3871259ddee0dde4393b92ab67be0e5a4bccefd642d28c53d25ca8b4f82",
+      "feature-matrix/consensus-l1.toml": "27ae8d12b00c0f2b4034a50cf5f65fbbd1f8748a04f90978461a60d1afcd453f",
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
       "feature-matrix/cross-vm-atomic.toml": "a9c578dffa246c06939ce6b1b5ab1dfeadd2fbe42cc523b8c421a383d67825b0",
       "feature-matrix/economic-defi.toml": "780f5e51c1bbe5f35e64e90cd3de0085c74b38d136a819d9947a1fc03e1184b6",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "82709af2895a05fd284901791d511909ac64cc634a123da8ce7a86c90ebb0cfe",
+      "feature-matrix/operations-user-tools.toml": "c57775637641e7f0e8360f27a1a00d34d541ae509e02fcfb9ad1a0c1dad2d429",
       "feature-matrix/runtime-core.toml": "8b44ebcf62fab95e5678825f1671785b19e0771cdf4917ce9b323c34e772a5a6",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }

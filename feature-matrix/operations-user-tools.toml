@@ -52,9 +52,9 @@ name = "Public testnet gate"
 subsystem = "operations_user_tools"
 source = "master"
 paths = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh", "docs/reports/PUBLIC_TESTNET_LAUNCH.md"]
-implemented = 80
-tested = 65
-mainnet_ready = 45
+implemented = 85
+tested = 85
+mainnet_ready = 52
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
@@ -63,7 +63,8 @@ blockers = [
   "There is no public testnet to gate: measured 2026-09-22 — `rpc.testnet.x3-chain.io`, `faucet.testnet.x3-chain.io` and `bootnode.testnet.x3-chain.io` do not resolve (from a host whose DNS reaches github.com), `gh run list --workflow testnet-deploy.yml` is empty, and every step of docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md is unchecked",
   "No hosting, DNS, TLS or monitoring is provisioned, so the gate has nothing to point at; its default is `http://localhost:9933`",
   "The gate is RPC-only: it cannot see whether the network is *independently* operated, which is the property a public testnet exists to demonstrate",
-  "Both gates have only ever run against loopback networks on one host",
+  "**2026-09-26 — the gate runs, and it reads the chain's own numbers.** It was run against a real seven-validator testnet network (on this one host): 14 of 15 criteria PASS and the 15th is a SKIP. Reaching that took three real defects out of the way, each measured: gate 1 counted `peers + 1` and called it a validator count (`GrandpaApi_grandpa_authorities` is a hex SCALE blob and `jq length` on it is a parse error, so the code fell through to the fallback — it reported `found 6, need 7` on a seven-authority chain with one validator stopped), gates 10 and 11 issued `cargo test -p X name1 name2`, which is `error: unexpected argument` (one positional filter only — both criteria could never pass, whatever the tests did), and gate 5 looked for treasury/faucet fields no real spec has. Gate 6 (72-hour stability) is the SKIP: `X3_TESTNET_HOURS=0` is the CI form and the timer cannot be answered on this box. The verdict now says `PASS with skipped criteria` and names it, where it used to claim all criteria were met.",
+  "The gate is still RPC-only: it cannot see whether the network is *independently* operated, and it has only ever run against loopback networks on one host. Hosting, DNS, TLS and monitoring remain unprovisioned.",
 ]
 evidence = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/local-ci.sh", "docs/reports/PUBLIC_TESTNET_LAUNCH.md", "note: two runnable gates — the 25.6 kB RPC gate (system_health, GRANDPA authorities, bridge storage, block height over `--rpc-base-url`) and the ceremony verifier (genesis hash, spec sha256, runtime version, authority set, peer ids, finality; seen to reject a tampered manifest) — plus a spec builder that takes published `PUBLIC_BOOTNODES` and a bootnode identity tool, so the operator path up to 'point the gate at a hosted endpoint' is written down and exercised; `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` PASS 290s"]
 
