@@ -602,6 +602,11 @@ GATES_LIVE=(
   # without a log filter emits only warnings, so the check sets the level explicitly and
   # asserts on what the stream says rather than on a file existing.
   "logging across validators:bash scripts/monitoring/local3-logging-check.sh --self-test"
+  # The same two questions at testnet scale: a generated seven-authority network, seven
+  # exporters each identifying its own validator, seven collected log streams, and one
+  # aggregate query that has to reach all seven. `--self-test` holds a validator out of
+  # both collections and requires both checks to fail.
+  "observability across seven validators:bash scripts/monitoring/testnet7-observability-check.sh --self-test"
   # The snapshot bullet: export a running chain, restore it into a fresh base path,
   # and require the finalized height, the canonical hash at that height and every
   # storage entry to come back — with a control node on an empty database required
@@ -1084,6 +1089,7 @@ SERIAL_GATES=(
   "local network smoke"
   "monitoring across validators"
   "logging across validators"
+  "observability across seven validators"
   "snapshot restore across a live chain"
   "runtime upgrade through governance"
   "load soak across validators"
