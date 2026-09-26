@@ -347,7 +347,11 @@ impl X3VmAdapter for PlutusHtlcAdapter {
             claim_path: true,
             refund_path: true,
             event_proof_extraction: false, // needs actual Plutus event extraction
-            finality_proof: true,
+            // `finality_status` returns a constant proof — block 42 and a hash of the number —
+            // so there is no chain finality to point at. Declaring it true was the score claiming
+            // a capability the code does not have; scripts/ci/check-adapter-readiness-claims.py
+            // keeps that honest.
+            finality_proof: false,
             rpc_indexer_support: false, // needs real RPC/indexer integration
             timeout_safety: true,
             tests_implemented: true,
@@ -919,13 +923,16 @@ mod tests {
         assert!(score.claim_path);
         assert!(score.refund_path);
         assert!(!score.event_proof_extraction);
-        assert!(score.finality_proof);
+        assert!(
+            !score.finality_proof,
+            "finality_status returns a constant proof, so this adapter cannot claim finality"
+        );
         assert!(!score.rpc_indexer_support);
         assert!(score.timeout_safety);
         assert!(score.tests_implemented);
         assert!(!score.proof_ledger_integration);
 
-        assert_eq!(score.score(), 70);
+        assert_eq!(score.score(), 60);
         assert_eq!(score.adapter_name, "x3-adapter-plutus");
         assert_eq!(score.vm_type, VmType::PlutusEutxo);
 
@@ -934,7 +941,7 @@ mod tests {
         assert!(missing.contains(&"rpc_indexer_support"));
         assert!(missing.contains(&"proof_ledger_integration"));
         assert!(missing.contains(&"ibc_support"));
-        assert_eq!(missing.len(), 5);
+        assert_eq!(missing.len(), 6);
     }
 
     // ── Stateful Adapter Tests ────────────────────────────────────────────

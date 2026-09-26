@@ -2994,8 +2994,14 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
         "must contain x3vm"
     );
 
-    // 25. Verify overall score is at least 70. X3VM is offline simulation
-    // only, so it must not be marked as a fully production-ready adapter.
+    // 25. The scoreboard has to describe the adapters, not flatter them.
+    //
+    // This asserted `overall_score >= 70` until 2026-09-26, and the number was only reachable
+    // because the adapters declared `finality_proof` and `proof_ledger_integration` true while
+    // `finality_status` returns a constant proof and nothing writes a ledger: the threshold was
+    // measuring the claim rather than the code. With the declarations corrected the same set scores
+    // 58, so what is asserted now is the property the threshold was standing in for — an adapter
+    // with no chain evidence has to show up as missing it.
     let scoreboard = AdapterScoreboard::from_adapters(
         &center
             .adapters
@@ -3005,8 +3011,21 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
         0,
     );
     assert!(
-        scoreboard.overall_score >= 70,
-        "overall score must be at least 70, got {}",
+        !scoreboard.entries.is_empty(),
+        "the scoreboard must describe the adapters under test"
+    );
+    assert!(
+        scoreboard
+            .entries
+            .iter()
+            .any(|e| e.missing_capabilities.iter().any(|m| m == "finality_proof")),
+        "every adapter here returns a constant finality proof, so the scoreboard must report \
+         finality_proof missing for at least one of them: {:?}",
+        scoreboard.entries
+    );
+    assert!(
+        scoreboard.overall_score < 70,
+        "an adapter set with no chain evidence must not score as though it had it, got {}",
         scoreboard.overall_score
     );
     let x3vm_entry = scoreboard

@@ -15,15 +15,4 @@
 # scores their own tests pin, e.g. move_vm 80, cosmwasm 80/100, wasm_l1 90) or giving the adapter a
 # real evidence path.
 
-FAIL  crates/x3-atomic-swap/src/bitcoin_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/cairo_vm_htlc.rs: claims finality_proof while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/cosmwasm_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/fuel_htlc.rs: claims finality_proof while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/move_vm_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/near_htlc.rs: claims finality_proof while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/plutus_htlc.rs: claims finality_proof while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/polkadot_ink_htlc.rs: claims finality_proof while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/soroban_htlc.rs: claims finality_proof while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/substrate_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/ton_htlc.rs: claims finality_proof while fabricating chain evidence
-FAIL  crates/x3-atomic-swap/src/wasm_l1_htlc.rs: claims finality_proof , proof_ledger_integration while fabricating chain evidence
+# (no entries: every adapter's declared readiness was corrected on 2026-09-26)

@@ -360,7 +360,11 @@ impl X3VmAdapter for InkHtlcAdapter {
             claim_path: true,
             refund_path: true,
             event_proof_extraction: false, // needs actual ink! event extraction
-            finality_proof: true,
+            // `finality_status` returns a constant proof — block 42 and a hash of the number —
+            // so there is no chain finality to point at. Declaring it true was the score claiming
+            // a capability the code does not have; scripts/ci/check-adapter-readiness-claims.py
+            // keeps that honest.
+            finality_proof: false,
             rpc_indexer_support: false, // needs real RPC/indexer integration
             timeout_safety: true,
             tests_implemented: true,
@@ -941,7 +945,7 @@ mod tests {
     fn test_readiness_score() {
         let adapter = InkHtlcAdapter::new("polkadot-mainnet".into(), InkNetwork::PolkadotMainnet);
         let score = adapter.readiness_score();
-        assert_eq!(score.score(), 70);
+        assert_eq!(score.score(), 60);
         assert!(score.missing_items().contains(&"event_proof_extraction"));
         assert!(score.missing_items().contains(&"rpc_indexer_support"));
         assert!(score.missing_items().contains(&"proof_ledger_integration"));

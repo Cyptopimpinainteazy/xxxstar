@@ -315,11 +315,17 @@ impl X3VmAdapter for WasmL1Adapter {
             claim_path: true,
             refund_path: true,
             event_proof_extraction: false,
-            finality_proof: true,
+            // `finality_status` returns a constant proof — block 42 and a hash of the number —
+            // so there is no chain finality to point at. Declaring it true was the score claiming
+            // a capability the code does not have; scripts/ci/check-adapter-readiness-claims.py
+            // keeps that honest.
+            finality_proof: false,
             rpc_indexer_support: false,
             timeout_safety: true,
             tests_implemented: true,
-            proof_ledger_integration: true,
+            // Nothing in this adapter writes to a proof ledger: the flag asserted integration
+            // that does not exist.
+            proof_ledger_integration: false,
             ibc_support: matches!(self.runtime, WasmL1Runtime::Archway),
             cross_adapter_atomicity_test: true,
         }
@@ -547,8 +553,8 @@ mod tests {
     fn test_readiness_score() {
         let a = test_adapter();
         let score = a.readiness_score();
-        // 9 items true (out of 12), cap 100; cross_adapter_atomicity_test adds 10
-        assert_eq!(score.score(), 90);
+        // 7 items true (out of 12), cap 100; cross_adapter_atomicity_test adds 10
+        assert_eq!(score.score(), 70);
         let missing = score.missing_items();
         assert!(missing.contains(&"event_proof_extraction"));
         assert!(missing.contains(&"rpc_indexer_support"));
