@@ -607,6 +607,15 @@ GATES_LIVE=(
   # aggregate query that has to reach all seven. `--self-test` holds a validator out of
   # both collections and requires both checks to fail.
   "observability across seven validators:bash scripts/monitoring/testnet7-observability-check.sh --self-test"
+  # The launch gate itself, run against a real network instead of remembered from one
+  # recorded run: a generated seven-authority network, then criterion 1 required to report
+  # the chain's own authority set *and* how many of those authorities are reachable (the
+  # two numbers that used to be one wrong one, `peers + 1`), then one validator stopped and
+  # the same criterion required to FAIL. It owns the criteria that are about the chain
+  # (1 and 12) and requires the verdict not to claim a clean sweep while criterion 6 is
+  # skipped; the criteria that read a dashboard or a wallet app on this box are printed
+  # rather than asserted, and the drill says so in its output.
+  "public testnet gate across seven validators:bash scripts/testnet/public-testnet-gate-drill.sh --self-test"
   # The snapshot bullet: export a running chain, restore it into a fresh base path,
   # and require the finalized height, the canonical hash at that height and every
   # storage entry to come back — with a control node on an empty database required
@@ -1090,6 +1099,7 @@ SERIAL_GATES=(
   "monitoring across validators"
   "logging across validators"
   "observability across seven validators"
+  "public testnet gate across seven validators"
   "snapshot restore across a live chain"
   "runtime upgrade through governance"
   "load soak across validators"
