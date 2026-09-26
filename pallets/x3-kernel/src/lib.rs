@@ -34,11 +34,11 @@ compile_error!(
 /// The pallet uses pluggable VM adapters (`T::EvmAdapter`, `T::SvmAdapter`) configured at runtime:
 ///
 /// - **Test Runtime**: Uses `MockEvmAdapter` and `MockSvmAdapter` for deterministic testing
-/// - **Production Runtime**: Should use `FrontierEvmAdapter` and `RbpfSvmAdapter`
+/// - **Production Runtime**: the EVM arm runs on the runtime's own EVM adapter
+///   (`NativeEvmAdapter` under `--features frontier`, `WasmEvmAdapter` otherwise); the SVM and
+///   X3 arms use `RbpfSvmAdapter` and `X3VmAdapter`
 ///
 /// **IMPORTANT**: Before mainnet deployment, verify runtime configuration uses real adapters.
-/// The `adapters.rs` module includes `FrontierEvmAdapter` which wraps pallet-evm, but runtime
-/// must be properly configured to use it instead of mocks.
 pub use pallet::*;
 
 /// Phase 1: Full Consensus Implementation
@@ -48,8 +48,9 @@ pub mod authority;
 /// VM Execution Adapters
 /// Provides EvmExecutorAdapter and SvmExecutorAdapter traits for runtime configuration.
 ///
-/// **H-5 Note**: For production, configure runtime with `FrontierEvmAdapter` and `RbpfSvmAdapter`
-/// instead of mock adapters. Mock adapters are for testing only.
+/// **H-5 Note**: For production, configure the runtime with its real adapters
+/// (`NativeEvmAdapter`/`WasmEvmAdapter`, `RbpfSvmAdapter`, `X3VmAdapter`) instead of mock
+/// adapters. Mock adapters are for testing only.
 pub mod adapters;
 
 /// Packet Deserialization & Domain Routing Layer (Phase 1.3)
@@ -99,7 +100,7 @@ pub use security_gates::*;
 
 // Re-export real adapters for std builds (native runtime)
 #[cfg(feature = "std")]
-pub use adapters::real_adapters::{FrontierEvmAdapter, RbpfSvmAdapter, X3VmAdapter};
+pub use adapters::real_adapters::{RbpfSvmAdapter, X3VmAdapter};
 
 /// Benchmarking support for weight generation.
 /// Enable with `--features runtime-benchmarks`.

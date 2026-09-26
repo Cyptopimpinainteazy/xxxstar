@@ -104,9 +104,10 @@ pub async fn execute(args: DeployArgs) -> Result<()> {
     let signer = x3_sdk::Sr25519Signer::from_seed(&seed);
     let client = client.with_signer(signer);
 
-    // Build deployment Comit — use evm_deploy to construct a valid
-    // Packet::Evm(EvmPacket::Deploy{..}) for the packet-validated
-    // submit_comit path.
+    // Build the deployment Comit. `evm_deploy` sets the EVM payload to the init
+    // code itself — the artifact the chain's EVM adapter executes. It used to
+    // SCALE-encode a `Packet::Evm(EvmPacket::Deploy{..})`, which every adapter now
+    // refuses by name (X3-LANG-004: a payload is the artifact its adapter runs).
     let gas_limit = args.gas_limit.unwrap_or(1_000_000);
 
     let comit = ComitBuilder::evm_deploy(bytecode)
@@ -194,9 +195,11 @@ async fn simulate_deploy(endpoint: &str, bytecode: &[u8]) -> Result<()> {
         .await?;
 
     println!("  {} Estimated gas: {}", "✓".green(), gas);
+    // `evm_estimate_gas` estimates gas; it does not execute, so it cannot show that a
+    // deployment would succeed. Saying so was a claim the command never checked.
     println!(
-        "{} Simulation complete - deployment would succeed",
-        "✓".green()
+        "{} Dry run complete - gas estimate only, no deployment was executed",
+        "→".yellow()
     );
 
     Ok(())

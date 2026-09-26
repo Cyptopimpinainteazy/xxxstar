@@ -78,8 +78,11 @@ This document tracks everything accomplished in creating X3 Chain - a Substrate-
   - `MockEvmAdapter` / `MockSvmAdapter` with deterministic behavior
 
 - [x] **Real Adapter Implementations** (std-only)
-  - `FrontierEvmAdapter` wrapping real EVM executor
   - `RbpfSvmAdapter` wrapping real BPF executor
+  - `X3VmAdapter` wrapping the X3 VM executor
+  - (no standalone EVM adapter: the EVM arm runs on the runtime's own
+    `NativeEvmAdapter`/`WasmEvmAdapter`. A `FrontierEvmAdapter` used to live here and returned
+    `success: true` for code it never executed; it was deleted on 2026-09-26.)
 
 - [x] **Pallet Config Integration**
   - `type EvmAdapter: EvmExecutorAdapter;`

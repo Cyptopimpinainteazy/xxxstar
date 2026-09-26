@@ -12,7 +12,8 @@ use sp_std::vec;
 use sp_std::vec::Vec;
 
 /// Trait for EVM execution adapters
-/// Runtime configures this with either MockEvmAdapter (tests) or FrontierEvmAdapter (production)
+/// The runtime configures this with `MockEvmAdapter` (tests), `NativeEvmAdapter`
+/// (std + `frontier` builds) or `WasmEvmAdapter` (the wasm runtime the chain runs).
 pub trait EvmExecutorAdapter {
     /// Execute EVM payload and return execution receipt
     fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError>;
@@ -92,7 +93,8 @@ impl EvmExecutorAdapter for MockEvmAdapter {
 }
 
 // Unit-type adapters are gated behind test/benchmarks only — production
-// runtimes must wire real adapters (FrontierEvmAdapter, RbpfSvmAdapter, etc.).
+// runtimes must wire real adapters (NativeEvmAdapter/WasmEvmAdapter,
+// RbpfSvmAdapter, X3VmAdapter).
 #[cfg(any(test, feature = "runtime-benchmarks"))]
 impl EvmExecutorAdapter for () {
     fn execute(_payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
@@ -357,7 +359,7 @@ impl X3ExecutorAdapter for FailingMockX3Adapter {
 
 /// The unit-type adapter exists ONLY for test support and backwards compatibility
 /// in non-production contexts.  Production code MUST use a concrete adapter
-/// (e.g. `FrontierEvmAdapter`, `SolanaBpfAdapter`, or a custom `X3ExecutorAdapter` impl)
+/// (e.g. the runtime's EVM adapter or `X3VmAdapter`, or a custom `X3ExecutorAdapter` impl)
 /// and MUST NOT allow `()` to silently produce mock receipts.
 #[cfg(any(test, feature = "dev-mock"))]
 impl X3ExecutorAdapter for () {
@@ -392,84 +394,17 @@ pub mod real_adapters {
     //! Real VM adapters using solana-rbpf and X3 VM
     //!
     //! These are only available in std builds due to external dependencies.
-    //! Note: FrontierEvmAdapter uses a standalone EVM implementation because
-    //! the Frontier executor requires runtime type parameters not available here.
+    //!
+    //! There is deliberately **no** EVM adapter here. The EVM arm is executed by
+    //! whichever `EvmExecutorAdapter` the runtime configures (`NativeEvmAdapter`
+    //! under `--features frontier`, `WasmEvmAdapter` otherwise), and both of those
+    //! really run the payload. A standalone adapter in this module cannot: it has
+    //! no account, storage, or block context to execute against, and the one that
+    //! used to live here (`FrontierEvmAdapter`) returned `success: true` with a
+    //! gas figure derived from the payload length, for code it never ran.
 
     use super::*;
     use x3_svm_integration::{RbpfSvmExecutor, SvmConfig, SvmExecutor};
-
-    /// Production EVM adapter
-    /// Uses a standalone EVM implementation for basic bytecode validation and execution.
-    /// For full Frontier integration, the runtime should configure pallet-evm directly.
-    pub struct FrontierEvmAdapter;
-
-    impl EvmExecutorAdapter for FrontierEvmAdapter {
-        fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
-            // Basic EVM payload validation
-            if payload.is_empty() {
-                return Err(DispatchError::Other("Empty EVM payload"));
-            }
-
-            // For native execution, we perform basic validation and return a success receipt.
-            // The actual EVM execution happens via pallet-evm in the runtime.
-            // This adapter is primarily for gas estimation and validation in native context.
-
-            // Compute gas based on payload size (21000 base + 16 per non-zero byte + 4 per zero byte)
-            let gas_used: u64 = 21000
-                + payload
-                    .iter()
-                    .map(|&b| if b == 0 { 4u64 } else { 16u64 })
-                    .sum::<u64>();
-            let gas_used = gas_used.min(gas_limit);
-
-            let mut pseudo_address = [0u8; 20];
-            let payload_hash = sp_io::hashing::blake2_256(payload);
-            pseudo_address.copy_from_slice(&payload_hash[..20]);
-
-            Ok(ExecutionReceipt {
-                version: crate::EXECUTION_RECEIPT_VERSION,
-                success: true,
-                gas_used,
-                return_data: Vec::new(),
-                logs: Vec::new(),
-                state_changes: vec![StateChange {
-                    // Standalone adapter has no runtime AccountId context, so we derive a
-                    // deterministic pseudo-address from payload hash.
-                    address: pseudo_address.to_vec(),
-                    key: canonical_asset_key(0),
-                    value: canonical_balance_value(gas_used as u128),
-                }],
-                protocol_version: 1,
-                migration_history: Vec::new(),
-                compatibility_flags: 0,
-                from: Vec::new(),
-                to: Vec::new(),
-                value: 0,
-            })
-        }
-
-        fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
-            if payload.is_empty() {
-                return Err(DispatchError::Other("Empty EVM payload"));
-            }
-
-            // EIP-2028 gas costs: 16 per non-zero byte, 4 per zero byte, plus 21000 base
-            let calldata_gas: u64 = payload
-                .iter()
-                .map(|&b| if b == 0 { 4u64 } else { 16u64 })
-                .sum();
-            Ok(21000 + calldata_gas)
-        }
-
-        fn validate(payload: &[u8]) -> Result<(), DispatchError> {
-            if payload.is_empty() {
-                return Err(DispatchError::Other("Empty EVM payload"));
-            }
-            // Basic validation - check for common invalid patterns
-            // Full validation happens during actual execution in pallet-evm
-            Ok(())
-        }
-    }
 
     /// Production SVM adapter using solana-rbpf
     pub struct RbpfSvmAdapter;
@@ -687,13 +622,5 @@ mod real_adapter_tests {
         let result = X3VmAdapter::validate(&valid_header);
         // May fail due to incomplete module, but should recognize header
         assert!(result.is_ok() || result.is_err());
-    }
-
-    #[test]
-    fn test_frontier_evm_adapter_with_real_executor() {
-        // This test will work once FrontierEvmAdapter is wired to real executor
-        let simple_evm = vec![0x60, 0x00, 0x60, 0x00, 0xf3];
-        let result = FrontierEvmAdapter::execute(&simple_evm, 100_000);
-        assert!(result.is_ok());
     }
 }
