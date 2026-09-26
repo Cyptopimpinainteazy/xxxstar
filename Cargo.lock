@@ -12479,6 +12479,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3-asset-kernel-types",
  "x3-cross-vm-bridge",
  "x3-evm-integration",
  "x3-packet-schema",

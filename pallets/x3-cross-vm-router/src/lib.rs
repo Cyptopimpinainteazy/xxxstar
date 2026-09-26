@@ -97,6 +97,40 @@ compile_error!(
 /// X3 Cross-VM Router pallet.
 pub use pallet::*;
 
+/// Verifies an external chain's block root against that chain's consensus.
+///
+/// See `Config::ExternalRootVerifier`. There is deliberately **no default that accepts**:
+/// a runtime that has not wired a verifier must refuse the registration, because the root is
+/// later trusted by bridge accounting and a well-formed byte string is not a proof.
+pub trait ExternalRootVerifier<T: pallet::Config> {
+    /// `Ok(())` means: this proof binds `root_hash` at `block_number` to `chain_id`'s
+    /// consensus. Anything else — including "I cannot check this" — must be an error.
+    fn verify_root(
+        chain_id: u32,
+        root_hash: sp_core::H256,
+        block_number: u32,
+        proof: &[u8],
+    ) -> Result<(), sp_runtime::DispatchError>;
+}
+
+/// The verifier a runtime wires while it has no external light client.
+///
+/// It refuses every registration with `Error::ExternalRootVerificationUnavailable`, which is
+/// the honest answer: no component of this repository can check an external chain's consensus,
+/// so no root can be established.
+pub struct RefuseExternalRoots;
+
+impl<T: pallet::Config> ExternalRootVerifier<T> for RefuseExternalRoots {
+    fn verify_root(
+        _chain_id: u32,
+        _root_hash: sp_core::H256,
+        _block_number: u32,
+        _proof: &[u8],
+    ) -> Result<(), sp_runtime::DispatchError> {
+        Err(pallet::Error::<T>::ExternalRootVerificationUnavailable.into())
+    }
+}
+
 #[cfg(test)]
 mod tests;
 
@@ -119,6 +153,8 @@ pub mod pallet {
     use sp_core::H256;
     use sp_runtime::traits::SaturatedConversion;
     use sp_std::{vec, vec::Vec};
+    // The trait has to be in scope at the call site; the associated type alone is not enough.
+    use crate::ExternalRootVerifier;
 
     /// Convenience alias for the balance type used by the configured currency.
     pub type BalanceOf<T> =
@@ -352,6 +388,18 @@ pub mod pallet {
         /// Read-only economic halt gate used to block new transfer initiation.
         type EconomicHalt: EconomicHaltInspect;
 
+        /// Verifies that an external chain's block root really is that chain's block root.
+        ///
+        /// `register_external_root` stores a root other code then trusts as the state of a
+        /// foreign chain, and the body used to accept **any non-empty byte string** while
+        /// calling it "proof against chain consensus" — a data-shape check in the same class as
+        /// the settlement verifier's, which was fixed the same way. A runtime that has not wired
+        /// a verifier must therefore refuse to register a root: `RefuseExternalRoots` is that
+        /// implementation, and it is what this runtime wires until a per-chain verifier (SPV /
+        /// light client) exists. Returning `Ok(())` from a verifier is a claim that the proof
+        /// binds the root to the chain's consensus, not merely that it is well-formed.
+        type ExternalRootVerifier: crate::ExternalRootVerifier<Self>;
+
         /// Currency for charging the XVM routing fee in native X3 tokens.
         type Currency: Currency<Self::AccountId>;
 
@@ -483,6 +531,13 @@ pub mod pallet {
         NotAuthorizedGovernance,
         /// Invalid proof provided
         InvalidProof,
+        /// No verifier can bind an external chain's root to that chain's consensus.
+        ///
+        /// Distinct from `InvalidProof`: this is not "the proof was bad" but "nothing here can
+        /// check a proof at all", and it is what `Config::ExternalRootVerifier` returns when the
+        /// runtime has wired `RefuseExternalRoots` (the state of this runtime until an external
+        /// light client exists).
+        ExternalRootVerificationUnavailable,
         /// Root hash mismatch
         RootHashMismatch,
         /// Caller not authorized to use the claimed sender identity
@@ -691,9 +746,16 @@ pub mod pallet {
                 Error::<T>::BridgePaused
             );
 
-            // P4: Validate proof against chain consensus (basic checks)
-            // In production, this would verify SPV proofs, Merkle roots, etc.
-            ensure!(!proof.is_empty(), Error::<T>::InvalidProof);
+            // P4: The root has to be bound to the external chain's consensus before it is stored.
+            //
+            // This was `ensure!(!proof.is_empty())` with a comment saying a production version
+            // "would verify SPV proofs, Merkle roots, etc." — a data-shape check standing in for
+            // a verifier, in the same class as the settlement verifier's fabricated acceptance,
+            // and worse in consequence: the value it accepted is written to `BridgeRoots` and
+            // read by everything downstream as *the* state of that chain. The check is now a
+            // call to a configured verifier, and the runtime wires one that refuses, so a root
+            // cannot be established at all until a real per-chain verifier exists.
+            T::ExternalRootVerifier::verify_root(chain_id, root_hash, block_number, &proof)?;
 
             // P5: Verify block_number is reasonable (not too far in future)
             let current_block = frame_system::Pallet::<T>::block_number();

@@ -2510,6 +2510,11 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
+    // Refuses every external root: nothing in this runtime can bind a foreign chain's block
+    // root to that chain's consensus, and `register_external_root` writes a value the bridge
+    // surface later trusts. Wire a per-chain light client here and the extrinsic becomes usable;
+    // until then it fails closed with `ExternalRootVerificationUnavailable`.
+    type ExternalRootVerifier = pallet_x3_cross_vm_router::RefuseExternalRoots;
     type VmAdapterOrigin = EnsureX3LangGateway;
     type X3LangOrigin = EnsureX3LangGateway;
     type EconomicHalt = X3SupplyLedger;
@@ -4280,6 +4285,19 @@ impl_runtime_apis! {
 
         fn get_total_issuance() -> Balance {
             pallet_balances::TotalIssuance::<Runtime>::get()
+        }
+
+        /// The per-asset supply ledger, read straight out of the ledger pallet.
+        ///
+        /// The ledger is the thing that enforces `native + evm + svm + external_locked +
+        /// pending <= canonical` per asset, and until this existed nothing could check that
+        /// identity on a running chain — the distributed supply proof covered only the native
+        /// currency. Reading the pallet's own storage means the API cannot report a shape the
+        /// ledger does not hold.
+        fn get_asset_supply_ledger(
+            asset_id: x3_asset_kernel_types::AssetId,
+        ) -> Option<x3_asset_kernel_types::SupplyLedger> {
+            pallet_x3_supply_ledger::Ledgers::<Runtime>::get(asset_id)
         }
 
         fn native_locked_supply() -> u128 {

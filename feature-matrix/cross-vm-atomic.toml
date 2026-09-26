@@ -361,13 +361,16 @@ subsystem = "cross_vm_atomic"
 source = "master"
 paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
 implemented = 95
-tested = 90
+tested = 93
 mainnet_ready = 90
 priority = "P1"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Operational governance activation process still required"]
+blockers = [
+  "**CLOSED 2026-09-26 — the root-registration path asks a verifier, not a byte count.** `register_external_root` did `ensure!(!proof.is_empty())` under a comment saying a production version \"would verify SPV proofs, Merkle roots, etc.\", and then wrote the caller's `root_hash` into `BridgeRoots`, where the bridge surface reads it as the state of a foreign chain — a well-formed byte string treated as a proof, the same class as the settlement verifier's fabricated acceptance and worse in consequence. It now calls `Config::ExternalRootVerifier`, and this runtime wires `RefuseExternalRoots`, so no root can be established at all until a per-chain light client exists; the refusal is its own error (`ExternalRootVerificationUnavailable`), distinct from the scope-freeze (`ExternalBridgesDisabled`, checked earlier) and from the data-shape `InvalidProof` it replaced. Pinned by `an_external_root_cannot_be_registered_without_a_verifier` (an enabled bridge surface, a 64-byte proof, `BridgeRoots` still untouched) and by `register_external_root_works_only_after_governance_enables`, whose second half now asserts the verifier's refusal where it used to assert a raw `vec![1u8; 8]` was accepted. Load-bearing, measured: restoring the byte-count check turns the first test red on the error variant, then the file was restored byte-identically.",
+  "Operational governance activation process still required",
+]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: ExternalBridgesEnabled defaults false and is dispatch-gated"]
 required_tests = [
   "external_bridges_are_paused_at_genesis",

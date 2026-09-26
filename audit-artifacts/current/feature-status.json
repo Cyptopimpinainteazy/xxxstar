@@ -1751,6 +1751,7 @@
       "live_tested": "LIVE_TESTNET",
       "mainnet_ready": 90,
       "missing_work": [
+        "**CLOSED 2026-09-26 \u2014 the root-registration path asks a verifier, not a byte count.** `register_external_root` did `ensure!(!proof.is_empty())` under a comment saying a production version \"would verify SPV proofs, Merkle roots, etc.\", and then wrote the caller's `root_hash` into `BridgeRoots`, where the bridge surface reads it as the state of a foreign chain \u2014 a well-formed byte string treated as a proof, the same class as the settlement verifier's fabricated acceptance and worse in consequence. It now calls `Config::ExternalRootVerifier`, and this runtime wires `RefuseExternalRoots`, so no root can be established at all until a per-chain light client exists; the refusal is its own error (`ExternalRootVerificationUnavailable`), distinct from the scope-freeze (`ExternalBridgesDisabled`, checked earlier) and from the data-shape `InvalidProof` it replaced. Pinned by `an_external_root_cannot_be_registered_without_a_verifier` (an enabled bridge surface, a 64-byte proof, `BridgeRoots` still untouched) and by `register_external_root_works_only_after_governance_enables`, whose second half now asserts the verifier's refusal where it used to assert a raw `vec![1u8; 8]` was accepted. Load-bearing, measured: restoring the byte-count check turns the first test red on the error variant, then the file was restored byte-identically.",
         "Operational governance activation process still required"
       ],
       "name": "External bridge pause-at-genesis",
@@ -1762,7 +1763,7 @@
       "state": "COMPLETE",
       "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
       "subsystem": "cross_vm_atomic",
-      "tested": 90,
+      "tested": 93,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
@@ -3365,6 +3366,7 @@
         "No hosting, DNS, TLS or monitoring is provisioned, so the gate has nothing to point at; its default is `http://localhost:9933`",
         "The gate is RPC-only: it cannot see whether the network is *independently* operated, which is the property a public testnet exists to demonstrate",
         "**2026-09-26 \u2014 the gate runs, and it reads the chain's own numbers.** It was run against a real seven-validator testnet network (on this one host): 14 of 15 criteria PASS and the 15th is a SKIP. Reaching that took three real defects out of the way, each measured: gate 1 counted `peers + 1` and called it a validator count (`GrandpaApi_grandpa_authorities` is a hex SCALE blob and `jq length` on it is a parse error, so the code fell through to the fallback \u2014 it reported `found 6, need 7` on a seven-authority chain with one validator stopped), gates 10 and 11 issued `cargo test -p X name1 name2`, which is `error: unexpected argument` (one positional filter only \u2014 both criteria could never pass, whatever the tests did), and gate 5 looked for treasury/faucet fields no real spec has. Gate 6 (72-hour stability) is the SKIP: `X3_TESTNET_HOURS=0` is the CI form and the timer cannot be answered on this box. The verdict now says `PASS with skipped criteria` and names it, where it used to claim all criteria were met.",
+        "**2026-09-26 \u2014 criterion 14 is environment-dependent, and on this box it is what fails.** `explorer_or_dashboard` passes only if something is actually serving on 3000, 3001 or 8080. `apps/dashboard` and `apps/explorer` exist in the tree and nothing serves them here, so a healthy seven-validator network still ends in `public_testnet_gate: FAIL` on that one criterion (re-run 2026-09-26: 13 PASS, gate 6 SKIP, gate 14 FAIL). The recorded 14-of-15 run had a dev server up at the time, and the criterion is weak enough that any process on those ports satisfies it \u2014 the wallet app's own `next dev -p 3001` counts as an explorer. A launch gate should name the explorer it reached, not a port range.",
         "The gate is still RPC-only: it cannot see whether the network is *independently* operated, and it has only ever run against loopback networks on one host. Hosting, DNS, TLS and monitoring remain unprovisioned."
       ],
       "name": "Public testnet gate",
@@ -4437,7 +4439,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "2e94c0d8097346528de50abd25471c098d2a64af0b66276c625dad896fd55024",
+    "source_digest": "bc7c563a5dade06f5dcb522c79e9fd753c415632a93afa75568a475d98ffedfd",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
@@ -4445,12 +4447,12 @@
       "feature-matrix/claims-hygiene.toml": "e2101c3396a4b68a38e6f8ffc7245967fd1edaa05631080996a4a5d3c8bbd6e6",
       "feature-matrix/consensus-l1.toml": "5864a9286dda53a8b6154e0ec4b34cdf860fce7f7ce29f0c9895b0ceb356f220",
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
-      "feature-matrix/cross-vm-atomic.toml": "a9c578dffa246c06939ce6b1b5ab1dfeadd2fbe42cc523b8c421a383d67825b0",
+      "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "780f5e51c1bbe5f35e64e90cd3de0085c74b38d136a819d9947a1fc03e1184b6",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "a6912a180addab8d34851ac1e3bb63801782b82adadb58d257ef2a9405808ae6",
+      "feature-matrix/operations-user-tools.toml": "0d567f89a69a328e1294e1a7b4d7fe74788cf8322be4a449315210baab147d52",
       "feature-matrix/runtime-core.toml": "8b44ebcf62fab95e5678825f1671785b19e0771cdf4917ce9b323c34e772a5a6",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }

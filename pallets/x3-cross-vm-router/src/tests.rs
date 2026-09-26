@@ -159,6 +159,8 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type Registry = Registry;
     type Ledger = Ledger;
     type ExternalExecutorOrigin = RootOrAny;
+    // The runtime's own posture: nothing here can verify an external chain's consensus.
+    type ExternalRootVerifier = pallet_x3_cross_vm_router::RefuseExternalRoots;
     type VmAdapterOrigin = RootOnly;
     type X3LangOrigin = RootOrSignedAccount;
     type EconomicHalt = Ledger;
@@ -958,6 +960,52 @@ fn only_root_can_toggle_external_bridges() {
     });
 }
 
+/// The root-registration path must ask a *verifier*, not a byte-count.
+///
+/// `register_external_root` used to `ensure!(!proof.is_empty())` and call that "proof against
+/// chain consensus", then write the caller's `root_hash` into `BridgeRoots`, where the bridge
+/// surface reads it as the state of a foreign chain. This pins the replacement: with the
+/// runtime's `RefuseExternalRoots` wired, an enabled bridge surface still cannot establish a
+/// root, and the refusal is the verifier's own error — not `ExternalBridgesDisabled` (that is
+/// the scope-freeze, which is checked earlier and is asserted elsewhere) and not `InvalidProof`
+/// (the data-shape check this replaced). A well-formed 64-byte proof is used, so a check that
+/// merely counted bytes would pass it.
+#[test]
+fn an_external_root_cannot_be_registered_without_a_verifier() {
+    new_test_ext().execute_with(|| {
+        // Open the scope-freeze and the audit gate: the only path to the verifier.
+        assert_ok!(Router::set_external_bridge_audit_gate(RuntimeOrigin::root(), true));
+        assert_ok!(Router::set_external_bridges_enabled(RuntimeOrigin::root(), true));
+        assert!(pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+
+        let root = H256::repeat_byte(0xAB);
+        let proof = vec![0x11u8; 64];
+
+        assert_noop!(
+            Router::register_external_root(
+                RuntimeOrigin::root(),
+                1u32,
+                root,
+                10u32,
+                proof.clone(),
+            ),
+            pallet_x3_cross_vm_router::Error::<Test>::ExternalRootVerificationUnavailable
+        );
+
+        assert!(
+            !pallet_x3_cross_vm_router::BridgeRoots::<Test>::contains_key(1u32),
+            "a refused registration must not write a root, whatever else happened"
+        );
+
+        // The same call with an empty proof fails the same way: the verifier is the gate now,
+        // not the proof's length.
+        assert_noop!(
+            Router::register_external_root(RuntimeOrigin::root(), 1u32, root, 10u32, Vec::new()),
+            pallet_x3_cross_vm_router::Error::<Test>::ExternalRootVerificationUnavailable
+        );
+    });
+}
+
 #[test]
 fn enabling_external_bridges_requires_documented_audit_gate() {
     new_test_ext().execute_with(|| {
@@ -1001,15 +1049,28 @@ fn register_external_root_works_only_after_governance_enables() {
             true
         ));
 
-        // Now it should pass the scope-freeze gate (other validation may still
-        // gate it; here block_number=1 == current block so it is in-range).
-        assert_ok!(Router::register_external_root(
-            RuntimeOrigin::root(),
-            1,
-            H256::repeat_byte(0x11),
-            1,
-            vec![1u8; 8],
-        ));
+        // Now it passes the scope-freeze gate and reaches the *verifier* — which refuses,
+        // because this runtime wires `RefuseExternalRoots`. That is the change: the raw
+        // byte-count check this test used to satisfy with `vec![1u8; 8]` was accepting a
+        // data shape as a proof and writing the caller's root into `BridgeRoots`.
+        //
+        // The governance half of the test is unchanged and still asserted: without the
+        // audit gate and the scope-freeze open, the call fails *earlier*, with
+        // `ExternalBridgesDisabled`.
+        assert_noop!(
+            Router::register_external_root(
+                RuntimeOrigin::root(),
+                1,
+                H256::repeat_byte(0x11),
+                1,
+                vec![1u8; 8],
+            ),
+            pallet_x3_cross_vm_router::Error::<Test>::ExternalRootVerificationUnavailable
+        );
+        assert!(
+            !pallet_x3_cross_vm_router::BridgeRoots::<Test>::contains_key(1u32),
+            "nothing may be registered while no verifier can check it"
+        );
     });
 }
 

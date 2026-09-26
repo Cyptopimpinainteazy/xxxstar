@@ -39,6 +39,9 @@ x3-svm-integration = { path = "../../crates/svm-integration", default-features =
 x3-x3-integration = { path = "../../crates/x3-integration", default-features = false }
 x3-cross-vm-bridge = { path = "../../crates/cross-vm-bridge", default-features = false }
 x3-packet-schema = { path = "../../crates/x3-packet-schema", default-features = false }
+# The per-asset supply ledger's own type, so the runtime API below returns the shape the
+# ledger stores instead of a tuple whose field order callers have to remember.
+x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
 
 [features]
 default = ["std"]
@@ -55,6 +58,7 @@ std = [
     "sp-core/std",
     "sp-io/std",
     "sp-runtime/std",
+    "x3-asset-kernel-types/std",
     "serde/std",
     "minicbor/std",
     "hex/std",

@@ -219,6 +219,21 @@ bytes**:
   the bytes move — compact 8,508,725 bytes (was 8,508,157), compressed 1,465,616 (was 1,463,840). Two
   from-scratch builds agree.
 
+* `6ebdd35bd` — an external root needs a verifier, and the per-asset ledger gets a read
+  surface. `register_external_root` accepted any non-empty byte string as "proof against chain
+  consensus" and stored the caller's root where the bridge surface trusts it; it now calls
+  `Config::ExternalRootVerifier`, and this runtime wires `RefuseExternalRoots`, so the call
+  fails closed with `ExternalRootVerificationUnavailable` until a per-chain light client exists.
+  `AtlasKernelRuntimeApi::get_asset_supply_ledger(asset_id)` returns the ledger's own record, so
+  the per-asset invariant has a read path over RPC. The bytes move: compact 8,512,083 bytes (was
+  8,508,732), `set_code 0xfb92492d…`. Two from-scratch builds agree.
+
+  Note on the record: `docs/reports/runtime-wasm-hashes.json` names the revision the *script* was
+  run at (`335a27d8c`), while these bytes were built from the working tree that became commit
+  `6ebdd35bd` — the record was written before that commit existed, and the field cannot name a
+  commit that contains it. The check that matters is stage 6b of `make mainnet-check`, which
+  rebuilds from the revision and requires every hash to match; it is green on `6ebdd35bd`.
+
 * `43099919a` — the adapter story told the truth. `pallets/x3-kernel/src/adapters.rs` and
   `lib.rs` still advertised a `FrontierEvmAdapter` as the production EVM adapter; it returned
   `ExecutionReceipt { success: true, gas_used: <derived from payload length>, .. }` for code it never
@@ -252,7 +267,7 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,508,732 bytes — revision `43099919a`)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,512,083 bytes — revision `6ebdd35bd`)**
 
 ```
 Version          : x3-chain-20 (x3-chain-1.tx1.au1)

@@ -4437,6 +4437,24 @@ sp_api::decl_runtime_apis! {
         /// Get the total issuance (total supply) of the native currency.
         fn get_total_issuance() -> Balance;
 
+        /// Per-asset supply ledger for `asset_id`, as the ledger pallet stores it.
+        ///
+        /// `None` means the asset has no ledger entry — which is *not* "zero supply": the
+        /// ledger's rule is that a missing record is an unknown asset, and the conservation
+        /// identity `native + evm + svm + external_locked + pending <= canonical` only has a
+        /// meaning once a record exists. This is a read surface for the invariant, so a
+        /// validator's own view of it can be checked over RPC without guessing storage keys:
+        /// before it, the per-asset identity had no read path at all and only the *native*
+        /// supply could be checked on a live network.
+        ///
+        /// The id is the **ledger's** `AssetId` (`H256`), not this API's `AssetId` (`u32`):
+        /// `pallet-x3-supply-ledger` keys its records by the 32-byte asset key. Both id spaces
+        /// exist in this tree, and naming the wrong one here is a compile error rather than a
+        /// silent miss — which is why the parameter type is spelled out.
+        fn get_asset_supply_ledger(
+            asset_id: x3_asset_kernel_types::AssetId,
+        ) -> Option<x3_asset_kernel_types::SupplyLedger>;
+
         /// Native balance held by protocol-controlled accounts (treasury et al.)
         /// that is not in free circulation. Protocol-locked supply; a caller may
         /// derive circulating supply as `get_total_issuance() - native_locked_supply()`.
