@@ -44,6 +44,18 @@ fn one_leg_bundle() -> BoundedVec<BundleLeg, MaxLegsPerBundle> {
     .expect("a single leg fits MaxLegsPerBundle")
 }
 
+/// The same shape with a different `amount_in`, so the derived bundle id differs.
+///
+/// The id is derived from the legs, so two submissions of the *same* legs are the same bundle —
+/// which is its own invariant (`BundleAlreadyExists`), and is why a test about the nonce has to
+/// vary the legs to isolate the nonce rule.
+#[allow(dead_code)]
+fn one_leg_bundle_with(amount_in: u128) -> BoundedVec<BundleLeg, MaxLegsPerBundle> {
+    let mut legs = one_leg_bundle();
+    legs[0].amount_in = amount_in;
+    legs
+}
+
 #[test]
 fn economic_halt_blocks_bundle_submission() {
     let halt = economy_open();
@@ -1239,6 +1251,227 @@ fn finalization_happens_once() {
             Error::<Test>::InvalidBundleState
         );
         assert!(crate::PoaeProofs::<Test>::contains_key(bundle_id));
+    });
+}
+
+// ── The invariant suite ────────────────────────────────────────────────────────
+//
+// The row's own note said "nine previously claimed invariant tests were removed as fictional;
+// real invariant suite needed". These are the invariants an atomic bundle actually has to hold,
+// asserted directly rather than inferred from the happy path one test at a time: a lifecycle
+// that runs forward once, a bond that settles exactly once, leg receipts that are written once
+// each, and a submission nonce that cannot be spent twice.
+
+/// A settled bundle stays settled: once a bundle has been finalized, rolling it back is not a
+/// "second opinion" — it would move the bond again under a bundle whose receipt is already
+/// committed.
+#[test]
+fn a_finalized_bundle_cannot_be_rolled_back() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 20);
+        let cert = H256::repeat_byte(0xA1);
+        anchor_cert(1, cert);
+        let root = committed_receipt_root(bundle_id, cert, 1);
+        assert_ok!(finalize(bundle_id, root, cert));
+
+        let free_before = Balances::free_balance(ALICE);
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            Error::<Test>::InvalidBundleState
+        );
+        assert_eq!(
+            Bundles::<Test>::get(bundle_id).expect("record").status,
+            BundleStatus::Finalized,
+            "a refused rollback must leave the status exactly as it was"
+        );
+        assert_eq!(
+            Balances::free_balance(ALICE),
+            free_before,
+            "a refused rollback must not move the bond"
+        );
+    });
+}
+
+/// And the other direction: a rollback is final too. Finalizing afterwards would commit a
+/// receipt for a bundle whose legs were already reverted.
+#[test]
+fn a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 21);
+        let cert = H256::repeat_byte(0xA2);
+        anchor_cert(1, cert);
+        let root = committed_receipt_root(bundle_id, cert, 1);
+
+        assert_ok!(AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            bundle_id,
+            BundleRollbackReason::SubmitterCancelled,
+        ));
+        let reserved_after = Balances::reserved_balance(ALICE);
+        assert_eq!(reserved_after, 0, "rollback releases the whole bond");
+
+        assert_noop!(
+            finalize(bundle_id, root, cert),
+            Error::<Test>::InvalidBundleState
+        );
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            Error::<Test>::InvalidBundleState
+        );
+        assert_eq!(
+            Balances::reserved_balance(ALICE),
+            reserved_after,
+            "a second rollback must not release (or re-slash) anything a second time"
+        );
+        assert!(
+            !crate::PoaeProofs::<Test>::contains_key(bundle_id),
+            "a rolled-back bundle must never gain a finality proof"
+        );
+    });
+}
+
+/// A leg's receipt is written once. Overwriting it would let a second execution replace the
+/// state diff the bundle is finalized against.
+#[test]
+fn a_leg_receipt_is_written_once_and_keeps_its_first_state_diff() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 22);
+        let first = crate::vm_revert::StateDiff::from_vec_lossy(b"first".to_vec());
+
+        assert_ok!(AtomicKernel::record_leg_execution_receipt(
+            RuntimeOrigin::none(),
+            bundle_id,
+            0,
+            first.clone(),
+        ));
+        assert!(
+            crate::BundleLegReceipts::<Test>::get(bundle_id)[0].executed,
+            "the receipt has to record that the leg ran"
+        );
+
+        assert_noop!(
+            AtomicKernel::record_leg_execution_receipt(
+                RuntimeOrigin::none(),
+                bundle_id,
+                0,
+                crate::vm_revert::StateDiff::from_vec_lossy(b"second".to_vec()),
+            ),
+            Error::<Test>::LegAlreadyExecuted
+        );
+        assert_eq!(
+            crate::BundleLegReceipts::<Test>::get(bundle_id)[0].state_diff,
+            first,
+            "the refused second receipt must leave the first state diff in place"
+        );
+    });
+}
+
+/// A receipt for a leg the bundle does not have is refused. `one_leg_bundle` has one leg, so
+/// index 1 is out of range — and an index that large is what a caller guessing at a bundle's
+/// shape would send.
+#[test]
+fn a_receipt_for_a_leg_outside_the_bundle_is_refused() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 23);
+        assert_eq!(
+            crate::BundleLegReceipts::<Test>::get(bundle_id).len(),
+            1,
+            "the receipt vector is sized from the bundle's own legs"
+        );
+        assert_noop!(
+            AtomicKernel::record_leg_execution_receipt(
+                RuntimeOrigin::none(),
+                bundle_id,
+                1,
+                crate::vm_revert::StateDiff::from_vec_lossy(b"out of range".to_vec()),
+            ),
+            Error::<Test>::InvalidBundleState
+        );
+    });
+}
+
+/// A submission nonce is spent once. The rule is `nonce > last_nonce && !used`, so both a
+/// replay and a rewound nonce have to be refused — the second is the one that would let a
+/// submitted bundle be replaced by a different one under the same identity.
+#[test]
+fn a_submission_nonce_cannot_be_spent_twice_or_rewound() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle(),
+            10,
+            1,
+            30,
+        ));
+        assert_eq!(
+            NonceRegistry::<Test>::get(1, ALICE).used_nonces.len(),
+            1,
+            "the first submission spends nonce 30"
+        );
+
+        // The same legs again are the *same bundle* — one id, one submission — and that is
+        // refused before the nonce rule is even consulted.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle(),
+                10,
+                1,
+                31,
+            ),
+            Error::<Test>::BundleAlreadyExists
+        );
+
+        // The same nonce again, on a *different* bundle, so the refusal can only be the nonce.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle_with(1_001),
+                10,
+                1,
+                30,
+            ),
+            Error::<Test>::InvalidNonce
+        );
+        // And a nonce below the watermark, which is not in `used_nonces`.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle_with(1_002),
+                10,
+                1,
+                29,
+            ),
+            Error::<Test>::InvalidNonce
+        );
+        assert_eq!(
+            NonceRegistry::<Test>::get(1, ALICE).used_nonces.len(),
+            1,
+            "a refused submission must not spend a nonce"
+        );
+
+        // A fresh nonce on a fresh bundle still works.
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle_with(1_003),
+            10,
+            1,
+            31,
+        ));
+        assert_eq!(NonceRegistry::<Test>::get(1, ALICE).used_nonces.len(), 2);
+        assert_eq!(
+            NonceRegistry::<Test>::get(1, ALICE).last_nonce,
+            31,
+            "the watermark tracks the highest nonce spent"
+        );
     });
 }
 

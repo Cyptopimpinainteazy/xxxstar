@@ -60,14 +60,17 @@ name = "Runtime upgrade rehearsal"
 subsystem = "consensus_l1"
 source = "master"
 paths = ["pallets/evolution-core"]
-implemented = 60
-tested = 45
-mainnet_ready = 40
+implemented = 75
+tested = 85
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs automated full rehearsal with persisted state"]
+blockers = [
+  "**CLOSED 2026-09-26 — the rehearsal is automated, goes through the chain own upgrade path, and is gated.** `scripts/mainnet/runtime_upgrade_rehearsal.sh` used to hand the swap to `subxt upgrade --suri //Alice`: `subxt` was not installed and the sudo key is unset, so every live step was skipped while the script still printed `PASS — safe to proceed`. It now carries `system.set_code` through `governance.enact_proposal` — the only dispatch in this runtime that reaches `RawOrigin::Root` — on three live validators, and decides its verdict only from checks it prints. Gate: `runtime upgrade through governance` (serial, ~60s). Measured: 13/13 PASS — `governance_upgrade_enacted`, `spec_version_incremented` (20 -> 21), `code_hash_changed` (`:code` 0x519e2ea8... -> 0xf49da82b...), `all_validators_upgraded`, `blocks_and_finality_after_upgrade`, and `post_upgrade_state_operation` (a transfer signed after the swap moves balance) — so the chain state persisted and kept working, which is what this row asked for. Negative control: pointing `X3_UPGRADE_WASM` at the blob the chain already runs makes the chain refuse the swap with `System::SpecVersionNeedsToIncrease` and the run exit 1, so the check that claims the version moved is known to be able to say no.",
+  "Still open: the seven physical validators do not exist, so this is a three-validator network on one host; the operator runbook for upgrading a real testnet is still unwritten, and the rehearsal upgrades a spec_version with no migration work to do (a migration that rewrites keys is a different rehearsal).",
+]
 evidence = ["pallets/evolution-core", "note: Registry requires runtime_upgrade_rehearsal"]
 registry_feature = "triforge_runtime"
 
@@ -77,14 +80,17 @@ name = "Runtime upgrade / migration framework"
 subsystem = "consensus_l1"
 source = "master"
 paths = ["pallets/evolution-core"]
-implemented = 65
-tested = 45
-mainnet_ready = 45
+implemented = 78
+tested = 82
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["No complete migration dry-run across all runtime variants"]
+blockers = [
+  "**CLOSED 2026-09-26 — every runtime variant is dry-run migrated, in the release gate.** `runtime variant dry-runs` runs `scripts/check-runtime-variants.sh`, and the release gate (`make mainnet-check`) runs the same rehearsal for every `construct_runtime!` variant: measured `dev PASS`, `dev+frontier PASS`, `frontier PASS`, `mainnet-rc1 PASS`, `testnet PASS` — `runtime variant dry-run: all variants passed`. The upgrade path above is what exercises it end to end: the pallets in `Migrations` roll back to version 0, the hooks run, and each must end at the version its code declares.",
+  "Still open: the dry-run proves the migrations *run* against populated state; it does not prove a historical-state upgrade from a published release, because no published release exists to upgrade from on this box.",
+]
 evidence = ["pallets/evolution-core", "note: FEATURE_REGISTRY triforge_runtime = 65%"]
 registry_feature = "triforge_runtime"
 

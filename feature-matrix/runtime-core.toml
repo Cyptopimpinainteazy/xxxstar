@@ -34,16 +34,25 @@ name = "Atomic Kernel pallet"
 subsystem = "runtime_core"
 source = "master"
 paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
-implemented = 75
-tested = 35
-mainnet_ready = 25
+required_tests = [
+  "economic_halt_does_not_trap_pending_bundle_funds",
+  "a_finalized_bundle_cannot_be_rolled_back",
+  "a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice",
+  "a_leg_receipt_is_written_once_and_keeps_its_first_state_diff",
+  "a_receipt_for_a_leg_outside_the_bundle_is_refused",
+  "a_submission_nonce_cannot_be_spent_twice_or_rewound",
+  "finalization_happens_once",
+]
+implemented = 78
+tested = 70
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = true
 blockers = [
   "**Closed 2026-09-23 — bundle finalization is authorized now.** The unsigned `submit_finalization_result` extrinsic was removed: it was `ensure_none`, its off-chain marker (`x3fin:`) had no writer anywhere in this repository, and `do_finalize_bundle`'s certificate check compared the caller's input with the caller's own earlier input, so any account could finalize any `Executing` bundle. Finalization is the signed `finalize_atomic_bundle` (`X3LangOrigin`, an account the chain's genesis-authorized custody registry names) or `finalize_with_settlement` (`SettlementOrigin`). Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`; five tests in the pallet drive the finalization core, plus one that an unsigned origin cannot reach it at all.",
-  "Nine previously claimed invariant tests were removed as fictional; real invariant suite needed",
+  "**CLOSED 2026-09-26 — the invariant suite exists, and it is asserted directly rather than inferred from the happy path.** Five tests, each one an invariant the bundle lifecycle has to hold: `a_finalized_bundle_cannot_be_rolled_back` (and the bond and status are unchanged after the refusal), `a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice` (no second release, no finality proof), `a_leg_receipt_is_written_once_and_keeps_its_first_state_diff` (a replayed receipt is refused and the first diff survives), `a_receipt_for_a_leg_outside_the_bundle_is_refused`, and `a_submission_nonce_cannot_be_spent_twice_or_rewound` (replay, rewind, and the fact that a *refused* submission spends no nonce — with `BundleAlreadyExists` asserted as its own rule, since the bundle id derives from the legs). Measured load-bearing: removing the `LegAlreadyExecuted` guard turns the receipt test red at its own assertion, then the file was restored byte-identically. The suite runs under the `test atomic-kernel` gate: 71 lib tests plus the e2e/loom/miri/proptest targets, all green.",
   "The signed path's certificate still comes from an unsigned per-block anchor, which any peer can write first — the honest service can be made to finalize with a fabricated certificate (TICKET-107)",
 ]
 evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: FEATURE_REGISTRY corrected readiness to 40%"]

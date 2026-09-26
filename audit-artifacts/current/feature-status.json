@@ -265,19 +265,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 48,
+      "composite": 70,
       "confidence": "high",
       "evidence": [
         "pallets/evolution-core",
         "note: Registry requires runtime_upgrade_rehearsal"
       ],
       "id": "X3-L1-003",
-      "implemented": 60,
+      "implemented": 75,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 40,
+      "mainnet_ready": 55,
       "missing_work": [
-        "Needs automated full rehearsal with persisted state"
+        "**CLOSED 2026-09-26 \u2014 the rehearsal is automated, goes through the chain own upgrade path, and is gated.** `scripts/mainnet/runtime_upgrade_rehearsal.sh` used to hand the swap to `subxt upgrade --suri //Alice`: `subxt` was not installed and the sudo key is unset, so every live step was skipped while the script still printed `PASS \u2014 safe to proceed`. It now carries `system.set_code` through `governance.enact_proposal` \u2014 the only dispatch in this runtime that reaches `RawOrigin::Root` \u2014 on three live validators, and decides its verdict only from checks it prints. Gate: `runtime upgrade through governance` (serial, ~60s). Measured: 13/13 PASS \u2014 `governance_upgrade_enacted`, `spec_version_incremented` (20 -> 21), `code_hash_changed` (`:code` 0x519e2ea8... -> 0xf49da82b...), `all_validators_upgraded`, `blocks_and_finality_after_upgrade`, and `post_upgrade_state_operation` (a transfer signed after the swap moves balance) \u2014 so the chain state persisted and kept working, which is what this row asked for. Negative control: pointing `X3_UPGRADE_WASM` at the blob the chain already runs makes the chain refuse the swap with `System::SpecVersionNeedsToIncrease` and the run exit 1, so the check that claims the version moved is known to be able to say no.",
+        "Still open: the seven physical validators do not exist, so this is a three-validator network on one host; the operator runbook for upgrading a real testnet is still unwritten, and the rehearsal upgrades a spec_version with no migration work to do (a migration that rewrites keys is a different rehearsal)."
       ],
       "name": "Runtime upgrade rehearsal",
       "paths": [
@@ -288,25 +289,26 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "consensus_l1",
-      "tested": 45,
-      "tests": "tested score 45% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 52,
+      "composite": 70,
       "confidence": "high",
       "evidence": [
         "pallets/evolution-core",
         "note: FEATURE_REGISTRY triforge_runtime = 65%"
       ],
       "id": "X3-L1-004",
-      "implemented": 65,
+      "implemented": 78,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 45,
+      "mainnet_ready": 55,
       "missing_work": [
-        "No complete migration dry-run across all runtime variants"
+        "**CLOSED 2026-09-26 \u2014 every runtime variant is dry-run migrated, in the release gate.** `runtime variant dry-runs` runs `scripts/check-runtime-variants.sh`, and the release gate (`make mainnet-check`) runs the same rehearsal for every `construct_runtime!` variant: measured `dev PASS`, `dev+frontier PASS`, `frontier PASS`, `mainnet-rc1 PASS`, `testnet PASS` \u2014 `runtime variant dry-run: all variants passed`. The upgrade path above is what exercises it end to end: the pallets in `Migrations` roll back to version 0, the hooks run, and each must end at the version its code declares.",
+        "Still open: the dry-run proves the migrations *run* against populated state; it does not prove a historical-state upgrade from a published release, because no published release exists to upgrade from on this box."
       ],
       "name": "Runtime upgrade / migration framework",
       "paths": [
@@ -317,8 +319,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "consensus_l1",
-      "tested": 45,
-      "tests": "tested score 45% (no named test list on this row)"
+      "tested": 82,
+      "tests": "tested score 82% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3663,20 +3665,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": true,
-      "composite": 45,
+      "composite": 59,
       "confidence": "high",
       "evidence": [
         "pallets/x3-atomic-kernel/src/lib.rs",
         "note: FEATURE_REGISTRY corrected readiness to 40%"
       ],
       "id": "X3-RT-002",
-      "implemented": 75,
+      "implemented": 78,
       "launch_scope": "core",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 25,
+      "mainnet_ready": 35,
       "missing_work": [
         "**Closed 2026-09-23 \u2014 bundle finalization is authorized now.** The unsigned `submit_finalization_result` extrinsic was removed: it was `ensure_none`, its off-chain marker (`x3fin:`) had no writer anywhere in this repository, and `do_finalize_bundle`'s certificate check compared the caller's input with the caller's own earlier input, so any account could finalize any `Executing` bundle. Finalization is the signed `finalize_atomic_bundle` (`X3LangOrigin`, an account the chain's genesis-authorized custody registry names) or `finalize_with_settlement` (`SettlementOrigin`). Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`; five tests in the pallet drive the finalization core, plus one that an unsigned origin cannot reach it at all.",
-        "Nine previously claimed invariant tests were removed as fictional; real invariant suite needed",
+        "**CLOSED 2026-09-26 \u2014 the invariant suite exists, and it is asserted directly rather than inferred from the happy path.** Five tests, each one an invariant the bundle lifecycle has to hold: `a_finalized_bundle_cannot_be_rolled_back` (and the bond and status are unchanged after the refusal), `a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice` (no second release, no finality proof), `a_leg_receipt_is_written_once_and_keeps_its_first_state_diff` (a replayed receipt is refused and the first diff survives), `a_receipt_for_a_leg_outside_the_bundle_is_refused`, and `a_submission_nonce_cannot_be_spent_twice_or_rewound` (replay, rewind, and the fact that a *refused* submission spends no nonce \u2014 with `BundleAlreadyExists` asserted as its own rule, since the bundle id derives from the legs). Measured load-bearing: removing the `LegAlreadyExecuted` guard turns the receipt test red at its own assertion, then the file was restored byte-identically. The suite runs under the `test atomic-kernel` gate: 71 lib tests plus the e2e/loom/miri/proptest targets, all green.",
         "The signed path's certificate still comes from an unsigned per-block anchor, which any peer can write first \u2014 the honest service can be made to finalize with a fabricated certificate (TICKET-107)"
       ],
       "name": "Atomic Kernel pallet",
@@ -3688,7 +3690,7 @@
       "state": "NOT INTEGRATED",
       "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
       "subsystem": "runtime_core",
-      "tested": 35,
+      "tested": 70,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
@@ -4442,13 +4444,13 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "fd460f71c3f74d9816ea26ed8a1ca49d41fa07ce14dbe52228d39c6617f16676",
+    "source_digest": "215c1b84a46e0fb1e34d97e072ebb50098279868928314edcc2fce4c2a1c162d",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
       "feature-matrix/claims-hygiene.toml": "e2101c3396a4b68a38e6f8ffc7245967fd1edaa05631080996a4a5d3c8bbd6e6",
-      "feature-matrix/consensus-l1.toml": "5864a9286dda53a8b6154e0ec4b34cdf860fce7f7ce29f0c9895b0ceb356f220",
+      "feature-matrix/consensus-l1.toml": "8e8d8e26c515ad7ebdbb2bc0177a2ea1c70f0c33051e7f45a400fde2ff72216f",
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
@@ -4456,7 +4458,7 @@
       "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "4625dc94e0159ac6dbbd1a67dca8ae4adee16028945a81370e0a3d38fc8a35b6",
-      "feature-matrix/runtime-core.toml": "8b44ebcf62fab95e5678825f1671785b19e0771cdf4917ce9b323c34e772a5a6",
+      "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
   },
