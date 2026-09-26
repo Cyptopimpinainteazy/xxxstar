@@ -23,6 +23,10 @@ pallet-x3-invariants = { path = "../../pallets/x3-invariants", default-features 
 # types have to be in scope here exactly as they are in the node.
 pallet-collective = { workspace = true, default-features = false, features = ["std"] }
 pallet-cross-chain-validator = { path = "../../pallets/cross-chain-validator", default-features = false, features = ["std"] }
+# `sign_token_factory_create` signs `X3TokenFactory::create_token`, which is the only signed
+# path in this tree that gives the supply ledger an asset record — the reason the per-asset
+# conservation identity could not be checked on a running chain.
+pallet-x3-token-factory = { path = "../../pallets/x3-token-factory", default-features = false, features = ["std"] }
 pallet-transaction-payment = { workspace = true, default-features = false, features = ["std"] }
 frame-system = { workspace = true, default-features = false, features = ["std"] }
 frame-support = { workspace = true, default-features = false, features = ["std"] }

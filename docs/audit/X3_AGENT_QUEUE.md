@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `bc7c563a5dade06f…` — the artifacts move when
+Source digest: `1cc6f44a547ebad9…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -108,7 +108,7 @@ fails when they do not match.
 | MTX-X3-XVM-018 | cross_vm_atomic | Adaptor-signature settlement primitive: Needs cryptographic audit and production-path proof | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · 24 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-ECO-001 | economic_defi | Biometric wallet registration: Biometric template handling unaudited | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 7 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-ECO-002 | economic_defi | Pending supply returns-to-zero invariant: **CLOSED 2026-09-25 — the invariant is proven on the transitions, not on a struct.** The pallet had no mock runtime, so `SupplyLedgerWrite` (`debit_source_to_pending`, `credit_destination_from_pending`, `refund_pending_to_source`) — the thr… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 78% (no named test list on this row) | open |
-| MTX-X3-ECO-003 | economic_defi | Supply conservation ledger: **CLOSED 2026-09-25 at the ledger level.** The conservation law is `represented() = native + evm + svm + external_locked + pending` never exceeding the canonical ceiling, and every transition being a relabelling rather than a creation: debi… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 80% (no named test list on this row) | open |
+| MTX-X3-ECO-003 | economic_defi | Supply conservation ledger: **CLOSED 2026-09-25 at the ledger level.** The conservation law is `represented() = native + evm + svm + external_locked + pending` never exceeding the canonical ceiling, and every transition being a relabelling rather than a creation: debi… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 88% (no named test list on this row) | open |
 | MTX-X3-ECO-004 | economic_defi | Wallet recovery flow: Recovery logic security review pending | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 7 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-ECO-005 | economic_defi | Minter authority management: Needs role-transition/governance tests | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · 7 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-ECO-006 | economic_defi | Wallet multisig: Needs external security review | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · 7 named tests in FEATURE_REGISTRY | open |

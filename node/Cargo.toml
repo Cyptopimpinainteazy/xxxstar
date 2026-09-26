@@ -158,6 +158,10 @@ pallet-balances = { workspace = true, features = ["std"] }
 # `SupplyLedger` out of `AtlasKernelRuntimeApi_get_asset_supply_ledger`, so it names the
 # ledger's type rather than a hand-copied field order. Same crate the runtime already links.
 x3-asset-kernel-types = { path = "../crates/x3-asset-kernel-types", features = ["std"] }
+# The per-asset half also *creates* the record it checks (`X3TokenFactory::create_token`, the
+# only signed path that gives the supply ledger an asset), so the test names the pallet's own
+# `TokenFactoryConfig` rather than restating its fields.
+pallet-x3-token-factory = { path = "../pallets/x3-token-factory", default-features = false, features = ["std"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 tempfile = { workspace = true }
 # The producer: this test boots an anvil, has the relayer build the receipt

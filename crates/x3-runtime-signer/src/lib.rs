@@ -492,6 +492,31 @@ impl X3RuntimeSigner {
         self.signed_extrinsic(council_call)
     }
 
+    /// Create an asset through the token factory, signed by this account.
+    ///
+    /// `X3TokenFactory::create_token` takes `EnsureSigned`, so unlike the council and
+    /// header-submitter paths it needs no proposal — and it is the only signed call in this
+    /// tree that gives `pallet-x3-supply-ledger` an asset record. Without one, the per-asset
+    /// conservation identity (`native + evm + svm + external_locked + pending <= canonical`)
+    /// has nothing to check on a live chain: the kernel's comits write the kernel's own
+    /// `CanonicalLedger`, not the supply ledger. This method exists so the distributed supply
+    /// test can create the record it then asserts on every validator.
+    ///
+    /// Genesis validation in the pallet is not repeated here — the pallet's own checks
+    /// (`canonical_decimals`, supported class, enabled domains) are the authority, and a call
+    /// this method builds that they refuse will fail with the pallet's error rather than a
+    /// locally invented one.
+    pub fn sign_token_factory_create(
+        &self,
+        config: pallet_x3_token_factory::TokenFactoryConfig,
+    ) -> Result<String, SwapError> {
+        let call =
+            RuntimeCall::X3TokenFactory(pallet_x3_token_factory::Call::<Runtime>::create_token {
+                config,
+            });
+        self.signed_extrinsic(call)
+    }
+
     /// Enroll external-header submitters, through the council.
     ///
     /// `set_authorized_submitters` requires `AdminOrigin` — Root or half the

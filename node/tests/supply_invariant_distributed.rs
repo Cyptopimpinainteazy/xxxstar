@@ -1209,17 +1209,80 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
     // The native identity above is one ledger. The *asset* ledger
     // (`native + evm + svm + external_locked + pending <= canonical`, per asset, in
     // `pallet-x3-supply-ledger`) is a different one, and until this API existed it had no read
-    // surface at all. This chain does not create asset records: nothing in these comits touches
-    // that pallet — the kernel writes its own `CanonicalLedger` — so the assertion below is on
-    // what the read surface *reports*, cross-checked between validators, and it says out loud
-    // how many records that is. It is deliberately not written as "the identity holds" when
-    // there is nothing to check: creating an asset needs a signed `tokenFactory.createToken`,
-    // which `x3-runtime-signer` does not expose yet.
+    // surface at all. Nothing in the comits above touches that pallet — the kernel writes its
+    // own `CanonicalLedger` — so a record has to be created for the assertion to mean anything:
+    // `X3TokenFactory::create_token` is the signed path that does it. It is submitted *after* the
+    // native assertions because minting an initial supply moves native balances and issuance,
+    // which is exactly what those assertions pin.
+    let creator = X3RuntimeSigner::from_uri(CHAIN_ID.into(), rpc_url(ports[0]), "//Alice")
+        .expect("build the token creator's signer");
+    let config = pallet_x3_token_factory::TokenFactoryConfig {
+        symbol: b"SUPTEST".to_vec().try_into().expect("symbol fits"),
+        name: b"Supply invariant probe"
+            .to_vec()
+            .try_into()
+            .expect("name fits"),
+        canonical_decimals: 12,
+        initial_supply: 1_000_000_000_000u128,
+        max_supply: None,
+        class: x3_asset_kernel_types::TokenClass::FixedSupply,
+        enabled_domains: vec![
+            x3_asset_kernel_types::DomainId::X3Native,
+            x3_asset_kernel_types::DomainId::X3Evm,
+        ]
+        .try_into()
+        .expect("enabled domains fit"),
+    };
+    let signed = creator
+        .sign_token_factory_create(config)
+        .expect("sign the token creation");
+    let tx = rpc_try(
+        ports[0],
+        "author_submitExtrinsic",
+        vec![Value::String(signed)],
+    )
+    .expect("submit the token creation");
+    assert!(
+        !tx.as_str().map(str::is_empty).unwrap_or(true),
+        "the token creation did not return a transaction hash: {tx}"
+    );
+
+    // Wait for the record to exist, not merely for inclusion: the ledger entry is what the
+    // assertion below reads, and it is written by the dispatch rather than the pool.
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let mut created_on: Option<u16> = None;
+    while Instant::now() < deadline {
+        for port in ports {
+            let head = finalized_head(port);
+            if head.is_empty() {
+                continue;
+            }
+            if !ledger_assets(port, &head).is_empty() {
+                created_on = Some(port);
+                break;
+            }
+        }
+        if created_on.is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    let created_on = created_on.unwrap_or_else(|| {
+        panic!(
+            "no supply-ledger record appeared on any validator within 120s of the token \
+             creation — the per-asset identity would have nothing to check, so this is a \
+             failure rather than an empty pass"
+        )
+    });
+    println!("[x3-supply] token created; a supply-ledger record is readable on :{created_on}");
+
+    // Now assert the identity on every validator, at one finalized block hash they all share.
+    let ledger_block = finalized_head(ports[0]);
     let mut ledger_records = 0usize;
-    for asset in ledger_assets(ports[0], &hash1) {
+    for asset in ledger_assets(ports[0], &ledger_block) {
         let mut views = Vec::new();
         for port in ports {
-            let ledger = read_asset_ledger(port, &hash1, asset)
+            let ledger = read_asset_ledger(port, &ledger_block, asset)
                 .unwrap_or_else(|e| panic!("{asset:?}: ledger read failed on :{port}: {e}"));
             let ledger = ledger.unwrap_or_else(|| {
                 panic!("{asset:?} is in the ledger's key set but reads as None on :{port}")
@@ -1240,7 +1303,7 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
         }
         assert!(
             views.iter().all(|v| *v == views[0]),
-            "{asset:?}: validators disagree about the ledger at {height1}:{hash1}"
+            "{asset:?}: validators disagree about the ledger at {ledger_block}"
         );
         ledger_records += 1;
         println!(
@@ -1253,9 +1316,13 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
             views[0].canonical_supply,
         );
     }
+    assert!(
+        ledger_records > 0,
+        "the per-asset assertion ran over zero records, which is not evidence"
+    );
     println!(
-        "[x3-supply] per-asset ledger: {ledger_records} record(s) present on this chain, read \
-         through AtlasKernelRuntimeApi_get_asset_supply_ledger on every validator"
+        "[x3-supply] per-asset ledger: {ledger_records} record(s) at {ledger_block}, read through \
+         AtlasKernelRuntimeApi_get_asset_supply_ledger on every validator"
     );
 
     // -------- negative control, on a scratch copy of the ledger ----------
