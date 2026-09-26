@@ -220,6 +220,11 @@ GATES_FAST=(
   # citation is evidence, so it has to resolve; this reads every fragment, takes each row's
   # `required_tests` and `paths`, and requires `fn <name>` under one of those paths.
   "matrix tests exist:python3 scripts/ci/check-matrix-tests-exist.py"
+  # The sibling of the check above, for the free-text half: a `test_evidence` note that cites an
+  # invented test name or a path that moved was equally unchecked. An identifier counts as a
+  # citation when it starts with `test_` or carries two underscores — English prose does not — and
+  # it must resolve to a fn, file, stem or directory in the tree.
+  "matrix test evidence:python3 scripts/ci/check-matrix-test-evidence.py"
   # `check-readiness-consistency.sh` proves every `required_tests` name in the registry *exists* as
   # a function. Nothing asked whether anything ever *runs* it. Five suites answered "no" on
   # 2026-09-25 (the kernel pallet, the supply ledger, the cross-VM router, x3-x3-integration and the
