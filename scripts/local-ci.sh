@@ -729,6 +729,12 @@ GATES_CROSS=(
   # own state at a finalized block — with an injected unit in a scratch ledger required to
   # make the same check fail, so it is not a tautology.
   "supply invariant across validators:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test supply_invariant_distributed -- --ignored --nocapture --test-threads=1"
+  # A partition, not a crash: one validator cut off from the others while it stays alive,
+  # then healed and required to converge. The cut is confirmed through peer counts (the test
+  # fails if the cut does not show), and at three authorities the honest result is that the
+  # survivors keep *authoring* while nothing finalizes — GRANDPA's `n-(n-1)/3` threshold is
+  # all three — which is what the test asserts rather than pretending otherwise.
+  "partition and recovery:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test partition_recovery -- --ignored --nocapture --test-threads=1"
   "cross-domain EVM:bash scripts/cross-domain-evm-gate.sh"
   # Same reason as the `SVM contract lifecycle` gate above: this one also runs
   # `cargo build-sbf`, which shells out to `cargo +1.89.0-sbpf-solana-v1.54` and
@@ -1085,6 +1091,7 @@ SERIAL_GATES=(
   "SVM contract lifecycle"
   "X3-native lifecycles"
   "supply invariant across validators"
+  "partition and recovery"
   "cross-domain EVM"
   "cross-domain SVM"
   "cross-domain EVM (strict posture)"

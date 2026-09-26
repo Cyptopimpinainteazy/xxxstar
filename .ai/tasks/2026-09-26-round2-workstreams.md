@@ -130,3 +130,39 @@ COMMIT:           (none — say what you would commit)
 GATE LINE:        (as text, if one is needed)
 REMAINING HARD BLOCKERS:
 ```
+
+---
+
+## Workstream G — a partition, not a crash
+
+**Deliverable:** the goal's "Crash/restart/partition/recovery: all pass" has its crash
+(`validator failure drill`, which kills and restarts validators) and its restart (the X3Lang
+and lifecycle tests re-open a real database) but nothing exercises a **network partition**:
+a validator that is alive, running and reachable to nobody.
+
+Prove, on the built-in three-validator `local3` chain, in one test:
+
+1. three validators connected and finalizing;
+2. cut **one** validator off from the other two (it must keep running — do not kill it; the
+   difference between "crashed" and "partitioned" is the whole point);
+3. the remaining two keep authoring and finalizing — with three GRANDPA authorities, two is
+   exactly the 2/3 threshold, so this is the case where a naive implementation stalls;
+4. reconnect the isolated validator, and require it to converge: same finalized height and
+   the same canonical hash as the other two, and it finalizes *new* blocks again rather
+   than sitting at its stale height;
+5. assert that while it was cut off it was genuinely behind (its best/finalized height was
+   lower than the others') — otherwise step 3 proves nothing about partition behaviour.
+
+How to cut it off: the chain is local, so the honest lever is the validator's own network —
+stop forwarding its p2p traffic (`iptables`/`nft` on the loopback ports if permitted, or an
+unshare/netns boundary), or drive `system_disconnect`/`system_removeReservedPeer` over its
+RPC if the node exposes it. **Verify the cut actually happened** (peer counts drop on both
+sides) before claiming the partition; a test that "partitions" without changing any peer
+count is checking nothing. If no honest lever exists in this environment, say so with the
+evidence and do not fake it.
+
+**Files you own:** a NEW test under `node/tests/` (do not edit `x3lang_network_receipt.rs`)
+and any NEW script it needs.
+
+**Acceptance:** the command, its output, and the numbers — heights and hashes before,
+during and after, plus the peer counts that show the cut and the heal.
