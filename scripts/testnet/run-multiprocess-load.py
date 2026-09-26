@@ -10,10 +10,30 @@ from pathlib import Path
 
 
 def parse_json_tail(text: str) -> dict:
-    idx = text.rfind("{")
-    if idx == -1:
-      raise ValueError("No JSON object found in process output")
-    return json.loads(text[idx:])
+    """The worker's result object, out of its stdout.
+
+    `rfind("{")` looked like it took "the last JSON object", but the result object
+    *contains* nested objects — `baseline_requirements` is the last `{` in the text —
+    so it started parsing one level too deep and every worker was recorded as
+    `parse_error: "Extra data: line 8 column 1"`. Measured 2026-09-26: two workers
+    each reported `sent 5970 / accepted 5970 / finalized 5970 / error_rate 0`, and the
+    aggregate this function feeds reported `successful_workers: 0, finalized_total: 0`
+    — a harness that cannot see a successful run is worse than no harness.
+
+    Scan for the first `{` that decodes into an object carrying a worker's own keys,
+    rather than assuming where the object starts or ends."""
+    decoder = json.JSONDecoder()
+    idx = text.find("{")
+    while idx != -1:
+        try:
+            obj, _ = decoder.raw_decode(text[idx:])
+        except json.JSONDecodeError:
+            idx = text.find("{", idx + 1)
+            continue
+        if isinstance(obj, dict) and {"sent", "finalized"} & obj.keys():
+            return obj
+        idx = text.find("{", idx + 1)
+    raise ValueError("No worker result object found in process output")
 
 
 def main() -> int:
