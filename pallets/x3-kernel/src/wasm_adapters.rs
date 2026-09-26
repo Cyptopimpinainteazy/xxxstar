@@ -213,3 +213,62 @@ impl X3ExecutorAdapter for WasmX3Adapter {
             .map_err(|_| DispatchError::Other("X3 gas estimation failed"))
     }
 }
+
+#[cfg(test)]
+mod accepted_evm_payload_must_execute {
+    use super::*;
+    use crate::adapters::EvmExecutorAdapter;
+
+    /// **KNOWN-RED — this test is expected to fail while the defect stands, and it is meant to.**
+    ///
+    /// The kernel validates a non-empty EVM payload by decoding it as a `Packet` and checking the
+    /// EVM domain bit (`deserialize_packet` + `get_domain_mask` in `submit_comit_v2`). This adapter —
+    /// the one the *wasm* runtime, and therefore every live chain, is compiled with — executes those
+    /// same bytes as EVM code. A SCALE-encoded `Packet::Evm(..)` starts with the enum discriminant
+    /// `0x00`, which is `STOP`, so the interpreter halts on the first byte and reports success.
+    ///
+    /// Measured 2026-09-26 (`cargo test -p pallet-x3-kernel --lib`, probe since removed):
+    ///
+    /// ```text
+    /// PROBE evm payload bytes = 124
+    /// PROBE evm head = [00, 00, 6b, cb, 44, 6f, 34, 8c]
+    /// PROBE evm execute = Ok((true, 22576))     <- success, gas charged, nothing executed
+    /// PROBE evm validate = Ok(())
+    /// PROBE svm execute = Err(Other("SVM execution failed"))
+    /// PROBE x3 execute = Ok((true, 3))          <- the X3 arm really executes
+    /// ```
+    ///
+    /// So the EVM arm of the triple-VM submit path reports a successful execution for an operation
+    /// that never happened, and the kernel persists a receipt for it. The SVM arm fails closed
+    /// (which is merely a non-functional path, not a false success).
+    ///
+    /// A payload the kernel accepts must be either executed or refused — never reported as a
+    /// success. Flipping this test green is the acceptance criterion; see
+    /// `.ai/reports/evm-payload-never-executed-20260926.md`.
+    #[test]
+    #[ignore = "KNOWN-RED: an accepted EVM packet is reported as a successful execution without running; see .ai/reports/evm-payload-never-executed-20260926.md"]
+    fn an_accepted_evm_payload_is_executed_or_refused_never_reported_as_success() {
+        let payload = crate::test_helpers::wrap_evm_payload(&[0xAAu8; 64]);
+        assert!(
+            !payload.is_empty(),
+            "the fixture has to be a payload the kernel accepts"
+        );
+        // The kernel accepts it...
+        assert!(
+            crate::packet_adapters::deserialize_packet(&payload).is_ok(),
+            "the fixture must pass the same validation submit_comit_v2 applies"
+        );
+
+        // ...so executing it must either do the packet's work or refuse. Reporting `success: true`
+        // with the packet untouched is the defect this test exists to catch.
+        match WasmEvmAdapter::execute(&payload, 6_000_000) {
+            Ok(receipt) if receipt.success => panic!(
+                "the adapter reported success for a payload it cannot have executed: the packet \
+                 starts with its enum discriminant (0x{:02x}), which is EVM STOP",
+                payload[0]
+            ),
+            Ok(_) => {}
+            Err(_) => {}
+        }
+    }
+}
