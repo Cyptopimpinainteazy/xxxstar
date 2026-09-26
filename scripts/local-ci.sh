@@ -214,6 +214,12 @@ GATES_FAST=(
   "invariant registry:python3 scripts/check-invariant-registry.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
+  # `check-readiness-consistency.sh` validates `required_tests` in FEATURE_REGISTRY.toml. The matrix
+  # fragments carry the same field and nothing checked them: X3-XVM-006 could cite
+  # `a_test_that_does_not_exist_anywhere` and every gate still passed (measured 2026-09-26). A
+  # citation is evidence, so it has to resolve; this reads every fragment, takes each row's
+  # `required_tests` and `paths`, and requires `fn <name>` under one of those paths.
+  "matrix tests exist:python3 scripts/ci/check-matrix-tests-exist.py"
   # `check-readiness-consistency.sh` proves every `required_tests` name in the registry *exists* as
   # a function. Nothing asked whether anything ever *runs* it. Five suites answered "no" on
   # 2026-09-25 (the kernel pallet, the supply ledger, the cross-VM router, x3-x3-integration and the

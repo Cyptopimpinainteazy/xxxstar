@@ -118,7 +118,15 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs multi-validator timeout/recovery proof"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes test_expired_transfer_refunds_to_source"]
-test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+required_tests = [
+  "expired_transfer_refunds_source",
+  "test_expired_transfer_refunds_to_source",
+  "edge_expired_transfer_rejected",
+  "test_cannot_cancel_before_expiry",
+]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — pallets/x3-cross-vm-router/src/tests.rs: expired_transfer_refunds_source, test_expired_transfer_refunds_to_source, edge_expired_transfer_rejected and test_cannot_cancel_before_expiry (a refund before expiry is refused); run by the `test x3-cross-vm-router` gate",
+]
 
 [[feature]]
 id = "X3-XVM-007"
@@ -151,7 +159,14 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs persistence/crash injection around refund path"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes failed_destination_credit_refunds_pending_supply"]
-test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+required_tests = [
+  "test_failed_destination_credit_refunds_pending_supply",
+  "failed_second_leg_rolls_back_first_leg",
+  "ixl_abort_after_lock_restores_ledger",
+]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — pallets/x3-cross-vm-router/src/tests.rs: test_failed_destination_credit_refunds_pending_supply, failed_second_leg_rolls_back_first_leg and ixl_abort_after_lock_restores_ledger, which assert the pending supply returns to the source rather than being created or stranded; run by the `test x3-cross-vm-router` gate",
+]
 
 [[feature]]
 id = "X3-XVM-009"
@@ -189,7 +204,14 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs distributed replay injection test"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes duplicate_message_replay_rejected"]
-test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+required_tests = [
+  "test_duplicate_message_replay_rejected",
+  "replay_message_rejected_no_state_change",
+  "duplicate_message_id_rejected",
+]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — pallets/x3-cross-vm-router/src/tests.rs: test_duplicate_message_replay_rejected, replay_message_rejected_no_state_change and duplicate_message_id_rejected (the last two assert the ledger is untouched, not merely that an error was returned); run by the `test x3-cross-vm-router` gate",
+]
 
 [[feature]]
 id = "X3-XVM-011"
@@ -206,7 +228,13 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs sustained adversarial replay testing across validators"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes duplicate nonce/message replay rejection"]
-test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+required_tests = [
+  "test_duplicate_nonce_rejected",
+  "six_internal_routes_strict_invariants_and_replay_guards",
+]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — pallets/x3-cross-vm-router/src/tests.rs: test_duplicate_nonce_rejected, plus six_internal_routes_strict_invariants_and_replay_guards, which re-runs every internal route and requires the replay guards to hold on all six; run by the `test x3-cross-vm-router` gate",
+]
 
 [[feature]]
 id = "X3-XVM-012"
@@ -223,7 +251,14 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["External boundary proof remains separate"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+required_tests = [
+  "six_internal_routes_strict_invariants_and_replay_guards",
+  "test_all_six_internal_routes_succeed",
+  "vm_adapter_six_routes_preserve_supply_and_clear_pending",
+]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — pallets/x3-cross-vm-router/src/tests.rs: six_internal_routes_strict_invariants_and_replay_guards drives DomainId::X3Evm -> DomainId::X3Native with ledger invarants checked on both sides, with test_all_six_internal_routes_succeed and vm_adapter_six_routes_preserve_supply_and_clear_pending covering the same route; run by the `test x3-cross-vm-router` gate",
+]
 
 [[feature]]
 id = "X3-XVM-013"
@@ -240,7 +275,14 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["External boundary proof remains separate"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+required_tests = [
+  "six_internal_routes_strict_invariants_and_replay_guards",
+  "test_all_six_internal_routes_succeed",
+  "xvm_router_svm_to_evm_full_round_trip",
+]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — pallets/x3-cross-vm-router/src/tests.rs: six_internal_routes_strict_invariants_and_replay_guards drives DomainId::X3Svm -> DomainId::X3Native with ledger invarants checked on both sides, with test_all_six_internal_routes_succeed and xvm_router_svm_to_evm_full_round_trip covering the same route family; run by the `test x3-cross-vm-router` gate",
+]
 
 [[feature]]
 id = "X3-XVM-014"
@@ -298,7 +340,18 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["External bridge path intentionally disabled at genesis"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: FEATURE_REGISTRY atomic_router = 88%; eight required tests listed"]
-test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+required_tests = [
+  "six_internal_routes_strict_invariants_and_replay_guards",
+  "test_all_six_internal_routes_succeed",
+  "vm_adapter_six_routes_preserve_supply_and_clear_pending",
+  "xvm_router_state_machine_legal_transitions_only",
+  "compiled_x3_lang_gateway_path_routes_and_rejects_direct_unsigned",
+  "unsigned_origin_cannot_use_x3_lang_router_entrypoints",
+  "signed_user_cannot_spoof_vm_origin",
+]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — pallets/x3-cross-vm-router/src/tests.rs: six_internal_routes_strict_invariants_and_replay_guards, test_all_six_internal_routes_succeed, vm_adapter_six_routes_preserve_supply_and_clear_pending, xvm_router_state_machine_legal_transitions_only, and the origin guards compiled_x3_lang_gateway_path_routes_and_rejects_direct_unsigned / unsigned_origin_cannot_use_x3_lang_router_entrypoints / signed_user_cannot_spoof_vm_origin; run by the `test x3-cross-vm-router` gate",
+]
 registry_feature = "atomic_router"
 
 [[feature]]
@@ -316,7 +369,16 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Operational governance activation process still required"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: ExternalBridgesEnabled defaults false and is dispatch-gated"]
-test_evidence = ["note: audited test/CI evidence score=90; exact named tests should be added before score increase"]
+required_tests = [
+  "external_bridges_are_paused_at_genesis",
+  "external_bridges_disabled_at_genesis",
+  "test_external_route_rejected_in_mvp",
+  "register_external_root_rejected_at_genesis",
+  "enabling_external_bridges_requires_documented_audit_gate",
+]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — pallets/x3-cross-vm-router/src/tests.rs: external_bridges_are_paused_at_genesis, external_bridges_disabled_at_genesis, test_external_route_rejected_in_mvp, register_external_root_rejected_at_genesis and enabling_external_bridges_requires_documented_audit_gate; run by the `test x3-cross-vm-router` gate",
+]
 
 [[feature]]
 id = "X3-XVM-018"
