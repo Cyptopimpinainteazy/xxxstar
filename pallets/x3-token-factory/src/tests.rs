@@ -126,6 +126,11 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type Ledger = Ledger;
     type Currency = ();
     type ExternalExecutorOrigin = RootOrAny;
+    // The router's root-registration path now asks a verifier instead of counting proof
+    // bytes, and this test runtime has nothing that can bind a foreign chain's block root
+    // to that chain's consensus. Same posture as the pallet's own tests and the runtime:
+    // the registration is refused rather than accepted on a data-shape check.
+    type ExternalRootVerifier = pallet_x3_cross_vm_router::RefuseExternalRoots;
     type VmAdapterOrigin = RootOrAny;
     type X3LangOrigin = RootOrSignedAccount;
     type EconomicHalt = Ledger;
