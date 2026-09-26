@@ -257,7 +257,10 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["External boundary proof remains separate"]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
-test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+test_evidence = [
+  "note: named tests, measured 2026-09-26 — node/tests/x3vm_evm_live.rs runs real_x3vm_evm_lock_claim_atomic_lifecycle, real_x3vm_evm_timeout_refund_atomic_lifecycle, real_evm_header_attestation_populates_the_verifiers_anchor, real_evm_receipt_proof_is_accepted_against_the_attested_header, real_evm_a_claim_with_the_wrong_secret_is_refused, real_evm_a_second_claim_on_the_same_lock_is_refused and real_evm_an_early_refund_is_refused_and_succeeds_once_expired against anvil with a deployed AtlasHTLC and a real local X3 node; scripts/cross-domain-evm-gate.sh runs all seven (gate `cross-domain EVM`, PASS 224s) and the same gate with X3_STRICT_CROSS_DOMAIN_PROOFS=1 (PASS 334s)",
+  "note: the contract-level half is X3-contracts/evm/test-live-lifecycle.sh (gate `EVM contract lifecycle`, 11 passed / 0 failed — double-claim rejected, premature refund rejected, wrong-authority refund rejected); it calls the contract directly, while the node-level tests above are the same refusals through the executor the product path uses",
+]
 
 [[feature]]
 id = "X3-XVM-015"

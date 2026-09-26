@@ -1252,3 +1252,140 @@ fn unattested_cross_domain_proofs_allowed() -> bool {
         None => false,
     }
 }
+
+/// The contract and the two funded actors the gate deploys.
+fn evm_test_config() -> ([u8; 20], String, String) {
+    (
+        parse_address(&std::env::var("X3_TEST_EVM_HTLC").expect("X3_TEST_EVM_HTLC")),
+        std::env::var("X3_TEST_EVM_LOCKER_KEY").expect("X3_TEST_EVM_LOCKER_KEY"),
+        std::env::var("X3_TEST_EVM_CLAIMANT_KEY").expect("X3_TEST_EVM_CLAIMANT_KEY"),
+    )
+}
+
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock")
+        .as_secs()
+}
+
+/// A claim carrying a preimage that does not open the lock is refused, and the lock stays claimable.
+///
+/// PRIORITY 2's failure matrix names "wrong secret" and nothing on the live path had shown it: the
+/// lifecycle test only ever claims with the preimage it locked with, so "the contract checks the
+/// preimage" was an assumption about `AtlasHTLC` rather than something a chain had run. The second
+/// half matters as much as the first — a refusal that also bricks the lock would pass a one-sided
+/// test.
+#[test]
+#[ignore = "needs a running anvil with AtlasHTLC deployed; the EVM gate supplies both"]
+fn real_evm_a_claim_with_the_wrong_secret_is_refused() {
+    let (contract, locker_key, claimant_key) = evm_test_config();
+    let mut locker =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key).expect("live EVM locker");
+    let mut claimant =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &claimant_key).expect("live EVM claimant");
+    let sender = parse_address(&locker.signer_address().expect("EVM locker address"));
+    let recipient = parse_address(&claimant.signer_address().expect("EVM claimant address"));
+
+    let preimage = [0x77u8; 32];
+    let hashlock = sp_core::hashing::sha2_256(&preimage);
+    let timelock = now_secs().saturating_add(900);
+    let expected_count = evm_htlc_count(contract).saturating_add(1);
+    locker
+        .execute_lock("anvil", recipient, hashlock, timelock, [0u8; 20], 1, 30_000)
+        .expect("real EVM lock");
+    let id = htlc_id(sender, recipient, hashlock, expected_count);
+
+    let wrong = [0x78u8; 32];
+    assert_ne!(
+        sp_core::hashing::sha2_256(&wrong),
+        hashlock,
+        "the fixture's 'wrong' preimage has to actually be wrong"
+    );
+    assert!(
+        claimant
+            .execute_claim("anvil", id, 1, wrong, 30_000)
+            .is_err(),
+        "a claim with the wrong preimage must be refused"
+    );
+
+    // The refusal was the secret, not the lock: the right preimage still opens it.
+    let claimed = claimant
+        .execute_claim("anvil", id, 1, preimage, 30_000)
+        .expect("the right preimage still claims the lock");
+    assert_eq!(claimed.preimage, preimage);
+    assert!(!claimed.tx_id.is_empty());
+}
+
+/// The same lock cannot be claimed twice — the property the lock exists for.
+#[test]
+#[ignore = "needs a running anvil with AtlasHTLC deployed; the EVM gate supplies both"]
+fn real_evm_a_second_claim_on_the_same_lock_is_refused() {
+    let (contract, locker_key, claimant_key) = evm_test_config();
+    let mut locker =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key).expect("live EVM locker");
+    let mut claimant =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &claimant_key).expect("live EVM claimant");
+    let sender = parse_address(&locker.signer_address().expect("EVM locker address"));
+    let recipient = parse_address(&claimant.signer_address().expect("EVM claimant address"));
+
+    let preimage = [0x81u8; 32];
+    let hashlock = sp_core::hashing::sha2_256(&preimage);
+    let timelock = now_secs().saturating_add(900);
+    let expected_count = evm_htlc_count(contract).saturating_add(1);
+    locker
+        .execute_lock("anvil", recipient, hashlock, timelock, [0u8; 20], 1, 30_000)
+        .expect("real EVM lock");
+    let id = htlc_id(sender, recipient, hashlock, expected_count);
+
+    let first = claimant
+        .execute_claim("anvil", id, 1, preimage, 30_000)
+        .expect("the first claim must succeed");
+    assert_eq!(first.preimage, preimage);
+
+    assert!(
+        claimant
+            .execute_claim("anvil", id, 1, preimage, 30_000)
+            .is_err(),
+        "a claimed lock must not pay out twice, even to the same claimant with the same secret"
+    );
+}
+
+/// A refund before the timelock is refused; the same call succeeds once it has passed.
+#[test]
+#[ignore = "needs a running anvil with AtlasHTLC deployed; the EVM gate supplies both"]
+fn real_evm_an_early_refund_is_refused_and_succeeds_once_expired() {
+    let (contract, locker_key, claimant_key) = evm_test_config();
+    let mut locker =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key).expect("live EVM locker");
+    let claimant =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &claimant_key).expect("live EVM claimant");
+    let recipient = parse_address(&claimant.signer_address().expect("EVM claimant address"));
+
+    let preimage = [0x92u8; 32];
+    let hashlock = sp_core::hashing::sha2_256(&preimage);
+    let timelock = now_secs().saturating_add(900);
+    let expected_count = evm_htlc_count(contract).saturating_add(1);
+    locker
+        .execute_lock("anvil", recipient, hashlock, timelock, [0u8; 20], 1, 30_000)
+        .expect("real EVM lock");
+    let id = htlc_id(
+        parse_address(&locker.signer_address().expect("EVM locker address")),
+        recipient,
+        hashlock,
+        expected_count,
+    );
+
+    assert!(
+        locker.execute_refund("anvil", id, 1, 30_000).is_err(),
+        "a refund before the timelock must be refused, or the timeout means nothing"
+    );
+
+    // The same call, once the lock has actually expired: the guard was the clock, not a broken path.
+    advance_anvil_time(1_000);
+    let refunded = locker
+        .execute_refund("anvil", id, 1, 30_000)
+        .expect("the refund path still works after the timelock");
+    assert_eq!(refunded.vm_type, VmType::Evm);
+    assert!(!refunded.tx_id.is_empty());
+}

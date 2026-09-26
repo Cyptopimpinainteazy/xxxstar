@@ -15,6 +15,10 @@
 #      The same intent forced down the refund path: canonical refund proof set
 #      submitted, refund observed finalized on both domains, and a later claim
 #      on either leg rejected.
+#   3. three failure-path tests against the same deployed contract: a claim with
+#      the wrong preimage is refused (and the right one still claims), a second
+#      claim on a claimed lock is refused, and a refund before the timelock is
+#      refused while the same call succeeds once it has expired.
 #
 # Both tests are `#[ignore]`d in `node/tests/x3vm_evm_live.rs` because they need
 # a chain, not because they are unfinished. This script supplies the chain, so
@@ -165,6 +169,14 @@ TESTS=(
   # and record it. Each link has its own test; this is the one that shows they
   # compose on a chain.
   real_evm_receipt_proof_is_accepted_against_the_attested_header
+  # The failure half of the same contract. The lifecycle tests only ever claim with the preimage
+  # they locked with, so "the contract checks the secret", "it cannot pay twice" and "the timelock
+  # gates refunds" were assumptions about AtlasHTLC rather than anything a chain had shown. Each of
+  # these also proves the refusal did not brick the lock: the right secret still claims, and the
+  # refund still works once the lock has actually expired.
+  real_evm_a_claim_with_the_wrong_secret_is_refused
+  real_evm_a_second_claim_on_the_same_lock_is_refused
+  real_evm_an_early_refund_is_refused_and_succeeds_once_expired
 )
 
 failed=0
