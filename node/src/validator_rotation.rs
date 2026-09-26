@@ -15,8 +15,8 @@ use sp_core::{Pair as PairTrait, H256};
 use sp_runtime::generic::Era;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use x3_chain_runtime::{
-    AccountId, Address, Runtime, RuntimeCall, SessionKeys, Signature, SignedExtra, SignedPayload,
-    UncheckedExtrinsic, VERSION,
+    AccountId, Address, CouncilCollective, Runtime, RuntimeCall, SessionKeys, Signature,
+    SignedExtra, SignedPayload, UncheckedExtrinsic, VERSION,
 };
 
 /// A loaded sr25519 operator keypair (the account that signs `set_keys`).
@@ -99,6 +99,124 @@ impl OperatorKey {
             extra,
         ))
     }
+
+    /// Build the signed `Council::propose` for `call`, with `threshold` approvals.
+    ///
+    /// The custody registry gate is `EnsureRootOrHalfCouncil`, and `Sudo` has **no key** on
+    /// this chain (`development_config` leaves `sudo: Default::default()`), so a signed
+    /// account cannot reach that origin directly and there is no root path at all. The
+    /// collective origin is the only one left: a motion that reaches its threshold. Returns
+    /// the extrinsic and the proposal hash a second member has to vote on.
+    pub fn council_propose(
+        &self,
+        call: RuntimeCall,
+        threshold: u32,
+        genesis_hash: H256,
+        tx_nonce: u32,
+    ) -> Result<(UncheckedExtrinsic, H256), String> {
+        let proposal_hash = council_proposal_hash(&call);
+        let length_bound = call_length_bound(&call)?;
+        let propose = RuntimeCall::Council(
+            pallet_collective::Call::<Runtime, CouncilCollective>::propose {
+                threshold,
+                proposal: Box::new(call),
+                length_bound,
+            },
+        );
+        Ok((
+            self.signed_extrinsic(propose, genesis_hash, tx_nonce)?,
+            proposal_hash,
+        ))
+    }
+
+    /// Build the signed `Council::vote` that carries a motion over its threshold.
+    pub fn council_vote(
+        &self,
+        proposal: H256,
+        index: u32,
+        approve: bool,
+        genesis_hash: H256,
+        tx_nonce: u32,
+    ) -> Result<UncheckedExtrinsic, String> {
+        let vote = RuntimeCall::Council(
+            pallet_collective::Call::<Runtime, CouncilCollective>::vote {
+                proposal,
+                index,
+                approve,
+            },
+        );
+        self.signed_extrinsic(vote, genesis_hash, tx_nonce)
+    }
+
+    /// Build the signed `Council::close` that executes a motion whose votes are in.
+    ///
+    /// In this pallet version `vote` only records the vote — `do_vote` deposits `Voted` and
+    /// nothing else — so a motion that has reached its threshold sits there until `close`
+    /// dispatches it. Measured 2026-09-26: two ayes were recorded, no `Council::Executed` event
+    /// was emitted, and the call never ran. `close` may be called by any signed account.
+    pub fn council_close(
+        &self,
+        proposal: H256,
+        index: u32,
+        length_bound: u32,
+        genesis_hash: H256,
+        tx_nonce: u32,
+    ) -> Result<UncheckedExtrinsic, String> {
+        let close = RuntimeCall::Council(
+            pallet_collective::Call::<Runtime, CouncilCollective>::close {
+                proposal_hash: proposal,
+                index,
+                proposal_weight_bound: proposal_weight_bound(),
+                length_bound,
+            },
+        );
+        self.signed_extrinsic(close, genesis_hash, tx_nonce)
+    }
+}
+
+/// The length bound `propose` and `close` both take: the encoded length of the proposed call.
+pub fn call_length_bound(call: &RuntimeCall) -> Result<u32, String> {
+    u32::try_from(call.encode().len()).map_err(|_| "call is too large to propose".to_string())
+}
+
+/// The weight bound `close` takes: half a block.
+///
+/// `close` declares its own weight as that bound plus its base cost, so `Weight::MAX` is refused
+/// by the pool as a transaction that could never fit a block ("RPC error: Invalid Transaction",
+/// measured). Half a block is derived from this chain's configured limit rather than guessed, and
+/// is far above the weight of any governance call an operator proposes through a motion.
+pub fn proposal_weight_bound() -> frame_support::weights::Weight {
+    let max = <<Runtime as frame_system::Config>::BlockWeights as frame_support::traits::Get<
+        frame_system::limits::BlockWeights,
+    >>::get()
+    .max_block;
+    frame_support::weights::Weight::from_parts(max.ref_time() / 2, max.proof_size() / 2)
+}
+
+/// The call an operator wants the council to carry: register a validator key.
+pub fn register_validator_call(
+    account: AccountId,
+    rotation_due_at: x3_chain_runtime::BlockNumber,
+) -> RuntimeCall {
+    RuntimeCall::X3Custody(pallet_x3_custody::Call::<Runtime>::register_validator_key {
+        account,
+        rotation_due_at,
+    })
+}
+
+/// `pallet_collective` keys a motion by `blake2_256` of the encoded call.
+pub fn council_proposal_hash(call: &RuntimeCall) -> H256 {
+    H256::from(sp_core::hashing::blake2_256(&call.encode()))
+}
+
+/// Encode the `state_getStorage` key for `Council.ProposalCount`.
+///
+/// The index a `vote` must name is the count *before* the proposal is made — the pallet
+/// inserts a proposal under the current count and then increments it.
+pub fn council_proposal_count_storage_key() -> Vec<u8> {
+    let mut out = sp_core::hashing::twox_128(b"Council").to_vec();
+    out.extend_from_slice(&sp_core::hashing::twox_128(b"ProposalCount"));
+    out
 }
 
 /// Derive the Aura (sr25519) authority id for a new session key.

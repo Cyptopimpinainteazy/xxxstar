@@ -252,6 +252,42 @@ pub enum ValidatorSubcommand {
         #[arg(long, default_value_t = false)]
         submit: bool,
     },
+
+    /// Register an account as a validator in the custody registry, by council motion.
+    ///
+    /// `pallet_x3_custody::register_validator_key` takes the governance origin, and `rotate`
+    /// refuses any account without a registry entry — so a fresh chain has nothing to rotate
+    /// until something writes that entry. `Sudo` has no key on this chain (a dev spec leaves
+    /// it empty and the real specs have no root path at all), so the collective origin is the
+    /// way: `--suri` proposes the call and `--second` votes it over the threshold. Both
+    /// signatures are produced here; nothing is sent unless `--submit` is passed.
+    Register {
+        /// RPC endpoint URL.
+        #[arg(long, default_value = "http://127.0.0.1:9944")]
+        rpc_url: String,
+
+        /// Council member SURI that proposes the motion.
+        #[arg(long, value_name = "SURI")]
+        suri: String,
+
+        /// Council member SURI that seconds it. On a two-member council the motion needs both.
+        #[arg(long, value_name = "SURI")]
+        second: String,
+
+        /// Account to register, in SS58. Defaults to the proposer's own account,
+        /// which is what an operator bootstrapping a fresh chain wants.
+        #[arg(long, value_name = "SS58")]
+        account: Option<String>,
+
+        /// Block at which the next rotation is due. Defaults to the current
+        /// block plus `CustodyKeyRotationPeriod`.
+        #[arg(long)]
+        due_at: Option<u32>,
+
+        /// Submit the signed extrinsic instead of only printing it.
+        #[arg(long, default_value_t = false)]
+        submit: bool,
+    },
 }
 
 /// Comit transaction CLI commands for dual-VM execution.

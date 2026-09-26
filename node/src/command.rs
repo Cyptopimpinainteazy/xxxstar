@@ -6,7 +6,7 @@ use crate::{
     service,
 };
 use clap::Parser;
-use codec::{Decode, Encode};
+use codec::Encode;
 #[cfg(feature = "runtime-benchmarks")]
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
 use log::{error, info, warn};
@@ -869,6 +869,14 @@ pub fn run() -> CliResult<()> {
                 grandpa_seed,
                 submit,
             } => run_validator_rotate(rpc_url, suri, aura_seed, grandpa_seed, *submit),
+            ValidatorSubcommand::Register {
+                rpc_url,
+                suri,
+                second,
+                account,
+                due_at,
+                submit,
+            } => run_validator_register(rpc_url, suri, second, account, *due_at, *submit),
         },
         Some(Commands::Inspect(cmd)) => {
             match &cmd.command {
@@ -1305,8 +1313,216 @@ fn make_rpc_call(
         .ok_or_else(|| "No result in response".to_string())
 }
 
-/// `validator rotate`: read the on-chain registry, refuse unregistered accounts,
-/// derive fresh session keys, and build (optionally submit) `session.set_keys`.
+/// `validator register`: carry `x3_custody::register_validator_key` through the council.
+///
+/// The call takes the governance origin. There is no root path on a real chain and `Sudo`
+/// has no key on the dev one, so the collective origin is the only route: one council member
+/// proposes, another carries it over the threshold, and the motion executes the call.
+fn run_validator_register(
+    rpc_url: &str,
+    proposer_suri: &str,
+    second_suri: &str,
+    account_ss58: &Option<String>,
+    due_at: Option<u32>,
+    submit: bool,
+) -> CliResult<()> {
+    use sp_core::crypto::Ss58Codec;
+    use x3_chain_runtime::{AccountId, CustodyKeyRotationPeriod};
+
+    let proposer = crate::validator_rotation::OperatorKey::from_uri(proposer_suri)?;
+    let second = crate::validator_rotation::OperatorKey::from_uri(second_suri)?;
+    let account = match account_ss58 {
+        Some(ss58) => {
+            AccountId::from_ss58check(ss58).map_err(|e| format!("invalid account {ss58}: {e:?}"))?
+        }
+        None => proposer.account(),
+    };
+    let account_ss58 = account.to_ss58check();
+
+    let genesis_hash = decode_h256(&make_rpc_call(
+        rpc_url,
+        "chain_getBlockHash",
+        serde_json::json!([0]),
+    )?)?;
+    let current_block = current_block_number(rpc_url)?;
+    // Read both nonces from chain state, not from the pool's view of them.
+    let proposer_nonce = on_chain_nonce(rpc_url, &proposer.account())?;
+    let second_nonce = on_chain_nonce(rpc_url, &second.account())?;
+    let due_at = due_at.unwrap_or_else(|| {
+        current_block.saturating_add(<CustodyKeyRotationPeriod as frame_support::traits::Get<
+            x3_chain_runtime::BlockNumber,
+        >>::get())
+    });
+
+    // The vote has to name the motion's index, which is the council's proposal count *before*
+    // this proposal is inserted.
+    let proposal_count_raw = make_rpc_call(
+        rpc_url,
+        "state_getStorage",
+        serde_json::json!([format!(
+            "0x{}",
+            hex::encode(crate::validator_rotation::council_proposal_count_storage_key())
+        )]),
+    )?;
+    let index: u32 = decode_storage_hex(&proposal_count_raw)?.unwrap_or(0);
+
+    let custody_call = crate::validator_rotation::register_validator_call(account.clone(), due_at);
+    let length_bound = crate::validator_rotation::call_length_bound(&custody_call)?;
+    let (propose, proposal_hash) =
+        proposer.council_propose(custody_call, 2, genesis_hash, proposer_nonce)?;
+
+    println!("proposer:      {}", proposer.account().to_ss58check());
+    println!("second:        {}", second.account().to_ss58check());
+    println!("validator:     {account_ss58}");
+    println!("current block: {current_block}");
+    println!("register due:  {due_at}");
+    println!(
+        "proposal:      0x{} (index {index})",
+        hex::encode(proposal_hash)
+    );
+
+    if submit {
+        let propose_hash = make_rpc_call(
+            rpc_url,
+            "author_submitExtrinsic",
+            serde_json::json!([format!("0x{}", hex::encode(propose.encode()))]),
+        )?;
+        println!(
+            "proposed:      {}",
+            propose_hash.as_str().unwrap_or("<non-string>")
+        );
+
+        // Wait for the proposal to be *built into a block* before voting. Sending both at once
+        // left one of them stuck in the pool indefinitely (measured 2026-09-26): a vote that
+        // arrives while the motion it names is not on chain yet is skipped as invalid on every
+        // authoring attempt, and nothing in the output said so. The proposer's account index
+        // moving past the nonce this extrinsic was built with is the precise "included" signal.
+        wait_for_account_index_to_pass(
+            rpc_url,
+            &proposer.account().to_ss58check(),
+            proposer_nonce,
+        )?;
+
+        // `propose` does **not** count as an approval: with a threshold of two the motion needs
+        // two `vote` calls, which is what a two-member council is. Measured: one vote left
+        // `yes: 1, no: 0` in the block's events and the call never executed.
+        let proposer_vote = proposer.council_vote(
+            proposal_hash,
+            index,
+            true,
+            genesis_hash,
+            proposer_nonce.saturating_add(1),
+        )?;
+        let vote_hash = make_rpc_call(
+            rpc_url,
+            "author_submitExtrinsic",
+            serde_json::json!([format!("0x{}", hex::encode(proposer_vote.encode()))]),
+        )?;
+        println!(
+            "voted:         {} (proposer)",
+            vote_hash.as_str().unwrap_or("<non-string>")
+        );
+        wait_for_account_index_to_pass(
+            rpc_url,
+            &proposer.account().to_ss58check(),
+            proposer_nonce.saturating_add(1),
+        )?;
+
+        let second_vote =
+            second.council_vote(proposal_hash, index, true, genesis_hash, second_nonce)?;
+        let second_hash = make_rpc_call(
+            rpc_url,
+            "author_submitExtrinsic",
+            serde_json::json!([format!("0x{}", hex::encode(second_vote.encode()))]),
+        )?;
+        println!(
+            "voted:         {} (second)",
+            second_hash.as_str().unwrap_or("<non-string>")
+        );
+        wait_for_account_index_to_pass(rpc_url, &second.account().to_ss58check(), second_nonce)?;
+
+        // A motion at its threshold is not executed until someone closes it: `vote` only records
+        // the vote in this pallet version. Without this the call was built, included and
+        // dispatched, and nothing happened (measured).
+        let close = second.council_close(
+            proposal_hash,
+            index,
+            length_bound,
+            genesis_hash,
+            second_nonce.saturating_add(1),
+        )?;
+        let close_hash = make_rpc_call(
+            rpc_url,
+            "author_submitExtrinsic",
+            serde_json::json!([format!("0x{}", hex::encode(close.encode()))]),
+        )?;
+        println!(
+            "closed:        {} (executes the motion)",
+            close_hash.as_str().unwrap_or("<non-string>")
+        );
+        wait_for_account_index_to_pass(
+            rpc_url,
+            &second.account().to_ss58check(),
+            second_nonce.saturating_add(1),
+        )?;
+
+        // And report success only once the storage this wrote actually holds the entry — the
+        // same storage `rotate` refuses to work without.
+        let record: Option<pallet_x3_custody::ValidatorKeyRecord<x3_chain_runtime::BlockNumber>> =
+            decode_storage_hex(&make_rpc_call(
+                rpc_url,
+                "state_getStorage",
+                serde_json::json!([format!(
+                    "0x{}",
+                    hex::encode(
+                        crate::validator_rotation::validator_key_registry_storage_key(&account)
+                    )
+                )]),
+            )?)?;
+        match record {
+            Some(record) if record.active => println!(
+                "registered:    true (role {:?}, due at block {})",
+                record.role, record.rotation_due_at
+            ),
+            Some(_) => return Err("the registry entry exists but is inactive".into()),
+            None => {
+                // The extrinsic was included, so the answer is in the block's events: print the
+                // council and system events rather than guessing why the call had no effect.
+                print_recent_events(rpc_url)?;
+                return Err(
+                    "the council motion did not write a registry entry: the call was built, \
+                     included and dispatched without effect (events above)"
+                        .into(),
+                );
+            }
+        }
+    } else {
+        // A two-member motion is three extrinsics: one proposal and one vote from each member.
+        println!("council propose extrinsic, from the proposer (submit with --submit):");
+        println!("0x{}", hex::encode(propose.encode()));
+        let proposer_vote = proposer.council_vote(
+            proposal_hash,
+            index,
+            true,
+            genesis_hash,
+            proposer_nonce.saturating_add(1),
+        )?;
+        println!("council vote extrinsic, from the proposer:");
+        println!("0x{}", hex::encode(proposer_vote.encode()));
+        println!("council vote extrinsic, from the second member:");
+        println!(
+            "0x{}",
+            hex::encode(
+                second
+                    .council_vote(proposal_hash, index, true, genesis_hash, second_nonce)?
+                    .encode()
+            )
+        );
+    }
+
+    Ok(())
+}
+
 fn run_validator_rotate(
     rpc_url: &str,
     suri: &str,
@@ -1429,8 +1645,17 @@ fn decode_u32(value: &serde_json::Value) -> Result<u32, String> {
             .map(|v| v as u32)
             .ok_or_else(|| "nonce/index is not an unsigned integer".to_string()),
         serde_json::Value::String(s) => {
-            let bytes = decode_hex_bytes(s)?;
-            u32::decode(&mut &bytes[..]).map_err(|e| format!("failed to decode u32: {e}"))
+            // Substrate encodes a block number as *minimal* hex — `0x2dc`, not `0x02dc` — so
+            // half of all block heights have an odd number of digits. Two things went wrong
+            // when this was read as SCALE bytes rather than as a number: `hex::decode` refuses
+            // an odd digit count ("Odd number of digits"), and `u32::decode` wants exactly four
+            // bytes ("Not enough data to fill buffer"), so even `0x5f` failed. Measured on a
+            // live dev chain at height 0x2dc on 2026-09-26: `validator rotate` could not read
+            // the current block at all.
+            let digits = s.trim_start_matches("0x").trim_start_matches("0X");
+            let value = u64::from_str_radix(digits, 16)
+                .map_err(|e| format!("invalid hex integer {s}: {e}"))?;
+            u32::try_from(value).map_err(|_| format!("{s} does not fit in a u32 nonce/index"))
         }
         _ => Err("expected a number or hex string".to_string()),
     }
@@ -1447,6 +1672,113 @@ fn current_block_number(rpc_url: &str) -> Result<u32, String> {
 fn decode_hex_bytes(hex_str: &str) -> Result<Vec<u8>, String> {
     let hex_str = hex_str.trim_start_matches("0x").trim_start_matches("0X");
     hex::decode(hex_str).map_err(|e| format!("invalid hex: {e}"))
+}
+
+/// Block until `account`'s next index has moved past `used`, i.e. an extrinsic signed with that
+/// nonce was built into a block.
+///
+/// Neither `author_submitExtrinsic` (the pool took it) nor `system_accountNextIndex` (the *pool's*
+/// view, which advances the moment the transaction is queued) answers this — using the latter made
+/// a stuck transaction look included. The on-chain nonce in `System.Account` moves only when a
+/// block actually carries the extrinsic, whether or not its dispatch succeeds.
+fn wait_for_account_index_to_pass(rpc_url: &str, account_ss58: &str, used: u32) -> CliResult<()> {
+    use sp_core::crypto::Ss58Codec;
+    use x3_chain_runtime::AccountId;
+
+    let account =
+        AccountId::from_ss58check(account_ss58).map_err(|e| format!("invalid account: {e:?}"))?;
+    for _ in 0..120 {
+        let next = on_chain_nonce(rpc_url, &account)?;
+        if next > used {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+    Err(format!(
+        "the extrinsic signed by {account_ss58} with nonce {used} was queued but never built into \
+         a block — it is still sitting in the pool"
+    )
+    .into())
+}
+
+/// The account's on-chain nonce, from the runtime's `AccountNonceApi`.
+///
+/// Distinct from `system_accountNextIndex`, which answers with the *pool's* view of the next
+/// index and therefore advances the moment a transaction is queued.
+fn on_chain_nonce(rpc_url: &str, account: &x3_chain_runtime::AccountId) -> CliResult<u32> {
+    let raw = make_rpc_call(
+        rpc_url,
+        "state_call",
+        serde_json::json!([
+            "AccountNonceApi_account_nonce",
+            format!("0x{}", hex::encode(account.encode()))
+        ]),
+    )?;
+    let hex_str = raw
+        .as_str()
+        .ok_or_else(|| "state_call returned a non-string result".to_string())?;
+    let bytes = decode_hex_bytes(hex_str)?;
+    <x3_chain_runtime::Index as codec::Decode>::decode(&mut &bytes[..])
+        .map_err(|e| format!("failed to decode the account nonce: {e}").into())
+}
+
+/// Print the council, custody and failed-extrinsic events of the latest block.
+///
+/// `author_submitExtrinsic` answering with a hash says the pool took the transaction, and the
+/// account index moving says a block carried it — neither says the call *worked*. The dispatch
+/// result exists only in the block's events, so an operator debugging a governance call that had
+/// no effect needs them printed rather than a bare "nothing happened".
+fn print_recent_events(rpc_url: &str) -> CliResult<()> {
+    use x3_chain_runtime::RuntimeEvent;
+
+    let mut key = sp_core::hashing::twox_128(b"System").to_vec();
+    key.extend_from_slice(&sp_core::hashing::twox_128(b"Events"));
+    let key_hex = format!("0x{}", hex::encode(&key));
+
+    // The extrinsics under investigation are a block or two behind the head by the time we look,
+    // so scan a window of blocks rather than only the newest one.
+    let height = current_block_number(rpc_url)?;
+    let mut printed = 0usize;
+    for number in height.saturating_sub(12)..=height {
+        let Ok(hash) = decode_h256(&make_rpc_call(
+            rpc_url,
+            "chain_getBlockHash",
+            serde_json::json!([number]),
+        )?) else {
+            continue;
+        };
+        let raw = make_rpc_call(
+            rpc_url,
+            "state_getStorage",
+            serde_json::json!([key_hex, format!("0x{}", hex::encode(hash))]),
+        )?;
+        let Some(events) = decode_storage_hex::<
+            Vec<frame_system::EventRecord<RuntimeEvent, sp_core::H256>>,
+        >(&raw)?
+        else {
+            continue;
+        };
+        for record in events {
+            let interesting = match &record.event {
+                RuntimeEvent::System(frame_system::Event::ExtrinsicFailed {
+                    dispatch_error,
+                    ..
+                }) => Some(format!("ExtrinsicFailed: {dispatch_error:?}")),
+                RuntimeEvent::Council(council) => Some(format!("Council::{council:?}")),
+                RuntimeEvent::X3Custody(custody) => Some(format!("X3Custody::{custody:?}")),
+                _ => None,
+            };
+            if let Some(text) = interesting {
+                let text: String = text.chars().take(400).collect();
+                println!("events:        block {number}: {text}");
+                printed += 1;
+            }
+        }
+    }
+    if printed == 0 {
+        println!("events:        no council, custody or failure event in the last 12 blocks");
+    }
+    Ok(())
 }
 
 // ── Asset enumeration ───────────────────────────────────────────────────────
@@ -1510,6 +1842,21 @@ fn query_failed(what: &str, rpc_url: &str, error: impl std::fmt::Display) -> Cli
 #[cfg(test)]
 mod asset_scan_tests {
     use super::*;
+
+    /// The node reports a block number as *minimal* hex, so half of all heights have an
+    /// odd number of digits. `0x2dc` is the value measured from a live dev chain on
+    /// 2026-09-26, and it is what made `validator rotate` fail with
+    /// `Input("invalid hex: Odd number of digits")`.
+    #[test]
+    fn a_minimal_hex_block_number_decodes() {
+        assert_eq!(decode_u32(&serde_json::json!("0x2dc")).unwrap(), 0x2dc);
+        assert_eq!(decode_u32(&serde_json::json!("0x5f")).unwrap(), 0x5f);
+        assert_eq!(decode_u32(&serde_json::json!("0x02dc")).unwrap(), 0x2dc);
+        assert_eq!(decode_u32(&serde_json::json!(0)).unwrap(), 0);
+        assert_eq!(decode_u32(&serde_json::json!("0x0")).unwrap(), 0);
+        assert!(decode_u32(&serde_json::json!("0xzz")).is_err());
+        assert!(decode_u32(&serde_json::json!("0x1_0000_0000")).is_err());
+    }
 
     #[test]
     fn asset_metadata_is_taken_from_the_chain_answer() {
