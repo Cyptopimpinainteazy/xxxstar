@@ -419,18 +419,28 @@ EXPLORER_URLS=(
 )
 explorer_ok=false
 for url in "${EXPLORER_URLS[@]}"; do
-    if curl -sf -m 5 "$url" >/dev/null 2>&1; then
-        info "Explorer/dashboard found at $url"
+    # Something answering on the port is not an explorer. This used to accept *any* HTTP
+    # service on 3000/3001/8080 — the wallet app's own `next dev -p 3001` satisfied it — which
+    # is why an earlier "14 of 15 PASS" run read as a green criterion while nothing was serving
+    # a block explorer. Require the body to be the explorer it claims to be, and say what was
+    # reached.
+    body="$(curl -sf -m 5 "$url" 2>/dev/null || true)"
+    if [[ -z "$body" ]]; then
+        continue
+    fi
+    if grep -qiE "X3 Chain Explorer|X3 Chain Block Explorer|Block explorer for X3" <<<"$body"; then
+        info "Explorer found at $url ($(wc -c <<<"$body" | tr -d '[:space:]') bytes, identifies itself as the X3 Chain Explorer)"
         explorer_ok=true
         break
     fi
+    info "$url answered but does not identify itself as the X3 explorer"
 done
 if $explorer_ok; then
     pass "explorer_or_dashboard"
 else
     # Check if dashboard app exists and has a build script
     if [[ -d "$ROOT_DIR/apps/dashboard" ]] || [[ -d "$ROOT_DIR/apps/explorer" ]]; then
-        fail "explorer_or_dashboard" "app exists but not running — start the explorer/dashboard"
+        fail "explorer_or_dashboard" "nothing on ${EXPLORER_URLS[*]} serves the X3 explorer — start it (apps/explorer: 'npx next start -p 3000' after a build) or point this criterion at the URL that does"
     else
         fail "explorer_or_dashboard" "no explorer or dashboard found at common ports"
     fi
