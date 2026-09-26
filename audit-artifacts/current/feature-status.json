@@ -1855,7 +1855,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 55,
+      "composite": 61,
       "confidence": "high",
       "evidence": [
         "pallets/x3-supply-ledger/src/lib.rs",
@@ -1866,10 +1866,11 @@
       "implemented": 65,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 35,
+      "mainnet_ready": 45,
       "missing_work": [
         "**CLOSED 2026-09-25 at the ledger level.** The conservation law is `represented() = native + evm + svm + external_locked + pending` never exceeding the canonical ceiling, and every transition being a relabelling rather than a creation: debit moves source -> pending, credit moves pending -> destination, refund moves pending -> source. `tests_conservation.rs` asserts exactly that after every step of the success path (native -> EVM), the external route (native -> `external_locked`), the rollback path (debit then refund restores the ledger bit-for-bit), the duplicate-settle case (a replayed settle is refused), the halt/pause cases (new legs refused, refunds still allowed), and 200 random leg sequences. The mint path's own conservation is covered too: a governance mint raises the ceiling with the supply, and a replayed nonce moves neither.",
-        "Still open, and why `mainnet_ready` does not move: this is one asset ledger in one process. Nothing here exercises a *real* external bridge observation (a lock on another chain being seen and recorded), concurrent cross-domain traffic under a multi-validator network, or the router's own accounting against the ledger \u2014 the row's original 'end-to-end supply conservation remains P0' is only half closed, and the other half is X3-XVM-002's."
+        "**HALF CLOSED 2026-09-26 \u2014 concurrent traffic on a multi-validator network now has a conservation proof, for native balances.** That was one of this row's three open items ('concurrent cross-domain traffic under a multi-validator network'). `node/tests/supply_invariant_distributed.rs` (gate: `supply invariant across validators`, ~200s, serial \u2014 it binds node ports) boots the three-validator `local3` chain from one frozen node binary, drives five comits per account into all three validators concurrently \u2014 each one required to have an execution receipt on a validator that never received it \u2014 and then, at one finalized block, reads the conservation identity from **each validator's own state**: `sum(free + reserved)` over every `System::Account` enumerated with `state_getKeys` at that block hash versus the runtime's own `AtlasKernelRuntimeApi::get_total_issuance()` at the same hash. Measured: baseline 8 accounts, 8000000000000000000 == 8000000000000000000 on all three; after traffic, finalized block 107, all three report accounted 7999999998338644985 == TotalIssuance 7999999998338644985, and the fall in account balances equals the fall in issuance exactly (each account paid 553785005). Load-bearing: injecting one unit into `Balances::TotalIssuance` in a scratch genesis makes the same check fail by exactly that unit (`delta 1`).",
+        "Still open, and why `mainnet_ready` does not move further: the per-asset identity this row exists for \u2014 `represented() = native + evm + svm + external_locked + pending` never exceeding the canonical ceiling \u2014 has no read surface over RPC, so the distributed proof above covers the **native** side only; and a *real* external bridge observation (a lock on another chain being seen and recorded) is still unexercised, as is the router's own accounting reconciled against the ledger on a live network."
       ],
       "name": "Supply conservation ledger",
       "paths": [
@@ -1880,8 +1881,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "economic_defi",
-      "tested": 72,
-      "tests": "tested score 72% (no named test list on this row)"
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4432,7 +4433,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "2330aca1875868dba1893472903b4060afe7315d66d493880a3bc0778ee78e11",
+    "source_digest": "bf63c1ad5917c5ddfa2c5a17bdd7da3ed16c343c649da05c859f6d7218dff43c",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
@@ -4441,7 +4442,7 @@
       "feature-matrix/consensus-l1.toml": "86b9d3871259ddee0dde4393b92ab67be0e5a4bccefd642d28c53d25ca8b4f82",
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
       "feature-matrix/cross-vm-atomic.toml": "a9c578dffa246c06939ce6b1b5ab1dfeadd2fbe42cc523b8c421a383d67825b0",
-      "feature-matrix/economic-defi.toml": "34d83bfb027c88042f7b6f88b0552f2d6a4428c798360ccb432a893cf1b67743",
+      "feature-matrix/economic-defi.toml": "780f5e51c1bbe5f35e64e90cd3de0085c74b38d136a819d9947a1fc03e1184b6",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",

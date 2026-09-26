@@ -684,6 +684,12 @@ GATES_TESTNET=(
 # operator run — set MINUTES=60 for a real duration check.
 GATES_SOAK=(
   "consensus soak:bash scripts/testnet/consensus-soak.sh"
+  # The soak above is idle. An idle network is the easy case: the recorded open question
+  # against the multi-validator row is whether a *loaded* validator keeps up, because a
+  # starved one falls behind, repeats a block request, and can be banned out by its peers —
+  # a lag that becomes a partition. This drives real traffic at the network for the whole
+  # window and requires it to have finalized: seven validators, 15 minutes, load for 12.
+  "load soak across validators:env COUNT=7 LOAD_SECS=720 MINUTES=15 bash scripts/testnet/consensus-soak.sh"
 )
 
 # Validator key rotation is operator-driven, and the on-chain custody registry is
@@ -1074,6 +1080,7 @@ SERIAL_GATES=(
   "logging across validators"
   "snapshot restore across a live chain"
   "runtime upgrade through governance"
+  "load soak across validators"
   "EVM contract lifecycle"
   "SVM contract lifecycle"
   "X3-native lifecycles"

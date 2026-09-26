@@ -106,20 +106,41 @@ if echo "$HEALTH_RESULT" | grep -q '"error"'; then
     fail "min_7_validators" "RPC unreachable at $RPC_URL"
 else
     PEER_COUNT="$(echo "$HEALTH_RESULT" | jq -r '.result.peers // 0')"
-    # system_localListenAddresses for validator count requires separate query
-    # We check via grandpa_roundState or session validators
-    VALIDATOR_LIST="$(rpc_value "state_call" '["GrandpaApi_grandpa_authorities","0x"]')"
-    if [[ -z "$VALIDATOR_LIST" ]]; then
-        # Fallback: count peers + self
-        ACTUAL_VALIDATORS=$(( PEER_COUNT + 1 ))
+    # Two different numbers, and the gate used to report neither. `GrandpaApi_grandpa_authorities`
+    # returns a **hex** SCALE blob; `jq length` on that string is a parse error, so the code fell
+    # through to `peers + 1` and called *that* the validator count (measured 2026-09-26: it
+    # reported "found 6, need 7" on a seven-authority chain that had one validator stopped — the
+    # number was liveness, not the set). Both matter and they are not the same question:
+    #
+    #   * the authority set decides the fault tolerance the testnet is specified for (seven
+    #     authorities: GRANDPA needs five, so two may be lost);
+    #   * the reachable count says whether those authorities are actually up right now.
+    AUTH_HEX="$(rpc_value "state_call" '["GrandpaApi_grandpa_authorities","0x"]')"
+    AUTHORITY_COUNT="$(python3 - "$AUTH_HEX" <<'PY'
+import sys
+raw = sys.argv[1] if len(sys.argv) > 1 else ""
+raw = raw[2:] if raw.startswith("0x") else raw
+if not raw:
+    print(0); raise SystemExit
+first = int(raw[:2], 16)
+if first & 0b11 == 0:
+    print(first >> 2)
+elif first & 0b11 == 1 and len(raw) >= 4:
+    print(int.from_bytes(bytes.fromhex(raw[:4]), "little") >> 2)
+else:
+    print(0)
+PY
+)"
+    REACHABLE=$(( PEER_COUNT + 1 ))
+    info "authority set: ${AUTHORITY_COUNT:-0}, reachable now: $REACHABLE (peers: $PEER_COUNT)"
+    if [[ "${AUTHORITY_COUNT:-0}" -eq 0 ]]; then
+        fail "min_7_validators" "could not read the GRANDPA authority set from $RPC_URL"
+    elif (( AUTHORITY_COUNT < MIN_VALIDATORS )); then
+        fail "min_7_validators" "the chain configures $AUTHORITY_COUNT authorities, need $MIN_VALIDATORS"
+    elif (( REACHABLE < MIN_VALIDATORS )); then
+        fail "min_7_validators" "$AUTHORITY_COUNT authorities configured but only $REACHABLE reachable (peers: $PEER_COUNT)"
     else
-        ACTUAL_VALIDATORS="$(echo "$VALIDATOR_LIST" | jq 'length' 2>/dev/null || echo "$((PEER_COUNT + 1))")"
-    fi
-    info "Detected validators: $ACTUAL_VALIDATORS (peers: $PEER_COUNT)"
-    if (( ACTUAL_VALIDATORS >= MIN_VALIDATORS )); then
         pass "min_7_validators"
-    else
-        fail "min_7_validators" "found $ACTUAL_VALIDATORS, need $MIN_VALIDATORS"
     fi
 fi
 
@@ -464,15 +485,34 @@ fi
     echo "| 14 | Explorer/dashboard | ${RESULTS[explorer_or_dashboard]:-NOT_RUN} |"
     echo "| 15 | Production chain spec | ${RESULTS[production_chain_spec]:-NOT_RUN} |"
     echo ""
-    echo "## Missing drills (create these reports to pass their gates)"
-    echo ""
-    echo "- Gate 7: \`reports/drill_node_restart.md\` (must contain \`restart_drill: PASS\`)"
-    echo "- Gate 8: \`reports/drill_validator_removal.md\` (must contain \`validator_removal_drill: PASS\`)"
-    echo ""
+    # Only name the drills that are actually blocking. This section used to print
+    # unconditionally, so a run in which both drills passed still told the operator to go
+    # create their reports.
+    MISSING_DRILLS=""
+    [[ "${RESULTS[forced_node_restart_drill]:-NOT_RUN}" == "PASS" ]] \
+        || MISSING_DRILLS="${MISSING_DRILLS}- Gate 7: \`reports/drill_node_restart.md\` (must contain \`restart_drill: PASS\`) — run \`scripts/drills/node_restart_drill.sh\`\n"
+    [[ "${RESULTS[forced_validator_removal_drill]:-NOT_RUN}" == "PASS" ]] \
+        || MISSING_DRILLS="${MISSING_DRILLS}- Gate 8: \`reports/drill_validator_removal.md\` (must contain \`validator_removal_drill: PASS\`) — run \`scripts/drills/validator_removal_drill.sh\`\n"
+    if [[ -n "$MISSING_DRILLS" ]]; then
+        echo "## Missing drills (create these reports to pass their gates)"
+        echo ""
+        printf '%b' "$MISSING_DRILLS"
+        echo ""
+    fi
     echo "## Gate Decision"
     echo ""
-    if [[ "$OVERALL" == "PASS" ]]; then
-        echo "**public_testnet_gate: PASS** — all criteria met. Proceed to public testnet launch."
+    # A SKIP is not a PASS. Gate 6 is SKIPped whenever `X3_TESTNET_HOURS=0` is used for a CI
+    # run, and a verdict reading "all criteria met" over a skipped 72-hour stability timer is
+    # the overclaim this report exists to prevent. Name what was skipped.
+    SKIPPED=""
+    for key in "${!RESULTS[@]}"; do
+        [[ "${RESULTS[$key]}" == "SKIP" ]] && SKIPPED="${SKIPPED}${key} "
+    done
+    if [[ "$OVERALL" == "PASS" ]] && [[ -z "$SKIPPED" ]]; then
+        echo "**public_testnet_gate: PASS** — all 15 criteria met. Proceed to public testnet launch."
+    elif [[ "$OVERALL" == "PASS" ]]; then
+        echo "**public_testnet_gate: PASS with skipped criteria** — no criterion FAILED, but these"
+        echo "were not evaluated and must be before a public launch: ${SKIPPED}"
     else
         echo "**public_testnet_gate: FAIL** — resolve all FAIL items before opening public participation."
     fi

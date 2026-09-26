@@ -43,6 +43,21 @@ export NODE_TRIE_CACHE_BYTES
 # node's own growth: ~230 MiB over 15 minutes in the measurement above.
 MAX_RSS_GROWTH_MIB="${MAX_RSS_GROWTH_MIB:-1024}"
 RPC_BASE="${RPC_BASE:-9944}"
+# Load. `LOAD_SECS=0` (the default) soaks an idle network, which is what the
+# 2026-09-22 measurements were. An idle network is the easy case: the open question
+# recorded against the multi-validator row is whether a *loaded* validator keeps up,
+# because a starved one falls behind, repeats a block request, and can be banned out by
+# its peers — a lag that becomes a partition. `LOAD_SECS>0` drives
+# `scripts/testnet/run-multiprocess-load.py` at the first validator for that long, in the
+# background of the sampling loop, and requires the load to have actually finalized
+# transactions. The funder is the spec's own first validator account (a generated testnet
+# spec endows its authorities), never a dev phrase.
+LOAD_SECS="${LOAD_SECS:-0}"
+LOAD_WORKERS="${LOAD_WORKERS:-4}"
+LOAD_SENDERS="${LOAD_SENDERS:-20}"
+LOAD_CONCURRENCY="${LOAD_CONCURRENCY:-128}"
+LOAD_MAX_ERROR_RATE="${LOAD_MAX_ERROR_RATE:-0.01}"
+LOAD_REPORT="${LOAD_REPORT:-}"
 
 NODE_BIN="${NODE_BIN:-}"
 if [[ -z "$NODE_BIN" ]]; then
@@ -140,6 +155,34 @@ deadline=$(( start + MINUTES * 60 ))
 stall_fail=""
 
 info "soaking for ${MINUTES} minute(s), sampling every ${INTERVAL}s (stall tolerance ${STALL_TOLERANCE_SECS}s)"
+
+# Start the load before the sampling window so the whole window is measured under it.
+LOAD_PID=""
+LOAD_RESULT=""
+if [[ "$LOAD_SECS" -gt 0 ]]; then
+  KEYS_DIR_FOR_LOAD="${KEYS_DIR:-$(dirname "$SPEC")/validator-keys}"
+  FUNDER_FILE="$KEYS_DIR_FOR_LOAD/validator-1.suri"
+  [[ -f "$FUNDER_FILE" ]] || fail "LOAD_SECS>0 needs the spec's own keys: no $FUNDER_FILE (pass KEYS_DIR)"
+  FUNDER_SURI="$(sed -n 's/^seed=//p' "$FUNDER_FILE" | head -1)"
+  [[ -n "$FUNDER_SURI" ]] || fail "no seed= line in $FUNDER_FILE"
+  NODE_MODULES="${X3_LOAD_NODE_MODULES:-$ROOT_DIR/packages/blockchain-connector/node_modules}"
+  [[ -d "$NODE_MODULES/@polkadot/api" ]] || fail "no @polkadot/api under $NODE_MODULES (set X3_LOAD_NODE_MODULES)"
+  LOAD_REPORT="${LOAD_REPORT:-$BASE_DIR/load-report.json}"
+  LOAD_LOG="$BASE_DIR/load.log"
+  info "driving load for ${LOAD_SECS}s: ${LOAD_WORKERS} workers, ${LOAD_SENDERS} senders, concurrency ${LOAD_CONCURRENCY}"
+  (
+    cd "$ROOT_DIR" && \
+    FUNDER_SURI="$FUNDER_SURI" NODE_PATH="$NODE_MODULES" \
+      python3 scripts/testnet/run-multiprocess-load.py \
+        --rpc-ws "ws://127.0.0.1:${RPC_BASE}" \
+        --workers "$LOAD_WORKERS" --senders "$LOAD_SENDERS" \
+        --concurrency-total "$LOAD_CONCURRENCY" \
+        --duration-sec "$LOAD_SECS" --min-duration-sec 0 \
+        --finality-wait-sec 30 --output "$LOAD_REPORT"
+  ) >"$LOAD_LOG" 2>&1 &
+  LOAD_PID=$!
+fi
+
 while :; do
   now=$(date +%s); elapsed=$(( now - start ))
   printf '%s' "$elapsed" >> "$SAMPLES_FILE"
@@ -246,6 +289,42 @@ then
 fi
 
 pass "${MINUTES} minute(s) with no stall beyond ${STALL_TOLERANCE_SECS}s, no node lost, agreement held"
+
+# The load is evidence, not a side effect: a run whose load finalized nothing soaked
+# nothing, and a run whose submissions were refused measures the refusal.
+if [[ -n "$LOAD_PID" ]]; then
+  if ! wait "$LOAD_PID"; then
+    tail -20 "$LOAD_LOG" >&2 || true
+    fail "the load driver exited non-zero (see $LOAD_LOG)"
+  fi
+  if ! LOAD_SUMMARY="$(python3 - "$LOAD_REPORT" "$LOAD_MAX_ERROR_RATE" <<'PY'
+import json, sys
+report, max_error = sys.argv[1], float(sys.argv[2])
+d = json.load(open(report))
+finalized = int(d.get("finalized_total", 0))
+workers = int(d.get("successful_workers", 0))
+if finalized <= 0:
+    print("the load finalized no transactions")
+    raise SystemExit(1)
+if workers <= 0:
+    print("no load worker completed")
+    raise SystemExit(1)
+rates = [float(r.get("error_rate", 1.0)) for r in d.get("runs", []) if r.get("error_rate") is not None]
+worst = max(rates) if rates else 0.0
+if worst > max_error:
+    print(f"worst worker error rate {worst} is above {max_error}")
+    raise SystemExit(1)
+print(
+    f"{workers} workers, {finalized} finalized transactions, "
+    f"{d.get('finalized_tps_submit_window', 0):.1f} finalized TPS, worst error rate {worst}"
+)
+PY
+  )"; then
+    fail "the load did not hold up its half of the soak: ${LOAD_SUMMARY} (see $LOAD_REPORT)"
+  fi
+  pass "load held while soaking: ${LOAD_SUMMARY}"
+fi
+
 pass "report: ${REPORT}"
 cleanup
 if [[ "$KEEP" == "1" ]]; then

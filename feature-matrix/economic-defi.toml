@@ -51,15 +51,16 @@ subsystem = "economic_defi"
 source = "master"
 paths = ["pallets/x3-supply-ledger/src/lib.rs"]
 implemented = 65
-tested = 72
-mainnet_ready = 35
+tested = 80
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
   "**CLOSED 2026-09-25 at the ledger level.** The conservation law is `represented() = native + evm + svm + external_locked + pending` never exceeding the canonical ceiling, and every transition being a relabelling rather than a creation: debit moves source -> pending, credit moves pending -> destination, refund moves pending -> source. `tests_conservation.rs` asserts exactly that after every step of the success path (native -> EVM), the external route (native -> `external_locked`), the rollback path (debit then refund restores the ledger bit-for-bit), the duplicate-settle case (a replayed settle is refused), the halt/pause cases (new legs refused, refunds still allowed), and 200 random leg sequences. The mint path's own conservation is covered too: a governance mint raises the ceiling with the supply, and a replayed nonce moves neither.",
-  "Still open, and why `mainnet_ready` does not move: this is one asset ledger in one process. Nothing here exercises a *real* external bridge observation (a lock on another chain being seen and recorded), concurrent cross-domain traffic under a multi-validator network, or the router's own accounting against the ledger — the row's original 'end-to-end supply conservation remains P0' is only half closed, and the other half is X3-XVM-002's.",
+  "**HALF CLOSED 2026-09-26 — concurrent traffic on a multi-validator network now has a conservation proof, for native balances.** That was one of this row's three open items ('concurrent cross-domain traffic under a multi-validator network'). `node/tests/supply_invariant_distributed.rs` (gate: `supply invariant across validators`, ~200s, serial — it binds node ports) boots the three-validator `local3` chain from one frozen node binary, drives five comits per account into all three validators concurrently — each one required to have an execution receipt on a validator that never received it — and then, at one finalized block, reads the conservation identity from **each validator's own state**: `sum(free + reserved)` over every `System::Account` enumerated with `state_getKeys` at that block hash versus the runtime's own `AtlasKernelRuntimeApi::get_total_issuance()` at the same hash. Measured: baseline 8 accounts, 8000000000000000000 == 8000000000000000000 on all three; after traffic, finalized block 107, all three report accounted 7999999998338644985 == TotalIssuance 7999999998338644985, and the fall in account balances equals the fall in issuance exactly (each account paid 553785005). Load-bearing: injecting one unit into `Balances::TotalIssuance` in a scratch genesis makes the same check fail by exactly that unit (`delta 1`).",
+  "Still open, and why `mainnet_ready` does not move further: the per-asset identity this row exists for — `represented() = native + evm + svm + external_locked + pending` never exceeding the canonical ceiling — has no read surface over RPC, so the distributed proof above covers the **native** side only; and a *real* external bridge observation (a lock on another chain being seen and recorded) is still unexercised, as is the router's own accounting reconciled against the ledger on a live network.",
 ]
 required_tests = [
   "every_leg_of_the_lifecycle_conserves_the_represented_total",
