@@ -249,6 +249,36 @@ fn x3_receipt_at(comit_id: H256, block_hash: &str) -> Option<pallet_x3_kernel::E
 /// -> block inclusion -> finality, with the program's result readable from chain state afterwards.
 /// The runtime-level test proves the dispatch; this one proves it on a chain that actually
 /// finalizes blocks, which is a different claim.
+/// Ask the node to accept an extrinsic and return **why it refused**, if it did.
+///
+/// `submit` panics on a refusal because every other caller in this file expects acceptance; this
+/// is for the case where the refusal *is* the result.
+fn submit_error(signed: &str) -> Option<String> {
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    match rpc.call(
+        "author_submitExtrinsic",
+        vec![Value::String(signed.to_string())],
+    ) {
+        Ok(response) => response.error.map(|e| format!("{}: {}", e.code, e.message)),
+        Err(e) => Some(e.to_string()),
+    }
+}
+
+/// Flip one byte of `program` *inside* the signed extrinsic, leaving the signature untouched.
+///
+/// The payload is embedded in the call data, so its bytes appear contiguously in the encoded
+/// extrinsic. The last byte of the program is flipped: the length prefixes are untouched, which
+/// is the point — this is a well-formed extrinsic carrying a program the signer did not sign.
+fn tamper_payload(signed_hex: &str, program: &[u8]) -> Option<String> {
+    let program_hex = hex::encode(program);
+    let at = signed_hex.find(&program_hex)?;
+    let last = at + program_hex.len() - 2;
+    let byte = u8::from_str_radix(&signed_hex[last..last + 2], 16).ok()?;
+    let mut out = signed_hex.to_string();
+    out.replace_range(last..last + 2, &format!("{:02x}", byte ^ 0x01));
+    Some(out)
+}
+
 #[test]
 #[ignore = "boots the real X3 dev node, dispatches a compiled program, and reads its receipt"]
 fn a_compiled_x3_program_is_finalized_and_its_receipt_is_readable() {
@@ -420,6 +450,73 @@ fn proof_ledger_path(label: &str) -> std::path::PathBuf {
             .unwrap()
             .as_nanos()
     ))
+}
+
+/// The artifact is bound to the signer.
+///
+/// `X3-LANG-009` says the envelope's checksum is a corruption check and not authentication, and
+/// that is true of a `.x3` artifact sitting on disk. What is *not* true is that the chain will run
+/// an artifact nobody authorised: the program is an argument of the signed extrinsic, so the
+/// signature covers it, and a single flipped byte inside the payload is refused before execution.
+/// This pins that property — and, because the control below submits the untampered extrinsic and
+/// finalizes it, it also pins that the refusal is about the tampering rather than about the
+/// account, the nonce or the compile.
+#[test]
+#[ignore = "boots the real X3 dev node and proves a tampered artifact cannot be executed"]
+fn a_tampered_artifact_cannot_be_executed_under_the_original_signature() {
+    let _node = spawn_dev_node();
+    wait_rpc(Duration::from_secs(180));
+
+    let chain_id = String::from("x3-local");
+    let alice =
+        X3RuntimeSigner::from_uri(chain_id, RPC_URL.into(), &dev_uri("Alice")).expect("signer");
+
+    let authorize = alice
+        .sign_kernel_authorize_account(alice.account())
+        .expect("sign the council proposal");
+    assert!(!submit(&authorize).is_empty());
+    let (_, authorize_head) = wait_finalized(&authorize, Duration::from_secs(180));
+    assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
+
+    let program = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 {\n    return 42;\n}\n",
+    )
+    .expect("the program must compile");
+    let comit_id = H256::from_low_u64_be(0x5319);
+    let signed = alice
+        .sign_kernel_submit_comit_v2(comit_id, program.clone(), 1_000_000)
+        .expect("sign the comit");
+
+    let tampered = tamper_payload(&signed, &program).expect("the payload is in the signed bytes");
+    assert_ne!(
+        tampered, signed,
+        "the tamper must actually change the bytes"
+    );
+    let refusal = submit_error(&tampered).expect(
+        "the node accepted an artifact the signature does not cover — the payload is not bound to \
+         the signer",
+    );
+    println!("[x3-lang] tampered payload refused: {refusal}");
+    assert!(
+        refusal.to_lowercase().contains("invalid transaction")
+            || refusal.to_lowercase().contains("signature")
+            || refusal.to_lowercase().contains("badproof"),
+        "the refusal has to name a validity problem, got: {refusal}"
+    );
+
+    // Control: the same extrinsic, untampered, is accepted and finalizes — so the refusal above
+    // is the tampering, not the account, the nonce or the compile.
+    assert!(!submit(&signed).is_empty());
+    let (_, head) = wait_finalized(&signed, Duration::from_secs(180));
+    assert_dispatch_succeeded(&alice, &head, &signed);
+    let receipt = x3_receipt_at(comit_id, &head)
+        .expect("the untampered comit must store its execution receipt");
+    assert_eq!(
+        receipt.return_data,
+        42i64.to_le_bytes().to_vec(),
+        "the control has to execute the program the source states"
+    );
+    println!("[x3-lang] untampered control finalized at {head} with the source's value");
 }
 
 #[test]

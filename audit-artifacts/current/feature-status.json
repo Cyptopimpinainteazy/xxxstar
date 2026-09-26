@@ -2995,7 +2995,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 50,
+      "composite": 56,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/src/mini_x3.rs",
@@ -3006,21 +3006,22 @@
       "implemented": 60,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 38,
       "missing_work": [
-        "**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. The row's **name no longer claims more than the code does** (it was renamed from 'Authenticated bytecode decoder' to 'Checksum-verified bytecode decoder' on 2026-09-24), but the gap it names is real: there is no signature and no attestation, and no phase of the spec asks for one over the envelope. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"
+        "**2026-09-26 \u2014 the chain path does authenticate the artifact; a standalone artifact still does not.** The rest of this note is right that the envelope carries an unkeyed digest and no signature. What it did not say is that the path the chain actually executes is bound to the signer: the program is an argument of the signed extrinsic, so the signature covers it. `a_tampered_artifact_cannot_be_executed_under_the_original_signature` (gate `X3-native lifecycles`) flips one byte of the payload inside the signed bytes and submits it with the signature intact \u2014 the node refuses it (`RPC call failed: JSON-RPC error 1010: Invalid Transaction`), and the control (the same extrinsic, untampered) finalizes with the value the source states, so the refusal is the tampering and not the account or the nonce. What remains open is the case this note names: a `.x3`/X3BC artifact distributed out of band has no signature or attestation of its own, and no phase of the spec asks for one."
       ],
       "name": "Checksum-verified bytecode decoder",
       "paths": [
-        "crates/x3-integration"
+        "crates/x3-integration",
+        "node/tests/x3vm_live_lifecycle.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 70,
-      "tests": "tested score 70% (no named test list on this row)"
+      "tested": 78,
+      "tests": "tested score 78% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4444,20 +4445,20 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "215c1b84a46e0fb1e34d97e072ebb50098279868928314edcc2fce4c2a1c162d",
+    "source_digest": "2345c2df65a620a731e0d8b040103daad0bd6d6dc88c1e335c427a22a00237f5",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
       "feature-matrix/claims-hygiene.toml": "e2101c3396a4b68a38e6f8ffc7245967fd1edaa05631080996a4a5d3c8bbd6e6",
-      "feature-matrix/consensus-l1.toml": "8e8d8e26c515ad7ebdbb2bc0177a2ea1c70f0c33051e7f45a400fde2ff72216f",
+      "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
-      "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
+      "feature-matrix/language-trading.toml": "d0b411e31669d913ace7d2913cf2bc7b4cf38e8d46f424ab07dba7e3f4329cee",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "4625dc94e0159ac6dbbd1a67dca8ae4adee16028945a81370e0a3d38fc8a35b6",
+      "feature-matrix/operations-user-tools.toml": "7234ed3bbc554956fa01831ae4cd2d05f18e094ac0407228dd6eccb5794a64c7",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
