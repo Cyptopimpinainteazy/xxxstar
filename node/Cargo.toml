@@ -150,6 +150,10 @@ try-runtime = [
 # The live tests compile real `.x3` source with the same bridge the node uses, so a
 # program under test is an artifact the compiler produced rather than a fixture.
 x3-x3-integration = { path = "../crates/x3-integration", features = ["std", "compile"] }
+# `supply_invariant_distributed` reads `System::Account` back out of chain state, so it decodes the
+# runtime's real `frame_system::AccountInfo<Nonce, pallet_balances::AccountData<Balance>>` instead
+# of a hand-copied byte layout. Same crate the runtime already links.
+pallet-balances = { workspace = true, features = ["std"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 tempfile = { workspace = true }
 # The producer: this test boots an anvil, has the relayer build the receipt

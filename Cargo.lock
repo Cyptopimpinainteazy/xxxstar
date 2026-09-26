@@ -25909,6 +25909,7 @@ dependencies = [
  "log",
  "pallet-agent-memory",
  "pallet-atomic-trade-engine",
+ "pallet-balances",
  "pallet-collective",
  "pallet-cross-chain-validator",
  "pallet-evm",

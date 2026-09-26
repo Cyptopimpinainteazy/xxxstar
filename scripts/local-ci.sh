@@ -718,6 +718,11 @@ GATES_CROSS=(
   # different one, which finalized the same block. The single-node lifecycle above
   # cannot say anything about agreement between validators.
   "X3Lang across validators:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3lang_network_receipt -- --ignored --nocapture --test-threads=1"
+  # Supply conservation under distributed traffic: three validators, concurrent comits,
+  # and the identity `sum(free + reserved) == TotalIssuance` read from *each* validator's
+  # own state at a finalized block — with an injected unit in a scratch ledger required to
+  # make the same check fail, so it is not a tautology.
+  "supply invariant across validators:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test supply_invariant_distributed -- --ignored --nocapture --test-threads=1"
   "cross-domain EVM:bash scripts/cross-domain-evm-gate.sh"
   # Same reason as the `SVM contract lifecycle` gate above: this one also runs
   # `cargo build-sbf`, which shells out to `cargo +1.89.0-sbpf-solana-v1.54` and
@@ -1072,6 +1077,7 @@ SERIAL_GATES=(
   "EVM contract lifecycle"
   "SVM contract lifecycle"
   "X3-native lifecycles"
+  "supply invariant across validators"
   "cross-domain EVM"
   "cross-domain SVM"
   "cross-domain EVM (strict posture)"
