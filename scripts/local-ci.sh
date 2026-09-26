@@ -607,6 +607,13 @@ GATES_LIVE=(
   # storage entry to come back — with a control node on an empty database required
   # to disagree, so the same check cannot pass for an empty chain.
   "snapshot restore across a live chain:bash scripts/snapshot-live-restore-proof.sh"
+  # The upgrade path this chain actually has: three live validators on `local3`,
+  # council governance carrying `system.set_code` to Root, the new spec_version read
+  # back over RPC from every validator, and a transfer after the swap. Self-contained;
+  # it builds the next-runtime artifact once and caches it under target/upgrade-artifact/.
+  # Pointing X3_UPGRADE_WASM at the blob the chain already runs makes it FAIL, which is
+  # how the "the version changed" check is known to be able to say no.
+  "runtime upgrade through governance:bash scripts/mainnet/runtime_upgrade_rehearsal.sh"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
   # `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54 …` internally, and
   # `+toolchain` only works through the rustup shim — which this script puts
@@ -1061,6 +1068,7 @@ SERIAL_GATES=(
   "monitoring across validators"
   "logging across validators"
   "snapshot restore across a live chain"
+  "runtime upgrade through governance"
   "EVM contract lifecycle"
   "SVM contract lifecycle"
   "X3-native lifecycles"
