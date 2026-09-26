@@ -172,9 +172,9 @@ name = "Prometheus/Grafana-style ops monitoring"
 subsystem = "operations_user_tools"
 source = "master"
 paths = ["docs", "scripts/monitoring", "monitoring/local3"]
-implemented = 70
-tested = 65
-mainnet_ready = 45
+implemented = 78
+tested = 78
+mainnet_ready = 52
 priority = "P2"
 confidence = "medium"
 launch_scope = "guarded"
@@ -182,6 +182,7 @@ claim_risk = false
 blockers = [
   "**CLOSED 2026-09-26 — metrics *and* logs are live across all three validators, and both are gated.** `monitoring across validators` boots the built-in `local3` chain with a Prometheus exporter per validator and requires each one to identify itself from its own scrape: `substrate_build_info{name=…}` matching the target label, chain `x3_chain_local3`, finalized height past genesis, two peers, authority role — then requires all three to agree on the canonical hash at the lowest finalized height any reported. The checked-in scrape config drives the ports the gate boots on, and every metric the checked-in Grafana dashboard references must exist in the live scrape. `logging across validators` requires each validator's log stream to be collected under one queryable sink and to carry its own identity, imported blocks and finalized blocks: measured 264/266/149 lines, last imported #63/#63/#64, last finalized #60 on all three. Both gates have `--self-test` negative controls (hold a validator's metrics or its stream out of the collection and the same query must fail), and both were measured failing.",
   "The log-level finding is part of the fix, not a footnote: a node started without a filter emits warnings only — 13 lines of banner per validator, no chain identity, no imports, no finality — so the collection contract includes the level.",
+  "**CLOSED 2026-09-26 at testnet scale — seven validators, not three.** `scripts/monitoring/testnet7-observability-check.sh` (gate: `observability across seven validators`, ~45s, serial) builds a generated seven-authority spec, boots it with the launcher, and requires per validator: its own exporter answering 200, the node's `substrate_build_info{name=...}` label matching the validator it was scraped from, the chain label, a finalized height past genesis, the mesh peer floor, and a non-full-node role; then that all seven agree on the canonical hash at a common finalized height, that each of the seven collected log streams carries identity/imports/finality, and that one aggregate query over the sink reaches all seven sources. Measured: seven nodes named x3-testnet-node-01..07 on chain x3_chain_testnet, finalized 75..95, peers 6, role 4, logs at last imported #104 and finalized #99..#101. `--self-test` holds one validator out of both collections and requires both checks to fail (`only 6 of 7 observed`, `the aggregate query reaches 6 of 7 streams`). Four findings that only appear at this size: the spec's bootNodes are built from `P2P_BASE` (build the spec for the base you launch on, or the mesh collapses to one hub and six validators report exactly 1 peer); 'a finalized head exists' is not finality (a fresh node answers with the genesis hash at height 0, so the weak check passes at `best=1, finalized=0`); the exported finalized gauge lags its own node (measured: RPC past height 6 while the metric read 0); and demanding `COUNT-1` peers from every node fails a healthy network (the two-hour soak measured a minimum of 5).",
   "Still open: no Prometheus server, Grafana or log shipper is installed on this box (no promtool, no vector/fluent-bit/promtail/filebeat). The config and dashboard are parsed and driven by the gates rather than rendered by a real Prometheus, the sink is a directory of per-validator streams rather than a running collector, and there is no retention, indexing or alerting story. \"Across all validators\" means the three on this box until the seven physical servers exist.",
 ]
 evidence = ["docs", "note: Monitoring concepts present but operational proof incomplete"]

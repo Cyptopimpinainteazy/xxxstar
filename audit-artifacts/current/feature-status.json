@@ -183,7 +183,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 81,
+      "composite": 84,
       "confidence": "high",
       "evidence": [
         "scripts/testnet/run-7-validators-local.sh",
@@ -196,12 +196,13 @@
       "implemented": 88,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 68,
+      "mainnet_ready": 73,
       "missing_work": [
         "Every validator runs on one host: no independent operators, no geographic or administrative separation",
         "No slashing, jailing or equivocation evidence from a multi-operator network \u2014 those paths have unit coverage only",
         "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
         "**2026-09-26 \u2014 seven validators, under load, with a removal drill.** The launcher's own seven-authority spec (generated keys, no dev phrase) ran on this host for two hours: one chain throughout, all seven agreeing at heights 9000, 18000 and 27000, +35,938 to +35,940 blocks per validator, peers 6 each, zero stalls beyond 60s, no node lost, worst RSS growth 463.6 MiB against the 1 GiB bound. The same harness now carries load: `LOAD_SECS>0` drives real traffic at the network for the whole window and fails unless it finalized \u2014 measured 4 workers, 40,699 finalized transactions, 542.7 finalized TPS, worst error rate 0.0, still one chain and no stall. That closes the row's own open question ('whether a loaded validator can recover') in the direction that matters: a loaded validator kept *up*. The removal drill also passes on seven authorities: the threshold is `n - (n-1)/3` = 5, one validator was killed (verifiably gone) and the observer's finalized height kept advancing \u2014 which is the arithmetic that makes seven the specified size, and why a three-validator set cannot lose one at all.",
+        "**And the partition is proven where it means something.** The three-authority test (`partition and recovery`, first half) shows the other side honestly: with three GRANDPA authorities one isolation is a majority loss, so the survivors keep authoring and finality correctly stalls. The second half boots a seven-authority network and isolates one validator at the kernel level while it stays alive: measured, **6 of 7 survivors finalized past the watermark (722) while the isolated validator stayed alive at 685 and fell 39 behind**, then after the heal all seven converged on one hash at 750 and finality resumed (722 -> 750 -> 753). Two facts the test records because they cost it a run each: the spec builder and the launcher must share `P2P_BASE` or the mesh collapses to a star with six validators reporting exactly one peer, and a port-scoped cut is only complete if the isolated validator cannot re-dial from an ephemeral source port \u2014 hence the inbound-only restart. The cut is confirmed through peer counts on both sides before anything is asserted, and with the socket reset disabled the cut fails to show and the test fails by name.",
         "Era rotation is unexercised",
         "Two hours on a quiet box now holds \u2014 one chain, agreement at three heights, +36,092 blocks per validator, peers 3 throughout, zero peer bans, no stall beyond 60s (`.ai/reports/soak-2h-idle-20260922.md`) \u2014 so the earlier failure was load-induced: a starved validator falls behind, repeats one block request, and the peer set bans it out, which turns a lag into a partition. What that experiment does **not** show is whether a loaded validator can recover, and nothing throttles a node that is behind its own import queue",
         "Two hours, four validators, release and debug: consensus holds (one chain, agreement at three heights, +36,146 to +36,159 blocks per validator, peers 3, zero peer bans, no stall beyond 60s) and, with the state cache out of the measurement, memory holds too \u2014 worst growth 398 MiB against the 1 GiB bound (`<repo>/.wt-agent/soak-100b`, `.ai/reports/soak-2h-idle-20260922.md`). With the default 1 GiB state cache the same node grows ~1.75 GiB, which is configured memory rather than a leak, and the harness now says which cache size it ran with instead of failing every normally-configured node"
@@ -218,8 +219,8 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "consensus_l1",
-      "tested": 93,
-      "tests": "tested score 93% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3558,20 +3559,21 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 59,
+      "composite": 68,
       "confidence": "medium",
       "evidence": [
         "docs",
         "note: Monitoring concepts present but operational proof incomplete"
       ],
       "id": "X3-OPS-010",
-      "implemented": 70,
+      "implemented": 78,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 45,
+      "mainnet_ready": 52,
       "missing_work": [
         "**CLOSED 2026-09-26 \u2014 metrics *and* logs are live across all three validators, and both are gated.** `monitoring across validators` boots the built-in `local3` chain with a Prometheus exporter per validator and requires each one to identify itself from its own scrape: `substrate_build_info{name=\u2026}` matching the target label, chain `x3_chain_local3`, finalized height past genesis, two peers, authority role \u2014 then requires all three to agree on the canonical hash at the lowest finalized height any reported. The checked-in scrape config drives the ports the gate boots on, and every metric the checked-in Grafana dashboard references must exist in the live scrape. `logging across validators` requires each validator's log stream to be collected under one queryable sink and to carry its own identity, imported blocks and finalized blocks: measured 264/266/149 lines, last imported #63/#63/#64, last finalized #60 on all three. Both gates have `--self-test` negative controls (hold a validator's metrics or its stream out of the collection and the same query must fail), and both were measured failing.",
         "The log-level finding is part of the fix, not a footnote: a node started without a filter emits warnings only \u2014 13 lines of banner per validator, no chain identity, no imports, no finality \u2014 so the collection contract includes the level.",
+        "**CLOSED 2026-09-26 at testnet scale \u2014 seven validators, not three.** `scripts/monitoring/testnet7-observability-check.sh` (gate: `observability across seven validators`, ~45s, serial) builds a generated seven-authority spec, boots it with the launcher, and requires per validator: its own exporter answering 200, the node's `substrate_build_info{name=...}` label matching the validator it was scraped from, the chain label, a finalized height past genesis, the mesh peer floor, and a non-full-node role; then that all seven agree on the canonical hash at a common finalized height, that each of the seven collected log streams carries identity/imports/finality, and that one aggregate query over the sink reaches all seven sources. Measured: seven nodes named x3-testnet-node-01..07 on chain x3_chain_testnet, finalized 75..95, peers 6, role 4, logs at last imported #104 and finalized #99..#101. `--self-test` holds one validator out of both collections and requires both checks to fail (`only 6 of 7 observed`, `the aggregate query reaches 6 of 7 streams`). Four findings that only appear at this size: the spec's bootNodes are built from `P2P_BASE` (build the spec for the base you launch on, or the mesh collapses to one hub and six validators report exactly 1 peer); 'a finalized head exists' is not finality (a fresh node answers with the genesis hash at height 0, so the weak check passes at `best=1, finalized=0`); the exported finalized gauge lags its own node (measured: RPC past height 6 while the metric read 0); and demanding `COUNT-1` peers from every node fails a healthy network (the two-hour soak measured a minimum of 5).",
         "Still open: no Prometheus server, Grafana or log shipper is installed on this box (no promtool, no vector/fluent-bit/promtail/filebeat). The config and dashboard are parsed and driven by the gates rather than rendered by a real Prometheus, the sink is a directory of per-validator streams rather than a running collector, and there is no retention, indexing or alerting story. \"Across all validators\" means the three on this box until the seven physical servers exist."
       ],
       "name": "Prometheus/Grafana-style ops monitoring",
@@ -3585,8 +3587,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 65,
-      "tests": "tested score 65% (no named test list on this row)"
+      "tested": 78,
+      "tests": "tested score 78% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4435,20 +4437,20 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "a327481e22d73b1dc43c567927041922a875067c002535491f29c26fba80eeb0",
+    "source_digest": "2e94c0d8097346528de50abd25471c098d2a64af0b66276c625dad896fd55024",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
       "feature-matrix/claims-hygiene.toml": "e2101c3396a4b68a38e6f8ffc7245967fd1edaa05631080996a4a5d3c8bbd6e6",
-      "feature-matrix/consensus-l1.toml": "27ae8d12b00c0f2b4034a50cf5f65fbbd1f8748a04f90978461a60d1afcd453f",
+      "feature-matrix/consensus-l1.toml": "5864a9286dda53a8b6154e0ec4b34cdf860fce7f7ce29f0c9895b0ceb356f220",
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
       "feature-matrix/cross-vm-atomic.toml": "a9c578dffa246c06939ce6b1b5ab1dfeadd2fbe42cc523b8c421a383d67825b0",
       "feature-matrix/economic-defi.toml": "780f5e51c1bbe5f35e64e90cd3de0085c74b38d136a819d9947a1fc03e1184b6",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "c57775637641e7f0e8360f27a1a00d34d541ae509e02fcfb9ad1a0c1dad2d429",
+      "feature-matrix/operations-user-tools.toml": "a6912a180addab8d34851ac1e3bb63801782b82adadb58d257ef2a9405808ae6",
       "feature-matrix/runtime-core.toml": "8b44ebcf62fab95e5678825f1671785b19e0771cdf4917ce9b323c34e772a5a6",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
