@@ -170,6 +170,25 @@ authf = os.path.join(outdir, "authorities.json")
 endf = os.path.join(outdir, "endowed.json")
 counf = os.path.join(outdir, "council.json")
 treaf = os.path.join(outdir, "treasury.json")
+
+# A public testnet needs a faucet, and the gate that admits the public
+# (`scripts/mainnet/public_testnet_gate.sh`, gate 5) checks that the faucet is not the
+# treasury. It could never pass: the spec named no faucet account at all, so the check
+# fell through to a grep and SKIPped. Generate one — never a dev phrase — endow it so it
+# can actually drip, and record its seed beside the validator keys for the operator.
+faucet_master = "0x" + secrets.token_hex(32)
+# `keys generate` takes `aura|grandpa|imonline`, not a crypto scheme: Aura's key type *is*
+# sr25519, which is what an ordinary account needs (measured — `--key-type sr25519` is
+# rejected by the node's own CLI).
+faucet_account = public_ss58(faucet_master, "aura")
+faucet_path = os.path.join(keysdir, "faucet.suri")
+with open(faucet_path, "w") as ff:
+    ff.write("seed=" + faucet_master + "\n")
+os.chmod(faucet_path, 0o600)
+with open(suri_log, "a") as f:
+    f.write(f"faucet = {faucet_master}\n")
+endowed.append(faucet_account)
+
 json.dump(aut, open(authf, "w"))
 json.dump(endowed, open(endf, "w"))
 json.dump(endowed[: max(2, COUNT // 3)], open(counf, "w"))
@@ -209,7 +228,16 @@ start = text.find("{")
 json.loads(text[start:])
 name = "x3-testnet-raw.json" if make_raw else "x3-testnet-plain.json"
 outfile = os.path.join(outdir, name)
-open(outfile, "w").write(text[start:])
+spec = json.loads(text[start:])
+
+# Publish the faucet account where a front-end reads it. `properties` exists in the
+# spec the node emits but is `null` when empty, so `setdefault` is not enough.
+if not isinstance(spec.get("properties"), dict):
+    spec["properties"] = {}
+spec["properties"]["faucetAccount"] = faucet_account
+print(f"[spec] faucet account {faucet_account} -> {faucet_path}")
+
+open(outfile, "w").write(json.dumps(spec, indent=2))
 print(f"[spec] {name} written -> {outdir} ({os.path.getsize(outfile)} bytes)")
 
 # The artifact has to survive the node's own loader, which is the check that

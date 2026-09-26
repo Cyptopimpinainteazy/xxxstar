@@ -193,19 +193,37 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 echo "→ [Gate 5] Faucet account separated from treasury..."
 if [[ -f "$CHAIN_SPEC" ]]; then
-    TREASURY_ACCT="$(jq -r '.genesis.runtimeGenesis.config.treasury.account // empty' "$CHAIN_SPEC" 2>/dev/null || echo "")"
-    FAUCET_ACCT="$(jq -r '.genesis.runtimeGenesis.config.faucet.account // .properties.faucetAccount // empty' "$CHAIN_SPEC" 2>/dev/null || echo "")"
-    if [[ -n "$TREASURY_ACCT" ]] && [[ -n "$FAUCET_ACCT" ]] && [[ "$TREASURY_ACCT" != "$FAUCET_ACCT" ]]; then
-        pass "faucet_separated_from_treasury"
-    elif [[ -z "$TREASURY_ACCT" ]] && [[ -z "$FAUCET_ACCT" ]]; then
-        # Check via grep for known treasury patterns
-        if grep -q "faucet\|Faucet" "$CHAIN_SPEC" 2>/dev/null; then
-            pass "faucet_separated_from_treasury"
-        else
-            skip "faucet_separated_from_treasury" "faucet account not found in chain spec — verify manually"
-        fi
+    # The question is whether the account that drips free tokens is one of the accounts
+    # that govern money. This used to compare `.config.treasury.account` with
+    # `.config.faucet.account` — neither of which a real spec has: a spec names the
+    # treasury's *signers* and the runtime derives the pot from a PalletId, so the check
+    # could only ever fall through to `grep faucet` and SKIP. Measured 2026-09-26.
+    #
+    # So: the faucet must exist and must not be a treasury signer, a council member or an
+    # authority. That is the separation an operator can actually verify from the spec, and
+    # it names the accounts it compared rather than the two fields it wished existed.
+    FAUCET_ACCT="$(jq -r '.properties.faucetAccount // .genesis.runtimeGenesis.config.faucet.account // empty' \
+        "$CHAIN_SPEC" 2>/dev/null || echo "")"
+    mapfile -t PRIVILEGED < <(jq -r '
+        [ (.genesis.runtimeGenesis.config.treasury.initialSigners // [])[],
+          (.genesis.runtimeGenesis.config.council.members // [])[],
+          (.genesis.runtimeGenesis.config.aura.authorities // [])[] ]
+        | unique | .[]' "$CHAIN_SPEC" 2>/dev/null || true)
+    if [[ -z "$FAUCET_ACCT" ]]; then
+        skip "faucet_separated_from_treasury" "the chain spec names no faucet account (properties.faucetAccount) — build it with scripts/testnet/build-x3-testnet-spec.py"
     else
-        fail "faucet_separated_from_treasury" "treasury=$TREASURY_ACCT faucet=$FAUCET_ACCT (same or missing)"
+        OVERLAP=""
+        for acct in "${PRIVILEGED[@]}"; do
+            [[ "$acct" == "$FAUCET_ACCT" ]] && OVERLAP="$acct"
+        done
+        if [[ -n "$OVERLAP" ]]; then
+            fail "faucet_separated_from_treasury" "the faucet ($FAUCET_ACCT) is also treasury/council/authority account $OVERLAP"
+        elif [[ "${#PRIVILEGED[@]}" -eq 0 ]]; then
+            skip "faucet_separated_from_treasury" "faucet $FAUCET_ACCT named, but the spec names no treasury/council/authority accounts to compare against"
+        else
+            pass "faucet_separated_from_treasury"
+            info "faucet $FAUCET_ACCT is distinct from ${#PRIVILEGED[@]} treasury/council/authority account(s)"
+        fi
     fi
 else
     skip "faucet_separated_from_treasury" "chain spec not found"
