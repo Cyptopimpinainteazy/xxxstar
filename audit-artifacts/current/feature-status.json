@@ -2826,7 +2826,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 62,
+      "composite": 65,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration",
@@ -2838,7 +2838,7 @@
       "implemented": 80,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 35,
       "missing_work": [
         "**CLOSED 2026-09-25 \u2014 an extrinsic now carries a compiled program through the pallet, and the pallet records it.** `submit_comit_v2` validated its `x3_payload` as an `X3VmPacket` and then handed those same bytes to `T::X3Adapter::execute`, which parses X3BC. A packet is a semantic operation, not bytecode, and the executor accepts nothing else, so on any chain with a real adapter (`X3VmAdapter`, or `WasmX3Adapter` in the wasm build) every non-empty X3 payload died with `X3ExecutionFailed` \u2014 while a program compiled from `.x3` source was refused earlier as `InvalidX3VmPacket`. Reproduced before the fix by dispatching a compiled program at the real runtime: `Module(ModuleError { index: 11, error: [7, 0, 0, 0], message: Some(\"InvalidX3VmPacket\") })`. The payload is now the program, and validation is the adapter's own (`T::X3Adapter::validate`: envelope magic, version gate, checksum) \u2014 the component that does the work.",
         "**CLOSED 2026-09-25 \u2014 the execution receipt is persisted.** The X3 domain had no receipt storage at all (only EVM did), so a program's result existed in an event and a gas number and could not be read back. `X3ExecutionReceipts` is keyed by comit id and written only after every acceptance check, so a stored receipt always describes an accepted comit. `STORAGE_VERSION` moves 1\u21922, recorded by the migration the runtime already runs in its `Migrations` tuple (the map starts empty, so there is nothing to rewrite). The extra storage write is declared at the call site as `submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))` because the benchmark predates it.",
@@ -2864,8 +2864,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 90,
-      "tests": "tested score 90% (no named test list on this row)"
+      "tested": 92,
+      "tests": "tested score 92% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3312,31 +3312,33 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 40,
+      "composite": 60,
       "confidence": "high",
       "evidence": [
         "scripts/snapshot-restore.sh",
         "note: Independent audit previously scored snapshot/restore partial"
       ],
       "id": "X3-OPS-002",
-      "implemented": 55,
+      "implemented": 70,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 35,
+      "mainnet_ready": 50,
       "missing_work": [
-        "Needs live restore drills and integrity verification"
+        "**CLOSED 2026-09-26 \u2014 there is a live restore proof, and it is load-bearing.** This row asked for \"live restore drills and integrity verification\"; the only restore test round-tripped a text file through a tarball, which passes just as well for an empty database. `scripts/snapshot-live-restore-proof.sh` (gate: `snapshot restore across a live chain`, serial, ~25s) boots a real chain, reads the anchor *from the running node* \u2014 finalized height, canonical hash at that height, state root, and every storage entry at that height over RPC \u2014 stops it, snapshots with `snapshot-restore.sh backup`, restores into a fresh base path, boots a node on the restored database and requires height, hash, state root and the whole state map to come back identical (169 keys). It then boots a **control** node on an empty base path, lets it reach the same height, and requires its hash to differ, so the same check cannot pass for an empty chain. Measured: height 9, hash 0x0193e88c\u2026, control 0x5f51ff2c\u2026 Also green: launch-gates/snapshot-murder-test.sh (20 passed) and `cargo test -p x3-state-snapshot` (48 passed).",
+        "Still open: the backup refuses a *live* database (`check_validator_stopped`), correctly \u2014 a plain tar of a running RocksDB is not a consistent snapshot and the node exposes no `create_checkpoint`. The anchor is read from the running chain, but the archive is cut with the node stopped, so on a multi-GB validator DB that stop is the backup window. A zero-downtime snapshot needs a RocksDB checkpoint or an RPC state-export driver feeding `x3-state-snapshot build`, and the multi-GB size class has never been exercised on this box."
       ],
       "name": "Snapshot / restore tooling",
       "paths": [
-        "scripts/snapshot-restore.sh"
+        "scripts/snapshot-restore.sh",
+        "scripts/snapshot-live-restore-proof.sh"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 25,
-      "tests": "tested score 25% (no named test list on this row)"
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3553,31 +3555,35 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 26,
+      "composite": 59,
       "confidence": "medium",
       "evidence": [
         "docs",
         "note: Monitoring concepts present but operational proof incomplete"
       ],
       "id": "X3-OPS-010",
-      "implemented": 35,
+      "implemented": 70,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 25,
+      "mainnet_ready": 45,
       "missing_work": [
-        "No complete canonical deployed monitoring stack proven"
+        "**CLOSED 2026-09-26 \u2014 metrics *and* logs are live across all three validators, and both are gated.** `monitoring across validators` boots the built-in `local3` chain with a Prometheus exporter per validator and requires each one to identify itself from its own scrape: `substrate_build_info{name=\u2026}` matching the target label, chain `x3_chain_local3`, finalized height past genesis, two peers, authority role \u2014 then requires all three to agree on the canonical hash at the lowest finalized height any reported. The checked-in scrape config drives the ports the gate boots on, and every metric the checked-in Grafana dashboard references must exist in the live scrape. `logging across validators` requires each validator's log stream to be collected under one queryable sink and to carry its own identity, imported blocks and finalized blocks: measured 264/266/149 lines, last imported #63/#63/#64, last finalized #60 on all three. Both gates have `--self-test` negative controls (hold a validator's metrics or its stream out of the collection and the same query must fail), and both were measured failing.",
+        "The log-level finding is part of the fix, not a footnote: a node started without a filter emits warnings only \u2014 13 lines of banner per validator, no chain identity, no imports, no finality \u2014 so the collection contract includes the level.",
+        "Still open: no Prometheus server, Grafana or log shipper is installed on this box (no promtool, no vector/fluent-bit/promtail/filebeat). The config and dashboard are parsed and driven by the gates rather than rendered by a real Prometheus, the sink is a directory of per-validator streams rather than a running collector, and there is no retention, indexing or alerting story. \"Across all validators\" means the three on this box until the seven physical servers exist."
       ],
       "name": "Prometheus/Grafana-style ops monitoring",
       "paths": [
-        "docs"
+        "docs",
+        "scripts/monitoring",
+        "monitoring/local3"
       ],
       "priority": "P2",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 15,
-      "tests": "tested score 15% (no named test list on this row)"
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4423,7 +4429,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "35cf0885b04ccf49e89d388cce89d7575d789e5608c957c2241922feb03b0e85",
+    "source_digest": "15c9469c60fbfe3db71a7e7e23af06fb37cc4547b3c185249b47e22f3a701c1f",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
@@ -4434,9 +4440,9 @@
       "feature-matrix/cross-vm-atomic.toml": "a9c578dffa246c06939ce6b1b5ab1dfeadd2fbe42cc523b8c421a383d67825b0",
       "feature-matrix/economic-defi.toml": "34d83bfb027c88042f7b6f88b0552f2d6a4428c798360ccb432a893cf1b67743",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
-      "feature-matrix/language-trading.toml": "3a6d30aab4cfa190125ed26e8d26dd642505c09b6eb52ae974664c08303cb66d",
+      "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "75feb2b8b04dea7eb169c6bb17f0d38c2cfcc7ed9bc94e10b7b1732b0841ad14",
+      "feature-matrix/operations-user-tools.toml": "82709af2895a05fd284901791d511909ac64cc634a123da8ce7a86c90ebb0cfe",
       "feature-matrix/runtime-core.toml": "d36e103197c2d7bd4c4348365ed08875160353a43c98d8e5f42b1e54e64442e9",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
@@ -4874,8 +4880,8 @@
       "FUNCTIONAL BUT UNHARDENED": 56,
       "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
-      "PARTIAL": 61,
-      "STUB": 11
+      "PARTIAL": 62,
+      "STUB": 10
     },
     "matrix_features": 146,
     "registry_features": 21,

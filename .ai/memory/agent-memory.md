@@ -1,5 +1,23 @@
 # Agent Memory — X3 Repo
 
+## 🟥 2026-09-26 — READ FIRST IF YOU WERE SPAWNED WITH AN EMPTY MESSAGE
+
+**Your task is in `.ai/tasks/2026-09-26-round2-workstreams.md` (the current round) or
+`.ai/tasks/2026-09-26-parallel-workstreams.md` (round 1). Open both and take the workstream whose
+files are still untouched.** Round 2 is: a runtime upgrade through the chain's own governance path
+/ EVM-SVM external paths proven or explicitly disabled / supply invariants under distributed
+traffic. Round 1 (monitoring, snapshot-restore, X3Lang across validators) is already committed and
+pushed.
+
+The three rules that matter most, because they have already been broken once in this repo:
+
+1. **Do not commit and do not push.** The primary agent commits. Leave your work in the working tree.
+2. **Own only the files your workstream lists.** Do not edit `runtime/src/lib.rs`,
+   `pallets/x3-kernel/**`, `node/src/**`, or `reports/rc6/*` (the last is the operator's dirty set).
+3. **No fake green, and re-run your own proof.** Quote the command and its output in your report.
+
+Everything else about this repository is in the entries below this one.
+
 ## 2026-09-17 — Repo consolidation pass
 
 ### Facts to remember
@@ -8282,3 +8300,14 @@ Report: `.ai/reports/dependabot-triage-20260925.md`.
 - Set the EVM/SVM payload convention for `submit_comit_v2` — the last locally-actionable item on
   `X3-LANG-004` — by making the payload the artifact `T::EvmAdapter::validate` / `T::SvmAdapter::validate`
   accept (the X3 arm's precedent), then re-attest the runtime once, in the same commit.
+
+## 2026-09-26 — CLAIM (session xxxstar-main-2d): x3-lang "what's left for 100%" audit
+- **Picking up:** a read-only gap audit of x3-lang (the `x3-lang/` workspace plus the X3-LANG-001..010 matrix rows), checked against the code
+  and not the docs. Running the `x3-lang/` workspace gates (fmt/clippy/test) in an isolated target dir.
+- **Not touching:** `runtime/`, `pallets/x3-kernel/`, or any runtime-hash file. An srtool release build is live on this box
+  (someone's re-attestation). No commits to the shared checkout; any fix goes through `git worktree add /tmp/...` + a PR.
+- If you're on X3-LANG-004 (the EVM/SVM payload convention), it stays yours. I'll post before starting any implementation ticket.
+- **UPDATE (xxxstar-main-2d, 2026-09-26):** moving from audit to implementation. Worktree `/tmp/x3lang-finish`, branch
+  `fix/x3lang-finish` off origin/master `43099919a`. First target is the compiler stack under `crates/x3-{parser,typeck,hir,mir,opt,backend,vm,integration}`:
+  the optimizer order-sensitivity (entry function placed before others breaks e2e programs), then differential opt-on/off
+  tests and control-flow/register agreement. Still **not** touching `runtime/` or `pallets/x3-kernel/` until the live srtool build finishes.

@@ -219,6 +219,15 @@ bytes**:
   the bytes move — compact 8,508,725 bytes (was 8,508,157), compressed 1,465,616 (was 1,463,840). Two
   from-scratch builds agree.
 
+* `43099919a` — the adapter story told the truth. `pallets/x3-kernel/src/adapters.rs` and
+  `lib.rs` still advertised a `FrontierEvmAdapter` as the production EVM adapter; it returned
+  `ExecutionReceipt { success: true, gas_used: <derived from payload length>, .. }` for code it never
+  executed, and the EVM arm is executed instead by the runtime's own `NativeEvmAdapter` (std) or
+  `WasmEvmAdapter` (wasm). It is deleted, the SDK's `evm_deploy` builds init code rather than a
+  `Packet` that halts on byte 0, and two accept-anything verifiers on the proposal and receipt paths
+  were replaced with real ones. The bytes move: compact 8,508,732 bytes (was 8,508,725), compressed
+  1,465,245 (was 1,465,616). Two from-scratch builds agree.
+
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
 revision builds.
@@ -243,24 +252,24 @@ taken at older revisions and are kept here only as the record of how this was
 established. `setCode` for the compact artifact is `0xac13ee1b…`, quoted with the
 other values below.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,482,928 bytes)**
+**Compact (`x3_chain_runtime.compact.wasm`, 8,508,732 bytes — revision `43099919a`)**
 
 ```
 Version          : x3-chain-20 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0xac2e46e9366fa6a31129599faf552dc568157dfc656e52deffea8b7e7b04361c
-authorizeUpgrade : 0x9c2bb5f158a63d5281e0e4948c92e75830e02707c7ebb2455ba9f48888c3d6de
-IPFS             : QmYBepxKZR7wB6RJZE7QdnWqQocmG3bZ9mxLCH9PsauLsk
-BLAKE2_256       : 0xeb9c27c2a89fe1803f4923bf32cc9c3d09124fa3f17b5f04f56bfd5b4db6f390
+setCode          : 0x568105227d11285fbad532780b7646f2b8311dc565d2ac225e4d9441f421ca11
+authorizeUpgrade : 0x76b489c790351b452482dae7981e2824cf9ec76b8568afeb37a987fa6473ff14
+IPFS             : QmbrH7E8EfV7ivRcz5qvfDfHwHFpxaidTQHUV6iRmPrrzo
+BLAKE2_256       : 0xf272e2f05eef5302664670e5b5a3a90b8b26afdeb8089397370d09c9a1d906e5
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,459,662 bytes)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,465,245 bytes — revision `43099919a`)**
 
 ```
-setCode          : 0x465d6fbc78fdec2652447cb6bd7d57576e53dfc0736d2c04665414fe7fc523a9
-authorizeUpgrade : 0x354782abcad1b712a5edb78bbfb4b7e2adbbeae55692bb25cf6703a947f8e80d
-IPFS             : QmeZCmK1QA7zQ8DiNgTZGSc9ZXc5QmTGT9acA9iNYo1mXm
-BLAKE2_256       : 0x532b70e61d1a95bab79cbff721ffbbbfb652e79283b8f19f5876b64850e0d2de
+setCode          : 0x77247760d5d0c876eabc7a490fc63c3c23a1dfc554d003dd92ebfe662245bcf3
+authorizeUpgrade : 0x43adaa2e231de7642e1fa5cfb37e04f5dfe85b6d62270db932068229fc8ba0a2
+IPFS             : QmYas4jvNZmXkUMbGPxxGpbdj8ckzcgaob2MpcC1Qee4qL
+BLAKE2_256       : 0xad72d272abfa9a3c4e9b8b5ddc8f299cba1d59f5462a1ea8c70f14a788818bf8
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the
