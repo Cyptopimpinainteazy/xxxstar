@@ -574,6 +574,13 @@ GATES_LIVE=(
   # Three validators on the built-in `local3` chain: they have to find each
   # other, finalize, and agree on the canonical hash at a finalized height.
   "local network smoke:bash scripts/local-network-smoke.sh"
+  # The same three validators, but this one keeps them up long enough to scrape
+  # each one's own Prometheus exporter and requires every validator to identify
+  # itself (node name, finalized height, peer count, role). One scrape of one
+  # node is not "monitoring live across all validators"; this fails if fewer
+  # than three are observed. It also parses the checked-in scrape config and
+  # Grafana dashboard so the operator artifacts cannot rot.
+  "monitoring across validators:bash scripts/monitoring/local3-monitoring-check.sh --self-test"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
   # `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54 …` internally, and
   # `+toolchain` only works through the rustup shim — which this script puts
@@ -1020,6 +1027,7 @@ run_gate() {
 SERIAL_GATES=(
   "local node smoke"
   "local network smoke"
+  "monitoring across validators"
   "EVM contract lifecycle"
   "SVM contract lifecycle"
   "X3-native lifecycles"

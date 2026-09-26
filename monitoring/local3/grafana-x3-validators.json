@@ -1,0 +1,145 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "Prometheus scraping monitoring/local3/prometheus-local3.yml",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "dashboard": {
+    "title": "X3 — local3 validator network",
+    "uid": "x3-local3-validators",
+    "tags": ["x3", "validators", "finality", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "time": { "from": "now-15m", "to": "now" },
+    "templating": {
+      "list": [
+        {
+          "name": "validator",
+          "label": "Validator",
+          "type": "query",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "query": "label_values(substrate_build_info, validator)",
+          "includeAll": true,
+          "multi": true,
+          "refresh": 1
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Finalized height (per validator)",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "expr": "substrate_block_height{status=\"finalized\", validator=~\"$validator\"}",
+            "legendFormat": "{{validator}}"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Peer count (per validator)",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "expr": "substrate_sub_libp2p_peers_count{validator=~\"$validator\"}",
+            "legendFormat": "{{validator}}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Node role (per validator)",
+        "type": "stat",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "gridPos": { "x": 0, "y": 8, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "expr": "substrate_node_roles{validator=~\"$validator\"}",
+            "legendFormat": "{{validator}}"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Best height (per validator)",
+        "type": "stat",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "gridPos": { "x": 8, "y": 8, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "expr": "substrate_block_height{status=\"best\", validator=~\"$validator\"}",
+            "legendFormat": "{{validator}}"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Block production rate (per validator, blocks/s)",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "gridPos": { "x": 16, "y": 8, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "expr": "rate(x3_blocks_produced_total{validator=~\"$validator\"}[1m])",
+            "legendFormat": "{{validator}}"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "GRANDPA rounds (per validator)",
+        "type": "timeseries",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "gridPos": { "x": 0, "y": 14, "w": 12, "h": 6 },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "expr": "substrate_finality_grandpa_round{validator=~\"$validator\"}",
+            "legendFormat": "{{validator}}"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Runtime build (per validator)",
+        "type": "table",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "gridPos": { "x": 12, "y": 14, "w": 12, "h": 6 },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "expr": "substrate_build_info{validator=~\"$validator\"}",
+            "format": "table",
+            "instant": true
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true
+}

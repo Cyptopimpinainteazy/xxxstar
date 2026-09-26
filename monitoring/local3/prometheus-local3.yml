@@ -1,0 +1,41 @@
+# Prometheus scrape config for the built-in three-validator `local3` chain.
+#
+# This file is the source of truth for the ports the monitoring gate uses: the
+# gate reads the three targets below, boots one validator per target on the
+# matching ports, and scrapes each exporter individually. If this file rots
+# (wrong port, wrong path, fewer than three validators) the gate fails instead
+# of silently scraping one node and calling the network "observed".
+#
+# Bring the chain up on these ports and this file works as-is:
+#   scripts/monitoring/local3-monitoring-up.sh
+#
+# Each validator runs its own Prometheus exporter (the node's --prometheus-port).
+# The validator's identity is carried in two places: the `validator` target label
+# added here, and the `name` label of `substrate_build_info` that the node itself
+# exports. The gate requires both to agree, so a single scrape cannot stand in
+# for three live validators.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'x3-validator-alice'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:19703']
+        labels:
+          validator: alice
+
+  - job_name: 'x3-validator-bob'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:19713']
+        labels:
+          validator: bob
+
+  - job_name: 'x3-validator-charlie'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:19723']
+        labels:
+          validator: charlie
