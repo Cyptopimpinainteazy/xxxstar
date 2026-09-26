@@ -42,6 +42,36 @@ fail()  { RESULTS["$1"]="FAIL";  OVERALL="FAIL"; echo "[FAIL] $1 — ${2:-}"; }
 skip()  { RESULTS["$1"]="SKIP";  echo "[SKIP] $1 — ${2:-}"; }
 info()  { echo "  [info] $*"; }
 
+# Run one named test per `cargo test` invocation, and require it to have *run*.
+#
+# Two bugs lived here and both made this gate lie. `cargo test` takes a single
+# positional TESTNAME — passing a second one is `error: unexpected argument`, so
+# the gates that named two or three tests could never pass, whatever the tests did
+# ("halt/supply-ledger pallet tests failed", "refund pallet tests failed", measured
+# 2026-09-26 against a live seven-validator network while each test passed on its
+# own). And a filter that matches nothing exits 0 with `0 passed; 0 filtered out`,
+# so a renamed test would have passed silently. One `cargo test` per name, plus a "… ok" line, is the
+# difference between running a test and naming one.
+run_named_tests() {
+    local pkg="$1"; shift
+    local test out
+    for test in "$@"; do
+        # No `--exact`: the harness prints `test tests::name ... ok`, so an exact
+        # match needs the module path, and a bare name with `--exact` matches
+        # nothing at all — which is the same silent pass this helper exists to stop.
+        if ! out="$(cargo test -p "$pkg" "$test" 2>&1)"; then
+            printf '%s\n' "$out" | tail -6 >&2
+            info "$pkg::$test failed to run"
+            return 1
+        fi
+        if ! printf '%s\n' "$out" | grep -qE "^test .*${test} \.\.\. ok"; then
+            info "$pkg::$test reported no result — the filter matched nothing"
+            return 1
+        fi
+    done
+    return 0
+}
+
 # ── Helper: RPC call ──────────────────────────────────────────────────────────
 rpc() {
     local method="$1"
@@ -260,12 +290,10 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 echo "→ [Gate 10] Invariant violation halt drill..."
 # Verify via pallet tests that the halt path works
-if cargo test -p pallet-x3-cross-vm-router \
-    test_paused_asset_rejects_transfers \
-    test_closed_route_rejects_transfers \
-    >/dev/null 2>&1 && \
-   cargo test -p pallet-x3-supply-ledger \
-    >/dev/null 2>&1; then
+if run_named_tests pallet-x3-cross-vm-router \
+       test_paused_asset_rejects_transfers \
+       test_closed_route_rejects_transfers \
+   && cargo test -p pallet-x3-supply-ledger >/dev/null 2>&1; then
     pass "invariant_halt_drill"
 else
     fail "invariant_halt_drill" "halt/supply-ledger pallet tests failed"
@@ -275,11 +303,10 @@ fi
 # GATE 11: Refund drill passed
 # ─────────────────────────────────────────────────────────────────────────────
 echo "→ [Gate 11] Refund drill..."
-if cargo test -p pallet-x3-cross-vm-router \
-    test_expired_transfer_refunds_to_source \
-    test_failed_destination_credit_refunds_pending_supply \
-    completion_after_refund_rejected \
-    >/dev/null 2>&1; then
+if run_named_tests pallet-x3-cross-vm-router \
+       test_expired_transfer_refunds_to_source \
+       test_failed_destination_credit_refunds_pending_supply \
+       completion_after_refund_rejected; then
     pass "refund_drill"
 else
     fail "refund_drill" "refund pallet tests failed"
