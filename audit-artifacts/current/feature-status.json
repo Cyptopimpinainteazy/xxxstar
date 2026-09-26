@@ -3621,30 +3621,33 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 40,
+      "composite": 50,
       "confidence": "high",
       "evidence": [
         "pallets/x3-atomic-kernel/src/lib.rs",
-        "note: Registry blocker explicitly calls out refund/recovery tests"
+        "note: the registry blocker asked for refund/recovery tests; they are named in blockers and gated by `test atomic-kernel` and `test x3-kernel`"
       ],
       "id": "X3-RT-001",
       "implemented": 60,
       "launch_scope": "core",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 35,
+      "mainnet_ready": 45,
       "missing_work": [
-        "Required tests not yet proven in canonical registry"
+        "**CLOSED 2026-09-26 \u2014 the halt permits recovery, and the tests that say so are named here.** The open item was \"required tests not yet proven in canonical registry\". They exist and are gated (`test atomic-kernel`, `test x3-kernel`): `economic_halt_does_not_trap_pending_bundle_funds` halts the economy with a bundle already submitted and requires `rollback_atomic_bundle` to succeed *anyway*, releasing the whole bond while a new submission is still refused with `EconomicHaltActive` \u2014 and asserts the balances, the 50% cancel penalty and that total issuance is unchanged (slashed funds move to the treasury rather than being burned). `economic_halt_blocks_bundle_submission` pins the fail-closed half, including that lifting the halt restores work.",
+        "The kernel's own pause gets the same treatment: `emergency_pause_blocks_submit_comit` (refuses), `test_emergency_halt_recovery_restores_functionality` (the same caller and nonce succeed again after `emergency_unpause`), and, added 2026-09-26, `a_pause_leaves_committed_state_readable_and_the_nonce_sequence_intact` \u2014 a comit accepted before the pause stays byte-identical in storage while paused, a submission the pause refuses leaves the account's nonce untouched, and the same nonce works after resuming. Measured load-bearing: deleting the `ProtocolIsPaused` guard from `submit_comit` turns that test red at its `assert_noop!`, then the file was restored byte-identically.",
+        "Still open: the atomic-kernel's halt and the kernel's pause are independent switches, and no test drives both at once (a kernel pause must not strand funds held by an atomic bundle \u2014 rollback does not consult `ProtocolPaused`, but that is read from the code, not proven by a test). The runtime's `EmergencyHaltController` wiring to the kernel's halt state also has no runtime-level test."
       ],
       "name": "Halt permits recovery/refund paths",
       "paths": [
-        "pallets/x3-atomic-kernel/src/lib.rs"
+        "pallets/x3-atomic-kernel/src/lib.rs",
+        "pallets/x3-kernel/src/lib.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "runtime_core",
-      "tested": 20,
+      "tested": 45,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
@@ -4429,7 +4432,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "15c9469c60fbfe3db71a7e7e23af06fb37cc4547b3c185249b47e22f3a701c1f",
+    "source_digest": "2330aca1875868dba1893472903b4060afe7315d66d493880a3bc0778ee78e11",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
@@ -4443,7 +4446,7 @@
       "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "82709af2895a05fd284901791d511909ac64cc634a123da8ce7a86c90ebb0cfe",
-      "feature-matrix/runtime-core.toml": "d36e103197c2d7bd4c4348365ed08875160353a43c98d8e5f42b1e54e64442e9",
+      "feature-matrix/runtime-core.toml": "8b44ebcf62fab95e5678825f1671785b19e0771cdf4917ce9b323c34e772a5a6",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
   },

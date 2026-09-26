@@ -5,16 +5,27 @@ id = "X3-RT-001"
 name = "Halt permits recovery/refund paths"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+paths = ["pallets/x3-atomic-kernel/src/lib.rs", "pallets/x3-kernel/src/lib.rs"]
 implemented = 60
-tested = 20
-mainnet_ready = 35
+tested = 45
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Required tests not yet proven in canonical registry"]
-evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Registry blocker explicitly calls out refund/recovery tests"]
+blockers = [
+  "**CLOSED 2026-09-26 — the halt permits recovery, and the tests that say so are named here.** The open item was \"required tests not yet proven in canonical registry\". They exist and are gated (`test atomic-kernel`, `test x3-kernel`): `economic_halt_does_not_trap_pending_bundle_funds` halts the economy with a bundle already submitted and requires `rollback_atomic_bundle` to succeed *anyway*, releasing the whole bond while a new submission is still refused with `EconomicHaltActive` — and asserts the balances, the 50% cancel penalty and that total issuance is unchanged (slashed funds move to the treasury rather than being burned). `economic_halt_blocks_bundle_submission` pins the fail-closed half, including that lifting the halt restores work.",
+  "The kernel's own pause gets the same treatment: `emergency_pause_blocks_submit_comit` (refuses), `test_emergency_halt_recovery_restores_functionality` (the same caller and nonce succeed again after `emergency_unpause`), and, added 2026-09-26, `a_pause_leaves_committed_state_readable_and_the_nonce_sequence_intact` — a comit accepted before the pause stays byte-identical in storage while paused, a submission the pause refuses leaves the account's nonce untouched, and the same nonce works after resuming. Measured load-bearing: deleting the `ProtocolIsPaused` guard from `submit_comit` turns that test red at its `assert_noop!`, then the file was restored byte-identically.",
+  "Still open: the atomic-kernel's halt and the kernel's pause are independent switches, and no test drives both at once (a kernel pause must not strand funds held by an atomic bundle — rollback does not consult `ProtocolPaused`, but that is read from the code, not proven by a test). The runtime's `EmergencyHaltController` wiring to the kernel's halt state also has no runtime-level test.",
+]
+evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: the registry blocker asked for refund/recovery tests; they are named in blockers and gated by `test atomic-kernel` and `test x3-kernel`"]
+required_tests = [
+  "economic_halt_blocks_bundle_submission",
+  "economic_halt_does_not_trap_pending_bundle_funds",
+  "emergency_pause_blocks_submit_comit",
+  "test_emergency_halt_recovery_restores_functionality",
+  "a_pause_leaves_committed_state_readable_and_the_nonce_sequence_intact",
+]
 registry_feature = "atomic_kernel"
 
 [[feature]]

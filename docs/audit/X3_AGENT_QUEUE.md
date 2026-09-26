@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `15c9469c60fbfe3d…` — the artifacts move when
+Source digest: `2330aca1875868db…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -165,7 +165,7 @@ fails when they do not match.
 | MTX-X3-OPS-009 | operations_user_tools | Block explorer: No finished production explorer proven | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | STUB · tested score 15% (no named test list on this row) | open |
 | MTX-X3-OPS-010 | operations_user_tools | Prometheus/Grafana-style ops monitoring: **CLOSED 2026-09-26 — metrics *and* logs are live across all three validators, and both are gated.** `monitoring across validators` boots the built-in `local3` chain with a Prometheus exporter per validator and requires each one to identify… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P2/medium | `bash scripts/local-ci.sh` | PARTIAL · tested score 65% (no named test list on this row) | open |
 | MTX-X3-OPS-011 | operations_user_tools | Wallet signing crate (hardware signatures): **CLOSED 2026-09-25 — `HardwareWalletEngine::verify_signature` returned `Ok(true)` for bytes it never verified.** It refused an empty signature and a short one, then set `verified = true` unless `recovery_id > 3`: `tx_hash` was never read,… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 40% (no named test list on this row) | open |
-| MTX-X3-RT-001 | runtime_core | Halt permits recovery/refund paths: Required tests not yet proven in canonical registry | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
+| MTX-X3-RT-001 | runtime_core | Halt permits recovery/refund paths: **CLOSED 2026-09-26 — the halt permits recovery, and the tests that say so are named here.** The open item was "required tests not yet proven in canonical registry". They exist and are gated (`test atomic-kernel`, `test x3-kernel`): `econom… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-002 | runtime_core | Atomic Kernel pallet: **Closed 2026-09-23 — bundle finalization is authorized now.** The unsigned `submit_finalization_result` extrinsic was removed: it was `ensure_none`, its off-chain marker (`x3fin:`) had no writer anywhere in this repository, and `do_finaliz… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | NOT INTEGRATED · 8 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-003 | runtime_core | mainnet-rc1 feature mode: Historical status documents show verification churn; exact-head proof still required | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-004 | runtime_core | Canonical state ledger updates: Supply conservation across all failure paths needs stronger proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 50% (no named test list on this row) | open |

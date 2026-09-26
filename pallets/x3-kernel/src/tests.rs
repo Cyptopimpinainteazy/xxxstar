@@ -2305,6 +2305,90 @@ fn double_pause_is_rejected() {
     });
 }
 
+/// A pause stops new work; it must not make what already happened unreadable.
+///
+/// `emergency_pause` exists for the incident where submission is the thing going
+/// wrong, and an operator investigating that incident needs the comits that are
+/// already on chain — their ids, their nonces, their stored records — while the
+/// chain is paused. This pins read access and the nonce sequence across the pause:
+/// the refused submission in between must not consume a nonce, or the caller's
+/// queued transaction would be stranded by an incident it had nothing to do with.
+#[test]
+fn a_pause_leaves_committed_state_readable_and_the_nonce_sequence_intact() {
+    // `new_test_ext` is the harness that authorizes ALICE; the default `ExtBuilder`
+    // does not, and the auth check runs after the pause check — which is why a
+    // paused-submission test can use it and a successful submission cannot.
+    new_test_ext().execute_with(|| {
+        let fee: Balance = 100;
+        let evm = wrap_evm_payload(&[1, 2]);
+        let svm = wrap_svm_payload(&[3, 4]);
+        let comit_id = H256::from_low_u64_be(4242);
+        let prepare_root = compute_prepare_root(comit_id, &evm, &svm, 0, fee);
+
+        assert_ok!(AtlasKernel::submit_comit(
+            RuntimeOrigin::signed(ALICE),
+            comit_id,
+            evm.clone(),
+            svm.clone(),
+            0,
+            fee,
+            prepare_root,
+        ));
+        let stored = crate::SubmittedComits::<Test>::get(comit_id)
+            .expect("a submitted comit is recorded");
+        let nonce_after_submit = crate::Nonces::<Test>::get(ALICE);
+
+        assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
+
+        // Readable while paused, and unchanged by the pause itself.
+        assert_eq!(
+            crate::SubmittedComits::<Test>::get(comit_id).expect("still readable while paused"),
+            stored,
+            "the pause must not rewrite a comit that was already accepted"
+        );
+        assert_eq!(
+            crate::Nonces::<Test>::get(ALICE),
+            nonce_after_submit,
+            "reading the account's nonce while paused must not move it"
+        );
+
+        // A submission refused by the pause must not consume the next nonce.
+        let blocked_id = H256::from_low_u64_be(4243);
+        let blocked_root = compute_prepare_root(blocked_id, &evm, &svm, nonce_after_submit, fee);
+        assert_noop!(
+            AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                blocked_id,
+                evm.clone(),
+                svm.clone(),
+                nonce_after_submit,
+                fee,
+                blocked_root,
+            ),
+            crate::Error::<Test>::ProtocolIsPaused,
+        );
+        assert_eq!(
+            crate::Nonces::<Test>::get(ALICE),
+            nonce_after_submit,
+            "a refused submission must not consume a nonce"
+        );
+
+        // After the incident, the same nonce still works.
+        assert_ok!(AtlasKernel::emergency_unpause(RuntimeOrigin::root()));
+        let resumed_root = compute_prepare_root(blocked_id, &evm, &svm, nonce_after_submit, fee);
+        assert_ok!(AtlasKernel::submit_comit(
+            RuntimeOrigin::signed(ALICE),
+            blocked_id,
+            evm,
+            svm,
+            nonce_after_submit,
+            fee,
+            resumed_root,
+        ));
+        assert!(crate::SubmittedComits::<Test>::contains_key(blocked_id));
+    });
+}
+
 #[test]
 fn unpause_when_not_paused_is_noop() {
     new_test_ext().execute_with(|| {
