@@ -171,6 +171,10 @@ sp-io = { workspace = true, features = ["std"] }
 # The runtime's tests compile real `.x3` source with the compiler the node uses;
 # `pallet-x3-kernel` already depends on this crate, so it is in the runtime's graph either way.
 x3-x3-integration = { path = "../crates/x3-integration", features = ["std", "compile"] }
+# The native adapter tests build the same SCALE-encoded `Packet` fixtures the kernel's own suite
+# does, rather than pasting opaque bytes: a fixture that stopped being a packet would fail its own
+# precondition instead of quietly testing nothing.
+x3-packet-schema = { path = "../crates/x3-packet-schema" }
 
 [features]
 # `tuples-96` was here and in `default`. It is on the `frame-support` dependency now,

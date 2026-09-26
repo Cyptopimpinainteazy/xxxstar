@@ -5165,11 +5165,21 @@ mod vm_adapter_tests {
         // Test that X3VmAdapter uses real X3 VM
         use pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
 
-        // Simple X3 bytecode: X3BC magic + minimal module
+        // Four bytes: the X3BC magic and nothing else.
         let x3_bytecode = vec![0x58, 0x33, 0x42, 0x43];
-        let result = X3VmAdapter::validate(&x3_bytecode);
-        // Validation should work with real verifier (may return Ok or Err for partial payload)
-        assert!(result.is_ok() || result.is_err());
+        // This test used to end in `assert!(result.is_ok() || result.is_err())`, which holds for
+        // every possible verdict — a test that could not fail, next to a comment admitting the
+        // author did not know the answer ("may return Ok or Err for partial payload"). The verdict
+        // is measured here instead: the verifier's `parse` refuses anything shorter than 6 bytes
+        // with `UnexpectedEof`, before it ever reads a version, so it is `Invalid X3 bytecode`.
+        let error = X3VmAdapter::validate(&x3_bytecode).expect_err(
+            "a magic-only artifact is not a module: it carries no version, no body and no checksum",
+        );
+        let message = format!("{error:?}");
+        assert!(
+            message.contains("Invalid X3 bytecode"),
+            "the refusal has to name the reason, got: {message}"
+        );
     }
 
     #[test]
@@ -5180,6 +5190,159 @@ mod vm_adapter_tests {
             // In WASM, adapters should be mocks
             // This test ensures no_std compatibility
         }
+    }
+}
+
+/// A packet is not code, and the native adapters have to say so by name.
+///
+/// `submit_comit_v2` accepts a non-empty EVM/SVM payload only when it decodes as a SCALE-encoded
+/// `Packet` carrying that domain's bit, while the adapters execute their input as bytes — EVM
+/// bytecode through Frontier, eBPF through the rBPF executor. The two conventions are not
+/// reconciled yet (the integration is open on X3-LANG-004; see
+/// `.ai/reports/evm-payload-never-executed-20260926.md`), so the guard in `native_vm_adapters` is
+/// the only thing between an accepted packet and a receipt for work that never happened. Nothing
+/// tested it on this path: `vm_adapter_tests` above executes real bytecode and never a packet.
+#[cfg(all(test, feature = "std", feature = "frontier"))]
+mod a_packet_is_refused_by_the_native_adapters {
+    use super::*;
+    use codec::Encode;
+    use pallet_evm::Runner;
+    use pallet_x3_kernel::{packet_adapters, EvmExecutorAdapter, SvmExecutorAdapter};
+    use sp_core::{H160, U256};
+    use sp_runtime::DispatchError;
+    // `x3_packet_schema::U256` is the schema's wire type (a 32-byte big-endian array), not
+    // `sp_core::U256`: the EVM payload needs the former, the Frontier call the latter.
+    use x3_packet_schema::{EvmPacket, Packet, SvmPacket, U256 as PacketU256};
+
+    const EVM_GAS_LIMIT: u64 = 6_000_000;
+    const SVM_COMPUTE_LIMIT: u64 = 500_000;
+
+    /// `EvmPacket::Call` with the test's intent bytes in `args` — the same shape the kernel's own
+    /// `test_helpers::wrap_evm_payload` builds, so this is a payload `submit_comit_v2` accepts.
+    fn kernel_accepted_evm_packet(intent: &[u8]) -> Vec<u8> {
+        let digest = sp_core::hashing::blake2_256(intent);
+        let mut contract = [0u8; 20];
+        contract.copy_from_slice(&digest[..20]);
+        Packet::Evm(EvmPacket::Call {
+            contract,
+            function_selector: [0xaa, 0xbb, 0xcc, 0xdd],
+            args: intent.to_vec(),
+            value: PacketU256::from(0),
+        })
+        .encode()
+    }
+
+    /// `SvmPacket::Invoke` with the test's intent bytes in `data` — the shape
+    /// `test_helpers::wrap_svm_payload` builds.
+    fn kernel_accepted_svm_packet(intent: &[u8]) -> Vec<u8> {
+        Packet::Svm(SvmPacket::Invoke {
+            program_id: sp_core::hashing::blake2_256(intent),
+            accounts: Vec::new(),
+            data: intent.to_vec(),
+        })
+        .encode()
+    }
+
+    #[test]
+    fn a_native_evm_adapter_refuses_a_packet_the_kernel_accepts() {
+        let payload = kernel_accepted_evm_packet(&[0xAAu8; 64]);
+
+        // Preconditions, asserted so the test cannot pass vacuously: this is a payload the kernel
+        // accepts, for the EVM domain, and its first byte is the `Packet` discriminant `0x00` —
+        // EVM `STOP`, the byte the pre-guard path halted on.
+        let packet = packet_adapters::deserialize_packet(&payload)
+            .expect("the fixture must pass the validation submit_comit_v2 applies");
+        assert_eq!(
+            packet_adapters::get_domain_mask(&packet),
+            0b0001,
+            "the fixture has to be an EVM packet"
+        );
+        assert_eq!(
+            payload.first().copied(),
+            Some(0x00),
+            "SCALE puts the enum discriminant first, and `0x00` is EVM STOP"
+        );
+
+        sp_io::TestExternalities::default().execute_with(|| {
+            match super::native_vm_adapters::NativeEvmAdapter::execute(&payload, EVM_GAS_LIMIT) {
+                Err(DispatchError::Other(message)) => assert!(
+                    message.contains("Packet, not bytecode"),
+                    "the refusal has to name the reason, got: {message}"
+                ),
+                Err(other) => panic!("expected the named refusal, got: {other:?}"),
+                Ok(receipt) => panic!(
+                    "the native EVM adapter must not report success for a payload it cannot \
+                     execute: success={}, gas_used={}",
+                    receipt.success, receipt.gas_used
+                ),
+            }
+        });
+    }
+
+    #[test]
+    fn a_native_svm_adapter_refuses_a_packet_the_kernel_accepts() {
+        let payload = kernel_accepted_svm_packet(&[0xBBu8; 64]);
+
+        let packet = packet_adapters::deserialize_packet(&payload)
+            .expect("the fixture must pass the validation submit_comit_v2 applies");
+        assert_eq!(
+            packet_adapters::get_domain_mask(&packet),
+            0b0010,
+            "the fixture has to be an SVM packet"
+        );
+
+        sp_io::TestExternalities::default().execute_with(|| {
+            match super::native_vm_adapters::NativeSvmAdapter::execute(&payload, SVM_COMPUTE_LIMIT)
+            {
+                Err(DispatchError::Other(message)) => assert!(
+                    message.contains("Packet, not a program"),
+                    "the refusal has to name the reason, got: {message}"
+                ),
+                Err(other) => panic!("expected the named refusal, got: {other:?}"),
+                Ok(receipt) => panic!(
+                    "the native SVM adapter must not report success for a payload it cannot \
+                     execute: success={}, gas_used={}",
+                    receipt.success, receipt.gas_used
+                ),
+            }
+        });
+    }
+
+    /// Why the guard is not cosmetic. These are the same bytes the adapter above refuses, handed to
+    /// the Frontier path the guard replaced: `create` runs the packet as init code, the first byte
+    /// is `STOP`, so it reports a *successful* contract creation with no code and the kernel would
+    /// have persisted a receipt for work that never happened. Measured before the guard was added;
+    /// this test keeps the measurement reproducible, so the guard cannot be "simplified" away
+    /// without this failing.
+    #[test]
+    fn the_frontier_create_path_the_guard_replaced_reports_success_for_the_same_bytes() {
+        let payload = kernel_accepted_evm_packet(&[0xAAu8; 64]);
+
+        sp_io::TestExternalities::default().execute_with(|| {
+            let evm_config = fp_evm::Config::shanghai();
+            let created = <super::Runtime as pallet_evm::Config>::Runner::create(
+                H160::zero(),
+                payload.clone(),
+                U256::zero(),
+                EVM_GAS_LIMIT,
+                Some(U256::from(super::NATIVE_GAS_PRICE)),
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                false,
+                false,
+                None,
+                None,
+                &evm_config,
+            )
+            .expect("Frontier accepts the packet as init code; that acceptance is the hazard");
+            assert!(
+                matches!(created.exit_reason, fp_evm::ExitReason::Succeed(_)),
+                "the unguarded path reported a success for these bytes: exit_reason={:?}",
+                created.exit_reason
+            );
+        });
     }
 }
 

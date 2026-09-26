@@ -26105,6 +26105,7 @@ dependencies = [
  "x3-cross-vm-bridge",
  "x3-dex",
  "x3-ixl",
+ "x3-packet-schema",
  "x3-packet-standard",
  "x3-revenue-sharing",
  "x3-security-events",

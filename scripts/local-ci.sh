@@ -451,6 +451,15 @@ GATES_FAST=(
   # required evidence, `check-readiness-consistency.sh` proves those names exist, and nothing in the
   # default set ever executed them. Measured cost: 22s including compile, 0.03s of test time.
   "test runtime:cargo test -p x3-chain-runtime"
+  # ...but that suite runs with `frontier` OFF, so it cannot reach the native adapters, and the
+  # variant dry-run in `GATES_VARIANTS` selects only `runtime_upgrade_rehearsal` under the feature.
+  # `native_vm_adapters` (`NativeEvmAdapter`, `NativeSvmAdapter`) and every test in
+  # `vm_adapter_tests` were therefore compiled and executed by nothing — including the guard added
+  # 2026-09-26 that refuses a SCALE-encoded `Packet` instead of reporting success for work that
+  # never happened, and `a_packet_is_refused_by_the_native_adapters`, whose third test keeps the
+  # pre-guard false success measurable. Same feature set the `frontier` variant builds, whole suite
+  # rather than one filter.
+  "test runtime frontier:env SKIP_WASM_BUILD=1 cargo test -p x3-chain-runtime --no-default-features --features std,frontier"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
   # The snapshot format is the trust boundary for state sync: a mirror must not
