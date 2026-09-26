@@ -958,11 +958,13 @@ pub mod pallet {
         EmptyPayloads,
         /// Packet deserialization failed or packet domain targeting is invalid.
         InvalidPacket,
-        /// EVM packet deserialization failed or domain mask does not target EVM.
+        /// The EVM payload is not something `T::EvmAdapter` will execute. A SCALE-encoded
+        /// `Packet` lands here by name: a packet is a semantic operation, not bytecode.
         InvalidEvmPacket,
-        /// SVM packet deserialization failed or domain mask does not target SVM.
+        /// The SVM payload is not something `T::SvmAdapter` will execute. A SCALE-encoded
+        /// `Packet` lands here by name: a packet is a semantic operation, not a program.
         InvalidSvmPacket,
-        /// X3VM packet deserialization failed or domain mask does not target X3VM.
+        /// The X3 payload is not something `T::X3Adapter` will execute (X3BC bytecode).
         InvalidX3VmPacket,
         /// Supplied nonce does not match the expected account nonce.
         InvalidNonce,
@@ -1423,39 +1425,14 @@ pub mod pallet {
             // First layer checks on payload sizes and emptiness.
             Self::verify_payloads(&comit_id, &evm_payload, &svm_payload)?;
 
-            // Phase 1.4 (FIX): Strict packet validation — ALL non-empty payloads
-            // MUST deserialize as valid packets with correct domain masks.
-            // The previous 30-byte threshold allowed undecodable or wrong-domain
-            // raw/legacy payloads to pass through the critical path, which broke
-            // the atomicity assumption.  Every packet targeting the EVM domain
-            // must deserialize cleanly and carry the EVM domain bit (0b0001).
-            if !evm_payload.is_empty() {
-                match deserialize_packet(&evm_payload) {
-                    Ok(packet) => {
-                        let domain_mask = get_domain_mask(&packet);
-                        if (domain_mask & 0b0001) == 0 {
-                            return Err(Error::<T>::InvalidEvmPacket.into());
-                        }
-                    }
-                    Err(_) => {
-                        return Err(Error::<T>::InvalidEvmPacket.into());
-                    }
-                }
-            }
-
-            if !svm_payload.is_empty() {
-                match deserialize_packet(&svm_payload) {
-                    Ok(packet) => {
-                        let domain_mask = get_domain_mask(&packet);
-                        if (domain_mask & 0b0010) == 0 {
-                            return Err(Error::<T>::InvalidSvmPacket.into());
-                        }
-                    }
-                    Err(_) => {
-                        return Err(Error::<T>::InvalidSvmPacket.into());
-                    }
-                }
-            }
+            // A payload is the artifact the matching adapter executes: EVM bytecode for
+            // `T::EvmAdapter`, an eBPF program for `T::SvmAdapter`. The component that does the
+            // work is the component that validates it (X3-LANG-004), because the two used to
+            // disagree: this arm decoded the payload as a SCALE-encoded `Packet` and checked its
+            // domain bit, while every adapter executes its input as code — and SCALE puts the
+            // packet enum discriminant first, `0x00` being EVM `STOP`, so a packet the kernel
+            // accepted was reported as a successful execution of work that never happened.
+            Self::verify_domain_payloads(&evm_payload, &svm_payload)?;
 
             // Atomic nonce check and increment using try_mutate (C-3)
             // This ensures the nonce is atomically verified and incremented in a single storage operation
@@ -1722,39 +1699,8 @@ pub mod pallet {
 
             Self::verify_payloads_v2(&comit_id, &evm_payload, &svm_payload, &x3_payload)?;
 
-            // Phase 1.4 (FIX): Strict packet validation — ALL non-empty payloads
-            // MUST deserialize as valid packets with correct domain masks.
-            // The previous 30-byte threshold allowed undecodable or wrong-domain
-            // raw/legacy payloads to pass through the critical path, which broke
-            // the atomicity assumption.  Every packet targeting the EVM domain
-            // must deserialize cleanly and carry the EVM domain bit (0b0001).
-            if !evm_payload.is_empty() {
-                match deserialize_packet(&evm_payload) {
-                    Ok(packet) => {
-                        let domain_mask = get_domain_mask(&packet);
-                        if (domain_mask & 0b0001) == 0 {
-                            return Err(Error::<T>::InvalidEvmPacket.into());
-                        }
-                    }
-                    Err(_) => {
-                        return Err(Error::<T>::InvalidEvmPacket.into());
-                    }
-                }
-            }
-
-            if !svm_payload.is_empty() {
-                match deserialize_packet(&svm_payload) {
-                    Ok(packet) => {
-                        let domain_mask = get_domain_mask(&packet);
-                        if (domain_mask & 0b0010) == 0 {
-                            return Err(Error::<T>::InvalidSvmPacket.into());
-                        }
-                    }
-                    Err(_) => {
-                        return Err(Error::<T>::InvalidSvmPacket.into());
-                    }
-                }
-            }
+            // Same rule as `submit_comit` above, for the same reason (X3-LANG-004).
+            Self::verify_domain_payloads(&evm_payload, &svm_payload)?;
 
             if !x3_payload.is_empty() {
                 // The X3 payload is the compiled program, and `T::X3Adapter` is the thing that
@@ -2358,6 +2304,32 @@ pub mod pallet {
                         max_combined: max_combined as u32,
                     },
                 ));
+            }
+            Ok(())
+        }
+
+        /// Validate every non-empty domain payload by asking the adapter that will execute it.
+        ///
+        /// A payload is the artifact its adapter runs: EVM bytecode for `T::EvmAdapter`, an eBPF
+        /// program for `T::SvmAdapter`, X3BC bytecode for `T::X3Adapter`. It is *not* a `Packet`:
+        /// packets are the cross-VM message layer's wire format, where an operation names a target
+        /// contract or program, and an adapter whose interface is `(payload, limit) -> receipt`
+        /// has nowhere to put that target. Every adapter therefore refuses a SCALE-encoded packet
+        /// by name instead of running it as code.
+        ///
+        /// This was a `deserialize_packet` + domain-bit check here, which accepted exactly the
+        /// payloads no adapter can execute and rejected the ones they can. Measured on the wasm
+        /// runtime 2026-09-26: a 124-byte `Packet::Evm(Call)` beginning `00 00 6b cb …` was run as
+        /// EVM code, halted on its own enum discriminant (`0x00` is EVM `STOP`) and was recorded as
+        /// `success: true` with a persisted receipt. Reports:
+        /// `.ai/reports/evm-payload-never-executed-20260926.md` and
+        /// `.ai/reports/evm-svm-payload-convention-20260926.md` (X3-LANG-004).
+        fn verify_domain_payloads(evm_payload: &[u8], svm_payload: &[u8]) -> DispatchResult {
+            if !evm_payload.is_empty() {
+                T::EvmAdapter::validate(evm_payload).map_err(|_| Error::<T>::InvalidEvmPacket)?;
+            }
+            if !svm_payload.is_empty() {
+                T::SvmAdapter::validate(svm_payload).map_err(|_| Error::<T>::InvalidSvmPacket)?;
             }
             Ok(())
         }

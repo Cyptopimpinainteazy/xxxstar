@@ -1953,6 +1953,15 @@ mod native_vm_adapters {
             if payload.is_empty() {
                 return Err(DispatchError::Other("Empty EVM payload"));
             }
+            // X3-LANG-004: the kernel validates an EVM payload by asking this adapter, and a
+            // payload is the artifact the adapter executes — bytecode. A SCALE-encoded `Packet` is
+            // a semantic operation, and Frontier would take it as init code and report success for
+            // the empty contract it creates, so it is refused by name here and in `execute`.
+            if pallet_x3_kernel::packet_adapters::payload_is_packet(payload) {
+                return Err(DispatchError::Other(
+                    "EVM payload is a SCALE-encoded Packet, not bytecode: this adapter cannot execute it",
+                ));
+            }
             // Basic validation - could add opcode validation here
             Ok(())
         }
@@ -2013,6 +2022,12 @@ mod native_vm_adapters {
         }
 
         fn validate(payload: &[u8]) -> Result<(), DispatchError> {
+            // Same rule as the EVM arm above (X3-LANG-004): a packet is not an eBPF program.
+            if pallet_x3_kernel::packet_adapters::payload_is_packet(payload) {
+                return Err(DispatchError::Other(
+                    "SVM payload is a SCALE-encoded Packet, not a program: this adapter cannot execute it",
+                ));
+            }
             let executor = RbpfSvmExecutor::new();
             executor
                 .validate_program(payload)

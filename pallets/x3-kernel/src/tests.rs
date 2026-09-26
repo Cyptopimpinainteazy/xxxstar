@@ -855,6 +855,11 @@ fn submit_comit_with_very_large_payloads_near_limit() {
 fn submit_comit_rejects_malformed_payloads_at_max_size() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(102);
+        // An all-zero 4 KiB buffer begins with `Packet`'s first discriminant, so it *is* a
+        // SCALE-encoded packet — and a packet is not bytecode, so the EVM slot refuses it by name
+        // (X3-LANG-004). This used to be refused with `InvalidSvmPacket` instead, because the
+        // kernel decoded the buffer as a packet and then found its domain bit did not match the
+        // SVM slot. The check order did not change; which check is first did.
         let payload = vec![0u8; 4_096];
         let fee = 26u128;
         let prepare_root = compute_prepare_root(comit_id, &payload, &payload, 0, fee);
@@ -864,10 +869,25 @@ fn submit_comit_rejects_malformed_payloads_at_max_size() {
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
                 payload.clone(),
-                payload,
+                payload.clone(),
                 0,
                 fee,
                 prepare_root,
+            ),
+            AtlasError::InvalidEvmPacket
+        );
+
+        // The same buffer on the SVM slot alone is still refused, with the SVM error.
+        let svm_only_root = compute_prepare_root(comit_id, &[], &payload, 0, 5u128);
+        assert_noop!(
+            AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                comit_id,
+                Vec::new(),
+                payload,
+                0,
+                5,
+                svm_only_root,
             ),
             AtlasError::InvalidSvmPacket
         );

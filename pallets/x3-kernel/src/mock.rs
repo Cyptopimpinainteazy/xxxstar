@@ -191,8 +191,21 @@ impl pallet_x3_kernel::EvmExecutorAdapter for TestEvmAdapter {
         Ok(21000)
     }
 
-    fn validate(_payload: &[u8]) -> Result<(), DispatchError> {
-        Ok(())
+    fn validate(payload: &[u8]) -> Result<(), DispatchError> {
+        // X3-LANG-004: the payload is the artifact the adapter executes. The chain's EVM adapter
+        // refuses a SCALE-encoded `Packet` by name, so this mock has to as well — otherwise a test
+        // could pass a payload every live chain refuses and still come out green.
+        if crate::packet_adapters::payload_is_packet(payload) {
+            return Err(DispatchError::Other(
+                "EVM payload is a SCALE-encoded Packet, not bytecode: this adapter cannot execute it",
+            ));
+        }
+        // Mirror the validator the live EVM adapter runs (`mini_evm::validate_evm`), so a fixture
+        // this mock accepts is a fixture the chain accepts too. A permissive mock here is exactly
+        // how the payload convention went unnoticed: every kernel test passed a packet that no
+        // live chain will execute.
+        x3_evm_integration::mini_evm::validate_evm(payload)
+            .map_err(|_| DispatchError::Other("EVM validation failed"))
     }
 }
 
@@ -235,8 +248,16 @@ impl pallet_x3_kernel::SvmExecutorAdapter for TestSvmAdapter {
         })
     }
 
-    fn validate(_payload: &[u8]) -> Result<(), DispatchError> {
-        Ok(())
+    fn validate(payload: &[u8]) -> Result<(), DispatchError> {
+        // Same rule as `TestEvmAdapter::validate` above, for the SVM domain (X3-LANG-004).
+        if crate::packet_adapters::payload_is_packet(payload) {
+            return Err(DispatchError::Other(
+                "SVM payload is a SCALE-encoded Packet, not a program: this adapter cannot execute it",
+            ));
+        }
+        // Same rule as `TestEvmAdapter::validate` above: mirror the live SVM program validator.
+        x3_svm_integration::interp_validate_program(payload)
+            .map_err(|_| DispatchError::Other("SVM validation failed"))
     }
 }
 

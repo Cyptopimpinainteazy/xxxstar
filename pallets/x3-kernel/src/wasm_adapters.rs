@@ -74,6 +74,15 @@ impl EvmExecutorAdapter for WasmEvmAdapter {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty EVM payload"));
         }
+        // X3-LANG-004: the kernel now asks *this* component whether a payload is valid, so the
+        // refusal has to live here as well as in `execute`. `validate_evm` on its own would accept
+        // a packet — it only checks non-empty, EIP-170 size and the `0xEF` prefix — and the kernel
+        // would then take a packet as validated bytecode.
+        if crate::packet_adapters::payload_is_packet(payload) {
+            return Err(DispatchError::Other(
+                "EVM payload is a SCALE-encoded Packet, not bytecode: this adapter cannot execute it",
+            ));
+        }
         x3_evm_integration::mini_evm::validate_evm(payload)
             .map_err(|_| DispatchError::Other("EVM validation failed"))
     }
@@ -174,6 +183,13 @@ impl SvmExecutorAdapter for WasmSvmAdapter {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty SVM payload"));
         }
+        // Same as the EVM arm above: `interp_validate_program` happens to reject the 124-byte packet
+        // as malformed, but the reason has to be named rather than left to a length accident.
+        if crate::packet_adapters::payload_is_packet(payload) {
+            return Err(DispatchError::Other(
+                "SVM payload is a SCALE-encoded Packet, not a program: this adapter cannot execute it",
+            ));
+        }
         x3_svm_integration::interp_validate_program(payload)
             .map_err(|_| DispatchError::Other("SVM validation failed"))
     }
@@ -250,20 +266,34 @@ mod an_accepted_evm_payload_is_refused {
     ///                  validate -> Ok(())
     /// ```
     ///
-    /// The adapter refuses a packet by name now. When the payload convention is settled — packets
-    /// translated into work, or the payload becoming the code itself — this test should assert that
-    /// the payload *executes* instead of being refused; see
-    /// `.ai/reports/evm-payload-never-executed-20260926.md`.
+    /// The adapter refuses a packet by name now, and the payload convention is settled the other
+    /// way (X3-LANG-004, 2026-09-26): a payload **is** the artifact the adapter executes, so the
+    /// fixture here is an explicit packet — the shape the kernel used to accept — while the tests
+    /// below run the bytecode an EVM payload is supposed to be. Reports:
+    /// `.ai/reports/evm-payload-never-executed-20260926.md`,
+    /// `.ai/reports/evm-svm-payload-convention-20260926.md`.
     #[test]
     fn an_accepted_evm_payload_is_refused_rather_than_reported_as_success() {
-        let payload = crate::test_helpers::wrap_evm_payload(&[0xAAu8; 64]);
+        use x3_packet_schema::{EvmPacket, Packet};
+        let payload = Packet::Evm(EvmPacket::Call {
+            contract: [0x11u8; 20],
+            function_selector: [0xaa, 0xbb, 0xcc, 0xdd],
+            args: vec![0xAAu8; 64],
+            value: x3_packet_schema::U256::from(0),
+        })
+        .encode();
         assert!(
             !payload.is_empty(),
             "the fixture has to be a payload the kernel accepts"
         );
         assert!(
             crate::packet_adapters::deserialize_packet(&payload).is_ok(),
-            "the fixture must pass the same validation submit_comit_v2 applies"
+            "the fixture has to be a packet, which is what the old validation accepted"
+        );
+        assert_eq!(
+            payload.first().copied(),
+            Some(0x00),
+            "SCALE puts the enum discriminant first, and `0x00` is EVM STOP"
         );
 
         match WasmEvmAdapter::execute(&payload, 6_000_000) {
@@ -278,12 +308,27 @@ mod an_accepted_evm_payload_is_refused {
                 receipt.success, receipt.gas_used
             ),
         }
+        // `validate` is the gate the kernel actually calls now, so it has to refuse by the same
+        // name — otherwise a packet would pass validation and only fail later, at execution.
+        match WasmEvmAdapter::validate(&payload) {
+            Err(DispatchError::Other(msg)) => assert!(
+                msg.contains("Packet, not bytecode"),
+                "`validate` has to name the reason, got: {msg}"
+            ),
+            other => panic!("`validate` has to refuse the packet, got: {other:?}"),
+        }
     }
 
     /// The SVM arm, same boundary: a packet is not a program, and the refusal says so.
     #[test]
     fn an_accepted_svm_payload_is_refused_by_name() {
-        let payload = crate::test_helpers::wrap_svm_payload(&[0xBBu8; 64]);
+        use x3_packet_schema::{Packet, SvmPacket};
+        let payload = Packet::Svm(SvmPacket::Invoke {
+            program_id: [0x22u8; 32],
+            accounts: Vec::new(),
+            data: vec![0xBBu8; 64],
+        })
+        .encode();
         assert!(crate::packet_adapters::deserialize_packet(&payload).is_ok());
         match WasmSvmAdapter::execute(&payload, 500_000) {
             Err(DispatchError::Other(msg)) => assert!(
@@ -297,5 +342,47 @@ mod an_accepted_evm_payload_is_refused {
                 receipt.success, receipt.gas_used
             ),
         }
+        match WasmSvmAdapter::validate(&payload) {
+            Err(DispatchError::Other(msg)) => assert!(
+                msg.contains("Packet, not a program"),
+                "`validate` has to name the reason, got: {msg}"
+            ),
+            other => panic!("`validate` has to refuse the packet, got: {other:?}"),
+        }
+    }
+
+    /// The other direction, measured in the same run: the artifact an EVM payload is supposed to
+    /// be — bytecode — is executed. Without this, the refusals above could be satisfied by an
+    /// adapter that refuses everything.
+    #[test]
+    fn evm_bytecode_that_is_not_a_packet_executes() {
+        let code = crate::test_helpers::wrap_evm_payload(&[0xAAu8; 64]);
+        assert!(
+            !crate::packet_adapters::payload_is_packet(&code),
+            "the fixture has to be bytecode, not a packet"
+        );
+        let receipt = WasmEvmAdapter::execute(&code, 6_000_000).expect("bytecode has to execute");
+        assert!(
+            receipt.success,
+            "`PUSH1 0; PUSH1 0; RETURN` halts successfully"
+        );
+        assert!(receipt.gas_used > 0, "execution has to charge for the work");
+    }
+
+    /// The SVM arm of the same direction: an eBPF program runs.
+    #[test]
+    fn svm_program_that_is_not_a_packet_executes() {
+        let program = crate::test_helpers::wrap_svm_payload(&[0xBBu8; 8]);
+        assert!(
+            !crate::packet_adapters::payload_is_packet(&program),
+            "the fixture has to be a program, not a packet"
+        );
+        let receipt =
+            <WasmSvmAdapter as crate::adapters::SvmExecutorAdapter>::execute(&program, 500_000)
+                .expect("an eBPF program has to execute");
+        assert!(
+            receipt.success,
+            "`MOV64_IMM r0, …; EXIT` returns successfully"
+        );
     }
 }
