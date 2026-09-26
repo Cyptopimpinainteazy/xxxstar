@@ -16,7 +16,9 @@ pub trait ReviewerRegistry {
             return 0;
         }
         // ceil(2/3 * total): 2-of-3, 3-of-4, 4-of-5, etc.
-        (total * 2 + 2) / 3
+        // `div_ceil`, not `(total * 2 + 2) / 3`: same value for every usize, and
+        // clippy's `manual_div_ceil` fires on the latter under `-D warnings`.
+        (total * 2).div_ceil(3)
     }
 }
 

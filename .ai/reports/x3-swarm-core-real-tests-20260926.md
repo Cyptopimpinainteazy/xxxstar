@@ -60,20 +60,30 @@ $ python3 scripts/check-registry-tests-are-gated.py
 
 $ python3 scripts/x3_audit_matrix.py && python3 scripts/x3_audit_matrix.py --check
   x3-audit-matrix check PASS: artifacts match their sources
+
+$ env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-core cargo clippy --locked --all-targets \
+      --manifest-path crates/x3-swarm-core/Cargo.toml -- -D warnings
+  Finished `dev` profile (exit 0)
 ```
+
+## Also fixed here (found while verifying this change)
+
+`crates/x3-swarm-core/src/policy.rs:19` did not compile under
+`cargo clippy -- -D warnings`: `manual_div_ceil` — the 2/3 security-council quorum
+threshold was written `(total * 2 + 2) / 3`. It is pre-existing (2026-09-03 baseline)
+and invisible to CI, because the nested workspace has no clippy gate in
+`scripts/local-ci.sh` — only `test x3-swarm-core` runs there, and `cargo test` does
+not run clippy. Changed to `(total * 2).div_ceil(3)`: the same value for every
+`usize` (checked for all `n` in `0..100000`, 0 mismatches), and the crate now exits 0
+under the full `--all-targets -- -D warnings` lint.
 
 ## Findings left open (not fixed here)
 
-1. `crates/x3-swarm-core/src/policy.rs:19` does not compile under
-   `cargo clippy -- -D warnings`:
-   `manual_div_ceil` — `(total * 2 + 2) / 3` should be `(total * 2).div_ceil(3)`.
-   This is pre-existing (from the 2026-09-03 baseline) and invisible to CI because
-   the nested workspace has no clippy gate in `scripts/local-ci.sh`; only `test
-   x3-swarm-core` runs there. The new test target itself is lint-clean (measured:
-   `cargo clippy --locked --all-targets ... -- -D warnings -A clippy::manual_div_ceil`
-   exits 0).
-2. The remaining `[x3_swarm_core]` blocker stands: no multi-agent
+1. The remaining `[x3_swarm_core]` blocker stands: no multi-agent
    race-condition or partition-tolerance testing exists.
-3. `services/x3-swarm-api` and `services/x3-swarm-worker` are still `cargo check`
+2. `services/x3-swarm-api` and `services/x3-swarm-worker` are still `cargo check`
    only — they declare no tests, so the swarm control plane has no service-level
    coverage.
+3. The nested swarm workspace has no clippy gate, which is how the `manual_div_ceil`
+   failure above survived two years of green CI. Propose, do not silently add: a
+   `clippy x3-swarm-core` entry in `scripts/local-ci.sh` alongside `test x3-swarm-core`.
