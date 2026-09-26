@@ -2936,19 +2936,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 54,
+      "composite": 67,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
         "note: Trading Core v1 gap #3"
       ],
       "id": "X3-LANG-007",
-      "implemented": 70,
+      "implemented": 80,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 45,
       "missing_work": [
-        "Needs real stateful verifier"
+        "Re-measured 2026-09-26: the row's blocker (\"Needs real stateful verifier\") was stale. `verify_trading_sequences` (x3-lang/compiler/src/verify.rs) walks the flat operation list with `open_debts`/`closed_debts` and refuses, by name, a commit with an open debt, a close for a debt that was never opened, a second close of one debt, a repay before its borrow, and an operation after the commit. It is called from `verify_ir`, which `ir_level_errors` calls from `run_pre_emission_layers_with_context` and from lowering, so it guards the real compile path and nested `atomic` bodies \u2014 it is not test-only.",
+        "What that does not establish: the rule set is one hand-written state machine with no independent second implementation to disagree with it, no property/fuzz test over generated operation sequences, and no proof that the same refusal happens when a hostile IR arrives from a network peer rather than from the local compiler."
       ],
       "name": "Stateful trading IR verifier",
       "paths": [
@@ -2959,8 +2960,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 70,
-      "tests": "tested score 70% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4445,7 +4446,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "2345c2df65a620a731e0d8b040103daad0bd6d6dc88c1e335c427a22a00237f5",
+    "source_digest": "cc6e3f2ef5369d68fb62032ad7bbb18e2c86922da4f7e6f74955978264d715df",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
@@ -4456,7 +4457,7 @@
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
-      "feature-matrix/language-trading.toml": "d0b411e31669d913ace7d2913cf2bc7b4cf38e8d46f424ab07dba7e3f4329cee",
+      "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "7234ed3bbc554956fa01831ae4cd2d05f18e094ac0407228dd6eccb5794a64c7",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",

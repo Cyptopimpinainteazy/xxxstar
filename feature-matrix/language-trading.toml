@@ -208,14 +208,30 @@ name = "Stateful trading IR verifier"
 subsystem = "language_trading"
 source = "master"
 paths = ["x3-lang/compiler"]
-implemented = 70
-tested = 70
-mainnet_ready = 30
+implemented = 80
+tested = 85
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs real stateful verifier"]
+blockers = [
+  "Re-measured 2026-09-26: the row's blocker (\"Needs real stateful verifier\") was stale. `verify_trading_sequences` (x3-lang/compiler/src/verify.rs) walks the flat operation list with `open_debts`/`closed_debts` and refuses, by name, a commit with an open debt, a close for a debt that was never opened, a second close of one debt, a repay before its borrow, and an operation after the commit. It is called from `verify_ir`, which `ir_level_errors` calls from `run_pre_emission_layers_with_context` and from lowering, so it guards the real compile path and nested `atomic` bodies — it is not test-only.",
+  "What that does not establish: the rule set is one hand-written state machine with no independent second implementation to disagree with it, no property/fuzz test over generated operation sequences, and no proof that the same refusal happens when a hostile IR arrives from a network peer rather than from the local compiler.",
+]
+required_tests = [
+  "rejects_commit_with_an_open_debt",
+  "rejects_close_debt_before_it_was_opened",
+  "rejects_close_debt_twice",
+  "rejects_repay_before_borrow",
+  "rejects_swap_after_bridge",
+  "the_operations_a_hyperarb_lowers_to_pass_the_structural_verifier",
+]
+test_evidence = [
+  "x3-lang/compiler/tests/test_ir_verifier.rs",
+  "note: 42 tests pass; the three debt-sequence cases above assert *which* rule fired by matching the verifier's diagnostic message, so they cannot pass because of an unrelated refusal",
+  "note: `cargo test --manifest-path x3-lang/Cargo.toml -p x3-lang-compiler --test test_ir_verifier` -> test result: ok. 42 passed; 0 failed; 0 ignored",
+]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #3"]
 
 [[feature]]
