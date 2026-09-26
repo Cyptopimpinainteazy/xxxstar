@@ -349,17 +349,37 @@ impl UnifiedProof {
             result.add_error("Atomic VM proof validation failed".to_string());
         }
 
-        // Validate attestations
+        // Validate attestations.
+        //
+        // An empty set is a warning, not an error, because the aggregator's flow is submit-first,
+        // attest-later: `submit_proof` accepts a proof into `Collecting` and only `add_attestation`
+        // moves it, and that only at `finality_threshold`. So "no attestations yet" is a proof with
+        // nothing to attest *yet*, and `is_valid` here means "nothing malformed" rather than
+        // "attested" — which the warning says out loud. What a caller must not read as an
+        // attestation is a signature, and that is the check below.
         if self.gpu_attestations.is_empty() {
-            result.add_warning("No GPU attestations in proof".to_string());
+            result.add_warning(
+                "No GPU attestations in proof: nothing is attested, and the aggregator cannot \
+                 finalize it"
+                    .to_string(),
+            );
         }
 
         for attestation in &self.gpu_attestations {
             if attestation.validator_id == [0u8; 32] {
                 result.add_error("Invalid validator_id in attestation".to_string());
             }
-            if attestation.signature.is_empty() {
-                result.add_error("Empty signature in attestation".to_string());
+            // A signature is `r || s || recovery`, the shape `ProofAggregator` verifies against a
+            // registered key. This check used to be `is_empty()`, which accepted `vec![1, 2, 3, 4]`
+            // as an attestation — so `is_valid` reported evidence where a placeholder sat, and the
+            // aggregator would have refused the same bytes one call later. Key ownership is not
+            // decidable here (the public keys live in the aggregator); the shape is.
+            if attestation.signature.len() != crate::crypto::SIGNATURE_LENGTH {
+                result.add_error(format!(
+                    "Malformed signature in attestation: expected {} bytes, found {}",
+                    crate::crypto::SIGNATURE_LENGTH,
+                    attestation.signature.len()
+                ));
             }
         }
 
@@ -536,5 +556,69 @@ mod tests {
         let result = proof.validate();
         // Should have warning about no consensus, error about merkle proof validation
         assert!(!result.errors.is_empty());
+    }
+
+    fn attestation_proof(signature: Vec<u8>) -> UnifiedProof {
+        let header = ProofHeader::new([1u8; 32], 100, [2u8; 32]);
+        let atomic_vm_proof = AtomicVmProof {
+            receipt_root: [3u8; 32],
+            finality_cert: [4u8; 32],
+            leg_count: 1,
+            finality_cert_data: vec![1, 2, 3],
+        };
+        let mut proof = UnifiedProof::new(header, atomic_vm_proof, 10).expect("valid atomic proof");
+        let receipt = GpuReceipt {
+            kernel_hash: [5u8; 32],
+            input_commitment: [6u8; 32],
+            output_commitment: [7u8; 32],
+            gpu_cycles_used: 1,
+            device_class: crate::gpu_receipt::GpuClass::DataCenter,
+            executor: [8u8; 32],
+            proof_type: ProofType::RecomputeA,
+        };
+        proof
+            .add_attestation(GpuValidatorAttestation {
+                validator_id: [8u8; 32],
+                receipt,
+                signature,
+                device_index: 0,
+                proof_type: ProofType::RecomputeA,
+                timestamp: 1,
+                execution_latency_ms: 1,
+            })
+            .expect("one attestation per validator");
+        proof
+    }
+
+    /// A signature is only a signature in the shape this crate's verifier reads.
+    ///
+    /// `validate` used to accept any non-empty signature, so `vec![1, 2, 3, 4]` made `is_valid`
+    /// true — a placeholder reported as evidence, on bytes `ProofAggregator::verify_attestations`
+    /// would refuse one call later. This is the regression test for that gap.
+    #[test]
+    fn validate_refuses_a_signature_that_is_not_the_shape_the_verifier_reads() {
+        let placeholder = attestation_proof(vec![1, 2, 3, 4]);
+        let result = placeholder.validate();
+        assert!(
+            !result.is_valid,
+            "four bytes is not an attestation, whatever it is not empty of"
+        );
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.contains("expected 65") && e.contains("found 4")),
+            "the refusal has to name both lengths so the caller can tell what was wrong: {:?}",
+            result.errors
+        );
+
+        let well_formed = attestation_proof(vec![0u8; crate::crypto::SIGNATURE_LENGTH]);
+        let result = well_formed.validate();
+        assert!(
+            result.is_valid,
+            "a 65-byte signature is structurally acceptable here; who owns the key is the \
+             aggregator's question, not this one: {:?}",
+            result.errors
+        );
     }
 }

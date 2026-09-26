@@ -2584,7 +2584,8 @@
       "confidence": "high",
       "evidence": [
         "crates/x3-gpu-validator-swarm",
-        "note: Honest audit describes divergence detection, replay, quarantine, CPU fallback"
+        "note: Honest audit describes divergence detection, replay, quarantine, CPU fallback",
+        "note: 2026-09-25 - the structural validator accepted placeholder signatures as attestations and the crate's tests ran nowhere"
       ],
       "id": "X3-GPU-013",
       "implemented": 75,
@@ -2592,6 +2593,9 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 50,
       "missing_work": [
+        "**CLOSED 2026-09-25 \u2014 `UnifiedProof::validate()` called any non-empty bytes an attestation.** `proof_integration.rs` asserted `is_valid` for proofs whose attestation signature was `vec![1, 2, 3, 4]` and `vec![9, 9, 9]`, while the crate's own verifier \u2014 `ProofAggregator::signature_from_bytes`, then `verify_attestations` against a registered public key \u2014 refuses anything that is not 65 bytes (`r || s || recovery`). A caller who only saw `ProofValidationResult::is_valid` was told a placeholder was evidence. The check now requires `crypto::SIGNATURE_LENGTH`, one named constant shared with the verifier so the two cannot drift, and it is measured load-bearing: reverting it to `is_empty()` turns exactly `validate_refuses_a_signature_that_is_not_the_shape_the_verifier_reads` red (110 passed, 1 failed, file restored).",
+        "An empty attestation set stays a *warning*, on purpose, because the aggregator's flow is submit-first: `test_submit_proof` submits an unattested proof and expects it collected, and only `add_attestation` past `finality_threshold` moves the entry. `an_unattested_proof_is_collected_but_never_finalized` pins the other half \u2014 silence never becomes finality.",
+        "Still open: `GpuReceiptValidator::verify_signature` is a real Ed25519 verification over the receipt hash that **nothing calls** \u2014 it is defined and re-exported from `lib.rs`, and no path in this repository invokes it, so receipt-level signature checking is dead code rather than a control. It also uses a second signing convention (`pubkey || sig`, 96 bytes) where the aggregator uses `r || s || recovery` (65), and the two have never been reconciled.",
         "Needs real GPU failure injection"
       ],
       "name": "GPU divergence quarantine / fallback",
@@ -4381,7 +4385,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "26d5b7f22ddc3c746249ca2834d0a9fe0765e35dc881ce78366dd831783ad3d7",
+    "source_digest": "630aca041c7d07b25c4673e9a9df7cb67db16bb7d26eadcdb342528a635c7ccf",
     "sources": {
       "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
       "FEATURE_REGISTRY.toml": "0904b8179e9168aa5739c75e81309aa771f0893a38e15935551ad825dd58e955",
@@ -4391,7 +4395,7 @@
       "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
       "feature-matrix/cross-vm-atomic.toml": "bb43674a4bc6f2d3ca9c6af54eff3f40f509612377b0f9fd095ec956a054ef5f",
       "feature-matrix/economic-defi.toml": "34d83bfb027c88042f7b6f88b0552f2d6a4428c798360ccb432a893cf1b67743",
-      "feature-matrix/gpu-performance.toml": "f9e7b016703312a764d98ab39a652a255858495daae45d4430bc2db85716075a",
+      "feature-matrix/gpu-performance.toml": "e8ee0032511dea19438afd4e9ed78b228e8b121c4c61855d2583b7d20cf7262f",
       "feature-matrix/language-trading.toml": "3d3fc065467efb1a9f90305f4add9d6b275ac262f0ecf2da9aed61a5ff16f0fc",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
       "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",

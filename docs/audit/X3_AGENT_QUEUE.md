@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `26d5b7f22ddc3c74…` — the artifacts move when
+Source digest: `630aca041c7d07b2…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -132,7 +132,7 @@ fails when they do not match.
 | MTX-X3-GPU-010 | gpu_performance | Single-authority finalized TPS baseline: Single-authority result cannot stand in for production network | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 90% (no named test list on this row) | open |
 | MTX-X3-GPU-011 | gpu_performance | WGPU accelerator backend: Needs real physical GPU CI/run evidence | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 55% (no named test list on this row) | open |
 | MTX-X3-GPU-012 | gpu_performance | WGPU SHA-256 compute kernel: No production validator GPU benchmark yet | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 55% (no named test list on this row) | open |
-| MTX-X3-GPU-013 | gpu_performance | GPU divergence quarantine / fallback: Needs real GPU failure injection | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 65% (no named test list on this row) | open |
+| MTX-X3-GPU-013 | gpu_performance | GPU divergence quarantine / fallback: **CLOSED 2026-09-25 — `UnifiedProof::validate()` called any non-empty bytes an attestation.** `proof_integration.rs` asserted `is_valid` for proofs whose attestation signature was `vec![1, 2, 3, 4]` and `vec![9, 9, 9]`, while the crate's ow… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 65% (no named test list on this row) | open |
 | MTX-X3-GPU-014 | gpu_performance | x3-accel backend abstraction: Real accelerator coverage is incomplete | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 75% (no named test list on this row) | open |
 | MTX-X3-GPU-015 | gpu_performance | Benchmark regression CI gate: Need benchmark corpus tied to launch SLOs | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 75% (no named test list on this row) | open |
 | MTX-X3-GPU-016 | gpu_performance | GPU Blake2b batching: No verified accelerator kernel | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | STUB · tested score 10% (no named test list on this row) | open |

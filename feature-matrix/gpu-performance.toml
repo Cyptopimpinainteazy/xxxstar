@@ -208,8 +208,17 @@ priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Needs real GPU failure injection"]
-evidence = ["crates/x3-gpu-validator-swarm", "note: Honest audit describes divergence detection, replay, quarantine, CPU fallback"]
+blockers = [
+  "**CLOSED 2026-09-25 — `UnifiedProof::validate()` called any non-empty bytes an attestation.** `proof_integration.rs` asserted `is_valid` for proofs whose attestation signature was `vec![1, 2, 3, 4]` and `vec![9, 9, 9]`, while the crate's own verifier — `ProofAggregator::signature_from_bytes`, then `verify_attestations` against a registered public key — refuses anything that is not 65 bytes (`r || s || recovery`). A caller who only saw `ProofValidationResult::is_valid` was told a placeholder was evidence. The check now requires `crypto::SIGNATURE_LENGTH`, one named constant shared with the verifier so the two cannot drift, and it is measured load-bearing: reverting it to `is_empty()` turns exactly `validate_refuses_a_signature_that_is_not_the_shape_the_verifier_reads` red (110 passed, 1 failed, file restored).",
+  "An empty attestation set stays a *warning*, on purpose, because the aggregator's flow is submit-first: `test_submit_proof` submits an unattested proof and expects it collected, and only `add_attestation` past `finality_threshold` moves the entry. `an_unattested_proof_is_collected_but_never_finalized` pins the other half — silence never becomes finality.",
+  "Still open: `GpuReceiptValidator::verify_signature` is a real Ed25519 verification over the receipt hash that **nothing calls** — it is defined and re-exported from `lib.rs`, and no path in this repository invokes it, so receipt-level signature checking is dead code rather than a control. It also uses a second signing convention (`pubkey || sig`, 96 bytes) where the aggregator uses `r || s || recovery` (65), and the two have never been reconciled.",
+  "Needs real GPU failure injection",
+]
+test_evidence = [
+  "note: the two regression tests are crates/x3-gpu-validator-swarm/src/unified_proof.rs (validate refuses a 4-byte signature, naming both lengths) and src/proof_aggregator.rs (an unattested proof is collected, never finalized), on 2026-09-25",
+  "note: the crate is gated by `test x3-gpu-validator-swarm` (added 2026-09-25 — it had no gate): 111 lib tests plus its integration suites, all green",
+]
+evidence = ["crates/x3-gpu-validator-swarm", "note: Honest audit describes divergence detection, replay, quarantine, CPU fallback", "note: 2026-09-25 - the structural validator accepted placeholder signatures as attestations and the crate's tests ran nowhere"]
 
 [[feature]]
 id = "X3-GPU-014"

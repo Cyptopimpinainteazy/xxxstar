@@ -93,9 +93,10 @@ impl ProofAggregator {
     }
 
     fn signature_from_bytes(signature: &[u8]) -> SwarmResult<crate::crypto::SignatureOutput> {
-        if signature.len() != 65 {
+        if signature.len() != crate::crypto::SIGNATURE_LENGTH {
             return Err(SwarmError::VerificationFailed(format!(
-                "Invalid signature length: expected 65, got {}",
+                "Invalid signature length: expected {}, got {}",
+                crate::crypto::SIGNATURE_LENGTH,
                 signature.len()
             )));
         }
@@ -603,5 +604,46 @@ mod tests {
         // Retrieve finalized proof
         let finalized_proof = aggregator.get_proof(proof_hash).unwrap();
         assert!(finalized_proof.validate().is_valid);
+    }
+
+    /// Absence of attestation is collected, never finalized.
+    ///
+    /// `UnifiedProof::validate` treats an empty attestation set as a warning, because the flow is
+    /// submit-first and attest-later. That is only safe if silence can never become assent, so this
+    /// pins the property: a proof nobody has attested to sits in `Collecting` at count 0, the
+    /// aggregator's own state says `Collecting`, and it reports the missing evidence.
+    #[test]
+    fn an_unattested_proof_is_collected_but_never_finalized() {
+        let mut aggregator = ProofAggregator::new(10);
+        let proof = create_test_proof([1u8; 32], 100);
+        let proof_hash = proof.proof_hash();
+        let validation = proof.validate();
+        assert!(
+            validation.is_valid,
+            "nothing is malformed about a proof before it is attested: {:?}",
+            validation.errors
+        );
+        assert!(
+            validation
+                .warnings
+                .iter()
+                .any(|w| w.contains("No GPU attestations")),
+            "and it has to say so rather than pass silently: {:?}",
+            validation.warnings
+        );
+
+        aggregator
+            .submit_proof(proof)
+            .expect("a structurally sound proof is collected");
+
+        let (state, votes, _) = aggregator.get_aggregation_state(proof_hash).unwrap();
+        assert_eq!(state, AggregationState::Collecting);
+        assert_eq!(votes, 0, "nobody has attested");
+
+        let stats = aggregator.get_stats();
+        assert_eq!(stats.total_proofs, 1);
+        assert_eq!(stats.collecting, 1);
+        assert_eq!(stats.finalized, 0);
+        assert_eq!(stats.byzantine_finalized, 0, "silence is never finality");
     }
 }

@@ -338,6 +338,14 @@ GATES_FAST=(
   # include the Merkle-proof guards (`test_verify_empty_merkle_proof`,
   # `test_verify_too_short_merkle_proof`); a warm run is seconds, a cold one about a minute.
   "test x3-cross-vm-bridge:cargo test -p x3-cross-vm-bridge"
+  # `x3-gpu-validator-swarm` decides whether a GPU validator's attestation is acceptable, and
+  # nothing ran its tests: no gate named it, and it is not a crate `FEATURE_REGISTRY.toml` cites, so
+  # `registry tests are gated` did not reach it either. Its `UnifiedProof::validate()` accepted any
+  # non-empty signature as an attestation — two tests asserted `is_valid` on `vec![1, 2, 3, 4]` —
+  # while the crate's own verifier refuses anything that is not 65 bytes and then checks the key.
+  # The check requires the verifier's shape now, measured load-bearing, and this gate keeps the
+  # suite (111 lib tests plus its integration suites) running.
+  "test x3-gpu-validator-swarm:cargo test -p x3-gpu-validator-swarm"
   # `pallet-x3-supply-ledger` holds the king invariant — represented supply never exceeds the
   # canonical ceiling — and its suite was in no gate list either. It also had no mock runtime at all
   # until 2026-09-25: the S0-1 tests build `SupplyLedger` structs by hand, so the three transition

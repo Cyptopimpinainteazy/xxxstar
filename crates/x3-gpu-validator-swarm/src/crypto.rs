@@ -49,6 +49,13 @@ impl Default for HashOutput {
     }
 }
 
+/// Byte length of an encoded validator signature: `r || s || recovery`.
+///
+/// This is what `SigningKey::sign(..).to_bytes()` writes and what
+/// `ProofAggregator::signature_from_bytes` reads. Both sides use this constant so they cannot
+/// drift, and so a structural check can tell "a signature" from "some bytes".
+pub const SIGNATURE_LENGTH: usize = 65;
+
 /// Signature output (64 bytes + recovery byte)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignatureOutput {

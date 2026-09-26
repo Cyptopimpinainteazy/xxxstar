@@ -323,7 +323,9 @@ mod tests {
         let executor = [99u8; 32];
         let receipt = execution_result_to_receipt(&result, executor, 0).unwrap();
         let bundle_id = [11u8; 32];
-        let signature = vec![1, 2, 3, 4];
+        // The shape the aggregator verifies. Authenticity is decided there, against a registered
+        // public key; this test is about the proof a validator builds, not about who can sign it.
+        let signature = vec![1u8; crate::crypto::SIGNATURE_LENGTH];
 
         let proof = create_unified_proof(&result, receipt, signature, bundle_id, 100, 10).unwrap();
 
@@ -351,7 +353,7 @@ mod tests {
         let proof = orchestra_evidence_to_unified_proof(
             &evidence,
             [7u8; 32],
-            vec![9, 9, 9],
+            vec![9u8; crate::crypto::SIGNATURE_LENGTH],
             [3u8; 32],
             42,
             5,
