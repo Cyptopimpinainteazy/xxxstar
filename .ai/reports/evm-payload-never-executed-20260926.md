@@ -64,7 +64,7 @@ operation from one that was never attempted.
   settlement engine, not through `submit_comit_v2`'s EVM arm.
 * No test asserts that an accepted EVM payload produced an effect.
 
-## Regression test (KNOWN-RED, deliberately)
+## Regression test (was KNOWN-RED, now green)
 
 `pallets/x3-kernel/src/wasm_adapters.rs`:
 `accepted_evm_payload_must_execute::an_accepted_evm_payload_is_executed_or_refused_never_reported_as_success`
@@ -78,7 +78,30 @@ the adapter reported success for a payload it cannot have executed: the packet s
 discriminant (0x00), which is EVM STOP
 ```
 
-**Acceptance criterion for the fix: that test passes when un-ignored.**
+**The acceptance criterion is met: both regression tests now pass.**
+
+## The fix applied here
+
+`pallets/x3-kernel/src/packet_adapters.rs` gains one predicate, next to the packet layer it belongs to:
+
+```rust
+pub fn payload_is_packet(payload: &[u8]) -> bool { deserialize_packet(payload).is_ok() }
+```
+
+and all four adapter sites refuse a packet by name rather than running it as code:
+
+| site | before | after |
+|---|---|---|
+| `wasm_adapters::WasmEvmAdapter` | `Ok(success: true, gas_used: 22576)` for a packet | `Err("EVM payload is a SCALE-encoded Packet, not bytecode: this adapter cannot execute it")` |
+| `wasm_adapters::WasmSvmAdapter` | failed as `SVM execution failed` (by accident of decoding) | refused with the reason |
+| `runtime::native_vm_adapters::NativeEvmAdapter` | Frontier's `create` ran the packet as init code and reported success for an empty contract | refused |
+| `runtime::native_vm_adapters::NativeSvmAdapter` | same shape | refused |
+
+Before/after is measured, not asserted: the EVM test failed with *"the adapter reported success for a
+payload it cannot have executed"* before the guard and passes after it. Both tests run in
+`test x3-kernel` now — no `#[ignore]`.
+
+## What remains open (the integration, not the safety)
 
 ## What the fix has to decide
 

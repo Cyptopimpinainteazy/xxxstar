@@ -1816,6 +1816,16 @@ mod native_vm_adapters {
 
     impl EvmExecutorAdapter for NativeEvmAdapter {
         fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+            // The kernel's non-empty EVM payload is a SCALE-encoded `Packet`, and Frontier would
+            // treat those bytes as init code: the packet's discriminant `0x00` is `STOP`, so `create`
+            // reports success for an empty contract and the chain stores a receipt for work that
+            // never happened. Refuse instead — see `payload_is_packet`.
+            if pallet_x3_kernel::packet_adapters::payload_is_packet(payload) {
+                return Err(DispatchError::Other(
+                    "EVM payload is a SCALE-encoded Packet, not bytecode: this adapter cannot execute it",
+                ));
+            }
+
             // Use Frontier's Runner directly for real EVM execution
             let source = H160::zero(); // System caller
             let target = H160::zero(); // Default target (for create, this is ignored)
@@ -1986,6 +1996,12 @@ mod native_vm_adapters {
         fn execute(payload: &[u8], compute_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
             if payload.is_empty() {
                 return Err(DispatchError::Other("Empty SVM payload"));
+            }
+            // Same reason as the native EVM arm: a packet is not a program.
+            if pallet_x3_kernel::packet_adapters::payload_is_packet(payload) {
+                return Err(DispatchError::Other(
+                    "SVM payload is a SCALE-encoded Packet, not a program: this adapter cannot execute it",
+                ));
             }
 
             let executor = RbpfSvmExecutor::new();

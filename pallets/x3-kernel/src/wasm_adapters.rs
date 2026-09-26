@@ -27,6 +27,14 @@ impl EvmExecutorAdapter for WasmEvmAdapter {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty EVM payload"));
         }
+        // The kernel hands this adapter SCALE-encoded packets, and a packet is not EVM code: its first
+        // byte is the enum discriminant `0x00`, which is `STOP`, so running it halts immediately and
+        // reports success. Refusing is the only honest answer until the payload convention is settled.
+        if crate::packet_adapters::payload_is_packet(payload) {
+            return Err(DispatchError::Other(
+                "EVM payload is a SCALE-encoded Packet, not bytecode: this adapter cannot execute it",
+            ));
+        }
         let evm_config = x3_evm_integration::EvmConfig {
             gas_limit,
             ..x3_evm_integration::EvmConfig::default()
@@ -82,6 +90,14 @@ impl SvmExecutorAdapter for WasmSvmAdapter {
     fn execute(payload: &[u8], compute_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty SVM payload"));
+        }
+        // Same reason as the EVM arm above: a packet is not eBPF, so it cannot be executed here.
+        // Today this path fails anyway (`SVM execution failed`); refusing by name makes the reason
+        // the payload convention rather than a decoding accident.
+        if crate::packet_adapters::payload_is_packet(payload) {
+            return Err(DispatchError::Other(
+                "SVM payload is a SCALE-encoded Packet, not a program: this adapter cannot execute it",
+            ));
         }
         let config = x3_svm_integration::SvmConfig {
             compute_unit_limit: compute_limit,
@@ -215,60 +231,71 @@ impl X3ExecutorAdapter for WasmX3Adapter {
 }
 
 #[cfg(test)]
-mod accepted_evm_payload_must_execute {
+mod an_accepted_evm_payload_is_refused {
     use super::*;
     use crate::adapters::EvmExecutorAdapter;
 
-    /// **KNOWN-RED — this test is expected to fail while the defect stands, and it is meant to.**
+    /// An accepted EVM payload must be executed or refused — never reported as a success.
     ///
-    /// The kernel validates a non-empty EVM payload by decoding it as a `Packet` and checking the
-    /// EVM domain bit (`deserialize_packet` + `get_domain_mask` in `submit_comit_v2`). This adapter —
-    /// the one the *wasm* runtime, and therefore every live chain, is compiled with — executes those
-    /// same bytes as EVM code. A SCALE-encoded `Packet::Evm(..)` starts with the enum discriminant
-    /// `0x00`, which is `STOP`, so the interpreter halts on the first byte and reports success.
-    ///
-    /// Measured 2026-09-26 (`cargo test -p pallet-x3-kernel --lib`, probe since removed):
+    /// The regression test for the false success found on 2026-09-26. The kernel validates a
+    /// non-empty EVM payload by decoding it as a `Packet` and checking the EVM domain bit, while this
+    /// adapter — the one a live chain is compiled with — used to hand those same bytes to
+    /// `mini_evm::execute_evm` as EVM code. A SCALE-encoded `Packet::Evm(..)` begins with its enum
+    /// discriminant `0x00`, which is `STOP`, so the interpreter halted on byte 0, charged base gas
+    /// and reported success, and the kernel persisted a receipt for an operation that never ran.
     ///
     /// ```text
-    /// PROBE evm payload bytes = 124
-    /// PROBE evm head = [00, 00, 6b, cb, 44, 6f, 34, 8c]
-    /// PROBE evm execute = Ok((true, 22576))     <- success, gas charged, nothing executed
-    /// PROBE evm validate = Ok(())
-    /// PROBE svm execute = Err(Other("SVM execution failed"))
-    /// PROBE x3 execute = Ok((true, 3))          <- the X3 arm really executes
+    /// (before the fix) payload 124 bytes, head [00, 00, 6b, cb, 44, 6f, 34, 8c]
+    ///                  execute -> Ok((success: true, gas_used: 22576))
+    ///                  validate -> Ok(())
     /// ```
     ///
-    /// So the EVM arm of the triple-VM submit path reports a successful execution for an operation
-    /// that never happened, and the kernel persists a receipt for it. The SVM arm fails closed
-    /// (which is merely a non-functional path, not a false success).
-    ///
-    /// A payload the kernel accepts must be either executed or refused — never reported as a
-    /// success. Flipping this test green is the acceptance criterion; see
+    /// The adapter refuses a packet by name now. When the payload convention is settled — packets
+    /// translated into work, or the payload becoming the code itself — this test should assert that
+    /// the payload *executes* instead of being refused; see
     /// `.ai/reports/evm-payload-never-executed-20260926.md`.
     #[test]
-    #[ignore = "KNOWN-RED: an accepted EVM packet is reported as a successful execution without running; see .ai/reports/evm-payload-never-executed-20260926.md"]
-    fn an_accepted_evm_payload_is_executed_or_refused_never_reported_as_success() {
+    fn an_accepted_evm_payload_is_refused_rather_than_reported_as_success() {
         let payload = crate::test_helpers::wrap_evm_payload(&[0xAAu8; 64]);
         assert!(
             !payload.is_empty(),
             "the fixture has to be a payload the kernel accepts"
         );
-        // The kernel accepts it...
         assert!(
             crate::packet_adapters::deserialize_packet(&payload).is_ok(),
             "the fixture must pass the same validation submit_comit_v2 applies"
         );
 
-        // ...so executing it must either do the packet's work or refuse. Reporting `success: true`
-        // with the packet untouched is the defect this test exists to catch.
         match WasmEvmAdapter::execute(&payload, 6_000_000) {
-            Ok(receipt) if receipt.success => panic!(
-                "the adapter reported success for a payload it cannot have executed: the packet \
-                 starts with its enum discriminant (0x{:02x}), which is EVM STOP",
-                payload[0]
+            Err(DispatchError::Other(msg)) => assert!(
+                msg.contains("Packet, not bytecode"),
+                "the refusal has to name the reason, got: {msg}"
             ),
-            Ok(_) => {}
-            Err(_) => {}
+            Err(other) => panic!("expected the named refusal, got: {other:?}"),
+            Ok(receipt) => panic!(
+                "the adapter must not report success for a payload it cannot execute: \
+                 success={}, gas_used={}",
+                receipt.success, receipt.gas_used
+            ),
+        }
+    }
+
+    /// The SVM arm, same boundary: a packet is not a program, and the refusal says so.
+    #[test]
+    fn an_accepted_svm_payload_is_refused_by_name() {
+        let payload = crate::test_helpers::wrap_svm_payload(&[0xBBu8; 64]);
+        assert!(crate::packet_adapters::deserialize_packet(&payload).is_ok());
+        match WasmSvmAdapter::execute(&payload, 500_000) {
+            Err(DispatchError::Other(msg)) => assert!(
+                msg.contains("Packet, not a program"),
+                "the refusal has to name the reason, got: {msg}"
+            ),
+            Err(other) => panic!("expected the named refusal, got: {other:?}"),
+            Ok(receipt) => panic!(
+                "the adapter must not report success for a payload it cannot execute: \
+                 success={}, compute_units_used={}",
+                receipt.success, receipt.gas_used
+            ),
         }
     }
 }

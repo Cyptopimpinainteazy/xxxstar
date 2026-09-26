@@ -112,6 +112,21 @@ impl DomainRoute {
     }
 }
 
+/// Is this payload a SCALE-encoded `Packet` rather than code for a VM?
+///
+/// `submit_comit_v2` requires a non-empty EVM/SVM payload to decode as a `Packet` (the domain bit is
+/// checked), while the adapters execute their input as EVM bytecode / eBPF. A packet run as code
+/// halts on its own enum discriminant — `0x00` is EVM `STOP` — and reports success for work it never
+/// did, which is a false success with a persisted receipt rather than a failure. An adapter that
+/// finds a packet on its code path has to refuse it, and this is the test for that.
+///
+/// Measured 2026-09-26: `WasmEvmAdapter::execute(wrap_evm_payload(&[0xAA; 64]), 6_000_000)` returned
+/// `Ok(success: true, gas_used: 22576)` for a 124-byte packet whose first byte is `0x00`. Report:
+/// `.ai/reports/evm-payload-never-executed-20260926.md`.
+pub fn payload_is_packet(payload: &[u8]) -> bool {
+    deserialize_packet(payload).is_ok()
+}
+
 /// Deserialize raw payload bytes into a typed Packet
 ///
 /// **Process:**
