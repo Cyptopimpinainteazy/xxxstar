@@ -1059,3 +1059,98 @@ fn a_replayed_x3_comit_extrinsic_is_not_mined_twice() {
         "a replayed signed extrinsic must not appear in a second finalized block"
     );
 }
+
+/// A program that burns past the chain's X3 gas budget is refused, not mined as a success.
+///
+/// PRIORITY 1 asks for gas accounting to be *proven* on the runtime path, and the live suite only
+/// ever ran programs that return immediately: every receipt it checked reported `gas_used > 0`, but
+/// nothing showed the chain stops a program that will not finish inside its budget. The budget is the
+/// runtime's own constant (`DefaultX3GasLimit = 6_000_000`, runtime/src/lib.rs), so "too expensive"
+/// is not something the submitter chooses — it is the chain's rule, and an attacker who could evade
+/// it would buy unbounded interpretation time per block.
+///
+/// The loop is sized so it *cannot* finish inside the budget: the interpreter stops at the limit, so
+/// a larger iteration count costs nothing extra and makes the intent unambiguous.
+#[test]
+#[ignore = "boots the real X3 dev node and runs a program past the chain's gas limit"]
+fn a_program_past_the_gas_limit_is_refused_and_leaves_no_receipt() {
+    let _node = spawn_dev_node();
+    wait_rpc(Duration::from_secs(180));
+
+    let chain_id = String::from("x3-local");
+    let alice_uri = dev_uri("Alice");
+    let alice = X3RuntimeSigner::from_uri(chain_id, RPC_URL.into(), &alice_uri).expect("signer");
+
+    let authorize = alice
+        .sign_kernel_authorize_account(alice.account())
+        .expect("sign the council proposal");
+    assert!(!submit(&authorize).is_empty());
+    let (_, authorize_head) = wait_finalized(&authorize, Duration::from_secs(180));
+    assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
+
+    let program = x3_x3_integration::compiler_bridge::compile_source(
+        "fn burn(n: i64) -> i64 {\n    let mut i = 0;\n    let mut total = 0;\n    while (i < n) {\n        total = total + i;\n        i = i + 1;\n    }\n    return total;\n}\n\nfn main() -> i64 {\n    return burn(3000000);\n}\n",
+    )
+    .expect("the burn program must compile");
+
+    let comit_id = H256::from_low_u64_be(0x0BAD_6000);
+    let signed = alice
+        .sign_kernel_submit_comit_v2(comit_id, program.clone(), 1_000_000)
+        .expect("sign the comit");
+    assert!(!submit(&signed).is_empty());
+    let (_, head) = wait_finalized(&signed, Duration::from_secs(600));
+
+    // The extrinsic is well-formed and signed, so it is included — and it failed there. Inclusion is
+    // not success, which is exactly what this asserts.
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    let index = extrinsic_index_in_block(&mut rpc, &head, &signed)
+        .expect("the out-of-gas comit is present in the block that included it");
+    let refusal = alice
+        .verify_finalized_dispatch(&head, index)
+        .expect_err("a program past the gas budget must not dispatch successfully");
+    // Not just "it failed": the kernel's own reason has to be the one this test is about. A refusal
+    // for any other reason (a malformed envelope, a bad nonce, a duplicate id) would pass a looser
+    // assertion while leaving gas accounting unproven.
+    // The runtime reports `ModuleError { index, error: [variant, 0, 0, 0], message: None }` with no
+    // name, so the expected variant is computed from the pallet's own enum rather than pinned as a
+    // byte. `X3ExecutionFailed` is the kernel's mapping for the adapter's out-of-gas error.
+    let encoded = pallet_x3_kernel::Error::<x3_chain_runtime::Runtime>::X3ExecutionFailed.encode();
+    assert_eq!(
+        encoded.len(),
+        1,
+        "a fieldless pallet error encodes as a single index byte"
+    );
+    let mut expected = [0u8; 4];
+    expected[0] = encoded[0];
+    let reported = refusal.to_string();
+    assert!(
+        reported.contains(&format!("index: 11, error: {expected:?}")),
+        "expected the kernel's X3ExecutionFailed (pallet 11, variant {}), got: {reported}",
+        encoded[0]
+    );
+
+    // And it left nothing behind: the kernel records a comit's receipt only after every acceptance
+    // check, so a refused submission must be indistinguishable from one that never happened.
+    assert!(
+        x3_receipt_at(comit_id, &head).is_none(),
+        "a refused comit must leave no execution receipt"
+    );
+
+    // The chain is still healthy for a program that respects the budget: a refusal that broke the
+    // path would pass the two assertions above.
+    let cheap = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 {\n    return 42;\n}\n",
+    )
+    .expect("the fixture must compile");
+    let after_id = H256::from_low_u64_be(0x0BAD_6001);
+    let after = alice
+        .sign_kernel_submit_comit_v2(after_id, cheap, 1_000_000)
+        .expect("sign a cheap comit");
+    assert!(!submit(&after).is_empty());
+    let (_, after_head) = wait_finalized(&after, Duration::from_secs(180));
+    assert_dispatch_succeeded(&alice, &after_head, &after);
+    let receipt = x3_receipt_at(after_id, &after_head)
+        .expect("a program inside the budget still gets its receipt");
+    assert!(receipt.success);
+    assert_eq!(receipt.return_data, 42i64.to_le_bytes().to_vec());
+}

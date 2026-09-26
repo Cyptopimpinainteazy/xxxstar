@@ -128,10 +128,12 @@ required_tests = [
   "the_receipt_map_starts_empty_on_an_upgraded_chain",
   "a_finalized_x3_comit_survives_a_node_restart",
   "a_replayed_x3_comit_extrinsic_is_not_mined_twice",
+  "a_program_past_the_gas_limit_is_refused_and_leaves_no_receipt",
 ]
 test_evidence = [
   "note: the first four tests are in crates/x3-integration (tests/compiler_bridge.rs, src/mini_x3.rs), measured on master 2026-09-23 (TICKET-101 third pass)",
   "note: the adapter pair is pallets/x3-kernel/tests/x3_adapter_route.rs and the runtime pair is runtime/src/tests.rs; each compiles its program from `.x3` source inside the test (2026-09-25). The runtime pair also reads the persisted receipt back from storage, and asserts none is written for a refused comit",
+  "note: gas accounting is proven live by a_program_past_the_gas_limit_is_refused_and_leaves_no_receipt (2026-09-26) — a loop that cannot finish inside the runtime's own `DefaultX3GasLimit = 6_000_000` is included in a finalized block, dispatched as `X3ExecutionFailed` (kernel pallet 11, the variant computed from the pallet enum in the test), leaves no receipt, and a cheap program submitted afterwards still succeeds and gets one. The unit-level `test_gas_exhausted` covers the adapter alone; this covers the chain's rule.",
   "note: the live tests are node/tests/x3vm_live_lifecycle.rs (run by the `X3-native lifecycles` gate with --ignored, 6 passed / 0 failed in 324.73s on 2026-09-25): one finalizes a compiled program's comit and reads the receipt from finalized state; one stops the node and starts it again on the same database, requiring the restarted node to resume at or past the finalized height it reached (not genesis) and to report the same receipt value, gas and version, then finalizes a further comit; one resubmits the identical signed extrinsic and counts how many finalized blocks contain those bytes, which must stay 1",
   "note: the state-preservation rehearsal is runtime/src/lib.rs::runtime_upgrade_rehearsal::the_kernel_upgrade_moves_the_version_without_touching_its_state (2026-09-25)",
   "note: the seven version-matrix tests are crates/x3-integration/tests/bytecode_version_compat.rs, run by the `test x3-integration` gate added 2026-09-25, and were shown to fail when the version check is removed",
