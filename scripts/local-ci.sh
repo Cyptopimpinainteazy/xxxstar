@@ -606,7 +606,12 @@ GATES_LIVE=(
   # exporters each identifying its own validator, seven collected log streams, and one
   # aggregate query that has to reach all seven. `--self-test` holds a validator out of
   # both collections and requires both checks to fail.
-  "observability across seven validators:bash scripts/monitoring/testnet7-observability-check.sh --self-test"
+  # `X3_OBSERVABILITY_REQUIRE_REAL=1` makes the three real halves mandatory — Prometheus,
+  # Grafana and a Fluent Bit collector — so this gate's green means "a metrics server scraped
+  # all seven, a dashboard rendered them, and a collector ingested every stream", not "the
+  # binaries were missing so the phases skipped". Without the flag the check still runs the
+  # endpoint-level proofs and says loudly what it skipped.
+  "observability across seven validators:env X3_OBSERVABILITY_REQUIRE_REAL=1 bash scripts/monitoring/testnet7-observability-check.sh --self-test"
   # The launch gate itself, run against a real network instead of remembered from one
   # recorded run: a generated seven-authority network, then criterion 1 required to report
   # the chain's own authority set *and* how many of those authorities are reachable (the

@@ -46,6 +46,11 @@ case "${1:-}" in
 esac
 
 COUNT="${X3_OBSERVABILITY_VALIDATORS:-7}"
+# The three halves below need binaries that may not be installed (`brew install prometheus
+# grafana fluent-bit`). Without them the check still proves the endpoint-level claims, but it
+# proves *less* — so the gate sets this, and a missing binary becomes a failure naming the
+# install instead of an `info` line a reader could mistake for a pass.
+REQUIRE_REAL="${X3_OBSERVABILITY_REQUIRE_REAL:-0}"
 MIN_FINALIZED="${X3_OBSERVABILITY_MIN_FINALIZED:-6}"
 RPC_BASE="${X3_OBSERVABILITY_RPC_BASE:-19800}"
 P2P_BASE="${X3_OBSERVABILITY_P2P_BASE:-30500}"
@@ -388,14 +393,18 @@ print(sum(len(f.get("data", {}).get("values", [[]])[0]) for f in frames))')"
     else
       info "grafana is on PATH but its homepath ($GF_HOME) is missing — skipping the Grafana half"
     fi
+  elif [[ "$REQUIRE_REAL" = 1 ]]; then
+    fail "grafana is not on PATH and X3_OBSERVABILITY_REQUIRE_REAL=1 (brew install grafana)"
   else
-    info "grafana not on PATH — skipping the Grafana half (brew install grafana)"
+    info "grafana not on PATH — skipping the Grafana half (brew install grafana); set X3_OBSERVABILITY_REQUIRE_REAL=1 to make this a failure"
   fi
 
   kill "$PROM_PID" 2>/dev/null || true
   wait "$PROM_PID" 2>/dev/null || true
+elif [[ "$REQUIRE_REAL" = 1 ]]; then
+  fail "prometheus/promtool are not on PATH and X3_OBSERVABILITY_REQUIRE_REAL=1 (brew install prometheus)"
 else
-  info "prometheus/promtool not on PATH — skipping the real-scrape half (brew install prometheus)"
+  info "prometheus/promtool not on PATH — skipping the real-scrape half (brew install prometheus); set X3_OBSERVABILITY_REQUIRE_REAL=1 to make this a failure"
 fi
 
 # One chain: every scraped validator agrees on the hash at a height all of them finalized.
@@ -437,6 +446,95 @@ for i in $(seq 1 "$COUNT"); do
   streams=$(( streams + 1 ))
 done
 
+# ── a real collector, ingesting all seven streams ────────────────────────────
+# The streams above are files on one host. "Logging live across all validators" means a
+# collector is ingesting them, so when Fluent Bit is installed the check runs one: a tail input
+# per validator, one file output as the sink, and the collector's own metrics required to show
+# records ingested for every validator. The sink carries one file per tag, which is what makes
+# the collected stream attributable rather than a merged blob.
+COLLECTOR_INGESTED=0
+if command -v fluent-bit >/dev/null 2>&1; then
+  FB_DIR="$WORK_DIR/collector"
+  mkdir -p "$FB_DIR/out" "$FB_DIR/db"
+  # Not `PROM_BASE + 200`: that lands on RPC_BASE (19600 + 200 == 19800), which the validators
+  # are already listening on — the first run of this phase died with "Error binding socket".
+  FB_PORT=$(( PROM_READY_PORT + 2 ))   # Prometheus 19700, Grafana 19701, collector 19702
+  {
+    echo "[SERVICE]"
+    echo "    Flush 1"
+    echo "    Log_Level error"
+    echo "    HTTP_Server On"
+    echo "    HTTP_Listen 127.0.0.1"
+    echo "    HTTP_Port $FB_PORT"
+    echo "    storage.path $FB_DIR/db"
+    echo ""
+    for i in $(seq 1 "$COUNT"); do
+      if [[ "$SELF_TEST" = 1 && "$i" = "$HELD_OUT" ]]; then
+        continue
+      fi
+      echo "[INPUT]"
+      echo "    Name tail"
+      echo "    Path $LOG_DIR/node-$i.log"
+      echo "    Tag x3-node-$i"
+      echo "    Read_from_Head true"
+      echo "    DB $FB_DIR/db/node-$i.db"
+      echo ""
+    done
+    echo "[OUTPUT]"
+    echo "    Name file"
+    echo "    Match *"
+    echo "    Path $FB_DIR/out"
+    echo "    Format plain"
+  } > "$FB_DIR/fluent-bit.conf"
+  fluent-bit -c "$FB_DIR/fluent-bit.conf" >"$FB_DIR/fluent-bit.log" 2>&1 &
+  FB_PID=$!
+  # Started here, stopped here.
+  cleanup() {
+    local f
+    kill "$FB_PID" 2>/dev/null || true
+    [[ -n "${GF_PID:-}" ]] && kill "$GF_PID" 2>/dev/null || true
+    [[ -n "${PROM_PID:-}" ]] && kill "$PROM_PID" 2>/dev/null || true
+    for f in "$BASE_DIR"/pids/node-*.pid; do
+      [[ -f "$f" ]] || continue
+      kill "$(cat "$f")" 2>/dev/null || true
+    done
+    sleep 2
+    for f in "$BASE_DIR"/pids/node-*.pid; do
+      [[ -f "$f" ]] || continue
+      kill -9 "$(cat "$f")" 2>/dev/null || true
+    done
+  }
+  EXPECTED_INGESTED="$COUNT"
+  [[ "$SELF_TEST" = 1 ]] && EXPECTED_INGESTED=$(( COUNT - 1 ))
+  ingested=""
+  fb_deadline=$(( $(date +%s) + 120 ))
+  while [[ "$(date +%s)" -lt "$fb_deadline" ]]; do
+    ingested="$(curl -s -m 5 "http://127.0.0.1:$FB_PORT/api/v1/metrics/prometheus" 2>/dev/null \
+      | awk '/^fluentbit_input_records_total/ { n = $2; if (n + 0 > 0) c++ } END { print c + 0 }')"
+    [[ "${ingested:-0}" = "$EXPECTED_INGESTED" ]] && break
+    kill -0 "$FB_PID" 2>/dev/null || { tail -10 "$FB_DIR/fluent-bit.log" >&2 || true; break; }
+    sleep 2
+  done
+  [[ "${ingested:-0}" = "$EXPECTED_INGESTED" ]] \
+    || fail "Fluent Bit ingested records from ${ingested:-0} of $EXPECTED_INGESTED validators (see $FB_DIR/fluent-bit.log)"
+  # The sink has to be attributable: one file per tag, not one merged file.
+  sink_files="$(find "$FB_DIR/out" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+  [[ "$sink_files" = "$EXPECTED_INGESTED" ]] \
+    || fail "the collector sink holds $sink_files file(s) for $EXPECTED_INGESTED expected validators — the stream is not attributable per validator"
+  # And a query over that sink reaches every validator's own file.
+  sink_with_finality="$(grep -l "Block finalized" "$FB_DIR"/out/* 2>/dev/null | wc -l | tr -d '[:space:]')"
+  [[ "$sink_with_finality" = "$EXPECTED_INGESTED" ]] \
+    || fail "only $sink_with_finality of $EXPECTED_INGESTED collected streams contain a finalized-block line"
+  COLLECTOR_INGESTED="$EXPECTED_INGESTED"
+  pass "Fluent Bit ingests $ingested of $EXPECTED_INGESTED validator streams into $sink_files attributable sink file(s)"
+  kill "$FB_PID" 2>/dev/null || true
+  wait "$FB_PID" 2>/dev/null || true
+elif [[ "$REQUIRE_REAL" = 1 ]]; then
+  fail "fluent-bit is not on PATH and X3_OBSERVABILITY_REQUIRE_REAL=1 (brew install fluent-bit)"
+else
+  info "fluent-bit not on PATH — skipping the collector half (brew install fluent-bit); set X3_OBSERVABILITY_REQUIRE_REAL=1 to make this a failure"
+fi
+
 aggregate="$(grep -lE "Block finalized: #[0-9]+" "$LOG_DIR"/node-*.log 2>/dev/null | wc -l | tr -d '[:space:]')"
 if [[ "$SELF_TEST" = 1 ]]; then
   [[ "$aggregate" -lt "$COUNT" ]] || fail "self-test: the aggregate query still reached $aggregate streams"
@@ -445,5 +543,7 @@ if [[ "$SELF_TEST" = 1 ]]; then
 else
   [[ "$streams" = "$COUNT" ]] || fail "checked $streams of $COUNT log streams"
   [[ "$aggregate" = "$COUNT" ]] || fail "the aggregate query reaches $aggregate of $COUNT log streams"
-  pass "all $COUNT validators: metrics identify themselves, logs carry identity/imports/finality"
+  proven="metrics identify themselves, logs carry identity/imports/finality"
+  [[ -n "${COLLECTOR_INGESTED:-}" && "$COLLECTOR_INGESTED" != 0 ]] && proven="$proven, a Fluent Bit collector ingested every stream"
+  pass "all $COUNT validators: $proven"
 fi
