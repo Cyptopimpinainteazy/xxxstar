@@ -268,6 +268,12 @@ GATES_FAST=(
   # inside a window recorded in `security/advisory-scope.toml`, or if the resolved set drifts from
   # that record -- so a lockfile bump cannot quietly turn a verified judgement into a stale claim.
   "advisory scope:python3 scripts/check-advisory-scope.py"
+  # Every KV of the EVM/SVM *external* surface has to be either proven against a real
+  # testnet or explicitly closed. None can be proven here, so this checks the closure:
+  # the gate in the code, the behavioural refusal test behind it, and the flag in
+  # TESTNET_FEATURE_FLAGS.toml — and it fails if one of those refusal suites runs in no
+  # gate, which is how `x3-external-chains` was found running nowhere at all.
+  "external paths disabled:python3 scripts/ci/check-external-paths-disabled.py"
   # The dependency gate `.cargo/audit.toml` and `deny.toml` were written for, and which no gate
   # ever ran. `.cargo/audit.toml` carries a long ignore list with a reason per entry; nothing
   # verified it, nothing noticed a new advisory, and nothing noticed an ignore that had gone
@@ -433,6 +439,11 @@ GATES_FAST=(
   # itself, its 81-test suite was in no gate list. `pallet-x3-asset-registry` gates every route and
   # asset lifecycle decision those two depend on.
   "test x3-cross-vm-router:cargo test -p pallet-x3-cross-vm-router"
+  # The crate that holds every external EVM adapter and the settlement verifier had no
+  # gate, so its refusals (`AdapterUnimplemented`, `VerificationUnavailable`, `Ok(false)`
+  # for a mismatch) ran nowhere and were not evidence. `external paths disabled` requires
+  # this gate to exist before it will pass.
+  "test x3-external-chains:cargo test -p x3-external-chains"
   "test x3-asset-registry:cargo test -p pallet-x3-asset-registry"
   # `x3-x3-integration` is the crate the chain executes X3 bytecode through (`mini_x3` and the
   # adapters `pallets/x3-kernel` calls). Its suite — the compiler bridge, the cross-decoder body

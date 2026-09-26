@@ -268,9 +268,11 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         System::set_block_number(1);
         Timestamp::set_timestamp(1_000);
         // Permissive, like a dev/local genesis: the mock has no external chain to
-        // prove against, so the lifecycle tests drive the bookkeeping path. Tests
-        // that exercise the strict rule (the production/testnet posture) set this
-        // to false themselves — see `allow_unattested_cross_domain_proofs_is_false_by_default_in_live_genesis`.
+        // prove against, so the lifecycle tests drive the bookkeeping path. Tests that
+        // exercise the strict rule (the production/testnet posture) set this to false
+        // themselves; that every live chain spec is *born* with it false is enforced by
+        // `scripts/ci/check-external-paths-disabled.py`, not by a test named here —
+        // this comment used to cite one that does not exist anywhere in the tree.
         crate::AllowUnattestedCrossDomainProofs::<Test>::put(true);
     });
     ext
