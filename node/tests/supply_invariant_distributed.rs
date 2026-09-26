@@ -327,6 +327,68 @@ fn check_conserved(port: u16, block: &str) -> Result<SupplyView, String> {
     Ok(view)
 }
 
+/// The per-asset supply ledger, read through the runtime API that exposes it.
+///
+/// Key is the **ledger's** `AssetId` (H256), value is the pallet's own `SupplyLedger`. Read with
+/// the block hash as `at`, like everything else here, so every validator is asked about the same
+/// block.
+fn read_asset_ledger(
+    port: u16,
+    block: &str,
+    asset: x3_asset_kernel_types::AssetId,
+) -> Result<Option<x3_asset_kernel_types::SupplyLedger>, String> {
+    let raw = rpc_try(
+        port,
+        "state_call",
+        vec![
+            Value::String("AtlasKernelRuntimeApi_get_asset_supply_ledger".into()),
+            Value::String(format!("0x{}", hex::encode(asset.encode()))),
+            Value::String(block.to_string()),
+        ],
+    )?;
+    let raw = raw
+        .as_str()
+        .ok_or_else(|| format!("get_asset_supply_ledger on :{port} did not return a string"))?;
+    let bytes = hex::decode(raw.trim_start_matches("0x"))
+        .map_err(|e| format!("get_asset_supply_ledger on :{port} was not hex: {e}"))?;
+    Option::<x3_asset_kernel_types::SupplyLedger>::decode(&mut &bytes[..])
+        .map_err(|e| format!("get_asset_supply_ledger on :{port} did not decode: {e}"))
+}
+
+/// Every asset key the ledger holds, enumerated at `block`.
+///
+/// The prefix is the pallet's own (`X3SupplyLedger` + `Ledgers`), built with the same
+/// `storage_prefix` helper the `System::Account` enumeration uses, so the test cannot drift from
+/// the storage layout by hard-coding a hash.
+fn ledger_assets(port: u16, block: &str) -> Vec<x3_asset_kernel_types::AssetId> {
+    let prefix = frame_support::storage::storage_prefix(b"X3SupplyLedger", b"Ledgers").to_vec();
+    let keys = rpc_expect(
+        port,
+        "state_getKeys",
+        vec![
+            Value::String(format!("0x{}", hex::encode(&prefix))),
+            Value::String(block.to_string()),
+        ],
+    );
+    let Some(keys) = keys.as_array() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for key in keys {
+        let Some(key) = key.as_str() else { continue };
+        let Ok(bytes) = hex::decode(key.trim_start_matches("0x")) else {
+            continue;
+        };
+        // prefix (32) + Blake2_128Concat (16 byte hash + the 32-byte key)
+        if bytes.len() != prefix.len() + 16 + 32 {
+            continue;
+        }
+        let tail = &bytes[prefix.len() + 16..];
+        out.push(H256::from_slice(tail));
+    }
+    out
+}
+
 /// One account's free balance at one block, read by its own key rather than by enumeration, so a
 /// caller's before/after can be compared without depending on the account list being stable.
 fn free_balance_at(port: u16, block: &str, account: &x3_chain_runtime::AccountId) -> u128 {
@@ -1140,6 +1202,60 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
         burned,
         "account balances fell by {} but issuance fell by {burned}: value was created or lost",
         baseline[0].accounted - after[0].accounted
+    );
+
+    // -------- the per-asset ledger, through the API that exposes it --------
+    //
+    // The native identity above is one ledger. The *asset* ledger
+    // (`native + evm + svm + external_locked + pending <= canonical`, per asset, in
+    // `pallet-x3-supply-ledger`) is a different one, and until this API existed it had no read
+    // surface at all. This chain does not create asset records: nothing in these comits touches
+    // that pallet — the kernel writes its own `CanonicalLedger` — so the assertion below is on
+    // what the read surface *reports*, cross-checked between validators, and it says out loud
+    // how many records that is. It is deliberately not written as "the identity holds" when
+    // there is nothing to check: creating an asset needs a signed `tokenFactory.createToken`,
+    // which `x3-runtime-signer` does not expose yet.
+    let mut ledger_records = 0usize;
+    for asset in ledger_assets(ports[0], &hash1) {
+        let mut views = Vec::new();
+        for port in ports {
+            let ledger = read_asset_ledger(port, &hash1, asset)
+                .unwrap_or_else(|e| panic!("{asset:?}: ledger read failed on :{port}: {e}"));
+            let ledger = ledger.unwrap_or_else(|| {
+                panic!("{asset:?} is in the ledger's key set but reads as None on :{port}")
+            });
+            let represented = ledger
+                .native_supply
+                .checked_add(ledger.evm_supply)
+                .and_then(|v| v.checked_add(ledger.svm_supply))
+                .and_then(|v| v.checked_add(ledger.external_locked_supply))
+                .and_then(|v| v.checked_add(ledger.pending_supply))
+                .expect("represented supply overflowed");
+            assert!(
+                represented <= ledger.canonical_supply,
+                "{asset:?} on :{port}: represented {represented} exceeds canonical {}",
+                ledger.canonical_supply
+            );
+            views.push(ledger);
+        }
+        assert!(
+            views.iter().all(|v| *v == views[0]),
+            "{asset:?}: validators disagree about the ledger at {height1}:{hash1}"
+        );
+        ledger_records += 1;
+        println!(
+            "[x3-supply] asset {asset:?}: native {}, evm {}, svm {}, external_locked {}, pending {}, canonical {} — identity holds and all validators agree",
+            views[0].native_supply,
+            views[0].evm_supply,
+            views[0].svm_supply,
+            views[0].external_locked_supply,
+            views[0].pending_supply,
+            views[0].canonical_supply,
+        );
+    }
+    println!(
+        "[x3-supply] per-asset ledger: {ledger_records} record(s) present on this chain, read \
+         through AtlasKernelRuntimeApi_get_asset_supply_ledger on every validator"
     );
 
     // -------- negative control, on a scratch copy of the ledger ----------

@@ -154,6 +154,10 @@ x3-x3-integration = { path = "../crates/x3-integration", features = ["std", "com
 # runtime's real `frame_system::AccountInfo<Nonce, pallet_balances::AccountData<Balance>>` instead
 # of a hand-copied byte layout. Same crate the runtime already links.
 pallet-balances = { workspace = true, features = ["std"] }
+# The per-asset half of `supply_invariant_distributed` decodes the pallet's own
+# `SupplyLedger` out of `AtlasKernelRuntimeApi_get_asset_supply_ledger`, so it names the
+# ledger's type rather than a hand-copied field order. Same crate the runtime already links.
+x3-asset-kernel-types = { path = "../crates/x3-asset-kernel-types", features = ["std"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 tempfile = { workspace = true }
 # The producer: this test boots an anvil, has the relayer build the receipt

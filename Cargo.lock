@@ -25966,6 +25966,7 @@ dependencies = [
  "substrate-prometheus-endpoint",
  "tempfile",
  "tokio",
+ "x3-asset-kernel-types",
  "x3-atomic-swap",
  "x3-atomic-trade",
  "x3-bridge-adapters",
