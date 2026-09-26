@@ -16,6 +16,12 @@
 #     operational logging, and a node started without `--log info` emits exactly that;
 #   * one aggregate query over the sink reaches all seven sources.
 #
+# When `prometheus` and `promtool` are on PATH (`brew install prometheus`), the check also
+# *scrapes the seven validators with a real Prometheus*: it generates a scrape config for the
+# ports it booted, `promtool check config`s it, starts Prometheus, and requires
+# `count(up{job="x3-validators"} == 1)` to be seven. That is the difference between "the
+# config parses and the endpoints answer" and "a metrics server is ingesting all of them".
+#
 # `--self-test` holds one validator out of the metrics scrape and out of the log collection and
 # requires both checks to fail, so neither can pass on a network that is not fully observed.
 #
@@ -29,6 +35,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib-local3.sh"   # for the metric parsers only; the bring-up is the testnet launcher
 
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# The dashboard this repository ships, imported into Grafana and queried below. Its panels are
+# metric queries, so the same definition serves the seven-validator network as the local3 one.
+DASHBOARD="$ROOT_DIR/monitoring/local3/grafana-x3-validators.json"
 SELF_TEST=0
 case "${1:-}" in
   --self-test) SELF_TEST=1 ;;
@@ -190,6 +199,203 @@ if [[ "$SELF_TEST" = 1 ]]; then
   pass "self-test: only $scraped of $COUNT validators were observed"
 else
   [[ "$scraped" = "$COUNT" ]] || fail "observed $scraped validators, expected $COUNT"
+fi
+
+# ── a real Prometheus, scraping all seven ────────────────────────────────────
+if command -v prometheus >/dev/null 2>&1 && command -v promtool >/dev/null 2>&1; then
+  PROM_CONF="$WORK_DIR/prometheus-testnet7.yml"
+  PROM_READY_PORT=$(( PROM_BASE + 100 ))
+  {
+    echo "global:"
+    echo "  scrape_interval: 1s"
+    echo "  evaluation_interval: 1s"
+    echo "scrape_configs:"
+    EXPECTED_UP="$COUNT"
+    for i in $(seq 1 "$COUNT"); do
+      if [[ "$SELF_TEST" = 1 && "$i" = "$HELD_OUT" ]]; then
+        EXPECTED_UP=$(( COUNT - 1 ))
+        continue
+      fi
+      # One job per validator, each carrying its own `validator` label — the same shape the
+      # checked-in local3 config uses, and the label the dashboard's `$validator` template
+      # variable is built from (`label_values(substrate_build_info, validator)`). A single job
+      # with a bare target list scrapes everything and labels nothing, which leaves every panel
+      # query empty.
+      echo "  - job_name: x3-validator-node-$i"
+      echo "    metrics_path: /metrics"
+      echo "    static_configs:"
+      echo "      - targets: [\"127.0.0.1:$(( PROM_BASE + i - 1 ))\"]"
+      echo "        labels:"
+      echo "          validator: x3-testnet-node-0$i"
+    done
+  } > "$PROM_CONF"
+  promtool check config "$PROM_CONF" >/dev/null 2>&1 \
+    || fail "promtool rejected the scrape config this check just generated ($PROM_CONF)"
+  info "promtool accepted the generated scrape config; starting Prometheus on :$PROM_READY_PORT"
+  prometheus --config.file="$PROM_CONF" --storage.tsdb.path="$WORK_DIR/prom-data" \
+    --web.listen-address="127.0.0.1:$PROM_READY_PORT" --web.enable-admin-api \
+    >"$WORK_DIR/prometheus.log" 2>&1 &
+  PROM_PID=$!
+  # It is started here, so it is stopped here — and only this one.
+  cleanup() {
+    local f
+    kill "$PROM_PID" 2>/dev/null || true
+    for f in "$BASE_DIR"/pids/node-*.pid; do
+      [[ -f "$f" ]] || continue
+      kill "$(cat "$f")" 2>/dev/null || true
+    done
+    sleep 2
+    for f in "$BASE_DIR"/pids/node-*.pid; do
+      [[ -f "$f" ]] || continue
+      kill -9 "$(cat "$f")" 2>/dev/null || true
+    done
+  }
+
+  # `up{job=...} == 1` per target is the question: a Prometheus that started but cannot reach a
+  # validator reports `up 0` for it, which is exactly what "live" must mean.
+  up_count=""
+  prom_deadline=$(( $(date +%s) + 180 ))
+  while [[ "$(date +%s)" -lt "$prom_deadline" ]]; do
+    up_count="$(curl -s -m 5 --get \
+      --data-urlencode 'query=count(up{job=~"x3-validator-node-.*"} == 1)' \
+      "http://127.0.0.1:$PROM_READY_PORT/api/v1/query" \
+      | python3 -c 'import json,sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print(""); raise SystemExit
+r = d.get("data", {}).get("result", [])
+print(r[0]["value"][1] if r else "")' 2>/dev/null || true)"
+    [[ "$up_count" = "$EXPECTED_UP" ]] && break
+    kill -0 "$PROM_PID" 2>/dev/null || { tail -10 "$WORK_DIR/prometheus.log" >&2 || true; fail "Prometheus exited before it scraped anything"; }
+    sleep 2
+  done
+  [[ "$up_count" = "$EXPECTED_UP" ]] \
+    || fail "a real Prometheus reached $up_count of $EXPECTED_UP expected validators (query: count(up{job=~\"x3-validator-node-.*\"} == 1))"
+  pass "a real Prometheus (promtool-validated config) scrapes $up_count of $EXPECTED_UP expected validators: all up"
+
+  # ── Grafana on top of that Prometheus, when it is installed ─────────────────
+  # The bullet is "Prometheus/Grafana/logging live across all validators" — three claims.
+  # Prometheus is proven above, the logs below, and this is the Grafana half: a running server,
+  # a provisioned datasource that reports itself healthy, the dashboard this repository ships
+  # imported into it, and one of that dashboard's *panel* expressions returning points when
+  # Grafana asks Prometheus for it.
+  if command -v grafana >/dev/null 2>&1; then
+    GF_HOME="${X3_GRAFANA_HOME:-/home/linuxbrew/.linuxbrew/opt/grafana/share/grafana}"
+    if [[ -d "$GF_HOME" ]]; then
+      GF_PORT=$(( PROM_READY_PORT + 1 ))
+      mkdir -p "$WORK_DIR/grafana/data" "$WORK_DIR/grafana/logs" "$WORK_DIR/grafana/provisioning/datasources"
+      cat > "$WORK_DIR/grafana/provisioning/datasources/x3.yml" <<X3_DS_YAML
+apiVersion: 1
+datasources:
+  - name: X3-Prometheus
+    type: prometheus
+    access: proxy
+    url: http://127.0.0.1:$PROM_READY_PORT
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+X3_DS_YAML
+      GF_PATHS_DATA="$WORK_DIR/grafana/data" \
+      GF_PATHS_LOGS="$WORK_DIR/grafana/logs" \
+      GF_PATHS_PROVISIONING="$WORK_DIR/grafana/provisioning" \
+      GF_SERVER_HTTP_ADDR=127.0.0.1 GF_SERVER_HTTP_PORT="$GF_PORT" \
+      GF_AUTH_ANONYMOUS_ENABLED=true GF_AUTH_ANONYMOUS_ORG_ROLE=Admin \
+      GF_ANALYTICS_REPORTING_ENABLED=false GF_ANALYTICS_CHECK_FOR_UPDATES=false \
+      grafana server --homepath "$GF_HOME" >"$WORK_DIR/grafana.log" 2>&1 &
+      GF_PID=$!
+      # Started here, stopped here — Grafana, Prometheus, and only this check's validators.
+      cleanup() {
+        local f
+        kill "$GF_PID" 2>/dev/null || true
+        kill "$PROM_PID" 2>/dev/null || true
+        for f in "$BASE_DIR"/pids/node-*.pid; do
+          [[ -f "$f" ]] || continue
+          kill "$(cat "$f")" 2>/dev/null || true
+        done
+        sleep 2
+        for f in "$BASE_DIR"/pids/node-*.pid; do
+          [[ -f "$f" ]] || continue
+          kill -9 "$(cat "$f")" 2>/dev/null || true
+        done
+      }
+      gf_ready=0
+      for _ in $(seq 1 60); do
+        if curl -sf -m 3 "http://127.0.0.1:$GF_PORT/api/health" 2>/dev/null | grep -q '"database": *"ok"'; then
+          gf_ready=1
+          break
+        fi
+        kill -0 "$GF_PID" 2>/dev/null || { tail -12 "$WORK_DIR/grafana.log" >&2 || true; break; }
+        sleep 2
+      done
+      [[ "$gf_ready" = 1 ]] || fail "Grafana did not become healthy on :$GF_PORT (see $WORK_DIR/grafana.log)"
+
+      DS_UID="$(curl -sf -m 5 "http://127.0.0.1:$GF_PORT/api/datasources" \
+        | python3 -c 'import json,sys
+print(next((x["uid"] for x in json.load(sys.stdin) if x.get("name") == "X3-Prometheus"), ""))')"
+      [[ -n "$DS_UID" ]] || fail "Grafana started but the provisioned X3-Prometheus datasource is not there"
+      # Not `curl -sf`: this endpoint answers 400 *with a JSON body* when the datasource cannot
+      # reach its Prometheus, and `-f` throws that body away — which is how the first run of this
+      # phase reported an empty status instead of the connection it could not make.
+      GF_DS_BODY="$(curl -s -m 20 "http://127.0.0.1:$GF_PORT/api/datasources/uid/$DS_UID/health" || true)"
+      GF_DS_HEALTH="$(printf '%s' "$GF_DS_BODY" \
+        | python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("status", ""))
+except Exception:
+    print("")')"
+      [[ "$GF_DS_HEALTH" = "OK" ]] \
+        || fail "Grafana reports datasource health '$GF_DS_HEALTH', not OK: ${GF_DS_BODY:0:300}"
+
+      # Import the shipped dashboard, binding its `${DS_PROMETHEUS}` input to the provisioned uid.
+      python3 - "$DASHBOARD" "$DS_UID" >"$WORK_DIR/grafana-dashboard.json" <<'X3_DASH_PY'
+import json, sys
+doc = json.load(open(sys.argv[1]))
+print(json.dumps({"dashboard": doc["dashboard"], "overwrite": True,
+                  "message": "x3 observability check"}).replace("${DS_PROMETHEUS}", sys.argv[2]))
+X3_DASH_PY
+      IMPORT="$(curl -sf -m 15 -H 'Content-Type: application/json' -X POST \
+        --data @"$WORK_DIR/grafana-dashboard.json" "http://127.0.0.1:$GF_PORT/api/dashboards/db" \
+        | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("status",""), d.get("uid",""))')"
+      # Grafana answers `{"status":"success","uid":…}`; older versions used `"ok"`.
+      [[ "$IMPORT" == success* || "$IMPORT" == ok* ]] \
+        || fail "Grafana refused the dashboard this repository ships: $IMPORT"
+      info "Grafana imported the shipped dashboard ($IMPORT)"
+
+      # The point of the phase: a panel's own expression, asked through Grafana, returns points.
+      # `$validator` is the dashboard's template variable; resolved to "all" here.
+      PANEL_EXPR="$(jq -r '.dashboard.panels[0].targets[0].expr' "$DASHBOARD" | sed 's/\$validator/.*/g')"
+      [[ -n "$PANEL_EXPR" && "$PANEL_EXPR" != "null" ]] || fail "the shipped dashboard's first panel has no expression"
+      python3 -c '
+import json, sys
+uid, expr, path = sys.argv[1], sys.argv[2], sys.argv[3]
+body = {"queries": [{"refId": "A", "datasource": {"type": "prometheus", "uid": uid},
+                     "expr": expr, "instant": True, "format": "time_series"}],
+        "from": "now-10m", "to": "now"}
+open(path, "w").write(json.dumps(body))
+' "$DS_UID" "$PANEL_EXPR" "$WORK_DIR/grafana-query.json"
+      SERIES="$(curl -sf -m 15 -H 'Content-Type: application/json' -X POST \
+        --data @"$WORK_DIR/grafana-query.json" "http://127.0.0.1:$GF_PORT/api/ds/query" \
+        | python3 -c 'import json,sys
+frames = json.load(sys.stdin).get("results", {}).get("A", {}).get("frames", [])
+print(sum(len(f.get("data", {}).get("values", [[]])[0]) for f in frames))')"
+      [[ "${SERIES:-0}" -gt 0 ]] \
+        || fail "Grafana asked Prometheus for the dashboard panel '$PANEL_EXPR' and got no points"
+      pass "Grafana serves the shipped dashboard and that panel returns $SERIES point(s) through Prometheus"
+      info "panel: $PANEL_EXPR"
+      kill "$GF_PID" 2>/dev/null || true
+      wait "$GF_PID" 2>/dev/null || true
+    else
+      info "grafana is on PATH but its homepath ($GF_HOME) is missing — skipping the Grafana half"
+    fi
+  else
+    info "grafana not on PATH — skipping the Grafana half (brew install grafana)"
+  fi
+
+  kill "$PROM_PID" 2>/dev/null || true
+  wait "$PROM_PID" 2>/dev/null || true
+else
+  info "prometheus/promtool not on PATH — skipping the real-scrape half (brew install prometheus)"
 fi
 
 # One chain: every scraped validator agrees on the hash at a height all of them finalized.

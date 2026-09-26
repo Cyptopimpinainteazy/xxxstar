@@ -3562,22 +3562,23 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 68,
+      "composite": 75,
       "confidence": "medium",
       "evidence": [
         "docs",
         "note: Monitoring concepts present but operational proof incomplete"
       ],
       "id": "X3-OPS-010",
-      "implemented": 78,
+      "implemented": 85,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 52,
+      "mainnet_ready": 58,
       "missing_work": [
         "**CLOSED 2026-09-26 \u2014 metrics *and* logs are live across all three validators, and both are gated.** `monitoring across validators` boots the built-in `local3` chain with a Prometheus exporter per validator and requires each one to identify itself from its own scrape: `substrate_build_info{name=\u2026}` matching the target label, chain `x3_chain_local3`, finalized height past genesis, two peers, authority role \u2014 then requires all three to agree on the canonical hash at the lowest finalized height any reported. The checked-in scrape config drives the ports the gate boots on, and every metric the checked-in Grafana dashboard references must exist in the live scrape. `logging across validators` requires each validator's log stream to be collected under one queryable sink and to carry its own identity, imported blocks and finalized blocks: measured 264/266/149 lines, last imported #63/#63/#64, last finalized #60 on all three. Both gates have `--self-test` negative controls (hold a validator's metrics or its stream out of the collection and the same query must fail), and both were measured failing.",
         "The log-level finding is part of the fix, not a footnote: a node started without a filter emits warnings only \u2014 13 lines of banner per validator, no chain identity, no imports, no finality \u2014 so the collection contract includes the level.",
         "**CLOSED 2026-09-26 at testnet scale \u2014 seven validators, not three.** `scripts/monitoring/testnet7-observability-check.sh` (gate: `observability across seven validators`, ~45s, serial) builds a generated seven-authority spec, boots it with the launcher, and requires per validator: its own exporter answering 200, the node's `substrate_build_info{name=...}` label matching the validator it was scraped from, the chain label, a finalized height past genesis, the mesh peer floor, and a non-full-node role; then that all seven agree on the canonical hash at a common finalized height, that each of the seven collected log streams carries identity/imports/finality, and that one aggregate query over the sink reaches all seven sources. Measured: seven nodes named x3-testnet-node-01..07 on chain x3_chain_testnet, finalized 75..95, peers 6, role 4, logs at last imported #104 and finalized #99..#101. `--self-test` holds one validator out of both collections and requires both checks to fail (`only 6 of 7 observed`, `the aggregate query reaches 6 of 7 streams`). Four findings that only appear at this size: the spec's bootNodes are built from `P2P_BASE` (build the spec for the base you launch on, or the mesh collapses to one hub and six validators report exactly 1 peer); 'a finalized head exists' is not finality (a fresh node answers with the genesis hash at height 0, so the weak check passes at `best=1, finalized=0`); the exported finalized gauge lags its own node (measured: RPC past height 6 while the metric read 0); and demanding `COUNT-1` peers from every node fails a healthy network (the two-hour soak measured a minimum of 5).",
-        "Still open: no Prometheus server, Grafana or log shipper is installed on this box (no promtool, no vector/fluent-bit/promtail/filebeat). The config and dashboard are parsed and driven by the gates rather than rendered by a real Prometheus, the sink is a directory of per-validator streams rather than a running collector, and there is no retention, indexing or alerting story. \"Across all validators\" means the three on this box until the seven physical servers exist."
+        "**CLOSED 2026-09-26 \u2014 a real Prometheus and a real Grafana, scraping and rendering all seven validators.** The previous note was that no metrics server or dashboard server was installed. Both are now installed and the check uses them: it generates a per-validator scrape config (one job per validator carrying its own `validator` label, the shape the dashboard's `$validator` template variable is built from), validates it with `promtool check config`, starts Prometheus, and requires `count(up{job=~\"x3-validator-node-.*\"} == 1)` to be all seven. Then it starts Grafana with the Prometheus datasource provisioned, requires the datasource health endpoint to answer `OK`, imports the dashboard this repository ships, and asks one of that dashboard's **panel expressions** through Grafana's `/api/ds/query` \u2014 which returned 7 series, one point per validator. Measured: `a real Prometheus (promtool-validated config) scrapes 7 of 7 expected validators: all up`, `Grafana imported the shipped dashboard (success x3-local3-validators)`, `that panel returns 7 point(s) through Prometheus`. The self-test holds a validator out of the target list and out of the log collection and requires all three checks to drop to six.",
+        "Still open: the log half is still a directory of per-validator streams rather than a collector (no vector/fluent-bit/promtail on this box), and this is one host \u2014 seven validators, one Prometheus, one Grafana, with no retention, alerting or multi-operator story."
       ],
       "name": "Prometheus/Grafana-style ops monitoring",
       "paths": [
@@ -3590,8 +3591,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 78,
-      "tests": "tested score 78% (no named test list on this row)"
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4440,7 +4441,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "1cc6f44a547ebad953406e3aaaafc78b267e13f0608f5512e3e0f9dac4c46e6d",
+    "source_digest": "199ebf808a7fa89a485a7a37a59f4a4be7d28c85f27b3584c9d61e53957e015b",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
@@ -4453,7 +4454,7 @@
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "acf0af6c37dc499f2c86464affa178f0e0aa5f00beb00bf6a20baead857040c6",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "0d567f89a69a328e1294e1a7b4d7fe74788cf8322be4a449315210baab147d52",
+      "feature-matrix/operations-user-tools.toml": "190a3bd641fa606d24c808af448159b16089098f167f2d479bd7f8d4e0057897",
       "feature-matrix/runtime-core.toml": "8b44ebcf62fab95e5678825f1671785b19e0771cdf4917ce9b323c34e772a5a6",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
