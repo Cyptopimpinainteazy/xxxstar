@@ -210,6 +210,15 @@ bytes**:
   blob — so the bytes move: compact 8,508,157 bytes (was 8,506,630), compressed 1,463,840 (was
   1,463,693). Two from-scratch builds agree.
 
+* `a3d918abb` — a payload is the artifact its adapter executes (X3-LANG-004). The kernel required a
+  non-empty EVM/SVM payload to SCALE-decode as a `Packet`, while every adapter executes its input as
+  code; SCALE puts the enum discriminant first, so `Packet::Evm(..)` begins `0x00` — EVM `STOP` — and
+  an accepted payload was receipted as a success for work that never happened. Both validation sites
+  now ask `T::EvmAdapter::validate` / `T::SvmAdapter::validate`, the fixtures are real bytecode and
+  eBPF programs, and the mock and native adapters refuse packets by name. This is a runtime change:
+  the bytes move — compact 8,508,725 bytes (was 8,508,157), compressed 1,465,616 (was 1,463,840). Two
+  from-scratch builds agree.
+
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
 revision builds.
