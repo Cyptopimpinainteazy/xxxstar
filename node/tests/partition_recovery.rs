@@ -193,13 +193,9 @@ fn block_hash_at(port: u16, number: u64) -> Option<String> {
 /// The highest height every validator has finalized, plus the canonical hash at it — after
 /// requiring all three to report the *same* hash there. Three chains running side by side is not
 /// one chain; this is the check that makes the numbers comparable.
-fn common_finalized(ports: &[u16; 3]) -> (u64, String) {
-    let heights = [
-        finalized_number(ports[0]),
-        finalized_number(ports[1]),
-        finalized_number(ports[2]),
-    ];
-    let common = *heights.iter().min().expect("three finalized heights");
+fn common_finalized(ports: &[u16]) -> (u64, String) {
+    let heights: Vec<u64> = ports.iter().map(|port| finalized_number(*port)).collect();
+    let common = *heights.iter().min().expect("a finalized height to compare");
     let hashes: Vec<String> = ports
         .iter()
         .map(|port| {
@@ -243,8 +239,8 @@ impl Drop for ValidatorSet {
 }
 
 /// Every port this gate binds, in the order it binds them.
-fn gate_ports() -> [u16; 6] {
-    [
+fn gate_ports() -> Vec<u16> {
+    vec![
         ALICE_RPC,
         BOB_RPC,
         CHARLIE_RPC,
@@ -254,22 +250,22 @@ fn gate_ports() -> [u16; 6] {
     ]
 }
 
-/// Refuse to start if any of the six ports is already bound.
+/// Refuse to start if any of `ports` is already bound.
 ///
 /// A second validator set on these ports does not announce itself: the new node fails to bind, the
 /// gate's `system_health` probe answers from the *other* set, and the run wedges into a genesis
 /// mismatch or a finality timeout minutes later. Measuring the ports first turns that into one
 /// sentence naming the port.
-fn assert_ports_free() {
+fn assert_ports_free(ports: &[u16]) {
     const SETTLE_TIMEOUT: Duration = Duration::from_secs(20);
     let started = Instant::now();
     loop {
         let mut live = Vec::new();
         let mut settling = Vec::new();
-        for port in gate_ports() {
-            if let Err(error) = TcpListener::bind(("127.0.0.1", port)) {
+        for port in ports {
+            if let Err(error) = TcpListener::bind(("127.0.0.1", *port)) {
                 let entry = format!("{port} ({error})");
-                if port_has_listener(port) {
+                if port_has_listener(*port) {
                     live.push(entry);
                 } else {
                     settling.push(entry);
@@ -824,7 +820,7 @@ const ALL: [usize; 3] = [ALICE, BOB, CHARLIE];
             while it stays alive, and requires the two survivors to keep authoring but refuse to \
             finalize until the partition heals"]
 fn network_partition_isolates_one_validator_and_the_chain_reconverges() {
-    assert_ports_free();
+    assert_ports_free(&gate_ports());
     let tools = NetTools::detect();
 
     let stamp = std::time::SystemTime::now()
@@ -1111,4 +1107,854 @@ fn network_partition_isolates_one_validator_and_the_chain_reconverges() {
     drop(guard);
     drop(network);
     let _ = std::fs::remove_dir_all(&base_path);
+}
+
+// =====================================================================================
+// Partition *tolerance* at seven authorities
+// =====================================================================================
+//
+// The test above proves the honest behaviour of a **three**-authority set: isolating one authority
+// must stall finality, because three need all three votes (`n - (n-1)/3 = 3`). That is a safety
+// property, but it is the opposite of what a public testnet needs to show — a network that keeps
+// finalizing with one validator down. Only a set of four or more can lose one authority and still
+// reach the threshold, so this second gate boots a generated `N`-authority network (default seven,
+// where the threshold is five of seven) and proves that isolating exactly one validator leaves the
+// survivors **finalizing**.
+//
+// It reuses the pieces above — `NetTools::cut`/`heal`, `PartitionGuard`, `view`, `wait_until`,
+// `freeze_node_binary`, the port pre-flight — rather than a second harness. Two things are
+// different from the three-authority test, both measured on this box:
+//
+// * The network is booted from a **generated** spec and identity set
+//   (`scripts/testnet/build-x3-testnet-spec.py`, then `x3_testnet_up.sh`), never the built-in dev
+//   keys, so it is the topology a real testnet actually runs.
+// * The spec's `bootNodes` name `P2P_BASE + i - 1`, so the builder and the launcher must agree on
+//   `P2P_BASE` or every node dials a port nobody listens on and the mesh collapses through the one
+//   address `run-7-validators-local.sh` passes on the command line. (`P2P_BASE` is threaded into
+//   both below for that reason.) With them aligned, all `N` nodes form a full mesh and each reports
+//   `N - 1` peers.
+//
+// The cut is scoped to the isolated validator's single P2P port. That is complete here because this
+// node reuses its listening port for outbound dials: every established socket between two
+// validators is `127.0.0.1:<a> <-> 127.0.0.1:<b>` where `<a>`/`<b>` are their listening ports
+// (measured: six sockets on each of the seven ports, one per peer). So the DROP rules plus the
+// socket reset remove every link the isolated validator owns, in both directions.
+//
+// There is one more thing to get right, and it cost a run: a validator booted with the launcher's
+// normal outbound budget that is cut off **re-dials** its peers on a fresh *ephemeral* source port.
+// The DROP rules are scoped to the isolated P2P port, so an ephemeral-port dial matches neither
+// direction and the validator re-syncs — measured: peer counts fell to `[5,5,5,0,5,5,5]` at the
+// cut and the victim was level with the survivors again 180 s later. So before the cut the victim
+// is restarted exactly the way the three-authority test boots Charlie: `--out-peers 0` and a spec
+// whose only bootnode is unreachable. It then dials nobody, every link it owns is an inbound
+// connection to its single P2P port, and a cut of that port is a real partition.
+//
+// ```text
+// env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test partition_recovery \
+//   -- --ignored --nocapture --test-threads=1 seven_authority
+// ```
+
+/// The seven-authority gate's ports. Deliberately clear of every other gate on this box: `local3`
+/// holds 19974-19976 / 30410-30412, `x3lang_network_receipt` 19954-19956 / 30389-30391,
+/// `supply_invariant_distributed` 19964-19967 / 30394-30397, and the default RPC block 9944-9950.
+/// The launcher derives `rpc = RPC_BASE + i - 1` and `p2p = P2P_BASE + i - 1` for `i` in `1..=N`.
+const SEVEN_RPC_BASE: u16 = 19984;
+const SEVEN_P2P_BASE: u16 = 30420;
+/// Prometheus is off (`--no-prometheus`), so these are never bound; the base is still passed so a
+/// future metrics mode cannot silently land on another gate's port.
+const SEVEN_PROM_BASE: u16 = 9620;
+/// The launcher refuses more than seven authorities; the floor is four (below that, one isolation
+/// is already a majority loss and the tolerance claim is false).
+const SEVEN_MAX: usize = 7;
+/// Which authority (1-based) is isolated, matching the three-authority test's "Charlie" role.
+const SEVEN_VICTIM: usize = 4;
+/// Finality has to be past genesis before the cut, and the survivors have to push it at least this
+/// far past the watermark while the victim is cut off before "they kept finalizing" means anything.
+const SEVEN_MIN_FINALIZED: u64 = 3;
+const SEVEN_AFTER_CUT_FINALITY: u64 = 10;
+/// The isolated validator's head must be at least this far behind the slowest survivor.
+const SEVEN_VICTIM_LAG: u64 = 8;
+/// How far behind the best survivor the restarted validator may be and still count as caught up.
+/// It has to be caught up before the cut, or it keeps applying a backlog it fetched while
+/// reconnecting after the cut and its finalized head is not a meaningful watermark.
+const SEVEN_CATCHUP_DELTA: u64 = 5;
+
+fn seven_authority_count() -> usize {
+    let count = std::env::var("X3_PARTITION_VALIDATORS")
+        .ok()
+        .and_then(|raw| raw.trim().parse::<usize>().ok())
+        .unwrap_or(SEVEN_MAX);
+    assert!(
+        (4..=SEVEN_MAX).contains(&count),
+        "X3_PARTITION_VALIDATORS={count} cannot show the property this gate proves: n authorities \
+         need n - (n-1)/3 votes, so three need all three (a single isolated authority stalls \
+         finality, which the local3 test asserts) and the launcher refuses more than {SEVEN_MAX}"
+    );
+    count
+}
+
+fn seven_rpc_ports(count: usize) -> Vec<u16> {
+    (0..count).map(|i| SEVEN_RPC_BASE + i as u16).collect()
+}
+
+fn seven_p2p_ports(count: usize) -> Vec<u16> {
+    (0..count).map(|i| SEVEN_P2P_BASE + i as u16).collect()
+}
+
+/// `system_health.peers` for a node that may not be up (when one is being restarted), so a caller
+/// can distinguish "not answering yet" from "answers with a count".
+fn peers_try(port: u16) -> Result<u64, String> {
+    rpc_try(port, "system_health", Vec::new()).and_then(|value| {
+        value
+            .get("peers")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| format!("system_health on :{port} had no peers field"))
+    })
+}
+
+/// Wait until a port is no longer bound, so a restarted validator can take it back.
+fn wait_port_free(port: u16, what: &str, timeout: Duration) {
+    let started = Instant::now();
+    while started.elapsed() < timeout {
+        if !port_has_listener(port) {
+            return;
+        }
+        std::thread::sleep(POLL_INTERVAL);
+    }
+    panic!("{what}: port {port} was still held after {timeout:?}");
+}
+
+/// Stop one validator the launcher started, by the pid file it wrote, and wait for its RPC and P2P
+/// ports to be released. `SIGKILL` matches the three-authority test's `Child::kill`.
+fn stop_validator(net_dir: &Path, index: usize, rpc_port: u16, p2p_port: u16) {
+    let pid_file = net_dir.join("pids").join(format!("node-{index}.pid"));
+    let pid = std::fs::read_to_string(&pid_file)
+        .unwrap_or_else(|e| panic!("read {}: {e}", pid_file.display()));
+    let pid = pid.trim().to_string();
+    let _ = Command::new("kill")
+        .arg("-9")
+        .arg(&pid)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    wait_port_free(
+        rpc_port,
+        &format!("stopping validator {index}"),
+        Duration::from_secs(60),
+    );
+    wait_port_free(
+        p2p_port,
+        &format!("stopping validator {index}"),
+        Duration::from_secs(60),
+    );
+}
+
+/// Rewrite a copy of the run's chain spec so its only bootnode is unreachable. A Live spec must
+/// carry at least one bootnode, but it need not be reachable; the point is that the validator
+/// booted from this copy dials nobody while the survivors keep dialing *it* from their own spec.
+fn write_inbound_only_spec(chain_spec: &Path, out: &Path) {
+    let text = std::fs::read_to_string(chain_spec)
+        .unwrap_or_else(|e| panic!("read {}: {e}", chain_spec.display()));
+    let mut spec: Value = serde_json::from_str(&text)
+        .unwrap_or_else(|e| panic!("parse {}: {e}", chain_spec.display()));
+    let first = spec
+        .get("bootNodes")
+        .and_then(Value::as_array)
+        .and_then(|bootnodes| bootnodes.first())
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("{} carries no bootNodes to rewrite", chain_spec.display()))
+        .to_string();
+    let unreachable = first
+        .split_once("/tcp/")
+        .and_then(|(head, tail)| tail.split_once("/p2p/").map(|(_, peer)| (head, peer)))
+        .map(|(head, peer)| format!("{head}/tcp/1/p2p/{peer}"))
+        .unwrap_or_else(|| panic!("bootnode {first} is not an /ip4…/tcp…/p2p/… multiaddr"));
+    *spec
+        .get_mut("bootNodes")
+        .expect("bootNodes exists, read just above") =
+        Value::Array(vec![Value::String(unreachable)]);
+    std::fs::write(
+        out,
+        serde_json::to_string_pretty(&spec).expect("re-serialize the rewritten chain spec"),
+    )
+    .unwrap_or_else(|e| panic!("write {}: {e}", out.display()));
+}
+
+/// Relaunch one validator from the frozen binary on the same base path, keystore and network key,
+/// but inbound-only: `--out-peers 0` and no `--bootnodes`. The pid file is rewritten so the set's
+/// `Drop` still tears this process down; the returned `Child` is held by the set so it is reaped.
+#[allow(clippy::too_many_arguments)]
+fn relaunch_inbound_only(
+    node_bin: &Path,
+    net_dir: &Path,
+    keys_dir: &Path,
+    index: usize,
+    rpc_port: u16,
+    p2p_port: u16,
+    victim_spec: &Path,
+    log_path: &Path,
+) -> Child {
+    let seed_file = keys_dir.join(format!("validator-{index}.suri"));
+    let seed_text = std::fs::read_to_string(&seed_file)
+        .unwrap_or_else(|e| panic!("read {}: {e}", seed_file.display()));
+    let seed = seed_text
+        .lines()
+        .find_map(|line| line.strip_prefix("seed="))
+        .unwrap_or_else(|| panic!("{} has no `seed=` line", seed_file.display()))
+        .to_string();
+    let key_file = keys_dir.join(format!("validator-{index}.nodekey"));
+    let node_key = std::fs::read_to_string(&key_file)
+        .unwrap_or_else(|e| panic!("read {}: {e}", key_file.display()));
+    let node_key = node_key.trim().to_string();
+
+    let mut command = Command::new(node_bin);
+    command
+        .env("X3_DEV_SEED", seed)
+        .arg("--chain")
+        .arg(victim_spec)
+        .arg("--base-path")
+        .arg(net_dir.join(format!("node-{index}")))
+        .arg("--name")
+        .arg(format!("x3-testnet-node-{index:02}"))
+        .arg("--rpc-port")
+        .arg(rpc_port.to_string())
+        .arg("--rpc-methods=Unsafe")
+        .arg("--rpc-cors=all")
+        .arg("--disable-log-color")
+        .arg("--listen-addr")
+        .arg(format!("/ip4/127.0.0.1/tcp/{p2p_port}"))
+        .arg("--no-mdns")
+        .arg("--no-telemetry")
+        .arg("--no-prometheus")
+        .arg("--validator")
+        .arg("--force-authoring")
+        .arg("--allow-private-ip")
+        .arg("--node-key")
+        .arg(node_key)
+        .arg("--out-peers")
+        .arg("0");
+    let log =
+        File::create(log_path).unwrap_or_else(|e| panic!("create {}: {e}", log_path.display()));
+    command.stdout(Stdio::from(log.try_clone().expect("clone log handle")));
+    command.stderr(Stdio::from(log));
+    let child = command
+        .spawn()
+        .unwrap_or_else(|e| panic!("relaunch validator {index} inbound-only: {e}"));
+    std::fs::write(
+        net_dir.join("pids").join(format!("node-{index}.pid")),
+        child.id().to_string(),
+    )
+    .unwrap_or_else(|e| panic!("write the relaunched validator's pid file: {e}"));
+    child
+}
+
+/// Run a helper script from the repository root, with `envs` set, and hand back its stdout. A
+/// non-zero exit or a spawn failure panics with everything the script printed, so a broken spec
+/// build or launcher is a readable failure rather than a mysterious timeout.
+fn run_script(root: &Path, program: &str, args: &[String], envs: &[(&str, String)]) -> String {
+    let mut command = Command::new(program);
+    command.args(args).current_dir(root);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    let output = command
+        .output()
+        .unwrap_or_else(|e| panic!("run {program} {args:?} in {}: {e}", root.display()));
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    if !output.status.success() {
+        panic!(
+            "{program} {args:?} failed ({})\n--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}",
+            output.status
+        );
+    }
+    stdout
+}
+
+/// The generated validator set, killed on drop — on success *and* on panic — by the pid files the
+/// launcher wrote. `pkill -f` is scoped to this run's base path, never a bare
+/// `pkill -f x3-chain-node`, which would kill the nodes of every other gate on this box.
+struct TestnetSet {
+    run_dir: PathBuf,
+    net_dir: PathBuf,
+    /// The inbound-only replacement for the isolated validator, once it has been restarted. Held so
+    /// `Drop` can reap it rather than leave a zombie.
+    relaunched: Option<Child>,
+}
+
+impl TestnetSet {
+    fn run_dir(&self) -> &Path {
+        &self.run_dir
+    }
+
+    fn net_dir(&self) -> &Path {
+        &self.net_dir
+    }
+
+    /// The sanitized copy of the spec the launcher actually boots (`CHAIN_SPEC_RUN`).
+    fn chain_spec(&self) -> PathBuf {
+        self.net_dir.join("chain-spec.json")
+    }
+
+    fn keys_dir(&self) -> PathBuf {
+        self.run_dir.join("spec").join("validator-keys")
+    }
+}
+
+impl Drop for TestnetSet {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.relaunched.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        if let Ok(entries) = std::fs::read_dir(self.net_dir.join("pids")) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                if !(name.starts_with("node-") && name.ends_with(".pid")) {
+                    continue;
+                }
+                if let Ok(text) = std::fs::read_to_string(entry.path()) {
+                    if let Ok(pid) = text.trim().parse::<u32>() {
+                        let _ = Command::new("kill")
+                            .arg("-9")
+                            .arg(pid.to_string())
+                            .stdout(Stdio::null())
+                            .stderr(Stdio::null())
+                            .status();
+                    }
+                }
+            }
+        }
+        // A pid file can be stale (a `--only` restart rewrites one), so sweep by the base path too.
+        // The pattern deliberately does not begin with `-`: `pkill` would read `--base-path` as an
+        // option rather than a pattern.
+        let _ = Command::new("pkill")
+            .arg("-9")
+            .arg("-f")
+            .arg(format!("base-path {}/node-", self.net_dir.display()))
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        if std::thread::panicking() {
+            eprintln!(
+                "[x3-partition7] test panicked — keeping {} for diagnosis",
+                self.run_dir.display()
+            );
+        } else {
+            let _ = std::fs::remove_dir_all(&self.run_dir);
+        }
+    }
+}
+
+/// Build a generated `count`-authority plain Live spec and boot it with the testnet launcher.
+///
+/// The guard is constructed *before* anything is spawned, so a panic while the launcher is starting
+/// nodes still tears the ones that did start down. The launcher exits once every node answers RPC,
+/// so a successful return means `count` validators are running.
+fn boot_generated_network(
+    root: &Path,
+    node_bin: &Path,
+    run_dir: &Path,
+    count: usize,
+) -> TestnetSet {
+    let net_dir = run_dir.join("net");
+    let spec_dir = run_dir.join("spec");
+    let log_dir = run_dir.join("logs");
+    std::fs::create_dir_all(&net_dir).expect("create the generated network's base dir");
+    std::fs::create_dir_all(&spec_dir).expect("create the generated network's spec dir");
+
+    let network = TestnetSet {
+        run_dir: run_dir.to_path_buf(),
+        net_dir: net_dir.clone(),
+        relaunched: None,
+    };
+    let node_bin = node_bin.to_string_lossy().into_owned();
+    let chain_spec = spec_dir.join("x3-testnet-plain.json");
+    let keys_dir = spec_dir.join("validator-keys");
+
+    println!(
+        "[x3-partition7] building a {count}-authority spec from generated keys (never dev keys)"
+    );
+    run_script(
+        root,
+        "python3",
+        &[
+            "scripts/testnet/build-x3-testnet-spec.py".to_string(),
+            count.to_string(),
+        ],
+        &[
+            ("X3_NODE_BIN", node_bin.clone()),
+            ("OUT_DIR", spec_dir.to_string_lossy().into_owned()),
+            // Must equal the launcher's P2P_BASE below, or the spec's bootNodes name ports nobody
+            // listens on and the mesh collapses.
+            ("P2P_BASE", SEVEN_P2P_BASE.to_string()),
+        ],
+    );
+    assert!(
+        chain_spec.is_file(),
+        "the spec builder did not write {}",
+        chain_spec.display()
+    );
+
+    println!("[x3-partition7] booting {count} validators via x3_testnet_up.sh...");
+    let stdout = run_script(
+        root,
+        "bash",
+        &[
+            "scripts/testnet/x3_testnet_up.sh".to_string(),
+            "--skip-build".to_string(),
+            "--node-bin".to_string(),
+            node_bin,
+        ],
+        &[
+            ("COUNT", count.to_string()),
+            ("RPC_BASE", SEVEN_RPC_BASE.to_string()),
+            ("P2P_BASE", SEVEN_P2P_BASE.to_string()),
+            ("PROM_BASE", SEVEN_PROM_BASE.to_string()),
+            ("BASE_DIR", net_dir.to_string_lossy().into_owned()),
+            ("CHAIN_SPEC", chain_spec.to_string_lossy().into_owned()),
+            ("KEYS_DIR", keys_dir.to_string_lossy().into_owned()),
+            ("LOG_DIR", log_dir.to_string_lossy().into_owned()),
+            ("SKIP_BUILD", "1".to_string()),
+        ],
+    );
+    let started = stdout
+        .lines()
+        .filter(|line| line.contains("Started x3-testnet-node-"))
+        .count();
+    assert_eq!(
+        started, count,
+        "the launcher reported {started} of {count} validators started; refusing to test a network \
+         that is not all there"
+    );
+
+    network
+}
+
+#[test]
+#[ignore = "boots a generated seven-authority network, isolates one validator at the kernel level \
+            while it stays alive, and requires the six survivors to keep finalizing — the \
+            tolerance a three-authority set cannot have and a public testnet needs"]
+fn seven_authority_network_keeps_finalizing_with_one_validator_isolated() {
+    let count = seven_authority_count();
+    let victim = SEVEN_VICTIM - 1;
+    assert!(
+        victim < count,
+        "the victim index {SEVEN_VICTIM} is outside a {count}-authority set"
+    );
+    let rpc_ports = seven_rpc_ports(count);
+    let p2p_ports = seven_p2p_ports(count);
+    let mut all_ports = rpc_ports.clone();
+    all_ports.extend(p2p_ports.iter().copied());
+    assert_ports_free(&all_ports);
+    let tools = NetTools::detect();
+
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock after the epoch")
+        .as_nanos();
+    let run_dir =
+        std::env::temp_dir().join(format!("x3-partition7-{}-{stamp}", std::process::id()));
+    std::fs::create_dir_all(&run_dir).expect("create the run directory");
+    let (node_bin, node_bin_digest) = freeze_node_binary(&run_dir);
+    println!(
+        "[x3-partition7] every validator runs one frozen artifact: {} (sha256 {})",
+        node_bin.display(),
+        node_bin_digest.as_deref().unwrap_or("unavailable")
+    );
+    println!("[x3-partition7] run directory: {}", run_dir.display());
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("the node crate has a parent (the repository root)")
+        .to_path_buf();
+
+    // -------- phase 1: N authorities, fully connected and finalizing --------
+    let mut network = boot_generated_network(&root, &node_bin, &run_dir, count);
+    for (i, port) in rpc_ports.iter().enumerate() {
+        wait_for_rpc(&format!("node{}", i + 1), *port, NODE_BOOT_TIMEOUT);
+    }
+
+    let expected_peers = (count - 1) as u64;
+    let peers = wait_until(
+        &format!("all {count} validators to see each other"),
+        CONSENSUS_TIMEOUT,
+        || {
+            let peers: Vec<u64> = rpc_ports.iter().map(|port| peers_of(*port)).collect();
+            if peers.iter().all(|n| *n >= expected_peers) {
+                Ok(peers)
+            } else {
+                Err(format!("peers {peers:?} (want {expected_peers} each)"))
+            }
+        },
+    );
+    println!("[x3-partition7] connected: {count} validators, peers {peers:?}");
+
+    let finals = wait_until(
+        &format!("finality past genesis on all {count} validators"),
+        CONSENSUS_TIMEOUT,
+        || {
+            let finals: Vec<u64> = rpc_ports
+                .iter()
+                .map(|port| finalized_number(*port))
+                .collect();
+            if finals.iter().all(|n| *n >= SEVEN_MIN_FINALIZED) {
+                Ok(finals)
+            } else {
+                Err(format!("finalized {finals:?}"))
+            }
+        },
+    );
+    let (height0, hash0) = common_finalized(&rpc_ports);
+    println!(
+        "[x3-partition7] consensus: all {count} agree on {height0}:{hash0} (finalized {finals:?})"
+    );
+
+    // -------- phase 1b: put the victim on an inbound-only footing --------
+    // A port-scoped cut is only complete if the isolated validator cannot dial out. With the
+    // launcher's normal outbound budget it re-dials on a fresh ephemeral source port the DROP rules
+    // do not match and re-syncs (measured — see the note at the top of this section). Restarting it
+    // with `--out-peers 0` and an unreachable-only spec, exactly as the three-authority test boots
+    // Charlie, makes every link it owns an inbound connection to its single P2P port.
+    let victim_rpc = rpc_ports[victim];
+    let victim_p2p = p2p_ports[victim];
+    let victim_spec = run_dir.join("chain-spec-inbound-only.json");
+    println!(
+        "[x3-partition7] restarting validator {} inbound-only (--out-peers 0, unreachable \
+         bootnode) so the cut can be complete",
+        victim + 1
+    );
+    stop_validator(network.net_dir(), victim + 1, victim_rpc, victim_p2p);
+    write_inbound_only_spec(&network.chain_spec(), &victim_spec);
+    let victim_child = relaunch_inbound_only(
+        &node_bin,
+        network.net_dir(),
+        &network.keys_dir(),
+        victim + 1,
+        victim_rpc,
+        victim_p2p,
+        &victim_spec,
+        &network.run_dir().join("victim-inbound-only.log"),
+    );
+    network.relaunched = Some(victim_child);
+    let rejoin = wait_until(
+        &format!(
+            "validator {} to rejoin with {expected_peers} inbound peers",
+            victim + 1
+        ),
+        CONVERGE_TIMEOUT,
+        || {
+            let mut peers = Vec::with_capacity(count);
+            for port in &rpc_ports {
+                match peers_try(*port) {
+                    Ok(n) => peers.push(n),
+                    Err(error) => return Err(format!("{error}; peers so far {peers:?}")),
+                }
+            }
+            if peers.iter().all(|n| *n >= expected_peers) {
+                Ok(peers)
+            } else {
+                Err(format!("peers {peers:?} (want {expected_peers} each)"))
+            }
+        },
+    );
+    println!(
+        "[x3-partition7] validator {} rejoined inbound-only: peers {rejoin:?}",
+        victim + 1
+    );
+
+    // It must be caught up before it is cut, or the backlog it fetched while reconnecting (blocks
+    // and finality justifications already in hand) keeps advancing its finalized head after the cut.
+    // Measured: a validator left ~160 blocks behind kept finalizing from a 519 watermark up to 653
+    // once it was cut off, which is not the isolated validator finalizing on its own.
+    let caught_up = wait_until(
+        &format!("validator {} to catch up before it is cut off", victim + 1),
+        CONVERGE_TIMEOUT,
+        || {
+            let finals: Vec<u64> = rpc_ports
+                .iter()
+                .map(|port| finalized_number(*port))
+                .collect();
+            let best_survivor = finals
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != victim)
+                .map(|(_, n)| *n)
+                .max()
+                .expect("at least one survivor");
+            if finals[victim] + SEVEN_CATCHUP_DELTA >= best_survivor {
+                Ok(finals)
+            } else {
+                Err(format!(
+                    "validator {} finalized {} against the best survivor {best_survivor}",
+                    victim + 1,
+                    finals[victim]
+                ))
+            }
+        },
+    );
+    println!(
+        "[x3-partition7] validator {} caught up before the cut: finalized {caught_up:?}",
+        victim + 1
+    );
+
+    // -------- phase 2: cut exactly one validator off, without killing it --------
+    let guard = PartitionGuard {
+        tools,
+        p2p_port: victim_p2p,
+    };
+    guard.tools.cut(victim_p2p);
+    println!(
+        "[x3-partition7] cut validator {} (rpc :{victim_rpc}, p2p :{victim_p2p}) off at the kernel \
+         level; it stays alive",
+        victim + 1
+    );
+
+    // The cut is only believed once the peer counts move: the survivor that lost the link drops by
+    // one; the isolated validator reaches zero. A "partition" that does not change a count is
+    // checking nothing, so a cut that does not show fails here by name.
+    let survivor_peers = (count - 2) as u64;
+    let cut_peers = wait_until(
+        &format!("the cut to show as peer counts (victim 0, each survivor {survivor_peers})"),
+        PARTITION_TIMEOUT,
+        || {
+            let mut observed = Vec::with_capacity(count);
+            for (i, port) in rpc_ports.iter().enumerate() {
+                let n = peers_of(*port);
+                observed.push(n);
+                if i == victim {
+                    if n != 0 {
+                        return Err(format!(
+                            "the isolated validator still reports {n} peer(s); peer counts \
+                             {observed:?}"
+                        ));
+                    }
+                } else if n != survivor_peers {
+                    return Err(format!(
+                        "survivor {} reports {n} peers, want {survivor_peers}; peer counts \
+                         {observed:?}",
+                        i + 1
+                    ));
+                }
+            }
+            Ok(observed)
+        },
+    );
+    println!("[x3-partition7] cut confirmed: peer counts {cut_peers:?}");
+
+    // The isolated validator is a running node, not a corpse.
+    let alive = rpc_expect(victim_rpc, "system_health", Vec::new());
+    assert!(
+        alive.get("peers").is_some(),
+        "the isolated validator stopped answering system_health: {alive}"
+    );
+
+    // The watermark the survivors must push past and the victim must not. Read only once the
+    // victim's finalized head has stopped moving, so a backlog it fetched while reconnecting cannot
+    // advance it after the cut and be mistaken for the isolated validator finalizing on its own.
+    let victim_frozen = wait_until(
+        "the isolated validator's finalized head to stop moving",
+        PARTITION_TIMEOUT,
+        || {
+            let before = finalized_number(victim_rpc);
+            std::thread::sleep(Duration::from_secs(5));
+            let after = finalized_number(victim_rpc);
+            if before == after {
+                Ok(before)
+            } else {
+                Err(format!("finalized moved {before} -> {after}"))
+            }
+        },
+    );
+    let at_cut: Vec<View> = rpc_ports.iter().map(|port| view(*port)).collect();
+    let freeze_floor = at_cut
+        .iter()
+        .map(|v| v.finalized)
+        .max()
+        .expect("a finalized watermark");
+    let fork = at_cut.iter().map(|v| v.best).min().expect("a fork point");
+    println!(
+        "[x3-partition7] fork point ≈ {fork}; finality watermark {freeze_floor}; validator {} \
+         frozen at {victim_frozen}",
+        victim + 1
+    );
+
+    // -------- phase 3: the survivors keep finalizing while the victim falls behind --------
+    let during = wait_until(
+        &format!(
+            "the survivors to finalize past {} while the isolated validator falls {SEVEN_VICTIM_LAG} \
+             behind",
+            freeze_floor + SEVEN_AFTER_CUT_FINALITY
+        ),
+        PARTITION_TIMEOUT,
+        || {
+            let views: Vec<View> = rpc_ports.iter().map(|port| view(*port)).collect();
+            let survivor_finalized = views
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != victim)
+                .map(|(_, v)| v.finalized)
+                .min()
+                .expect("at least one survivor");
+            let survivor_best = views
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != victim)
+                .map(|(_, v)| v.best)
+                .min()
+                .expect("at least one survivor");
+            let behind = survivor_best.saturating_sub(views[victim].best);
+            if survivor_finalized >= freeze_floor + SEVEN_AFTER_CUT_FINALITY
+                && behind >= SEVEN_VICTIM_LAG
+            {
+                Ok(views)
+            } else {
+                Err(format!(
+                    "survivors finalized {survivor_finalized} (want ≥ {}); victim behind by \
+                     {behind} (want ≥ {SEVEN_VICTIM_LAG}); best {survivor_best}",
+                    freeze_floor + SEVEN_AFTER_CUT_FINALITY
+                ))
+            }
+        },
+    );
+    println!(
+        "[x3-partition7] during: finalized {:?}; best {:?}; peers {:?}",
+        during.iter().map(|v| v.finalized).collect::<Vec<_>>(),
+        during.iter().map(|v| v.best).collect::<Vec<_>>(),
+        during.iter().map(|v| v.peers).collect::<Vec<_>>(),
+    );
+
+    // (a) The survivors kept finalizing — the property a testnet needs, and the one a three-set
+    //     cannot have.
+    for (i, observed) in during.iter().enumerate() {
+        if i == victim {
+            continue;
+        }
+        assert!(
+            observed.finalized >= freeze_floor + SEVEN_AFTER_CUT_FINALITY,
+            "survivor {} stopped finalizing: {} did not reach {} (watermark {freeze_floor})",
+            i + 1,
+            observed.finalized,
+            freeze_floor + SEVEN_AFTER_CUT_FINALITY
+        );
+        assert!(
+            observed.peers >= survivor_peers,
+            "survivor {} lost a peer it should have kept: {} < {survivor_peers}",
+            i + 1,
+            observed.peers
+        );
+    }
+    // (b) The isolated validator is isolated: zero peers, alive, frozen, and behind.
+    assert_eq!(
+        during[victim].peers, 0,
+        "the isolated validator was not isolated: it reports {} peers",
+        during[victim].peers
+    );
+    assert!(
+        during[victim].finalized <= victim_frozen,
+        "the isolated validator finalized past its watermark without the other authorities: {} -> \
+         {}",
+        victim_frozen,
+        during[victim].finalized
+    );
+    let slowest_survivor_best = during
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != victim)
+        .map(|(_, v)| v.best)
+        .min()
+        .expect("at least one survivor");
+    assert!(
+        during[victim].best + SEVEN_VICTIM_LAG <= slowest_survivor_best,
+        "the isolated validator did not fall behind: its head {} vs the slowest survivor's {}",
+        during[victim].best,
+        slowest_survivor_best
+    );
+    println!(
+        "[x3-partition7] tolerance proven: {} of {count} survivors finalized past {freeze_floor} \
+         while validator {} stayed alive at {victim_frozen} and fell {} behind",
+        count - 1,
+        victim + 1,
+        slowest_survivor_best - during[victim].best
+    );
+
+    // -------- phase 4: heal, and require real convergence --------
+    guard.tools.heal(victim_p2p);
+
+    let healed = wait_until(
+        &format!("all {count} validators to reconnect after the heal"),
+        CONVERGE_TIMEOUT,
+        || {
+            let peers: Vec<u64> = rpc_ports.iter().map(|port| peers_of(*port)).collect();
+            if peers.iter().all(|n| *n >= expected_peers) {
+                Ok(peers)
+            } else {
+                Err(format!("peers {peers:?} (want {expected_peers} each)"))
+            }
+        },
+    );
+    println!("[x3-partition7] healed: peers {healed:?}");
+
+    let converged = wait_until(
+        "all validators to agree on a finalized block past the freeze",
+        CONVERGE_TIMEOUT,
+        || {
+            let heights: Vec<u64> = rpc_ports
+                .iter()
+                .map(|port| finalized_number(*port))
+                .collect();
+            let common = *heights.iter().min().expect("a finalized height to compare");
+            if common <= freeze_floor {
+                return Err(format!(
+                    "finality has not resumed past the freeze {freeze_floor}: {heights:?}"
+                ));
+            }
+            let hashes: Vec<String> = rpc_ports
+                .iter()
+                .map(|port| {
+                    block_hash_at(*port, common)
+                        .unwrap_or_else(|| panic!(":{} has no hash at {common}", port))
+                })
+                .collect();
+            if !hashes.iter().all(|h| h == &hashes[0]) {
+                return Err(format!(
+                    "the validators disagree at height {common}: {hashes:?}"
+                ));
+            }
+            Ok((common, hashes[0].clone(), heights))
+        },
+    );
+    let (conv_height, conv_hash, heights) = converged;
+    assert!(
+        conv_height > freeze_floor,
+        "finality did not resume past the freeze point ({freeze_floor})"
+    );
+    println!(
+        "[x3-partition7] converged: all {count} finalized {conv_height}:{conv_hash} (heights \
+         {heights:?}), past the freeze {freeze_floor}"
+    );
+
+    let resumed = wait_until(
+        "finality to keep advancing after the heal",
+        CONVERGE_TIMEOUT,
+        || {
+            let heights: Vec<u64> = rpc_ports
+                .iter()
+                .map(|port| finalized_number(*port))
+                .collect();
+            let common = *heights.iter().min().expect("a finalized height to compare");
+            if common > conv_height {
+                Ok(common)
+            } else {
+                Err(format!("finalized {heights:?}"))
+            }
+        },
+    );
+    println!(
+        "[x3-partition7] finality resumed: {freeze_floor} (frozen) -> {conv_height} (converged) -> \
+         {resumed} (still advancing) on all {count}"
+    );
+
+    drop(guard);
+    drop(network);
 }
