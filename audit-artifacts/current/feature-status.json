@@ -3577,6 +3577,39 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
+      "composite": 37,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-wallet/src/hardware_wallet.rs",
+        "crates/x3-wallet/src/transaction_signer.rs",
+        "note: 2026-09-25 - the hardware verifier was fail-open on shaped bytes and the crate's tests ran in no gate"
+      ],
+      "id": "X3-OPS-011",
+      "implemented": 55,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 20,
+      "missing_work": [
+        "**CLOSED 2026-09-25 \u2014 `HardwareWalletEngine::verify_signature` returned `Ok(true)` for bytes it never verified.** It refused an empty signature and a short one, then set `verified = true` unless `recovery_id > 3`: `tx_hash` was never read, the public key was never used and no ECDSA recovery or check ran, so any 64-byte blob with an in-range recovery id was reported as a verified hardware signature, bound to no transaction. The device's signing convention (message pre-hash, public-key encoding, derivation-path binding, recovery-id semantics) is defined nowhere in this repository and there is no device or test vector to pin it, so the directive's fail-closed branch applies: it refuses every input now, with an error saying verification is not implemented, and the two tests that pinned the old behaviour assert the refusal instead.",
+        "**OPEN \u2014 `approve_signature` still records `verified: true`.** A device approval is not a verification and the field name says otherwise; the struct derives `Encode`/`Decode`, so renaming it or keeping it as 'the device approved this request' is an interface decision this row has not taken.",
+        "**OPEN \u2014 nothing proves the crate talks to a real device.** No Ledger/Trezor integration test, no device fixture, and `crates/x3-wallet-cli` answers its commands with 'not implemented: this CLI does not talk to a node yet'.",
+        "**OPEN \u2014 a signature convention has to be pinned before verification can be implemented.** Until a device, a test vector and the pre-hash are recorded, `verify_signature` refusing is the only honest state."
+      ],
+      "name": "Wallet signing crate (hardware signatures)",
+      "paths": [
+        "crates/x3-wallet/src"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
+      "subsystem": "operations_user_tools",
+      "tested": 40,
+      "tests": "tested score 40% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
+      "claim_risk": false,
       "composite": 40,
       "confidence": "high",
       "evidence": [
@@ -4385,9 +4418,9 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "630aca041c7d07b25c4673e9a9df7cb67db16bb7d26eadcdb342528a635c7ccf",
+    "source_digest": "cf2c919d746d6249e7479a843d0c9a895c8cfd3d7b9121a1236bf6f5c343a842",
     "sources": {
-      "FEATURE_MATRIX.toml": "b9cab28b2cac40313f79408149baae5a2b66e42b188c86f47501061414d54954",
+      "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "0904b8179e9168aa5739c75e81309aa771f0893a38e15935551ad825dd58e955",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
       "feature-matrix/claims-hygiene.toml": "38adfc42c2cfe602e3588afb5ee401319b27d4b2cbd824b7e262b46a552da389",
@@ -4398,7 +4431,7 @@
       "feature-matrix/gpu-performance.toml": "e8ee0032511dea19438afd4e9ed78b228e8b121c4c61855d2583b7d20cf7262f",
       "feature-matrix/language-trading.toml": "3d3fc065467efb1a9f90305f4add9d6b275ac262f0ecf2da9aed61a5ff16f0fc",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "318871c7725faec6007c77028002406884b40067977c3ef44dd4e2454f334230",
+      "feature-matrix/operations-user-tools.toml": "75feb2b8b04dea7eb169c6bb17f0d38c2cfcc7ed9bc94e10b7b1732b0841ad14",
       "feature-matrix/runtime-core.toml": "d36e103197c2d7bd4c4348365ed08875160353a43c98d8e5f42b1e54e64442e9",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
@@ -4832,10 +4865,10 @@
       "FUNCTIONAL BUT UNHARDENED": 56,
       "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
-      "PARTIAL": 60,
+      "PARTIAL": 61,
       "STUB": 11
     },
-    "matrix_features": 145,
+    "matrix_features": 146,
     "registry_features": 21,
     "registry_max_readiness": 88,
     "registry_mean_readiness": 56.0,

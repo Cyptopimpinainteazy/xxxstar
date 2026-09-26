@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `630aca041c7d07b2…` — the artifacts move when
+Source digest: `cf2c919d746d6249…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -165,6 +165,7 @@ fails when they do not match.
 | MTX-X3-OPS-008 | operations_user_tools | RPC middleware: Production rate limits/abuse policies need external testing | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 65% (no named test list on this row) | open |
 | MTX-X3-OPS-009 | operations_user_tools | Block explorer: No finished production explorer proven | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | STUB · tested score 15% (no named test list on this row) | open |
 | MTX-X3-OPS-010 | operations_user_tools | Prometheus/Grafana-style ops monitoring: No complete canonical deployed monitoring stack proven | unassigned | — | — | P2/medium | `bash scripts/local-ci.sh` | STUB · tested score 15% (no named test list on this row) | open |
+| MTX-X3-OPS-011 | operations_user_tools | Wallet signing crate (hardware signatures): **CLOSED 2026-09-25 — `HardwareWalletEngine::verify_signature` returned `Ok(true)` for bytes it never verified.** It refused an empty signature and a short one, then set `verified = true` unless `recovery_id > 3`: `tx_hash` was never read,… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 40% (no named test list on this row) | open |
 | MTX-X3-RT-001 | runtime_core | Halt permits recovery/refund paths: Required tests not yet proven in canonical registry | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-002 | runtime_core | Atomic Kernel pallet: **Closed 2026-09-23 — bundle finalization is authorized now.** The unsigned `submit_finalization_result` extrinsic was removed: it was `ensure_none`, its off-chain marker (`x3fin:`) had no writer anywhere in this repository, and `do_finaliz… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | NOT INTEGRATED · 8 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-003 | runtime_core | mainnet-rc1 feature mode: Historical status documents show verification churn; exact-head proof still required | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
@@ -193,6 +194,6 @@ fails when they do not match.
 | MTX-X3-SEC-014 | security_proofgate | Trivy scanning: Keep filesystem scope current | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 78% (no named test list on this row) | open |
 | MTX-X3-SEC-015 | security_proofgate | Rust Clippy hard-fail gate: Keep -D warnings and avoid coverage weakening | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 80% (no named test list on this row) | open |
 
-**181 open rows** (1 blocker lines on registry rows are marked CLOSED and are not
+**182 open rows** (1 blocker lines on registry rows are marked CLOSED and are not
 listed). A row disappears only when the underlying record changes - a fixed blocker removed
 from `FEATURE_REGISTRY.toml`, or a matrix row that reached `COMPLETE`.

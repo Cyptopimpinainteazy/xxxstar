@@ -177,3 +177,35 @@ launch_scope = "guarded"
 claim_risk = false
 blockers = ["No complete canonical deployed monitoring stack proven"]
 evidence = ["docs", "note: Monitoring concepts present but operational proof incomplete"]
+
+[[feature]]
+# Recorded 2026-09-25 against the code: `crates/x3-wallet` was cited by no row, run by no gate, and
+# its hardware-wallet verifier accepted bytes it could not verify.
+id = "X3-OPS-011"
+name = "Wallet signing crate (hardware signatures)"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["crates/x3-wallet/src"]
+implemented = 55
+tested = 40
+mainnet_ready = 20
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = [
+  "**CLOSED 2026-09-25 — `HardwareWalletEngine::verify_signature` returned `Ok(true)` for bytes it never verified.** It refused an empty signature and a short one, then set `verified = true` unless `recovery_id > 3`: `tx_hash` was never read, the public key was never used and no ECDSA recovery or check ran, so any 64-byte blob with an in-range recovery id was reported as a verified hardware signature, bound to no transaction. The device's signing convention (message pre-hash, public-key encoding, derivation-path binding, recovery-id semantics) is defined nowhere in this repository and there is no device or test vector to pin it, so the directive's fail-closed branch applies: it refuses every input now, with an error saying verification is not implemented, and the two tests that pinned the old behaviour assert the refusal instead.",
+  "**OPEN — `approve_signature` still records `verified: true`.** A device approval is not a verification and the field name says otherwise; the struct derives `Encode`/`Decode`, so renaming it or keeping it as 'the device approved this request' is an interface decision this row has not taken.",
+  "**OPEN — nothing proves the crate talks to a real device.** No Ledger/Trezor integration test, no device fixture, and `crates/x3-wallet-cli` answers its commands with 'not implemented: this CLI does not talk to a node yet'.",
+  "**OPEN — a signature convention has to be pinned before verification can be implemented.** Until a device, a test vector and the pre-hash are recorded, `verify_signature` refusing is the only honest state.",
+]
+required_tests = [
+  "test_verify_signature",
+  "test_verify_signature_refuses_a_well_shaped_but_unverifiable_signature",
+  "test_verify_signature_empty",
+  "test_verify_signature_invalid_recovery_id",
+]
+test_evidence = [
+  "note: `test x3-wallet` (added 2026-09-25 — the crate's 174 tests ran in no gate before that) passes; the refusal tests are crates/x3-wallet/src/hardware_wallet.rs and the real Ed25519/Sr25519 checks, which refuse tampered, retargeted and truncated input, are crates/x3-wallet/src/transaction_signer.rs",
+]
+evidence = ["crates/x3-wallet/src/hardware_wallet.rs", "crates/x3-wallet/src/transaction_signer.rs", "note: 2026-09-25 - the hardware verifier was fail-open on shaped bytes and the crate's tests ran in no gate"]

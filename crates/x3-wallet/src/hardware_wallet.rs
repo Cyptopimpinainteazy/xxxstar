@@ -140,33 +140,28 @@ impl HardwareWalletEngine {
         })
     }
 
-    /// Verify hardware signature against public key
+    /// Verify a hardware signature against a transaction hash.
+    ///
+    /// **This refuses every signature, deliberately.** It used to return `Ok(true)` for any 64-byte
+    /// or longer blob whose `recovery_id` was in range: `tx_hash` was never read, the public key was
+    /// never used and no ECDSA recovery or verification ran, so an arbitrary byte string was
+    /// reported as a verified hardware signature — the same "some bytes = an attestation" shape
+    /// `ROADMAP PRIORITY 6` prohibits. The directive allows either a real verification against a
+    /// defined trust root or failing closed; the device's signing convention is not defined
+    /// anywhere in this repository (message pre-hash, public-key encoding, derivation-path binding
+    /// and the recovery-id semantics are all unknown, and there is no device or test vector to pin
+    /// them), so the honest answer is to refuse rather than invent a convention and call it
+    /// verification. `approve_signature` records a device approval; that is not verification, and
+    /// must not be read as it.
     pub fn verify_signature(
         signature: &HardwareSignature,
         tx_hash: [u8; 32],
     ) -> Result<bool, &'static str> {
-        if signature.signature.is_empty() {
-            return Err("Empty signature");
-        }
-        if signature.public_key.is_empty() {
-            return Err("Empty public key");
-        }
-
-        // ECDSA signature verification (secp256k1)
-        // Format: (r, s) where r and s are 32-byte values
-        if signature.signature.len() < 64 {
-            return Err("Invalid signature length");
-        }
-
-        // Basic validation: signature should be deterministic
-        let mut verified = true;
-
-        // Verify recovery_id is in valid range [0, 3]
-        if signature.recovery_id > 3 {
-            verified = false;
-        }
-
-        Ok(verified)
+        let _ = (signature, tx_hash);
+        Err(
+            "hardware signature verification is not implemented for this backend: the device \
+             signing convention is undefined, so no hardware signature is accepted",
+        )
     }
 
     /// Approve signature (user confirmed on device)
@@ -316,6 +311,28 @@ mod tests {
         assert!(result.is_err());
     }
 
+    /// The regression test for the gap: correctly shaped bytes with an in-range recovery id used to
+    /// come back `Ok(true)` without anything being verified.
+    #[test]
+    fn test_verify_signature_refuses_a_well_shaped_but_unverifiable_signature() {
+        let sig = HardwareSignature {
+            signature: vec![1; 64],
+            public_key: vec![1, 2, 3],
+            signing_request_id: [0u8; 32],
+            verified: false,
+            recovery_id: 0,
+        };
+        let result = HardwareWalletEngine::verify_signature(&sig, [9u8; 32]);
+        assert!(
+            result.is_err(),
+            "no hardware signature may be accepted while the convention is undefined"
+        );
+        assert!(
+            result.unwrap_err().contains("not implemented"),
+            "the refusal has to say why, not fail opaquely"
+        );
+    }
+
     #[test]
     fn test_verify_signature_invalid_recovery_id() {
         let sig = HardwareSignature {
@@ -326,8 +343,10 @@ mod tests {
             recovery_id: 5, // invalid, should be 0-3
         };
         let result = HardwareWalletEngine::verify_signature(&sig, [0u8; 32]);
-        assert!(result.is_ok());
-        assert!(!result.unwrap());
+        assert!(
+            result.is_err(),
+            "an out-of-range recovery id is refused like every other input"
+        );
     }
 
     #[test]

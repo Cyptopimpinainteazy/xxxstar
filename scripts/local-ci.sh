@@ -359,6 +359,12 @@ GATES_FAST=(
   "test x3-lp-locker:cargo test -p pallet-x3-lp-locker"
   "test x3-token-factory:cargo test -p pallet-x3-token-factory"
   "test x3-sentinel:cargo test -p pallet-x3-sentinel"
+  # `crates/x3-wallet` is the wallet's own signing crate, and only its *pallet* was gated, so its
+  # suite ran nowhere. It is also where `HardwareWalletEngine::verify_signature` returned `Ok(true)`
+  # for any 64-byte blob with an in-range recovery id — `tx_hash` was never read and no ECDSA check
+  # ran — which is the fail-open shape PRIORITY 6 prohibits. That path refuses now, and the two
+  # tests that pinned the old behaviour assert the refusal instead.
+  "test x3-wallet:cargo test -p x3-wallet"
   "test x3-wallet-pallet:cargo test -p pallet-x3-wallet"
   "test x3-wrapped:cargo test -p pallet-x3-wrapped"
   "test atomic-trade-engine:cargo test -p pallet-atomic-trade-engine"

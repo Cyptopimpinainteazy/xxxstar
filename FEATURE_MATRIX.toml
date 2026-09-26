@@ -20,5 +20,5 @@ includes = [
 version = 1
 audit_date = "2026-09-12"
 repository = "Cyptopimpinainteazy/xxxstar"
-feature_count_expected = 145
+feature_count_expected = 146
 scoring = "implemented*0.35 + tested*0.25 + mainnet_ready*0.40"
