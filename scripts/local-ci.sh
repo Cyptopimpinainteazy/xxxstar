@@ -581,6 +581,11 @@ GATES_LIVE=(
   # than three are observed. It also parses the checked-in scrape config and
   # Grafana dashboard so the operator artifacts cannot rot.
   "monitoring across validators:bash scripts/monitoring/local3-monitoring-check.sh --self-test"
+  # The snapshot bullet: export a running chain, restore it into a fresh base path,
+  # and require the finalized height, the canonical hash at that height and every
+  # storage entry to come back — with a control node on an empty database required
+  # to disagree, so the same check cannot pass for an empty chain.
+  "snapshot restore across a live chain:bash scripts/snapshot-live-restore-proof.sh"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
   # `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54 …` internally, and
   # `+toolchain` only works through the rustup shim — which this script puts
@@ -1028,6 +1033,7 @@ SERIAL_GATES=(
   "local node smoke"
   "local network smoke"
   "monitoring across validators"
+  "snapshot restore across a live chain"
   "EVM contract lifecycle"
   "SVM contract lifecycle"
   "X3-native lifecycles"

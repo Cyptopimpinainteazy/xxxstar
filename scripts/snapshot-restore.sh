@@ -11,6 +11,10 @@
 #   rebuild: bash scripts/snapshot-restore.sh rebuild <manifest.json> <chunks_dir> <out_spec.json> \
 #                --chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n> \
 #                [--from-spec <template.json>] [--state-version 0|1] [--force]
+#   live-proof: bash scripts/snapshot-restore.sh live-proof
+#                (boots a real chain, snapshots it, restores it, and proves the
+#                 restored chain is the same chain — see
+#                 scripts/snapshot-live-restore-proof.sh)
 #
 # Exit codes:
 #   0 — success
@@ -55,6 +59,7 @@ usage() {
     echo "               [--chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n>]"
     echo "  rebuild: bash scripts/snapshot-restore.sh rebuild <manifest.json> <chunks_dir> <out_spec.json> \\"
     echo "               --chain-id <id> --block-hash <0x..> --state-root <0x..> --runtime-version <n>"
+    echo "  live-proof: bash scripts/snapshot-restore.sh live-proof"
     exit 1
 }
 
@@ -298,6 +303,14 @@ case "$ACTION" in
         ;;
     list)
         do_list "${2:-$SNAPSHOT_DIR}"
+        ;;
+    live-proof)
+        # End-to-end proof that a restore reproduces the source chain: boot a
+        # chain, snapshot it, restore it into a fresh base path, boot a node on
+        # the restored database, and require the finalized height, the canonical
+        # hash, the state root and the state key set to match — with an empty-DB
+        # control that must fail the same check.
+        exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/snapshot-live-restore-proof.sh"
         ;;
     verify-snapshot)
         # Verify a content-addressed snapshot (manifest + chunk directory)
