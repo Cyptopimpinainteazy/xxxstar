@@ -8176,3 +8176,58 @@ Report: `.ai/reports/dependabot-triage-20260925.md`.
 3. `evm`/`ethereum` port as above.
 4. `submit_comit_v2` weight is still a placeholder (the benchmark exists but needs executable EVM/SVM
    fixtures).
+
+## 2026-09-26 (fifty-third pass) — `x3_swarm_core`'s four fictional tests are now real
+
+### Facts to remember
+- `crates/x3-swarm-core` is a **nested cargo workspace** (excluded from the root workspace) and is gated by the
+  fast gate `test x3-swarm-core` in `scripts/local-ci.sh` -> `cargo test --locked --all-targets
+  --manifest-path crates/x3-swarm-core/Cargo.toml`. Measured 2026-09-26: 73 passed / 0 failed / 0 ignored
+  (54 lib + 4 new + 15 guard).
+- The runtime dependency graph that `scripts/check-runtime-hash-freshness.py` computes from `cargo metadata`
+  for `x3-chain-runtime` is **129 package directories**; an edit anywhere under them fails the `runtime hash
+  freshness` gate until `docs/reports/runtime-wasm-hashes.json` moves with it. `crates/x3-swarm-core` is not
+  in that set, which is why this work could proceed while a runtime re-attestation was in flight.
+- CRITICAL-TOK-1 (2026-09-06) had deleted `[x3_swarm_core]`'s `required_tests` because the four names existed
+  nowhere in the crate. They now exist as real behaviour tests in
+  `crates/x3-swarm-core/tests/agent_lifecycle.rs` and are cited again.
+
+### Decisions made this session
+- Kept `readiness_score = 25`. Four real tests for four cited behaviours do not make an experimental control
+  plane ready, and the row's other blocker (no multi-agent race/partition testing) still stands.
+- Rewrote the stale blocker "Experimental — not in CI critical path" instead of leaving a claim the gate list
+  contradicts: the tests *do* run in the fast set; the honest fact is the crate is off the deployed path.
+- Left the pre-existing `manual_div_ceil` clippy failure at `crates/x3-swarm-core/src/policy.rs:19` unfixed and
+  reported it instead — unrelated to this change, and the nested workspace has no clippy gate.
+
+### Canonical paths chosen
+- `crates/x3-swarm-core/tests/agent_lifecycle.rs` is the only place the four registry-cited swarm behaviours are
+  asserted; `tests/guard_tests.rs` remains the path-guard suite.
+
+### Known blockers
+- The `runtime hash freshness` gate passes as soon as the record file appears in the outgoing diff — it is a
+  cheap early warning only. The real check is stage 6b of `scripts/mainnet_release_gate.py`, which rebuilds the
+  runtime in the pinned srtool image.
+- `services/x3-swarm-api` and `services/x3-swarm-worker` declare no tests, so the swarm control plane has no
+  service-level coverage.
+
+### Dead ends to avoid
+- Do not start a second `scripts/update-runtime-hashes.sh` while one is running: it removes
+  `runtime/target/srtool` between the two builds, so concurrent runs destroy each other's cache. The
+  2026-09-26 re-attestation was correctly run from a scratch copy at `/tmp/x3-rt-rebuild`.
+
+### Environment notes
+- **Sandboxing is broken on this box**: every sandboxed `exec_command` and `apply_patch` fails with
+  `error building bubblewrap command: mountinfo path is not absolute`. Run commands with escalation; for edits
+  `apply_patch` cannot make, use an exact-match replacement that asserts the anchor occurs once, then verify
+  with `git diff`.
+- Multiple Codex agents work this tree at once (the 2026-09-26 srtool re-attestation ran in
+  `/tmp/x3-rt-rebuild` while this crate's tests were written). Check `git status` and `ps` for an in-flight
+  build before touching runtime-affecting files, and stage commits file-by-file rather than with `-A`.
+
+### Next task seed
+- `X3-LANG-004`, the EVM/SVM payload convention: decide whether an accepted EVM/SVM payload is bytecode/eBPF
+  (validated with `T::EvmAdapter::validate`) or a SCALE-encoded `Packet` the adapter translates. The kernel and
+  the adapters disagree today, which is why packets are now refused by name; the choice ripples through kernel
+  tests, benchmark fixtures and the routing helpers. It is runtime-affecting, so it must be the last thing
+  committed before a runtime re-attestation.
