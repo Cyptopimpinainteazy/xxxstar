@@ -432,9 +432,15 @@ impl EthereumBridge {
             ));
         }
 
-        // Mint wrapped token on X3
+        // Mint wrapped token on X3. A deposit adds to whatever the key already holds;
+        // `insert` used to overwrite it, so a second deposit of the same token to the
+        // same recipient silently destroyed every earlier one.
         let wrapped_key = format!("{}_{}", deposit.token, x3_recipient);
-        self.wrapped_tokens.insert(wrapped_key, deposit.amount);
+        let minted_so_far = *self.wrapped_tokens.get(&wrapped_key).unwrap_or(&0);
+        let new_balance = minted_so_far
+            .checked_add(deposit.amount)
+            .ok_or("Wrapped balance overflow")?;
+        self.wrapped_tokens.insert(wrapped_key, new_balance);
 
         // Update deposit status
         if let Some(deposit_mut) = self.deposits.get_mut(&message.deposit_id) {
@@ -451,14 +457,26 @@ impl EthereumBridge {
         Ok(())
     }
 
-    /// Burn wrapped token on X3 to unlock on Ethereum
+    /// Burn wrapped tokens on X3 to unlock them on Ethereum.
+    ///
+    /// The burn debits **only the caller's own account**. This is the off-chain model
+    /// of `pallets/x3-wrapped`'s `burn_wrapped`, whose production path takes the
+    /// account from `ensure_signed(origin)`; with no origin to read here the caller
+    /// names itself, and there is deliberately no parameter through which one account
+    /// could name another's to debit. Until 2026-09-26 the account to debit was an
+    /// argument and nothing was checked about who was asking, so any caller could
+    /// destroy any holder's wrapped balance in one call.
     pub fn burn_wrapped(
         &mut self,
-        x3_account: String,
-        token_addr: String,
+        caller: &str,
+        token_addr: &str,
         amount: u128,
     ) -> Result<(), String> {
-        let key = format!("{}_{}", token_addr, x3_account);
+        if amount == 0 {
+            return Err("Amount must be non-zero".to_string());
+        }
+
+        let key = format!("{}_{}", token_addr, caller);
 
         let balance = self
             .wrapped_tokens
@@ -811,26 +829,27 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_burn_wrapped() {
+    /// A test-bypass bridge holding `amount` of `0xUSDC` for `recipient`, minted
+    /// through the real lock -> confirm -> message -> 5-of-7 sign -> execute_mint path.
+    fn bridge_holding(recipient: &str, amount: u128) -> EthereumBridge {
         let validators: Vec<String> = (0..7).map(|i| format!("0x{:040x}", i)).collect();
         let mut bridge = EthereumBridge::new_with_test_bypass(validators).unwrap();
 
-        let usdc = ERC20Token {
-            address: "0xUSDC".to_string(),
-            name: "USDC".to_string(),
-            decimals: 6,
-            total_supply: 1_000_000_000_000u128,
-        };
-
-        bridge.register_token(usdc).ok();
+        bridge
+            .register_token(ERC20Token {
+                address: "0xUSDC".to_string(),
+                name: "USDC".to_string(),
+                decimals: 6,
+                total_supply: 1_000_000_000_000u128,
+            })
+            .ok();
 
         let deposit = bridge
             .lock_on_ethereum(
                 "0xAlice".to_string(),
                 "0xUSDC".to_string(),
-                1_000_000u128,
-                "0xAlice_X3".to_string(),
+                amount,
+                recipient.to_string(),
                 17_000_000,
                 "0xtxhash".to_string(),
             )
@@ -844,13 +863,89 @@ mod tests {
         }
 
         bridge
-            .execute_mint(&msg.id, "0xAlice_X3".to_string(), 1000)
-            .ok();
+            .execute_mint(&msg.id, recipient.to_string(), 1000)
+            .unwrap();
+        bridge
+    }
 
-        // Now burn
-        let burn_result =
-            bridge.burn_wrapped("0xAlice_X3".to_string(), "0xUSDC".to_string(), 500_000u128);
-        assert!(burn_result.is_ok());
+    #[test]
+    fn test_burn_wrapped() {
+        let mut bridge = bridge_holding("0xAlice_X3", 1_000_000);
+
+        assert!(bridge
+            .burn_wrapped("0xAlice_X3", "0xUSDC", 500_000u128)
+            .is_ok());
+        assert_eq!(bridge.get_wrapped_balance("0xAlice_X3", "0xUSDC"), 500_000);
+    }
+
+    /// A burn debits the caller's own account and nothing else. The previous shape of
+    /// `burn_wrapped` took the account to debit as an argument and checked nothing about
+    /// who was asking: a call with no identity in it at all could destroy half of
+    /// Alice's wrapped balance (measured before the fix). With the account parameter
+    /// gone, naming someone else's account to debit is not expressible.
+    #[test]
+    fn a_burn_debits_only_the_callers_own_account() {
+        let mut bridge = bridge_holding("0xAlice_X3", 1_000_000);
+
+        // Bob holds nothing here, and calling as himself cannot reach Alice's balance.
+        assert!(bridge.burn_wrapped("0xBob_X3", "0xUSDC", 1u128).is_err());
+        assert_eq!(
+            bridge.get_wrapped_balance("0xAlice_X3", "0xUSDC"),
+            1_000_000,
+            "a burn by another caller must leave Alice's balance untouched"
+        );
+
+        // More than the caller holds is refused, and the balance is untouched.
+        assert!(bridge
+            .burn_wrapped("0xAlice_X3", "0xUSDC", 1_000_001u128)
+            .is_err());
+        assert_eq!(
+            bridge.get_wrapped_balance("0xAlice_X3", "0xUSDC"),
+            1_000_000
+        );
+
+        // A zero-amount burn is not a burn.
+        assert!(bridge.burn_wrapped("0xAlice_X3", "0xUSDC", 0u128).is_err());
+        assert_eq!(
+            bridge.get_wrapped_balance("0xAlice_X3", "0xUSDC"),
+            1_000_000
+        );
+    }
+
+    /// A second deposit of the same token to the same recipient adds to the balance.
+    /// `execute_mint` used to `insert` the new amount over the old one, so a second
+    /// deposit destroyed the first.
+    #[test]
+    fn a_second_deposit_adds_to_the_wrapped_balance() {
+        let mut bridge = bridge_holding("0xAlice_X3", 1_000_000);
+
+        let deposit = bridge
+            .lock_on_ethereum(
+                "0xAlice".to_string(),
+                "0xUSDC".to_string(),
+                250_000u128,
+                "0xAlice_X3".to_string(),
+                17_000_100,
+                "0xtxhash2".to_string(),
+            )
+            .unwrap();
+
+        bridge.confirm_deposit(&deposit.id, 17_000_112).ok();
+        let msg = bridge.create_bridge_message(deposit.id).unwrap();
+
+        for i in 0..5 {
+            bridge.sign_message(&msg.id, i as u32, vec![i as u8]).ok();
+        }
+
+        bridge
+            .execute_mint(&msg.id, "0xAlice_X3".to_string(), 1001)
+            .unwrap();
+
+        assert_eq!(
+            bridge.get_wrapped_balance("0xAlice_X3", "0xUSDC"),
+            1_250_000,
+            "the second deposit must add to the first, not replace it"
+        );
     }
 
     #[test]

@@ -91,8 +91,8 @@ name = "Ethereum bridge adapter"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/src/evm_receipt.rs", "crates/x3-relayer/src/evm_receipt_proof.rs"]
-implemented = 75
-tested = 60
+implemented = 80
+tested = 70
 mainnet_ready = 45
 priority = "P0"
 confidence = "high"
@@ -100,11 +100,21 @@ launch_scope = "core"
 claim_risk = false
 blockers = [
   "The lock-mint adapter is not wired into anything: `crates/x3-bridge/src/ethereum_bridge.rs` has no caller outside its own module, so no pallet or service enforces its checks in production yet",
-  "`burn_wrapped` takes the account to debit as an argument and verifies nothing about who is asking — the origin check has to come from whatever calls it, and nothing does; it is a theft primitive waiting for a caller",
   "No live Ethereum deployment: the receipt proof path is exercised against anvil (including strict posture) and nothing has run against a public chain",
   "The production signer policy for the 5-of-7 keys is the same gap as X3-L1-002 (no ceremony, rotation or HSM guidance)",
   "No external audit",
 ]
+# The theft primitive the row recorded is closed: `EthereumBridge::burn_wrapped`
+# took the account to debit as an argument and checked nothing about who was asking,
+# so any caller could destroy any holder's wrapped balance (measured on 2026-09-26:
+# a call naming Alice's account halved it, with no identity anywhere in the call).
+# It now takes the caller and debits only that account — there is no parameter
+# through which one account can name another's — which is the off-chain shape of the
+# pallet's `ensure_signed`. `execute_mint` had the same shape of defect on the other
+# side of the same key: it `insert`ed the new amount over the old one, so a second
+# deposit of a token to one recipient destroyed the first. Both are pinned by tests
+# that fail when the guard is removed. What remains open on this row is unchanged:
+# the model still has no production consumer, no public-chain run and no audit.
 # Two real defects were fixed here on 2026-09-22. `create_bridge_message` claimed
 # `keccak256(deposit_id || amount || token || recipient)` and computed
 # `hash[i] ^= deposit_id.as_bytes()[i]` — no hash function, and none of the amount,
@@ -114,7 +124,13 @@ blockers = [
 # deposit now carries `x3_recipient`, the message hash is keccak over all four fields,
 # and the mint must match the recorded recipient.
 evidence = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/src/evm_receipt.rs", "crates/x3-relayer/src/evm_receipt_proof.rs", "note: the 5-of-7 path verifies real ECDSA — 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused — and the external proof the row called missing exists: anvil-backed EVM lifecycles run in the cross-domain gates, dev and strict posture, with receipts-trie inclusion and typed receipts verified through x3-verification-router"]
-test_evidence = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/tests/data/anvil_block1_receipts.hex", "note: 122 x3-bridge lib tests pass, including bridge_message_hash_covers_the_economic_terms (a different recipient or amount must change what validators sign, and the hash must not be the deposit id XORed) and mint_to_an_account_other_than_the_recorded_recipient_is_refused (fails when the recipient binding is removed — negative control run); the EVM receipt producer and verifier have anvil-backed inclusion tests"]
+test_evidence = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/tests/data/anvil_block1_receipts.hex", "note: 124 x3-bridge lib tests pass, including bridge_message_hash_covers_the_economic_terms (a different recipient or amount must change what validators sign, and the hash must not be the deposit id XORed), mint_to_an_account_other_than_the_recorded_recipient_is_refused (fails when the recipient binding is removed — negative control run), and the burn/mint accounting pair added 2026-09-26 (a_burn_debits_only_the_callers_own_account fails when the burn key is not the caller; a_second_deposit_adds_to_the_wrapped_balance pins accumulation); the EVM receipt producer and verifier have anvil-backed inclusion tests"]
+required_tests = [
+    "test_burn_wrapped",
+    "a_burn_debits_only_the_callers_own_account",
+    "a_second_deposit_adds_to_the_wrapped_balance",
+    "mint_to_an_account_other_than_the_recorded_recipient_is_refused",
+]
 
 [[feature]]
 id = "X3-XCHAIN-005"

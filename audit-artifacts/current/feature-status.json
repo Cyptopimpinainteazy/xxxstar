@@ -684,7 +684,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 59,
+      "composite": 64,
       "confidence": "high",
       "evidence": [
         "crates/x3-bridge/src/ethereum_bridge.rs",
@@ -693,13 +693,12 @@
         "note: the 5-of-7 path verifies real ECDSA \u2014 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused \u2014 and the external proof the row called missing exists: anvil-backed EVM lifecycles run in the cross-domain gates, dev and strict posture, with receipts-trie inclusion and typed receipts verified through x3-verification-router"
       ],
       "id": "X3-XCHAIN-004",
-      "implemented": 75,
+      "implemented": 80,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 45,
       "missing_work": [
         "The lock-mint adapter is not wired into anything: `crates/x3-bridge/src/ethereum_bridge.rs` has no caller outside its own module, so no pallet or service enforces its checks in production yet",
-        "`burn_wrapped` takes the account to debit as an argument and verifies nothing about who is asking \u2014 the origin check has to come from whatever calls it, and nothing does; it is a theft primitive waiting for a caller",
         "No live Ethereum deployment: the receipt proof path is exercised against anvil (including strict posture) and nothing has run against a public chain",
         "The production signer policy for the 5-of-7 keys is the same gap as X3-L1-002 (no ceremony, rotation or HSM guidance)",
         "No external audit"
@@ -715,8 +714,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "cross_chain",
-      "tested": 60,
-      "tests": "tested score 60% (no named test list on this row)"
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4446,14 +4445,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "cc6e3f2ef5369d68fb62032ad7bbb18e2c86922da4f7e6f74955978264d715df",
+    "source_digest": "22b39aebb3c0dfd91f9d0acc9335d15a1ae8b9c7808998086f5d3a45467e621d",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
       "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
       "feature-matrix/claims-hygiene.toml": "e2101c3396a4b68a38e6f8ffc7245967fd1edaa05631080996a4a5d3c8bbd6e6",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "ea91a58676dc19d77e4fbb8c8966a7831ba620affbf40f79c1f62c411d3ae297",
+      "feature-matrix/cross-chain.toml": "ba968045e0f7d00c3223a4a0506ab1d4088b756c60444d8f88376d7be95dfd89",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
