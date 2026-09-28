@@ -45,7 +45,7 @@ jobs:
         run: python3 scripts/feature_matrix.py summary
 
       - name: Upload feature matrix reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: x3-feature-matrix-${{ github.sha }}
           if-no-files-found: error
