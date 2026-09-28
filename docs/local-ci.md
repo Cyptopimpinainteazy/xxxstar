@@ -4,6 +4,15 @@
 gate it runs is a real command with a real exit code, written to its own log
 under `.ai/runlogs/`.
 
+The separate `scripts/mainnet/run_release_gates_rc6.sh` wrapper records every
+executed stage and returns 1 if any stage fails. It returns 2 (BLOCKED) when the
+executed stages pass but required coverage is skipped. The retired six-route
+live smoke currently blocks certification until its replacement is wired in;
+it is never counted as a passing stage. Reports and stage logs are written
+under the repository's `reports/rc6/`, regardless of the caller's directory.
+The fast gate `RC6 release sequence` tests this reporting and exit behavior
+with isolated test commands; it does not run or certify the chain itself.
+
 ## Why local CI is the primary CI here
 
 GitHub-hosted runners are unusable for this account: each hosted run finishes in
