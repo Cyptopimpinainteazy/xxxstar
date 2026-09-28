@@ -369,6 +369,139 @@ fn a_bundle_nonce_cannot_be_replayed() {
     });
 }
 
+// ── the two halt switches, and whether they meet ─────────────────────────────────────────────
+//
+// X3-RT-001's row named three things that were "read from the code, not proven by a test": the
+// atomic-kernel's economic halt and the kernel's routine pause are independent switches, nothing
+// drove both at once, and the runtime's `EmergencyHaltController` wiring had no runtime-level
+// test. `RuntimeEmergencyHaltController::trigger()` sets
+// `pallet_x3_supply_ledger::TransferHalted`, which is exactly what the atomic kernel's
+// `T::EconomicHalt::is_halted()` returns — a chain of three pallets that no test had walked end
+// to end. These two do.
+
+/// The nuclear halt reaches the atomic kernel, through the runtime's own controller.
+///
+/// `EmergencyHaltController` has a blanket no-op impl for `()`, so a mock that configured `()`
+/// would let every "the halt works" test pass while a real chain kept accepting bundles. The
+/// assertion is therefore not "the extrinsic succeeded" but the two links the wiring consists of:
+/// the flag the atomic kernel reads has flipped, and the bundle the gateway was authorized to
+/// submit a moment ago is now refused by name.
+#[test]
+fn the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime() {
+    use frame_support::BoundedVec;
+
+    atomic_test_ext().execute_with(|| {
+        let gateway = atomic_gateway();
+
+        assert!(
+            !pallet_x3_supply_ledger::TransferHalted::<Runtime>::get(),
+            "the atomic kernel's halt flag must be clear in genesis, or the rest proves nothing"
+        );
+
+        // The gateway is authorized and funded: this submission would be accepted as it stands.
+        assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+            100,
+            ATOMIC_CHAIN_ID,
+            ATOMIC_NONCE,
+        ));
+
+        assert_ok!(pallet_x3_kernel::Pallet::<Runtime>::emergency_halt(
+            RuntimeOrigin::root()
+        ));
+
+        assert!(
+            pallet_x3_supply_ledger::TransferHalted::<Runtime>::get(),
+            "`emergency_halt` must flip the flag the atomic kernel's `EconomicHalt` reads; the \
+             controller is otherwise the no-op impl for `()`"
+        );
+
+        assert_err!(
+            crate::X3AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(gateway),
+                BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+                100,
+                ATOMIC_CHAIN_ID,
+                ATOMIC_NONCE + 1,
+            ),
+            pallet_x3_atomic_kernel::Error::<Runtime>::EconomicHaltActive
+        );
+    });
+}
+
+/// A routine pause must not strand the bond an atomic bundle is already holding.
+///
+/// The two switches are independent: the pause lives in `pallet_x3_kernel` and its guards are on
+/// that pallet's own extrinsic paths, while `submit_atomic_bundle` and `rollback_atomic_bundle`
+/// live in `pallet_x3_atomic_kernel` and consult `EconomicHalt`, not `ProtocolPaused`. That is the
+/// safe direction — a pause can never make a pending bundle unrecoverable — but it was an
+/// argument made from reading two files, so it is measured here: the bundle is submitted, the
+/// chain is paused, and the submitter cancels it *while paused*, with the bond released in full
+/// and total issuance unchanged.
+#[test]
+fn a_kernel_pause_leaves_a_pending_atomic_bundle_recoverable() {
+    use frame_support::BoundedVec;
+    use pallet_x3_atomic_kernel::{BundleRollbackReason, BundleStatus, Bundles};
+
+    atomic_test_ext().execute_with(|| {
+        let gateway = atomic_gateway();
+        let balances = pallet_balances::Pallet::<Runtime>::free_balance(gateway.clone());
+        let issuance_before = pallet_balances::Pallet::<Runtime>::total_issuance();
+
+        assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+            100,
+            ATOMIC_CHAIN_ID,
+            ATOMIC_NONCE,
+        ));
+        let (bundle_id, _) = Bundles::<Runtime>::iter()
+            .next()
+            .expect("the submitted bundle is stored");
+        assert!(
+            pallet_balances::Pallet::<Runtime>::reserved_balance(gateway.clone()) > 0,
+            "the bundle must be holding a bond, or there is nothing to strand"
+        );
+
+        assert_ok!(pallet_x3_kernel::Pallet::<Runtime>::emergency_pause(
+            RuntimeOrigin::root()
+        ));
+        assert!(
+            pallet_x3_kernel::ProtocolPaused::<Runtime>::get(),
+            "the pause the recovery below has to survive must actually be in force"
+        );
+
+        assert_ok!(crate::X3AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            BundleRollbackReason::SubmitterCancelled,
+        ));
+
+        assert_eq!(
+            Bundles::<Runtime>::get(bundle_id)
+                .expect("the record survives rollback")
+                .status,
+            BundleStatus::RolledBack
+        );
+        assert_eq!(
+            pallet_balances::Pallet::<Runtime>::reserved_balance(gateway.clone()),
+            0,
+            "a pause must not leave the bundle's bond reserved"
+        );
+        assert_eq!(
+            pallet_balances::Pallet::<Runtime>::free_balance(gateway.clone()),
+            balances - crate::AtomicKernelMinBond::get() / 2,
+            "a voluntary cancel costs exactly the 50% penalty and returns the rest"
+        );
+        assert_eq!(
+            pallet_balances::Pallet::<Runtime>::total_issuance(),
+            issuance_before,
+            "the penalty moves to the treasury rather than being burned"
+        );
+    });
+}
+
 // ── the X3 domain, driven through the runtime's own dispatch ────────────────────────────────
 
 /// A genesis with one funded account, authorized to submit comits to the kernel.
@@ -529,3 +662,4 @@ fn a_corrupted_x3_program_is_refused_by_the_runtime_path() {
         );
     });
 }
+
