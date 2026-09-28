@@ -15,10 +15,11 @@ This scanner classifies the *enclosing code* instead:
   pallet-call    the panic sits in a `#[pallet::call]` extrinsic body
   production     any other non-test code
 
-Lines inside `#[cfg(test)]` items, and commented-out lines, are excluded: they do
-not exist in the runtime or in a release node build. String literals and comments
-are stripped before brace counting so `format!("{{}}")` cannot end a test module
-early.
+Lines inside a `#[cfg(test)]` item — in any of the forms this repository writes,
+including `#[cfg(all(test, feature = "std"))]` and `#[cfg(any(test, feature =
+"dev-mock"))]` — and commented-out lines are excluded: they do not exist in the
+runtime or in a release node build. String literals and comments are stripped
+before brace counting so `format!("{{}}")` cannot end a test module early.
 
 Output: JSON on stdout. Exit status is 0 when the scan itself succeeded.
 """
@@ -54,30 +55,65 @@ SKIP_DIR_PARTS = {
 }
 
 
-def strip_strings_and_comments(line: str, in_block_comment: bool) -> tuple[str, bool]:
-    """Return the code-only part of `line` and the block-comment state.
+class ScanState:
+    """The multi-line state one line cannot show: an open block comment, or an open raw string."""
+
+    __slots__ = ("in_block_comment", "raw_delimiter")
+
+    def __init__(self) -> None:
+        self.in_block_comment = False
+        self.raw_delimiter: str | None = None
+
+
+def strip_strings_and_comments(line: str, state: ScanState) -> str:
+    """Return the code-only part of `line`.
 
     Braces inside string literals or comments must not move the depth counter, or
     a test module would appear to end early and its assertions would be counted
     as production panics (or, worse, real code would be skipped).
+
+    Raw strings count here for the same reason, and they were missing: `r#"{"a": 1}"#` in a
+    `#[cfg(test)]` fixture put two braces into the depth counter, ended the test module's range
+    early, and reported the test's own assertion as a production panic (measured 2026-09-27 on
+    `crates/x3-atomic-swap/src/scoreboard.rs`, whose JSON fixture is a multi-line raw string).
+    A raw string can span lines, so its delimiter lives in `state`.
     """
     out: list[str] = []
     i = 0
     n = len(line)
     while i < n:
-        if in_block_comment:
+        if state.raw_delimiter is not None:
+            end = line.find(state.raw_delimiter, i)
+            if end == -1:
+                return "".join(out)
+            i = end + len(state.raw_delimiter)
+            state.raw_delimiter = None
+            continue
+        if state.in_block_comment:
             end = line.find("*/", i)
             if end == -1:
-                return "".join(out), True
+                return "".join(out)
             i = end + 2
-            in_block_comment = False
+            state.in_block_comment = False
             continue
         ch = line[i]
         if ch == "/" and i + 1 < n and line[i + 1] == "/":
             break
         if ch == "/" and i + 1 < n and line[i + 1] == "*":
-            in_block_comment = True
+            state.in_block_comment = True
             i += 2
+            continue
+        # `r"…"`, `r#"…"#`, `br##"…"##`: the `#`s are the delimiter, so a raw string may contain
+        # plain quotes and braces.
+        raw = re.match(r'b?r(#*)"', line[i:]) if ch in ("r", "b") else None
+        if raw is not None:
+            delimiter = '"' + raw.group(1)
+            i += raw.end()
+            end = line.find(delimiter, i)
+            if end == -1:
+                state.raw_delimiter = delimiter
+                return "".join(out)
+            i = end + len(delimiter)
             continue
         if ch == '"':
             i += 1
@@ -99,26 +135,28 @@ def strip_strings_and_comments(line: str, in_block_comment: bool) -> tuple[str, 
             continue
         out.append(ch)
         i += 1
-    return "".join(out), in_block_comment
+    return "".join(out)
 
 
 def test_line_ranges(lines: list[str]) -> list[tuple[int, int]]:
     """1-based inclusive line ranges covered by `#[cfg(test)]` items."""
     ranges: list[tuple[int, int]] = []
-    in_block_comment = False
+    state = ScanState()
     i = 0
     while i < len(lines):
-        code, in_block_comment = strip_strings_and_comments(lines[i], in_block_comment)
-        if "#[cfg(test)]" not in code:
+        code = strip_strings_and_comments(lines[i], state)
+        if not is_cfg_test_item(code):
             i += 1
             continue
         # Find the opening brace of the item this attribute belongs to.
         depth = 0
         started = False
         j = i
-        block = in_block_comment
+        inner = ScanState()
+        inner.in_block_comment = state.in_block_comment
+        inner.raw_delimiter = state.raw_delimiter
         while j < len(lines):
-            text, block = strip_strings_and_comments(lines[j], block)
+            text = strip_strings_and_comments(lines[j], inner)
             for ch in text:
                 if ch == "{":
                     depth += 1
@@ -132,12 +170,50 @@ def test_line_ranges(lines: list[str]) -> list[tuple[int, int]]:
         if not started:  # attribute without a body (e.g. on a `use`) — skip it
             i += 1
             continue
-        i = j + 1
-    return ranges
+        # Advance by one line, not to the end of the item: `#[cfg(test)]` attributes
+        # nest inside each other (a `#[cfg(all(test, …))]` helper inside a
+        # `#[cfg(test)] mod tests`), and jumping to the end of the *inner* item left
+        # the rest of the enclosing test module counted as production code — 1,589
+        # findings instead of 570 when this was first widened.
+        i += 1
+    ranges.sort()
+    merged: list[tuple[int, int]] = []
+    for start, end in ranges:
+        if merged and start <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+CFG_ATTRIBUTE = re.compile(r"#\[cfg\((?P<predicate>[^\n]*)\)\]")
+
+
+def is_cfg_test_item(code: str) -> bool:
+    """Does this line carry a `#[cfg(..)]` attribute that is true only under `test`?
+
+    `#[cfg(test)]` is the form the SDK templates use, and for a long time the only
+    one this scanner recognised. This repository also writes
+    `#[cfg(all(test, feature = "std"))]`, `#[cfg(all(test, feature = "std",
+    feature = "frontier"))]` and `#[cfg(any(test, feature = "dev-mock"))]`, and
+    each of those was counted as production code — the whole of
+    `runtime/src/lib.rs`'s test surface, 26 findings, among them.
+
+    `not(test)` is the opposite and is deliberately not matched: that is code
+    which exists *only* in a production build.
+    """
+    for match in CFG_ATTRIBUTE.finditer(code):
+        predicate = match.group("predicate")
+        if not re.search(r"\btest\b", predicate):
+            continue
+        if re.search(r"\bnot\s*\(\s*test\b", predicate):
+            continue
+        return True
+    return False
 
 
 CFG_TEST_MODULE = re.compile(
-    r"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*mod\s+([A-Za-z0-9_]+)\s*;"
+    r"#\[cfg\([^\n]*\btest\b[^\n]*\)\]\s*(?:#\[[^\n]*\]\s*)*mod\s+([A-Za-z0-9_]+)\s*;"
 )
 
 
@@ -202,7 +278,7 @@ def scan_file(path: os.PathLike[str], test_only: set[str]) -> list[tuple[int, st
             continue
         if in_test(line_no):
             continue
-        code, _ = strip_strings_and_comments(line, False)
+        code = strip_strings_and_comments(line, ScanState())
         if not any(pattern.search(code) for pattern in PANIC_PATTERNS):
             continue
         hits.append((line_no, line.strip()))
@@ -212,13 +288,13 @@ def scan_file(path: os.PathLike[str], test_only: set[str]) -> list[tuple[int, st
 def enclosing_fn(lines: list[str], index: int) -> tuple[str, bool]:
     """Nearest `fn` declaration above `index`, and whether it is a pallet call."""
     for k in range(index, -1, -1):
-        code, _ = strip_strings_and_comments(lines[k], False)
+        code = strip_strings_and_comments(lines[k], ScanState())
         match = re.search(r"\bfn\s+([A-Za-z0-9_]+)", code)
         if not match:
             continue
         is_call = False
         for attr in range(k, max(k - 12, -1), -1):
-            attr_code, _ = strip_strings_and_comments(lines[attr], False)
+            attr_code = strip_strings_and_comments(lines[attr], ScanState())
             if "#[pallet::call" in attr_code:
                 is_call = True
                 break
