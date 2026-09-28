@@ -304,8 +304,24 @@ if [[ -f "$RESTART_REPORT" ]]; then
         elif [[ "$REPORT_CHAIN" != "$GATE_GENESIS" ]]; then
             fail "forced_node_restart_drill" "the report proves a restart on chain $REPORT_CHAIN but this gate reads $GATE_GENESIS — the drill was run against a different network (or a previous boot)"
         else
-            info "the restart report names this chain ($GATE_GENESIS)"
-            pass "forced_node_restart_drill"
+            # Chain identity is necessary but not sufficient: a network re-booted from the same
+            # spec has the same genesis, so a report from that network's *previous* boot would
+            # still name this chain. The drill records when it ran, and this gate refuses a proof
+            # older than a day. Twenty-four hours is a policy bound, not a proof of boot identity
+            # — the honest statement is "a restart proof from the last day, on this chain" — and it
+            # is deliberately generous because the documented flow is drill-then-gate.
+            REPORT_EPOCH="$(sed -n 's/^- restart_drill_epoch: //p' "$RESTART_REPORT" | head -1)"
+            if [[ -z "$REPORT_EPOCH" ]]; then
+                fail "forced_node_restart_drill" "the report at $RESTART_REPORT has no restart_drill_epoch — re-run scripts/drills/node_restart_drill.sh against this network so the proof is dated"
+            else
+                AGE=$(( $(date +%s) - REPORT_EPOCH ))
+                if (( AGE > 86400 )); then
+                    fail "forced_node_restart_drill" "the restart proof on $GATE_GENESIS is $(( AGE / 3600 ))h old — a launch gate cannot be certified by a restart from a previous boot; re-run scripts/drills/node_restart_drill.sh"
+                else
+                    info "the restart report names this chain ($GATE_GENESIS) and is $(( AGE / 60 ))m old"
+                    pass "forced_node_restart_drill"
+                fi
+            fi
         fi
     else
         fail "forced_node_restart_drill" "drill report present but not PASS — see $RESTART_REPORT"

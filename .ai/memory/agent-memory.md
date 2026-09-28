@@ -9387,3 +9387,66 @@ registration, with the outcome per file:
   the documented-exception path for `register_external_root`), `x3-asset-registry` (7),
   `x3-account-registry` (3, no mock and no tests), and `x3-settlement-engine`'s own weights can now be
   regenerated on a dev chain if the runtime's verifier accepts the fixture — worth trying next.
+
+## 2026-09-28 — claude (x3-lang agent) CLAIM: x3_swarm_core replica reconciler (P1)
+- Branch feat/swarm-replica-reconciler, worktree /tmp/x3-swarm-reconcile. Closing the registry blocker
+  "Partition settlement has no reconciler": crates/x3-swarm-core gains a reconciler that diffs two
+  SwarmScheduler replicas, asks a ClaimArbiter (the chain's claim_task is the real one) who holds each
+  conflicting task, converges both replicas and reports evicted holders. Touches only crates/x3-swarm-core
+  (+ its registry row). Please don't pick up the same blocker.
+
+## 2026-09-28 — claude (x3-lang agent): #530 MERGED (d295a5f7d) — swarm-core replica reconciler, claim released
+- `x3_swarm_core::reconcile(a, b, arbiter)` settles partitioned SwarmScheduler replicas; 10 tests in
+  tests/replica_reconcile.rs, mutation-checked. Score 51 -> 52 (row formula).
+- FACT for anyone touching swarm docs: pallet-northern-swarm `claim_task` is NOT exclusive — up to
+  MaxExecutorsPerTask (3) executors claim one task; `claimed_by` is the FIRST claimer. Old docs said
+  "a second executor is refused"; corrected in swarm-core.
+- Remaining swarm-core blocker (open for anyone): a ClaimArbiter that reads `claimed_by` from a node.
+- Pre-existing: crates/x3-swarm-core/src/{policy,sensitive}.rs and tests/sensitive_actions.rs are not
+  rustfmt-clean; no gate checks it (crate is outside the root workspace).
+
+## 2026-09-28 — claude (x3-lang agent) CLAIM: [x3_htlc] re-pointed to the native X3 HTLC (owner approved)
+- Branch fix/x3-htlc-registry-native, worktree /tmp/x3-htlc-reg. `[x3_htlc]` now = X3Native legs in
+  pallet-x3-settlement-engine (score derived 60); the orphan SVM program's row moved verbatim to
+  `[svm_x3_htlc_program]` (45).
+- BUG FIXED in my own #520: lock_escrow on an X3Native leg did not check the declared token, so a leg
+  promising X3Asset/Contract was locked by reserving native X3. Now requires TokenId::Native (fails closed).
+  Touches the runtime -> will re-attest runtime hashes before merge.
+- (x3_htlc PR, 2026-09-28) MASTER CLIPPY IS RED since 9be777e00: pallet-x3-token-factory's test runtime lacks
+  `type WeightInfo = ();` for pallet_x3_cross_vm_router (E0046). Fixed in my fix/x3-htlc-registry-native PR;
+  whoever adds WeightInfo to a pallet: grep every `impl <pallet>::Config for` in other crates' tests too.
+
+## 2026-09-28 — claude (x3-lang agent) CLAIM: x3_reactor "two halves unjoined" blocker (P2)
+- Branch feat/reactor-placement-attested, worktree /tmp/x3-reactor. x3-bench: a job carries the
+  reactor's Placement (backend id + accelerator); RunAttestation signs the backend it ran on;
+  publish_attested refuses PlacementMismatch. northern-swarm: ScheduleDecision::placement() -> x3_bench::Placement
+  (new dep northern-swarm -> x3-bench). Touches crates/x3-bench/src/job.rs, crates/northern-swarm/src/reactor.rs.
+
+## 2026-09-28 — claude (x3-lang agent) CLAIM: finishing x3-lang (owner: "get x3 lang done completely")
+Working, in order, one PR each (please don't pick these up):
+1. X3-LANG-001: optimizer order-sensitivity (entry fn first breaks 4 e2e programs) + E2E for match/strings/host calls.
+2. X3-LANG-010/TICKET-149: interpreter divergence (aggregates, inc/dec, mod_f, conversions, ctx_gas) — make engines agree or refuse at validation.
+3. X3-LANG-007: property test + independent reference for verify_trading_sequences.
+4. X3-LANG-009: signed/attested standalone X3BC artifact.
+5. X3-LANG-003: receipt attestation key registry/rotation.
+
+## 2026-09-28 — claude (x3-lang agent): SECURITY finding + CLAIM (x3-lang/vm TradingVm)
+- TradingVm::execute_atomic COMMITS operation sequences the compiler's verify_ir refuses: no
+  AssertMinNetProfit (trade commits with no profit check), no AssertAllDebtsClosed, op after commit,
+  duplicate receipt, receipt before guards. A peer-supplied/decoded IR bypasses verification.
+- Fixing on branch fix/trading-vm-verifies-peer-ir (/tmp/x3-tradeverify): run_atomic runs verify_ir first.
+- Also: the disk hit 100% (2.2T) at ~20:52Z from /tmp target dirs; I deleted only MY merged worktrees'
+  targets (272G). Please clean your own merged targets.
+
+## 2026-09-28 21:35Z — claude (x3-lang agent): state before the machine moves to the rack
+- MERGED today: #531 (x3_htlc registry + native-leg token fix), #532 (reactor placement attested),
+  #533 (x3-lang host calls/constants/strings/optimizer-order + `test x3 chain compiler` gate),
+  #534 (trading VM verifies peer programs).
+- PUSHED, NOT MERGED:
+  * fix/x3vm-engine-agreement (TICKET-149: both engines refuse conversions + ctx_gas at intake).
+    Pipeline was running at shutdown; it needs runtime re-attestation, then merge. Rerun:
+    scratchpad agree-finish.sh, or merge master, run gates, run update-runtime-hashes, then merge.
+  * feat/receipt-key-registry (X3-LANG-003 key registry). Needs gates + PR + merge after the
+    TICKET-149 PR (both touch feature-matrix/language-trading.toml). No runtime change.
+- x3-lang still open: X3-LANG-009 (signed standalone X3BC artifact), X3-LANG-007 independent second
+  implementation of the trading rules, and registry distribution/signing side for X3-LANG-003.

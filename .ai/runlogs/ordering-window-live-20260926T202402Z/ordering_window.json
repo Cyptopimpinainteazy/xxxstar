@@ -1,0 +1,32 @@
+{
+  "status": "failed",
+  "steps": [
+    {
+      "label": "read the window switch",
+      "detail": "enabled=false"
+    },
+    {
+      "label": "enable ordering windows: motion executed",
+      "detail": "block=32"
+    },
+    {
+      "label": "the ordering lane is enabled"
+    },
+    {
+      "label": "window opened",
+      "detail": "id=0 range=35..=42"
+    },
+    {
+      "label": "committed from alice",
+      "detail": "block=38"
+    },
+    {
+      "label": "committed from bob",
+      "detail": "block=40"
+    }
+  ],
+  "settled_order": null,
+  "recomputed": null,
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "error": "createType(Call):: Call: failed decoding privateExecution.revealOrdering:: Struct: failed on args: {\"window_id\":\"u64\",\"commit_hash\":\"H256\",\"plaintext\":\"Bytes\",\"nonce\":\"[u8;32]\"}:: Struct: failed on plaintext: Bytes:: Bytes length 190651355 exceeds 10485760"
+}

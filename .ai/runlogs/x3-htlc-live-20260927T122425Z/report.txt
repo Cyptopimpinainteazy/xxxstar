@@ -1,0 +1,101 @@
+runlog: /home/lojak/Desktop/xxxstar-main/.ai/runlogs/x3-htlc-live-20260927T122425Z
+workdir: /tmp/x3-htlc-live.tfpBGh
+rpc:     http://127.0.0.1:18511 (port 18511)
+=== build the SBF program ===
+
+warning: `x3_htlc` (lib) generated 13 warnings (5 duplicates)
+    Finished `release` profile [optimized] target(s) in 0.49s
+program so: /home/lojak/Desktop/xxxstar-main/X3-contracts/svm/target/deploy/x3_htlc.so (284560 bytes)
+=== build the broadcaster ===
+    Finished `release` profile [optimized] target(s) in 0.54s
+=== generating keypairs ===
+initiator=FoK1rWqqk5GbPzcjw7jLqMtdL8atVsnUSs5hMizVxUv6 recipient=3KVgkub8SQhnsKRCRjXMTfnCD7ChSYKyP2wVAk1VZgvu stranger=Ezs7HXo6PxZWbDNpBaBrVva4pdsFWRgZsSCKTvo4HMv4
+=== starting solana-test-validator ===
+validator ready: 4.2.2
+PASS: x3_htlc is deployed and executable on-chain at X3HTLC1111111111111111111111111111111111111
+=== creating SPL mint and token accounts ===
+mint=4cD87JXs619jkzd9rApCQwqcTusCDurSf8S5aDXxwSr5
+PASS: SPL mint is owned by the on-chain token program
+Signature: vaDGWAYM3oWM46biX9Q45ZEzwkYki9ZaPS3j24PMui3mW4mzRb7Qow9FY3U6ynodo2mZVXysNwpV6Aeeuq6UeWw
+
+Signature: ooUR7u7bMcFJgoCwhWNkqx7FraLfjKTCHzWCzAUBEGYTHyqUULCfbxzfU1oBPZTJbYLYo2GKp6QMbeGfCahQM8j
+
+initiator_ata=GeJViam1ph5Nw74W46JCkvoFvzQ1abf347E7eiA4XDQK recipient_ata=HxVcGnugK2MfjQ31dBqTKy5h3bbJxTsKUrjyWm8GjSsA
+mint decimals=9 minted=1000000000000 lock=500000000000 (base units)
+Signature: 38LnePp3qdHJJDx9i4jcdwHM6M3JVjhu3jadWVdLyRnYum1ddFhWuBJGemLi4Kgx5tdwYBPzBU9etiZKxhDwmxv3
+
+PASS: initiator token account holds the minted supply before locking
+PASS: on-chain mint supply equals the minted amount
+escrow=GT4bcGoyT5SoMFWNLnV1Y3ZftZrgrY75s2SPrTU6YGKJ vault=vP9Km6iqjehtY8oEBzWtX5sUdCEukkytcoqHi3QqtGg
+PASS: escrow account does not exist before the lock
+PASS: lock (happy path, real SPL transfer into the escrow vault)
+PASS: on-chain escrow account has the allocated HTLC_SIZE
+PASS: on-chain escrow is owned by the x3_htlc program
+PASS: on-chain status == Funded(1) after the lock
+PASS: on-chain amount == the locked amount
+PASS: on-chain timelock == the requested timelock
+PASS: on-chain hashlock == sha256(preimage)
+PASS: on-chain initiator == the signing initiator
+PASS: on-chain recipient == the requested recipient
+PASS: on-chain token_mint == the SPL mint
+PASS: on-chain preimage is zeroed until claimed
+PASS: escrow vault holds exactly the locked amount
+PASS: initiator balance decreased by exactly the locked amount
+PASS: supply is conserved after the lock
+PASS: claim with a WRONG preimage (rejected with the expected program error)
+PASS: rejected wrong-preimage claim left the escrow Funded
+PASS: rejected wrong-preimage claim moved no tokens
+FAIL: claim by a party that is not the recorded recipient (rejected with an unexpected error)
+claim failed: x3-htlc-client: send_and_confirm failed: RPC response error -32002: Transaction simulation failed: Error processing Instruction 0: custom program error: 0xbc4; 5 log messages:
+  Program X3HTLC1111111111111111111111111111111111111 invoke [1]
+  Program log: Instruction: ClaimHtlc
+  Program log: AnchorError caused by account: htlc. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.
+  Program X3HTLC1111111111111111111111111111111111111 consumed 2836 of 200000 compute units
+  Program X3HTLC1111111111111111111111111111111111111 failed: custom program error: 0xbc4
+
+PASS: rejected unauthorized claim left the escrow Funded
+PASS: rejected unauthorized claim moved no tokens
+PASS: claim with the CORRECT preimage
+PASS: on-chain status == Claimed(2) after the claim
+PASS: on-chain preimage records the revealed secret
+PASS: escrow vault was drained by the claim
+PASS: recipient received exactly the locked amount
+PASS: supply is conserved after the claim
+PASS: double-claim on a Claimed escrow (rejected with the expected program error)
+PASS: double-claim moved nothing
+PASS: double-claim left the escrow Claimed
+PASS: refund after a successful claim (rejected with the expected program error)
+PASS: post-claim refund attempt changed no balances
+PASS: lock #2 (long timelock, for the refund-path rejections)
+PASS: refund BEFORE the timelock expires (rejected with the expected program error)
+PASS: rejected early refund left the escrow Funded
+PASS: rejected early refund kept the tokens in the vault
+FAIL: refund by a party that is not the recorded initiator (rejected with an unexpected error)
+refund failed: x3-htlc-client: send_and_confirm failed: RPC response error -32002: Transaction simulation failed: Error processing Instruction 0: custom program error: 0xbc4; 5 log messages:
+  Program X3HTLC1111111111111111111111111111111111111 invoke [1]
+  Program log: Instruction: RefundHtlc
+  Program log: AnchorError caused by account: htlc. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.
+  Program X3HTLC1111111111111111111111111111111111111 consumed 2812 of 200000 compute units
+  Program X3HTLC1111111111111111111111111111111111111 failed: custom program error: 0xbc4
+
+PASS: rejected unauthorized refund moved no tokens
+PASS: rejected unauthorized refund left the escrow Funded
+PASS: lock with amount = 0 (rejected with the expected program error)
+PASS: lock with a timelock shorter than the 1-hour minimum (rejected with the expected program error)
+PASS: lock with a timelock longer than the 7-day maximum (rejected with the expected program error)
+PASS: rejected lock shapes created no escrow account
+PASS: rejected lock shapes moved no tokens
+PASS: re-locking an existing escrow identity (rejected with the expected program error)
+PASS: rejected re-lock left the original escrow untouched
+PASS: rejected re-lock moved no extra tokens
+PASS: supply is conserved across every path
+
+=== Results: 50 passed, 2 failed ===
+escrow(claimed)=GT4bcGoyT5SoMFWNLnV1Y3ZftZrgrY75s2SPrTU6YGKJ
+escrow(funded)=ABmwi3HFyd7HLXPgV1xKfdqD7Y6b2JCmdUWbHTSXQ6vP
+program log tail:
+
+Notice! No wallet available. `solana airdrop` localnet SOL after creating one
+
+Waiting for first slot 1...
+Waiting for first slot 2...

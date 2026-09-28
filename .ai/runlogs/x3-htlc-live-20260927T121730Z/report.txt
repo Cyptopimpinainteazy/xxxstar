@@ -1,0 +1,20 @@
+runlog: /home/lojak/Desktop/xxxstar-main/.ai/runlogs/x3-htlc-live-20260927T121730Z
+workdir: /tmp/x3-htlc-live.PuRo6Q
+rpc:     http://127.0.0.1:18511 (port 18511)
+=== build the SBF program ===
+
+warning: `x3_htlc` (lib) generated 13 warnings (5 duplicates)
+    Finished `release` profile [optimized] target(s) in 0.78s
+program so: /home/lojak/Desktop/xxxstar-main/X3-contracts/svm/target/deploy/x3_htlc.so (284560 bytes)
+=== build the broadcaster ===
+    Finished `release` profile [optimized] target(s) in 0.58s
+=== generating keypairs ===
+initiator=FffagLjA2EDKhkUTXvSutJHpMFCJJ4gmB28iAHfJvS8x recipient=DpdwuW7sRe8Ti1DWQVUXpEG2tEjUQFgdhQKeHqnRX2fC stranger=4R7ZkAMTCYaYyHynVC69zwhyCh6Mnd73TUbJrRQw64mi
+=== starting solana-test-validator ===
+validator ready: 4.2.2
+PASS: x3_htlc is deployed and executable on-chain at X3HTLC1111111111111111111111111111111111111
+=== creating SPL mint and token accounts ===
+mint=HYSRZgkqp91Ka7xZAcX95V1xkNr7WvYzjDAYiGkkdtP4
+PASS: SPL mint is owned by the on-chain token program
+initiator_ata=ApYyq53KsA49J5Wcn6gQh3474n3itShkSurjFRuHp2sp recipient_ata=CFFjVsuHePXT5NQDVbYDotQUkHUH3qDahfyVuT7QPHWZ
+Error: initiator minted balance (ApYyq53KsA49J5Wcn6gQh3474n3itShkSurjFRuHp2sp) never reached 1000000 base units in the finalized bank

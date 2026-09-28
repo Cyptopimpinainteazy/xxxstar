@@ -1,0 +1,10 @@
+--- a/scripts/local-ci.sh
++++ b/scripts/local-ci.sh
+@@ -734,6 +734,7 @@
+   # leftover `next start -p 3010` satisfied the criterion on another port — which is why the
+   # URL is a pin now. It needs no chain: the other fourteen criteria are expected to fail.
+   "explorer gate drill:bash scripts/testnet/explorer-gate-drill.sh"
++  "test svm-counter-test:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-counter-test cargo test --locked --manifest-path integration-tests/svm-counter-test/Cargo.toml -p svm-counter-test"
+ )
+ 
+ # Gates that boot real chains (anvil / solana-test-validator / x3 dev node).

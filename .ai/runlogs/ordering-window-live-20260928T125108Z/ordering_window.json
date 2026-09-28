@@ -1,0 +1,52 @@
+{
+  "status": "passed",
+  "steps": [
+    {
+      "label": "read the window switch",
+      "detail": "enabled=false"
+    },
+    {
+      "label": "enable ordering windows: motion executed",
+      "detail": "block=52"
+    },
+    {
+      "label": "the ordering lane is enabled"
+    },
+    {
+      "label": "window opened",
+      "detail": "id=0 range=54..=93"
+    },
+    {
+      "label": "committed from alice",
+      "detail": "block=57"
+    },
+    {
+      "label": "committed from bob",
+      "detail": "block=60"
+    },
+    {
+      "label": "a reveal that does not hash to its commit was refused",
+      "detail": "privateExecution.OrderingRevealMismatch"
+    },
+    {
+      "label": "both reveals accepted at their own blocks"
+    },
+    {
+      "label": "window settled",
+      "detail": "block=96"
+    },
+    {
+      "label": "the settled order equals the order recomputed from the stored beacon"
+    }
+  ],
+  "settled_order": [
+    "0x58bad719665f6e7caca9790a43b1012993a71515cd438aab1b1f2d2a76755aac",
+    "0x092836f4edbf22fa2a94826f44021a881619895c1c32377129b6cbbaa8aa857a"
+  ],
+  "recomputed": [
+    "0x58bad719665f6e7caca9790a43b1012993a71515cd438aab1b1f2d2a76755aac",
+    "0x092836f4edbf22fa2a94826f44021a881619895c1c32377129b6cbbaa8aa857a"
+  ],
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "beacon": "0xe7dfef4ca2c6938dfd86000bed8369da9cda762b343a6c995536740b370e9261"
+}

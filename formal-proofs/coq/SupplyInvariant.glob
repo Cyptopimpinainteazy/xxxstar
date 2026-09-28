@@ -1,0 +1,87 @@
+DIGEST 873e21e88a1a539fed312f68df365fd0
+FSupplyInvariant
+R15:29 Coq.Arith.Arith <> <> lib
+rec 40:44 <> State
+proj 53:64 <> total_supply
+R68:70 Coq.Init.Datatypes <> nat ind
+ind 87:88 <> Tx
+constr 95:102 <> Transfer
+constr 121:124 <> Mint
+constr 143:146 <> Burn
+R114:116 Coq.Init.Datatypes <> nat ind
+binder 105:110 <> amount:5
+R136:138 Coq.Init.Datatypes <> nat ind
+binder 127:132 <> amount:6
+R158:160 Coq.Init.Datatypes <> nat ind
+binder 149:154 <> amount:7
+scheme 87:88 <> Tx_rect
+scheme 87:88 <> Tx_ind
+scheme 87:88 <> Tx_rec
+scheme 87:88 <> Tx_sind
+def 176:183 <> apply_tx
+R190:194 SupplyInvariant <> State rec
+binder 186:186 <> s:8
+R203:204 SupplyInvariant <> Tx ind
+binder 198:199 <> tx:9
+R209:214 Coq.Init.Datatypes <> option ind
+R216:220 SupplyInvariant <> State rec
+R233:234 SupplyInvariant <> tx:9 var
+R245:252 SupplyInvariant <> Transfer constr
+R259:262 Coq.Init.Datatypes <> Some constr
+R264:264 SupplyInvariant <> s:8 var
+R270:273 SupplyInvariant <> Mint constr
+R282:285 Coq.Init.Datatypes <> Some constr
+R290:301 SupplyInvariant <> total_supply proj
+R290:301 SupplyInvariant <> total_supply proj
+R290:301 SupplyInvariant <> total_supply proj
+R322:324 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R309:320 SupplyInvariant <> total_supply proj
+R306:306 SupplyInvariant <> s:8 var
+R336:339 SupplyInvariant <> Burn constr
+R360:364 Coq.Arith.PeanoNat <> ::nat_scope:x_'<=?'_x not
+R368:379 SupplyInvariant <> total_supply proj
+R365:365 SupplyInvariant <> s:8 var
+R454:457 Coq.Init.Datatypes <> None constr
+R393:396 Coq.Init.Datatypes <> Some constr
+R401:412 SupplyInvariant <> total_supply proj
+R401:412 SupplyInvariant <> total_supply proj
+R401:412 SupplyInvariant <> total_supply proj
+R433:435 Coq.Init.Peano <> ::nat_scope:x_'-'_x not
+R420:431 SupplyInvariant <> total_supply proj
+R417:417 SupplyInvariant <> s:8 var
+prf 475:493 <> supply_conservation
+binder 506:506 <> s:11
+binder 508:509 <> s':12
+binder 511:512 <> tx:13
+R542:549 Coq.Init.Logic <> ::type_scope:x_'->'_x not
+R532:534 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R519:526 SupplyInvariant <> apply_tx def
+R528:528 SupplyInvariant <> s:11 var
+R530:531 SupplyInvariant <> tx:13 var
+R535:538 Coq.Init.Datatypes <> Some constr
+R540:541 SupplyInvariant <> s':12 var
+R556:557 SupplyInvariant <> tx:13 var
+R570:577 SupplyInvariant <> Transfer constr
+R599:601 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R584:595 SupplyInvariant <> total_supply proj
+R597:598 SupplyInvariant <> s':12 var
+R602:613 SupplyInvariant <> total_supply proj
+R615:615 SupplyInvariant <> s:11 var
+R623:626 SupplyInvariant <> Mint constr
+R650:652 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R635:646 SupplyInvariant <> total_supply proj
+R648:649 SupplyInvariant <> s':12 var
+R667:669 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R653:664 SupplyInvariant <> total_supply proj
+R666:666 SupplyInvariant <> s:11 var
+R680:683 SupplyInvariant <> Burn constr
+R707:709 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R692:703 SupplyInvariant <> total_supply proj
+R705:706 SupplyInvariant <> s':12 var
+R724:726 Coq.Init.Peano <> ::nat_scope:x_'-'_x not
+R710:721 SupplyInvariant <> total_supply proj
+R723:723 SupplyInvariant <> s:11 var
+R892:896 Coq.Arith.PeanoNat <> ::nat_scope:x_'<=?'_x not
+R897:908 SupplyInvariant <> total_supply proj
+R892:896 Coq.Arith.PeanoNat <> ::nat_scope:x_'<=?'_x not
+R897:908 SupplyInvariant <> total_supply proj

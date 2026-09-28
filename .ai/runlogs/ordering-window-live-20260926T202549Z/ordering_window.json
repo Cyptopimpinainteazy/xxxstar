@@ -1,0 +1,39 @@
+{
+  "status": "failed",
+  "steps": [
+    {
+      "label": "read the window switch",
+      "detail": "enabled=false"
+    },
+    {
+      "label": "enable ordering windows: motion executed",
+      "detail": "block=35"
+    },
+    {
+      "label": "the ordering lane is enabled"
+    },
+    {
+      "label": "window opened",
+      "detail": "id=0 range=37..=76"
+    },
+    {
+      "label": "committed from alice",
+      "detail": "block=40"
+    },
+    {
+      "label": "committed from bob",
+      "detail": "block=42"
+    },
+    {
+      "label": "a reveal that does not hash to its commit was refused",
+      "detail": "privateExecution.OrderingRevealMismatch"
+    },
+    {
+      "label": "both reveals accepted at their own blocks"
+    }
+  ],
+  "settled_order": null,
+  "recomputed": null,
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "error": "1010: Invalid Transaction: Transaction would exhaust the block limits"
+}
