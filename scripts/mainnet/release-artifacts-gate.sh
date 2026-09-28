@@ -38,7 +38,8 @@ INSTALLER="$ROOT/scripts/install-validator.sh"
 [ -f "$BUILDER" ] || fail "scripts/mainnet/build-release-artifacts.sh is missing"
 [ -f "$INSTALLER" ] || fail "scripts/install-validator.sh is missing"
 
-# The release binary stage 2 built, so this gate does not compile the node again.
+# Use an existing node only to generate the input spec. The packager rebuilds
+# committed source and refuses a spec whose runtime differs from that new binary.
 NODE_BIN="${X3_NODE_BIN:-}"
 if [ -z "$NODE_BIN" ]; then
   for candidate in "$TARGET_DIR/release/x3-chain-node" "$ROOT/target/release/x3-chain-node"; do
@@ -49,21 +50,28 @@ fi
   || fail "no release binary; build it with cargo build --release -p x3-chain-node"
 info "packaging $NODE_BIN"
 
+# A Live genesis, generated from fixture keys, so the install check exercises the
+# same path an operator takes.
+X3_NODE_BIN="$NODE_BIN" bash "$ROOT/scripts/mainnet/make-fixture-live-spec.sh" \
+  "$WORK/spec" >"$WORK/fixture.log" 2>&1 \
+  || { tail -15 "$WORK/fixture.log" >&2; fail "could not build a fixture Live genesis"; }
+LIVE_SPEC="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['spec'])" "$WORK/spec/fixture.json")"
+
 # ── 1. build the bundle ──────────────────────────────────────────────────────
 OUT="$WORK/bundle"
-bash "$BUILDER" "$TAG" --out "$OUT" --binary "$NODE_BIN" --skip-sbom >"$WORK/build.log" 2>&1
+bash "$BUILDER" "$TAG" --out "$OUT" --chain "$LIVE_SPEC" --features "${X3_RELEASE_FEATURES:-cli}" --skip-sbom >"$WORK/build.log" 2>&1
 rc=$?
 if [ "$rc" -ne 0 ]; then
   tail -20 "$WORK/build.log" >&2
   fail "build-release-artifacts.sh failed"
 fi
-for required in x3-chain-node x3-chain-node.sha256 MANIFEST.txt; do
+for required in x3-chain-node x3-chain-node.sha256 MANIFEST.txt SHA256SUMS genesis.json genesis-raw.json x3-runtime.wasm; do
   [ -f "$OUT/$required" ] || fail "the bundle is missing $required"
 done
 info "bundle built: $(ls -1 "$OUT" | tr '\n' ' ')"
 
 # ── 2. the checksum file verifies ────────────────────────────────────────────
-( cd "$OUT" && sha256sum -c x3-chain-node.sha256 >/dev/null ) \
+( cd "$OUT" && sha256sum -c SHA256SUMS >/dev/null ) \
   || fail "the bundle's own checksum file does not verify"
 info "checksums verify"
 
@@ -75,7 +83,7 @@ MANIFEST_COMMIT="$(sed -n 's/^commit: *//p' "$OUT/MANIFEST.txt" | head -1)"
 info "manifest names HEAD"
 
 # ── 4. the tarball carries a runnable binary ─────────────────────────────────
-TARBALL="$ROOT/dist/${TAG}-linux-x86_64.tar.gz"
+TARBALL="${OUT}.tar.gz"
 [ -f "$TARBALL" ] || fail "expected tarball not written: $TARBALL"
 mkdir -p "$WORK/extracted"
 tar -xzf "$TARBALL" -C "$WORK/extracted" || fail "the tarball does not extract"
@@ -83,15 +91,9 @@ tar -xzf "$TARBALL" -C "$WORK/extracted" || fail "the tarball does not extract"
 version="$("$WORK/extracted/x3-chain-node" --version 2>/dev/null | head -1)"
 [ -n "$version" ] || fail "the extracted binary does not answer --version"
 info "extracted binary runs: $version"
-rm -f "$TARBALL"   # a gate must not leave a tarball in dist/
+# The archive lives under WORK and is removed by cleanup.
 
 # ── 5. the installer accepts the bundled artifact ────────────────────────────
-# A Live genesis, generated from fixture keys, so the install check exercises the
-# same path an operator takes.
-X3_NODE_BIN="$NODE_BIN" bash "$ROOT/scripts/mainnet/make-fixture-live-spec.sh" \
-  "$WORK/spec" >"$WORK/fixture.log" 2>&1 \
-  || { tail -15 "$WORK/fixture.log" >&2; fail "could not build a fixture Live genesis"; }
-LIVE_SPEC="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['spec'])" "$WORK/spec/fixture.json")"
 DIGEST="$(awk '{print $1}' "$OUT/x3-chain-node.sha256" | head -1)"
 
 env X3_INSTALL_DIR="$WORK/prefix/bin" X3_DATA_DIR="$WORK/prefix/data" \
@@ -116,7 +118,6 @@ printf 'x' >>"$WORK/tampered"   # one byte is enough
 mkdir -p "$WORK/tamper-check"
 cp "$WORK/tampered" "$WORK/tamper-check/x3-chain-node"
 cp "$OUT/x3-chain-node.sha256" "$WORK/tamper-check/"
-cp "$OUT"/x3_chain_runtime*.wasm "$OUT"/x3_chain_runtime*.wasm.gz "$WORK/tamper-check/" 2>/dev/null || true
 if ( cd "$WORK/tamper-check" && sha256sum -c x3-chain-node.sha256 >/dev/null 2>&1 ); then
   fail "a tampered binary passed the release checksum file"
 fi

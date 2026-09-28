@@ -13,6 +13,19 @@ under the repository's `reports/rc6/`, regardless of the caller's directory.
 The fast gate `RC6 release sequence` tests this reporting and exit behavior
 with isolated test commands; it does not run or certify the chain itself.
 
+Release bundles require a clean checkout (including untracked files), a plain
+chain spec, and explicit Cargo features. For example:
+`bash scripts/mainnet/build-release-artifacts.sh candidate --chain /path/plain.json --features cli,testnet`.
+The builder archives HEAD into a temporary source directory and runs a locked
+release build with default features disabled and a fresh target directory.
+It refuses prebuilt binaries and existing output destinations. The plain spec,
+its generated raw twin, and the binary's embedded runtime must agree. The
+bundle's `SHA256SUMS` covers the specs, runtime, binary and provenance manifest;
+`x3-chain-node.sha256` remains the installer's binary-only checksum. The archive
+is written beside the output directory as `<output>.tar.gz`. This binds a single
+build; independent reproducible-build comparison remains a separate gate.
+SBOM generation must succeed unless `--skip-sbom` is explicitly recorded.
+
 ## Why local CI is the primary CI here
 
 GitHub-hosted runners are unusable for this account: each hosted run finishes in
