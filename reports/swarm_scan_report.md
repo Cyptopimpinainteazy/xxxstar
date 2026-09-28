@@ -2,7 +2,7 @@
 
 Findings carry an id, a severity, the exact file and symbol, why it matters, the fix, the test that would prove the fix and the gate that catches a regression. Sorted by severity, kind, path and line, so two runs over the same tree are byte-identical.
 
-Root: `/home/lojak/Desktop/xxxstar-main`
+Root: `/tmp/x3lang-finish`
 Findings: 12
 
 ## Counts
@@ -15,9 +15,9 @@ Findings: 12
 
 | gate | status | detail |
 |---|---|---|
-| stub / marker ratchet | pass | critical-marker=444, explicit-stub=74, marker=1185 |
-| fake-code scan | pass | constant-assert=17, noop-test=2, skip=139 |
-| panic / unwrap ratchet | pass | pallet-call=0, production=440, runtime-hook=0 |
+| stub / marker ratchet | pass | critical-marker=442, explicit-stub=72, marker=1035 |
+| fake-code scan | pass | constant-assert=14, prod-mock=239, skip=137 |
+| panic / unwrap ratchet | pass | pallet-call=0, production=442, runtime-hook=0 |
 
 ## Findings
 

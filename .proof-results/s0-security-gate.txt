@@ -1,40 +1,6 @@
 === S0 Security Gate Execution ===
-Timestamp: Sun Sep 27 14:39:08 UTC 2026
+Timestamp: Mon Sep 28 03:47:29 AM UTC 2026
 
 Running basic security verification...
 
-X3 ProofForge v1.0.0 - Executable Truth Layer
-Workspace: .
-
-Checking Security Gates (S0/S1)...
-
-S0 Blockers (Catastrophic):
-  ✅ canonical_supply_invariant_missing — supply-ledger check_invariant in on_finalize
-  ✅ double_mint_possible — MintIdempotencyToken / MinterNonce nonce tracking
-  ✅ bridge_replay_accepted — ProcessedMintTokens replay-prevention storage
-  ✅ finality_spoof_accepted — finality proof types in crates
-  ✅ atomic_rollback_missing — with_storage_layer atomic rollback in settlement/evolution
-  ✅ runtime_panic_critical_path — x3-invariants uses defensive! instead of panic!
-
-S1 Blockers (Critical):
-  ✅ failed_rollback — with_storage_layer in settlement-engine / evolution-core
-  ✅ governance_bypass — CanonicalConstitutionHash enforcement in governance
-  ✅ unauthorized_mint — Minters allow-list in x3-coin + ensure_root in x3-wallet-pallet
-
-Formal Verification (S0):
-  • status=VERIFIED score=100.0%
-
-Gate Status: ALL SECURITY GATES PASS ✅
-
-=== Blockers Check ===
-Explaining blockers for: all
-
-Current Blockers:
-  1. Missing test for failure case
-  2. Panic on malformed input
-  3. No mutation testing
-
-Next Steps:
-  1. Add failure path tests
-  2. Handle errors instead of panicking
-  3. Run mutation tests
+scripts/run-security-gates.sh: line 82: /tmp/x3lang-finish/target/release/x3-proof: No such file or directory

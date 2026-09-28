@@ -1,0 +1,95 @@
+runlog: /tmp/x3lang-finish/.ai/runlogs/x3-htlc-live-20260928T043634Z
+workdir: /tmp/x3-htlc-live.A42BIC
+rpc:     http://127.0.0.1:18511 (port 18511)
+=== build the SBF program ===
+
+warning: `x3_htlc` (lib) generated 13 warnings (5 duplicates)
+    Finished `release` profile [optimized] target(s) in 42.43s
+program so: /tmp/x3lang-finish/X3-contracts/svm/target/deploy/x3_htlc.so (284560 bytes)
+=== build the broadcaster ===
+   Compiling solana-rpc-client v3.0.0
+   Compiling x3-htlc-client v0.1.0 (/tmp/x3lang-finish/X3-contracts/svm/programs/x3_htlc/client)
+    Finished `release` profile [optimized] target(s) in 1m 12s
+=== generating keypairs ===
+initiator=8DKVTqX1PmEYKyVNJC4C8ghQZHTrqyMR6pwuNf69EHG4 recipient=GBbdutjvAToySoqaxChgdmeVTkA5ptxFxAo8qUzsihZp stranger=Ej4DNYN9xMaDzbBLbHt9x3dzm5sYFQHnyssAATghjGLp
+=== starting solana-test-validator ===
+validator ready: 4.2.2
+PASS: x3_htlc is deployed and executable on-chain at X3HTLC1111111111111111111111111111111111111
+=== creating SPL mint and token accounts ===
+mint=JE5fX2R65AWDX6TdRhBLvke9jncJucyLsxj64wNgBQuq
+PASS: SPL mint is owned by the on-chain token program
+Signature: 2xcnBHshMT7kAcZvoQiGwjDXkdJNJvrbjKm2i6G4AXqx2awNNmtHAQWM1VbsnzdHrRygnR6WJRkq8GdWPARRVnof
+
+Signature: 4h1RSjGVkmdKMmnb4Sk2DaRDdzaeoSXhv7pzUUkwGkBKsFF2EwW8YEZtkYZK9geh3byekFzdgNR2UicD9TnAaf6z
+
+Signature: 2ishutUZLrpPaLGqRtcQJxUSkUPR6cackYZnMn4C6C4QYJH73zkiffngxfT9z6W4pCKk25JTPhVdVtgmmMczTHdZ
+
+initiator_ata=EuqyUyvKDnPLBZHgs7KL7ej5kKMUhRbDsk2QgBj3w64N recipient_ata=55CwnzSfRHiaHyCbFj7QDLgTZJoVGYMspxZCk557QNtA stranger_ata=G7kyawgudYdYa96zyuWYBpbr9QhHQDGsXY6C9CM2eYkT
+mint decimals=9 minted=1000000000000 lock=500000000000 (base units)
+Signature: 3T6nNLpHfwCLj9iodRQqAnMFzMRFRUSfytvtxp3QeL6BDKjgA1vmxxqBcUqREsZjDwTRkAupJbExoRsKYErUQoyu
+
+PASS: initiator token account holds the minted supply before locking
+PASS: on-chain mint supply equals the minted amount
+escrow=Gm3JpjjHMvK39YodTX8s6gSnNqRmfSaqye7dAUhLJ5Eu vault=7jEwwcez6YJ5trxvcHHEhgyAjMsfvds5qZDNmiizkW6H
+PASS: escrow account does not exist before the lock
+PASS: lock (happy path, real SPL transfer into the escrow vault)
+PASS: on-chain escrow account has the allocated HTLC_SIZE
+PASS: on-chain escrow is owned by the x3_htlc program
+PASS: on-chain status == Funded(1) after the lock
+PASS: on-chain amount == the locked amount
+PASS: on-chain timelock == the requested timelock
+PASS: on-chain hashlock == sha256(preimage)
+PASS: on-chain initiator == the signing initiator
+PASS: on-chain recipient == the requested recipient
+PASS: on-chain token_mint == the SPL mint
+PASS: on-chain preimage is zeroed until claimed
+PASS: escrow vault holds exactly the locked amount
+PASS: initiator balance decreased by exactly the locked amount
+PASS: supply is conserved after the lock
+PASS: claim with a WRONG preimage (rejected with the expected program error)
+PASS: rejected wrong-preimage claim left the escrow Funded
+PASS: rejected wrong-preimage claim moved no tokens
+PASS: claim by a party that is not the recorded recipient (rejected with the expected program error)
+PASS: rejected unauthorized claim left the escrow Funded
+PASS: rejected unauthorized claim moved no tokens
+PASS: claim with the CORRECT preimage
+PASS: on-chain status == Claimed(2) after the claim
+PASS: on-chain preimage records the revealed secret
+PASS: escrow vault was drained by the claim
+PASS: recipient received exactly the locked amount
+PASS: supply is conserved after the claim
+PASS: double-claim on a Claimed escrow (rejected with the expected program error)
+PASS: double-claim moved nothing
+PASS: double-claim left the escrow Claimed
+PASS: refund after a successful claim (rejected with the expected program error)
+PASS: post-claim refund attempt changed no balances
+PASS: lock #2 (long timelock, for the refund-path rejections)
+PASS: refund BEFORE the timelock expires (rejected with the expected program error)
+PASS: rejected early refund left the escrow Funded
+PASS: rejected early refund kept the tokens in the vault
+PASS: refund by a party that is not the recorded initiator (rejected with the expected program error)
+PASS: rejected unauthorized refund moved no tokens
+PASS: rejected unauthorized refund left the escrow Funded
+PASS: lock with amount = 0 (rejected with the expected program error)
+PASS: lock with a timelock shorter than the 1-hour minimum (rejected with the expected program error)
+PASS: lock with a timelock longer than the 7-day maximum (rejected with the expected program error)
+PASS: rejected lock shapes created no escrow account
+PASS: rejected lock shapes moved no tokens
+PASS: re-locking an existing escrow identity (rejected with the expected program error)
+PASS: rejected re-lock left the original escrow untouched
+PASS: rejected re-lock moved no extra tokens
+=== restarting the validator on the same ledger ===
+PASS: the validator restarted on the same ledger
+PASS: the funded escrow survives a validator restart
+PASS: the escrow amount survives a validator restart
+PASS: the escrow hashlock survives a validator restart
+PASS: the vault balance survives a validator restart
+PASS: the claimed escrow is still Claimed after a restart
+PASS: refund before the timelock is still refused after a restart (rejected with the expected program error)
+PASS: the post-restart rejection moved no tokens
+PASS: double-claim on the settled escrow is still refused after a restart (rejected with the expected program error)
+PASS: supply is conserved across every path
+
+=== Results: 61 passed, 0 failed ===
+escrow(claimed)=Gm3JpjjHMvK39YodTX8s6gSnNqRmfSaqye7dAUhLJ5Eu
+escrow(funded)=3PNShwB6t4QQVXuh2VmNx6mqW2qy35rCqjStaFuefgZK

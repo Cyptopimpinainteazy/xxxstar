@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "root": "/home/lojak/Desktop/xxxstar-main",
+  "root": "/tmp/x3lang-finish",
   "counts": {
     "pallet-call-without-weights": 12
   },
@@ -24,17 +24,17 @@
     {
       "gate": "stub / marker ratchet",
       "status": "pass",
-      "detail": "critical-marker=444, explicit-stub=74, marker=1185"
+      "detail": "critical-marker=442, explicit-stub=72, marker=1035"
     },
     {
       "gate": "fake-code scan",
       "status": "pass",
-      "detail": "constant-assert=17, noop-test=2, skip=139"
+      "detail": "constant-assert=14, prod-mock=239, skip=137"
     },
     {
       "gate": "panic / unwrap ratchet",
       "status": "pass",
-      "detail": "pallet-call=0, production=440, runtime-hook=0"
+      "detail": "pallet-call=0, production=442, runtime-hook=0"
     }
   ],
   "findings": [
