@@ -392,7 +392,7 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // a genesis-named gateway account since 19) or `finalize_with_settlement` (`SettlementOrigin`).
     // One call and one weight entry removed, no storage key changes shape, so no migration.
     // `transaction_version` is unchanged: no existing call's encoding moved.
-    spec_version: 20,
+    spec_version: 21,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
