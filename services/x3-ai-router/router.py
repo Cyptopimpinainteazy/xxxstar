@@ -55,6 +55,9 @@ class Router:
             model = provider["model"]
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
+            if provider.get("api_key_env") and (price_in <= 0 or price_out <= 0):
+                failures.append(name + ": configure positive token prices")
+                continue
             # Reserve against an upper-bound configured for each request before making the call.
             estimate = (request.get("max_tokens", 4096) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
             if not self.remaining(agent, estimate):
