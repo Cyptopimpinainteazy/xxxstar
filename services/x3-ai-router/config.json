@@ -1,0 +1,14 @@
+{
+  "daily_budget_usd": 30,
+  "agent_daily_budget_usd": 10,
+  "max_input_tokens": 16000,
+  "routes": {
+    "routine": ["ollama", "openrouter", "direct"],
+    "critical": ["direct", "openrouter"]
+  },
+  "providers": {
+    "ollama": {"base_url": "http://127.0.0.1:11434/v1", "model": "qwen2.5-coder:7b", "critical_allowed": false},
+    "openrouter": {"base_url": "https://openrouter.ai/api/v1", "model": "openai/gpt-4.1-mini", "api_key_env": "OPENROUTER_API_KEY", "input_usd_per_million": 0.4, "output_usd_per_million": 1.6, "critical_allowed": true},
+    "direct": {"base_url": "https://api.openai.com/v1", "model": "gpt-5", "api_key_env": "OPENAI_API_KEY", "input_usd_per_million": 0, "output_usd_per_million": 0, "critical_allowed": true}
+  }
+}
