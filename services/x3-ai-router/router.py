@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Small OpenAI-compatible, budgeted model router. Standard library only."""
 import argparse
+import base64
 import datetime as dt
+import html
 import json
 import os
 import sqlite3
@@ -58,6 +60,24 @@ class Router:
         with self.lock:
             rows = self.db.execute("SELECT day,agent,provider,COUNT(*),ROUND(SUM(cost_usd),6) FROM usage GROUP BY day,agent,provider ORDER BY day DESC,agent").fetchall()
         return [{"day": d, "agent": a, "provider": p, "requests": n, "cost_usd": c} for d, a, p, n, c in rows]
+
+    def snapshot(self):
+        day = dt.datetime.now(dt.timezone.utc).date().isoformat()
+        with self.lock:
+            spent, requests, inputs, outputs = self.db.execute(
+                "SELECT COALESCE(SUM(cost_usd),0),COUNT(*),COALESCE(SUM(input_tokens),0),COALESCE(SUM(output_tokens),0) FROM usage WHERE day=?", (day,)
+            ).fetchone()
+            reserved, inflight = self.db.execute(
+                "SELECT COALESCE(SUM(cost_usd),0),COUNT(*) FROM reservations WHERE day=?", (day,)
+            ).fetchone()
+            rows = self.db.execute(
+                "SELECT agent,provider,COUNT(*),SUM(cost_usd) FROM usage WHERE day=? GROUP BY agent,provider ORDER BY SUM(cost_usd) DESC", (day,)
+            ).fetchall()
+        return {"day": day, "spent_usd": spent, "reserved_usd": reserved, "requests": requests,
+                "inflight": inflight, "input_tokens": inputs, "output_tokens": outputs,
+                "daily_budget_usd": self.config["daily_budget_usd"],
+                "breakdown": [{"agent": a, "provider": p, "requests": n, "cost_usd": c} for a, p, n, c in rows]}
+
 
     def complete(self, request, agent):
         # UTF-8 JSON bytes conservatively bound visible input tokens; reject
@@ -180,6 +200,25 @@ class Router:
         return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
 
 
+def dashboard(snapshot):
+    rows = "".join("<tr>" + "".join(f"<td>{html.escape(str(item[key]))}</td>" for key in ("agent", "provider", "requests", "cost_usd")) + "</tr>"
+                   for item in snapshot["breakdown"])
+    cells = "".join(f"<li><strong>{html.escape(key.replace('_', ' ').title())}:</strong> {html.escape(str(value))}</li>"
+                    for key, value in snapshot.items() if key != "breakdown")
+    return ("<!doctype html><html lang='en'><meta charset='utf-8'><meta http-equiv='refresh' content='15'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'><title>X3 AI router</title>"
+            "<style>body{font:16px system-ui;background:#111827;color:#f9fafb;max-width:960px;margin:3rem auto;padding:1rem}"
+            "table{border-collapse:collapse;width:100%}td,th{padding:.7rem;border-bottom:1px solid #4b5563;text-align:left}"
+            "li{margin:.5rem 0}a{color:#fb923c}</style><h1>X3 AI router</h1><ul>" + cells +
+            "</ul><h2>Today by agent and provider</h2><table><thead><tr><th>Agent</th><th>Provider</th>"
+            "<th>Requests</th><th>USD</th></tr></thead><tbody>" + rows + "</tbody></table></html>")
+
+
+def metrics(snapshot):
+    fields = ("spent_usd", "reserved_usd", "requests", "inflight", "input_tokens", "output_tokens", "daily_budget_usd")
+    return "".join(f"x3_ai_router_{name} {snapshot[name]}\n" for name in fields)
+
+
 def handler_for(router):
     class Handler(BaseHTTPRequestHandler):
         def reply(self, status, data):
@@ -192,15 +231,32 @@ def handler_for(router):
 
         def authorized(self):
             secret = os.environ.get("X3_ROUTER_TOKEN")
-            return not secret or self.headers.get("Authorization") == "Bearer " + secret
+            auth = self.headers.get("Authorization", "")
+            return not secret or auth in ("Bearer " + secret, "Basic " + base64.b64encode(("x3:" + secret).encode()).decode())
+
+        def raw(self, status, body, content_type):
+            data = body.encode()
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
 
         def do_GET(self):
             if not self.authorized():
-                return self.reply(401, {"error": "Unauthorized"})
+                self.send_response(401)
+                self.send_header("WWW-Authenticate", 'Basic realm="X3 AI router"')
+                self.end_headers()
+                return
             if self.path == "/health":
                 return self.reply(200, {"status": "ok"})
             if self.path == "/v1/usage":
                 return self.reply(200, {"usage": router.stats()})
+            if self.path == "/v1/dashboard":
+                return self.raw(200, dashboard(router.snapshot()), "text/html; charset=utf-8")
+            if self.path == "/metrics":
+                return self.raw(200, metrics(router.snapshot()), "text/plain; version=0.0.4; charset=utf-8")
             if self.path == "/v1/models":
                 return self.reply(200, {"object": "list", "data": [{"id": "x3-auto", "object": "model"}]})
             return self.reply(404, {"error": "Not found"})
