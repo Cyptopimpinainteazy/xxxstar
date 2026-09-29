@@ -21,6 +21,17 @@ class Provider(BaseHTTPRequestHandler):
     def do_POST(self):
         data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         self.requests.append(data)
+        if data.get("stream"):
+            chunks = [b'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+                      b'data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n',
+                      b'data: [DONE]\n\n']
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for chunk in chunks:
+                self.wfile.write(chunk)
+                self.wfile.flush()
+            return
         body = json.dumps({"choices": [{"message": {"role": "assistant", "content": "ok"}}], "usage": {"prompt_tokens": 10, "completion_tokens": 5}}).encode()
         self.send_response(200)
         self.send_header("Content-Length", str(len(body)))
@@ -77,6 +88,34 @@ class RouterTests(unittest.TestCase):
         self.assertIsNotNone(self.router.reserve("alice", 0.001))
         status, _ = self.router.complete({"messages": [{"content": "z" * 1100}]}, "alice")
         self.assertEqual(status, 413)
+
+    def test_stream_fallback_and_usage(self):
+        chunks = []
+        started = []
+        result = self.router.stream({"messages": [{"role": "user", "content": "format"}], "max_tokens": 10},
+                                    "alice", lambda: started.append(True), chunks.append)
+        self.assertIsNone(result)
+        self.assertEqual(started, [True])
+        self.assertIn(b"data: [DONE]", b"".join(chunks))
+        self.assertTrue(Provider.requests[0]["stream_options"]["include_usage"])
+        self.assertEqual(self.router.stats()[0]["cost_usd"], 0.000015)
+
+    def test_http_stream_endpoint(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            data = json.dumps({"model": "x3-auto", "messages": [{"role": "user", "content": "format"}],
+                               "max_tokens": 10, "stream": True}).encode()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/chat/completions",
+                                             data, {"Content-Type": "application/json", "X-X3-Agent": "alice"})
+            with urllib.request.urlopen(request) as response:
+                self.assertEqual(response.headers["Content-Type"], "text/event-stream")
+                self.assertIn(b"data: [DONE]", response.read())
+            self.assertEqual(self.router.stats()[0]["cost_usd"], 0.000015)
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 if __name__ == "__main__":
