@@ -117,6 +117,34 @@ class RouterTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_dashboard_metrics_and_auth(self):
+        self.router.finish(self.router.reserve("<script>", 0.001), "<script>", "up", "up",
+                           {"prompt_tokens": 10, "completion_tokens": 5}, 0.000015)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        previous = os.environ.get("X3_ROUTER_TOKEN")
+        os.environ["X3_ROUTER_TOKEN"] = "test-secret"
+        try:
+            url = f"http://127.0.0.1:{server.server_port}"
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                urllib.request.urlopen(url + "/v1/dashboard")
+            self.assertEqual(rejected.exception.code, 401)
+            headers = {"Authorization": "Bearer test-secret"}
+            with urllib.request.urlopen(urllib.request.Request(url + "/v1/dashboard", headers=headers)) as response:
+                page = response.read().decode()
+                self.assertIn("&lt;script&gt;", page)
+                self.assertNotIn("<script>", page)
+            with urllib.request.urlopen(urllib.request.Request(url + "/metrics", headers=headers)) as response:
+                self.assertIn("x3_ai_router_spent_usd 1.5e-05", response.read().decode())
+        finally:
+            if previous is None:
+                os.environ.pop("X3_ROUTER_TOKEN", None)
+            else:
+                os.environ["X3_ROUTER_TOKEN"] = previous
+            server.shutdown()
+            server.server_close()
+
 
 if __name__ == "__main__":
     unittest.main()
