@@ -17,6 +17,25 @@ CRITICAL = ("consensus", "finality", "settlement", "atomic", "cryptograph", "sup
 MAX_BODY = 2_000_000
 
 
+def pricing_error(provider):
+    """Fail closed for paid providers with missing or old price assumptions."""
+    if not provider.get("api_key_env"):
+        return None
+    if provider.get("free_model"):
+        if not provider.get("model", "").endswith(":free") or provider.get("input_usd_per_million", 0) != 0 or provider.get("output_usd_per_million", 0) != 0:
+            return "free model must use a :free ID and zero prices"
+    elif provider.get("input_usd_per_million", 0) <= 0 or provider.get("output_usd_per_million", 0) <= 0:
+        return "configure positive token prices"
+    try:
+        checked = dt.date.fromisoformat(provider["pricing_checked_on"])
+        age = (dt.datetime.now(dt.timezone.utc).date() - checked).days
+        if age < 0 or age > provider.get("pricing_max_age_days", 30):
+            return "refresh provider pricing"
+    except (KeyError, TypeError, ValueError):
+        return "configure pricing_checked_on (YYYY-MM-DD)"
+    return None
+
+
 class Router:
     def __init__(self, config, db_path):
         self.config = config
@@ -88,13 +107,16 @@ class Router:
         failures = []
         for name in chain:
             provider = self.config["providers"][name]
+            if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
+                continue
             if tier == "critical" and not provider.get("critical_allowed", False):
                 continue
             model = provider["model"]
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
-            if provider.get("api_key_env") and (price_in <= 0 or price_out <= 0):
-                failures.append(name + ": configure positive token prices")
+            error = pricing_error(provider)
+            if error:
+                failures.append(name + ": " + error)
                 continue
             # Reserve against an upper-bound configured for each request before making the call.
             estimate = (request.get("max_tokens", 4096) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
@@ -108,6 +130,8 @@ class Router:
             payload = dict(request)
             payload["model"] = model
             payload["stream"] = False
+            if provider.get("output_token_parameter") == "max_completion_tokens":
+                payload["max_completion_tokens"] = payload.pop("max_tokens", 4096)
             headers = {"Content-Type": "application/json"}
             if key:
                 headers["Authorization"] = "Bearer " + key
@@ -137,12 +161,15 @@ class Router:
         failures = []
         for name in chain:
             provider = self.config["providers"][name]
+            if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
+                continue
             if tier == "critical" and not provider.get("critical_allowed", False):
                 continue
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
-            if provider.get("api_key_env") and (price_in <= 0 or price_out <= 0):
-                failures.append(name + ": configure positive token prices")
+            error = pricing_error(provider)
+            if error:
+                failures.append(name + ": " + error)
                 continue
             key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
             if provider.get("api_key_env") and not key:
@@ -156,6 +183,8 @@ class Router:
             payload["model"] = provider["model"]
             payload["stream"] = True
             payload["stream_options"] = {"include_usage": True}
+            if provider.get("output_token_parameter") == "max_completion_tokens":
+                payload["max_completion_tokens"] = payload.pop("max_tokens", 4096)
             headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
             if key:
                 headers["Authorization"] = "Bearer " + key
