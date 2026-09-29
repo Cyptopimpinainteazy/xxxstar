@@ -6,6 +6,7 @@ import json
 import os
 import sqlite3
 import threading
+import uuid
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,6 +21,7 @@ class Router:
         self.db = sqlite3.connect(db_path, check_same_thread=False)
         self.lock = threading.Lock()
         self.db.execute("CREATE TABLE IF NOT EXISTS usage (day TEXT, agent TEXT, provider TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL)")
+        self.db.execute("CREATE TABLE IF NOT EXISTS reservations (id TEXT PRIMARY KEY, day TEXT, agent TEXT, cost_usd REAL)")
         self.db.commit()
 
     def choose(self, request):
@@ -27,17 +29,29 @@ class Router:
         tier = "critical" if any(term in text for term in CRITICAL) else "routine"
         return tier, self.config["routes"][tier]
 
-    def remaining(self, agent, estimate):
+    def reserve(self, agent, estimate):
         day = dt.datetime.now(dt.timezone.utc).date().isoformat()
         with self.lock:
+            self.db.execute("BEGIN IMMEDIATE")
             total = self.db.execute("SELECT COALESCE(SUM(cost_usd),0) FROM usage WHERE day=?", (day,)).fetchone()[0]
+            total += self.db.execute("SELECT COALESCE(SUM(cost_usd),0) FROM reservations WHERE day=?", (day,)).fetchone()[0]
             spent = self.db.execute("SELECT COALESCE(SUM(cost_usd),0) FROM usage WHERE day=? AND agent=?", (day, agent)).fetchone()[0]
-        return total + estimate <= self.config["daily_budget_usd"] and spent + estimate <= self.config["agent_daily_budget_usd"]
+            spent += self.db.execute("SELECT COALESCE(SUM(cost_usd),0) FROM reservations WHERE day=? AND agent=?", (day, agent)).fetchone()[0]
+            if total + estimate > self.config["daily_budget_usd"] or spent + estimate > self.config["agent_daily_budget_usd"]:
+                self.db.commit()
+                return None
+            reservation = uuid.uuid4().hex
+            self.db.execute("INSERT INTO reservations VALUES (?,?,?,?)", (reservation, day, agent, estimate))
+            self.db.commit()
+            return reservation
 
-    def record(self, agent, provider, model, usage, cost):
+    def finish(self, reservation, agent, provider=None, model=None, usage=None, cost=0):
         day = dt.datetime.now(dt.timezone.utc).date().isoformat()
         with self.lock:
-            self.db.execute("INSERT INTO usage VALUES (?,?,?,?,?,?,?)", (day, agent, provider, model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), cost))
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute("DELETE FROM reservations WHERE id=?", (reservation,))
+            if provider is not None:
+                self.db.execute("INSERT INTO usage VALUES (?,?,?,?,?,?,?)", (day, agent, provider, model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), cost))
             self.db.commit()
 
     def stats(self):
@@ -46,6 +60,10 @@ class Router:
         return [{"day": d, "agent": a, "provider": p, "requests": n, "cost_usd": c} for d, a, p, n, c in rows]
 
     def complete(self, request, agent):
+        # UTF-8 JSON bytes conservatively bound visible input tokens; reject
+        # oversized requests instead of trusting a configured estimate.
+        if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config["max_input_tokens"]:
+            return 413, {"error": {"message": "Input exceeds configured budget bound"}}
         tier, chain = self.choose(request)
         failures = []
         for name in chain:
@@ -60,12 +78,13 @@ class Router:
                 continue
             # Reserve against an upper-bound configured for each request before making the call.
             estimate = (request.get("max_tokens", 4096) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
-            if not self.remaining(agent, estimate):
-                return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded"}}
             key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
             if provider.get("api_key_env") and not key:
                 failures.append(name + ": credential unavailable")
                 continue
+            reservation = self.reserve(agent, estimate)
+            if reservation is None:
+                return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded"}}
             payload = dict(request)
             payload["model"] = model
             payload["stream"] = False
@@ -77,12 +96,18 @@ class Router:
                 call = urllib.request.Request(url, json.dumps(payload).encode(), headers, method="POST")
                 with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
                     result = json.load(response)
+                if not isinstance(result, dict) or "choices" not in result:
+                    raise ValueError("Provider response lacks choices")
                 usage = result.get("usage", {})
-                cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000
-                self.record(agent, name, model, usage, cost)
+                cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000 if usage else estimate
+                self.finish(reservation, agent, name, model, usage, cost)
                 return 200, result
             except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+                self.finish(reservation, agent)
                 failures.append(name + ": " + type(exc).__name__)
+            except Exception:
+                self.finish(reservation, agent)
+                raise
         return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
 
 
