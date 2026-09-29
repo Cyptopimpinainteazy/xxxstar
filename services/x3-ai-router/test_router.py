@@ -145,6 +145,34 @@ class RouterTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_paid_price_freshness_and_free_id(self):
+        paid = {"api_key_env": "TEST_KEY", "model": "paid", "input_usd_per_million": 1,
+                "output_usd_per_million": 2, "pricing_checked_on": "2020-01-01"}
+        self.assertEqual(router_module.pricing_error(paid), "refresh provider pricing")
+        free = {"api_key_env": "TEST_KEY", "model": "nvidia/example:free", "free_model": True,
+                "pricing_checked_on": router_module.dt.datetime.now(router_module.dt.timezone.utc).date().isoformat()}
+        self.assertIsNone(router_module.pricing_error(free))
+        free["model"] = "nvidia/example"
+        self.assertIn("must use a :free ID", router_module.pricing_error(free))
+
+    def test_free_provider_requires_opt_in(self):
+        self.config["routes"]["routine"] = ["free", "up"]
+        self.config["providers"]["free"] = {"base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1",
+            "model": "nvidia/example:free", "free_model": True, "enabled_env": "X3_ENABLE_FREE_CLOUD_TEST",
+            "api_key_env": "OPENROUTER_TEST_KEY", "pricing_checked_on": router_module.dt.datetime.now(router_module.dt.timezone.utc).date().isoformat()}
+        request = {"messages": [{"role": "user", "content": "format this"}], "max_tokens": 10}
+        os.environ.pop("X3_ENABLE_FREE_CLOUD_TEST", None)
+        self.router.complete(request, "alice")
+        self.assertEqual(Provider.requests[-1]["model"], "up")
+        os.environ["X3_ENABLE_FREE_CLOUD_TEST"] = "1"
+        os.environ["OPENROUTER_TEST_KEY"] = "test"
+        try:
+            self.router.complete(request, "alice")
+            self.assertEqual(Provider.requests[-1]["model"], "nvidia/example:free")
+        finally:
+            os.environ.pop("X3_ENABLE_FREE_CLOUD_TEST", None)
+            os.environ.pop("OPENROUTER_TEST_KEY", None)
+
 
 if __name__ == "__main__":
     unittest.main()
