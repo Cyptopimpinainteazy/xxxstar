@@ -110,6 +110,75 @@ class Router:
                 raise
         return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
 
+    def stream(self, request, agent, start, send):
+        if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config["max_input_tokens"]:
+            return 413, {"error": "Input exceeds configured budget bound"}
+        tier, chain = self.choose(request)
+        failures = []
+        for name in chain:
+            provider = self.config["providers"][name]
+            if tier == "critical" and not provider.get("critical_allowed", False):
+                continue
+            price_in = provider.get("input_usd_per_million", 0)
+            price_out = provider.get("output_usd_per_million", 0)
+            if provider.get("api_key_env") and (price_in <= 0 or price_out <= 0):
+                failures.append(name + ": configure positive token prices")
+                continue
+            key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
+            if provider.get("api_key_env") and not key:
+                failures.append(name + ": credential unavailable")
+                continue
+            estimate = (request.get("max_tokens", 4096) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
+            reservation = self.reserve(agent, estimate)
+            if reservation is None:
+                return 429, {"error": "Daily budget exhausted"}
+            payload = dict(request)
+            payload["model"] = provider["model"]
+            payload["stream"] = True
+            payload["stream_options"] = {"include_usage": True}
+            headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+            if key:
+                headers["Authorization"] = "Bearer " + key
+            emitted = False
+            usage = None
+            try:
+                call = urllib.request.Request(provider["base_url"].rstrip("/") + "/chat/completions",
+                                              json.dumps(payload).encode(), headers, method="POST")
+                with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
+                    if "text/event-stream" not in response.headers.get("Content-Type", ""):
+                        raise ValueError("Provider did not return SSE")
+                    for line in response:
+                        if len(line) > 1_000_000:
+                            raise ValueError("Oversized SSE line")
+                        if not line.startswith(b"data: "):
+                            if emitted:
+                                send(line)
+                            continue
+                        data = line[6:].strip()
+                        if data != b"[DONE]":
+                            event = json.loads(data)
+                            if event.get("usage"):
+                                usage = event["usage"]
+                        if not emitted:
+                            start()
+                            emitted = True
+                        send(line)
+                if not emitted:
+                    raise ValueError("Empty SSE response")
+                cost = ((usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000) if usage else estimate
+                self.finish(reservation, agent, name, provider["model"], usage or {}, cost)
+                return None
+            except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+                if emitted:
+                    self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
+                    return None  # A partial stream cannot be retried with another model.
+                self.finish(reservation, agent)
+                failures.append(name + ": " + type(exc).__name__)
+            except Exception:
+                self.finish(reservation, agent, name if emitted else None, provider["model"], usage or {}, estimate if emitted else 0)
+                raise
+        return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
+
 
 def handler_for(router):
     class Handler(BaseHTTPRequestHandler):
@@ -146,11 +215,28 @@ def handler_for(router):
                 if size < 1 or size > MAX_BODY:
                     return self.reply(413, {"error": "Invalid request size"})
                 data = json.loads(self.rfile.read(size))
-                if not isinstance(data.get("messages"), list) or data.get("stream"):
-                    return self.reply(400, {"error": "Expected messages and stream=false"})
+                if not isinstance(data.get("messages"), list) or not isinstance(data.get("stream", False), bool):
+                    return self.reply(400, {"error": "Expected messages and boolean stream"})
                 if not isinstance(data.get("max_tokens", 4096), int) or not 1 <= data.get("max_tokens", 4096) <= 32768:
                     return self.reply(400, {"error": "Invalid max_tokens"})
                 agent = self.headers.get("X-X3-Agent", "default")[:80]
+                if data.get("stream"):
+                    def start():
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/event-stream")
+                        self.send_header("Cache-Control", "no-cache")
+                        self.send_header("Connection", "close")
+                        self.end_headers()
+
+                    def send(chunk):
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+
+                    outcome = router.stream(data, agent, start, send)
+                    if outcome is not None:
+                        return self.reply(*outcome)
+                    self.close_connection = True
+                    return
                 status, result = router.complete(data, agent)
                 return self.reply(status, result)
             except (ValueError, TypeError, KeyError):
