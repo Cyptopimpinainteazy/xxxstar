@@ -2,6 +2,7 @@
   "daily_budget_usd": 30,
   "agent_daily_budget_usd": 10,
   "max_input_tokens": 200000,
+  "max_request_bytes": 8388608,
   "max_output_tokens": 32768,
   "default_max_output_tokens": 4096,
   "reservation_ttl_seconds": 900,
@@ -9,13 +10,15 @@
   "provider_cooldown_max_seconds": 3600,
   "routes": {
     "routine": [
+      "deepseek",
+      "openrouter",
       "ollama",
       "nemotron_lightning_free",
       "nemotron_ultra_free",
-      "openrouter",
       "direct"
     ],
     "critical": [
+      "deepseek",
       "direct",
       "openrouter"
     ]
@@ -29,7 +32,8 @@
     "ollama": {
       "base_url": "http://127.0.0.1:11434/v1",
       "model": "qwen2.5-coder:7b",
-      "critical_allowed": false
+      "supports_tools": true,
+      "critical_allowed": true
     },
     "nemotron_lightning_free": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -37,6 +41,7 @@
       "api_key_env": "OPENROUTER_API_KEY",
       "enabled_env": "X3_ENABLE_FREE_CLOUD",
       "free_model": true,
+      "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
       "critical_allowed": false
     },
@@ -46,6 +51,7 @@
       "api_key_env": "OPENROUTER_API_KEY",
       "enabled_env": "X3_ENABLE_FREE_CLOUD",
       "free_model": true,
+      "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
       "critical_allowed": false
     },
@@ -55,6 +61,7 @@
       "api_key_env": "OPENROUTER_API_KEY",
       "input_usd_per_million": 0.4,
       "output_usd_per_million": 1.6,
+      "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
       "critical_allowed": true
     },
@@ -64,8 +71,24 @@
       "api_key_env": "OPENAI_API_KEY",
       "input_usd_per_million": 1.25,
       "output_usd_per_million": 10,
+      "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
       "output_token_parameter": "max_completion_tokens",
+      "critical_allowed": true
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-flash",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "input_usd_per_million": 0.3,
+      "output_usd_per_million": 1.2,
+      "pricing_checked_on": "2026-09-30",
+      "supports_tools": true,
+      "thinking": {
+        "parameter": "thinking",
+        "disabled_value": {"type": "disabled"},
+        "disable_when_tool_choice_forced": true
+      },
       "critical_allowed": true
     }
   }

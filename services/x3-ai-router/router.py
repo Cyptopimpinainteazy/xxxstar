@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sqlite3
+import sys
 import threading
 import time
 import uuid
@@ -24,15 +25,151 @@ DEFAULT_OUTPUT_TOKENS = 4_096
 # Endpoints OpenAI clients probe that this router deliberately does not
 # implement. A 501 names the gap; a 404 reads as a wrong base URL.
 UNSUPPORTED_PATHS = ("/v1/embeddings", "/v1/audio")
+# Responses tool types with no Chat Completions equivalent. They are refused by
+# name rather than dropped: a tool that silently disappears makes the model look
+# like it chose not to call something it was never offered.
+UNSUPPORTED_TOOL_TYPES = ("file_search", "image_generation", "computer_use",
+                          "code_interpreter", "mcp", "local_shell", "shell")
+# The single Chat Completions argument that carries a custom (freeform) tool's
+# body. Chat Completions has no freeform tool type, so the text travels as one
+# string argument and is lifted back out on the way to the client.
+CUSTOM_TOOL_INPUT = "input"
+TOOL_CAPABLE = "supports_tools"
+
+
+class UnsupportedFeature(Exception):
+    """The client asked for something Chat Completions cannot carry."""
+
+
+class ClientDisconnected(Exception):
+    """The caller closed the socket mid-stream. Not a provider failure."""
+
+
+def _flatten_tools(tools, custom, disabled):
+    """Chat Completions tools for a Responses `tools` list.
+
+    `custom` collects the names of freeform tools so the answer can be turned
+    back into `custom_tool_call` items, and `disabled` collects tools the client
+    itself switched off.
+    """
+    translated = []
+    for tool in tools or []:
+        if not isinstance(tool, dict):
+            continue
+        kind = tool.get("type")
+        if kind == "namespace":
+            translated.extend(_flatten_tools(tool.get("tools"), custom, disabled))
+            continue
+        if kind == "function":
+            if not isinstance(tool.get("name"), str) or not tool["name"]:
+                raise UnsupportedFeature("a function tool without a name")
+            function = {"name": tool["name"],
+                        "parameters": tool.get("parameters") or {"type": "object", "properties": {}}}
+            if tool.get("description"):
+                function["description"] = tool["description"]
+            translated.append({"type": "function", "function": function})
+            continue
+        if kind == "custom":
+            name = tool.get("name")
+            if not isinstance(name, str) or not name:
+                raise UnsupportedFeature("a custom tool without a name")
+            # The freeform body is carried verbatim in one string argument and
+            # rebuilt as a `custom_tool_call` on the way back, so the client
+            # never sees the difference. What is lost is the grammar, which
+            # Chat Completions cannot express; the client still validates what
+            # it receives against its own schema.
+            custom.add(name)
+            description = tool.get("description") or ""
+            translated.append({"type": "function", "function": {
+                "name": name,
+                "description": (description + " " if description else "") +
+                               "Pass the complete tool input verbatim as the `" + CUSTOM_TOOL_INPUT + "` string.",
+                "parameters": {"type": "object", "required": [CUSTOM_TOOL_INPUT],
+                               "properties": {CUSTOM_TOOL_INPUT: {
+                                   "type": "string",
+                                   "description": "The complete input for this tool, verbatim."}}},
+            }})
+            continue
+        if kind == "web_search":
+            if tool.get("external_web_access"):
+                raise UnsupportedFeature("web_search with external_web_access enabled")
+            # The client disabled it, so there is nothing to run and nothing to
+            # misreport. A search that would actually leave the machine is
+            # refused above rather than silently ignored.
+            disabled.append("web_search")
+            continue
+        if kind in UNSUPPORTED_TOOL_TYPES:
+            raise UnsupportedFeature("tool type " + str(kind))
+    return translated
+
+
+def flattened_tools(request):
+    """(chat tools, freeform tool names, client-disabled tool names)."""
+    custom, disabled = set(), []
+    return _flatten_tools(request.get("tools"), custom, disabled), custom, disabled
+
+
+def tool_choice_forces_a_tool(choice):
+    """True when the caller named a tool or demanded a call."""
+    return choice == "required" or (isinstance(choice, dict) and choice.get("type") in ("function", "custom"))
+
+
+def chat_tool_choice(choice, custom):
+    """Responses `tool_choice` -> Chat Completions `tool_choice`.
+
+    A string passes through. The named-function object form becomes the Chat
+    Completions object; dropping it made the router answer with whatever tool
+    the model preferred while the client believed it had named one.
+    """
+    if choice is None:
+        return None
+    if isinstance(choice, str):
+        if choice in ("auto", "none", "required"):
+            return choice
+        raise UnsupportedFeature("tool_choice " + choice)
+    if isinstance(choice, dict):
+        kind, name = choice.get("type"), choice.get("name")
+        if kind in ("function", "custom") and isinstance(name, str) and name:
+            return {"type": "function", "function": {"name": name}}
+        if kind == "allowed_tools":
+            mode = choice.get("mode")
+            return mode if mode in ("auto", "required") else "auto"
+    raise UnsupportedFeature("tool_choice " + json.dumps(choice)[:80])
+
+
+def custom_tool_input(arguments):
+    """The freeform body back out of the single-argument Chat encoding."""
+    try:
+        parsed = json.loads(arguments)
+    except (TypeError, ValueError):
+        return arguments or ""
+    if isinstance(parsed, dict) and isinstance(parsed.get(CUSTOM_TOOL_INPUT), str):
+        return parsed[CUSTOM_TOOL_INPUT]
+    return arguments or ""
+
+
+def apply_provider_reasoning(payload, provider):
+    """Provider-specific reasoning rules for a tool turn.
+
+    DeepSeek runs thinking mode by default and rejects a named or required
+    `tool_choice` there with HTTP 400 ("Thinking mode does not support this
+    tool_choice"). A provider that declares the conflict has thinking switched
+    off for exactly those turns; every other turn keeps the provider default.
+    """
+    thinking = provider.get("thinking")
+    if not thinking or not thinking.get("disable_when_tool_choice_forced"):
+        return
+    if tool_choice_forces_a_tool(payload.get("tool_choice")):
+        payload[thinking.get("parameter", "thinking")] = thinking.get("disabled_value", {"type": "disabled"})
 
 
 def responses_messages(request):
     """Translate a Responses API request into Chat Completions messages.
 
     Codex sends the Responses shape: a top-level `instructions` string plus an
-    `input` list whose items are messages, function calls and function results.
-    Only these three item kinds exist in what Codex sends, and each has a
-    direct Chat Completions equivalent.
+    `input` list whose items are messages, function calls, custom tool calls and
+    their outputs. Each has a direct Chat Completions equivalent, so a tool
+    round trip keeps the same call IDs and names on both sides.
     """
     messages = []
     instructions = request.get("instructions")
@@ -60,7 +197,24 @@ def responses_messages(request):
                     "function": {"name": item.get("name", ""), "arguments": item.get("arguments") or "{}"},
                 }],
             })
+        elif kind == "custom_tool_call":
+            messages.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": item.get("call_id", ""),
+                    "type": "function",
+                    "function": {"name": item.get("name", ""),
+                                 "arguments": json.dumps({CUSTOM_TOOL_INPUT: item.get("input") or ""})},
+                }],
+            })
         elif kind == "function_call_output":
+            messages.append({
+                "role": "tool",
+                "tool_call_id": item.get("call_id", ""),
+                "content": str(item.get("output", "")),
+            })
+        elif kind == "custom_tool_call_output":
             messages.append({
                 "role": "tool",
                 "tool_call_id": item.get("call_id", ""),
@@ -69,51 +223,29 @@ def responses_messages(request):
     return messages
 
 
-def responses_tools(request, messages):
-    """Flatten Responses function tools into the Chat Completions tool shape.
-
-    A Responses tool carries `name`/`parameters` at the top level; a chat tool
-    nests them under `function`. Namespaced tools are flattened, because the
-    chat protocol has no namespace concept. `web_search` has no chat equivalent
-    and is dropped rather than translated into something that would lie about
-    what ran.
-    """
-    translated = []
-    for tool in request.get("tools") or []:
-        if not isinstance(tool, dict):
-            continue
-        kind = tool.get("type")
-        if kind == "namespace":
-            translated.extend(responses_tools({"tools": tool.get("tools")}, messages))
-        elif kind == "function" and tool.get("name"):
-            function = {"name": tool["name"], "parameters": tool.get("parameters") or {"type": "object", "properties": {}}}
-            if tool.get("description"):
-                function["description"] = tool["description"]
-            translated.append({"type": "function", "function": function})
-    if translated:
-        choice = request.get("tool_choice")
-        if choice in ("auto", "none", "required"):
-            messages.append(("tool_choice", choice))
-    return translated
-
-
-def responses_request_to_chat(request):
-    """A complete Chat Completions request for the provider loop to execute."""
+def responses_request(request):
+    """(Chat Completions body, freeform tool names, client-disabled tool names)."""
     chat = {"messages": responses_messages(request)}
-    tools = responses_tools(request, [])
+    tools, custom, disabled = flattened_tools(request)
     if tools:
         chat["tools"] = tools
-        if request.get("tool_choice") in ("auto", "none", "required"):
-            chat["tool_choice"] = request["tool_choice"]
+        choice = chat_tool_choice(request.get("tool_choice"), custom)
+        if choice is not None:
+            chat["tool_choice"] = choice
         if isinstance(request.get("parallel_tool_calls"), bool):
             chat["parallel_tool_calls"] = request["parallel_tool_calls"]
     limit = request.get("max_output_tokens")
     if isinstance(limit, int) and limit > 0:
         chat["max_tokens"] = limit
-    return chat
+    return chat, custom, disabled
 
 
-def chat_message_to_response_output(message, prefix):
+def responses_request_to_chat(request):
+    """A complete Chat Completions request for the provider loop to execute."""
+    return responses_request(request)[0]
+
+
+def chat_message_to_response_output(message, prefix, custom=frozenset()):
     """Chat Completions message -> the Responses `output` list."""
     output = []
     content = message.get("content")
@@ -122,9 +254,16 @@ def chat_message_to_response_output(message, prefix):
                        "content": [{"type": "output_text", "text": content, "annotations": []}]})
     for index, call in enumerate(message.get("tool_calls") or []):
         function = call.get("function") or {}
-        output.append({"id": f"{prefix}fc{index}", "type": "function_call", "status": "completed",
-                       "call_id": call.get("id", ""), "name": function.get("name", ""),
-                       "arguments": function.get("arguments") or "{}"})
+        name = function.get("name", "")
+        arguments = function.get("arguments") or ""
+        if name in custom:
+            output.append({"id": f"{prefix}fc{index}", "type": "custom_tool_call", "status": "completed",
+                           "call_id": call.get("id", ""), "name": name,
+                           "input": custom_tool_input(arguments)})
+        else:
+            output.append({"id": f"{prefix}fc{index}", "type": "function_call", "status": "completed",
+                           "call_id": call.get("id", ""), "name": name,
+                           "arguments": arguments or "{}"})
     return output
 
 
@@ -149,20 +288,26 @@ class ResponsesStream:
     event sequence Codex expects, so the budget logic is not duplicated.
     """
 
-    def __init__(self, send, response_id, model):
+    def __init__(self, send, response_id, model, custom=frozenset()):
         self.send = send
         self.response_id = response_id
         self.model = model
+        self.custom = set(custom)
+        self.started = False
         self.message_started = False
         self.text = []
         self.calls = {}          # tool index -> {"id","name","arguments"}
         self.call_order = []
+        self.usage = None
+        self.finish_reason = None
+        self.saw_done = False
         self.finished = False
 
     def _emit(self, event):
         self.send(("data: " + json.dumps(event) + "\n\n").encode())
 
     def start(self):
+        self.started = True
         self._emit({"type": "response.created",
                     "response": responses_envelope(self.response_id, self.model, [], status="in_progress")})
 
@@ -175,24 +320,43 @@ class ResponsesStream:
 
     def _open_call(self, index, call_id, name):
         self.message_started = True
+        # A freeform tool has no chat equivalent, so its body arrives as one
+        # string argument. The item is opened with an empty `input` and closed
+        # with the whole body rather than as fabricated argument fragments.
+        freeform = name in self.custom
+        if freeform:
+            item = {"id": f"{self.response_id}fc{index}", "type": "custom_tool_call", "status": "in_progress",
+                    "call_id": call_id, "name": name, "input": ""}
+        else:
+            item = {"id": f"{self.response_id}fc{index}", "type": "function_call", "status": "in_progress",
+                    "call_id": call_id, "name": name, "arguments": ""}
         self._emit({"type": "response.output_item.added", "output_index": index + 1,
-                    "item": {"id": f"{self.response_id}fc{index}", "type": "function_call",
-                             "status": "in_progress", "call_id": call_id, "name": name, "arguments": ""}})
+                    "item": item})
 
     def on_line(self, chunk):
         line = chunk.decode("utf-8", "replace").strip()
         if not line.startswith("data: "):
             return
         data = line[6:].strip()
-        if data == "[DONE]" or not data:
+        if data == "[DONE]":
+            self.saw_done = True
+            return
+        if not data:
             return
         try:
             event = json.loads(data)
         except ValueError:
             return
+        if isinstance(event.get("model"), str) and event["model"]:
+            # Report the model that answered, not the alias the client sent.
+            self.model = event["model"]
+        if event.get("usage"):
+            self.usage = event["usage"]
         choices = event.get("choices") or []
         if not choices:
             return
+        if choices[0].get("finish_reason"):
+            self.finish_reason = choices[0]["finish_reason"]
         delta = choices[0].get("delta") or {}
         text = delta.get("content")
         if text:
@@ -214,11 +378,13 @@ class ResponsesStream:
             arguments = function.get("arguments")
             if arguments:
                 self.calls[index]["arguments"] += arguments
-                self._emit({"type": "response.function_call_arguments.delta",
-                            "item_id": f"{self.response_id}fc{index}", "output_index": index + 1,
-                            "delta": arguments})
+                if self.calls[index]["name"] not in self.custom:
+                    self._emit({"type": "response.function_call_arguments.delta",
+                                "item_id": f"{self.response_id}fc{index}", "output_index": index + 1,
+                                "delta": arguments})
 
     def finish(self):
+        """Close the stream as completed or incomplete, never as a success lie."""
         if self.finished:
             return
         self.finished = True
@@ -233,17 +399,44 @@ class ResponsesStream:
             output.append(item)
         for index in self.call_order:
             call = self.calls[index]
-            item = {"id": f"{self.response_id}fc{index}", "type": "function_call", "status": "completed",
-                    "call_id": call["id"], "name": call["name"], "arguments": call["arguments"] or "{}"}
-            self._emit({"type": "response.function_call_arguments.done", "item_id": item["id"],
-                        "output_index": index + 1, "arguments": item["arguments"]})
+            freeform = call["name"] in self.custom
+            if freeform:
+                item = {"id": f"{self.response_id}fc{index}", "type": "custom_tool_call", "status": "completed",
+                        "call_id": call["id"], "name": call["name"],
+                        "input": custom_tool_input(call["arguments"])}
+            else:
+                item = {"id": f"{self.response_id}fc{index}", "type": "function_call", "status": "completed",
+                        "call_id": call["id"], "name": call["name"], "arguments": call["arguments"] or "{}"}
+                self._emit({"type": "response.function_call_arguments.done", "item_id": item["id"],
+                            "output_index": index + 1, "arguments": item["arguments"]})
             self._emit({"type": "response.output_item.done", "output_index": index + 1, "item": item})
             output.append(item)
         if not output:
             self._open_message()
-            output = chat_message_to_response_output({"content": ""}, self.response_id)
-        self._emit({"type": "response.completed",
-                    "response": responses_envelope(self.response_id, self.model, output)})
+            output = chat_message_to_response_output({"content": ""}, self.response_id, self.custom)
+        status, details = "completed", None
+        if self.finish_reason == "length":
+            status, details = "incomplete", {"reason": "max_output_tokens"}
+        elif not self.saw_done and self.finish_reason is None:
+            # No `[DONE]` and no finish reason means the upstream stopped
+            # mid-answer. Reporting that as completed is the failure this
+            # router shipped once with a text-only stream.
+            status, details = "incomplete", {"reason": "stream_ended_without_a_terminal_event"}
+        envelope = responses_envelope(self.response_id, self.model, output, self.usage, status=status)
+        if details:
+            envelope["incomplete_details"] = details
+        self._emit({"type": "response.incomplete" if details else "response.completed", "response": envelope})
+
+    def fail(self, message, status=None):
+        """Terminal event for a stream the provider did not finish."""
+        if self.finished:
+            return
+        self.finished = True
+        envelope = responses_envelope(self.response_id, self.model, [], self.usage, status="failed")
+        envelope["error"] = {"code": "upstream_error", "message": message}
+        if status is not None:
+            envelope["error"]["status"] = status
+        self._emit({"type": "response.failed", "response": envelope})
 
 
 def output_bound(request, config):
@@ -532,12 +725,84 @@ class Router:
                 "daily_budget_usd": self.config["daily_budget_usd"],
                 "breakdown": [{"agent": a, "provider": p, "requests": n, "cost_usd": c} for a, p, n, c in rows]}
 
+    def diagnostic(self, provider, status, reason, attempt=None):
+        """One sanitized refusal: who, what status, why, how long it is benched.
+
+        Deliberately no prompt text, no headers and no credential values: the
+        log line and the error body are read by operators and by failing
+        clients, and neither should carry repository contents.
+        """
+        entry = {"provider": provider, "status": status, "reason": reason,
+                 "cooldown_seconds": round(self.provider_cooldown(provider), 1),
+                 "request_id": getattr(self.context, "request_id", None)}
+        entry["attempt"] = attempt if attempt is not None else (
+            provider + ": " + reason if provider else reason)
+        self.log_diagnostic(entry)
+        return entry
+
+    def log_diagnostic(self, entry):
+        print("x3-ai-router request_id=" + str(entry.get("request_id"))
+              + " provider=" + str(entry.get("provider")) + " status=" + str(entry.get("status"))
+              + " cooldown=" + str(entry.get("cooldown_seconds"))
+              + " reason=" + str(entry.get("reason"))[:200], file=sys.stderr, flush=True)
+
+    def provider_skip(self, name, provider, tier, request):
+        """Why this provider cannot take this request, or None to try it.
+
+        An agent request carries tool schemas. A provider whose model cannot
+        call tools answers in prose and the client waits for a tool call that
+        can never arrive, so an agent request needs a provider that has
+        declared `supports_tools` — text-only success is not success here.
+
+        A provider the operator switched off is skipped quietly: it is a
+        configuration choice, not a failure worth reporting on every request.
+        """
+        if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
+            return {"quiet": True}
+        if tier == "critical" and not may_serve_critical(provider):
+            return self.diagnostic(name, None, "not cleared for critical work")
+        cooldown = self.provider_cooldown(name)
+        if cooldown > 0:
+            return self.diagnostic(name, None, f"cooling down for {cooldown:.0f}s")
+        if (request.get("tools") or request.get("functions")) and not provider.get(TOOL_CAPABLE, False):
+            return self.diagnostic(name, None, "model is not declared tool-capable")
+        error = pricing_error(provider)
+        if error:
+            return self.diagnostic(name, None, error)
+        if provider.get("api_key_env") and not os.environ.get(provider["api_key_env"]):
+            return self.diagnostic(name, None, "credential unavailable")
+        return None
+
+    def provider_payload(self, request, provider, stream):
+        """The upstream Chat Completions body for one provider attempt.
+
+        The client's `model` is ignored: the router chooses. `max_tokens` is
+        always set, even when the client left it out, so the request can never
+        be billed for more than the reservation covers.
+        """
+        payload = dict(request)
+        payload["model"] = provider["model"]
+        payload["stream"] = stream
+        if stream:
+            payload["stream_options"] = {"include_usage": True}
+        payload["max_tokens"] = output_bound(request, self.config)
+        apply_provider_reasoning(payload, provider)
+        if provider.get("output_token_parameter") == "max_completion_tokens":
+            payload["max_completion_tokens"] = payload.pop("max_tokens", DEFAULT_OUTPUT_TOKENS)
+        return payload
+
+    def failure_body(self, diagnostics, kind="no_provider_succeeded", message="No provider succeeded"):
+        return {"error": {"message": message, "type": kind,
+                          "request_id": getattr(self.context, "request_id", None),
+                          "attempts": [entry["attempt"] for entry in diagnostics],
+                          "providers": [{key: value for key, value in entry.items()
+                                         if key not in ("attempt", "quiet")} for entry in diagnostics]}}
 
     def complete(self, request, agent):
         # UTF-8 JSON bytes conservatively bound visible input tokens; reject
         # oversized requests instead of trusting a configured estimate.
-        if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config["max_input_tokens"]:
-            return 413, {"error": {"message": "Input exceeds configured budget bound"}}
+        if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config.get("max_request_bytes", 8 * 1024 * 1024):
+            return 413, {"error": {"message": "Request body exceeds configured byte limit", "type": "request_body_too_large"}}
         error = request_error(request, self.config)
         if error:
             return 400, {"error": {"message": error}}
@@ -546,28 +811,17 @@ class Router:
         budget_refused = False
         for name in self.attempt_order(chain):
             provider = self.config["providers"][name]
-            if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
-                continue
-            if tier == "critical" and not may_serve_critical(provider):
-                failures.append(name + ": not cleared for critical work")
-                continue
-            cooldown = self.provider_cooldown(name)
-            if cooldown > 0:
-                failures.append(f"{name}: cooling down for {cooldown:.0f}s")
-                continue
             model = provider["model"]
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
-            error = pricing_error(provider)
-            if error:
-                failures.append(name + ": " + error)
+            skip = self.provider_skip(name, provider, tier, request)
+            if skip is not None:
+                if not skip.get("quiet"):
+                    failures.append(skip)
                 continue
             # Reserve against an upper-bound configured for each request before making the call.
             estimate = (output_bound(request, self.config) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
             key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
-            if provider.get("api_key_env") and not key:
-                failures.append(name + ": credential unavailable")
-                continue
             # A provider that cannot bill needs no reservation, and must not be
             # blocked by a budget that is already spent. Refusing a free local
             # model because a paid API is over its ceiling turns "stop spending"
@@ -578,13 +832,9 @@ class Router:
                 reservation = self.reserve(agent, estimate)
                 if reservation is None:
                     budget_refused = True
-                    failures.append(name + ": daily budget exhausted")
+                    failures.append(self.diagnostic(name, None, "daily budget exhausted"))
                     continue
-            payload = dict(request)
-            payload["model"] = model
-            payload["stream"] = False
-            if provider.get("output_token_parameter") == "max_completion_tokens":
-                payload["max_completion_tokens"] = payload.pop("max_tokens", 4096)
+            payload = self.provider_payload(request, provider, False)
             headers = {"Content-Type": "application/json"}
             if key:
                 headers["Authorization"] = "Bearer " + key
@@ -606,23 +856,22 @@ class Router:
                 self.finish(reservation, agent)
                 retry_after = exc.headers.get("Retry-After") if exc.headers else None
                 self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
-                failures.append(f"{name}: HTTP {exc.code}")
+                failures.append(self.diagnostic(name, exc.code, "HTTP " + str(exc.code)))
             except (urllib.error.URLError, TimeoutError, ValueError) as exc:
                 self.finish(reservation, agent)
                 self.note_provider_failure(name, type(exc).__name__)
-                failures.append(name + ": " + type(exc).__name__)
+                failures.append(self.diagnostic(name, None, type(exc).__name__))
             except Exception:
                 self.finish(reservation, agent)
                 self.note_provider_failure(name, "unexpected error")
                 raise
         if budget_refused:
-            return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded",
-                                   "attempts": failures}}
-        return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
+            return 429, self.failure_body(failures, "budget_exceeded", "Daily budget exhausted")
+        return 502, self.failure_body(failures)
 
     def stream(self, request, agent, start, send):
-        if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config["max_input_tokens"]:
-            return 413, {"error": "Input exceeds configured budget bound"}
+        if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config.get("max_request_bytes", 8 * 1024 * 1024):
+            return 413, {"error": "Request body exceeds configured byte limit"}
         error = request_error(request, self.config)
         if error:
             return 400, {"error": error}
@@ -631,25 +880,14 @@ class Router:
         budget_refused = False
         for name in self.attempt_order(chain):
             provider = self.config["providers"][name]
-            if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
-                continue
-            if tier == "critical" and not may_serve_critical(provider):
-                failures.append(name + ": not cleared for critical work")
-                continue
-            cooldown = self.provider_cooldown(name)
-            if cooldown > 0:
-                failures.append(f"{name}: cooling down for {cooldown:.0f}s")
-                continue
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
-            error = pricing_error(provider)
-            if error:
-                failures.append(name + ": " + error)
+            skip = self.provider_skip(name, provider, tier, request)
+            if skip is not None:
+                if not skip.get("quiet"):
+                    failures.append(skip)
                 continue
             key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
-            if provider.get("api_key_env") and not key:
-                failures.append(name + ": credential unavailable")
-                continue
             estimate = (output_bound(request, self.config) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
             # A provider that cannot bill needs no reservation, and must not be
             # blocked by a budget that is already spent. Refusing a free local
@@ -661,19 +899,16 @@ class Router:
                 reservation = self.reserve(agent, estimate)
                 if reservation is None:
                     budget_refused = True
-                    failures.append(name + ": daily budget exhausted")
+                    failures.append(self.diagnostic(name, None, "daily budget exhausted"))
                     continue
-            payload = dict(request)
-            payload["model"] = provider["model"]
-            payload["stream"] = True
-            payload["stream_options"] = {"include_usage": True}
-            if provider.get("output_token_parameter") == "max_completion_tokens":
-                payload["max_completion_tokens"] = payload.pop("max_tokens", 4096)
+            payload = self.provider_payload(request, provider, True)
             headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
             if key:
                 headers["Authorization"] = "Bearer " + key
             emitted = False
             usage = None
+            saw_done = False
+            finish_reason = None
             try:
                 call = urllib.request.Request(provider["base_url"].rstrip("/") + "/chat/completions",
                                               json.dumps(payload).encode(), headers, method="POST")
@@ -688,43 +923,68 @@ class Router:
                                 send(line)
                             continue
                         data = line[6:].strip()
-                        if data != b"[DONE]":
-                            event = json.loads(data)
-                            if event.get("usage"):
-                                usage = event["usage"]
                         if not emitted:
                             start()
                             emitted = True
+                        if data == b"[DONE]":
+                            # The stream is over. Reading until the socket
+                            # closes instead left the client waiting on a
+                            # keep-alive connection the provider never closed.
+                            saw_done = True
+                            send(line)
+                            break
+                        event = json.loads(data)
+                        if event.get("usage"):
+                            usage = event["usage"]
+                        for choice in event.get("choices") or []:
+                            if choice.get("finish_reason"):
+                                finish_reason = choice["finish_reason"]
                         send(line)
                 if not emitted:
                     raise ValueError("Empty SSE response")
+                if not saw_done and finish_reason is None:
+                    raise ValueError("Stream ended without a terminal event")
                 cost = ((usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000) if usage else estimate
                 self.note_provider_success(name)
                 self.finish(reservation, agent, name, provider["model"], usage or {}, cost)
                 return None
+            except ClientDisconnected:
+                # The caller hung up. Charge what the provider already
+                # produced, release the reservation, and say nothing: there is
+                # no socket left to answer on and no traceback worth printing.
+                self.finish(reservation, agent, name if emitted else None, provider["model"],
+                            usage or {}, estimate if emitted else 0)
+                self.diagnostic(name, None, "client disconnected")
+                return None
             except urllib.error.HTTPError as exc:
-                if emitted:
-                    self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
-                    return None
-                self.finish(reservation, agent)
                 retry_after = exc.headers.get("Retry-After") if exc.headers else None
                 self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
-                failures.append(f"{name}: HTTP {exc.code}")
-            except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+                failure = self.diagnostic(name, exc.code, "HTTP " + str(exc.code))
                 if emitted:
                     self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
-                    return None  # A partial stream cannot be retried with another model.
+                    # The client already has half an answer. It gets a terminal
+                    # failure event, not a `response.completed`.
+                    return 502, self.failure_body([failure])
                 self.finish(reservation, agent)
+                failures.append(failure)
+            except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
                 self.note_provider_failure(name, type(exc).__name__)
-                failures.append(name + ": " + type(exc).__name__)
+                failure = self.diagnostic(name, None, type(exc).__name__)
+                if emitted:
+                    self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
+                    # A partial stream cannot be retried with another model, so
+                    # the client is told it failed rather than handed a
+                    # truncated answer dressed up as a complete one.
+                    return 502, self.failure_body([failure])
+                self.finish(reservation, agent)
+                failures.append(failure)
             except Exception:
                 self.finish(reservation, agent, name if emitted else None, provider["model"], usage or {}, estimate if emitted else 0)
                 self.note_provider_failure(name, "unexpected error")
                 raise
         if budget_refused:
-            return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded",
-                                   "attempts": failures}}
-        return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
+            return 429, self.failure_body(failures, "budget_exceeded", "Daily budget exhausted")
+        return 502, self.failure_body(failures)
 
 
 def dashboard(snapshot):
@@ -749,7 +1009,22 @@ def metrics(snapshot):
 
 def handler_for(router):
     class Handler(BaseHTTPRequestHandler):
+        # Tool names already reported as dropped. Codex sends a disabled
+        # `web_search` on every turn; saying so once is a record, saying it
+        # every turn is noise that buries the real diagnostics.
+        reported_disabled = set()
+
+        def handle_one_request(self):
+            # A client that hangs up mid-answer is ordinary, not an incident.
+            # Without this the base server prints a traceback per disconnect.
+            try:
+                super().handle_one_request()
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
+
         def reply(self, status, data):
+            if self.wfile is None:
+                return
             body = json.dumps(data).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
@@ -800,8 +1075,11 @@ def handler_for(router):
             return self.reply(404, {"error": "Not found"})
 
         def stream_chunk(self, chunk):
-            self.wfile.write(chunk)
-            self.wfile.flush()
+            try:
+                self.wfile.write(chunk)
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError) as exc:
+                raise ClientDisconnected() from exc
 
         def serve_responses(self, data, agent):
             """Serve `POST /v1/responses` by translating onto the chat path.
@@ -815,12 +1093,28 @@ def handler_for(router):
             """
             if not isinstance(data.get("input"), list):
                 return self.reply(400, {"error": {"message": "Expected an input list"}})
-            chat = responses_request_to_chat(data)
+            try:
+                chat, custom, disabled = responses_request(data)
+            except UnsupportedFeature as exc:
+                # Fail closed rather than silently dropping a capability the
+                # caller believed it had. The client can then pick a provider
+                # that speaks the Responses protocol natively.
+                return self.reply(400, {"error": {
+                    "message": "Unsupported feature for Chat Completions providers: " + str(exc),
+                    "type": "unsupported_feature",
+                    "unsupported": str(exc)}})
             if not chat["messages"]:
                 return self.reply(400, {"error": {"message": "Expected at least one input message"}})
             error = request_error(chat, router.config)
             if error:
                 return self.reply(400, {"error": {"message": error}})
+            for name in disabled:
+                if name not in Handler.reported_disabled:
+                    Handler.reported_disabled.add(name)
+                    # Named, never silent: an operator can see that a tool the
+                    # client sent with the request disabled was not offered to
+                    # the model.
+                    self.log_message("tool disabled by the client, not offered to the model: %s", name)
 
             response_id = "resp_" + uuid.uuid4().hex
             model = data.get("model") if isinstance(data.get("model"), str) else "x3-auto"
@@ -831,11 +1125,11 @@ def handler_for(router):
                     return self.reply(status, result)
                 message = (result.get("choices") or [{}])[0].get("message") or {}
                 envelope = responses_envelope(response_id, result.get("model", model),
-                                              chat_message_to_response_output(message, response_id),
+                                              chat_message_to_response_output(message, response_id, custom),
                                               result.get("usage"))
                 return self.reply(200, envelope)
 
-            stream = ResponsesStream(self.stream_chunk, response_id, model)
+            stream = ResponsesStream(self.stream_chunk, response_id, model, custom)
 
             def start():
                 self.send_response(200)
@@ -846,9 +1140,19 @@ def handler_for(router):
                 stream.start()
 
             outcome = router.stream(chat, agent, start, stream.on_line)
-            if outcome is not None:
-                return self.reply(*outcome)
-            stream.finish()
+            try:
+                if outcome is not None and stream.started:
+                    # The response already began, so the only honest ending is
+                    # a failure event rather than a status code the client
+                    # cannot see any more.
+                    stream.fail(outcome[1].get("error", {}).get("message", "upstream failure"),
+                                status=outcome[0])
+                elif outcome is not None:
+                    return self.reply(*outcome)
+                else:
+                    stream.finish()
+            except ClientDisconnected:
+                pass
             self.close_connection = True
             return
 
@@ -877,6 +1181,9 @@ def handler_for(router):
                     return self.reply(413, {"error": "Invalid request size"})
                 data = json.loads(self.rfile.read(size))
                 agent = self.headers.get("X-X3-Agent", "default")[:80]
+                # One id per request, echoed in failures and in the sanitized
+                # operator log so a 502 can be traced without log diving.
+                router.context.request_id = uuid.uuid4().hex
                 task_id = self.headers.get("X-X3-Task-ID")
                 if task_id:
                     router.begin_task(task_id, agent, self.headers.get("X-X3-Revision", ""), self.headers.get("X-X3-Scope", "router"))
@@ -888,7 +1195,10 @@ def handler_for(router):
                 if error:
                     return self.reply(400, {"error": error})
                 if data.get("stream"):
+                    started_stream = []
+
                     def start():
+                        started_stream.append(True)
                         self.send_response(200)
                         self.send_header("Content-Type", "text/event-stream")
                         self.send_header("Cache-Control", "no-cache")
@@ -896,11 +1206,18 @@ def handler_for(router):
                         self.end_headers()
 
                     def send(chunk):
-                        self.wfile.write(chunk)
-                        self.wfile.flush()
+                        try:
+                            self.wfile.write(chunk)
+                            self.wfile.flush()
+                        except (BrokenPipeError, ConnectionResetError, OSError) as exc:
+                            raise ClientDisconnected() from exc
 
-                    outcome = router.stream(data, agent, start, send)
-                    if outcome is not None:
+                    try:
+                        outcome = router.stream(data, agent, start, send)
+                    except ClientDisconnected:
+                        self.close_connection = True
+                        return
+                    if outcome is not None and not started_stream:
                         return self.reply(*outcome)
                     self.close_connection = True
                     return

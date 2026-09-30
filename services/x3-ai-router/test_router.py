@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -51,11 +52,12 @@ class RouterTests(unittest.TestCase):
         self.upstream_thread.start()
         self.config = {
             "daily_budget_usd": 0.01, "agent_daily_budget_usd": 0.01,
-            "max_input_tokens": 1000, "routes": {"routine": ["down", "up"], "critical": ["up"]},
+            "max_input_tokens": 1000, "max_request_bytes": 1000, "routes": {"routine": ["down", "up"], "critical": ["up"]},
             "providers": {
-                "down": {"base_url": "http://127.0.0.1:1/v1", "model": "down", "input_usd_per_million": 1, "output_usd_per_million": 1},
+                "down": {"base_url": "http://127.0.0.1:1/v1", "model": "down", "input_usd_per_million": 1,
+                         "output_usd_per_million": 1, "supports_tools": True},
                 "up": {"base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "up", "critical_allowed": True,
-                       "input_usd_per_million": 1, "output_usd_per_million": 1}
+                       "input_usd_per_million": 1, "output_usd_per_million": 1, "supports_tools": True}
             }
         }
         self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
@@ -519,6 +521,518 @@ class RouterTests(unittest.TestCase):
         self.assertNotIn(-1, positions, f"missing event; got {raw[:400]}")
         self.assertEqual(positions, sorted(positions), "events must arrive in the order Codex expects")
         self.assertIn('"text": "ok"', raw)
+
+
+class ScriptedProvider(BaseHTTPRequestHandler):
+    """Upstream that behaves exactly as one test tells it to.
+
+    Real providers differ in ways the default `Provider` cannot express: one
+    sends fragments across many chunks, one dies mid-answer, one holds the
+    socket open after `[DONE]`. Each script is a small function over the
+    handler so the wire bytes stay visible in the test.
+    """
+
+    script = None
+    requests = []
+    daemon_threads = True
+
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        ScriptedProvider.requests.append(body)
+        ScriptedProvider.script(self, body)
+
+    def log_message(self, *_):
+        pass
+
+
+def sse(handler, chunks):
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream")
+    handler.end_headers()
+    for chunk in chunks:
+        handler.wfile.write(chunk)
+        handler.wfile.flush()
+
+
+class ProtocolTests(unittest.TestCase):
+    """Responses <-> Chat translation, with a controllable upstream."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        ScriptedProvider.requests = []
+        ScriptedProvider.script = None
+        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), ScriptedProvider)
+        self.upstream.daemon_threads = True
+        threading.Thread(target=self.upstream.serve_forever, daemon=True).start()
+        self.config = {
+            "daily_budget_usd": 1, "agent_daily_budget_usd": 1, "max_input_tokens": 100000,
+            "max_request_bytes": 2000000, "routes": {"routine": ["up"], "critical": ["up"]},
+            "providers": {"up": {"base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1",
+                                 "model": "up-model", "critical_allowed": True,
+                                 "input_usd_per_million": 1, "output_usd_per_million": 1,
+                                 "supports_tools": True}},
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+
+    def tearDown(self):
+        self.upstream.shutdown()
+        self.upstream.server_close()
+        self.tmp.cleanup()
+
+    def serve(self, timeout=30):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server
+
+    def post(self, server, body, timeout=30):
+        request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                         json.dumps(body).encode(),
+                                         {"Content-Type": "application/json", "X-X3-Agent": "codex"})
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return response.status, response.read().decode()
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read().decode()
+
+    def events(self, raw):
+        return [json.loads(line[6:]) for line in raw.splitlines()
+                if line.startswith("data: ") and line[6:].strip() not in ("", "[DONE]")]
+
+    def script_json(self, content="ok"):
+        """Upstream answers once with a plain Chat Completions body."""
+        def respond(handler, body):
+            payload = json.dumps({"model": "up-model",
+                                  "choices": [{"message": {"role": "assistant", "content": content}}],
+                                  "usage": {"prompt_tokens": 3, "completion_tokens": 1}}).encode()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+        ScriptedProvider.script = respond
+
+    def responses_body(self, **overrides):
+        body = {"model": "x3-auto", "stream": True, "instructions": "be brief",
+                "input": [{"type": "message", "role": "user",
+                           "content": [{"type": "input_text", "text": "hi"}]}]}
+        body.update(overrides)
+        return body
+
+    # ── Named tool_choice ────────────────────────────────────────────────
+
+    def test_named_tool_choice_reaches_the_provider_as_a_named_choice(self):
+        """The object form used to be dropped, so the model picked the tool."""
+        chat = router_module.responses_request_to_chat({
+            "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]}],
+            "tools": [{"type": "function", "name": "exec_command", "parameters": {"type": "object"}}],
+            "tool_choice": {"type": "function", "name": "exec_command"}})
+
+        self.assertEqual(chat["tool_choice"],
+                         {"type": "function", "function": {"name": "exec_command"}})
+
+    def test_string_tool_choices_still_pass_through(self):
+        for choice in ("auto", "none", "required"):
+            chat = router_module.responses_request_to_chat({
+                "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]}],
+                "tools": [{"type": "function", "name": "exec_command", "parameters": {"type": "object"}}],
+                "tool_choice": choice})
+            self.assertEqual(chat["tool_choice"], choice)
+
+    def test_unknown_tool_choice_fails_closed(self):
+        with self.assertRaises(router_module.UnsupportedFeature):
+            router_module.responses_request_to_chat({
+                "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]}],
+                "tools": [{"type": "function", "name": "exec_command", "parameters": {"type": "object"}}],
+                "tool_choice": {"type": "mystery", "name": "whatever"}})
+
+    def test_forced_tool_choice_disables_thinking_for_a_provider_that_requires_it(self):
+        """DeepSeek answers HTTP 400 for a forced tool_choice in thinking mode."""
+        provider = dict(self.config["providers"]["up"], thinking={
+            "parameter": "thinking", "disabled_value": {"type": "disabled"},
+            "disable_when_tool_choice_forced": True})
+        forced = {"messages": [{"role": "user", "content": "go"}],
+                  "tools": [{"type": "function", "function": {"name": "f"}}],
+                  "tool_choice": {"type": "function", "function": {"name": "f"}},
+                  "max_tokens": 8}
+        auto = dict(forced, tool_choice="auto")
+
+        forced_payload = self.router.provider_payload(forced, provider, True)
+        auto_payload = self.router.provider_payload(auto, provider, True)
+
+        self.assertEqual(forced_payload["thinking"], {"type": "disabled"})
+        self.assertNotIn("thinking", auto_payload,
+                         "a normal turn must keep the provider's own reasoning default")
+
+    def test_named_tool_choice_through_the_responses_endpoint(self):
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1",'
+            b'"type":"function","function":{"name":"exec_command","arguments":"{\\"cmd\\": "}}]}}]}\n\n',
+            b'data: {"model":"up-model","choices":[{"delta":{"tool_calls":[{"index":0,'
+            b'"function":{"arguments":"\\"ls\\"}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            b"data: [DONE]\n\n"])
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body(tools=[
+                {"type": "function", "name": "exec_command",
+                 "parameters": {"type": "object", "properties": {"cmd": {"type": "string"}}}}],
+                tool_choice={"type": "function", "name": "exec_command"}))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(ScriptedProvider.requests[0]["tool_choice"],
+                         {"type": "function", "function": {"name": "exec_command"}})
+
+    # ── Streamed tool calls ──────────────────────────────────────────────
+
+    def test_streamed_tool_call_fragments_become_one_genuine_function_call(self):
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc",'
+            b'"type":"function","function":{"name":"exec_command","arguments":"{\\"cmd\\":"}}]}}]}\n\n',
+            b'data: {"model":"up-model","choices":[{"delta":{"tool_calls":[{"index":0,'
+            b'"function":{"arguments":"\\"ls"}}]}}]}\n\n',
+            b'data: {"model":"up-model","choices":[{"delta":{"tool_calls":[{"index":0,'
+            b'"function":{"arguments":" -la\\"}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            b'data: {"model":"up-model","choices":[],"usage":{"prompt_tokens":9,"completion_tokens":4}}\n\n',
+            b"data: [DONE]\n\n"])
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body(tools=[
+                {"type": "function", "name": "exec_command",
+                 "parameters": {"type": "object", "properties": {"cmd": {"type": "string"}}}}]))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        events = self.events(raw)
+        added = [e for e in events if e["type"] == "response.output_item.added"]
+        done = [e for e in events if e["type"] == "response.output_item.done"]
+        deltas = [e["delta"] for e in events if e["type"] == "response.function_call_arguments.delta"]
+        final = events[-1]
+
+        self.assertEqual(status, 200)
+        self.assertEqual(added[0]["item"]["type"], "function_call")
+        self.assertEqual(added[0]["item"]["call_id"], "call_abc")
+        self.assertEqual(deltas, ['{"cmd":', '"ls', ' -la"}'],
+                         "every argument fragment must reach the client unchanged")
+        self.assertEqual(done[0]["item"]["type"], "function_call")
+        self.assertEqual(done[0]["item"]["call_id"], "call_abc")
+        self.assertEqual(done[0]["item"]["name"], "exec_command")
+        self.assertEqual(json.loads(done[0]["item"]["arguments"]), {"cmd": "ls -la"})
+        self.assertEqual(final["type"], "response.completed")
+        self.assertEqual(final["response"]["model"], "up-model", "the answering model, not the alias")
+        self.assertEqual(final["response"]["usage"], {"input_tokens": 9, "output_tokens": 4, "total_tokens": 13})
+
+    def test_stream_ends_at_done_without_waiting_for_the_socket_to_close(self):
+        """A keep-alive upstream used to hang the handler until it gave up."""
+        def hold(handler, body):
+            sse(handler, [b'data: {"model":"up-model","choices":[{"delta":{"content":"ok"}}]}\n\n',
+                          b"data: [DONE]\n\n"])
+            time.sleep(20)  # the socket stays open; only `[DONE]` ends the answer
+
+        ScriptedProvider.script = hold
+        server = self.serve()
+        started = time.monotonic()
+        try:
+            status, raw = self.post(server, self.responses_body(), timeout=10)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertLess(time.monotonic() - started, 10, "the stream must not wait for EOF")
+        self.assertIn('"type": "response.completed"', raw)
+
+    # ── Tool round trip ──────────────────────────────────────────────────
+
+    def test_tool_result_round_trip_keeps_call_id_and_name(self):
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"content":"done"}}]}\n\n',
+            b'data: {"model":"up-model","choices":[],"usage":{"prompt_tokens":20,"completion_tokens":2}}\n\n',
+            b"data: [DONE]\n\n"])
+        server = self.serve()
+        try:
+            self.post(server, self.responses_body(input=[
+                {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "read it"}]},
+                {"type": "function_call", "call_id": "call_1", "name": "exec_command",
+                 "arguments": '{"cmd":"cat f"}'},
+                {"type": "function_call_output", "call_id": "call_1", "output": "MARKER"}]))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        messages = ScriptedProvider.requests[0]["messages"]
+        self.assertEqual([m["role"] for m in messages], ["system", "user", "assistant", "tool"])
+        self.assertEqual(messages[2]["tool_calls"][0]["id"], "call_1")
+        self.assertEqual(messages[2]["tool_calls"][0]["function"]["name"], "exec_command")
+        self.assertEqual(messages[3], {"role": "tool", "tool_call_id": "call_1", "content": "MARKER"})
+
+    # ── Freeform (custom) tools ──────────────────────────────────────────
+
+    def test_custom_tool_is_carried_as_one_string_argument(self):
+        chat = router_module.responses_request_to_chat({
+            "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]}],
+            "tools": [{"type": "custom", "name": "apply_patch",
+                       "format": {"type": "grammar", "syntax": "lark", "definition": "start: x"}}]})
+
+        tool = chat["tools"][0]["function"]
+        self.assertEqual(tool["name"], "apply_patch")
+        self.assertEqual(tool["parameters"]["required"], ["input"])
+        self.assertEqual(tool["parameters"]["properties"]["input"]["type"], "string")
+
+    def test_custom_tool_call_comes_back_as_a_custom_tool_call_item(self):
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"tool_calls":[{"index":0,'
+            b'"id":"call_p","type":"function","function":{"name":"apply_patch","arguments":'
+            b'"{\\"input\\":\\"*** Begin Patch\\\\n*** End Patch\\"}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            b"data: [DONE]\n\n"])
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body(tools=[
+                {"type": "custom", "name": "apply_patch",
+                 "format": {"type": "grammar", "syntax": "lark", "definition": "start: x"}}]))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        item = [e for e in self.events(raw) if e["type"] == "response.output_item.done"][0]["item"]
+        self.assertEqual(status, 200)
+        self.assertEqual(item["type"], "custom_tool_call")
+        self.assertEqual(item["call_id"], "call_p")
+        self.assertEqual(item["name"], "apply_patch")
+        self.assertEqual(item["input"], "*** Begin Patch\n*** End Patch")
+        self.assertNotIn("arguments", item, "a custom call must not be dressed as a function call")
+
+    def test_custom_tool_result_round_trip(self):
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"content":"applied"}}]}\n\n',
+            b"data: [DONE]\n\n"])
+        server = self.serve()
+        try:
+            status, _ = self.post(server, self.responses_body(input=[
+                {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "patch it"}]},
+                {"type": "custom_tool_call", "call_id": "call_p", "name": "apply_patch",
+                 "input": "*** Begin Patch"},
+                {"type": "custom_tool_call_output", "call_id": "call_p", "output": "Success"}]))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        messages = ScriptedProvider.requests[0]["messages"]
+        self.assertEqual(status, 200)
+        self.assertEqual(messages[2]["tool_calls"][0]["id"], "call_p")
+        self.assertEqual(json.loads(messages[2]["tool_calls"][0]["function"]["arguments"]),
+                         {"input": "*** Begin Patch"})
+        self.assertEqual(messages[3]["tool_call_id"], "call_p")
+
+    def test_a_namespaced_tool_still_flattens(self):
+        chat = router_module.responses_request_to_chat({
+            "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]}],
+            "tools": [{"type": "namespace", "name": "collaboration", "tools": [
+                {"type": "function", "name": "followup_task", "parameters": {"type": "object"}}]}]})
+
+        self.assertEqual([t["function"]["name"] for t in chat["tools"]], ["followup_task"])
+
+    # ── Unsupported tools ────────────────────────────────────────────────
+
+    def test_unsupported_tool_is_named_rather_than_dropped(self):
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body(tools=[
+                {"type": "computer_use", "display_width": 1024}]))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw)["error"]["type"], "unsupported_feature")
+        self.assertIn("computer_use", raw)
+        self.assertEqual(ScriptedProvider.requests, [], "nothing may reach a provider")
+
+    def test_enabled_web_search_is_refused_and_a_disabled_one_is_not(self):
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body(tools=[
+                {"type": "web_search", "external_web_access": True}]))
+            self.assertEqual(status, 400)
+            self.assertIn("web_search", raw)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"content":"ok"}}]}\n\n',
+            b"data: [DONE]\n\n"])
+        server = self.serve()
+        try:
+            status, _ = self.post(server, self.responses_body(tools=[
+                {"type": "web_search", "external_web_access": False}]))
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(status, 200, "a search the client itself disabled is not a failure")
+
+    def test_a_function_tool_without_a_name_is_refused(self):
+        with self.assertRaises(router_module.UnsupportedFeature):
+            router_module.responses_request_to_chat({
+                "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]}],
+                "tools": [{"type": "function", "parameters": {"type": "object"}}]})
+
+    # ── Failure semantics ────────────────────────────────────────────────
+
+    def test_an_upstream_that_dies_mid_stream_fails_the_response(self):
+        """A truncated answer must never be reported as completed."""
+        def truncate(handler, body):
+            sse(handler, [b'data: {"model":"up-model","choices":[{"delta":{"content":"half"}}]}\n\n'])
+            handler.close_connection = True
+
+        ScriptedProvider.script = truncate
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        events = self.events(raw)
+        self.assertEqual(status, 200, "the headers were already sent, so the failure is in-band")
+        self.assertEqual(events[-1]["type"], "response.failed")
+        self.assertEqual(events[-1]["response"]["status"], "failed")
+        self.assertNotIn("response.completed", raw)
+        self.assertIn("half", raw, "what did arrive is still delivered")
+
+    def test_a_provider_error_before_any_event_is_a_json_failure(self):
+        def fail(handler, body):
+            handler.send_response(500)
+            handler.send_header("Content-Length", "2")
+            handler.end_headers()
+            handler.wfile.write(b"{}")
+
+        ScriptedProvider.script = fail
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        body = json.loads(raw)
+        self.assertEqual(status, 502)
+        self.assertEqual(body["error"]["type"], "no_provider_succeeded")
+        self.assertEqual(body["error"]["providers"][0]["provider"], "up")
+        self.assertEqual(body["error"]["providers"][0]["status"], 500)
+        self.assertTrue(body["error"]["request_id"], "a failure names the request that produced it")
+        self.assertGreater(body["error"]["providers"][0]["cooldown_seconds"], 0)
+
+    def test_a_provider_that_never_finishes_is_not_called_complete(self):
+        """No `[DONE]` and no finish reason means the answer was cut short."""
+        def cut(handler, body):
+            sse(handler, [b'data: {"model":"up-model","choices":[{"delta":{"content":"partial"}}]}\n\n'])
+            handler.wfile.write(b"")  # then the body simply stops
+
+        ScriptedProvider.script = cut
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertNotIn("response.completed", raw)
+        self.assertEqual(self.events(raw)[-1]["type"], "response.failed")
+
+    def test_truncated_by_max_tokens_is_incomplete_not_completed(self):
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"content":"half"},"finish_reason":"length"}]}\n\n',
+            b"data: [DONE]\n\n"])
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        events = self.events(raw)
+        self.assertEqual(status, 200)
+        self.assertEqual(events[-1]["type"], "response.incomplete")
+        self.assertEqual(events[-1]["response"]["incomplete_details"]["reason"], "max_output_tokens")
+
+    # ── Capability-aware fallback ────────────────────────────────────────
+
+    def test_a_tool_request_skips_a_provider_that_cannot_call_tools(self):
+        self.config["providers"]["up"]["supports_tools"] = False
+        self.config["providers"]["text"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "text",
+            "supports_tools": False, "input_usd_per_million": 1, "output_usd_per_million": 1}
+        self.config["routes"]["routine"] = ["up", "text"]
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"content":"ok"}}]}\n\n',
+            b"data: [DONE]\n\n"])
+
+        status, body = self.router.complete(
+            {"messages": [{"role": "user", "content": "go"}], "max_tokens": 8,
+             "tools": [{"type": "function", "function": {"name": "f", "parameters": {"type": "object"}}}]}, "alice")
+
+        self.assertEqual(status, 502, "a text-only provider must not be handed an agent request")
+        self.assertEqual(ScriptedProvider.requests, [])
+        self.assertIn("not declared tool-capable", " ".join(body["error"]["attempts"]))
+
+    def test_the_same_request_without_tools_still_uses_that_provider(self):
+        self.config["providers"]["up"]["supports_tools"] = False
+        self.script_json()
+        status, _ = self.router.complete({"messages": [{"role": "user", "content": "go"}], "max_tokens": 8}, "alice")
+        self.assertEqual(status, 200, "plain text work does not need tool support")
+
+    # ── Disconnect handling ──────────────────────────────────────────────
+
+    def test_a_client_disconnect_releases_the_reservation(self):
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"content":"a"}}]}\n\n',
+            b'data: {"model":"up-model","choices":[{"delta":{"content":"b"}}]}\n\n',
+            b'data: {"model":"up-model","choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2}}\n\n',
+            b"data: [DONE]\n\n"])
+        chunks = []
+
+        def send(chunk):
+            chunks.append(chunk)
+            if len(chunks) > 3:
+                raise router_module.ClientDisconnected()
+
+        outcome = self.router.stream({"messages": [{"role": "user", "content": "hi"}], "max_tokens": 8},
+                                     "alice", lambda: None, send)
+
+        self.assertIsNone(outcome)
+        self.assertEqual(self.router.snapshot()["reserved_usd"], 0, "the reservation must be released")
+        self.assertEqual(self.router.snapshot()["inflight"], 0)
+        self.assertGreater(self.router.snapshot()["spent_usd"], 0,
+                           "what the provider already produced is still charged")
+
+    def test_a_disconnect_before_the_first_event_releases_the_reservation(self):
+        def send(chunk):
+            raise router_module.ClientDisconnected()
+
+        # A provider that is never reached: the very first send is the one that
+        # fails, which is the path a client closing immediately takes.
+        ScriptedProvider.script = lambda handler, body: sse(handler, [
+            b'data: {"model":"up-model","choices":[{"delta":{"content":"a"}}]}\n\n', b"data: [DONE]\n\n"])
+        outcome = self.router.stream({"messages": [{"role": "user", "content": "hi"}], "max_tokens": 8},
+                                     "alice", lambda: None, send)
+
+        self.assertIsNone(outcome)
+        self.assertEqual(self.router.snapshot()["reserved_usd"], 0)
+
+    # ── Accounting ───────────────────────────────────────────────────────
+
+    def test_the_provider_is_asked_for_no_more_than_the_reservation_covers(self):
+        self.script_json()
+        self.router.complete({"messages": [{"role": "user", "content": "go"}]}, "alice")
+
+        self.assertEqual(self.config.get("default_max_output_tokens", router_module.DEFAULT_OUTPUT_TOKENS),
+                         ScriptedProvider.requests[0]["max_tokens"],
+                         "an unset output bound must be pinned so the estimate is an upper bound")
 
 
 if __name__ == "__main__":
