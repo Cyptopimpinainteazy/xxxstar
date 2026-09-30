@@ -1293,5 +1293,316 @@ class CapabilityProbeTests(unittest.TestCase):
         self.assertNotIn("reasoning_effort", payload)
 
 
+class RoutingIntelligenceTests(unittest.TestCase):
+    """§1–3 and §50: classification, policy routing, registry, retries."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        ScriptedProvider.requests = []
+        ScriptedProvider.script = None
+        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), ScriptedProvider)
+        self.upstream.daemon_threads = True
+        threading.Thread(target=self.upstream.serve_forever, daemon=True).start()
+        self.base = f"http://127.0.0.1:{self.upstream.server_port}/v1"
+        self.config = {
+            "daily_budget_usd": 1, "agent_daily_budget_usd": 1, "max_input_tokens": 100000,
+            "max_request_bytes": 2000000, "routes": {"routine": ["up"], "critical": ["up"]},
+            "retry_attempts": 1, "retry_backoff_ms": 1, "retry_backoff_max_ms": 5,
+            # The full policy set, with this fixture's providers substituted, so
+            # class routing is exercised the way the shipped config uses it.
+            "policies": {
+                "x3-auto": {"tier": "auto", "order": ["up"]},
+                "x3-fast": {"tier": "routine", "order": ["local", "up"]},
+                "x3-code": {"tier": "routine", "order": ["up"]},
+                "x3-deep": {"tier": "routine", "order": ["up"]},
+                "x3-security": {"tier": "critical", "order": ["up"]},
+                "x3-review": {"tier": "routine", "order": ["up"]},
+                "x3-local": {"tier": "routine", "order": ["local"]},
+            },
+            "providers": {
+                "up": {"base_url": self.base, "model": "up-model", "critical_allowed": True,
+                       "input_usd_per_million": 1, "output_usd_per_million": 1, "supports_tools": True},
+                "local": {"base_url": self.base, "model": "local-model", "supports_tools": True},
+            },
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+
+    def tearDown(self):
+        self.upstream.shutdown()
+        self.upstream.server_close()
+        self.tmp.cleanup()
+
+    def reply_ok(self):
+        ScriptedProvider.script = lambda handler, body: self.reply_json(handler, "ok")
+
+    @staticmethod
+    def reply_json(handler, content):
+        payload = json.dumps({"model": "up-model",
+                              "choices": [{"message": {"role": "assistant", "content": content}}],
+                              "usage": {"prompt_tokens": 3, "completion_tokens": 1}}).encode()
+        handler.send_response(200)
+        handler.send_header("Content-Type", "application/json")
+        handler.send_header("Content-Length", str(len(payload)))
+        handler.end_headers()
+        handler.wfile.write(payload)
+
+    def chat(self, text, **extra):
+        body = {"messages": [{"role": "system", "content": "You are a coding agent."},
+                             {"role": "user", "content": text}]}
+        body.update(extra)
+        return body
+
+    # ── §2 task classification ───────────────────────────────────────────
+
+    def test_the_classifier_separates_the_classes_it_claims_to(self):
+        cases = {
+            "Rename the field in this struct": "SIMPLE_EDIT",
+            "Add a unit test for the parser": "TEST_GENERATION",
+            "Update the README with the new flag": "DOCUMENTATION",
+            "Where is the settlement code?": "REPOSITORY_SEARCH",
+            "Why does the validator panic on restart?": "DEBUGGING",
+            "Profile the transaction pool and find the bottleneck": "PERFORMANCE",
+            "Write a Solidity contract and test it with foundry": "EVM",
+            "Derive the PDA and sign with invoke_signed": "SVM",
+            "Review this patch and critique the design": "CODE_REVIEW",
+            "Post-mortem the incident and find what went wrong": "FAILURE_ANALYSIS",
+            "Add a fuzz target for the codec": "FUZZING",
+            "Plan the migration for the sqlite schema": "DATABASE",
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                result = router_module.classify(self.chat(text))
+                self.assertEqual(result["task_class"], expected, result["scores"])
+
+    def test_the_system_prompt_does_not_decide_the_class(self):
+        # Codex's instructions mention security, performance and testing in the
+        # abstract. If they were scored, every request would classify the same.
+        noisy = {"messages": [
+            {"role": "system", "content": "You are a security expert. Consider consensus, "
+                                          "cryptography, performance and fuzzing at all times."},
+            {"role": "user", "content": "Rename the field"}]}
+        self.assertEqual(router_module.classify(noisy)["task_class"], "SIMPLE_EDIT")
+
+    def test_classification_is_deterministic(self):
+        body = self.chat("Debug the consensus finality bug in the cross-chain bridge")
+        first = router_module.classify(body)
+        second = router_module.classify(body)
+        self.assertEqual(first, second)
+
+    def test_a_critical_request_is_critical_whatever_it_classifies_as(self):
+        # "Read the README about slashing" classifies as DOCUMENTATION, which
+        # routes to the cheap policy — but it is still consensus material and
+        # must not be downgraded.
+        result = router_module.classify(self.chat("Read the README section about slashing"))
+        self.assertEqual(result["risk"], "critical")
+        self.assertIn("slashing", result["blast_radius"])
+
+    def test_the_estimates_are_present_and_bounded(self):
+        result = router_module.classify(self.chat("Implement the atomic settlement path"))
+        self.assertIn(result["complexity"], ("low", "medium", "high"))
+        self.assertIn(result["parallelizable"], ("low", "medium", "high"))
+        self.assertGreater(result["context_tokens"], 0)
+        self.assertTrue(result["verification"], "a task class must carry a verification requirement")
+
+    def test_every_class_has_a_route_and_a_verification_requirement(self):
+        for name in router_module.TASK_CLASSES:
+            self.assertIn(name, router_module.CLASS_TERMS, name)
+            self.assertIn(name, router_module.VERIFICATION_BY_CLASS, name)
+            self.assertIn(name, router_module.PARALLEL_BY_CLASS, name)
+
+    # ── §1 logical models as policies ────────────────────────────────────
+
+    def test_the_class_chooses_the_policy_for_x3_auto(self):
+        _, _, _, logical = self.router.choose(self.chat("Review this patch"))
+        self.assertEqual(logical, "x3-review")
+        _, _, _, logical = self.router.choose(self.chat("Update the README"))
+        self.assertEqual(logical, "x3-fast")
+
+    def test_an_explicit_logical_model_overrides_the_class(self):
+        _, chain, _, logical = self.router.choose(self.chat("Update the README", model="x3-security"))
+        self.assertEqual(logical, "x3-security")
+        self.assertEqual(chain, ["up"])
+
+    def test_x3_local_stays_on_the_local_provider(self):
+        _, chain, _, _ = self.router.choose(self.chat("anything at all", model="x3-local"))
+        self.assertEqual(chain, ["local"])
+
+    def test_a_policy_cannot_downgrade_a_critical_classification(self):
+        # x3-fast is a routine policy, but the request carries consensus terms.
+        tier, _, classification, logical = self.router.choose(
+            self.chat("Update the README about finality", model="x3-fast"))
+        self.assertEqual(logical, "x3-fast")
+        self.assertEqual(classification["risk"], "critical")
+        self.assertEqual(tier, "critical", "privacy is a floor, not a preference")
+
+    def test_an_unknown_logical_model_falls_back_rather_than_failing(self):
+        tier, chain, _, logical = self.router.choose(self.chat("hello", model="gpt-9-mystery"))
+        self.assertIn(logical, router_module.DEFAULT_POLICIES)
+        self.assertNotEqual(logical, "gpt-9-mystery")
+        self.assertTrue(chain)
+        self.assertIn(tier, ("routine", "critical"))
+
+    def test_a_config_without_policies_keeps_the_old_route_behaviour(self):
+        legacy = dict(self.config)
+        legacy.pop("policies")
+        legacy["routes"] = {"routine": ["local"], "critical": ["up"]}
+        router = router_module.Router(legacy, self.tmp.name + "/legacy.db")
+        tier, chain, _, _ = router.choose(self.chat("format this"))
+        self.assertEqual((tier, chain), ("routine", ["local"]))
+
+    # ── §3 measured registry + latency accounting ────────────────────────
+
+    def test_the_registry_records_latency_and_outcomes(self):
+        self.reply_ok()
+        self.router.complete(self.chat("hello", model="x3-code"), "alice")
+        self.router.complete(self.chat("hello", model="x3-code"), "alice")
+
+        entry = self.router.provider_registry()[0]
+        self.assertEqual((entry["provider"], entry["model"]), ("up", "up-model"))
+        self.assertEqual(entry["attempts"], 2)
+        self.assertEqual(entry["successes"], 2)
+        self.assertEqual(entry["failures"], 0)
+        self.assertEqual(entry["retries"], 0)
+        self.assertIsNotNone(entry["average_latency_ms"])
+        self.assertGreater(entry["latency_samples"], 0)
+        self.assertEqual(entry["input_tokens"], 6)
+
+    def test_failed_attempts_are_counted_against_the_provider(self):
+        def fail(handler, body):
+            handler.send_response(400)
+            handler.send_header("Content-Length", "2")
+            handler.end_headers()
+            handler.wfile.write(b"{}")
+
+        ScriptedProvider.script = fail
+        self.router.complete(self.chat("hello", model="x3-code"), "alice")
+
+        entry = self.router.provider_registry()[0]
+        self.assertEqual(entry["failures"], 1)
+        self.assertEqual(entry["successes"], 0)
+        self.assertEqual(entry["failure_rate"], 1.0)
+        # Latency is recorded for failures too: a provider that is slow when it
+        # breaks is a different routing proposition from one that is fast.
+        self.assertIsNotNone(entry["average_latency_ms"])
+
+    def test_the_registry_reports_a_verified_patch_rate_from_task_feedback(self):
+        self.reply_ok()
+        revision = "a" * 40
+        self.router.begin_task("task-9", "alice", revision, "router")
+        self.router.complete(self.chat("hello", model="x3-code"), "alice")
+        self.router.end_task_request(5)
+        self.router.task_outcome({
+            "task_id": "task-9", "revision": revision, "scope": "router",
+            "checks": [{"name": "router-tests", "exit_code": 0, "output_sha256": "b" * 64}]})
+
+        entry = self.router.provider_registry()[0]
+        self.assertEqual(entry["passed_tasks"], 1)
+        self.assertEqual(entry["verified_patch_rate"], 1.0)
+
+    # ── §50 bounded retries ──────────────────────────────────────────────
+
+    def test_a_transient_failure_is_retried_once_and_can_succeed(self):
+        calls = {"n": 0}
+
+        def flaky(handler, body):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                handler.send_response(503)
+                handler.send_header("Content-Length", "2")
+                handler.end_headers()
+                handler.wfile.write(b"{}")
+                return
+            self.reply_json(handler, "recovered")
+
+        ScriptedProvider.script = flaky
+        status, result = self.router.complete(self.chat("hello", model="x3-code"), "alice")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(result["choices"][0]["message"]["content"], "recovered")
+        self.assertEqual(calls["n"], 2, "one retry, not a retry storm")
+        entry = self.router.provider_registry()[0]
+        self.assertEqual(entry["attempts"], 2)
+        self.assertEqual(entry["retries"], 1)
+
+    def test_a_terminal_failure_is_not_retried(self):
+        calls = {"n": 0}
+
+        def unauthorized(handler, body):
+            calls["n"] += 1
+            handler.send_response(401)
+            handler.send_header("Content-Length", "2")
+            handler.end_headers()
+            handler.wfile.write(b"{}")
+
+        ScriptedProvider.script = unauthorized
+        status, _ = self.router.complete(self.chat("hello", model="x3-code"), "alice")
+
+        self.assertEqual(status, 502)
+        self.assertEqual(calls["n"], 1, "retrying a 401 only spends money to get the same answer")
+
+    def test_retries_are_bounded_by_configuration(self):
+        calls = {"n": 0}
+
+        def always_503(handler, body):
+            calls["n"] += 1
+            handler.send_response(503)
+            handler.send_header("Content-Length", "2")
+            handler.end_headers()
+            handler.wfile.write(b"{}")
+
+        ScriptedProvider.script = always_503
+        self.router.config["providers"]["up"]["retry_attempts"] = 3
+        self.router.complete(self.chat("hello", model="x3-code"), "alice")
+
+        self.assertEqual(calls["n"], 4, "one attempt plus three bounded retries")
+        self.assertEqual(self.router.provider_registry()[0]["retries"], 3)
+
+    def test_a_malformed_body_is_not_retried(self):
+        calls = {"n": 0}
+
+        def nonsense(handler, body):
+            calls["n"] += 1
+            payload = b'{"not":"a completion"}'
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+
+        ScriptedProvider.script = nonsense
+        self.router.complete(self.chat("hello", model="x3-code"), "alice")
+        self.assertEqual(calls["n"], 1)
+
+    def test_the_registry_and_explain_endpoints_answer(self):
+        self.reply_ok()
+        self.router.complete(self.chat("hello", model="x3-code"), "alice")
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}"
+            with urllib.request.urlopen(url + "/v1/registry") as response:
+                registry = json.load(response)["registry"]
+            self.assertEqual(registry[0]["provider"], "up")
+
+            with urllib.request.urlopen(url + "/v1/models") as response:
+                ids = [entry["id"] for entry in json.load(response)["data"]]
+            self.assertIn("x3-security", ids)
+            self.assertIn("x3-local", ids)
+
+            body = json.dumps({"messages": [{"role": "user",
+                                             "content": "Review the consensus change"}]}).encode()
+            request = urllib.request.Request(url + "/v1/explain", body,
+                                             {"Content-Type": "application/json"})
+            with urllib.request.urlopen(request) as response:
+                decision = json.load(response)
+            self.assertEqual(decision["tier"], "critical")
+            self.assertIn(decision["policy"], ("x3-security", "x3-review"))
+            self.assertEqual(decision["provider_order"], ["up"])
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

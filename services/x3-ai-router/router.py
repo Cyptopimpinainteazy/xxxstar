@@ -40,6 +40,276 @@ TOOL_CAPABLE = "supports_tools"
 # for one and will not take prose for an answer.
 PROBE_TOOL = "x3_capability_probe"
 PROBE_ARGUMENT = "value"
+# ── Task classification (§2) ─────────────────────────────────────────────
+# A deterministic keyword classifier, not a model call. Routing decisions have
+# to be reproducible and free: asking a model which model to use would add the
+# cost, the latency and the nondeterminism this router exists to manage. The
+# table is the spec's class list, and every class is reachable and tested.
+#
+# Terms are matched against the task text only — user, assistant and tool
+# messages — never the system prompt. Codex sends ~17KB of instructions that
+# mention security, performance and testing in the abstract, and scoring those
+# would classify everything as everything.
+TASK_CLASSES = (
+    "REPOSITORY_SEARCH",
+    "SIMPLE_EDIT",
+    "BOILERPLATE",
+    "DOCUMENTATION",
+    "TEST_GENERATION",
+    "RUST_IMPLEMENTATION",
+    "COMPILER_WORK",
+    "CONSENSUS",
+    "CRYPTOGRAPHY",
+    "SECURITY_ANALYSIS",
+    "FUZZING",
+    "DEBUGGING",
+    "ARCHITECTURE",
+    "PERFORMANCE",
+    "DATABASE",
+    "NETWORKING",
+    "EVM",
+    "SVM",
+    "X3VM",
+    "X3_LANG",
+    "CROSS_CHAIN",
+    "CODE_REVIEW",
+    "FAILURE_ANALYSIS",
+)
+
+CLASS_TERMS = {
+    "REPOSITORY_SEARCH": ("where is", "find the", "search for", "locate", "grep", "which file",
+                          "list files", "rg "),
+    "SIMPLE_EDIT": ("rename", "typo", "one-line", "one line", "bump the version", "add a comment"),
+    "BOILERPLATE": ("scaffold", "boilerplate", "stub out", "generate the skeleton", "new crate"),
+    "DOCUMENTATION": ("readme", "document", "docs", "docstring", "comment the", "changelog"),
+    "TEST_GENERATION": ("add a test", "write tests", "unit test", "test coverage", "regression test",
+                        "add tests"),
+    "RUST_IMPLEMENTATION": ("rust", "cargo", "crate", "trait impl", "implement the", "borrow checker",
+                            "fn ", "pub struct"),
+    "COMPILER_WORK": ("compiler", "parser", "lexer", "type check", "hir", "mir", "codegen",
+                      "bytecode", "lowering", "ast"),
+    "CONSENSUS": ("consensus", "finality", "finalize", "quorum", "validator set", "fork choice",
+                  "equivocat", "slashing", "babe", "grandpa"),
+    "CRYPTOGRAPHY": ("cryptograph", "signature", "ed25519", "secp256k1", "hash lock", "merkle",
+                     "preimage", "key derivation", "aead"),
+    "SECURITY_ANALYSIS": ("security", "exploit", "attack", "vulnerab", "audit", "adversar",
+                          "threat model", "reentrancy", "fail closed", "privilege"),
+    "FUZZING": ("fuzz", "corpus", "coverage-guided", "cargo-fuzz", "afl", "honggfuzz"),
+    "DEBUGGING": ("debug", "why does", "reproduce", "root cause", "stack trace", "panic",
+                  "failing test", "bisect"),
+    "ARCHITECTURE": ("architecture", "design the", "trade-off", "tradeoff", "refactor the module",
+                     "restructure", "plan the"),
+    "PERFORMANCE": ("performance", "benchmark", "throughput", "latency", "tps", "profil",
+                    "optimize", "bottleneck", "regression benchmark"),
+    "DATABASE": ("database", "sql", "sqlite", "migration", "schema", "index the", "rocksdb"),
+    "NETWORKING": ("network", "p2p", "gossip", "libp2p", "peer", "bandwidth", "packet loss",
+                   "partition", "tcp", "socket"),
+    "EVM": ("evm", "solidity", "foundry", "ethereum", "abi", "gas ", "smart contract"),
+    "SVM": ("svm", "solana", "anchor", "pda", "invoke_signed", "bpf"),
+    "X3VM": ("x3vm", "x3-vm", "x3 virtual machine"),
+    "X3_LANG": (".x3", "x3lang", "x3-lang", "x3 language", "native x3 language"),
+    "CROSS_CHAIN": ("cross-chain", "cross chain", "cross-vm", "cross vm", "bridge", "relayer",
+                    "htlc", "atomic swap", "light client"),
+    "CODE_REVIEW": ("review", "critique", "look over", "second opinion", "check my patch"),
+    "FAILURE_ANALYSIS": ("post-mortem", "postmortem", "incident", "failure analysis", "retrospective",
+                         "what went wrong"),
+}
+
+# Classes that make a request safety-critical regardless of the words used:
+# they carry economic or consensus meaning, and a third party must not see them
+# unless an operator has cleared it.
+CRITICAL_CLASSES = ("CONSENSUS", "CRYPTOGRAPHY", "SECURITY_ANALYSIS", "CROSS_CHAIN",
+                    "FAILURE_ANALYSIS")
+
+VERIFICATION_BY_CLASS = {
+    "DOCUMENTATION": (),
+    "REPOSITORY_SEARCH": (),
+    "SIMPLE_EDIT": ("unit",),
+    "BOILERPLATE": ("unit",),
+    "TEST_GENERATION": ("unit",),
+    "RUST_IMPLEMENTATION": ("unit", "integration"),
+    "COMPILER_WORK": ("unit", "integration"),
+    "CONSENSUS": ("unit", "integration", "local-ci", "audit"),
+    "CRYPTOGRAPHY": ("unit", "integration", "audit"),
+    "SECURITY_ANALYSIS": ("unit", "integration", "audit"),
+    "FUZZING": ("unit", "fuzz"),
+    "DEBUGGING": ("unit", "reproduction"),
+    "ARCHITECTURE": ("unit", "integration", "review"),
+    "PERFORMANCE": ("benchmark", "regression"),
+    "DATABASE": ("unit", "integration", "migration"),
+    "NETWORKING": ("unit", "integration"),
+    "EVM": ("unit", "integration"),
+    "SVM": ("unit", "integration"),
+    "X3VM": ("unit", "integration"),
+    "X3_LANG": ("unit", "integration", "conformance"),
+    "CROSS_CHAIN": ("unit", "integration", "local-ci", "audit"),
+    "CODE_REVIEW": ("review",),
+    "FAILURE_ANALYSIS": ("reproduction", "regression"),
+}
+
+PARALLEL_BY_CLASS = {
+    "REPOSITORY_SEARCH": "high",
+    "DOCUMENTATION": "high",
+    "TEST_GENERATION": "high",
+    "BOILERPLATE": "high",
+    "SIMPLE_EDIT": "high",
+    "FUZZING": "high",
+    "RUST_IMPLEMENTATION": "medium",
+    "COMPILER_WORK": "medium",
+    "DEBUGGING": "medium",
+    "PERFORMANCE": "medium",
+    "DATABASE": "medium",
+    "EVM": "medium",
+    "SVM": "medium",
+    "X3VM": "medium",
+    "X3_LANG": "medium",
+    "NETWORKING": "low",
+    "CONSENSUS": "low",
+    "CRYPTOGRAPHY": "low",
+    "SECURITY_ANALYSIS": "low",
+    "CROSS_CHAIN": "low",
+    "ARCHITECTURE": "low",
+    "CODE_REVIEW": "high",
+    "FAILURE_ANALYSIS": "low",
+}
+
+# Which logical model a class routes to when the client asks for `x3-auto`.
+DEFAULT_CLASS_ROUTES = {
+    "SECURITY_ANALYSIS": "x3-security",
+    "CRYPTOGRAPHY": "x3-security",
+    "CONSENSUS": "x3-security",
+    "CROSS_CHAIN": "x3-security",
+    "FAILURE_ANALYSIS": "x3-deep",
+    "DEBUGGING": "x3-deep",
+    "ARCHITECTURE": "x3-deep",
+    "PERFORMANCE": "x3-deep",
+    "CODE_REVIEW": "x3-review",
+    "DOCUMENTATION": "x3-fast",
+    "REPOSITORY_SEARCH": "x3-fast",
+    "SIMPLE_EDIT": "x3-fast",
+    "BOILERPLATE": "x3-fast",
+}
+DEFAULT_LOGICAL_MODEL = "x3-code"
+
+# Ordered provider preference per logical model. The first *usable* provider
+# in the list wins; capability, health, budget and privacy all still apply.
+DEFAULT_POLICIES = {
+    "x3-auto": {"tier": "auto",
+                "order": ["deepseek", "openrouter", "ollama", "nemotron_lightning_free", "direct"]},
+    "x3-fast": {"tier": "routine", "order": ["ollama", "deepseek", "openrouter"]},
+    "x3-code": {"tier": "routine", "order": ["deepseek", "openrouter", "ollama"]},
+    "x3-deep": {"tier": "routine", "order": ["deepseek", "openrouter", "direct"]},
+    "x3-security": {"tier": "critical", "order": ["deepseek", "direct"]},
+    "x3-review": {"tier": "routine", "order": ["deepseek", "openrouter"]},
+    "x3-local": {"tier": "routine", "order": ["ollama"]},
+}
+
+# Terms that make a request critical whatever else the classifier thinks.
+CRITICAL_TERMS = CRITICAL
+
+# Statuses that mean "try again", as opposed to "this request is wrong".
+# Retrying a 400 or a 401 only spends money to get the same answer.
+RETRYABLE_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+
+
+def task_text(request):
+    """The part of a request that describes the work.
+
+    System and developer messages are excluded on purpose. They carry the
+    agent's own instructions, which mention almost every class in the table and
+    would swamp the signal from the actual task.
+    """
+    parts = []
+    for message in request.get("messages") or []:
+        if not isinstance(message, dict):
+            continue
+        if message.get("role") in ("system", "developer"):
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):
+            parts.extend(part.get("text", "") for part in content if isinstance(part, dict))
+    for tool in request.get("tools") or []:
+        if isinstance(tool, dict):
+            function = tool.get("function") or {}
+            if function.get("name"):
+                parts.append(function["name"])
+    return " ".join(parts).lower()
+
+
+def classify(request):
+    """Classify a request and estimate what it will cost to do safely.
+
+    Returns the class, the scores behind it, and the estimates §2 asks for:
+    complexity, risk, blast radius, context requirement, verification
+    requirement and parallelizability.
+    """
+    text = task_text(request)
+    words = re.findall(r"[a-z0-9_]+", text)
+    joined = " " + " ".join(words) + " "
+
+    scores = {}
+    for name in TASK_CLASSES:
+        total = 0
+        for term in CLASS_TERMS.get(name, ()):
+            needle = term.strip()
+            if not needle:
+                continue
+            if " " in needle:
+                if needle in joined:
+                    total += 2
+            elif " " + needle in joined or needle.endswith(" ") and needle in joined:
+                total += 2
+            elif needle in joined:
+                # Prefix match, so "cryptograph" covers cryptographic and
+                # cryptography without listing both.
+                total += 1
+        if total:
+            scores[name] = total
+
+    # Ties break on the fixed class order, so the same request always classifies
+    # the same way.
+    task_class = None
+    best = 0
+    for name in TASK_CLASSES:
+        if scores.get(name, 0) > best:
+            best = scores[name]
+            task_class = name
+
+    critical_terms = [term for term in CRITICAL_TERMS if term in joined]
+    blast_radius = sorted(set(critical_terms))
+    risk = "critical" if (critical_terms or task_class in CRITICAL_CLASSES) else "low"
+    if risk != "critical" and task_class in ("ARCHITECTURE", "DATABASE", "COMPILER_WORK",
+                                             "RUST_IMPLEMENTATION", "PERFORMANCE"):
+        risk = "medium"
+
+    context_tokens = len(json.dumps(request, ensure_ascii=False).encode("utf-8")) // 4
+    distinct = len(scores)
+    complexity = "low"
+    if context_tokens > 40_000 or distinct >= 3:
+        complexity = "high"
+    elif context_tokens > 8_000 or distinct >= 2 or task_class in (
+            "ARCHITECTURE", "CONSENSUS", "CROSS_CHAIN", "COMPILER_WORK", "CRYPTOGRAPHY"):
+        complexity = "medium"
+
+    if task_class is None:
+        # Nothing in the table matched. Fall back to the shape of the request
+        # rather than inventing a class: an agent request with tools is a code
+        # task, anything else is a chat turn.
+        task_class = "RUST_IMPLEMENTATION" if request.get("tools") else "DOCUMENTATION"
+
+    return {
+        "task_class": task_class,
+        "scores": dict(sorted(scores.items(), key=lambda item: (-item[1], item[0]))),
+        "complexity": complexity,
+        "risk": risk,
+        "blast_radius": blast_radius,
+        "context_tokens": context_tokens,
+        "verification": list(VERIFICATION_BY_CLASS.get(task_class, ("unit",))),
+        "parallelizable": PARALLEL_BY_CLASS.get(task_class, "medium"),
+        "critical_terms": critical_terms,
+    }
 
 
 class UnsupportedFeature(Exception):
@@ -555,15 +825,57 @@ class Router:
         if "created_at" not in {row[1] for row in self.db.execute("PRAGMA table_info(reservations)")}:
             self.db.execute("ALTER TABLE reservations ADD COLUMN created_at REAL")
         self.db.execute("CREATE TABLE IF NOT EXISTS provider_health (provider TEXT PRIMARY KEY, failures INTEGER DEFAULT 0, cooldown_until REAL DEFAULT 0, last_error TEXT, last_failure_at REAL)")
+        # Measured capability (§3). `provider_health` answers "is it working
+        # right now"; this answers "how well has it worked", which is what a
+        # routing decision needs and what a static config cannot know.
+        self.db.execute(
+            "CREATE TABLE IF NOT EXISTS provider_stats ("
+            "provider TEXT, model TEXT, attempts INTEGER DEFAULT 0, successes INTEGER DEFAULT 0, "
+            "failures INTEGER DEFAULT 0, retries INTEGER DEFAULT 0, "
+            "latency_ms_total REAL DEFAULT 0, latency_samples INTEGER DEFAULT 0, "
+            "input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0, cost_usd REAL DEFAULT 0, "
+            "PRIMARY KEY (provider, model))")
         self.db.commit()
         self.reconciled_orphans = 0
         self.capabilities = {}
         self.reconcile_reservations()
 
     def choose(self, request):
-        text = " ".join(str(m.get("content", "")) for m in request.get("messages", [])).lower()
-        tier = "critical" if any(term in text for term in CRITICAL) else "routine"
-        return tier, self.config["routes"][tier]
+        """Pick the tier, the provider order, and the reasoning behind them.
+
+        The client's `model` is normally an alias Codex sends and the router
+        ignores, but a real logical model name (`x3-security`, `x3-local`, ...)
+        is a routing instruction and is honoured.
+
+        A critical classification is a *floor*, never a ceiling: a policy
+        cannot downgrade it. A request containing consensus or settlement terms
+        stays critical even when its task class would otherwise route to the
+        cheap chain, because that check is what keeps such code off third-party
+        providers.
+        """
+        classification = classify(request)
+        policies = self.config.get("policies") or DEFAULT_POLICIES
+        class_routes = self.config.get("class_routes") or DEFAULT_CLASS_ROUTES
+
+        requested = request.get("model")
+        logical = requested if isinstance(requested, str) and requested in policies else None
+        if logical is None:
+            target = class_routes.get(classification["task_class"], DEFAULT_LOGICAL_MODEL)
+            logical = target if target in policies else "x3-auto"
+
+        policy = policies.get(logical) or policies.get("x3-auto") or {}
+        tier = "critical" if (
+            policy.get("tier") == "critical" or classification["risk"] == "critical"
+        ) else "routine"
+
+        order = [name for name in policy.get("order", []) if name in self.config["providers"]]
+        if not order:
+            # No usable policy — an older config, or one whose providers were
+            # renamed. Fall back to the fixed route for the tier rather than
+            # failing, so an existing deployment keeps working.
+            routes = self.config.get("routes") or {}
+            order = list(routes.get(tier, []))
+        return tier, order, classification, logical
 
     def attempt_order(self, chain):
         """The providers to try, in order, for one request.
@@ -682,6 +994,78 @@ class Router:
             rows = self.db.execute("SELECT provider,failures,cooldown_until,last_error FROM provider_health").fetchall()
         return [{"provider": p, "failures": f or 0, "cooldown_seconds": round(max(0.0, (u or 0) - now), 3), "last_error": e}
                 for p, f, u, e in rows]
+
+    def note_attempt(self, name, model, latency_ms, ok, retried=False, usage=None, cost=0.0):
+        """Record one provider attempt, successful or not.
+
+        Latency is taken from every attempt, including the ones that failed:
+        a provider that is fast when it works and slow when it times out is a
+        different routing proposition from one that is uniformly slow, and
+        averaging only the successes hides exactly that.
+        """
+        usage = usage or {}
+        with self.lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute(
+                "INSERT INTO provider_stats (provider,model,attempts,successes,failures,retries,"
+                "latency_ms_total,latency_samples,input_tokens,output_tokens,cost_usd) "
+                "VALUES (?,?,1,?,?,?,?,1,?,?,?) "
+                "ON CONFLICT(provider,model) DO UPDATE SET "
+                "attempts=attempts+1, successes=successes+excluded.successes, "
+                "failures=failures+excluded.failures, retries=retries+excluded.retries, "
+                "latency_ms_total=latency_ms_total+excluded.latency_ms_total, "
+                "latency_samples=latency_samples+1, "
+                "input_tokens=input_tokens+excluded.input_tokens, "
+                "output_tokens=output_tokens+excluded.output_tokens, "
+                "cost_usd=cost_usd+excluded.cost_usd",
+                (name, model, 1 if ok else 0, 0 if ok else 1, 1 if retried else 0,
+                 float(latency_ms), usage.get("prompt_tokens", 0) or 0,
+                 usage.get("completion_tokens", 0) or 0, float(cost)))
+            self.db.commit()
+
+    def provider_registry(self):
+        """Measured profiles, in the shape §3 asks for.
+
+        `verified_patch_rate` is joined in from the task feedback table rather
+        than invented here: it counts tasks whose recorded checks passed, which
+        is the only evidence this router has that a patch was actually good.
+        """
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT provider,model,attempts,successes,failures,retries,"
+                "latency_ms_total,latency_samples,input_tokens,output_tokens,cost_usd "
+                "FROM provider_stats ORDER BY provider,model").fetchall()
+            outcomes = self.db.execute(
+                "SELECT u.provider,u.model,"
+                "COUNT(DISTINCT CASE WHEN t.outcome='checks_passed' THEN t.id END),"
+                "COUNT(DISTINCT CASE WHEN t.outcome='checks_failed' THEN t.id END) "
+                "FROM usage u JOIN tasks t ON t.id=u.task_id GROUP BY u.provider,u.model").fetchall()
+        verified = {(p, m): (ok, bad) for p, m, ok, bad in outcomes}
+
+        registry = []
+        for (name, model, attempts, successes, failures, retries,
+             latency_total, latency_samples, tokens_in, tokens_out, cost) in rows:
+            ok, bad = verified.get((name, model), (0, 0))
+            attempts = attempts or 0
+            registry.append({
+                "provider": name,
+                "model": model,
+                "attempts": attempts,
+                "successes": successes or 0,
+                "failures": failures or 0,
+                "failure_rate": round((failures or 0) / attempts, 4) if attempts else None,
+                "retries": retries or 0,
+                "retry_rate": round((retries or 0) / attempts, 4) if attempts else None,
+                "average_latency_ms": round((latency_total or 0) / latency_samples, 1) if latency_samples else None,
+                "latency_samples": latency_samples or 0,
+                "input_tokens": tokens_in or 0,
+                "output_tokens": tokens_out or 0,
+                "cost_usd": round(cost or 0, 6),
+                "passed_tasks": ok or 0,
+                "failed_tasks": bad or 0,
+                "verified_patch_rate": round((ok or 0) / (ok + bad), 4) if (ok + bad) else None,
+            })
+        return registry
 
     def begin_task(self, task_id, agent, revision, scope):
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", task_id) or not re.fullmatch(r"[0-9a-f]{40}", revision) or scope != "router":
@@ -952,6 +1336,29 @@ class Router:
                           "providers": [{key: value for key, value in entry.items()
                                          if key not in ("attempt", "quiet")} for entry in diagnostics]}}
 
+    def retry_budget(self, provider):
+        """Extra attempts beyond the first, for one provider.
+
+        Bounded on purpose (§50): an unbounded retry turns a slow provider into
+        a stalled request, and the fallback chain already exists to move on.
+        """
+        try:
+            return max(0, int(provider.get("retry_attempts", self.config.get("retry_attempts", 1))))
+        except (TypeError, ValueError):
+            return 1
+
+    def retry_delay(self, provider, index):
+        """Exponential backoff, capped. Retry-After still wins where sent."""
+        try:
+            base = float(provider.get("retry_backoff_ms", self.config.get("retry_backoff_ms", 250))) / 1000.0
+            cap = float(self.config.get("retry_backoff_max_ms", 2_000)) / 1000.0
+        except (TypeError, ValueError):
+            return 0.25
+        return max(0.0, min(cap, base * (2 ** max(0, index))))
+
+    def elapsed_ms(self, started):
+        return (time.monotonic() - started) * 1000.0
+
     def complete(self, request, agent):
         # UTF-8 JSON bytes conservatively bound visible input tokens; reject
         # oversized requests instead of trusting a configured estimate.
@@ -960,7 +1367,9 @@ class Router:
         error = request_error(request, self.config)
         if error:
             return 400, {"error": {"message": error}}
-        tier, chain = self.choose(request)
+        tier, chain, classification, logical = self.choose(request)
+        self.context.routing = {"policy": logical, "tier": tier,
+                                "task_class": classification["task_class"]}
         failures = []
         budget_refused = False
         for name in self.attempt_order(chain):
@@ -993,32 +1402,56 @@ class Router:
             if key:
                 headers["Authorization"] = "Bearer " + key
             url = provider["base_url"].rstrip("/") + "/chat/completions"
-            try:
-                call = urllib.request.Request(url, json.dumps(payload).encode(), headers, method="POST")
-                with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
-                    result = json.load(response)
-                if not isinstance(result, dict) or "choices" not in result:
-                    raise ValueError("Provider response lacks choices")
-                usage = result.get("usage", {})
-                cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000 if usage else estimate
-                self.note_provider_success(name)
-                self.finish(reservation, agent, name, model, usage, cost)
-                return 200, result
-            except urllib.error.HTTPError as exc:
-                # HTTPError is a subclass of URLError, so it has to be caught
-                # first to read a rate-limit `Retry-After` instead of guessing.
-                self.finish(reservation, agent)
-                retry_after = exc.headers.get("Retry-After") if exc.headers else None
-                self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
-                failures.append(self.diagnostic(name, exc.code, "HTTP " + str(exc.code)))
-            except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-                self.finish(reservation, agent)
-                self.note_provider_failure(name, type(exc).__name__)
-                failures.append(self.diagnostic(name, None, type(exc).__name__))
-            except Exception:
-                self.finish(reservation, agent)
-                self.note_provider_failure(name, "unexpected error")
-                raise
+            body = json.dumps(payload).encode()
+            allowed = 1 + self.retry_budget(provider)
+            for attempt_index in range(allowed):
+                started = time.monotonic()
+                try:
+                    call = urllib.request.Request(url, body, headers, method="POST")
+                    with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
+                        result = json.load(response)
+                    if not isinstance(result, dict) or "choices" not in result:
+                        raise ValueError("Provider response lacks choices")
+                    usage = result.get("usage", {})
+                    cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000 if usage else estimate
+                    self.note_attempt(name, model, self.elapsed_ms(started), True, attempt_index > 0, usage, cost)
+                    self.note_provider_success(name)
+                    self.finish(reservation, agent, name, model, usage, cost)
+                    return 200, result
+                except urllib.error.HTTPError as exc:
+                    # HTTPError is a subclass of URLError, so it has to be
+                    # caught first to read a rate-limit `Retry-After`.
+                    self.note_attempt(name, model, self.elapsed_ms(started), False, attempt_index > 0)
+                    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                    if exc.code in RETRYABLE_STATUS and attempt_index + 1 < allowed:
+                        time.sleep(self.retry_delay(provider, attempt_index))
+                        continue
+                    self.finish(reservation, agent)
+                    self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
+                    failures.append(self.diagnostic(name, exc.code, "HTTP " + str(exc.code)))
+                    break
+                except (urllib.error.URLError, TimeoutError) as exc:
+                    self.note_attempt(name, model, self.elapsed_ms(started), False, attempt_index > 0)
+                    if attempt_index + 1 < allowed:
+                        time.sleep(self.retry_delay(provider, attempt_index))
+                        continue
+                    self.finish(reservation, agent)
+                    self.note_provider_failure(name, type(exc).__name__)
+                    failures.append(self.diagnostic(name, None, type(exc).__name__))
+                    break
+                except ValueError as exc:
+                    # A malformed body is not transient: the same request will
+                    # produce the same malformed answer.
+                    self.note_attempt(name, model, self.elapsed_ms(started), False, attempt_index > 0)
+                    self.finish(reservation, agent)
+                    self.note_provider_failure(name, type(exc).__name__)
+                    failures.append(self.diagnostic(name, None, type(exc).__name__))
+                    break
+                except Exception:
+                    self.note_attempt(name, model, self.elapsed_ms(started), False, attempt_index > 0)
+                    self.finish(reservation, agent)
+                    self.note_provider_failure(name, "unexpected error")
+                    raise
         if budget_refused:
             return 429, self.failure_body(failures, "budget_exceeded", "Daily budget exhausted")
         return 502, self.failure_body(failures)
@@ -1029,7 +1462,9 @@ class Router:
         error = request_error(request, self.config)
         if error:
             return 400, {"error": error}
-        tier, chain = self.choose(request)
+        tier, chain, classification, logical = self.choose(request)
+        self.context.routing = {"policy": logical, "tier": tier,
+                                "task_class": classification["task_class"]}
         failures = []
         budget_refused = False
         for name in self.attempt_order(chain):
@@ -1059,87 +1494,121 @@ class Router:
             headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
             if key:
                 headers["Authorization"] = "Bearer " + key
-            emitted = False
-            usage = None
-            saw_done = False
-            finish_reason = None
-            try:
-                call = urllib.request.Request(provider["base_url"].rstrip("/") + "/chat/completions",
-                                              json.dumps(payload).encode(), headers, method="POST")
-                with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
-                    if "text/event-stream" not in response.headers.get("Content-Type", ""):
-                        raise ValueError("Provider did not return SSE")
-                    for line in response:
-                        if len(line) > 1_000_000:
-                            raise ValueError("Oversized SSE line")
-                        if not line.startswith(b"data: "):
-                            if emitted:
+            body = json.dumps(payload).encode()
+            allowed = 1 + self.retry_budget(provider)
+            for attempt_index in range(allowed):
+                attempt_started = time.monotonic()
+                # Reset per attempt: a retry is only legal before any byte has
+                # reached the client, and a partial stream must never be
+                # stitched onto a fresh one.
+                emitted = False
+                usage = None
+                saw_done = False
+                finish_reason = None
+                try:
+                    call = urllib.request.Request(provider["base_url"].rstrip("/") + "/chat/completions",
+                                                  body, headers, method="POST")
+                    with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
+                        if "text/event-stream" not in response.headers.get("Content-Type", ""):
+                            raise ValueError("Provider did not return SSE")
+                        for line in response:
+                            if len(line) > 1_000_000:
+                                raise ValueError("Oversized SSE line")
+                            if not line.startswith(b"data: "):
+                                if emitted:
+                                    send(line)
+                                continue
+                            data = line[6:].strip()
+                            if not emitted:
+                                start()
+                                emitted = True
+                            if data == b"[DONE]":
+                                # The stream is over. Reading until the socket
+                                # closes instead left the client waiting on a
+                                # keep-alive connection the provider never closed.
+                                saw_done = True
                                 send(line)
-                            continue
-                        data = line[6:].strip()
-                        if not emitted:
-                            start()
-                            emitted = True
-                        if data == b"[DONE]":
-                            # The stream is over. Reading until the socket
-                            # closes instead left the client waiting on a
-                            # keep-alive connection the provider never closed.
-                            saw_done = True
+                                break
+                            event = json.loads(data)
+                            if event.get("usage"):
+                                usage = event["usage"]
+                            for choice in event.get("choices") or []:
+                                if choice.get("finish_reason"):
+                                    finish_reason = choice["finish_reason"]
                             send(line)
-                            break
-                        event = json.loads(data)
-                        if event.get("usage"):
-                            usage = event["usage"]
-                        for choice in event.get("choices") or []:
-                            if choice.get("finish_reason"):
-                                finish_reason = choice["finish_reason"]
-                        send(line)
-                if not emitted:
-                    raise ValueError("Empty SSE response")
-                if not saw_done and finish_reason is None:
-                    raise ValueError("Stream ended without a terminal event")
-                cost = ((usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000) if usage else estimate
-                self.note_provider_success(name)
-                self.finish(reservation, agent, name, provider["model"], usage or {}, cost)
-                return None
-            except ClientDisconnected:
-                # The caller hung up. Charge what the provider already
-                # produced, release the reservation, and say nothing: there is
-                # no socket left to answer on and no traceback worth printing.
-                self.finish(reservation, agent, name if emitted else None, provider["model"],
-                            usage or {}, estimate if emitted else 0)
-                self.diagnostic(name, None, "client disconnected")
-                return None
-            except urllib.error.HTTPError as exc:
-                retry_after = exc.headers.get("Retry-After") if exc.headers else None
-                self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
-                failure = self.diagnostic(name, exc.code, "HTTP " + str(exc.code))
-                if emitted:
-                    self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
-                    # The client already has half an answer. It gets a terminal
-                    # failure event, not a `response.completed`.
-                    return 502, self.failure_body([failure])
-                self.finish(reservation, agent)
-                failures.append(failure)
-            except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
-                self.note_provider_failure(name, type(exc).__name__)
-                failure = self.diagnostic(name, None, type(exc).__name__)
-                if emitted:
-                    self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
-                    # A partial stream cannot be retried with another model, so
-                    # the client is told it failed rather than handed a
-                    # truncated answer dressed up as a complete one.
-                    return 502, self.failure_body([failure])
-                self.finish(reservation, agent)
-                failures.append(failure)
-            except Exception:
-                self.finish(reservation, agent, name if emitted else None, provider["model"], usage or {}, estimate if emitted else 0)
-                self.note_provider_failure(name, "unexpected error")
-                raise
+                    if not emitted:
+                        raise ValueError("Empty SSE response")
+                    if not saw_done and finish_reason is None:
+                        raise ValueError("Stream ended without a terminal event")
+                    cost = ((usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000) if usage else estimate
+                    self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), True,
+                                      attempt_index > 0, usage or {}, cost)
+                    self.note_provider_success(name)
+                    self.finish(reservation, agent, name, provider["model"], usage or {}, cost)
+                    return None
+                except ClientDisconnected:
+                    # The caller hung up. Charge what the provider already
+                    # produced, release the reservation, and say nothing: there
+                    # is no socket left to answer on and no traceback worth
+                    # printing.
+                    self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), False,
+                                      attempt_index > 0)
+                    self.finish(reservation, agent, name if emitted else None, provider["model"],
+                                usage or {}, estimate if emitted else 0)
+                    self.diagnostic(name, None, "client disconnected")
+                    return None
+                except urllib.error.HTTPError as exc:
+                    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                    self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), False,
+                                      attempt_index > 0)
+                    # A 5xx or a 429 before the first byte is worth one more
+                    # try; after the first byte it is not, because the client
+                    # already has half an answer.
+                    if not emitted and exc.code in RETRYABLE_STATUS and attempt_index + 1 < allowed:
+                        time.sleep(self.retry_delay(provider, attempt_index))
+                        continue
+                    self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
+                    failure = self.diagnostic(name, exc.code, "HTTP " + str(exc.code))
+                    if emitted:
+                        self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
+                        return 502, self.failure_body([failure])
+                    self.finish(reservation, agent)
+                    failures.append(failure)
+                    break
+                except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                    self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), False,
+                                      attempt_index > 0)
+                    if not emitted and attempt_index + 1 < allowed:
+                        time.sleep(self.retry_delay(provider, attempt_index))
+                        continue
+                    self.note_provider_failure(name, type(exc).__name__)
+                    failure = self.diagnostic(name, None, type(exc).__name__)
+                    if emitted:
+                        self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
+                        return 502, self.failure_body([failure])
+                    self.finish(reservation, agent)
+                    failures.append(failure)
+                    break
+                except ValueError as exc:
+                    # A malformed or truncated body is not transient: repeating
+                    # the identical request produces the identical answer.
+                    self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), False,
+                                      attempt_index > 0)
+                    self.note_provider_failure(name, type(exc).__name__)
+                    failure = self.diagnostic(name, None, type(exc).__name__)
+                    if emitted:
+                        self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
+                        return 502, self.failure_body([failure])
+                    self.finish(reservation, agent)
+                    failures.append(failure)
+                    break
+                except Exception:
+                    self.finish(reservation, agent, name if emitted else None, provider["model"], usage or {}, estimate if emitted else 0)
+                    self.note_provider_failure(name, "unexpected error")
+                    raise
         if budget_refused:
             return 429, self.failure_body(failures, "budget_exceeded", "Daily budget exhausted")
         return 502, self.failure_body(failures)
-
 
 def dashboard(snapshot):
     rows = "".join("<tr>" + "".join(f"<td>{html.escape(str(item[key]))}</td>" for key in ("agent", "provider", "requests", "cost_usd")) + "</tr>"
@@ -1219,11 +1688,20 @@ def handler_for(router):
             if self.path == "/metrics":
                 return self.raw(200, metrics(router.snapshot()), "text/plain; version=0.0.4; charset=utf-8")
             if self.path == "/v1/models":
-                return self.reply(200, {"object": "list", "data": [{"id": "x3-auto", "object": "model"}]})
+                # The logical models are routing policies, not model names.
+                policies = router.config.get("policies") or DEFAULT_POLICIES
+                data = [{"id": name, "object": "model",
+                         "description": "routing policy: " + " -> ".join(policy.get("order", []))}
+                        for name, policy in policies.items()]
+                return self.reply(200, {"object": "list", "data": data})
             if self.path.startswith("/v1/models/"):
-                if self.path.rsplit("/", 1)[-1] == "x3-auto":
-                    return self.reply(200, {"id": "x3-auto", "object": "model"})
+                wanted = self.path.rsplit("/", 1)[-1]
+                policies = router.config.get("policies") or DEFAULT_POLICIES
+                if wanted in policies:
+                    return self.reply(200, {"id": wanted, "object": "model"})
                 return self.reply(404, {"error": {"message": "No such model"}})
+            if self.path == "/v1/registry":
+                return self.reply(200, {"registry": router.provider_registry()})
             if self.path == "/v1/providers":
                 return self.reply(200, {"providers": router.provider_health()})
             capabilities, _, query = self.path.partition("?")
@@ -1329,6 +1807,32 @@ def handler_for(router):
                     return self.reply(400, {"error": "Invalid verification evidence"})
             if not self.authorized():
                 return self.reply(401, {"error": "Unauthorized"})
+            if self.path == "/v1/explain":
+                # Answers "what would you do with this, and why" without
+                # calling a provider. Routing a request is a decision worth
+                # being able to audit on its own, and it costs nothing to ask.
+                try:
+                    size = int(self.headers.get("Content-Length", "0"))
+                    if size < 1 or size > MAX_BODY:
+                        return self.reply(413, {"error": "Invalid request size"})
+                    data = json.loads(self.rfile.read(size))
+                    if isinstance(data.get("input"), list):
+                        chat, custom, disabled = responses_request(data)
+                    else:
+                        chat, custom, disabled = data, set(), []
+                    tier, chain, classification, logical = router.choose(chat)
+                except UnsupportedFeature as exc:
+                    return self.reply(400, {"error": {"message": str(exc),
+                                                      "type": "unsupported_feature"}})
+                except (ValueError, TypeError, KeyError):
+                    return self.reply(400, {"error": "Invalid request"})
+                return self.reply(200, {
+                    "policy": logical,
+                    "tier": tier,
+                    "provider_order": router.attempt_order(chain),
+                    "classification": classification,
+                    "disabled_tools": disabled,
+                })
             if any(self.path == path or self.path.startswith(path + "/") for path in UNSUPPORTED_PATHS):
                 return self.reply(501, {"error": {"message": self.path + " is not implemented: this router speaks the Chat Completions API at /v1/chat/completions"}})
             if self.path not in ("/v1/chat/completions", "/v1/responses"):

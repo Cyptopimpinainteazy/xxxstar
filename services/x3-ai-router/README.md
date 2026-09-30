@@ -25,6 +25,81 @@ Edit `config.json` for installed Ollama models, provider models, prices, and bud
 
 ## Request validation
 
+## Routing intelligence
+
+`x3-auto` used to be a label over one fixed chain per tier. It is now a
+policy decision, and the decision is auditable without spending a token:
+
+```bash
+curl -s -X POST http://127.0.0.1:11435/v1/explain -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"Fix the consensus finality bug"}]}'
+```
+
+```json
+{"policy":"x3-security","tier":"critical",
+ "provider_order":["deepseek","direct","ollama"],
+ "classification":{"task_class":"CONSENSUS","risk":"critical",
+   "blast_radius":["consensus","finality"],"complexity":"medium",
+   "verification":["unit","integration","local-ci","audit"],"parallelizable":"low"}}
+```
+
+### Task classification
+
+A deterministic keyword classifier, not a model call: asking a model which
+model to use would add the cost, the latency and the nondeterminism the router
+exists to manage. It names one of the 23 classes in the Forge spec and
+estimates complexity, risk, blast radius, context requirement, verification
+requirement and parallelizability.
+
+It scores the **task text only** — user, assistant and tool messages. Codex
+sends ~17KB of instructions that mention security, consensus and testing in the
+abstract, and scoring those would classify every request as everything.
+
+### Logical models are routing policies
+
+`GET /v1/models` lists them; each one is an ordered provider preference, not a
+model name:
+
+| Logical model | Order | Tier |
+| --- | --- | --- |
+| `x3-auto` | class decides | derived |
+| `x3-fast` | ollama → deepseek → openrouter | routine |
+| `x3-code` | deepseek → openrouter → ollama | routine |
+| `x3-deep` | deepseek → openrouter → direct | routine |
+| `x3-security` | deepseek → direct | critical |
+| `x3-review` | deepseek → openrouter | routine |
+| `x3-local` | ollama only | routine |
+
+A client that sends one of these as its `model` is giving a routing
+instruction and is obeyed. Anything else is the alias Codex sends, resolved
+from the class. Capability, health, budget and privacy checks all still apply
+to whichever provider the policy names.
+
+**A critical classification is a floor, not a ceiling.** A policy cannot
+downgrade it: a request containing consensus or settlement terms stays critical
+even when its task class would route to the cheap chain, because that check is
+what keeps such code off third-party providers.
+
+### Measured capability registry
+
+`GET /v1/registry` reports what each provider and model has actually done
+rather than what its config claims: attempts, failures, failure rate, retries,
+retry rate, average latency, tokens, cost, and the verified-patch rate joined
+from the task feedback table. Latency is recorded for **failed** attempts too —
+a provider that is fast when it works and slow when it times out is a
+different routing proposition from one that is uniformly slow, and averaging
+only the successes hides exactly that.
+
+### Bounded retries
+
+A provider is retried on a status that means "try again" (`408, 409, 425, 429,
+500, 502, 503, 504`) or a transport error, up to `retry_attempts` (default 1)
+with exponential backoff capped by `retry_backoff_max_ms`. A `400`, `401` or a
+malformed body is not retried: repeating an identical request produces the
+identical answer, so a retry only spends money. On a stream, a retry is legal
+only **before the first byte reaches the client** — after that the client
+already has half an answer and gets a failure event instead.
+
 A reservation is an upper bound on one call, so the request must not be able to spend more than the reservation covers. Two shapes used to get through:
 
 - **A second output parameter.** The estimate read `max_tokens` and fell back to 4096, so a request that set `max_completion_tokens` instead — which is what GPT-5 on the direct provider requires — was reserved at the default and billed for whatever it asked. Both parameters are now validated against `max_output_tokens`, and the estimate uses whichever one the client set.

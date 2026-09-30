@@ -8,6 +8,18 @@
   "reservation_ttl_seconds": 900,
   "provider_cooldown_seconds": 60,
   "provider_cooldown_max_seconds": 3600,
+  "retry_attempts": 1,
+  "retry_backoff_ms": 250,
+  "retry_backoff_max_ms": 2000,
+  "policies": {
+    "x3-auto": {"tier": "auto", "order": ["deepseek", "openrouter", "ollama", "nemotron_lightning_free", "direct"]},
+    "x3-fast": {"tier": "routine", "order": ["ollama", "deepseek", "openrouter"]},
+    "x3-code": {"tier": "routine", "order": ["deepseek", "openrouter", "ollama"]},
+    "x3-deep": {"tier": "routine", "order": ["deepseek", "openrouter", "direct"]},
+    "x3-security": {"tier": "critical", "order": ["deepseek", "direct"]},
+    "x3-review": {"tier": "routine", "order": ["deepseek", "openrouter"]},
+    "x3-local": {"tier": "routine", "order": ["ollama"]}
+  },
   "routes": {
     "routine": [
       "deepseek",
