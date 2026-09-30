@@ -708,6 +708,16 @@ GATES_FAST=(
   # stays fixed. `--locked` against the committed lock, and its own target dir
   # because it resolves the coordinator's dependency graph.
   "test x3-sim:export CARGO_TARGET_DIR=/tmp/x3-nested-x3-sim; cargo fetch --locked --manifest-path crates/x3-sim/Cargo.toml || echo 'local-ci: x3-sim dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-sim/Cargo.toml"
+  # `x3-mc` is the Monte Carlo search layer over `x3-sim`: it samples scenario
+  # parameters, drives `x3_sim::run_with`, and judges the result with the
+  # coordinator's invariants. It is a third standalone workspace root on the
+  # same dependency chain, so `cargo test --workspace` never sees it either.
+  # Its suite is the evidence that the search engine can actually detect a
+  # defect (the control scenario is deliberately broken), that a failure
+  # replays from its recorded seed, and that minimization shrinks a reproducer
+  # without drifting onto a different violation. Without a gate it would rot
+  # exactly the way the nested workspaces above did.
+  "test x3-mc:export CARGO_TARGET_DIR=/tmp/x3-nested-x3-mc; cargo fetch --locked --manifest-path crates/x3-mc/Cargo.toml || echo 'local-ci: x3-mc dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-mc/Cargo.toml"
   # The crates below are `exclude`d from the root workspace: each declares its
   # own `[workspace]` (or path-depends on one that does), and cargo refuses to
   # have them as members ("multiple workspace roots found in the same

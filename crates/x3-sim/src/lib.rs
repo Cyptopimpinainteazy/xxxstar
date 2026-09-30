@@ -26,6 +26,7 @@ pub mod clock;
 pub mod faults;
 pub mod invariants;
 pub mod network;
+pub mod params;
 pub mod rng;
 pub mod sim;
 
@@ -33,5 +34,6 @@ pub use clock::VirtualClock;
 pub use faults::{FaultEvent, FaultKind, FaultPlan};
 pub use invariants::{check_session, check_sessions, Violation};
 pub use network::{NetworkStats, VirtualNetwork};
+pub use params::SimParams;
 pub use rng::SimRng;
-pub use sim::{run, Scenario, SimConfig, SimOp, SimOutcome, START_UNIX_MS};
+pub use sim::{run, run_with, Scenario, SimConfig, SimOp, SimOutcome, START_UNIX_MS};

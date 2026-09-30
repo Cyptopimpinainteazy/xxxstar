@@ -24,6 +24,7 @@ use crate::clock::VirtualClock;
 use crate::faults::{FaultKind, FaultPlan};
 use crate::invariants::{check_sessions, Violation};
 use crate::network::{NetworkStats, VirtualNetwork};
+use crate::params::SimParams;
 use crate::rng::SimRng;
 
 /// Fixed start instant: 2023-11-14T22:13:20Z. A constant, not a clock reading.
@@ -222,6 +223,17 @@ fn coordinator(
 
 /// Drive the real coordinator and report what happened.
 pub fn run(config: &SimConfig) -> SimOutcome {
+    run_with(config, &SimParams::for_scenario(config.scenario))
+}
+
+/// Drive the real coordinator at an explicitly chosen point in the parameter
+/// space.
+///
+/// `run` is this function at the scenario's default point, so every existing
+/// fixture keeps exercising exactly what it did before. A search supplies its
+/// own [`SimParams`]; the semantics being tested still come entirely from the
+/// coordinator crate.
+pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
     let mut rng = SimRng::from_seed(config.seed);
     let mut clock = VirtualClock::new(START_UNIX_MS);
     let persistence = Arc::new(InMemoryPersistence::new());
@@ -269,13 +281,16 @@ pub fn run(config: &SimConfig) -> SimOutcome {
     // completes when nothing goes wrong, so its network is ordered and lossless.
     // The adversarial scenarios keep jitter and loss, because a reordered
     // message is exactly one of the failures they exist to schedule.
-    let mut net = match config.scenario {
-        Scenario::HappyPath => VirtualNetwork::new(nodes, 25, 0, 0),
-        _ => VirtualNetwork::new(nodes, 25, 40, 2),
-    };
+    let mut net = VirtualNetwork::new(
+        nodes,
+        params.latency_ms,
+        params.jitter_ms,
+        params.drop_percent,
+    );
     let horizon_ms = (config.steps as u64).saturating_mul(500).max(1_000);
-    let mut plan = FaultPlan::generate(
+    let mut plan = FaultPlan::generate_with(
         config.scenario,
+        params,
         &mut rng,
         clients,
         sessions,
@@ -316,7 +331,14 @@ pub fn run(config: &SimConfig) -> SimOutcome {
 
     for step in 0..config.steps {
         // Move time, then let whatever is due happen.
-        clock.advance(250 + rng.next_u64() % 500);
+        clock.advance(
+            params.clock_step_ms
+                + if params.clock_jitter_ms > 0 {
+                    rng.next_u64() % params.clock_jitter_ms
+                } else {
+                    0
+                },
+        );
         let now_ms = clock.now_ms();
         let now_secs = clock.now_secs();
 
@@ -374,13 +396,7 @@ pub fn run(config: &SimConfig) -> SimOutcome {
             net.send(from, 0, now_ms, index, &mut rng);
 
             // Duplicate delivery: the same prepared message arrives twice.
-            let duplicate_percent = match config.scenario {
-                Scenario::HappyPath => 0,
-                Scenario::ClaimRefundRace => 15,
-                Scenario::PartitionStorm => 25,
-                Scenario::CrashRecovery => 20,
-            };
-            if rng.chance(duplicate_percent) {
+            if rng.chance(params.duplicate_percent) {
                 let index = last_op_index.unwrap_or(index);
                 net.send(from, 0, now_ms, index, &mut rng);
                 trace.push(format!("{step:04} RETRANSMIT op_index={index}"));
