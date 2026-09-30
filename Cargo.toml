@@ -40,6 +40,9 @@ exclude = [
 ]
 members = [
     "pallets/x3-kernel",
+    "pallets/x3-app-registry",
+    "pallets/x3-security-gate",
+    "pallets/x3-trust-gate",
     "pallets/atomic-trade-engine",
     "pallets/governance",
     "pallets/treasury",

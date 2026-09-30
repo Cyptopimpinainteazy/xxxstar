@@ -1,0 +1,1371 @@
+{
+  "project": "X3 Guardian",
+  "spec": "X3 GUARDIAN \u2014 Mandatory DApp Security, Anti-Scam, Certification, Monitoring, and Runtime Enforcement System",
+  "derived_from": "pasted-text-1.txt (66 sections)",
+  "status_values": [
+    "TODO",
+    "DOING",
+    "DONE",
+    "BLOCKED"
+  ],
+  "items": [
+    {
+      "id": "AUD-1",
+      "sec": "43/65",
+      "item": "Inspect repository before coding",
+      "status": "DONE",
+      "evidence": "Guardian components absent; 57 pallets, ~86 workspace members; \u00a743 targets enumerated"
+    },
+    {
+      "id": "AUD-2",
+      "sec": "43/65",
+      "item": "Identify existing compatible architecture",
+      "status": "DONE",
+      "evidence": "x3-kernel, atomic-trade-engine, x3-agent-law, swarm, x3-cross-vm-router, x3-asset-kernel-types, x3-settlement-engine, x3-asset-registry, x3-account-registry all present"
+    },
+    {
+      "id": "AUD-3",
+      "sec": "23/24",
+      "item": "Baseline: workspace compiles",
+      "status": "DONE",
+      "evidence": "cargo check -p pallet-x3-invariants finished clean in 26.6s"
+    },
+    {
+      "id": "A1",
+      "sec": "5",
+      "item": "pallet-x3-app-registry (identity, hashes, status, versions, revocations, upgrades)",
+      "status": "DONE",
+      "evidence": "pallets/x3-app-registry implemented; 17 tests pass (cargo test -p pallet-x3-app-registry)"
+    },
+    {
+      "id": "A2",
+      "sec": "5",
+      "item": "pallet-x3-security-gate (policies, thresholds, rule versions)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "A3",
+      "sec": "5",
+      "item": "pallet-x3-trust-gate (dangerous privilege detection)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "A4",
+      "sec": "5",
+      "item": "x3-guardian-runner (deterministic off-chain test coordinator)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "A5",
+      "sec": "5",
+      "item": "x3-exploit-corpus (machine-readable attack library)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "T1",
+      "sec": "3",
+      "item": "Tier EXPERIMENTAL (permissionless, unendorsed)",
+      "status": "DONE",
+      "evidence": "CertificationTier::Experimental; register_creates_experimental_app test"
+    },
+    {
+      "id": "T2",
+      "sec": "3",
+      "item": "Tier UNDER_REVIEW",
+      "status": "DONE",
+      "evidence": "CertificationTier::UnderReview; submit_for_review_only_from_experimental test"
+    },
+    {
+      "id": "T3",
+      "sec": "3",
+      "item": "Tier X3_VERIFIED",
+      "status": "DONE",
+      "evidence": "CertificationTier::X3Verified; only GuardianOrigin can set it (only_guardian_can_certify_or_restrict)"
+    },
+    {
+      "id": "T4",
+      "sec": "3",
+      "item": "Tier RESTRICTED (privileges removed, history kept)",
+      "status": "DONE",
+      "evidence": "CertificationTier::Restricted; restrict_removes_privileges_and_keeps_history test"
+    },
+    {
+      "id": "R1",
+      "sec": "24",
+      "item": "Registry: app id, name, owner, version, VM, addresses",
+      "status": "DONE",
+      "evidence": "ApplicationRecord id/owner/name/vm/category/current_version; CertificateTier + address binding (address_binding_is_exclusive_and_releasable)"
+    },
+    {
+      "id": "R2",
+      "sec": "24",
+      "item": "Registry: bytecode hash, source hash, manifest hash",
+      "status": "DONE",
+      "evidence": "ArtifactHashes stores manifest/source/bytecode hashes; certify_binds_to_exact_hashes test"
+    },
+    {
+      "id": "R3",
+      "sec": "24",
+      "item": "Registry: guardian standard, trust standard, exploit corpus",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "R4",
+      "sec": "24",
+      "item": "Registry: status, certification timestamp, next review",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "R5",
+      "sec": "24",
+      "item": "Registry: restrictions and reason codes",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "R6",
+      "sec": "24",
+      "item": "Registry: upgrade history",
+      "status": "DONE",
+      "evidence": "Versions retained per version + upgrade_count; add_version_resets_to_under_review test"
+    },
+    {
+      "id": "M1",
+      "sec": "23",
+      "item": "Security Manifest structure",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "M2",
+      "sec": "23",
+      "item": "Manifest hashing",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "M3",
+      "sec": "23/24",
+      "item": "Manifest hash registered on-chain",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "M4",
+      "sec": "23",
+      "item": "Off-chain evidence with verifiable references",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "S1",
+      "sec": "7",
+      "item": "Static analysis pipeline (VM-appropriate)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "sec": "7/31",
+      "item": "Structured findings output",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "F1",
+      "sec": "8",
+      "item": "Fuzz: individual calls and inputs",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "F2",
+      "sec": "8",
+      "item": "Fuzz: long multi-transaction sequences",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SF1",
+      "sec": "9",
+      "item": "Stateful fuzzing over an application state machine",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I1",
+      "sec": "10",
+      "item": "Invariant: asset conservation",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I2",
+      "sec": "10",
+      "item": "Invariant: supply integrity",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I3",
+      "sec": "10",
+      "item": "Invariant: solvency",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I4",
+      "sec": "10",
+      "item": "Invariant: authorization",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I5",
+      "sec": "10",
+      "item": "Invariant: atomicity (all-or-none across VMs)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I6",
+      "sec": "10",
+      "item": "Invariant: replay protection",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I7",
+      "sec": "10",
+      "item": "Invariant: settlement uniqueness",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I8",
+      "sec": "10",
+      "item": "Invariant: escrow safety",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "I9",
+      "sec": "10",
+      "item": "Invariant: upgrade safety",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "FV1",
+      "sec": "11",
+      "item": "Formal verification integration (additive)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SY1",
+      "sec": "12",
+      "item": "Symbolic execution integration",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "MU1",
+      "sec": "13",
+      "item": "Mutation engine (authorization/timelock/nonce/oracle breaks)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "MU2",
+      "sec": "13",
+      "item": "TEST SUITE INSUFFICIENT flag when mutations survive",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "D1",
+      "sec": "14",
+      "item": "Differential testing between implementations",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "E1",
+      "sec": "15",
+      "item": "Economic attack simulation",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "TR1",
+      "sec": "16",
+      "item": "Privilege Map (machine-readable)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "TR2",
+      "sec": "16",
+      "item": "Anti-Rug Analyzer",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "H1",
+      "sec": "17",
+      "item": "Honeypot detection (buy/sell/transfer simulation)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "P1",
+      "sec": "18",
+      "item": "Proxy/upgrade analysis; implementation change triggers review",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "X1",
+      "sec": "19",
+      "item": "Cross-VM security engine (EVM/SVM/X3VM pairings)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AT1",
+      "sec": "20",
+      "item": "Atomic execution invariants (COMMIT_ALL_OR_COMMIT_NONE)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AT2",
+      "sec": "20",
+      "item": "Atomic adversarial cases (wrong preimage, claim-after-refund, ...)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AE1",
+      "sec": "21",
+      "item": "Adversarial environment fault injection",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DOS1",
+      "sec": "22",
+      "item": "DoS / resource-exhaustion testing",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "W1",
+      "sec": "25",
+      "item": "Runtime watchdog for verified applications",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RC1",
+      "sec": "26",
+      "item": "Automatic recertification triggers",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "EP1",
+      "sec": "27",
+      "item": "Versioned Guardian security epochs",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "EP2",
+      "sec": "27",
+      "item": "Automated revalidation + restriction on failure",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RS1",
+      "sec": "28",
+      "item": "Versioned, reproducible rulesets",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SV1",
+      "sec": "30",
+      "item": "Deterministic severity model",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SV2",
+      "sec": "30",
+      "item": "Publicly recorded, expiring policy exceptions",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "FD1",
+      "sec": "31",
+      "item": "Finding format (id, rule, severity, repro, evidence, regression)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "FL1",
+      "sec": "32",
+      "item": "Fix -> retest loop with reproducible findings",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "BD1",
+      "sec": "33",
+      "item": "Certification bound to artifact hash, never to repo/name/owner",
+      "status": "DONE",
+      "evidence": "certify_binds_to_exact_hashes + certify_only_accepts_current_version tests"
+    },
+    {
+      "id": "C1",
+      "sec": "34",
+      "item": "App category policies (TOKEN/DEX/LENDING/...)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RK1",
+      "sec": "35",
+      "item": "Risk score used for scheduling only, never as proof",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AT3",
+      "sec": "36",
+      "item": "Signed runner attestation; multi-runner policy",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RP1",
+      "sec": "37",
+      "item": "Reproducible runner environment (tools, versions, seeds)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI1",
+      "sec": "38",
+      "item": "CI job: guardian-build-reproducibility",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI2",
+      "sec": "38",
+      "item": "CI job: guardian-static",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI3",
+      "sec": "38",
+      "item": "CI job: guardian-fuzz",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI4",
+      "sec": "38",
+      "item": "CI job: guardian-invariants",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI5",
+      "sec": "38",
+      "item": "CI job: guardian-mutation",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI6",
+      "sec": "38",
+      "item": "CI job: guardian-exploit-corpus",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI7",
+      "sec": "38",
+      "item": "CI job: guardian-cross-vm",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI8",
+      "sec": "38",
+      "item": "CI job: guardian-economic",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI9",
+      "sec": "38",
+      "item": "CI job: guardian-trust-gate",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI10",
+      "sec": "38",
+      "item": "CI job: guardian-manifest",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI11",
+      "sec": "38",
+      "item": "CI job: guardian-integration",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI12",
+      "sec": "38",
+      "item": "CI job: guardian-runtime-policy",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CI13",
+      "sec": "38",
+      "item": "CI job: guardian-regression",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "TM1",
+      "sec": "40",
+      "item": "EVM testing matrix (proxy, reentrancy, delegatecall, permit, ...)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "TM2",
+      "sec": "40",
+      "item": "SVM testing matrix (signer, PDA, CPI, account confusion, ...)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "TM3",
+      "sec": "40",
+      "item": "X3VM testing matrix (capabilities, syscalls, determinism, ...)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "EC1",
+      "sec": "5/41",
+      "item": "Exploit corpus entries with the required per-entry fields",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "EC2",
+      "sec": "41",
+      "item": "Historical exploit backtesting import path",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IM1",
+      "sec": "42",
+      "item": "Immune-system loop: exploit -> rule -> epoch -> revalidation",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN1",
+      "sec": "43",
+      "item": "Integrate with x3-kernel",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN2",
+      "sec": "43",
+      "item": "Integrate with pallet-atomic-trade-engine",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN3",
+      "sec": "43",
+      "item": "Integrate with pallet-x3-agent-law",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN4",
+      "sec": "43",
+      "item": "Integrate with pallet-swarm",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN5",
+      "sec": "43",
+      "item": "Integrate with pallet-x3-cross-vm-router",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN6",
+      "sec": "43",
+      "item": "Integrate with pallet-x3-supply-ledger",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN7",
+      "sec": "43",
+      "item": "Integrate with pallet-x3-asset-registry",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN8",
+      "sec": "43",
+      "item": "Integrate with pallet-x3-account-registry",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN9",
+      "sec": "43",
+      "item": "Integrate with pallet-x3-settlement-engine",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IN10",
+      "sec": "43",
+      "item": "Integrate with x3-asset-kernel-types / x3-ixl / x3-packet-standard",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AG1",
+      "sec": "44",
+      "item": "Agent Law can query Guardian status; refusal exposes reason",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "WA1",
+      "sec": "45",
+      "item": "Wallet shows verified/unverified/restricted + privilege map",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "EX1",
+      "sec": "46",
+      "item": "Explorer Guardian tab",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "IR1",
+      "sec": "47",
+      "item": "Incident states without deleting certification history",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "GV1",
+      "sec": "48",
+      "item": "Constrained emergency authority (audited, expiring)",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "FS1",
+      "sec": "49",
+      "item": "Fail-safe: unknown != verified; outage cannot elevate",
+      "status": "DONE",
+      "evidence": "CertificationTier::grants_privileges fails closed; unknown_application_is_rejected test"
+    },
+    {
+      "id": "IX1",
+      "sec": "50",
+      "item": "Indexes on id/address/hashes/owner/status/VM/standard",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP1",
+      "sec": "51",
+      "item": "API guardian_getApplication",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP2",
+      "sec": "51",
+      "item": "API guardian_getStatus",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP3",
+      "sec": "51",
+      "item": "API guardian_getManifest",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP4",
+      "sec": "51",
+      "item": "API guardian_getPrivilegeMap",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP5",
+      "sec": "51",
+      "item": "API guardian_getCertificationHistory",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP6",
+      "sec": "51",
+      "item": "API guardian_getFindings",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP7",
+      "sec": "51",
+      "item": "API guardian_getApplicableRules",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP8",
+      "sec": "51",
+      "item": "API guardian_getSecurityEpoch",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP9",
+      "sec": "51",
+      "item": "API guardian_getExploitCoverage",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "AP10",
+      "sec": "51",
+      "item": "API guardian_verifyArtifact / checkAddress / checkBytecode",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL1",
+      "sec": "52",
+      "item": "CLI x3 guardian submit",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL2",
+      "sec": "52",
+      "item": "CLI x3 guardian analyze",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL3",
+      "sec": "52",
+      "item": "CLI x3 guardian test",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL4",
+      "sec": "52",
+      "item": "CLI x3 guardian fuzz",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL5",
+      "sec": "52",
+      "item": "CLI x3 guardian verify",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL6",
+      "sec": "52",
+      "item": "CLI x3 guardian manifest",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL7",
+      "sec": "52",
+      "item": "CLI x3 guardian status",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL8",
+      "sec": "52",
+      "item": "CLI x3 guardian findings",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL9",
+      "sec": "52",
+      "item": "CLI x3 guardian reproduce",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL10",
+      "sec": "52",
+      "item": "CLI x3 guardian compare",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "CL11",
+      "sec": "52",
+      "item": "CLI x3 guardian exploit-test",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "LD1",
+      "sec": "53",
+      "item": "Local 'x3 guardian test .' matches official runner",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PF1",
+      "sec": "54",
+      "item": "Heavy analysis stays off-chain; block production unaffected",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DT1",
+      "sec": "55",
+      "item": "Retention of manifests, certifications, findings, revocations",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PV1",
+      "sec": "56",
+      "item": "No unnecessary developer identity data",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PH1",
+      "sec": "58",
+      "item": "Phase 1: registry, policy engine, manifest, CLI, basic EVM, trust analyzer, API",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PH2",
+      "sec": "58",
+      "item": "Phase 2: stateful fuzz, invariants, mutation, corpus, proxy monitoring, SVM",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PH3",
+      "sec": "58",
+      "item": "Phase 3: X3VM analysis, cross-VM, atomic settlement, economics",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PH4",
+      "sec": "58",
+      "item": "Phase 4: formal verification, attestations, epochs, revalidation",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PH5",
+      "sec": "58",
+      "item": "Phase 5: watchdog, privilege enforcement, wallet, explorer, incident",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PH6",
+      "sec": "58",
+      "item": "Phase 6: full exploit corpus, continuous ingestion, economic modeling",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SP1",
+      "sec": "59",
+      "item": "Certification cannot be forged",
+      "status": "DONE",
+      "evidence": "only_guardian_can_certify_or_restrict test (GuardianOrigin required)"
+    },
+    {
+      "id": "SP2",
+      "sec": "59",
+      "item": "Certification cannot transfer to different bytecode",
+      "status": "DONE",
+      "evidence": "certify_binds_to_exact_hashes test"
+    },
+    {
+      "id": "SP3",
+      "sec": "59",
+      "item": "Old certification cannot validate new code",
+      "status": "DONE",
+      "evidence": "certify_only_accepts_current_version + add_version_resets_to_under_review tests"
+    },
+    {
+      "id": "SP4",
+      "sec": "59",
+      "item": "Revoked applications cannot use Guardian-controlled privileges",
+      "status": "DONE",
+      "evidence": "restrict_removes_privileges_and_keeps_history + revoke_records_artifacts_and_blocks_recertification + revoked_bytecode_is_tracked_fleet_wide tests"
+    },
+    {
+      "id": "SP5",
+      "sec": "59",
+      "item": "Manifest hashes cannot be replaced without trace",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SP6",
+      "sec": "59",
+      "item": "Ruleset changes are versioned",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SP7",
+      "sec": "59",
+      "item": "Runner attestations are verified",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SP8",
+      "sec": "59",
+      "item": "Guardian failure cannot silently elevate permissions",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST1",
+      "sec": "60",
+      "item": "Adversarial: forged attestation",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST2",
+      "sec": "60",
+      "item": "Adversarial: replayed attestation",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST3",
+      "sec": "60",
+      "item": "Adversarial: old manifest reuse",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST4",
+      "sec": "60",
+      "item": "Adversarial: hash collision assumptions",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST5",
+      "sec": "60",
+      "item": "Adversarial: mismatched bytecode",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST6",
+      "sec": "60",
+      "item": "Adversarial: unauthorized verification",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST7",
+      "sec": "60",
+      "item": "Adversarial: revoked app privilege access",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST8",
+      "sec": "60",
+      "item": "Adversarial: downgrade attack",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST9",
+      "sec": "60",
+      "item": "Adversarial: ruleset rollback",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST10",
+      "sec": "60",
+      "item": "Adversarial: stale runner result",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST11",
+      "sec": "60",
+      "item": "Adversarial: fake compiler metadata",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST12",
+      "sec": "60",
+      "item": "Adversarial: dependency substitution",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST13",
+      "sec": "60",
+      "item": "Adversarial: proxy bait-and-switch",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "ST14",
+      "sec": "60",
+      "item": "Adversarial: TOCTOU mismatch",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RT1",
+      "sec": "61",
+      "item": "Red team: rug-pull developer",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RT2",
+      "sec": "61",
+      "item": "Red team: honeypot developer",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RT3",
+      "sec": "61",
+      "item": "Red team: proxy bait-and-switch attacker",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RT4",
+      "sec": "61",
+      "item": "Red team: oracle manipulator",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RT5",
+      "sec": "61",
+      "item": "Red team: cross-VM attacker",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RT6",
+      "sec": "61",
+      "item": "Red team: attestation forger",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "RT7",
+      "sec": "61",
+      "item": "Red team: governance attacker",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC1",
+      "sec": "62",
+      "item": "docs/guardian/README.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC2",
+      "sec": "62",
+      "item": "docs/guardian/architecture.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC3",
+      "sec": "62",
+      "item": "docs/guardian/security-model.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC4",
+      "sec": "62",
+      "item": "docs/guardian/trust-model.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC5",
+      "sec": "62",
+      "item": "docs/guardian/certification.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC6",
+      "sec": "62",
+      "item": "docs/guardian/runtime-monitoring.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC7",
+      "sec": "62",
+      "item": "docs/guardian/exploit-corpus.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC8",
+      "sec": "62",
+      "item": "docs/guardian/security-epochs.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC9",
+      "sec": "62",
+      "item": "docs/guardian/application-developer-guide.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC10",
+      "sec": "62",
+      "item": "docs/guardian/operator-guide.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC11",
+      "sec": "62",
+      "item": "docs/guardian/incident-response.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DC12",
+      "sec": "62",
+      "item": "docs/guardian/threat-model.md",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "TH1",
+      "sec": "63",
+      "item": "Threat model covers all 14 named attacker classes",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG1",
+      "sec": "64",
+      "item": "Gate: reproducible builds work",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG2",
+      "sec": "64",
+      "item": "Gate: certification bound to exact bytecode",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG3",
+      "sec": "64",
+      "item": "Gate: certification forgery tests fail safely",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG4",
+      "sec": "64",
+      "item": "Gate: revocation works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG5",
+      "sec": "64",
+      "item": "Gate: proxy changes invalidate certification",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG6",
+      "sec": "64",
+      "item": "Gate: EVM pipeline works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG7",
+      "sec": "64",
+      "item": "Gate: SVM pipeline works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG8",
+      "sec": "64",
+      "item": "Gate: X3VM pipeline works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG9",
+      "sec": "64",
+      "item": "Gate: cross-VM testing works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG10",
+      "sec": "64",
+      "item": "Gate: atomicity testing works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG11",
+      "sec": "64",
+      "item": "Gate: exploit corpus executes",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG12",
+      "sec": "64",
+      "item": "Gate: mutation tests work",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG13",
+      "sec": "64",
+      "item": "Gate: trust/anti-rug checks work",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG14",
+      "sec": "64",
+      "item": "Gate: runtime monitoring works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG15",
+      "sec": "64",
+      "item": "Gate: manifest registration works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG16",
+      "sec": "64",
+      "item": "Gate: APIs work",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG17",
+      "sec": "64",
+      "item": "Gate: permission enforcement works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG18",
+      "sec": "64",
+      "item": "Gate: incident state works",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG19",
+      "sec": "64",
+      "item": "Gate: documentation exists",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PG20",
+      "sec": "64",
+      "item": "Gate: CI green and adversarial tests pass",
+      "status": "TODO",
+      "evidence": ""
+    }
+  ]
+}
