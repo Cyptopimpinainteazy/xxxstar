@@ -1604,5 +1604,124 @@ class RoutingIntelligenceTests(unittest.TestCase):
             server.server_close()
 
 
+class ContextIntegrationTests(unittest.TestCase):
+    """§7: the router reaches the Forge context compiler, and says so when it cannot."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        # A stand-in for `tools/x3-forge/context.py`. This tests the router's
+        # integration — argument passing, timeouts, exit codes, malformed
+        # output — not the compiler, which has its own suite and is verified
+        # live against the real index.
+        self.config = {
+            "daily_budget_usd": 1, "agent_daily_budget_usd": 1, "max_input_tokens": 1000,
+            "max_request_bytes": 100000, "routes": {"routine": ["up"], "critical": ["up"]},
+            "providers": {"up": {"base_url": "http://127.0.0.1:1/v1", "model": "up",
+                                 "supports_tools": True}},
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def compiler_returning(self, payload, exit_code=0, stderr=""):
+        script = ("import json,sys;"
+                  f"sys.stdout.write(json.dumps({payload!r}));"
+                  f"sys.stderr.write({stderr!r});"
+                  f"sys.exit({exit_code})")
+        self.config["context_compiler"] = {"command": ["python3", "-c", script]}
+        return self.config["context_compiler"]
+
+    def test_a_compiled_package_comes_back_through_the_router(self):
+        self.compiler_returning({"included": [{"path": "src/lib.rs"}], "terms": ["settlement"]})
+        package, error = self.router.compile_context("where is settlement enforced")
+        self.assertIsNone(error)
+        self.assertEqual(package["included"][0]["path"], "src/lib.rs")
+
+    def test_an_unconfigured_compiler_says_so_rather_than_pretending(self):
+        package, error = self.router.compile_context("anything")
+        self.assertIsNone(package)
+        self.assertIn("no context compiler", error)
+
+    def test_a_failing_compiler_reports_its_exit_code_and_last_error_line(self):
+        self.compiler_returning({"never": "printed"}, exit_code=3, stderr="index missing: run index.py build")
+        package, error = self.router.compile_context("anything")
+        self.assertIsNone(package)
+        self.assertIn("exited 3", error)
+        self.assertIn("index.py build", error)
+
+    def test_output_that_is_not_json_is_rejected(self):
+        self.config["context_compiler"] = {"command": ["python3", "-c", "print('not json')"]}
+        package, error = self.router.compile_context("anything")
+        self.assertIsNone(package)
+        self.assertIn("did not return JSON", error)
+
+    def test_a_missing_command_is_an_error_not_a_hang(self):
+        self.config["context_compiler"] = {"command": ["/nonexistent/context-compiler"]}
+        package, error = self.router.compile_context("anything")
+        self.assertIsNone(package)
+        self.assertIn("could not run", error)
+
+    def test_a_slow_compiler_times_out_rather_than_blocking_the_router(self):
+        self.config["context_compiler"] = {"command": ["python3", "-c", "import time; time.sleep(30)"],
+                                           "timeout_seconds": 0.5}
+        package, error = self.router.compile_context("anything")
+        self.assertIsNone(package)
+        self.assertIn("timed out", error)
+
+    def test_the_query_is_the_classified_task_text_not_the_system_prompt(self):
+        captured = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
+        self.addCleanup(os.unlink, captured.name)
+        script = ("import sys;"
+                  f"open({captured.name!r},'w').write(sys.argv[-1]);"
+                  "print('{}')")
+        self.config["context_compiler"] = {"command": ["python3", "-c", script]}
+        chat = {"messages": [
+            {"role": "system", "content": "You are a coding agent. Think about settlement."},
+            {"role": "user", "content": "where is the refund enforced"}]}
+        self.router.compile_context(router_module.task_text(chat))
+        with open(captured.name, encoding="utf-8") as handle:
+            sent = handle.read()
+        self.assertIn("refund", sent)
+        self.assertNotIn("coding agent", sent)
+
+    def test_the_endpoint_serves_a_package_and_refuses_an_empty_query(self):
+        self.compiler_returning({"included": []})
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}/v1/context"
+            request = urllib.request.Request(url + "?q=atomic%20settlement")
+            with urllib.request.urlopen(request) as response:
+                body = json.load(response)
+            self.assertIn("package", body)
+            self.assertIn("elapsed_ms", body)
+
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                urllib.request.urlopen(url)
+            self.assertEqual(rejected.exception.code, 400)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_the_endpoint_reports_an_unavailable_compiler_as_502(self):
+        # No compiler configured at all.
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/context?q=x")
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                urllib.request.urlopen(request)
+            self.assertEqual(rejected.exception.code, 502)
+            body = json.loads(rejected.exception.read())
+            self.assertEqual(body["error"]["type"], "context_unavailable")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

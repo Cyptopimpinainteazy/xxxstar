@@ -8,11 +8,13 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import sys
 import threading
 import time
 import uuid
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -1347,6 +1349,55 @@ class Router:
         except (TypeError, ValueError):
             return 1
 
+    def compile_context(self, query, budget=None, max_files=None):
+        """Ask the Forge context compiler what a task needs to read (§7).
+
+        The compiler is `tools/x3-forge/context.py`, run as a subprocess rather
+        than reimplemented here: it already carries the provenance that makes a
+        selection checkable, and a second copy would drift from it. The router's
+        job is to make it reachable from the same place routing decisions are
+        made, with the task text the classifier already extracted.
+
+        Returns `(package, None)` or `(None, reason)`.
+        """
+        spec = self.config.get("context_compiler")
+        if not spec:
+            return None, "no context compiler is configured"
+        command = list(spec.get("command") or [])
+        if not command:
+            return None, "context compiler command is empty"
+        if budget is not None:
+            command += ["--budget", str(int(budget))]
+        if max_files is not None:
+            command += ["--max-files", str(int(max_files))]
+        command.append(query)
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=spec.get("cwd") or None,
+                capture_output=True,
+                text=True,
+                timeout=float(spec.get("timeout_seconds", 60)),
+            )
+        except subprocess.TimeoutExpired:
+            return None, "context compiler timed out"
+        except (OSError, ValueError) as exc:
+            return None, "context compiler could not run: " + type(exc).__name__
+        if completed.returncode != 0:
+            detail = (completed.stderr or "").strip().splitlines()
+            hint = detail[-1] if detail else "no output"
+            return None, "context compiler exited " + str(completed.returncode) + ": " + hint[:200]
+        try:
+            return json.loads(completed.stdout), None
+        except ValueError:
+            return None, "context compiler did not return JSON"
+
+    def compile_context_once(self, query, budget=None, max_files=None):
+        """As above, and returns the wall-clock milliseconds it took."""
+        started = time.monotonic()
+        package, error = self.compile_context(query, budget, max_files)
+        return package, error, self.elapsed_ms(started)
+
     def retry_delay(self, provider, index):
         """Exponential backoff, capped. Retry-After still wins where sent."""
         try:
@@ -1702,6 +1753,23 @@ def handler_for(router):
                 return self.reply(404, {"error": {"message": "No such model"}})
             if self.path == "/v1/registry":
                 return self.reply(200, {"registry": router.provider_registry()})
+            context_path, _, context_query = self.path.partition("?")
+            if context_path == "/v1/context":
+                # Same intent as /v1/explain, for the other half of the
+                # question: what should the model read?
+                query = ""
+                for pair in context_query.split("&"):
+                    key, _, value = pair.partition("=")
+                    if key == "q":
+                        query = urllib.parse.unquote_plus(value)
+                if not query:
+                    return self.reply(400, {"error": {"message": "Expected ?q=<task>",
+                                                      "type": "missing_query"}})
+                package, error, elapsed = router.compile_context_once(query)
+                if error:
+                    return self.reply(502, {"error": {"message": error,
+                                                      "type": "context_unavailable"}})
+                return self.reply(200, {"package": package, "elapsed_ms": round(elapsed, 1)})
             if self.path == "/v1/providers":
                 return self.reply(200, {"providers": router.provider_health()})
             capabilities, _, query = self.path.partition("?")
@@ -1826,12 +1894,21 @@ def handler_for(router):
                                                       "type": "unsupported_feature"}})
                 except (ValueError, TypeError, KeyError):
                     return self.reply(400, {"error": "Invalid request"})
+                # `context: true` also answers the §7 half of the question.
+                # Opt-in, because compiling a package is a subprocess reading a
+                # large index and nobody should pay for it by accident.
+                context = None
+                if data.get("context") is True:
+                    package, error, elapsed = router.compile_context_once(task_text(chat))
+                    context = {"error": error, "elapsed_ms": round(elapsed, 1)} if error else \
+                              {"package": package, "elapsed_ms": round(elapsed, 1)}
                 return self.reply(200, {
                     "policy": logical,
                     "tier": tier,
                     "provider_order": router.attempt_order(chain),
                     "classification": classification,
                     "disabled_tools": disabled,
+                    "context": context,
                 })
             if any(self.path == path or self.path.startswith(path + "/") for path in UNSUPPORTED_PATHS):
                 return self.reply(501, {"error": {"message": self.path + " is not implemented: this router speaks the Chat Completions API at /v1/chat/completions"}})

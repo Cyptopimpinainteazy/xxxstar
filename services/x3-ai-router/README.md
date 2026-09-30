@@ -100,6 +100,35 @@ identical answer, so a retry only spends money. On a stream, a retry is legal
 only **before the first byte reaches the client** — after that the client
 already has half an answer and gets a failure event instead.
 
+### Context compiler integration (§7)
+
+The router reaches the Forge context compiler, which answers the other half of
+a task's question: not which model, but what it should read.
+
+```bash
+curl -s "http://127.0.0.1:11435/v1/context?q=where+is+atomic+settlement+enforced"
+curl -s -X POST http://127.0.0.1:11435/v1/explain -H 'Content-Type: application/json' \
+  -d '{"context":true,"messages":[{"role":"user","content":"fix the refund race"}]}'
+```
+
+```json
+{"policy":"x3-security","tier":"critical","classification":{"task_class":"CROSS_CHAIN"},
+ "context":{"elapsed_ms":13517.4,"package":{"index_commit":"893261786e1c…",
+   "included":[{"path":"crates/x3-atomic-swap/src/cairo_vm_htlc.rs","sha256":"…",
+                "estimated_tokens":4125}]}}}
+```
+
+The package is the compiler's own, provenance included, so a selection can be
+checked rather than trusted. The router supplies the query — the same task text
+the classifier scores, with system and developer messages excluded — and does
+not reimplement any of the selection.
+
+`context: true` is opt-in on `/v1/explain` because compiling is a subprocess
+reading a large index: ~13s for a narrow query, ~31s for a broad one. It never
+runs on the routing path. `budget` and `max_files` pass through to the
+compiler. An unconfigured, failing, slow or non-JSON compiler is reported as
+`502 context_unavailable` naming the reason — never as an empty package.
+
 A reservation is an upper bound on one call, so the request must not be able to spend more than the reservation covers. Two shapes used to get through:
 
 - **A second output parameter.** The estimate read `max_tokens` and fell back to 4096, so a request that set `max_completion_tokens` instead — which is what GPT-5 on the direct provider requires — was reserved at the default and billed for whatever it asked. Both parameters are now validated against `max_output_tokens`, and the estimate uses whichever one the client set.

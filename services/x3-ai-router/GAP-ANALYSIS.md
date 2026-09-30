@@ -95,15 +95,31 @@ Implemented, tested and live-verified in the commit that follows this file:
 | no measured model profile | `GET /v1/registry` with attempts, failure rate, retry rate, average latency, cost and verified-patch rate |
 | no retries at all | §50 bounded retries on retryable statuses and transport errors, with backoff, never after the first streamed byte |
 | no way to ask why | `GET`/`POST /v1/explain` returns the decision without calling a provider |
+| no context compiler integration | `POST /v1/context` and `explain {"context": true}` reach `tools/x3-forge/context.py` and return its provenance-carrying package |
 
 Verified live: a consensus request resolves to `x3-security` / critical with
 blast radius `[consensus, finality, settlement]`; a README request resolves to
-`x3-fast` / routine; Codex still reads a local file end to end; the registry
-reports real measurements (`deepseek-flash`, 2 attempts, 0% failures, 1160.7ms
-average).
+`x3-fast` / routine; a cross-chain request returns a 5-file context package
+compiled from the real index at commit `89326178`; Codex still reads a local
+file end to end; the registry reports real measurements (`deepseek-flash`, 2
+attempts, 0% failures, 1160.7ms average).
 
-Still missing from §56, unchanged by this increment: **context compiler
-integration** (§7) and **failure memory integration** (§17). Both need data
-sources that do not exist yet — there is no repository graph and no failure
-store — so building them now would mean building the shell of a feature and
-calling it done. They are the next increment.
+§6 and §7 were not built here. They already exist as `tools/x3-forge/index.py`
+(a provenance-carrying repository index) and `tools/x3-forge/context.py` (the
+context compiler, with its own suite). This increment wires them to the router
+rather than writing a second, divergent copy — which is what §7 integration
+means once the canonical implementation is already in the tree.
+
+Still missing from §56: **failure memory integration** (§17). There is no
+failure store to integrate with yet: the router sees task outcomes (checks
+passed or failed) but not the failing evidence, and inventing a store inside
+the router would put it in the wrong layer. It is the next increment, and it
+needs a decision about where failure records live.
+
+### Known cost, stated rather than hidden
+
+Compiling a context package takes ~13s for a narrow query and ~31s for a broad
+one, because the compiler reads an 79MB index. It is an explicit call and never
+on the routing path, and `--budget`/`--max-files` pass through. If it becomes
+hot, the fix belongs in the index (a sharded or pre-digested form), not in the
+router.

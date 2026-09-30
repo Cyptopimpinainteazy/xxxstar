@@ -8,26 +8,8 @@
   "reservation_ttl_seconds": 900,
   "provider_cooldown_seconds": 60,
   "provider_cooldown_max_seconds": 3600,
-  "retry_attempts": 1,
-  "retry_backoff_ms": 250,
-  "retry_backoff_max_ms": 2000,
-  "context_compiler": {
-    "command": ["python3", "tools/x3-forge/context.py", "--json"],
-    "cwd": "/home/lojak/Desktop/xxxstar-main",
-    "timeout_seconds": 90
-  },
-  "policies": {
-    "x3-auto": {"tier": "auto", "order": ["deepseek", "openrouter", "ollama", "nemotron_lightning_free", "direct"]},
-    "x3-fast": {"tier": "routine", "order": ["ollama", "deepseek", "openrouter"]},
-    "x3-code": {"tier": "routine", "order": ["deepseek", "openrouter", "ollama"]},
-    "x3-deep": {"tier": "routine", "order": ["deepseek", "openrouter", "direct"]},
-    "x3-security": {"tier": "critical", "order": ["deepseek", "direct"]},
-    "x3-review": {"tier": "routine", "order": ["deepseek", "openrouter"]},
-    "x3-local": {"tier": "routine", "order": ["ollama"]}
-  },
   "routes": {
     "routine": [
-      "deepseek",
       "openrouter",
       "ollama",
       "nemotron_lightning_free",
@@ -35,7 +17,6 @@
       "direct"
     ],
     "critical": [
-      "deepseek",
       "direct",
       "openrouter"
     ]
@@ -49,10 +30,7 @@
     "ollama": {
       "base_url": "http://127.0.0.1:11434/v1",
       "model": "qwen2.5-coder:7b",
-      "supports_tools": false,
-      "tool_probe": true,
-      "critical_allowed": true,
-      "probe_samples": 2
+      "critical_allowed": false
     },
     "nemotron_lightning_free": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -60,11 +38,8 @@
       "api_key_env": "OPENROUTER_API_KEY",
       "enabled_env": "X3_ENABLE_FREE_CLOUD",
       "free_model": true,
-      "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
-      "critical_allowed": false,
-      "tool_probe": true,
-      "probe_samples": 6
+      "critical_allowed": false
     },
     "nemotron_ultra_free": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -72,11 +47,8 @@
       "api_key_env": "OPENROUTER_API_KEY",
       "enabled_env": "X3_ENABLE_FREE_CLOUD",
       "free_model": true,
-      "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
-      "critical_allowed": false,
-      "tool_probe": true,
-      "probe_samples": 6
+      "critical_allowed": false
     },
     "openrouter": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -84,7 +56,6 @@
       "api_key_env": "OPENROUTER_API_KEY",
       "input_usd_per_million": 0.4,
       "output_usd_per_million": 1.6,
-      "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
       "critical_allowed": true
     },
@@ -94,30 +65,9 @@
       "api_key_env": "OPENAI_API_KEY",
       "input_usd_per_million": 1.25,
       "output_usd_per_million": 10,
-      "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
       "output_token_parameter": "max_completion_tokens",
       "critical_allowed": true
-    },
-    "deepseek": {
-      "base_url": "https://api.deepseek.com",
-      "model": "deepseek-flash",
-      "api_key_env": "DEEPSEEK_API_KEY",
-      "input_usd_per_million": 0.3,
-      "output_usd_per_million": 1.2,
-      "pricing_checked_on": "2026-09-30",
-      "supports_tools": true,
-      "reasoning_effort": true,
-      "tool_probe": true,
-      "thinking": {
-        "parameter": "thinking",
-        "disabled_value": {
-          "type": "disabled"
-        },
-        "disable_when_tool_choice_forced": true
-      },
-      "critical_allowed": true
     }
-  },
-  "capability_probe_samples": 3
+  }
 }
