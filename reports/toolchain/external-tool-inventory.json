@@ -1,0 +1,5570 @@
+{
+  "counts": {
+    "AVAILABLE": 0,
+    "CONFIGURED": 0,
+    "GATED": 45,
+    "INSTALLED_ONLY": 3,
+    "MISSING": 6,
+    "REFERENCE_ONLY": 4,
+    "WIRED": 8
+  },
+  "root": "/home/lojak/Desktop/xxxstar-main",
+  "tools": [
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 8724,
+          "strength": "dependency",
+          "term": "libfuzzer"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 143,
+          "strength": "dependency",
+          "term": "cargo fuzz"
+        },
+        {
+          "file": "scripts/test-all-advanced.sh",
+          "line": 141,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "scripts/run-substrate-tools.sh",
+          "line": 135,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 83,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "scripts/install-testing-tools.sh",
+          "line": 27,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "scripts/generate-fuzz-harnesses.sh",
+          "line": 53,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 76,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "tools/run-x3-tools.sh",
+          "line": 48,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 10,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 19,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 18,
+          "strength": "script",
+          "term": "cargo-fuzz"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "fuzzing",
+      "fuzz_crates_present": true,
+      "gate_files": [
+        "scripts/generate-fuzz-harnesses.sh",
+        "scripts/install-testing-tools.sh",
+        "scripts/run-all-tests.sh",
+        "scripts/run-substrate-tools.sh",
+        "scripts/test-all-advanced.sh",
+        "tools/run-x3-tools.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.cargo/bin/cargo-fuzz",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "cargo-fuzz",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "prompts/X3_ENDGAME_MASTER_PROMPT.md",
+          "line": 1481,
+          "strength": "prose",
+          "term": "afl++"
+        }
+      ],
+      "evidence_strengths": [
+        "prose"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "fuzzing",
+      "fuzz_crates_present": true,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": true,
+      "repeatable": "not_determinable",
+      "status": "REFERENCE_ONLY",
+      "tool": "afl++",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "services/x3-ai-router/router.py",
+          "line": 99,
+          "strength": "source",
+          "term": "honggfuzz"
+        },
+        {
+          "file": "x3-ai-command-system/knowledge-core/SVM_RULES.md",
+          "line": 139,
+          "strength": "prose",
+          "term": "honggfuzz"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "fuzzing",
+      "fuzz_crates_present": true,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "WIRED",
+      "tool": "honggfuzz",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 3008,
+          "strength": "dependency",
+          "term": "proptest"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 336,
+          "strength": "dependency",
+          "term": "proptest"
+        },
+        {
+          "file": "scripts/test-all-advanced.sh",
+          "line": 115,
+          "strength": "script",
+          "term": "proptest"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 65,
+          "strength": "script",
+          "term": "proptest"
+        },
+        {
+          "file": "tools/run-x3-tools.sh",
+          "line": 65,
+          "strength": "script",
+          "term": "proptest"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 22,
+          "strength": "script",
+          "term": "proptest"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 17,
+          "strength": "script",
+          "term": "proptest"
+        },
+        {
+          "file": "tools/launchops/src/risk_rules.rs",
+          "line": 8,
+          "strength": "script",
+          "term": "proptest"
+        },
+        {
+          "file": "tools/launchops/src/test_weaken.rs",
+          "line": 10,
+          "strength": "script",
+          "term": "proptest"
+        },
+        {
+          "file": "launch-gates/build-audit-packs.sh",
+          "line": 95,
+          "strength": "infrastructure",
+          "term": "proptest"
+        },
+        {
+          "file": "launch-gates/repomix-mainnet-pack.sh",
+          "line": 51,
+          "strength": "infrastructure",
+          "term": "proptest"
+        },
+        {
+          "file": "proof-forge/src/runners/mod.rs",
+          "line": 1080,
+          "strength": "source",
+          "term": "proptest"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "infrastructure",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "property",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/run-all-tests.sh",
+        "scripts/test-all-advanced.sh",
+        "tools/launchops/src/risk_rules.rs",
+        "tools/launchops/src/test_weaken.rs",
+        "tools/run-x3-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "Cargo.lock",
+      "kind": "crate",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "proptest",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": false,
+      "config_files": [],
+      "configured": false,
+      "evidence": [],
+      "evidence_strengths": [],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "property",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "MISSING",
+      "tool": "proptest-state-machine",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/x3-verification-harness.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "miri"
+        },
+        {
+          "file": "scripts/test-all-advanced.sh",
+          "line": 231,
+          "strength": "script",
+          "term": "miri"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 158,
+          "strength": "script",
+          "term": "miri"
+        },
+        {
+          "file": "scripts/install-testing-tools.sh",
+          "line": 46,
+          "strength": "script",
+          "term": "miri"
+        },
+        {
+          "file": "pallets/x3-atomic-kernel/tests/miri_tests.rs",
+          "line": 1,
+          "strength": "source",
+          "term": "miri"
+        },
+        {
+          "file": "patches/rustix/build.rs",
+          "line": 58,
+          "strength": "source",
+          "term": "miri"
+        },
+        {
+          "file": "patches/ahash/tests/bench.rs",
+          "line": 15,
+          "strength": "source",
+          "term": "miri"
+        },
+        {
+          "file": "patches/ahash/src/lib.rs",
+          "line": 110,
+          "strength": "source",
+          "term": "miri"
+        },
+        {
+          "file": "patches/ahash/src/random_state.rs",
+          "line": 4,
+          "strength": "source",
+          "term": "miri"
+        },
+        {
+          "file": "patches/ahash/src/hash_quality_test.rs",
+          "line": 443,
+          "strength": "source",
+          "term": "miri"
+        },
+        {
+          "file": "patches/ahash/src/operations.rs",
+          "line": 10,
+          "strength": "source",
+          "term": "miri"
+        },
+        {
+          "file": "patches/uuid/src/timestamp.rs",
+          "line": 366,
+          "strength": "source",
+          "term": "miri"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "correctness",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/install-testing-tools.sh",
+        "scripts/run-all-tests.sh",
+        "scripts/test-all-advanced.sh",
+        "scripts/x3-verification-harness.sh"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.cargo/bin/cargo-miri",
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "miri",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 5072,
+          "strength": "dependency",
+          "term": "loom"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 31,
+          "strength": "dependency",
+          "term": "loom"
+        },
+        {
+          "file": "Makefile",
+          "line": 5,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "scripts/x3-verification-harness.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "scripts/test-all-advanced.sh",
+          "line": 190,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 14,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 140,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "scripts/run-loom-tests.sh",
+          "line": 2,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 80,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 21,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 36,
+          "strength": "script",
+          "term": "loom"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 21,
+          "strength": "script",
+          "term": "loom"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "concurrency",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "Makefile",
+        "scripts/local-ci.sh",
+        "scripts/run-all-tests.sh",
+        "scripts/run-loom-tests.sh",
+        "scripts/test-all-advanced.sh",
+        "scripts/x3-verification-harness.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "Cargo.lock",
+      "kind": "crate",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "loom",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/x3-verification-harness.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "shuttle"
+        },
+        {
+          "file": "scripts/test-all-advanced.sh",
+          "line": 211,
+          "strength": "script",
+          "term": "shuttle"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 80,
+          "strength": "script",
+          "term": "shuttle"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 22,
+          "strength": "script",
+          "term": "shuttle"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 37,
+          "strength": "script",
+          "term": "shuttle"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 22,
+          "strength": "script",
+          "term": "shuttle"
+        },
+        {
+          "file": "crates/x3-gateway/tests/shuttle_validator_async.rs",
+          "line": 1,
+          "strength": "source",
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/report-source.json",
+          "line": 6130,
+          "strength": "prose",
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/source.md",
+          "line": 2918,
+          "strength": "prose",
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/component-map.json",
+          "line": 4774,
+          "strength": "prose",
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/api-inventory.txt",
+          "line": 19,
+          "strength": "prose",
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "line": 9771,
+          "strength": "prose",
+          "term": "shuttle"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "concurrency",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/test-all-advanced.sh",
+        "scripts/x3-verification-harness.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "shuttle",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/x3-verification-harness.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "kani"
+        },
+        {
+          "file": "scripts/test-all-advanced.sh",
+          "line": 164,
+          "strength": "script",
+          "term": "kani"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 116,
+          "strength": "script",
+          "term": "kani"
+        },
+        {
+          "file": "scripts/install-testing-tools.sh",
+          "line": 36,
+          "strength": "script",
+          "term": "kani"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 81,
+          "strength": "script",
+          "term": "kani"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 16,
+          "strength": "script",
+          "term": "kani"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 35,
+          "strength": "script",
+          "term": "kani"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 23,
+          "strength": "script",
+          "term": "kani"
+        },
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/3051-ed2112c555b50abd.js",
+          "line": 1,
+          "strength": "source",
+          "term": "kani"
+        },
+        {
+          "file": "crates/x3-fees/src/kani_proofs.rs",
+          "line": 1,
+          "strength": "source",
+          "term": "kani"
+        },
+        {
+          "file": "docs/X3_PROOF_LEDGER.md",
+          "line": 15,
+          "strength": "prose",
+          "term": "kani"
+        },
+        {
+          "file": "launch-gates/EXTERNAL_VALIDATION_REQUIREMENTS.md",
+          "line": 401,
+          "strength": "prose",
+          "term": "kani"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "formal",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/install-testing-tools.sh",
+        "scripts/run-all-tests.sh",
+        "scripts/test-all-advanced.sh",
+        "scripts/x3-verification-harness.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.cargo/bin/kani",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "kani",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/x3-verification-harness.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "scripts/test-all-advanced.sh",
+          "line": 285,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 198,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "scripts/install-testing-tools.sh",
+          "line": 52,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 44,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "tools/run-x3-tools.sh",
+          "line": 72,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 9,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 17,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 15,
+          "strength": "script",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "mutants.out.old/mutants.json",
+          "line": 3,
+          "strength": "prose",
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "docs/X3_PROOF_LEDGER.md",
+          "line": 13,
+          "strength": "prose",
+          "term": "cargo mutants"
+        },
+        {
+          "file": "prompts/X3_ENDGAME_MASTER_PROMPT.md",
+          "line": 1526,
+          "strength": "prose",
+          "term": "cargo-mutants"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "mutation",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/install-testing-tools.sh",
+        "scripts/run-all-tests.sh",
+        "scripts/test-all-advanced.sh",
+        "scripts/x3-verification-harness.sh",
+        "tools/run-x3-tools.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.cargo/bin/cargo-mutants",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "cargo-mutants",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/zombienet-integration.yml",
+          "line": 2,
+          "strength": "workflow",
+          "term": "zombienet"
+        },
+        {
+          "file": "scripts/test-tools.sh",
+          "line": 7,
+          "strength": "script",
+          "term": "zombienet"
+        },
+        {
+          "file": "scripts/run-substrate-tools.sh",
+          "line": 9,
+          "strength": "script",
+          "term": "zombienet"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 238,
+          "strength": "script",
+          "term": "zombienet"
+        },
+        {
+          "file": "scripts/run-substrate-tests.sh",
+          "line": 10,
+          "strength": "script",
+          "term": "zombienet"
+        },
+        {
+          "file": "scripts/run-zombienet.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "zombienet"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 52,
+          "strength": "script",
+          "term": "zombienet"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 79,
+          "strength": "script",
+          "term": "zombienet"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 41,
+          "strength": "script",
+          "term": "zombienet"
+        },
+        {
+          "file": "launch-gates/run-substrate-proof-pack.sh",
+          "line": 142,
+          "strength": "infrastructure",
+          "term": "zombienet"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/author_report.py",
+          "line": 89,
+          "strength": "source",
+          "term": "zombienet"
+        },
+        {
+          "file": "CURRENT_MAINNET_STATUS.md",
+          "line": 65,
+          "strength": "prose",
+          "term": "zombienet"
+        }
+      ],
+      "evidence_strengths": [
+        "infrastructure",
+        "prose",
+        "script",
+        "source",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "multi-validator",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/zombienet-integration.yml",
+        "scripts/run-all-tests.sh",
+        "scripts/run-substrate-tests.sh",
+        "scripts/run-substrate-tools.sh",
+        "scripts/run-zombienet.sh",
+        "scripts/test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.nvm/versions/node/v22.23.2/bin/zombienet",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "zombienet",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/run-chopsticks.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "chopsticks"
+        },
+        {
+          "file": "scripts/test-tools.sh",
+          "line": 8,
+          "strength": "script",
+          "term": "chopsticks"
+        },
+        {
+          "file": "scripts/run-substrate-tools.sh",
+          "line": 10,
+          "strength": "script",
+          "term": "chopsticks"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 244,
+          "strength": "script",
+          "term": "chopsticks"
+        },
+        {
+          "file": "scripts/run-substrate-tests.sh",
+          "line": 11,
+          "strength": "script",
+          "term": "chopsticks"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 79,
+          "strength": "script",
+          "term": "chopsticks"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 42,
+          "strength": "script",
+          "term": "chopsticks"
+        },
+        {
+          "file": "launch-gates/run-substrate-proof-pack.sh",
+          "line": 148,
+          "strength": "infrastructure",
+          "term": "chopsticks"
+        },
+        {
+          "file": "node/src/command.rs",
+          "line": 386,
+          "strength": "source",
+          "term": "chopsticks"
+        },
+        {
+          "file": "chopsticks/x3-dev.yml",
+          "line": 4,
+          "strength": "prose",
+          "term": "chopsticks"
+        },
+        {
+          "file": "plans/COMPLETE_BLOCKCHAIN_AUDIT_REPORT.md",
+          "line": 335,
+          "strength": "prose",
+          "term": "chopsticks"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "line": 137,
+          "strength": "prose",
+          "term": "chopsticks"
+        }
+      ],
+      "evidence_strengths": [
+        "infrastructure",
+        "prose",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "runtime-testing",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/run-all-tests.sh",
+        "scripts/run-chopsticks.sh",
+        "scripts/run-substrate-tests.sh",
+        "scripts/run-substrate-tools.sh",
+        "scripts/test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.nvm/versions/node/v22.23.2/bin/chopsticks",
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "chopsticks",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 6086,
+          "strength": "dependency",
+          "term": "try-runtime"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 364,
+          "strength": "dependency",
+          "term": "try-runtime"
+        },
+        {
+          "file": ".github/workflows/try-runtime-upgrade.yml",
+          "line": 2,
+          "strength": "workflow",
+          "term": "try-runtime"
+        },
+        {
+          "file": ".github/workflows/release-candidate-rehearsal.yml",
+          "line": 35,
+          "strength": "workflow",
+          "term": "try-runtime"
+        },
+        {
+          "file": "scripts/check-runtime-variants.sh",
+          "line": 6,
+          "strength": "script",
+          "term": "try-runtime"
+        },
+        {
+          "file": "scripts/run-try-runtime.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "try-runtime"
+        },
+        {
+          "file": "scripts/mainnet_release_gate.py",
+          "line": 475,
+          "strength": "script",
+          "term": "try-runtime"
+        },
+        {
+          "file": "scripts/test-tools.sh",
+          "line": 6,
+          "strength": "script",
+          "term": "try-runtime"
+        },
+        {
+          "file": "scripts/run-substrate-tools.sh",
+          "line": 8,
+          "strength": "script",
+          "term": "try-runtime"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 250,
+          "strength": "script",
+          "term": "try-runtime"
+        },
+        {
+          "file": "scripts/run-substrate-tests.sh",
+          "line": 9,
+          "strength": "script",
+          "term": "try-runtime"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 171,
+          "strength": "script",
+          "term": "try-runtime"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "runtime-testing",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/release-candidate-rehearsal.yml",
+        ".github/workflows/try-runtime-upgrade.yml",
+        "scripts/check-runtime-variants.sh",
+        "scripts/mainnet_release_gate.py",
+        "scripts/run-all-tests.sh",
+        "scripts/run-substrate-tests.sh",
+        "scripts/run-substrate-tools.sh",
+        "scripts/run-try-runtime.sh",
+        "scripts/test-tools.sh",
+        "tools/setup-x3-test-tools.sh"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "try-runtime",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 3676,
+          "strength": "dependency",
+          "term": "frame-benchmarking"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 358,
+          "strength": "dependency",
+          "term": "frame-benchmarking"
+        },
+        {
+          "file": ".github/workflows/frame-benchmarking.yml",
+          "line": 2,
+          "strength": "workflow",
+          "term": "frame-benchmarking"
+        },
+        {
+          "file": "Makefile",
+          "line": 162,
+          "strength": "script",
+          "term": "benchmarking"
+        },
+        {
+          "file": "scripts/run-frame-benchmarks.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "benchmarking"
+        },
+        {
+          "file": "scripts/check-no-float-in-consensus.py",
+          "line": 39,
+          "strength": "script",
+          "term": "benchmarking"
+        },
+        {
+          "file": "scripts/run-benchmarks.sh",
+          "line": 56,
+          "strength": "script",
+          "term": "benchmarking"
+        },
+        {
+          "file": "scripts/test-tools.sh",
+          "line": 9,
+          "strength": "script",
+          "term": "benchmarking"
+        },
+        {
+          "file": "scripts/check-runtime-weights-wired.py",
+          "line": 45,
+          "strength": "script",
+          "term": "benchmarking"
+        },
+        {
+          "file": "scripts/benchmark_pallet_weights.sh",
+          "line": 6,
+          "strength": "script",
+          "term": "frame-benchmarking"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 259,
+          "strength": "script",
+          "term": "benchmarking"
+        },
+        {
+          "file": "scripts/run-substrate-tests.sh",
+          "line": 93,
+          "strength": "script",
+          "term": "benchmarking"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "runtime-testing",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/frame-benchmarking.yml",
+        "Makefile",
+        "scripts/benchmark_pallet_weights.sh",
+        "scripts/check-no-float-in-consensus.py",
+        "scripts/check-runtime-weights-wired.py",
+        "scripts/run-all-tests.sh",
+        "scripts/run-benchmarks.sh",
+        "scripts/run-frame-benchmarks.sh",
+        "scripts/run-substrate-tests.sh",
+        "scripts/test-tools.sh"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "Cargo.lock",
+      "kind": "crate",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "frame-benchmarking",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/production-gate.yml",
+          "line": 38,
+          "strength": "workflow",
+          "term": "srtool"
+        },
+        {
+          "file": "Makefile",
+          "line": 7,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 53,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/mainnet_release_gate.py",
+          "line": 9,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/test-tools.sh",
+          "line": 10,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/check-cargo-home-safety.py",
+          "line": 13,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/run-substrate-tools.sh",
+          "line": 12,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 253,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/run-substrate-tests.sh",
+          "line": 13,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/check-runtime-hash-freshness.py",
+          "line": 5,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/run-srtool.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "srtool"
+        },
+        {
+          "file": "scripts/update-runtime-hashes.sh",
+          "line": 14,
+          "strength": "script",
+          "term": "srtool"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "reproducibility",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/production-gate.yml",
+        "Makefile",
+        "scripts/check-cargo-home-safety.py",
+        "scripts/check-runtime-hash-freshness.py",
+        "scripts/local-ci.sh",
+        "scripts/mainnet_release_gate.py",
+        "scripts/run-all-tests.sh",
+        "scripts/run-srtool.sh",
+        "scripts/run-substrate-tests.sh",
+        "scripts/run-substrate-tools.sh",
+        "scripts/test-tools.sh",
+        "scripts/update-runtime-hashes.sh"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/srtool",
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "srtool",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 174,
+          "strength": "script",
+          "term": "subwasm"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 14,
+          "strength": "script",
+          "term": "subwasm"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 29,
+          "strength": "script",
+          "term": "subwasm"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 39,
+          "strength": "script",
+          "term": "subwasm"
+        },
+        {
+          "file": "launch-gates/run-substrate-proof-pack.sh",
+          "line": 136,
+          "strength": "infrastructure",
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "line": 7526,
+          "strength": "prose",
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "line": 7390,
+          "strength": "prose",
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "line": 7415,
+          "strength": "prose",
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T015707-933420ee/summary.json",
+          "line": 7415,
+          "strength": "prose",
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T193358-6c1c2848/summary.json",
+          "line": 7415,
+          "strength": "prose",
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T043039-2d3520fd/summary.json",
+          "line": 7415,
+          "strength": "prose",
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T195410-e7c263e5/summary.json",
+          "line": 7415,
+          "strength": "prose",
+          "term": "subwasm"
+        }
+      ],
+      "evidence_strengths": [
+        "infrastructure",
+        "prose",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "reproducibility",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "subwasm",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 26582,
+          "strength": "dependency",
+          "term": "foundry"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 6,
+          "strength": "dependency",
+          "term": "foundry"
+        },
+        {
+          "file": "package.json",
+          "line": 5,
+          "strength": "dependency",
+          "term": "foundry"
+        },
+        {
+          "file": ".github/workflows/proof-gates.yml",
+          "line": 1,
+          "strength": "workflow",
+          "term": "forge "
+        },
+        {
+          "file": ".github/workflows/production-gate.yml",
+          "line": 67,
+          "strength": "workflow",
+          "term": "foundry"
+        },
+        {
+          "file": ".github/workflows/testnet-deploy.yml",
+          "line": 6,
+          "strength": "workflow",
+          "term": "foundry"
+        },
+        {
+          "file": ".github/workflows/x3vm-evm-live-lifecycle.yml",
+          "line": 91,
+          "strength": "workflow",
+          "term": "foundry"
+        },
+        {
+          "file": ".github/workflows/formal-verification.yml",
+          "line": 130,
+          "strength": "workflow",
+          "term": "forge "
+        },
+        {
+          "file": ".github/workflows/x3-local-runner-smoke.yml",
+          "line": 33,
+          "strength": "workflow",
+          "term": "forge "
+        },
+        {
+          "file": ".github/workflows/economic-attack-tests.yml",
+          "line": 33,
+          "strength": "workflow",
+          "term": "forge "
+        },
+        {
+          "file": "Makefile",
+          "line": 3,
+          "strength": "script",
+          "term": "foundry"
+        },
+        {
+          "file": "scripts/mock-rpc-server.js",
+          "line": 58,
+          "strength": "script",
+          "term": "cast "
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/economic-attack-tests.yml",
+        ".github/workflows/formal-verification.yml",
+        ".github/workflows/production-gate.yml",
+        ".github/workflows/proof-gates.yml",
+        ".github/workflows/testnet-deploy.yml",
+        ".github/workflows/x3-local-runner-smoke.yml",
+        ".github/workflows/x3vm-evm-live-lifecycle.yml",
+        "Makefile",
+        "scripts/mock-rpc-server.js"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.foundry/bin/forge",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "foundry",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/x3vm-evm-live-lifecycle.yml",
+          "line": 3,
+          "strength": "workflow",
+          "term": "anvil"
+        },
+        {
+          "file": ".github/workflows/x3-local-runner-smoke.yml",
+          "line": 34,
+          "strength": "workflow",
+          "term": "anvil"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 10,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "scripts/demo-x3-crosschain.sh",
+          "line": 15,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "scripts/cross-domain-evm-gate.sh",
+          "line": 5,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "scripts/local-node-smoke.sh",
+          "line": 12,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "scripts/e2e-atomic-trade.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 131,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 32,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 49,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/docker-compose.testnet.yml",
+          "line": 5,
+          "strength": "script",
+          "term": "anvil"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/prometheus.yml",
+          "line": 24,
+          "strength": "script",
+          "term": "anvil"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/x3-local-runner-smoke.yml",
+        ".github/workflows/x3vm-evm-live-lifecycle.yml",
+        "scripts/cross-domain-evm-gate.sh",
+        "scripts/demo-x3-crosschain.sh",
+        "scripts/e2e-atomic-trade.sh",
+        "scripts/local-ci.sh",
+        "scripts/local-node-smoke.sh",
+        "tools/cross-chain-gpu-validator/docker-compose.testnet.yml",
+        "tools/cross-chain-gpu-validator/prometheus.yml",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.foundry/bin/anvil",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "anvil",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 98,
+          "strength": "script",
+          "term": "slither"
+        },
+        {
+          "file": "tools/run-x3-tools.sh",
+          "line": 58,
+          "strength": "script",
+          "term": "slither"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 31,
+          "strength": "script",
+          "term": "slither"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 21,
+          "strength": "script",
+          "term": "slither"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 51,
+          "strength": "script",
+          "term": "slither"
+        },
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/page-53c0fd5719a59933.js",
+          "line": 1,
+          "strength": "source",
+          "term": "slither"
+        },
+        {
+          "file": "docs/X3_PROOF_LEDGER.md",
+          "line": 18,
+          "strength": "prose",
+          "term": "slither"
+        },
+        {
+          "file": "docs/security.md",
+          "line": 401,
+          "strength": "prose",
+          "term": "slither"
+        },
+        {
+          "file": "tests_core/security/slither.config.json",
+          "line": 50,
+          "strength": "prose",
+          "term": "slither"
+        },
+        {
+          "file": "tests_core/invariants/registry.toml",
+          "line": 324,
+          "strength": "prose",
+          "term": "slither"
+        },
+        {
+          "file": "apps/x3-studio/docs/SECURITY_SCANNER.md",
+          "line": 24,
+          "strength": "prose",
+          "term": "slither"
+        },
+        {
+          "file": "X3-contracts/evm/lib/openzeppelin-contracts/package.json",
+          "line": 35,
+          "strength": "prose",
+          "term": "slither"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm-static",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "tools/run-x3-tools.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/slither",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "slither",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 106,
+          "strength": "script",
+          "term": "echidna"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 31,
+          "strength": "script",
+          "term": "echidna"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 52,
+          "strength": "script",
+          "term": "echidna"
+        },
+        {
+          "file": "docs/X3_PROOF_LEDGER.md",
+          "line": 17,
+          "strength": "prose",
+          "term": "echidna"
+        },
+        {
+          "file": "tests_core/security/echidna.config.yaml",
+          "line": 1,
+          "strength": "prose",
+          "term": "echidna"
+        },
+        {
+          "file": "tests_core/invariants/registry.toml",
+          "line": 347,
+          "strength": "prose",
+          "term": "echidna"
+        },
+        {
+          "file": "apps/x3-studio/docs/SECURITY_SCANNER.md",
+          "line": 25,
+          "strength": "prose",
+          "term": "echidna"
+        },
+        {
+          "file": "X3-contracts/evm/out/build-info/887e5b924e4faa92.json",
+          "line": 1,
+          "strength": "prose",
+          "term": "echidna"
+        },
+        {
+          "file": "X3-contracts/evm/out/build-info/0f5a6c53d1fabb22.json",
+          "line": 1,
+          "strength": "prose",
+          "term": "echidna"
+        },
+        {
+          "file": "X3-contracts/evm/out/EchidnaX3.sol/EchidnaHTLC.json",
+          "line": 1,
+          "strength": "prose",
+          "term": "echidna"
+        },
+        {
+          "file": "X3-contracts/evm/out/EchidnaX3.sol/EchidnaGateway.json",
+          "line": 1,
+          "strength": "prose",
+          "term": "echidna"
+        },
+        {
+          "file": "X3-contracts/evm/out/EchidnaX3.sol/EchidnaStakingPool.json",
+          "line": 1,
+          "strength": "prose",
+          "term": "echidna"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm-fuzz",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "echidna",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tests_core/security/medusa.config.json",
+          "line": 11,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "apps/x3-studio/docs/SECURITY_SCANNER.md",
+          "line": 25,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "tests_phase4/security/medusa.config.json",
+          "line": 11,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "line": 600,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "line": 26447,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "line": 11285,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/tests-inventory.txt",
+          "line": 425,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/verification/source-change-detected.json",
+          "line": 49,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/verification/implementation-verification.json",
+          "line": 109,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "line": 11235,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "line": 11260,
+          "strength": "prose",
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T015707-933420ee/summary.json",
+          "line": 11260,
+          "strength": "prose",
+          "term": "medusa"
+        }
+      ],
+      "evidence_strengths": [
+        "prose"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm-fuzz",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": true,
+      "repeatable": "not_determinable",
+      "status": "REFERENCE_ONLY",
+      "tool": "medusa",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "docs/runbooks/getting-started/100GUIDE.md",
+          "line": 31,
+          "strength": "prose",
+          "term": "halmos"
+        }
+      ],
+      "evidence_strengths": [
+        "prose"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm-symbolic",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/halmos",
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "INSTALLED_ONLY",
+      "tool": "halmos",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/page-53c0fd5719a59933.js",
+          "line": 1,
+          "strength": "source",
+          "term": "mythril"
+        },
+        {
+          "file": "docs/security.md",
+          "line": 416,
+          "strength": "prose",
+          "term": "mythril"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm-symbolic",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "WIRED",
+      "tool": "mythril",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/cross-chain-gpu-validator/src/resources/chains.json",
+          "line": 1263,
+          "strength": "script",
+          "term": "revm"
+        },
+        {
+          "file": "packages/blockchain-connector/src/chains/generated/index.ts",
+          "line": 3617,
+          "strength": "source",
+          "term": "revm"
+        },
+        {
+          "file": "launch-gates/sources/pack-01-wiring/pallets/x3-kernel-lib.rs",
+          "line": 29,
+          "strength": "source",
+          "term": "revm"
+        },
+        {
+          "file": "launch-gates/sources/pack-05-test-gap/pallets/x3-kernel-excerpt.rs",
+          "line": 29,
+          "strength": "source",
+          "term": "revm"
+        },
+        {
+          "file": "pallets/x3-kernel/src/adapters.rs",
+          "line": 481,
+          "strength": "source",
+          "term": "revm"
+        },
+        {
+          "file": "crates/evm-integration/tests/erc20_integration.rs",
+          "line": 4,
+          "strength": "source",
+          "term": "revm"
+        },
+        {
+          "file": "crates/evm-integration/src/lib.rs",
+          "line": 31,
+          "strength": "source",
+          "term": "revm"
+        },
+        {
+          "file": "crates/evm-integration/src/frontier.rs",
+          "line": 16,
+          "strength": "source",
+          "term": "revm"
+        },
+        {
+          "file": "packages/blockchain-connector/src/chains/generated/chains.json",
+          "line": 3610,
+          "strength": "prose",
+          "term": "revm"
+        },
+        {
+          "file": "infra-structure/validator/src/resources/chains.json",
+          "line": 1263,
+          "strength": "prose",
+          "term": "revm"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm-oracle",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "tools/cross-chain-gpu-validator/src/resources/chains.json"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "revm",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "packages/atomic-swap-sdk/src/htlc/bitcoin.ts",
+          "line": 100,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "packages/ts-sdk/tests/x3.test.ts",
+          "line": 180,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "packages/ts-sdk/src/x3.ts",
+          "line": 31,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "packages/polkawallet-plugin/src/services/settlement.ts",
+          "line": 38,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "packages/polkawallet-plugin/src/types/interfaces.ts",
+          "line": 101,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "packages/blockchain-connector/src/connector/alerter.ts",
+          "line": 7,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "packages/blockchain-connector/src/chains/generated/index.ts",
+          "line": 41714,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "infra-structure/validator/src/cross_chain_gpu_validator/consensus/node_manager.py",
+          "line": 3,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "runtime/src/lib.rs",
+          "line": 2803,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "launch-gates/sources/pack-01-wiring/pallets/x3-settlement-engine-lib.rs",
+          "line": 553,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/1902-03bdeb73ff4af437.js",
+          "line": 1,
+          "strength": "source",
+          "term": "reth"
+        },
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/clerk.browser.js",
+          "line": 2,
+          "strength": "source",
+          "term": "reth"
+        }
+      ],
+      "evidence_strengths": [
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "evm-reference",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "WIRED",
+      "tool": "reth",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 23,
+          "strength": "script",
+          "term": "litesvm"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 38,
+          "strength": "script",
+          "term": "litesvm"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 59,
+          "strength": "script",
+          "term": "litesvm"
+        }
+      ],
+      "evidence_strengths": [
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "svm",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "litesvm",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": false,
+      "config_files": [],
+      "configured": false,
+      "evidence": [],
+      "evidence_strengths": [],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "svm",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "MISSING",
+      "tool": "mollusk",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/3051-ed2112c555b50abd.js",
+          "line": 1,
+          "strength": "source",
+          "term": "trident"
+        },
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/gtm.js",
+          "line": 378,
+          "strength": "source",
+          "term": "trident"
+        },
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/insight.min.js",
+          "line": 1,
+          "strength": "source",
+          "term": "trident"
+        },
+        {
+          "file": "ChatGPT_files/js",
+          "line": 400,
+          "strength": "prose",
+          "term": "trident"
+        },
+        {
+          "file": "docs/audits/2026-04-crossvm/Hashlock - Audit Report_files/js",
+          "line": 452,
+          "strength": "prose",
+          "term": "trident"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "svm-fuzz",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "WIRED",
+      "tool": "trident",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/x3vm-svm-live-lifecycle.yml",
+          "line": 3,
+          "strength": "workflow",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 826,
+          "strength": "script",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "scripts/cross-domain-svm-gate.sh",
+          "line": 5,
+          "strength": "script",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/docker-compose.testnet.yml",
+          "line": 37,
+          "strength": "script",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/deployment/run_testnet.sh",
+          "line": 4,
+          "strength": "script",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "X3-contracts/svm/programs/x3_htlc/test-live-lifecycle.sh",
+          "line": 2,
+          "strength": "infrastructure",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "infra-structure/validator/docker-compose.testnet.yml",
+          "line": 37,
+          "strength": "infrastructure",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "infra-structure/validator/deployment/run_testnet.sh",
+          "line": 4,
+          "strength": "infrastructure",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "programs/svm/x3_atomic_swap/test-live-lifecycle.sh",
+          "line": 2,
+          "strength": "infrastructure",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "node/tests/x3vm_svm_live.rs",
+          "line": 455,
+          "strength": "source",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "programs/svm/x3_atomic_swap/examples/client.rs",
+          "line": 5,
+          "strength": "source",
+          "term": "solana-test-validator"
+        },
+        {
+          "file": "progress.txt",
+          "line": 101,
+          "strength": "prose",
+          "term": "solana-test-validator"
+        }
+      ],
+      "evidence_strengths": [
+        "infrastructure",
+        "prose",
+        "script",
+        "source",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "svm",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/x3vm-svm-live-lifecycle.yml",
+        "scripts/cross-domain-svm-gate.sh",
+        "scripts/local-ci.sh",
+        "tools/cross-chain-gpu-validator/deployment/run_testnet.sh",
+        "tools/cross-chain-gpu-validator/docker-compose.testnet.yml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/share/solana/install/active_release/bin/solana-test-validator",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "solana-test-validator",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 156,
+          "strength": "script",
+          "term": "toxiproxy"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 34,
+          "strength": "script",
+          "term": "toxiproxy"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 34,
+          "strength": "script",
+          "term": "toxiproxy"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 66,
+          "strength": "script",
+          "term": "toxiproxy"
+        },
+        {
+          "file": "docs/X3_PROOF_LEDGER.md",
+          "line": 19,
+          "strength": "prose",
+          "term": "toxiproxy"
+        },
+        {
+          "file": "benchmarks/zombienet/x3-benchmark-network.toml",
+          "line": 145,
+          "strength": "prose",
+          "term": "toxiproxy"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "chaos",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "toxiproxy",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/cross-chain-gpu-validator/tests/inferstructor/failover_triggers.py",
+          "line": 150,
+          "strength": "script",
+          "term": "netem"
+        },
+        {
+          "file": "scripts/mainnet/rc5_chaos_harness.sh",
+          "line": 74,
+          "strength": "script",
+          "term": "netem"
+        },
+        {
+          "file": "CHAOS_QUICK_REFERENCE.sh",
+          "line": 211,
+          "strength": "infrastructure",
+          "term": "tc qdisc"
+        },
+        {
+          "file": "infra-structure/validator/tests/inferstructor/failover_triggers.py",
+          "line": 150,
+          "strength": "source",
+          "term": "netem"
+        },
+        {
+          "file": "infra-structure/validator/tests/adversarial/test_network_chaos.py",
+          "line": 94,
+          "strength": "source",
+          "term": "netem"
+        },
+        {
+          "file": "CHAOS_TESTING_GUIDE.md",
+          "line": 377,
+          "strength": "prose",
+          "term": "tc qdisc"
+        },
+        {
+          "file": "docs/testnet/PUBLIC_TESTNET_ALPHA_EXECUTION_PLAN.md",
+          "line": 445,
+          "strength": "prose",
+          "term": "netem"
+        },
+        {
+          "file": "benchmarks/zombienet/x3-benchmark-network.toml",
+          "line": 145,
+          "strength": "prose",
+          "term": "netem"
+        },
+        {
+          "file": "crates/x3-relayer/RPC_FAILOVER_PROCEDURES.md",
+          "line": 512,
+          "strength": "prose",
+          "term": "netem"
+        }
+      ],
+      "evidence_strengths": [
+        "infrastructure",
+        "prose",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "chaos",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/mainnet/rc5_chaos_harness.sh",
+        "tools/cross-chain-gpu-validator/tests/inferstructor/failover_triggers.py"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/usr/sbin/tc",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "tc/netem",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": false,
+      "config_files": [],
+      "configured": false,
+      "evidence": [],
+      "evidence_strengths": [],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "chaos",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "MISSING",
+      "tool": "pumba",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 68,
+          "strength": "script",
+          "term": "chaos mesh"
+        }
+      ],
+      "evidence_strengths": [
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "chaos",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "tools/test-tool-stack/README.md"
+      ],
+      "gated": true,
+      "installed": null,
+      "installed_path": null,
+      "kind": "reference",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "chaos-mesh",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Makefile",
+          "line": 9,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "scripts/benchmark_report.py",
+          "line": 245,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "scripts/run_all_benchmarks.sh",
+          "line": 10,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 143,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 35,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 33,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 67,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "tools/test-tool-stack/chaos-scenarios/rpc-spam.js",
+          "line": 1,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "scripts/mainnet/rc1_smoke_test.sh",
+          "line": 65,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "scripts/mainnet/rc4_runtime_upgrade_rehearsal.sh",
+          "line": 355,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "scripts/mainnet/rc5_internal_alpha_72h.sh",
+          "line": 436,
+          "strength": "script",
+          "term": "k6"
+        },
+        {
+          "file": "tests/p4_p5_crosschain_gpu_validator.py",
+          "line": 454,
+          "strength": "source",
+          "term": "k6"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "load",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "Makefile",
+        "scripts/benchmark_report.py",
+        "scripts/mainnet/rc1_smoke_test.sh",
+        "scripts/mainnet/rc4_runtime_upgrade_rehearsal.sh",
+        "scripts/mainnet/rc5_internal_alpha_72h.sh",
+        "scripts/run_all_benchmarks.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/chaos-scenarios/rpc-spam.js",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "k6",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "packages/blockchain-connector/package-lock.json",
+          "line": 2234,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "packages/polkawallet-plugin/package-lock.json",
+          "line": 3741,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "packages/ts-sdk/package-lock.json",
+          "line": 2693,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "packages/atomic-swap-sdk/package-lock.json",
+          "line": 2417,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "packages/x3-foundry-sdk/package-lock.json",
+          "line": 3468,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "packages/polkawallet-bridge-adapter/package-lock.json",
+          "line": 1576,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "tests_core/wallet-integration/package-lock.json",
+          "line": 5048,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "apps/inferstructor-dashboard/package-lock.json",
+          "line": 3673,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "apps/wallet/package-lock.json",
+          "line": 4477,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "apps/explorer/package-lock.json",
+          "line": 8453,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "apps/x3-studio/pnpm-lock.yaml",
+          "line": 476,
+          "strength": "prose",
+          "term": "wrk"
+        },
+        {
+          "file": "apps/x3-funding/package-lock.json",
+          "line": 851,
+          "strength": "prose",
+          "term": "wrk"
+        }
+      ],
+      "evidence_strengths": [
+        "prose"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "load",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": true,
+      "repeatable": "not_determinable",
+      "status": "REFERENCE_ONLY",
+      "tool": "wrk2",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/release-hardening.yml",
+          "line": 2,
+          "strength": "workflow",
+          "term": "semgrep"
+        },
+        {
+          "file": ".github/workflows/semgrep.yml",
+          "line": 1,
+          "strength": "workflow",
+          "term": "semgrep"
+        },
+        {
+          "file": "LAUNCH_SCOPE.md",
+          "line": 40,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "docs/local-ci.md",
+          "line": 12,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "docs/readiness-scan-2026-09-04.md",
+          "line": 211,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "feature-matrix/security-proofgate.toml",
+          "line": 223,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "prompts/X3_ENDGAME_MASTER_PROMPT.md",
+          "line": 2684,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "tests_core/invariants/registry.toml",
+          "line": 335,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "tests_core/security/semgrep/x3-security-rules.yml",
+          "line": 3,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "apps/x3-studio/docs/SECURITY_SCANNER.md",
+          "line": 24,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "tests_phase4/invariants/registry.toml",
+          "line": 335,
+          "strength": "prose",
+          "term": "semgrep"
+        },
+        {
+          "file": "tests_phase4/security/semgrep/x3-security-rules.yml",
+          "line": 3,
+          "strength": "prose",
+          "term": "semgrep"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "static",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/release-hardening.yml",
+        ".github/workflows/semgrep.yml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/semgrep",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "semgrep",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/release-hardening.yml",
+          "line": 2,
+          "strength": "workflow",
+          "term": "codeql"
+        },
+        {
+          "file": ".github/workflows/trivy.yml",
+          "line": 30,
+          "strength": "workflow",
+          "term": "codeql"
+        },
+        {
+          "file": ".github/workflows/semgrep.yml",
+          "line": 27,
+          "strength": "workflow",
+          "term": "codeql"
+        },
+        {
+          "file": ".github/workflows/osv-scan.yml",
+          "line": 36,
+          "strength": "workflow",
+          "term": "codeql"
+        },
+        {
+          "file": ".github/workflows/codeql.yml",
+          "line": 10,
+          "strength": "workflow",
+          "term": "codeql"
+        },
+        {
+          "file": "scripts/testnet/chainbench_server.py",
+          "line": 38,
+          "strength": "script",
+          "term": "codeql"
+        },
+        {
+          "file": "infra-structure/dashboard/src/api.ts",
+          "line": 16,
+          "strength": "source",
+          "term": "codeql"
+        },
+        {
+          "file": "infra-structure/services/chain-db/server.js",
+          "line": 29,
+          "strength": "source",
+          "term": "codeql"
+        },
+        {
+          "file": "infra-structure/services/blockchain-tps/server.js",
+          "line": 16,
+          "strength": "source",
+          "term": "codeql"
+        },
+        {
+          "file": "infra-structure/services/blockchain-tps/utils/ssrf-guard.js",
+          "line": 7,
+          "strength": "source",
+          "term": "codeql"
+        },
+        {
+          "file": "infra-structure/services/blockchain-tps/utils/mailer.js",
+          "line": 7,
+          "strength": "source",
+          "term": "codeql"
+        },
+        {
+          "file": "infra/blockchain-tps/server.js",
+          "line": 72,
+          "strength": "source",
+          "term": "codeql"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "source",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "static",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/osv-scan.yml",
+        ".github/workflows/release-hardening.yml",
+        ".github/workflows/semgrep.yml",
+        ".github/workflows/trivy.yml",
+        "scripts/testnet/chainbench_server.py"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "codeql",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [
+        ".cargo/audit.toml"
+      ],
+      "configured": true,
+      "evidence": [
+        {
+          "file": ".github/workflows/security-dashboard.yml",
+          "line": 26,
+          "strength": "workflow",
+          "term": "cargo-audit"
+        },
+        {
+          "file": ".github/workflows/mainnet-readiness.yml",
+          "line": 37,
+          "strength": "workflow",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 202,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "scripts/check-dependency-audit.sh",
+          "line": 5,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "scripts/check-cargo-home-safety.py",
+          "line": 13,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "scripts/check-advisory-scope.py",
+          "line": 194,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 44,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "tools/run-x3-tools.sh",
+          "line": 35,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 7,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 15,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 13,
+          "strength": "script",
+          "term": "cargo-audit"
+        },
+        {
+          "file": "tools/launchops/src/commands.rs",
+          "line": 51,
+          "strength": "script",
+          "term": "cargo audit"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "supply-chain",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/mainnet-readiness.yml",
+        ".github/workflows/security-dashboard.yml",
+        "scripts/check-advisory-scope.py",
+        "scripts/check-cargo-home-safety.py",
+        "scripts/check-dependency-audit.sh",
+        "scripts/local-ci.sh",
+        "tools/launchops/src/commands.rs",
+        "tools/run-x3-tools.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/cargo-audit",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "cargo-audit",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [
+        "deny.toml"
+      ],
+      "configured": true,
+      "evidence": [
+        {
+          "file": ".github/workflows/security-dashboard.yml",
+          "line": 29,
+          "strength": "workflow",
+          "term": "cargo-deny"
+        },
+        {
+          "file": ".github/workflows/mainnet-readiness.yml",
+          "line": 53,
+          "strength": "workflow",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 202,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "scripts/check-dependency-audit.sh",
+          "line": 5,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "scripts/check-cargo-home-safety.py",
+          "line": 13,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "scripts/check-advisory-scope.py",
+          "line": 194,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 44,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "tools/run-x3-tools.sh",
+          "line": 38,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 8,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 16,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 14,
+          "strength": "script",
+          "term": "cargo-deny"
+        },
+        {
+          "file": "scripts/mainnet/phase7_launchpad_gate.sh",
+          "line": 187,
+          "strength": "script",
+          "term": "cargo deny"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "supply-chain",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/mainnet-readiness.yml",
+        ".github/workflows/security-dashboard.yml",
+        "scripts/check-advisory-scope.py",
+        "scripts/check-cargo-home-safety.py",
+        "scripts/check-dependency-audit.sh",
+        "scripts/local-ci.sh",
+        "scripts/mainnet/phase7_launchpad_gate.sh",
+        "tools/run-x3-tools.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/cargo-deny",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "cargo-deny",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/osv-scan.yml",
+          "line": 24,
+          "strength": "workflow",
+          "term": "osv-scanner"
+        },
+        {
+          "file": "docs/local-ci.md",
+          "line": 12,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "line": 27,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "line": 799,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "line": 230,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/workflows-inventory.txt",
+          "line": 15,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/fbd4613b/findings/findings.json",
+          "line": 148,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "line": 141,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "line": 141,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T015707-933420ee/summary.json",
+          "line": 141,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T193358-6c1c2848/summary.json",
+          "line": 142,
+          "strength": "prose",
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T043039-2d3520fd/summary.json",
+          "line": 142,
+          "strength": "prose",
+          "term": "osv-scan"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "supply-chain",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/osv-scan.yml"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "osv-scanner",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/trivy.yml",
+          "line": 1,
+          "strength": "workflow",
+          "term": "trivy"
+        },
+        {
+          "file": "docs/local-ci.md",
+          "line": 12,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "docs/readiness-scan-2026-09-04.md",
+          "line": 211,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "feature-matrix/security-proofgate.toml",
+          "line": 239,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "prompts/X3_ENDGAME_MASTER_PROMPT.md",
+          "line": 2685,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/current/feature-status.json",
+          "line": 4792,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "line": 44,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "line": 867,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "line": 247,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/workflows-inventory.txt",
+          "line": 32,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "line": 158,
+          "strength": "prose",
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "line": 158,
+          "strength": "prose",
+          "term": "trivy"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "supply-chain",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/trivy.yml"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/trivy",
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "trivy",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": false,
+      "config_files": [],
+      "configured": false,
+      "evidence": [],
+      "evidence_strengths": [],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "sbom",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "MISSING",
+      "tool": "syft",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "docs/runbooks/deployment/TIER5_PRE_DEPLOYMENT_CHECKLIST.md",
+          "line": 293,
+          "strength": "prose",
+          "term": "grype"
+        }
+      ],
+      "evidence_strengths": [
+        "prose"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "sbom",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": true,
+      "repeatable": "not_determinable",
+      "status": "REFERENCE_ONLY",
+      "tool": "grype",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [],
+      "evidence_strengths": [],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "secrets",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/gitleaks",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "INSTALLED_ONLY",
+      "tool": "gitleaks",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/mainnet-readiness.yml",
+          "line": 14,
+          "strength": "workflow",
+          "term": "trufflehog"
+        },
+        {
+          "file": "docs/SECRET_MANAGEMENT_POLICY.md",
+          "line": 84,
+          "strength": "prose",
+          "term": "trufflehog"
+        },
+        {
+          "file": "docs/X3_NEXT_TASKS.md",
+          "line": 16,
+          "strength": "prose",
+          "term": "trufflehog"
+        },
+        {
+          "file": "docs/readiness-scan-2026-09-04.md",
+          "line": 32,
+          "strength": "prose",
+          "term": "trufflehog"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-fbd4613b/findings.json",
+          "line": 37,
+          "strength": "prose",
+          "term": "trufflehog"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "secrets",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/mainnet-readiness.yml"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "trufflehog",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 3438,
+          "strength": "dependency",
+          "term": "prometheus"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 527,
+          "strength": "dependency",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/start-validator-easy.sh",
+          "line": 35,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 492,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/start-x3-chain.sh",
+          "line": 36,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/test-tools.sh",
+          "line": 344,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/snapshot-zero-downtime-proof.sh",
+          "line": 159,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/snapshot-live-restore-proof.sh",
+          "line": 214,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/local-network-smoke.sh",
+          "line": 86,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/testnet-full-launch.sh",
+          "line": 124,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "scripts/local-node-smoke.sh",
+          "line": 20,
+          "strength": "script",
+          "term": "prometheus"
+        },
+        {
+          "file": "tools/x3_operator/command_center.py",
+          "line": 77,
+          "strength": "script",
+          "term": "prometheus"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "observability",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/local-ci.sh",
+        "scripts/local-network-smoke.sh",
+        "scripts/local-node-smoke.sh",
+        "scripts/snapshot-live-restore-proof.sh",
+        "scripts/snapshot-zero-downtime-proof.sh",
+        "scripts/start-validator-easy.sh",
+        "scripts/start-x3-chain.sh",
+        "scripts/test-tools.sh",
+        "scripts/testnet-full-launch.sh",
+        "tools/x3_operator/command_center.py"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/linuxbrew/.linuxbrew/bin/prometheus",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "prometheus",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 493,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 146,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md",
+          "line": 33,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 91,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/deployment/pilot/docker-compose.pilot.yml",
+          "line": 128,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "scripts/testnet/run-chainbench-stack.sh",
+          "line": 23,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "scripts/testnet/verify-testnet.sh",
+          "line": 14,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "scripts/monitoring/check-ops-artifacts.sh",
+          "line": 36,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "scripts/monitoring/local3-monitoring-up.sh",
+          "line": 3,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "scripts/monitoring/testnet7-observability-check.sh",
+          "line": 6,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "scripts/monitoring/local3-logging-check.sh",
+          "line": 2,
+          "strength": "script",
+          "term": "grafana"
+        },
+        {
+          "file": "scripts/monitoring/local3-monitoring-check.sh",
+          "line": 4,
+          "strength": "script",
+          "term": "grafana"
+        }
+      ],
+      "evidence_strengths": [
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "observability",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/local-ci.sh",
+        "scripts/monitoring/check-ops-artifacts.sh",
+        "scripts/monitoring/local3-logging-check.sh",
+        "scripts/monitoring/local3-monitoring-check.sh",
+        "scripts/monitoring/local3-monitoring-up.sh",
+        "scripts/monitoring/testnet7-observability-check.sh",
+        "scripts/testnet/run-chainbench-stack.sh",
+        "scripts/testnet/verify-testnet.sh",
+        "tools/cross-chain-gpu-validator/deployment/pilot/docker-compose.pilot.yml",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/X3_TEST_TOOL_STACK_REPORT.md"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "grafana",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "apps/x3-funding/src/data.ts",
+          "line": 525,
+          "strength": "source",
+          "term": "loki"
+        },
+        {
+          "file": "grants/C13-saas-devtools.md",
+          "line": 94,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "docs/X3_DEPLOYMENT_POLICY.md",
+          "line": 13,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "docs/STAGING_TESTNET_SETUP.md",
+          "line": 38,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "feature-matrix/operations-user-tools.toml",
+          "line": 267,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "infra-structure/services/rpc-crawler/crawler_state.json",
+          "line": 3202,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "audit-artifacts/current/feature-status.json",
+          "line": 3802,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "docs/testnet/RPC_AND_FAUCET.md",
+          "line": 55,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "docs/testnet/PUBLIC_TESTNET_ALPHA_EXECUTION_PLAN.md",
+          "line": 52,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "docs/openspec/changes/TESTNET-ARCH-001/proposal.md",
+          "line": 61,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "docs/openspec/changes/001-deploy-testnet/README.md",
+          "line": 20,
+          "strength": "prose",
+          "term": "loki"
+        },
+        {
+          "file": "docs/runbooks/testing/VALIDATION_CHECKLIST.md",
+          "line": 401,
+          "strength": "prose",
+          "term": "loki"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "observability",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "WIRED",
+      "tool": "loki",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 11336,
+          "strength": "dependency",
+          "term": "opentelemetry"
+        },
+        {
+          "file": "tests/p3_integration_tests.py",
+          "line": 140,
+          "strength": "source",
+          "term": "opentelemetry"
+        },
+        {
+          "file": "tests_phase4/p3_integration_tests.py",
+          "line": 140,
+          "strength": "source",
+          "term": "opentelemetry"
+        },
+        {
+          "file": "tests_core/p3_integration_tests.py",
+          "line": 146,
+          "strength": "source",
+          "term": "opentelemetry"
+        },
+        {
+          "file": "launch-gates/sources/pack-01-wiring/pallets/governance-lib.rs",
+          "line": 248,
+          "strength": "source",
+          "term": "otel"
+        },
+        {
+          "file": "launch-gates/sources/pack-05-test-gap/pallets/governance-excerpt.rs",
+          "line": 248,
+          "strength": "source",
+          "term": "otel"
+        },
+        {
+          "file": "pallets/governance/src/lib.rs",
+          "line": 276,
+          "strength": "source",
+          "term": "otel"
+        },
+        {
+          "file": "pallets/governance/src/types.rs",
+          "line": 267,
+          "strength": "source",
+          "term": "otel"
+        },
+        {
+          "file": "patches/ahash/tests/map_tests.rs",
+          "line": 48,
+          "strength": "source",
+          "term": "otel"
+        },
+        {
+          "file": "patches/quinn-proto/src/connection/mod.rs",
+          "line": 1403,
+          "strength": "source",
+          "term": "otel"
+        },
+        {
+          "file": "patches/quinn-proto/src/connection/packet_crypto.rs",
+          "line": 97,
+          "strength": "source",
+          "term": "otel"
+        },
+        {
+          "file": "patches/quinn-proto/src/config/transport.rs",
+          "line": 18,
+          "strength": "source",
+          "term": "otel"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "observability",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": true,
+      "installed_path": "Cargo.lock",
+      "kind": "crate",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "WIRED",
+      "tool": "opentelemetry",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/stop-testnet.sh",
+          "line": 14,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "scripts/harden-validator.sh",
+          "line": 35,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "scripts/check-runtime-hash-freshness.py",
+          "line": 293,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "scripts/snapshot-rpc-export.py",
+          "line": 362,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "scripts/feature_matrix.py",
+          "line": 272,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "tools/agent_scanner/test_scan.py",
+          "line": 47,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "tools/x3-forge/test_failure_memory.py",
+          "line": 22,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "tools/x3-forge/test_index.py",
+          "line": 182,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "tools/x3-forge/test_completion.py",
+          "line": 59,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/benchmarks/rpc_benchmark_report.json",
+          "line": 424,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/src/resources/chains.json",
+          "line": 13854,
+          "strength": "script",
+          "term": "tempo"
+        },
+        {
+          "file": "scripts/swarm/test_x3_repo_scan.py",
+          "line": 188,
+          "strength": "script",
+          "term": "tempo"
+        }
+      ],
+      "evidence_strengths": [
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "observability",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/check-runtime-hash-freshness.py",
+        "scripts/feature_matrix.py",
+        "scripts/harden-validator.sh",
+        "scripts/snapshot-rpc-export.py",
+        "scripts/stop-testnet.sh",
+        "scripts/swarm/test_x3_repo_scan.py",
+        "tools/agent_scanner/test_scan.py",
+        "tools/cross-chain-gpu-validator/benchmarks/rpc_benchmark_report.json",
+        "tools/cross-chain-gpu-validator/src/resources/chains.json",
+        "tools/x3-forge/test_completion.py",
+        "tools/x3-forge/test_failure_memory.py",
+        "tools/x3-forge/test_index.py"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "tempo",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/production-gate.yml",
+          "line": 150,
+          "strength": "workflow",
+          "term": "docker"
+        },
+        {
+          "file": ".github/workflows/x3-local-runner-smoke.yml",
+          "line": 32,
+          "strength": "workflow",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/docker-build.sh",
+          "line": 2,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/install-validator.sh",
+          "line": 5,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 425,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/mainnet_release_gate.py",
+          "line": 613,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/agent_guard.py",
+          "line": 93,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/test-tools.sh",
+          "line": 330,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/run-tps-tests.sh",
+          "line": 17,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/create-rc1-release.sh",
+          "line": 89,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/run-substrate-tools.sh",
+          "line": 112,
+          "strength": "script",
+          "term": "docker"
+        },
+        {
+          "file": "scripts/run-all-tests.sh",
+          "line": 253,
+          "strength": "script",
+          "term": "docker"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "infrastructure",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/production-gate.yml",
+        ".github/workflows/x3-local-runner-smoke.yml",
+        "scripts/agent_guard.py",
+        "scripts/create-rc1-release.sh",
+        "scripts/docker-build.sh",
+        "scripts/install-validator.sh",
+        "scripts/local-ci.sh",
+        "scripts/mainnet_release_gate.py",
+        "scripts/run-all-tests.sh",
+        "scripts/run-substrate-tools.sh",
+        "scripts/run-tps-tests.sh",
+        "scripts/test-tools.sh"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/usr/bin/docker",
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "docker",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/test-tools.sh",
+          "line": 330,
+          "strength": "script",
+          "term": "podman"
+        }
+      ],
+      "evidence_strengths": [
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "infrastructure",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/test-tools.sh"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "podman",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/docker-build.sh",
+          "line": 121,
+          "strength": "script",
+          "term": "kubernetes"
+        },
+        {
+          "file": "scripts/k8s-deploy.sh",
+          "line": 2,
+          "strength": "script",
+          "term": "kubernetes"
+        },
+        {
+          "file": "scripts/testnet/deploy-faucet.sh",
+          "line": 94,
+          "strength": "script",
+          "term": "helm"
+        },
+        {
+          "file": "x3-app-store/deploy.sh",
+          "line": 111,
+          "strength": "infrastructure",
+          "term": "kubernetes"
+        },
+        {
+          "file": "x3-app-store/deploy-prod.sh",
+          "line": 94,
+          "strength": "infrastructure",
+          "term": "kubernetes"
+        },
+        {
+          "file": "tests/p3_deployment_validation.py",
+          "line": 192,
+          "strength": "source",
+          "term": "kubernetes"
+        },
+        {
+          "file": "tests/p3_integration_tests.py",
+          "line": 323,
+          "strength": "source",
+          "term": "kubernetes"
+        },
+        {
+          "file": "tests_phase4/p3_deployment_validation.py",
+          "line": 192,
+          "strength": "source",
+          "term": "kubernetes"
+        },
+        {
+          "file": "tests_phase4/p3_integration_tests.py",
+          "line": 323,
+          "strength": "source",
+          "term": "kubernetes"
+        },
+        {
+          "file": "tests_core/p3_deployment_validation.py",
+          "line": 192,
+          "strength": "source",
+          "term": "kubernetes"
+        },
+        {
+          "file": "tests_core/p3_integration_tests.py",
+          "line": 220,
+          "strength": "source",
+          "term": "kubernetes"
+        },
+        {
+          "file": "apps/x3-desktop/src-tauri/src/main.rs",
+          "line": 667,
+          "strength": "source",
+          "term": "helm"
+        }
+      ],
+      "evidence_strengths": [
+        "infrastructure",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "infrastructure",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/docker-build.sh",
+        "scripts/k8s-deploy.sh",
+        "scripts/testnet/deploy-faucet.sh"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/kubectl",
+      "kind": "binary",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "kubernetes",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "docs/runbooks/testing/VALIDATION_CHECKLIST.md",
+          "line": 396,
+          "strength": "prose",
+          "term": "ansible"
+        }
+      ],
+      "evidence_strengths": [
+        "prose"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "infrastructure",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": true,
+      "installed_path": "/home/lojak/.local/bin/ansible",
+      "kind": "binary",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "INSTALLED_ONLY",
+      "tool": "ansible",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 3467,
+          "strength": "dependency",
+          "term": "libp2p"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 616,
+          "strength": "dependency",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 318,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/check-dependency-audit.sh",
+          "line": 10,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/harden-validator.sh",
+          "line": 28,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/snapshot-live-restore-proof.sh",
+          "line": 258,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/local-network-smoke.sh",
+          "line": 73,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/generate-bootnode-keys.py",
+          "line": 5,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/mainnet/peer-id-from-ed25519-pubkey.py",
+          "line": 2,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/mainnet/local3_lib.sh",
+          "line": 51,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/mainnet/make-fixture-live-spec.sh",
+          "line": 94,
+          "strength": "script",
+          "term": "libp2p"
+        },
+        {
+          "file": "scripts/mainnet/genesis_ceremony.sh",
+          "line": 28,
+          "strength": "script",
+          "term": "libp2p"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "networking",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/check-dependency-audit.sh",
+        "scripts/generate-bootnode-keys.py",
+        "scripts/harden-validator.sh",
+        "scripts/local-ci.sh",
+        "scripts/local-network-smoke.sh",
+        "scripts/mainnet/genesis_ceremony.sh",
+        "scripts/mainnet/local3_lib.sh",
+        "scripts/mainnet/make-fixture-live-spec.sh",
+        "scripts/mainnet/peer-id-from-ed25519-pubkey.py",
+        "scripts/snapshot-live-restore-proof.sh"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "Cargo.lock",
+      "kind": "crate",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "rust-libp2p",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": false,
+      "config_files": [],
+      "configured": false,
+      "evidence": [],
+      "evidence_strengths": [],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "consensus-reference",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": null,
+      "installed_path": null,
+      "kind": "reference",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "MISSING",
+      "tool": "malachite",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "tools/cross-chain-gpu-validator/src/cross_chain_gpu_validator/chain_registry.py",
+          "line": 115,
+          "strength": "script",
+          "term": "tendermint"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/src/cross_chain_gpu_validator/cosmos/__init__.py",
+          "line": 1,
+          "strength": "script",
+          "term": "tendermint"
+        },
+        {
+          "file": "packages/blockchain-connector/src/adapters/cosmos.ts",
+          "line": 4,
+          "strength": "source",
+          "term": "cometbft"
+        },
+        {
+          "file": "packages/blockchain-connector/src/chains/registry.ts",
+          "line": 459,
+          "strength": "source",
+          "term": "tendermint"
+        },
+        {
+          "file": "infra-structure/validator/src/cross_chain_gpu_validator/chain_registry.py",
+          "line": 114,
+          "strength": "source",
+          "term": "tendermint"
+        },
+        {
+          "file": "infra-structure/validator/src/cross_chain_gpu_validator/cosmos/__init__.py",
+          "line": 1,
+          "strength": "source",
+          "term": "tendermint"
+        },
+        {
+          "file": "infra-structure/db/seed/rpc_mega_scraper.py",
+          "line": 899,
+          "strength": "source",
+          "term": "tendermint"
+        },
+        {
+          "file": "infra-structure/db/seed/seed_chains.py",
+          "line": 171,
+          "strength": "source",
+          "term": "tendermint"
+        },
+        {
+          "file": "infra-structure/services/rpc-crawler/tps_benchmark.py",
+          "line": 60,
+          "strength": "source",
+          "term": "tendermint"
+        },
+        {
+          "file": "crates/x3-crosschain-intent/src/types.rs",
+          "line": 96,
+          "strength": "source",
+          "term": "tendermint"
+        },
+        {
+          "file": "crates/x3-bridge/src/cross_chain_proofs.rs",
+          "line": 93,
+          "strength": "source",
+          "term": "tendermint"
+        },
+        {
+          "file": "crates/x3-bridge/src/ibc_light_client.rs",
+          "line": 322,
+          "strength": "source",
+          "term": "tendermint"
+        }
+      ],
+      "evidence_strengths": [
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "consensus-reference",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "tools/cross-chain-gpu-validator/src/cross_chain_gpu_validator/chain_registry.py",
+        "tools/cross-chain-gpu-validator/src/cross_chain_gpu_validator/cosmos/__init__.py"
+      ],
+      "gated": true,
+      "installed": null,
+      "installed_path": null,
+      "kind": "reference",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "cometbft",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.toml",
+          "line": 531,
+          "strength": "dependency",
+          "term": "hive"
+        },
+        {
+          "file": ".github/workflows/x3-bridge-fixture-regeneration.yml",
+          "line": 18,
+          "strength": "workflow",
+          "term": "hive"
+        },
+        {
+          "file": ".github/workflows/release-candidate-rehearsal.yml",
+          "line": 110,
+          "strength": "workflow",
+          "term": "hive"
+        },
+        {
+          "file": "scripts/snapshot-restore.sh",
+          "line": 117,
+          "strength": "script",
+          "term": "hive"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 871,
+          "strength": "script",
+          "term": "hive"
+        },
+        {
+          "file": "scripts/snapshot-zero-downtime-proof.sh",
+          "line": 4,
+          "strength": "script",
+          "term": "hive"
+        },
+        {
+          "file": "scripts/snapshot-live-restore-proof.sh",
+          "line": 6,
+          "strength": "script",
+          "term": "hive"
+        },
+        {
+          "file": "scripts/snapshot-rpc-export.py",
+          "line": 11,
+          "strength": "script",
+          "term": "hive"
+        },
+        {
+          "file": "scripts/run-srtool.sh",
+          "line": 149,
+          "strength": "script",
+          "term": "hive"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/src/resources/chains.json",
+          "line": 9851,
+          "strength": "script",
+          "term": "hive"
+        },
+        {
+          "file": "scripts/proof/generate_eth_bridge_fixture.py",
+          "line": 2,
+          "strength": "script",
+          "term": "hive"
+        },
+        {
+          "file": "scripts/gpu/register_github_gpu_runner.sh",
+          "line": 85,
+          "strength": "script",
+          "term": "hive"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "conformance-reference",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/release-candidate-rehearsal.yml",
+        ".github/workflows/x3-bridge-fixture-regeneration.yml",
+        "scripts/gpu/register_github_gpu_runner.sh",
+        "scripts/local-ci.sh",
+        "scripts/proof/generate_eth_bridge_fixture.py",
+        "scripts/run-srtool.sh",
+        "scripts/snapshot-live-restore-proof.sh",
+        "scripts/snapshot-restore.sh",
+        "scripts/snapshot-rpc-export.py",
+        "scripts/snapshot-zero-downtime-proof.sh",
+        "tools/cross-chain-gpu-validator/src/resources/chains.json"
+      ],
+      "gated": true,
+      "installed": null,
+      "installed_path": null,
+      "kind": "reference",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "ethereum-hive",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 299,
+          "strength": "dependency",
+          "term": "ibc"
+        },
+        {
+          "file": ".github/workflows/formal-verification.yml",
+          "line": 78,
+          "strength": "workflow",
+          "term": "ibc"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 102,
+          "strength": "script",
+          "term": "ibc"
+        },
+        {
+          "file": "scripts/check-dependency-audit.sh",
+          "line": 56,
+          "strength": "script",
+          "term": "ibc"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/benchmarks/rpc_benchmark_report.json",
+          "line": 158,
+          "strength": "script",
+          "term": "ibc"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/src/resources/chains.json",
+          "line": 212,
+          "strength": "script",
+          "term": "ibc"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/src/cross_chain_gpu_validator/gpu/multi_gpu_scheduler.py",
+          "line": 96,
+          "strength": "script",
+          "term": "ibc"
+        },
+        {
+          "file": "packages/polkawallet-plugin/src/types/runtime-types.ts",
+          "line": 95,
+          "strength": "source",
+          "term": "ibc"
+        },
+        {
+          "file": "packages/blockchain-connector/src/chains/generated/index.ts",
+          "line": 689,
+          "strength": "source",
+          "term": "ibc"
+        },
+        {
+          "file": "x3-ai-command-system/router/x3_router_test.py",
+          "line": 44,
+          "strength": "source",
+          "term": "ibc"
+        },
+        {
+          "file": "x3-ai-command-system/router/classifier.py",
+          "line": 34,
+          "strength": "source",
+          "term": "ibc"
+        },
+        {
+          "file": "apps/x3-desktop/src-tauri/src/wallet_core/signers/mod.rs",
+          "line": 37,
+          "strength": "source",
+          "term": "ibc"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script",
+        "source",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "cross-chain-reference",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/formal-verification.yml",
+        "scripts/check-dependency-audit.sh",
+        "scripts/local-ci.sh",
+        "tools/cross-chain-gpu-validator/benchmarks/rpc_benchmark_report.json",
+        "tools/cross-chain-gpu-validator/src/cross_chain_gpu_validator/gpu/multi_gpu_scheduler.py",
+        "tools/cross-chain-gpu-validator/src/resources/chains.json"
+      ],
+      "gated": true,
+      "installed": null,
+      "installed_path": null,
+      "kind": "reference",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "hermes",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "packages/blockchain-connector/src/chains/registry.ts",
+          "line": 695,
+          "strength": "source",
+          "term": "narwhal"
+        }
+      ],
+      "evidence_strengths": [
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "da-reference",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": null,
+      "installed_path": null,
+      "kind": "reference",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "WIRED",
+      "tool": "narwhal",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 12971,
+          "strength": "dependency",
+          "term": "parity-db"
+        },
+        {
+          "file": "scripts/mainnet/rc5_chaos_harness.sh",
+          "line": 310,
+          "strength": "script",
+          "term": "paritydb"
+        },
+        {
+          "file": "scripts/proof/state-growth.py",
+          "line": 12,
+          "strength": "script",
+          "term": "paritydb"
+        },
+        {
+          "file": "Cargo.lock.baseline.json",
+          "line": 5448,
+          "strength": "prose",
+          "term": "parity-db"
+        },
+        {
+          "file": "launch-gates/VALIDATOR_ONBOARDING_RUNBOOK.md",
+          "line": 579,
+          "strength": "prose",
+          "term": "paritydb"
+        },
+        {
+          "file": "node/x3-chain-node.cdx.json",
+          "line": 16037,
+          "strength": "prose",
+          "term": "parity-db"
+        },
+        {
+          "file": "node/x3-chain-node.cdx.baseline.json",
+          "line": 2718,
+          "strength": "prose",
+          "term": "parity-db"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/dependency-inventory.json",
+          "line": 11698,
+          "strength": "prose",
+          "term": "parity-db"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "prose",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "storage",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/mainnet/rc5_chaos_harness.sh",
+        "scripts/proof/state-growth.py"
+      ],
+      "gated": true,
+      "installed": true,
+      "installed_path": "Cargo.lock",
+      "kind": "crate",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "paritydb",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "scripts/snapshot-zero-downtime-proof.sh",
+          "line": 6,
+          "strength": "script",
+          "term": "rocksdb"
+        },
+        {
+          "file": "scripts/snapshot-live-restore-proof.sh",
+          "line": 18,
+          "strength": "script",
+          "term": "rocksdb"
+        },
+        {
+          "file": "scripts/snapshot-rpc-export.py",
+          "line": 11,
+          "strength": "script",
+          "term": "rocksdb"
+        },
+        {
+          "file": "scripts/mainnet/rc5_resilience_orchestrator.sh",
+          "line": 226,
+          "strength": "script",
+          "term": "rocksdb"
+        },
+        {
+          "file": "scripts/mainnet/rc5_internal_alpha_72h.sh",
+          "line": 1127,
+          "strength": "script",
+          "term": "rocksdb"
+        },
+        {
+          "file": "CHAOS_QUICK_REFERENCE.sh",
+          "line": 180,
+          "strength": "infrastructure",
+          "term": "rocksdb"
+        },
+        {
+          "file": "launch-gates/fresh-machine-proof.sh",
+          "line": 25,
+          "strength": "infrastructure",
+          "term": "rocksdb"
+        },
+        {
+          "file": "runtime/src/lib.rs",
+          "line": 58,
+          "strength": "source",
+          "term": "rocksdb"
+        },
+        {
+          "file": "launch-gates/sources/pack-01-wiring/01-construct-runtime.rs",
+          "line": 146,
+          "strength": "source",
+          "term": "rocksdb"
+        },
+        {
+          "file": "launch-gates/sources/pack-01-wiring/pallets/agent-memory-lib.rs",
+          "line": 815,
+          "strength": "source",
+          "term": "rocksdb"
+        },
+        {
+          "file": "launch-gates/sources/pack-05-test-gap/runtime/lib-excerpt.rs",
+          "line": 27,
+          "strength": "source",
+          "term": "rocksdb"
+        },
+        {
+          "file": "pallets/x3-domain-registry/src/weights.rs",
+          "line": 49,
+          "strength": "source",
+          "term": "rocksdb"
+        }
+      ],
+      "evidence_strengths": [
+        "infrastructure",
+        "script",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "storage",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/mainnet/rc5_internal_alpha_72h.sh",
+        "scripts/mainnet/rc5_resilience_orchestrator.sh",
+        "scripts/snapshot-live-restore-proof.sh",
+        "scripts/snapshot-rpc-export.py",
+        "scripts/snapshot-zero-downtime-proof.sh"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "crate",
+      "priority_group": 3,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "rocksdb",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.lock",
+          "line": 3779,
+          "strength": "dependency",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "Cargo.toml",
+          "line": 478,
+          "strength": "dependency",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "apps/tauri-os/src-tauri/run-live-test.sh",
+          "line": 8,
+          "strength": "infrastructure",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "integration-tests/cross-vm-pallet-test.rs",
+          "line": 204,
+          "strength": "source",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "apps/tauri-os/src-tauri/src/chain.rs",
+          "line": 203,
+          "strength": "source",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "apps/tauri-os/src-tauri/src/error.rs",
+          "line": 163,
+          "strength": "source",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "node/src/rpc.rs",
+          "line": 15,
+          "strength": "source",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "node/src/rpc_frontier.rs",
+          "line": 11,
+          "strength": "source",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "node/src/service.rs",
+          "line": 3723,
+          "strength": "source",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "launch-gates/sources/pack-04-invariant/integration-tests/cross-vm-pallet-test.rs",
+          "line": 83,
+          "strength": "source",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "patches/jsonrpsee-server/src/server.rs",
+          "line": 43,
+          "strength": "source",
+          "term": "jsonrpsee"
+        },
+        {
+          "file": "patches/jsonrpsee-server/src/lib.rs",
+          "line": 27,
+          "strength": "source",
+          "term": "jsonrpsee"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "infrastructure",
+        "source"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "rpc",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": true,
+      "installed_path": "Cargo.lock",
+      "kind": "crate",
+      "priority_group": 1,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "WIRED",
+      "tool": "jsonrpsee",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/formal-verification.yml",
+          "line": 80,
+          "strength": "workflow",
+          "term": "tla+"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 563,
+          "strength": "script",
+          "term": "tla+"
+        },
+        {
+          "file": "scripts/run-security-gates.sh",
+          "line": 47,
+          "strength": "script",
+          "term": "tla+"
+        },
+        {
+          "file": "tools/setup-x3-test-tools.sh",
+          "line": 57,
+          "strength": "script",
+          "term": "tla+"
+        },
+        {
+          "file": "proof-forge/src/runners/formal_proofs.rs",
+          "line": 90,
+          "strength": "source",
+          "term": "tla+"
+        },
+        {
+          "file": "proof-forge/src/runners/consensus.rs",
+          "line": 14,
+          "strength": "source",
+          "term": "tla+"
+        },
+        {
+          "file": "plans/COMPLETE_BLOCKCHAIN_AUDIT_REPORT.md",
+          "line": 506,
+          "strength": "prose",
+          "term": "tla+"
+        },
+        {
+          "file": "stakeholder_comms/ENGINEERING_TEAM_ANNOUNCEMENT.md",
+          "line": 69,
+          "strength": "prose",
+          "term": "tla+"
+        },
+        {
+          "file": "stakeholder_comms/CTO_BRIEF_META_BLOCKERS.md",
+          "line": 52,
+          "strength": "prose",
+          "term": "tla+"
+        },
+        {
+          "file": "stakeholder_comms/SECURITY_TEAM_SPRINT_PLAN.md",
+          "line": 16,
+          "strength": "prose",
+          "term": "tla+"
+        },
+        {
+          "file": "feature-matrix/security-proofgate.toml",
+          "line": 94,
+          "strength": "prose",
+          "term": "tla+"
+        },
+        {
+          "file": "launch-gates/EXTERNAL_VALIDATION_REQUIREMENTS.md",
+          "line": 393,
+          "strength": "prose",
+          "term": "tla+"
+        }
+      ],
+      "evidence_strengths": [
+        "prose",
+        "script",
+        "source",
+        "workflow"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "formal",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        ".github/workflows/formal-verification.yml",
+        "scripts/local-ci.sh",
+        "scripts/run-security-gates.sh",
+        "tools/setup-x3-test-tools.sh"
+      ],
+      "gated": true,
+      "installed": false,
+      "installed_path": null,
+      "kind": "binary",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "tla+/apalache",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    },
+    {
+      "available": false,
+      "config_files": [],
+      "configured": false,
+      "evidence": [],
+      "evidence_strengths": [],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "failure-corpus",
+      "fuzz_crates_present": null,
+      "gate_files": [],
+      "gated": false,
+      "installed": null,
+      "installed_path": null,
+      "kind": "reference",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "MISSING",
+      "tool": "defihacklabs",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": false
+    },
+    {
+      "available": true,
+      "config_files": [],
+      "configured": false,
+      "evidence": [
+        {
+          "file": "Cargo.toml",
+          "line": 523,
+          "strength": "dependency",
+          "term": "cve"
+        },
+        {
+          "file": "scripts/local-ci.sh",
+          "line": 300,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "scripts/snapshot-live-restore-proof.sh",
+          "line": 206,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "scripts/snapshot-rpc-export.py",
+          "line": 466,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "tools/test-tool-stack/config.toml",
+          "line": 7,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "tools/test-tool-stack/README.md",
+          "line": 29,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "tools/cross-chain-gpu-validator/src/resources/chains.json",
+          "line": 9030,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "scripts/mainnet/runtime_upgrade_rehearsal.sh",
+          "line": 110,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "scripts/mainnet/verify-snapshot-root-against-chain.sh",
+          "line": 77,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "scripts/mainnet/verify-snapshot-restore.sh",
+          "line": 179,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "scripts/mainnet/rc2_internal_settlement_smoke.sh",
+          "line": 523,
+          "strength": "script",
+          "term": "cve"
+        },
+        {
+          "file": "scripts/mainnet/rc4_runtime_upgrade_rehearsal.sh",
+          "line": 1052,
+          "strength": "script",
+          "term": "cve"
+        }
+      ],
+      "evidence_strengths": [
+        "dependency",
+        "script"
+      ],
+      "evidenced": "not_determinable",
+      "exercised": "not_determinable",
+      "family": "failure-corpus",
+      "fuzz_crates_present": null,
+      "gate_files": [
+        "scripts/local-ci.sh",
+        "scripts/mainnet/rc2_internal_settlement_smoke.sh",
+        "scripts/mainnet/rc4_runtime_upgrade_rehearsal.sh",
+        "scripts/mainnet/runtime_upgrade_rehearsal.sh",
+        "scripts/mainnet/verify-snapshot-restore.sh",
+        "scripts/mainnet/verify-snapshot-root-against-chain.sh",
+        "scripts/snapshot-live-restore-proof.sh",
+        "scripts/snapshot-rpc-export.py",
+        "tools/cross-chain-gpu-validator/src/resources/chains.json",
+        "tools/test-tool-stack/README.md",
+        "tools/test-tool-stack/config.toml"
+      ],
+      "gated": true,
+      "installed": null,
+      "installed_path": null,
+      "kind": "reference",
+      "priority_group": 2,
+      "referenced_only": false,
+      "repeatable": "not_determinable",
+      "status": "GATED",
+      "tool": "cve-datasets",
+      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "wired": true
+    }
+  ]
+}
