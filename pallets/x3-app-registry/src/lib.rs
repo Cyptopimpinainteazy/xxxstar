@@ -199,6 +199,12 @@ pub trait ApplicationRegistryInspect<AccountId> {
     fn has_guardian_privileges(app_id: ApplicationId) -> bool;
     /// Whether a bytecode hash has been revoked (spec §59 SP4).
     fn is_artifact_revoked(bytecode: H256) -> bool;
+    /// Canonical hash of the application's registered Security Manifest, if any
+    /// (spec §23 M2/M3). Defaults to `None` so external implementers are not
+    /// forced to provide it.
+    fn manifest_hash(_app_id: ApplicationId) -> Option<H256> {
+        None
+    }
 }
 
 #[frame_support::pallet]
@@ -217,6 +223,75 @@ pub mod pallet {
     pub type MaxNameLen = ConstU32<64>;
     /// Bounded application name.
     pub type BoundedName = BoundedVec<u8, MaxNameLen>;
+    /// Max length of the human-readable version string in a manifest.
+    pub type MaxVersionLen = ConstU32<32>;
+    /// Max number of declared capability ids in a manifest.
+    pub type MaxCapabilities = ConstU32<32>;
+    /// Max number of off-chain evidence references in a manifest.
+    pub type MaxEvidence = ConstU32<16>;
+
+    /// A verifiable reference to off-chain evidence (spec §23 M4, §55). The chain
+    /// stores the hash of the evidence, never the evidence itself.
+    #[derive(
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        MaxEncodedLen,
+        TypeInfo,
+        RuntimeDebug,
+    )]
+    pub struct EvidenceRef {
+        /// Evidence kind (e.g. 0 = audit report, 1 = test transcript).
+        pub kind: u8,
+        /// Hash of the off-chain evidence document.
+        pub uri_hash: H256,
+    }
+
+    /// The machine-readable Security Manifest (spec §23 M1): what an application
+    /// claims about itself, bound to the exact artifact hashes it describes.
+    #[derive(
+        Clone,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        MaxEncodedLen,
+        TypeInfo,
+        RuntimeDebug,
+    )]
+    pub struct SecurityManifest {
+        /// Application name.
+        pub name: BoundedName,
+        /// Human-readable version string.
+        pub version: BoundedVec<u8, MaxVersionLen>,
+        /// Execution domain.
+        pub vm: GuardianVm,
+        /// Application category id.
+        pub category: u16,
+        /// The exact artifact hashes this manifest describes.
+        pub hashes: ArtifactHashes,
+        /// The standards this manifest was authored against.
+        pub standards: StandardRefs,
+        /// Declared capability ids (interpreted by the trust gate).
+        pub declared_capabilities: BoundedVec<u32, MaxCapabilities>,
+        /// Off-chain evidence references.
+        pub evidence: BoundedVec<EvidenceRef, MaxEvidence>,
+    }
+
+    impl SecurityManifest {
+        /// Deterministic, field-sensitive hash over the canonical SCALE encoding
+        /// (spec §23 M2). Field order is part of the wire format: reordering or
+        /// changing any field changes the hash, so a recorded manifest hash
+        /// cannot be silently reused for different content (spec §59 SP5).
+        pub fn canonical_hash(&self) -> H256 {
+            H256(sp_io::hashing::blake2_256(&self.encode()))
+        }
+    }
 
     /// Full on-chain application record.
     #[derive(
@@ -335,6 +410,17 @@ pub mod pallet {
     #[pallet::getter(fn revoked_artifacts)]
     pub type RevokedArtifacts<T: Config> = StorageMap<_, Blake2_128Concat, H256, BlockNumberFor<T>>;
 
+    /// ApplicationId → its currently registered Security Manifest.
+    #[pallet::storage]
+    #[pallet::getter(fn manifest_of)]
+    pub type Manifests<T: Config> =
+        StorageMap<_, Blake2_128Concat, ApplicationId, SecurityManifest>;
+
+    /// ApplicationId → canonical hash of its registered manifest.
+    #[pallet::storage]
+    #[pallet::getter(fn manifest_hash_of)]
+    pub type ManifestHashes<T: Config> = StorageMap<_, Blake2_128Concat, ApplicationId, H256>;
+
     // ── Config ─────────────────────────────────────────────────────────────
 
     #[pallet::pallet]
@@ -411,6 +497,12 @@ pub mod pallet {
             app_id: ApplicationId,
             vm: GuardianVm,
             address: [u8; 32],
+        },
+        /// A Security Manifest was registered; `manifest_hash` is its canonical
+        /// hash (spec §23 M3).
+        ManifestRegistered {
+            app_id: ApplicationId,
+            manifest_hash: H256,
         },
     }
 
@@ -763,6 +855,41 @@ pub mod pallet {
             });
             Ok(())
         }
+
+        /// Register (or replace) the Security Manifest for the current version.
+        /// The manifest must describe the exact artifact hashes of the current
+        /// version; a manifest for different bytecode is refused. The canonical
+        /// hash is recorded so a manifest cannot be swapped without trace
+        /// (spec §23 M1–M3, §59 SP5).
+        #[pallet::call_index(8)]
+        #[pallet::weight(T::WeightInfo::register_manifest())]
+        pub fn register_manifest(
+            origin: OriginFor<T>,
+            app_id: ApplicationId,
+            manifest: SecurityManifest,
+        ) -> DispatchResult {
+            let who = T::OwnerOrigin::ensure_origin(origin)?;
+            let app = Applications::<T>::get(app_id).ok_or(Error::<T>::UnknownApplication)?;
+            ensure!(app.owner == who, Error::<T>::NotApplicationOwner);
+            ensure!(!app.revoked, Error::<T>::ApplicationRevoked);
+
+            let current = Versions::<T>::get(app_id, app.current_version)
+                .ok_or(Error::<T>::UnknownVersion)?;
+            ensure!(
+                manifest.hashes == current.hashes,
+                Error::<T>::ArtifactHashMismatch
+            );
+
+            let manifest_hash = manifest.canonical_hash();
+            ManifestHashes::<T>::insert(app_id, manifest_hash);
+            Manifests::<T>::insert(app_id, manifest);
+
+            Self::deposit_event(Event::ManifestRegistered {
+                app_id,
+                manifest_hash,
+            });
+            Ok(())
+        }
     }
 
     impl<T: Config> Pallet<T> {
@@ -822,6 +949,10 @@ impl<T: Config> ApplicationRegistryInspect<T::AccountId> for Pallet<T> {
 
     fn is_artifact_revoked(bytecode: H256) -> bool {
         RevokedArtifacts::<T>::contains_key(bytecode)
+    }
+
+    fn manifest_hash(app_id: ApplicationId) -> Option<H256> {
+        ManifestHashes::<T>::get(app_id)
     }
 }
 

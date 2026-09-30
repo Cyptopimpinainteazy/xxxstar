@@ -28,6 +28,7 @@ pub trait WeightInfo {
 	fn revoke_application() -> Weight;
 	fn bind_address() -> Weight;
 	fn unbind_address() -> Weight;
+	fn register_manifest() -> Weight;
 }
 
 /// Provisional weights using the node's configured DB weight.
@@ -73,6 +74,11 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(2_u64))
 			.saturating_add(T::DbWeight::get().writes(2_u64))
 	}
+	fn register_manifest() -> Weight {
+		Weight::from_parts(24_000_000, 0)
+			.saturating_add(T::DbWeight::get().reads(2_u64))
+			.saturating_add(T::DbWeight::get().writes(2_u64))
+	}
 }
 
 impl WeightInfo for () {
@@ -113,6 +119,11 @@ impl WeightInfo for () {
 	}
 	fn unbind_address() -> Weight {
 		Weight::from_parts(20_000_000, 0)
+			.saturating_add(RocksDbWeight::get().reads(2_u64))
+			.saturating_add(RocksDbWeight::get().writes(2_u64))
+	}
+	fn register_manifest() -> Weight {
+		Weight::from_parts(24_000_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(2_u64))
 			.saturating_add(RocksDbWeight::get().writes(2_u64))
 	}

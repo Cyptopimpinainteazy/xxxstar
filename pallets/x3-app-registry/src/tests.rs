@@ -4,11 +4,12 @@
 // exactly as it must be in production (certification is a security power).
 
 use crate::pallet::{
-    AddressOwners, AppAddresses, Applications, NextApplicationId, RevokedArtifacts, Versions,
+    AddressOwners, AppAddresses, Applications, ManifestHashes, Manifests, NextApplicationId,
+    RevokedArtifacts, Versions,
 };
 use crate::{
-    ApplicationRegistryInspect, ArtifactHashes, CertificationTier, GuardianVm, RestrictionReason,
-    StandardRefs,
+    ApplicationRegistryInspect, ArtifactHashes, CertificationTier, EvidenceRef, GuardianVm,
+    RestrictionReason, SecurityManifest, StandardRefs,
 };
 use frame_support::{
     assert_noop, assert_ok, construct_runtime, derive_impl,
@@ -481,5 +482,94 @@ fn revoked_bytecode_is_tracked_fleet_wide() {
             RestrictionReason::PolicyViolation
         ));
         assert!(RevokedArtifacts::<Test>::contains_key(h(1)));
+    });
+}
+
+fn manifest(name: &[u8], b: u8, s: u8, m: u8) -> SecurityManifest {
+    SecurityManifest {
+        name: name.to_vec().try_into().unwrap(),
+        version: b"1.0.0".to_vec().try_into().unwrap(),
+        vm: GuardianVm::Evm,
+        category: 1,
+        hashes: hashes(b, s, m),
+        standards: stds(),
+        declared_capabilities: vec![1u32, 2].try_into().unwrap(),
+        evidence: vec![EvidenceRef {
+            kind: 0,
+            uri_hash: h(9),
+        }]
+        .try_into()
+        .unwrap(),
+    }
+}
+
+#[test]
+fn manifest_hash_is_deterministic_and_field_sensitive() {
+    new_test_ext().execute_with(|| {
+        let a = manifest(b"dex", 1, 2, 3);
+        let b = manifest(b"dex", 1, 2, 3);
+        // Same content => same hash (deterministic).
+        assert_eq!(a.canonical_hash(), b.canonical_hash());
+
+        // Any field change => different hash (SP5: no silent reuse).
+        let mut c = manifest(b"dex", 1, 2, 3);
+        c.category = 2;
+        assert_ne!(a.canonical_hash(), c.canonical_hash());
+
+        let mut d = manifest(b"dex", 1, 2, 3);
+        d.name = b"dexx".to_vec().try_into().unwrap();
+        assert_ne!(a.canonical_hash(), d.canonical_hash());
+
+        let e = manifest(b"dex", 4, 2, 3);
+        assert_ne!(a.canonical_hash(), e.canonical_hash());
+    });
+}
+
+#[test]
+fn register_manifest_requires_matching_artifacts() {
+    new_test_ext().execute_with(|| {
+        let id = register(7, b"dex", GuardianVm::Evm, hashes(1, 2, 3));
+        // A manifest describing different bytecode is refused.
+        assert_noop!(
+            AppRegistry::register_manifest(signed(7), id, manifest(b"dex", 9, 2, 3)),
+            crate::Error::<Test>::ArtifactHashMismatch
+        );
+        assert!(!Manifests::<Test>::contains_key(id));
+
+        assert_ok!(AppRegistry::register_manifest(
+            signed(7),
+            id,
+            manifest(b"dex", 1, 2, 3)
+        ));
+        assert!(Manifests::<Test>::contains_key(id));
+    });
+}
+
+#[test]
+fn register_manifest_records_a_traceable_hash() {
+    new_test_ext().execute_with(|| {
+        let id = register(7, b"dex", GuardianVm::Evm, hashes(1, 2, 3));
+        let m = manifest(b"dex", 1, 2, 3);
+        let expected = m.canonical_hash();
+        assert_ok!(AppRegistry::register_manifest(signed(7), id, m));
+
+        assert_eq!(ManifestHashes::<Test>::get(id), Some(expected));
+        assert_eq!(AppRegistry::manifest_hash(id), Some(expected));
+        // The stored manifest re-hashes to the recorded hash.
+        assert_eq!(
+            Manifests::<Test>::get(id).unwrap().canonical_hash(),
+            expected
+        );
+    });
+}
+
+#[test]
+fn register_manifest_requires_ownership() {
+    new_test_ext().execute_with(|| {
+        let id = register(7, b"dex", GuardianVm::Evm, hashes(1, 2, 3));
+        assert_noop!(
+            AppRegistry::register_manifest(signed(8), id, manifest(b"dex", 1, 2, 3)),
+            crate::Error::<Test>::NotApplicationOwner
+        );
     });
 }
