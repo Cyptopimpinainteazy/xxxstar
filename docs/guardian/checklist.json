@@ -28,7 +28,7 @@
       "sec": "23/24",
       "item": "Baseline: workspace compiles",
       "status": "DONE",
-      "evidence": "cargo check -p pallet-x3-invariants finished clean in 26.6s"
+      "evidence": "cargo check --workspace finished clean in 2m39s (0 errors) at d80b021ce; the previous evidence cited a single pallet (-p pallet-x3-invariants) for a whole-workspace claim"
     },
     {
       "id": "A1",
@@ -41,15 +41,15 @@
       "id": "A2",
       "sec": "5",
       "item": "pallet-x3-security-gate (policies, thresholds, rule versions)",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "pallets/x3-security-gate: versioned rulesets (mutable draft, activation freezes the version permanently), per-category and per-VM required test classes, severity blocking thresholds with public attributable expiring exceptions, fail-closed read API; 18 tests pass (cargo test -p pallet-x3-security-gate), no_std + clippy -D warnings clean (commit d80b021ce)"
     },
     {
       "id": "A3",
       "sec": "5",
       "item": "pallet-x3-trust-gate (dangerous privilege detection)",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "pallets/x3-trust-gate: closed 12-capability Privilege Map, category policy is a total disjoint partition (allowed/disclosed/forbidden) refused if incomplete or overlapping, Guardian-recorded privilege census that records its category, evaluate() refuses forbidden and unclassified privileges; 16 tests pass (cargo test -p pallet-x3-trust-gate), no_std + clippy -D warnings clean (commit d80b021ce)"
     },
     {
       "id": "A4",
@@ -111,22 +111,22 @@
       "id": "R3",
       "sec": "24",
       "item": "Registry: guardian standard, trust standard, exploit corpus",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "StandardRefs{guardian_standard,trust_standard,exploit_corpus} (lib.rs:172) stored on every VersionRecord.standards (lib.rs:355) and accepted by add_version"
     },
     {
       "id": "R4",
       "sec": "24",
       "item": "Registry: status, certification timestamp, next review",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "VersionRecord.tier / certified_at / next_review (lib.rs:357-363) written by certify_application (lib.rs:694); certify_binds_to_exact_hashes + certify_only_accepts_current_version tests"
     },
     {
       "id": "R5",
       "sec": "24",
       "item": "Registry: restrictions and reason codes",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "RestrictionReason enum (lib.rs:120) + record.restriction; restrict_application (lib.rs:736) and revoke_application (lib.rs:766) store the reason and keep history; restrict_removes_privileges_and_keeps_history test"
     },
     {
       "id": "R6",
@@ -1364,6 +1364,76 @@
       "id": "PG20",
       "sec": "64",
       "item": "Gate: CI green and adversarial tests pass",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PRIN-1",
+      "sec": "1",
+      "item": "Certification bound to an exact artifact plus ruleset version; never a claim that software is 100% safe",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "SEC-1",
+      "sec": "2",
+      "item": "Core security model: Security Gate and Trust Gate are independent, and both must pass before X3 Verified",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PERM-1",
+      "sec": "4",
+      "item": "Permissionlessness preserved: unendorsed deployment stays open; Guardian gates official status, not experimentation",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "WIRE-1",
+      "sec": "5",
+      "item": "Guardian pallets are wired into a runtime: at least one production path consults the gates before granting privileges",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PIPE-1",
+      "sec": "6",
+      "item": "Security testing pipeline: intake then reproducible build phases before any analysis verdict",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "DISP-1",
+      "sec": "29",
+      "item": "User-facing security display shows provenance and limits, never a \"safe\" badge",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "NOMOCK-1",
+      "sec": "39",
+      "item": "No mocks for production claims: certification evidence must come from real infrastructure",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "PROM-1",
+      "sec": "57",
+      "item": "User protection without false promises: state what was tested and what was not",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "OUT-1",
+      "sec": "65",
+      "item": "Agent output: what was created, files, tests run, remaining gaps, production gate verdict",
+      "status": "TODO",
+      "evidence": ""
+    },
+    {
+      "id": "REP-1",
+      "sec": "66",
+      "item": "Completion report: per-domain coverage percentages (EVM/SVM/X3VM/cross-VM/atomic/trust/corpus/monitoring/certification) with PASS or NOT READY",
       "status": "TODO",
       "evidence": ""
     }
