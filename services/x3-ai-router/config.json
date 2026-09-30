@@ -34,9 +34,10 @@
       "model": "qwen2.5-coder:7b",
       "supports_tools": false,
       "tool_probe": true,
-      "critical_allowed": true
+      "critical_allowed": true,
+      "probe_samples": 2
     },
-      "nemotron_lightning_free": {
+    "nemotron_lightning_free": {
       "base_url": "https://openrouter.ai/api/v1",
       "model": "nvidia/nemotron-3.5-lightning:free",
       "api_key_env": "OPENROUTER_API_KEY",
@@ -44,7 +45,9 @@
       "free_model": true,
       "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
-      "critical_allowed": false
+      "critical_allowed": false,
+      "tool_probe": true,
+      "probe_samples": 6
     },
     "nemotron_ultra_free": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -54,7 +57,9 @@
       "free_model": true,
       "supports_tools": true,
       "pricing_checked_on": "2026-09-29",
-      "critical_allowed": false
+      "critical_allowed": false,
+      "tool_probe": true,
+      "probe_samples": 6
     },
     "openrouter": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -89,10 +94,13 @@
       "tool_probe": true,
       "thinking": {
         "parameter": "thinking",
-        "disabled_value": {"type": "disabled"},
+        "disabled_value": {
+          "type": "disabled"
+        },
         "disable_when_tool_choice_forced": true
       },
       "critical_allowed": true
     }
-  }
+  },
+  "capability_probe_samples": 3
 }

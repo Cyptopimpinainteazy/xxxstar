@@ -819,19 +819,28 @@ class Router:
         `{"name": ..., "arguments": ...}` in the message body and `tool_calls`
         null. A declaration is a claim; this is the check.
 
+        One sample is not a verdict. A free cloud model returned a genuine tool
+        call on three consecutive startup probes and then answered the very next
+        one with prose; sampled six times it managed four. The probe therefore
+        takes several samples and reports the *rate*, and a provider counts as
+        capable only if that rate clears `probe_min_success_rate`.
+
         The verdict is cached per provider and model, and a probe that cannot
         run leaves `tools` as None rather than revoking a working declaration.
         """
         key = (name, provider.get("model"))
         now = now if now is not None else time.time()
         if not provider.get("tool_probe"):
-            return {"tools": None, "detail": "not probed", "checked_at": None}
+            return {"tools": None, "detail": "not probed", "checked_at": None,
+                    "samples": 0, "genuine": 0, "success_rate": None}
         with self.lock:
             cached = self.capabilities.get(key)
         ttl = self.config.get("capability_probe_ttl_seconds", 3600)
         if cached and cached["checked_at"] is not None and now - cached["checked_at"] < ttl:
             return cached
-        verdict = {"tools": None, "detail": "not probed", "checked_at": now}
+        samples = max(1, int(provider.get("probe_samples", self.config.get("capability_probe_samples", 3))))
+        threshold = float(provider.get("probe_min_success_rate", 1.0))
+        genuine, attempted, failure = 0, 0, None
         try:
             headers = {"Content-Type": "application/json"}
             key_env = provider.get("api_key_env")
@@ -842,26 +851,43 @@ class Router:
             # rejects `required` outright while thinking mode is on.
             probe_body = tool_probe_request(provider["model"])
             apply_provider_reasoning(probe_body, provider)
-            call = urllib.request.Request(provider["base_url"].rstrip("/") + "/chat/completions",
-                                          json.dumps(probe_body).encode(),
-                                          headers, method="POST")
-            with urllib.request.urlopen(call, timeout=provider.get("probe_timeout_seconds", 60)) as response:
-                result = json.load(response)
-            message = (result.get("choices") or [{}])[0].get("message") or {}
-            calls = [c for c in (message.get("tool_calls") or [])
-                     if (c.get("function") or {}).get("name") == PROBE_TOOL]
-            verdict["tools"] = bool(calls)
-            verdict["detail"] = ("returned a genuine tool call" if calls else
-                                 "answered a required tool request with text and no tool_calls array")
+            payload = json.dumps(probe_body).encode()
+            for _ in range(samples):
+                call = urllib.request.Request(provider["base_url"].rstrip("/") + "/chat/completions",
+                                              payload, headers, method="POST")
+                with urllib.request.urlopen(call, timeout=provider.get("probe_timeout_seconds", 60)) as response:
+                    result = json.load(response)
+                message = (result.get("choices") or [{}])[0].get("message") or {}
+                attempted += 1
+                if any((c.get("function") or {}).get("name") == PROBE_TOOL
+                       for c in (message.get("tool_calls") or [])):
+                    genuine += 1
         except urllib.error.HTTPError as exc:
-            verdict["detail"] = "probe failed: HTTP " + str(exc.code)
+            failure = "probe failed: HTTP " + str(exc.code)
         except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
-            verdict["detail"] = "probe failed: " + type(exc).__name__
+            failure = "probe failed: " + type(exc).__name__
+        rate = (genuine / attempted) if attempted else None
+        if failure is not None and attempted == 0:
+            verdict = {"tools": None, "detail": failure, "checked_at": now,
+                       "samples": samples, "genuine": genuine, "success_rate": None}
+        else:
+            reliable = rate is not None and rate >= threshold
+            detail = ("returned a genuine tool call on {}/{} probes".format(genuine, attempted)
+                      if reliable else
+                      "answered a required tool request with text and no tool_calls array on "
+                      "{}/{} probes".format(attempted - genuine, attempted))
+            if failure is not None:
+                detail += " (" + failure + ")"
+            verdict = {"tools": reliable, "detail": detail, "checked_at": now,
+                       "samples": samples, "genuine": genuine,
+                       "success_rate": round(rate, 4) if rate is not None else None}
         with self.lock:
             self.capabilities[key] = verdict
         self.log_diagnostic({"request_id": "capability", "provider": name,
                              "status": verdict["tools"], "cooldown_seconds": 0,
-                             "reason": str(provider.get("model")) + ": " + verdict["detail"]})
+                             "reason": "{model}: {genuine}/{attempted} genuine tool calls ({detail})".format(
+                                 model=provider.get("model"), genuine=verdict["genuine"],
+                                 attempted=attempted, detail=verdict["detail"])})
         return verdict
 
     def capability_report(self, probe=False):
@@ -881,6 +907,9 @@ class Router:
                 "declared_tools": bool(provider.get(TOOL_CAPABLE, False)),
                 "probed_tools": verdict["tools"],
                 "probe_detail": verdict["detail"],
+                "probe_samples": verdict.get("samples", 0),
+                "probe_genuine": verdict.get("genuine", 0),
+                "probe_success_rate": verdict.get("success_rate"),
                 "critical_allowed": may_serve_critical(provider),
                 "credential_present": bool(not provider.get("api_key_env")
                                            or os.environ.get(provider["api_key_env"])),

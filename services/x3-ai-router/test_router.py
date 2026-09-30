@@ -1,4 +1,5 @@
 import importlib.util
+import itertools
 import json
 import os
 import tempfile
@@ -1152,7 +1153,45 @@ class CapabilityProbeTests(unittest.TestCase):
         provider = self.config["providers"]["up"]
         for _ in range(3):
             self.router.probe_tools("up", provider)
-        self.assertEqual(len(ScriptedProvider.requests), 1, "one probe per provider and model")
+        self.assertEqual(len(ScriptedProvider.requests), 3,
+                         "one sampling round per provider and model, not one per request")
+        self.assertEqual(self.router.probe_tools("up", provider)["samples"], 3)
+        self.assertEqual(len(ScriptedProvider.requests), 3, "the cached verdict is reused")
+
+    def test_a_partially_reliable_provider_is_measured_not_assumed(self):
+        """A free model called the tool 4 times in 6; one sample says nothing."""
+        # Cycles, so a second sampling round sees the same distribution rather
+        # than running out of scripted answers.
+        outcomes = [True, True, False, True, True, False]
+        draw = itertools.cycle(outcomes)
+
+        def sometimes(handler, body):
+            genuine = next(draw)
+            message = ({"role": "assistant", "content": None, "tool_calls": [
+                {"id": "c", "type": "function",
+                 "function": {"name": router_module.PROBE_TOOL, "arguments": '{"value":"ok"}'}}]}
+                if genuine else
+                {"role": "assistant", "content": '{"name": "' + router_module.PROBE_TOOL + '", "arguments": {}}'})
+            payload = json.dumps({"model": "up-model",
+                                  "choices": [{"message": message, "finish_reason": "tool_calls"}]}).encode()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+
+        ScriptedProvider.script = sometimes
+        provider = dict(self.config["providers"]["up"], probe_samples=6)
+        verdict = self.router.probe_tools("up", provider)
+
+        self.assertEqual((verdict["genuine"], verdict["samples"]), (4, 6))
+        self.assertEqual(verdict["success_rate"], 0.6667)
+        self.assertFalse(verdict["tools"], "a provider that narrates a call a third of the time is not reliable")
+
+        # The same measurements, with the operator accepting that failure rate.
+        self.router.capabilities.clear()
+        lenient = dict(provider, probe_min_success_rate=0.6)
+        self.assertTrue(self.router.probe_tools("up", lenient)["tools"])
 
     def test_an_expired_verdict_is_probed_again(self):
         self.genuine_tool_call()
@@ -1161,7 +1200,8 @@ class CapabilityProbeTests(unittest.TestCase):
         self.router.capabilities[("up", "up-model")] = {"tools": True, "detail": "returned a genuine tool call",
                                                         "checked_at": stale}
         self.router.probe_tools("up", provider)
-        self.assertEqual(len(ScriptedProvider.requests), 1)
+        self.assertEqual(len(ScriptedProvider.requests), provider.get("probe_samples", 3),
+                         "the expired verdict is re-sampled")
 
     def test_a_provider_that_did_not_opt_in_is_never_probed(self):
         provider = {key: value for key, value in self.config["providers"]["up"].items() if key != "tool_probe"}
