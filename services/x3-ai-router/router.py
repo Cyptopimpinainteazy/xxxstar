@@ -35,6 +35,11 @@ UNSUPPORTED_TOOL_TYPES = ("file_search", "image_generation", "computer_use",
 # string argument and is lifted back out on the way to the client.
 CUSTOM_TOOL_INPUT = "input"
 TOOL_CAPABLE = "supports_tools"
+# A model can advertise tool support and still answer with JSON in the message
+# body. The only evidence that counts is a `tool_calls` array, so the probe asks
+# for one and will not take prose for an answer.
+PROBE_TOOL = "x3_capability_probe"
+PROBE_ARGUMENT = "value"
 
 
 class UnsupportedFeature(Exception):
@@ -155,12 +160,31 @@ def apply_provider_reasoning(payload, provider):
     `tool_choice` there with HTTP 400 ("Thinking mode does not support this
     tool_choice"). A provider that declares the conflict has thinking switched
     off for exactly those turns; every other turn keeps the provider default.
+
+    The client's reasoning effort rides along only to a provider that has
+    declared it accepts the parameter, so an unknown field is not forwarded to
+    every other provider in the chain.
     """
     thinking = provider.get("thinking")
-    if not thinking or not thinking.get("disable_when_tool_choice_forced"):
-        return
-    if tool_choice_forces_a_tool(payload.get("tool_choice")):
+    if thinking and thinking.get("disable_when_tool_choice_forced") \
+            and tool_choice_forces_a_tool(payload.get("tool_choice")):
         payload[thinking.get("parameter", "thinking")] = thinking.get("disabled_value", {"type": "disabled"})
+    if not provider.get("reasoning_effort"):
+        payload.pop("reasoning_effort", None)
+
+
+def tool_probe_request(model):
+    """A request whose only purpose is to be answered with a tool call."""
+    return {
+        "model": model, "stream": False, "max_tokens": 64, "tool_choice": "required",
+        "tools": [{"type": "function", "function": {
+            "name": PROBE_TOOL, "description": "Report a capability value.",
+            "parameters": {"type": "object", "required": [PROBE_ARGUMENT],
+                           "properties": {PROBE_ARGUMENT: {"type": "string"}}}}}],
+        "messages": [{"role": "user",
+                      "content": "Call the " + PROBE_TOOL + " tool with value set to \"ok\". "
+                                 "Do not answer in text."}],
+    }
 
 
 def responses_messages(request):
@@ -237,6 +261,11 @@ def responses_request(request):
     limit = request.get("max_output_tokens")
     if isinstance(limit, int) and limit > 0:
         chat["max_tokens"] = limit
+    # Codex sends the effort it was asked for. It is carried here and dropped
+    # again in `provider_payload` unless the provider declares it accepts it.
+    reasoning = request.get("reasoning")
+    if isinstance(reasoning, dict) and isinstance(reasoning.get("effort"), str):
+        chat["reasoning_effort"] = reasoning["effort"]
     return chat, custom, disabled
 
 
@@ -528,6 +557,7 @@ class Router:
         self.db.execute("CREATE TABLE IF NOT EXISTS provider_health (provider TEXT PRIMARY KEY, failures INTEGER DEFAULT 0, cooldown_until REAL DEFAULT 0, last_error TEXT, last_failure_at REAL)")
         self.db.commit()
         self.reconciled_orphans = 0
+        self.capabilities = {}
         self.reconcile_reservations()
 
     def choose(self, request):
@@ -754,6 +784,10 @@ class Router:
         can never arrive, so an agent request needs a provider that has
         declared `supports_tools` — text-only success is not success here.
 
+        A provider that declares tool support but has been *observed* answering
+        a tool request with prose is refused as well: configuration may grant
+        the capability, only evidence may take it away.
+
         A provider the operator switched off is skipped quietly: it is a
         configuration choice, not a failure worth reporting on every request.
         """
@@ -764,14 +798,105 @@ class Router:
         cooldown = self.provider_cooldown(name)
         if cooldown > 0:
             return self.diagnostic(name, None, f"cooling down for {cooldown:.0f}s")
-        if (request.get("tools") or request.get("functions")) and not provider.get(TOOL_CAPABLE, False):
-            return self.diagnostic(name, None, "model is not declared tool-capable")
+        if request.get("tools") or request.get("functions"):
+            if not provider.get(TOOL_CAPABLE, False):
+                return self.diagnostic(name, None, "model is not declared tool-capable")
+            verdict = self.probe_tools(name, provider)
+            if verdict["tools"] is False:
+                return self.diagnostic(name, None, "tool probe: " + verdict["detail"])
         error = pricing_error(provider)
         if error:
             return self.diagnostic(name, None, error)
         if provider.get("api_key_env") and not os.environ.get(provider["api_key_env"]):
             return self.diagnostic(name, None, "credential unavailable")
         return None
+
+    def probe_tools(self, name, provider, now=None):
+        """Does this endpoint really return a tool call, or only prose about one?
+
+        `/api/show` reporting a `tools` capability was not enough: a local model
+        was observed advertising tools and answering every tool request with
+        `{"name": ..., "arguments": ...}` in the message body and `tool_calls`
+        null. A declaration is a claim; this is the check.
+
+        The verdict is cached per provider and model, and a probe that cannot
+        run leaves `tools` as None rather than revoking a working declaration.
+        """
+        key = (name, provider.get("model"))
+        now = now if now is not None else time.time()
+        if not provider.get("tool_probe"):
+            return {"tools": None, "detail": "not probed", "checked_at": None}
+        with self.lock:
+            cached = self.capabilities.get(key)
+        ttl = self.config.get("capability_probe_ttl_seconds", 3600)
+        if cached and cached["checked_at"] is not None and now - cached["checked_at"] < ttl:
+            return cached
+        verdict = {"tools": None, "detail": "not probed", "checked_at": now}
+        try:
+            headers = {"Content-Type": "application/json"}
+            key_env = provider.get("api_key_env")
+            if key_env and os.environ.get(key_env):
+                headers["Authorization"] = "Bearer " + os.environ[key_env]
+            # The probe is a required tool choice, so it has to obey the same
+            # provider reasoning rules as a real forced-tool turn: DeepSeek
+            # rejects `required` outright while thinking mode is on.
+            probe_body = tool_probe_request(provider["model"])
+            apply_provider_reasoning(probe_body, provider)
+            call = urllib.request.Request(provider["base_url"].rstrip("/") + "/chat/completions",
+                                          json.dumps(probe_body).encode(),
+                                          headers, method="POST")
+            with urllib.request.urlopen(call, timeout=provider.get("probe_timeout_seconds", 60)) as response:
+                result = json.load(response)
+            message = (result.get("choices") or [{}])[0].get("message") or {}
+            calls = [c for c in (message.get("tool_calls") or [])
+                     if (c.get("function") or {}).get("name") == PROBE_TOOL]
+            verdict["tools"] = bool(calls)
+            verdict["detail"] = ("returned a genuine tool call" if calls else
+                                 "answered a required tool request with text and no tool_calls array")
+        except urllib.error.HTTPError as exc:
+            verdict["detail"] = "probe failed: HTTP " + str(exc.code)
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+            verdict["detail"] = "probe failed: " + type(exc).__name__
+        with self.lock:
+            self.capabilities[key] = verdict
+        self.log_diagnostic({"request_id": "capability", "provider": name,
+                             "status": verdict["tools"], "cooldown_seconds": 0,
+                             "reason": str(provider.get("model")) + ": " + verdict["detail"]})
+        return verdict
+
+    def capability_report(self, probe=False):
+        """What every configured provider claims, and what could be verified.
+
+        This exists so a green `/health` is not mistaken for a working agent
+        route: liveness and capability are different questions.
+        """
+        report = []
+        for name, provider in self.config["providers"].items():
+            verdict = (self.probe_tools(name, provider) if probe
+                       else self.capabilities.get((name, provider.get("model")), {
+                           "tools": None, "detail": "not probed", "checked_at": None}))
+            report.append({
+                "provider": name,
+                "model": provider.get("model"),
+                "declared_tools": bool(provider.get(TOOL_CAPABLE, False)),
+                "probed_tools": verdict["tools"],
+                "probe_detail": verdict["detail"],
+                "critical_allowed": may_serve_critical(provider),
+                "credential_present": bool(not provider.get("api_key_env")
+                                           or os.environ.get(provider["api_key_env"])),
+            })
+        return report
+
+    def warm_capabilities(self):
+        """Probe every opted-in provider once, without blocking startup."""
+        for name, provider in self.config["providers"].items():
+            if provider.get("tool_probe"):
+                try:
+                    self.probe_tools(name, provider)
+                except Exception as exc:  # a probe must never take the router down
+                    self.log_diagnostic({"request_id": "capability", "provider": name,
+                                         "status": None, "cooldown_seconds": 0,
+                                         "reason": "probe raised " + type(exc).__name__})
 
     def provider_payload(self, request, provider, stream):
         """The upstream Chat Completions body for one provider attempt.
@@ -1072,6 +1197,11 @@ def handler_for(router):
                 return self.reply(404, {"error": {"message": "No such model"}})
             if self.path == "/v1/providers":
                 return self.reply(200, {"providers": router.provider_health()})
+            capabilities, _, query = self.path.partition("?")
+            if capabilities == "/v1/capabilities":
+                # `?probe=1` re-checks every provider that opted in; the plain
+                # form reports the cached verdicts so a monitor can poll it.
+                return self.reply(200, {"capabilities": router.capability_report(probe="probe=1" in query)})
             return self.reply(404, {"error": "Not found"})
 
         def stream_chunk(self, chunk):
@@ -1238,7 +1368,11 @@ def main():
     args = parser.parse_args()
     with open(args.config, encoding="utf-8") as source:
         config = json.load(source)
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), handler_for(Router(config, args.db)))
+    router = Router(config, args.db)
+    # Probe in the background: a slow or unreachable provider must not hold up
+    # the listener, and the verdict is what makes an agent route provable.
+    threading.Thread(target=router.warm_capabilities, daemon=True).start()
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), handler_for(router))
     server.serve_forever()
 
 

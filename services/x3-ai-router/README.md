@@ -79,10 +79,63 @@ A request carrying `tools` (or legacy `functions`) needs a provider that can
 call them. A text-only model answers in prose and the agent waits for a tool
 call that can never arrive, so a provider must declare `"supports_tools": true`
 to be handed an agent request; otherwise it is skipped and the reason is
-reported. A plain text request to the same provider still works. The configured
-Ollama model, `qwen2.5-coder:7b`, was checked against `POST /api/show` and
-reports `capabilities: ["completion", "tools", "insert"]`, so it is declared
-tool-capable and remains a genuine agent fallback rather than a text-only one.
+reported. A plain text request to the same provider still works.
+
+### The local model is not a tool-capable fallback (measured, not assumed)
+
+`qwen2.5-coder:7b` reports `capabilities: ["completion", "tools", "insert"]`
+from `POST /api/show`, and an earlier revision of this file declared it
+tool-capable on that basis. That was wrong. Asked to call a tool — with
+`tool_choice: "required"`, three times — the model returned the call as
+**prose** and never populated `tool_calls`:
+
+    tool_calls: null
+    content: '{"name": "exec_command", "arguments": {"cmd": "ls -1"}}'
+
+The other installed models were no better: `huihui_ai/qwen3-abliterated:1.7b`
+returned empty content, and `leonardoba500/deepseek-v41-uncensored` was over its
+monthly quota and could not be tested at all. So the router is correct to refuse
+rather than to reinterpret: treating that JSON as an executable tool call is
+exactly the failure the Responses translation exists to prevent. `ollama` is
+therefore declared `supports_tools: false`, and an agent request routed to it
+fails closed with
+`ollama: model is not declared tool-capable` while plain text work still
+succeeds locally. A local agent fallback needs a model that genuinely emits tool
+calls; installing one is a model choice, not a router change.
+
+### Capability probes
+
+A declaration is a claim, so a provider may opt into verification with
+`"tool_probe": true`. The probe asks the provider for a required tool call and
+accepts only a real `tool_calls` array. Configuration may grant a capability;
+only evidence may take it away:
+
+| probe result | effect |
+| --- | --- |
+| genuine `tool_calls` | provider stays usable for agent requests |
+| text with no `tool_calls` | provider is refused for agent requests, named in the failure |
+| probe could not run | reported as unknown; a working declaration is not revoked |
+
+Probes run once in the background at startup — a slow provider never holds up
+the listener — and the verdict is cached per provider and model for
+`capability_probe_ttl_seconds` (3600). `GET /v1/capabilities` reports the
+cached verdicts; `?probe=1` re-checks on demand. The report separates the
+declaration from the verdict, so `declared_tools: true` next to
+`probed_tools: false` is visible rather than papered over. Live at the time of
+writing: `deepseek-flash` returned a genuine tool call, `qwen2.5-coder:7b` did
+not.
+
+`/health` remains a liveness check only. It does not mean an agent route works;
+`/v1/capabilities` is where that question is answered.
+
+### Reasoning effort
+
+Codex sends `reasoning: {"effort": ...}`. It is carried through translation and
+sent only to a provider declaring `"reasoning_effort": true`, so the field is
+not sprayed at every other provider in the chain. DeepSeek accepts the
+parameter alongside both thinking modes, including the forced-tool-choice turns
+where thinking is switched off, so the effort the operator selected is not
+silently dropped.
 
 `max_tokens` is pinned on every upstream call, even when the client sent no
 output bound, so the request can never be billed for more than the reservation

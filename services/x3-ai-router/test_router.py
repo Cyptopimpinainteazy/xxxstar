@@ -1035,5 +1035,223 @@ class ProtocolTests(unittest.TestCase):
                          "an unset output bound must be pinned so the estimate is an upper bound")
 
 
+class CapabilityProbeTests(unittest.TestCase):
+    """A declaration is a claim; the probe is the check behind it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        ScriptedProvider.requests = []
+        ScriptedProvider.script = None
+        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), ScriptedProvider)
+        self.upstream.daemon_threads = True
+        threading.Thread(target=self.upstream.serve_forever, daemon=True).start()
+        self.config = {
+            "daily_budget_usd": 1, "agent_daily_budget_usd": 1, "max_input_tokens": 100000,
+            "max_request_bytes": 2000000, "routes": {"routine": ["up"], "critical": ["up"]},
+            "providers": {"up": {"base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1",
+                                 "model": "up-model", "critical_allowed": True, "tool_probe": True,
+                                 "input_usd_per_million": 1, "output_usd_per_million": 1,
+                                 "supports_tools": True}},
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+
+    def tearDown(self):
+        self.upstream.shutdown()
+        self.upstream.server_close()
+        self.tmp.cleanup()
+
+    def script_message(self, message, finish="stop"):
+        def respond(handler, body):
+            payload = json.dumps({"model": "up-model",
+                                  "choices": [{"message": message, "finish_reason": finish}],
+                                  "usage": {"prompt_tokens": 3, "completion_tokens": 1}}).encode()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+        ScriptedProvider.script = respond
+
+    def genuine_tool_call(self):
+        self.script_message({"role": "assistant", "content": None, "tool_calls": [
+            {"id": "call_probe", "type": "function",
+             "function": {"name": router_module.PROBE_TOOL, "arguments": '{"value":"ok"}'}}]},
+            finish="tool_calls")
+
+    def prose_about_a_tool_call(self):
+        self.script_message({"role": "assistant",
+                             "content": '{"name": "' + router_module.PROBE_TOOL + '", "arguments": {"value": "ok"}}'})
+
+    def agent_request(self):
+        return {"messages": [{"role": "user", "content": "go"}], "max_tokens": 8,
+                "tools": [{"type": "function", "function": {"name": "f", "parameters": {"type": "object"}}}]}
+
+    def test_the_probe_asks_for_a_required_tool_call(self):
+        self.genuine_tool_call()
+        self.router.probe_tools("up", self.config["providers"]["up"])
+
+        probe = ScriptedProvider.requests[0]
+        self.assertEqual(probe["tool_choice"], "required")
+        self.assertEqual(probe["tools"][0]["function"]["name"], router_module.PROBE_TOOL)
+        self.assertEqual(probe["model"], "up-model")
+
+    def test_the_probe_obeys_the_provider_reasoning_rules(self):
+        """A forced tool choice would otherwise be rejected before it is answered."""
+        self.genuine_tool_call()
+        provider = dict(self.config["providers"]["up"], thinking={
+            "parameter": "thinking", "disabled_value": {"type": "disabled"},
+            "disable_when_tool_choice_forced": True})
+        self.router.config["providers"]["up"] = provider
+
+        self.router.probe_tools("up", provider)
+
+        self.assertEqual(ScriptedProvider.requests[0]["thinking"], {"type": "disabled"})
+
+    def test_a_genuine_tool_call_keeps_the_provider_for_agent_requests(self):
+        self.genuine_tool_call()
+        verdict = self.router.probe_tools("up", self.config["providers"]["up"])
+
+        self.assertTrue(verdict["tools"])
+        self.assertIn("genuine tool call", verdict["detail"])
+        self.assertIsNone(self.router.provider_skip("up", self.config["providers"]["up"],
+                                                    "routine", self.agent_request()))
+
+    def test_prose_about_a_tool_call_revokes_the_capability(self):
+        """The exact shape a local model was observed producing."""
+        self.prose_about_a_tool_call()
+        verdict = self.router.probe_tools("up", self.config["providers"]["up"])
+
+        self.assertFalse(verdict["tools"], "JSON in the message body is not a tool call")
+        skip = self.router.provider_skip("up", self.config["providers"]["up"], "routine", self.agent_request())
+        self.assertIsNotNone(skip, "an agent request must not go to a provider that only narrates")
+        self.assertIn("tool probe", skip["attempt"])
+
+    def test_a_revoked_capability_still_serves_plain_text(self):
+        self.prose_about_a_tool_call()
+        self.router.probe_tools("up", self.config["providers"]["up"])
+        self.assertIsNone(self.router.provider_skip("up", self.config["providers"]["up"], "routine",
+                                                    {"messages": [{"role": "user", "content": "go"}]}))
+
+    def test_a_probe_that_cannot_run_does_not_revoke_a_declaration(self):
+        def explode(handler, body):
+            handler.send_response(500)
+            handler.send_header("Content-Length", "2")
+            handler.end_headers()
+            handler.wfile.write(b"{}")
+
+        ScriptedProvider.script = explode
+        verdict = self.router.probe_tools("up", self.config["providers"]["up"])
+
+        self.assertIsNone(verdict["tools"], "an unrunnable probe is unknown, not a refusal")
+        self.assertIn("probe failed", verdict["detail"])
+        self.assertIsNone(self.router.provider_skip("up", self.config["providers"]["up"],
+                                                    "routine", self.agent_request()))
+
+    def test_the_verdict_is_cached_instead_of_probed_per_request(self):
+        self.genuine_tool_call()
+        provider = self.config["providers"]["up"]
+        for _ in range(3):
+            self.router.probe_tools("up", provider)
+        self.assertEqual(len(ScriptedProvider.requests), 1, "one probe per provider and model")
+
+    def test_an_expired_verdict_is_probed_again(self):
+        self.genuine_tool_call()
+        provider = self.config["providers"]["up"]
+        stale = router_module.time.time() - self.config.get("capability_probe_ttl_seconds", 3600) - 1
+        self.router.capabilities[("up", "up-model")] = {"tools": True, "detail": "returned a genuine tool call",
+                                                        "checked_at": stale}
+        self.router.probe_tools("up", provider)
+        self.assertEqual(len(ScriptedProvider.requests), 1)
+
+    def test_a_provider_that_did_not_opt_in_is_never_probed(self):
+        provider = {key: value for key, value in self.config["providers"]["up"].items() if key != "tool_probe"}
+        verdict = self.router.probe_tools("up", provider)
+        self.assertEqual((verdict["tools"], verdict["detail"]), (None, "not probed"))
+        self.assertEqual(ScriptedProvider.requests, [])
+
+    def test_warming_capabilities_survives_an_unreachable_provider(self):
+        self.genuine_tool_call()
+        self.config["providers"]["dead"] = {"base_url": "http://127.0.0.1:1/v1", "model": "dead",
+                                            "tool_probe": True, "probe_timeout_seconds": 1}
+        self.router.warm_capabilities()  # must not raise
+        self.assertIn(("dead", "dead"), self.router.capabilities)
+
+    def test_the_capability_report_separates_a_claim_from_a_verdict(self):
+        self.config["providers"]["unprobed"] = {"base_url": "http://127.0.0.1:1/v1",
+                                                "model": "unprobed", "supports_tools": True}
+        self.prose_about_a_tool_call()
+        self.router.warm_capabilities()
+        report = {row["provider"]: row for row in self.router.capability_report()}
+
+        self.assertTrue(report["up"]["declared_tools"])
+        self.assertFalse(report["up"]["probed_tools"], "the verdict disagrees with the declaration")
+        self.assertTrue(report["up"]["critical_allowed"])
+        self.assertIsNone(report["unprobed"]["probed_tools"])
+        self.assertEqual(report["unprobed"]["probe_detail"], "not probed")
+
+    def test_the_capabilities_endpoint_is_served_and_gated(self):
+        self.prose_about_a_tool_call()
+        self.router.warm_capabilities()
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        previous = os.environ.get("X3_ROUTER_TOKEN")
+        os.environ["X3_ROUTER_TOKEN"] = "test-secret"
+        try:
+            url = f"http://127.0.0.1:{server.server_port}/v1/capabilities"
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                urllib.request.urlopen(url)
+            self.assertEqual(rejected.exception.code, 401)
+            request = urllib.request.Request(url, headers={"Authorization": "Bearer test-secret"})
+            with urllib.request.urlopen(request) as response:
+                rows = {row["provider"]: row for row in json.load(response)["capabilities"]}
+            self.assertFalse(rows["up"]["probed_tools"])
+            self.assertEqual(rows["up"]["model"], "up-model")
+        finally:
+            if previous is None:
+                os.environ.pop("X3_ROUTER_TOKEN", None)
+            else:
+                os.environ["X3_ROUTER_TOKEN"] = previous
+            server.shutdown()
+            server.server_close()
+
+    # ── Reasoning effort fidelity ────────────────────────────────────────
+
+    def test_reasoning_effort_is_carried_from_the_responses_request(self):
+        chat = router_module.responses_request_to_chat({
+            "instructions": "sys", "reasoning": {"effort": "low"},
+            "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]}]})
+        self.assertEqual(chat["reasoning_effort"], "low")
+
+    def test_reasoning_effort_reaches_only_a_provider_that_accepts_it(self):
+        accepting = dict(self.config["providers"]["up"], reasoning_effort=True)
+        refusing = dict(self.config["providers"]["up"])
+        chat = {"messages": [{"role": "user", "content": "go"}], "max_tokens": 8, "reasoning_effort": "low"}
+
+        self.assertEqual(self.router.provider_payload(chat, accepting, False)["reasoning_effort"], "low")
+        self.assertNotIn("reasoning_effort", self.router.provider_payload(chat, refusing, False),
+                         "an undeclared field must not be forwarded to every provider")
+
+    def test_reasoning_effort_is_kept_when_a_forced_tool_choice_disables_thinking(self):
+        provider = dict(self.config["providers"]["up"], reasoning_effort=True, thinking={
+            "parameter": "thinking", "disabled_value": {"type": "disabled"},
+            "disable_when_tool_choice_forced": True})
+        payload = self.router.provider_payload(
+            {"messages": [{"role": "user", "content": "go"}], "max_tokens": 8, "reasoning_effort": "low",
+             "tools": [{"type": "function", "function": {"name": "f"}}],
+             "tool_choice": {"type": "function", "function": {"name": "f"}}}, provider, False)
+
+        # Verified live: DeepSeek accepts the pair, so the client's effort must
+        # not be silently dropped on the turns that need thinking switched off.
+        self.assertEqual(payload["thinking"], {"type": "disabled"})
+        self.assertEqual(payload["reasoning_effort"], "low")
+
+    def test_a_payload_without_a_reasoning_effort_is_left_alone(self):
+        accepting = dict(self.config["providers"]["up"], reasoning_effort=True)
+        payload = self.router.provider_payload({"messages": [{"role": "user", "content": "go"}], "max_tokens": 8},
+                                               accepting, False)
+        self.assertNotIn("reasoning_effort", payload)
+
+
 if __name__ == "__main__":
     unittest.main()
