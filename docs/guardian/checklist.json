@@ -139,29 +139,29 @@
       "id": "M1",
       "sec": "23",
       "item": "Security Manifest structure",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "pallet-x3-app-registry::pallet::SecurityManifest (name, version, vm, category, hashes, standards, declared_capabilities, evidence)"
     },
     {
       "id": "M2",
       "sec": "23",
       "item": "Manifest hashing",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "SecurityManifest::canonical_hash() BLAKE2 over SCALE; test manifest_hash_is_deterministic_and_field_sensitive"
     },
     {
       "id": "M3",
       "sec": "23/24",
       "item": "Manifest hash registered on-chain",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "register_manifest call records ManifestHashes[app_id]; test register_manifest_records_a_traceable_hash"
     },
     {
       "id": "M4",
       "sec": "23",
       "item": "Off-chain evidence with verifiable references",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DONE",
+      "evidence": "SecurityManifest.evidence: BoundedVec<EvidenceRef{kind,uri_hash}> — the chain stores the evidence hash only (spec §55/§56); register_manifest_requires_matching_artifacts"
     },
     {
       "id": "S1",
