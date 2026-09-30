@@ -707,7 +707,7 @@
       "sec": "49",
       "item": "Fail-safe: unknown != verified; outage cannot elevate",
       "status": "DONE",
-      "evidence": "CertificationTier::grants_privileges fails closed; unknown_application_is_rejected test"
+      "evidence": "unknown != verified: has_guardian_privileges is fail-closed for unknown/revoked/restricted; is_restricted now returns Option<bool> (None = unknown, never read as permission) - tests is_restricted_distinguishes_unknown_from_unrestricted + unknown_application_is_rejected; cargo test -p pallet-x3-app-registry -> 22 passed"
     },
     {
       "id": "IX1",

@@ -190,8 +190,16 @@ pub trait ApplicationRegistryInspect<AccountId> {
     fn current_version(app_id: ApplicationId) -> Option<u32>;
     /// The hashes bound to the current version of an application.
     fn current_hashes(app_id: ApplicationId) -> Option<ArtifactHashes>;
-    /// Whether the application is restricted or revoked (spec §59 SP4).
-    fn is_restricted(app_id: ApplicationId) -> bool;
+    /// Whether an application is currently restricted or revoked (spec §59 SP4).
+    ///
+    /// Returns `None` when no such application is registered. `None` is *not*
+    /// the same as unrestricted: an unknown application must never be read as
+    /// permission. Callers making an access decision must prefer
+    /// [`Self::has_guardian_privileges`], which is fail-closed and returns
+    /// `false` for unknown, revoked and restricted applications alike; callers
+    /// that surface status to a user (wallet/explorer, spec §45/§46) must show
+    /// `None` as "unknown", never as "not restricted".
+    fn is_restricted(app_id: ApplicationId) -> Option<bool>;
     /// Whether `bytecode` is exactly the artifact the current version is
     /// certified at, while that certification is live (spec §59 SP2/SP3).
     fn is_certified_artifact(app_id: ApplicationId, bytecode: H256) -> bool;
@@ -918,11 +926,9 @@ impl<T: Config> ApplicationRegistryInspect<T::AccountId> for Pallet<T> {
         Self::current_record(app_id).map(|v| v.hashes)
     }
 
-    fn is_restricted(app_id: ApplicationId) -> bool {
-        match Applications::<T>::get(app_id) {
-            Some(app) => app.revoked || app.tier == CertificationTier::Restricted,
-            None => false,
-        }
+    fn is_restricted(app_id: ApplicationId) -> Option<bool> {
+        Applications::<T>::get(app_id)
+            .map(|app| app.revoked || app.tier == CertificationTier::Restricted)
     }
 
     fn is_certified_artifact(app_id: ApplicationId, bytecode: H256) -> bool {

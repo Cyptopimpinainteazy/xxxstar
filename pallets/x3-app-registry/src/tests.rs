@@ -325,7 +325,7 @@ fn restrict_removes_privileges_and_keeps_history() {
         assert_eq!(app.restriction, Some(RestrictionReason::SecurityFinding));
         assert!(!app.revoked); // restricted, not revoked
         assert!(!AppRegistry::has_guardian_privileges(id));
-        assert!(AppRegistry::is_restricted(id));
+        assert_eq!(AppRegistry::is_restricted(id), Some(true));
         // History is retained, not deleted (§47).
         assert!(Versions::<Test>::contains_key(id, 0));
     });
@@ -467,7 +467,43 @@ fn unknown_application_is_rejected() {
             crate::Error::<Test>::UnknownApplication
         );
         assert_eq!(AppRegistry::tier(42), None);
+        // Unknown is `None`, not `false`: a caller that only asks "is it
+        // restricted?" must not read an absent application as unrestricted.
+        assert_eq!(AppRegistry::is_restricted(42), None);
         assert!(!AppRegistry::has_guardian_privileges(42));
+    });
+}
+
+#[test]
+fn is_restricted_distinguishes_unknown_from_unrestricted() {
+    new_test_ext().execute_with(|| {
+        // Unknown application: the typed read has no answer, and the fail-closed
+        // privilege helper denies it.
+        assert_eq!(AppRegistry::is_restricted(99), None);
+        assert!(!AppRegistry::has_guardian_privileges(99));
+
+        // A registered, unendorsed application is known and not restricted; it
+        // still holds no Guardian privileges (certification is required).
+        let id = register(7, b"dex", GuardianVm::Evm, hashes(1, 2, 3));
+        assert_eq!(AppRegistry::is_restricted(id), Some(false));
+        assert!(!AppRegistry::has_guardian_privileges(id));
+
+        // Certified then restricted: known and restricted.
+        assert_ok!(AppRegistry::certify_application(
+            root(),
+            id,
+            0,
+            hashes(1, 2, 3),
+            None
+        ));
+        assert_eq!(AppRegistry::is_restricted(id), Some(false));
+        assert!(AppRegistry::has_guardian_privileges(id));
+        assert_ok!(AppRegistry::restrict_application(
+            root(),
+            id,
+            RestrictionReason::SecurityFinding
+        ));
+        assert_eq!(AppRegistry::is_restricted(id), Some(true));
     });
 }
 

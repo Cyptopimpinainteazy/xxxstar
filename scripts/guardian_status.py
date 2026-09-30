@@ -12,10 +12,18 @@ happens to be finished. Run this after every completed item:
 """
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
-CHECKLIST = Path(__file__).resolve().parent.parent / "docs" / "guardian" / "checklist.json"
+# Overridable so tests (and other checkouts) can point at a scratch copy without
+# ever writing to the tracked tracker.
+CHECKLIST = Path(
+    os.environ.get(
+        "X3_GUARDIAN_CHECKLIST",
+        Path(__file__).resolve().parent.parent / "docs" / "guardian" / "checklist.json",
+    )
+)
 ORDER = ["DONE", "DOING", "TODO", "BLOCKED"]
 
 
@@ -33,6 +41,32 @@ def bar(done, total, width=28):
     return "[" + "#" * filled + "." * (width - filled) + "]"
 
 
+def apply_mark(items, item_id, status, evidence):
+    """Apply a status change in place and return the new status.
+
+    Raising `SystemExit` on any refusal keeps the CLI honest: a tracker whose
+    whole purpose is "the count cannot drift" must not accept `DONE` with no
+    evidence, because that is exactly how a count drifts upward without work.
+    """
+    status = status.upper()
+    if status not in ORDER:
+        sys.exit(f"status must be one of {ORDER}")
+    match = [i for i in items if i["id"] == item_id]
+    if not match:
+        sys.exit(f"no item with id {item_id}")
+    prior = match[0].get("evidence", "")
+    new_evidence = evidence if evidence is not None else prior
+    if status == "DONE" and not new_evidence.strip():
+        sys.exit(
+            f"refusing to mark {item_id} DONE with no evidence; pass "
+            f"--evidence \"<command and its result>\" or fix the item first"
+        )
+    match[0]["status"] = status
+    if evidence is not None:
+        match[0]["evidence"] = evidence
+    return status
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--by-section", action="store_true", help="break the counts down by spec section")
@@ -46,15 +80,7 @@ def main():
 
     if args.mark:
         item_id, status = args.mark
-        status = status.upper()
-        if status not in ORDER:
-            sys.exit(f"status must be one of {ORDER}")
-        match = [i for i in items if i["id"] == item_id]
-        if not match:
-            sys.exit(f"no item with id {item_id}")
-        match[0]["status"] = status
-        if args.evidence is not None:
-            match[0]["evidence"] = args.evidence
+        status = apply_mark(items, item_id, status, args.evidence)
         save(data)
         print(f"{item_id} -> {status}")
 
