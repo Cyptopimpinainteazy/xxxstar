@@ -129,6 +129,42 @@ runs on the routing path. `budget` and `max_files` pass through to the
 compiler. An unconfigured, failing, slow or non-JSON compiler is reported as
 `502 context_unavailable` naming the reason — never as an empty package.
 
+### Failure memory integration (§17–19)
+
+`tools/x3-forge/failure_memory.py` records failures, successes and dead ends as
+one append-only log. Append-only because a memory that rewrites itself cannot
+be audited, and this one is evidence: "we already tried this and it failed" is
+only useful if the record cannot quietly change.
+
+The router writes to it and reads from it:
+
+* a submitted task outcome becomes an entry — a failure carrying the failing
+  check and the provider that produced it, or a success (§18: "also record what
+  worked");
+* `GET /v1/memory?q=<task>` searches it, which is §17's "before debugging:
+  search failure memory";
+* `POST /v1/explain {"memory": true}` returns the routing decision *and* the
+  known failures for the task, so a known problem is not rediscovered.
+
+```json
+{"policy":"x3-deep","tier":"routine",
+ "classification":{"task_class":"DEBUGGING","verification":["unit","reproduction"]},
+ "memory":{"matches":[{"fingerprint":"8105f8488a1de5a6",
+   "component":"crates/cross-vm-coordinator",
+   "error":"abort after complete refunded both legs at line 412",
+   "fix":"route abort through the same transition table"}]}}
+```
+
+The fingerprint normalises hex addresses and reported line/column positions, so
+repeats of one bug collapse into one row with a sighting count — twelve
+thousand failures become three root causes, which is the difference between a
+usable memory and a log nobody reads. `kind` is part of the fingerprint: the
+same error text as a dead end and as a failure are different knowledge.
+
+**Memory is advisory.** The verification result is committed before the memory
+write is attempted, and a memory outage is reported (`"recorded": false`),
+never raised: losing a memory entry must not undo a passed check.
+
 A reservation is an upper bound on one call, so the request must not be able to spend more than the reservation covers. Two shapes used to get through:
 
 - **A second output parameter.** The estimate read `max_tokens` and fell back to 4096, so a request that set `max_completion_tokens` instead — which is what GPT-5 on the direct provider requires — was reserved at the default and billed for whatever it asked. Both parameters are now validated against `max_output_tokens`, and the estimate uses whichever one the client set.

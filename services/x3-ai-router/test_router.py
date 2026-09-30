@@ -1366,6 +1366,8 @@ class RoutingIntelligenceTests(unittest.TestCase):
             "Derive the PDA and sign with invoke_signed": "SVM",
             "Review this patch and critique the design": "CODE_REVIEW",
             "Post-mortem the incident and find what went wrong": "FAILURE_ANALYSIS",
+            "the coordinator refund is failing again after a claim": "DEBUGGING",
+            "the build is broken since the last merge": "DEBUGGING",
             "Add a fuzz target for the codec": "FUZZING",
             "Plan the migration for the sqlite schema": "DATABASE",
         }
@@ -1718,6 +1720,157 @@ class ContextIntegrationTests(unittest.TestCase):
             self.assertEqual(rejected.exception.code, 502)
             body = json.loads(rejected.exception.read())
             self.assertEqual(body["error"]["type"], "context_unavailable")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
+class FailureMemoryIntegrationTests(unittest.TestCase):
+    """§56's last item: the router reads and writes the Forge memories."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = Path(self.tmp.name) / "memory.jsonl"
+        self.recorder = Path(self.tmp.name) / "recorded.json"
+        self.config = {
+            "daily_budget_usd": 1, "agent_daily_budget_usd": 1, "max_input_tokens": 1000,
+            "max_request_bytes": 100000, "routes": {"routine": ["up"], "critical": ["up"]},
+            "providers": {"up": {"base_url": "http://127.0.0.1:1/v1", "model": "up",
+                                 "supports_tools": True}},
+            "failure_memory": {
+                "command": ["python3", str(Path(__file__).parent.parent.parent /
+                                           "tools/x3-forge/failure_memory.py"),
+                            "--store", str(self.store)],
+            },
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def submit(self, outcome_ok, task_id="task-1", revision="a" * 40):
+        self.router.begin_task(task_id, "alice", revision, "router")
+        self.router.end_task_request(1)
+        self.router.task_outcome({
+            "task_id": task_id, "revision": revision, "scope": "router",
+            "checks": [{"name": "router-tests", "exit_code": 0 if outcome_ok else 1,
+                        "output_sha256": "b" * 64}]})
+
+    # ── writing ──────────────────────────────────────────────────────────
+
+    def test_a_failed_task_becomes_a_failure_entry(self):
+        self.submit(False)
+        rows = [json.loads(line) for line in self.store.read_text().splitlines() if line.strip()]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["kind"], "failure")
+        self.assertEqual(rows[0]["component"], "router")
+        self.assertEqual(rows[0]["commit"], "a" * 40)
+        self.assertIn("router-tests", rows[0]["error"])
+
+    def test_a_passed_task_becomes_a_success_entry(self):
+        self.submit(True)
+        rows = [json.loads(line) for line in self.store.read_text().splitlines() if line.strip()]
+        self.assertEqual(rows[0]["kind"], "success")
+        self.assertIn("router-tests", rows[0]["fix"])
+
+    def test_the_outcome_names_the_provider_that_produced_it(self):
+        self.router.config["providers"]["up"]["base_url"] = "http://127.0.0.1:1/v1"
+        self.router.db.execute(
+            "INSERT INTO usage (day,agent,provider,model,input_tokens,output_tokens,cost_usd,task_id) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            ("2026-09-30", "alice", "deepseek", "deepseek-flash", 10, 5, 0.0, "task-1"))
+        self.router.db.commit()
+        self.submit(False)
+        rows = [json.loads(line) for line in self.store.read_text().splitlines() if line.strip()]
+        self.assertEqual(rows[0]["model"], "deepseek/deepseek-flash")
+
+    def test_the_outcome_reports_whether_the_memory_write_landed(self):
+        self.router.begin_task("task-9", "alice", "c" * 40, "router")
+        self.router.end_task_request(1)
+        result = self.router.task_outcome({
+            "task_id": "task-9", "revision": "c" * 40, "scope": "router",
+            "checks": [{"name": "router-tests", "exit_code": 1, "output_sha256": "d" * 64}]})
+        self.assertTrue(result["memory"]["recorded"])
+        self.assertTrue(result["memory"]["fingerprint"])
+        self.assertEqual(result["memory"]["kind"], "failure")
+
+    def test_a_memory_outage_does_not_undo_the_verification_result(self):
+        self.router.config["failure_memory"] = {"command": ["/nonexistent/memory"]}
+        self.router.begin_task("task-2", "alice", "e" * 40, "router")
+        self.router.end_task_request(1)
+        result = self.router.task_outcome({
+            "task_id": "task-2", "revision": "e" * 40, "scope": "router",
+            "checks": [{"name": "router-tests", "exit_code": 0, "output_sha256": "f" * 64}]})
+        self.assertEqual(result["outcome"], "checks_passed", "the checks result is durable")
+        self.assertFalse(result["memory"]["recorded"])
+        self.assertEqual(self.router.task_stats()[0]["outcome"], "checks_passed")
+
+    def test_repeated_failures_aggregate_into_one_memory_row(self):
+        for index in range(3):
+            self.submit(False, task_id=f"task-{index}", revision=str(index) * 40)
+        rows = [json.loads(line) for line in self.store.read_text().splitlines() if line.strip()]
+        self.assertEqual(len(rows), 3, "every sighting is appended")
+        self.assertEqual(len({row["fingerprint"] for row in rows}), 1,
+                         "the same failure has one fingerprint however many times it is seen")
+
+    # ── reading ──────────────────────────────────────────────────────────
+
+    def test_search_finds_a_recorded_failure(self):
+        self.submit(False)
+        matches, reason = self.router.search_memory("router tests failing")
+        self.assertIsNone(reason)
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]["component"], "router")
+
+    def test_an_unconfigured_memory_says_so_rather_than_answering_empty(self):
+        self.router.config.pop("failure_memory")
+        matches, reason = self.router.search_memory("anything")
+        self.assertIsNone(matches)
+        self.assertIn("no failure memory", reason)
+
+    def test_a_failing_memory_tool_is_reported_with_its_exit_code(self):
+        self.router.config["failure_memory"] = {"command": ["python3", "-c",
+                                                            "import sys; sys.stderr.write('boom'); sys.exit(4)"]}
+        matches, reason = self.router.search_memory("anything")
+        self.assertIsNone(matches)
+        self.assertIn("exited 4", reason)
+        self.assertIn("boom", reason)
+
+    def test_the_memory_endpoint_serves_matches_and_rejects_an_empty_query(self):
+        self.submit(False)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}/v1/memory"
+            with urllib.request.urlopen(url + "?q=router+tests") as response:
+                body = json.load(response)
+            self.assertEqual(len(body["matches"]), 1)
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                urllib.request.urlopen(url)
+            self.assertEqual(rejected.exception.code, 400)
+            with self.assertRaises(urllib.error.HTTPError) as bad_limit:
+                urllib.request.urlopen(url + "?q=x&limit=lots")
+            self.assertEqual(bad_limit.exception.code, 400)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_explain_can_consult_the_memory_before_the_work_starts(self):
+        self.submit(False)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            body = json.dumps({"memory": True, "messages": [
+                {"role": "user", "content": "the router tests are failing again"}]}).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/explain", body,
+                {"Content-Type": "application/json"})
+            with urllib.request.urlopen(request) as response:
+                decision = json.load(response)
+            self.assertEqual(len(decision["memory"]["matches"]), 1)
+            self.assertIsNone(decision["context"], "context stays opt-in")
         finally:
             server.shutdown()
             server.server_close()

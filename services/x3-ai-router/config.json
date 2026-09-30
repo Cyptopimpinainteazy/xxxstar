@@ -16,6 +16,11 @@
     "cwd": "/home/lojak/Desktop/xxxstar-main",
     "timeout_seconds": 90
   },
+  "failure_memory": {
+    "command": ["python3", "tools/x3-forge/failure_memory.py"],
+    "cwd": "/home/lojak/Desktop/xxxstar-main",
+    "timeout_seconds": 30
+  },
   "policies": {
     "x3-auto": {"tier": "auto", "order": ["deepseek", "openrouter", "ollama", "nemotron_lightning_free", "direct"]},
     "x3-fast": {"tier": "routine", "order": ["ollama", "deepseek", "openrouter"]},

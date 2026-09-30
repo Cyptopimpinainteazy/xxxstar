@@ -97,8 +97,12 @@ CLASS_TERMS = {
     "SECURITY_ANALYSIS": ("security", "exploit", "attack", "vulnerab", "audit", "adversar",
                           "threat model", "reentrancy", "fail closed", "privilege"),
     "FUZZING": ("fuzz", "corpus", "coverage-guided", "cargo-fuzz", "afl", "honggfuzz"),
+    # "failing"/"broken"/"not working" earn their place: a live request saying
+    # "the coordinator refund is failing again after a claim" carries no other
+    # debugging marker and classified as DOCUMENTATION without them.
     "DEBUGGING": ("debug", "why does", "reproduce", "root cause", "stack trace", "panic",
-                  "failing test", "bisect"),
+                  "failing test", "bisect", "failing", "is broken", "not working",
+                  "fails on", "error when", "regression in"),
     "ARCHITECTURE": ("architecture", "design the", "trade-off", "tradeoff", "refactor the module",
                      "restructure", "plan the"),
     "PERFORMANCE": ("performance", "benchmark", "throughput", "latency", "tps", "profil",
@@ -1108,7 +1112,17 @@ class Router:
                 raise ValueError("Unknown, mismatched, or finalized task")
             self.db.execute("UPDATE tasks SET outcome=?,evidence=? WHERE id=?", (outcome, json.dumps(checks), data["task_id"]))
             self.db.commit()
-        return {"task_id": data["task_id"], "outcome": outcome, "scope": "router"}
+            attribution = self.db.execute(
+                "SELECT provider,model FROM usage WHERE task_id=? ORDER BY input_tokens+output_tokens DESC LIMIT 1",
+                (data["task_id"],)).fetchone()
+        provider, model = attribution if attribution else (None, None)
+        # Recorded after the outcome is committed: the verification result is
+        # the durable fact, and a memory outage must not undo it.
+        kind, recorded = self.record_outcome_memory(
+            data["task_id"], data["scope"], data["revision"], outcome, checks, provider, model)
+        return {"task_id": data["task_id"], "outcome": outcome, "scope": "router",
+                "memory": {"kind": kind, "fingerprint": (recorded or {}).get("fingerprint"),
+                           "recorded": recorded is not None}}
 
     def task_stats(self):
         with self.lock:
@@ -1397,6 +1411,78 @@ class Router:
         started = time.monotonic()
         package, error = self.compile_context(query, budget, max_files)
         return package, error, self.elapsed_ms(started)
+
+    def memory_command(self, extra):
+        """Build the `failure_memory.py` invocation, or None if unconfigured."""
+        spec = self.config.get("failure_memory")
+        if not spec or not spec.get("command"):
+            return None, None
+        return list(spec["command"]) + extra, spec
+
+    def run_memory(self, extra, timeout_default=30):
+        """Run the memory tool. Returns `(parsed_json, reason)`.
+
+        Memory is advisory: an outage must not fail a verification submission,
+        so every caller here logs the reason and carries on.
+        """
+        command, spec = self.memory_command(extra)
+        if command is None:
+            return None, "no failure memory is configured"
+        try:
+            completed = subprocess.run(
+                command, cwd=spec.get("cwd") or None, capture_output=True, text=True,
+                timeout=float(spec.get("timeout_seconds", timeout_default)))
+        except subprocess.TimeoutExpired:
+            return None, "failure memory timed out"
+        except (OSError, ValueError) as exc:
+            return None, "failure memory could not run: " + type(exc).__name__
+        if completed.returncode != 0:
+            detail = (completed.stderr or "").strip().splitlines()
+            return None, "failure memory exited " + str(completed.returncode) + ": " + (
+                detail[-1] if detail else "no output")[:200]
+        try:
+            return json.loads(completed.stdout), None
+        except ValueError:
+            return None, "failure memory did not return JSON"
+
+    def search_memory(self, query, kind=None, component=None, limit=10):
+        extra = ["find", query, "--json", "--limit", str(int(limit))]
+        if kind:
+            extra += ["--kind", kind]
+        if component:
+            extra += ["--component", component]
+        return self.run_memory(extra)
+
+    def record_outcome_memory(self, task_id, scope, revision, outcome, checks, provider=None, model=None):
+        """Feed one task outcome into the Forge memories (§17, §18).
+
+        A failed task becomes a failure entry carrying the failing check and
+        the provider that produced it; a passed task becomes a success entry
+        (§18: "also record what worked"). Both are advisory writes — the
+        submission result is already committed by the time this runs, and a
+        memory outage is reported, not raised.
+        """
+        failing = [check for check in checks if check.get("exit_code") != 0]
+        if outcome == "checks_failed":
+            kind = "failure"
+            names = ", ".join(str(check.get("name")) for check in failing) or "unnamed check"
+            error = "task checks failed: " + names
+            extra = ["add", "--kind", "failure", "--component", scope,
+                     "--error", error, "--trigger", str(task_id), "--commit", revision]
+        else:
+            kind = "success"
+            names = ", ".join(str(check.get("name")) for check in checks) or "no checks"
+            extra = ["add", "--kind", "success", "--component", scope,
+                     "--error", "task checks passed: " + names,
+                     "--trigger", str(task_id), "--commit", revision,
+                     "--fix", "checks " + names + " passed on this revision"]
+        if provider:
+            extra += ["--model", str(provider) + ("/" + model if model else "")]
+        extra += ["--json"]
+        recorded, reason = self.run_memory(extra)
+        if reason:
+            print("x3-ai-router memory write skipped: " + reason, file=sys.stderr, flush=True)
+        return kind, recorded
 
     def retry_delay(self, provider, index):
         """Exponential backoff, capped. Retry-After still wins where sent."""
@@ -1770,6 +1856,28 @@ def handler_for(router):
                     return self.reply(502, {"error": {"message": error,
                                                       "type": "context_unavailable"}})
                 return self.reply(200, {"package": package, "elapsed_ms": round(elapsed, 1)})
+            memory_path, _, memory_query = self.path.partition("?")
+            if memory_path == "/v1/memory":
+                # §17: "Before debugging: SEARCH FAILURE MEMORY."
+                params = {}
+                for pair in memory_query.split("&"):
+                    key, _, value = pair.partition("=")
+                    if key:
+                        params[key] = urllib.parse.unquote_plus(value)
+                query = params.get("q", "")
+                if not query:
+                    return self.reply(400, {"error": {"message": "Expected ?q=<task>",
+                                                      "type": "missing_query"}})
+                try:
+                    limit = max(1, min(50, int(params.get("limit", "10"))))
+                except ValueError:
+                    return self.reply(400, {"error": {"message": "limit must be an integer"}})
+                matches, reason = router.search_memory(
+                    query, params.get("kind"), params.get("component"), limit)
+                if reason:
+                    return self.reply(502, {"error": {"message": reason,
+                                                      "type": "memory_unavailable"}})
+                return self.reply(200, {"query": query, "matches": matches})
             if self.path == "/v1/providers":
                 return self.reply(200, {"providers": router.provider_health()})
             capabilities, _, query = self.path.partition("?")
@@ -1902,6 +2010,13 @@ def handler_for(router):
                     package, error, elapsed = router.compile_context_once(task_text(chat))
                     context = {"error": error, "elapsed_ms": round(elapsed, 1)} if error else \
                               {"package": package, "elapsed_ms": round(elapsed, 1)}
+                # §17: search the memories before the work starts, so a known
+                # problem is not rediscovered. Opt-in for the same reason as
+                # context: it is a subprocess call.
+                memory = None
+                if data.get("memory") is True:
+                    matches, reason = router.search_memory(task_text(chat), limit=5)
+                    memory = {"error": reason} if reason else {"matches": matches}
                 return self.reply(200, {
                     "policy": logical,
                     "tier": tier,
@@ -1909,6 +2024,7 @@ def handler_for(router):
                     "classification": classification,
                     "disabled_tools": disabled,
                     "context": context,
+                    "memory": memory,
                 })
             if any(self.path == path or self.path.startswith(path + "/") for path in UNSUPPORTED_PATHS):
                 return self.reply(501, {"error": {"message": self.path + " is not implemented: this router speaks the Chat Completions API at /v1/chat/completions"}})

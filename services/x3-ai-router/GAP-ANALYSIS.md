@@ -96,6 +96,7 @@ Implemented, tested and live-verified in the commit that follows this file:
 | no retries at all | §50 bounded retries on retryable statuses and transport errors, with backoff, never after the first streamed byte |
 | no way to ask why | `GET`/`POST /v1/explain` returns the decision without calling a provider |
 | no context compiler integration | `POST /v1/context` and `explain {"context": true}` reach `tools/x3-forge/context.py` and return its provenance-carrying package |
+| no failure memory integration | `tools/x3-forge/failure_memory.py` stores failures, successes and dead ends; task outcomes write to it, `GET /v1/memory` and `explain {"memory": true}` read it |
 
 Verified live: a consensus request resolves to `x3-security` / critical with
 blast radius `[consensus, finality, settlement]`; a README request resolves to
@@ -110,11 +111,20 @@ context compiler, with its own suite). This increment wires them to the router
 rather than writing a second, divergent copy — which is what §7 integration
 means once the canonical implementation is already in the tree.
 
-Still missing from §56: **failure memory integration** (§17). There is no
-failure store to integrate with yet: the router sees task outcomes (checks
-passed or failed) but not the failing evidence, and inventing a store inside
-the router would put it in the wrong layer. It is the next increment, and it
-needs a decision about where failure records live.
+§56 is now complete.
+
+Failure memory lives in `tools/x3-forge/failure_memory.py`, beside `index.py`
+and `context.py`, because §17-19 describe Forge-side knowledge and that is
+where Forge tooling already lives. It was not put inside the router: the router
+sees task outcomes but not the failing evidence, so a store there would be in
+the wrong layer and would still need the Forge tooling to read it.
+
+One behaviour worth stating: §17 asks for a failure memory, §18 for a success
+memory and §19 for a dead-end memory. They are one append-only log with a
+`kind` field rather than three stores, because the fields are the same fields
+and three stores would drift. `kind` is part of the fingerprint, so the same
+error text recorded as a dead end and as a failure stays two pieces of
+knowledge.
 
 ### Known cost, stated rather than hidden
 
