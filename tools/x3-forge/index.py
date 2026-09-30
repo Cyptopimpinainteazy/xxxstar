@@ -30,6 +30,12 @@ import sys
 from pathlib import Path
 
 INDEX_VERSION = 1
+# Bump whenever the parser changes what it extracts, or the shape of what it
+# stores. Without this the cache is keyed only on file content, so improving the
+# parser leaves every unchanged file holding results the old parser produced —
+# silently reverting the improvement. Version 3 split string-literal mentions out
+# of `items` into `strings` (see below), which changes the stored schema.
+PARSER_VERSION = 3
 DEFAULT_INDEX = ".x3-forge/index.json"
 
 # Directories that are never source of truth for an engineering index.
@@ -50,6 +56,16 @@ RUST_IMPL = re.compile(r"^\s*impl(?:<[^>]*>)?\s+(?P<name>[A-Za-z_][A-Za-z0-9_:<>
 RUST_ATTR = re.compile(r"^\s*#\[\s*(?P<attr>[A-Za-z_:]+)")
 PY_DEF = re.compile(r"^\s*(?:async\s+)?(?P<kind>def|class)\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)")
 TODO = re.compile(r"\b(TODO|FIXME|XXX|HACK|unimplemented!|todo!)\b")
+# Identifier-shaped string literals. Config keys such as "budget_fallback" are
+# referenced as strings, never as declarations, so without this a query for the
+# behaviour cannot find the file that implements it. They are collected
+# separately: a mention is evidence, but it is not a declaration. `find` and the
+# exact-symbol lookups search declarations only, so a name that appears only as a
+# string (including the sentinel a test asserts is absent) must not make them
+# report a hit; the context compiler reads `strings` explicitly and weights them
+# as hints. Version 2 put these in `items`, and the two leaked into each other.
+STRING_LITERAL = re.compile(r"[\"']([a-z][a-z0-9_]{4,})[\"']")
+MAX_STRINGS_PER_FILE = 200
 
 
 def _skip(path: Path, root: Path) -> bool:
@@ -111,6 +127,7 @@ def parse_rust(text: str):
     items = []
     pending_attrs = []
     in_block_comment = False
+    strings = 0
     for number, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
         # Track /* */ so a commented-out fn is not indexed as a real one.
@@ -144,6 +161,12 @@ def parse_rust(text: str):
         if todo and not line.startswith("//"):
             items.append({"kind": "todo", "name": line[:160], "line": number})
 
+        for literal in STRING_LITERAL.findall(raw):
+            if strings >= MAX_STRINGS_PER_FILE:
+                break
+            strings += 1
+            items.append({"kind": "string", "name": literal, "line": number})
+
         item = RUST_ITEM.match(raw)
         if item:
             kind = item.group("kind")
@@ -171,10 +194,16 @@ def parse_rust(text: str):
 
 def parse_python(text: str):
     items = []
+    strings = 0
     for number, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
         if line.startswith("#"):
             continue
+        for literal in STRING_LITERAL.findall(raw):
+            if strings >= MAX_STRINGS_PER_FILE:
+                break
+            strings += 1
+            items.append({"kind": "string", "name": literal, "line": number})
         match = PY_DEF.match(raw)
         if match:
             items.append({"kind": match.group("kind"), "name": match.group("name"), "line": number})
@@ -211,7 +240,10 @@ def iter_files(root: Path):
 def build(root: Path, previous=None):
     """Build or refresh the index. Unchanged files are reused, not reparsed."""
     crates, manifests = load_crates(root)
-    previous_files = (previous or {}).get("files", {})
+    previous = previous or {}
+    # A cache written by a different parser cannot be trusted, however unchanged
+    # the files are.
+    previous_files = previous.get("files", {}) if previous.get("parser_version") == PARSER_VERSION else {}
     files = {}
     reused = 0
     parsed = 0
@@ -246,16 +278,24 @@ def build(root: Path, previous=None):
                 for number, line in enumerate(text.splitlines(), start=1)
                 if TODO.search(line) and not line.strip().startswith(("#", "//"))
             ]
+        # Declarations and mentions are distinct kinds of evidence, and different
+        # consumers want different ones: `find` and completion intelligence want
+        # declarations, while the context compiler may use a mention as a hint.
+        # Keeping both in `items` let a string literal answer a symbol query.
+        declarations = [i for i in items if i["kind"] != "string"]
+        strings = [i for i in items if i["kind"] == "string"]
         files[rel] = {
             "sha256": digest,
             "bytes": size,
             "lang": language,
             "crate": crate_for(path, root, crates),
-            "items": items,
+            "items": declarations,
+            "strings": strings,
         }
         parsed += 1
     return {
         "index_version": INDEX_VERSION,
+        "parser_version": PARSER_VERSION,
         "root": str(root),
         "commit": commit(root),
         "crates": len(manifests),
@@ -266,6 +306,7 @@ def build(root: Path, previous=None):
             "parsed": parsed,
             "reused": reused,
             "items": sum(len(f["items"]) for f in files.values()),
+            "strings": sum(len(f.get("strings", [])) for f in files.values()),
             "todos": sum(1 for f in files.values() for i in f["items"] if i["kind"] == "todo"),
             "tests": sum(1 for f in files.values() for i in f["items"] if i.get("test")),
         },
@@ -285,7 +326,7 @@ def cmd_build(args):
     out.write_text(json.dumps(index, indent=1) + "\n", encoding="utf-8")
     stats = index["stats"]
     print(f"indexed {stats['files_indexed']} files ({stats['parsed']} parsed, {stats['reused']} reused)")
-    print(f"items {stats['items']}  todos {stats['todos']}  tests {stats['tests']}  crates {index['crates']}")
+    print(f"items {stats['items']}  strings {stats['strings']}  todos {stats['todos']}  tests {stats['tests']}  crates {index['crates']}")
     print(f"commit {index['commit']}  -> {out}")
     return 0
 
