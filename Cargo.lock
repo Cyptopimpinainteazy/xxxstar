@@ -12670,6 +12670,7 @@ version = "0.1.0"
 dependencies = [
  "frame-support",
  "frame-system",
+ "pallet-x3-app-registry",
  "parity-scale-codec",
  "scale-info",
  "sp-core",
@@ -12848,6 +12849,7 @@ version = "0.1.0"
 dependencies = [
  "frame-support",
  "frame-system",
+ "pallet-x3-app-registry",
  "parity-scale-codec",
  "scale-info",
  "sp-core",

@@ -11,6 +11,7 @@ publish = false
 crate-type = ["rlib"]
 
 [dependencies]
+pallet-x3-app-registry = { path = "../x3-app-registry", default-features = false }
 frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
 parity-scale-codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
@@ -28,6 +29,7 @@ frame-system = { workspace = true, features = ["std"] }
 [features]
 default = ["std"]
 std = [
+    "pallet-x3-app-registry/std",
     "frame-support/std",
     "frame-system/std",
     "parity-scale-codec/std",
