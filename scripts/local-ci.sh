@@ -663,6 +663,15 @@ GATES_FAST=(
   # redden them, a missing one must fail rather than skip, and no check may
   # discard its status. Cheap: 18 checks, no build.
   "rc gate scripts:python3 tests/test_rc_gates.py"
+  # Gate 7 of the public testnet gate is the one criterion that decides a launch
+  # from a forced-restart proof the operator supplies, and until 2026-09-30 the
+  # rule that reads that proof was inline in a script that cannot run without a
+  # seven-validator network — so it had no test, and the fail-open it closes (any
+  # file containing `restart_drill: PASS`) survived unmeasured. The rule is now a
+  # function; this drives it with synthetic reports and a fixed clock, and asserts
+  # the gate calls it and the drill still writes the fields it reads.
+  # Cheap: 20 checks, no build, no network.
+  "public testnet gate 7 verdict:python3 tests/test_restart_proof_verdict.py"
   # The promotion record: what ties a passing RC run to the genesis it promotes.
   # `build` refuses a wrong validator count, a non-Live spec, an RC log without the
   # gate's own PASSED marker, a missing operator, a missing artifact and a dirty tree;
