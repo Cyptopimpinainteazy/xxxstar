@@ -90,12 +90,12 @@ def test_symbol_names(index):
 
 
 def test_occurrences(index):
-    """Test name -> every indexed declaration, with its `#[ignore]` marker.
+    """Test name -> every indexed declaration, with its ignore marker.
 
     A name is not a declaration: the same test function can be declared in
     several files, and the marker belongs to the declaration. Keeping only the
     last file seen (a dict overwrite) let a stale copy of a suite speak for the
-    live tree -- `launch-gates/sources/pack-05-test-gap` carried `#[ignore]`s
+    live tree -- `launch-gates/sources/pack-05-test-gap` carried ignore markers
     on tests the live router suite had un-ignored, and a running required test
     was reported as skipped.
     """
@@ -291,7 +291,7 @@ def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=RO
     required = [str(name) for name in (feature.get("required_tests") or [])]
     required_missing = [name for name in required if name not in tests]
     # A required test can exist and still prove nothing if every indexed
-    # declaration of its name is `#[ignore]`d and no gate runs any declaring
+    # declaration of its name carries the ignore attribute and no gate runs any declaring
     # target with `--ignored`. One un-ignored declaration, or one gate that
     # executes an ignored one, means the name is not evidence of a skipped
     # test. The gate corpus above is how that is distinguished from a test a

@@ -55,7 +55,7 @@ SKIP_SUFFIX = (".lock", ".min.js", ".map")
 # but they are point-in-time extracts of files that are indexed where they
 # really live. Indexing them again duplicates every declaration and lets an old
 # copy speak for a tree that has since changed: pack-05's router extract kept
-# 26 `#[ignore]` markers after the live suite dropped them, and the completion
+# 26 ignore markers after the live suite dropped them, and the completion
 # engine reported a running required test as skipped. Evidence, not source of
 # truth.
 FROZEN_PREFIXES = ("launch-gates/sources/",)

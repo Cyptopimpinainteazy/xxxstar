@@ -188,7 +188,7 @@ class CompletionTests(unittest.TestCase):
         self.assertIn("skipped test is not a passing test", gap["detail"])
 
     def test_a_name_ignored_in_one_file_but_live_in_another_is_not_flagged(self):
-        # The pack-05 false positive: a frozen extract kept `#[ignore]` on
+        # The pack-05 false positive: a frozen extract kept the ignore attribute on
         # tests the live suite runs. The marker belongs to the declaration,
         # not the name, so one un-ignored declaration means the test runs.
         (self.root / "pallets/x/src").mkdir(parents=True)
