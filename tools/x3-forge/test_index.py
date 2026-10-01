@@ -83,6 +83,25 @@ class ParserTraps(unittest.TestCase):
         self.assertEqual(items[0]["kind"], "mod")
         self.assertIn("cfg", items[0]["attrs"])
 
+    def test_a_multiline_ignore_attribute_does_not_hide_the_test(self):
+        """Regression: an `#[ignore = "..."]` reason spanning lines ended the
+        attribute handling early (`pending_attrs` reset), so the `fn` lost its
+        `test` attribute and a real ignored test vanished from the index —
+        completion then reported a required test as missing."""
+        source = ("#[test]\n"
+                  "#[ignore = \"boots the network, then proves \\\n"
+                  "            conservation on each; a reason with a ] bracket\"]\n"
+                  "fn distributed_check() {}\n")
+        items = [i for i in forge.parse_rust(source) if i.get("name") == "distributed_check"]
+        self.assertEqual(len(items), 1)
+        self.assertTrue(items[0].get("test"))
+        self.assertTrue(items[0].get("ignored"))
+
+    def test_an_inline_ignore_attribute_is_still_recorded(self):
+        items = forge.parse_rust("#[test]\n#[ignore]\nfn slow() {}\n")
+        self.assertTrue(items[0].get("test"))
+        self.assertTrue(items[0].get("ignored"))
+
 
 class PythonParser(unittest.TestCase):
     def test_definitions_are_found_with_line_numbers(self):

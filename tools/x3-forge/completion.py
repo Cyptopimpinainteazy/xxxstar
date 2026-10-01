@@ -89,6 +89,40 @@ def test_symbol_names(index):
     return names
 
 
+def ignored_test_symbols(index):
+    """Test names marked `#[ignore]`, mapped to their declaring file."""
+    ignored = {}
+    for rel, entry in index["files"].items():
+        for item in entry.get("items", []):
+            if item.get("test") and item.get("ignored") and item.get("name"):
+                ignored[item["name"]] = rel
+    return ignored
+
+
+def gated_ignored_targets(root=ROOT):
+    """Test targets some gate runs with `--ignored`.
+
+    An ignored test is not a passing test unless something actually runs it.
+    A gate line that pairs `--ignored` with a `--test <target>` executes that
+    target's ignored tests; its file stem is what the gate names.
+    """
+    targets = set()
+    candidates = [root / "scripts" / "local-ci.sh", root / "Makefile"]
+    workflows = root / ".github" / "workflows"
+    if workflows.is_dir():
+        candidates += sorted(workflows.glob("*.yml"))
+        candidates += sorted(workflows.glob("*.yaml"))
+    target = re.compile(r"--test\s+([A-Za-z0-9_\-]+)")
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        text = candidate.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            if "--ignored" in line:
+                targets.update(target.findall(line))
+    return targets
+
+
 def crate_dependents(index, root=ROOT):
     """Crate name -> how many manifests name it as a dependency.
 
@@ -222,8 +256,11 @@ def is_external(value):
          "commit:", "claim:"))
 
 
-def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=ROOT):
+def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=ROOT,
+                    ignored=None, gated=None):
     """One feature row, cross-referenced against the index."""
+    ignored = ignored or {}
+    gated = gated or set()
     paths = [str(p) for p in (feature.get("paths") or [])]
     test_paths = [str(p) for p in (feature.get("test_paths") or [])]
     declared = paths + test_paths
@@ -244,6 +281,12 @@ def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=RO
 
     required = [str(name) for name in (feature.get("required_tests") or [])]
     required_missing = [name for name in required if name not in tests]
+    # A required test can exist and still prove nothing if it is `#[ignore]`d
+    # and no gate runs its target with `--ignored`. The gate corpus above is
+    # how that is distinguished from a test a dedicated gate really executes.
+    required_ignored_ungated = [name for name in required
+                                if name in ignored
+                                and Path(ignored[name]).stem not in gated]
 
     crate = None
     for _, entry in items:
@@ -283,6 +326,12 @@ def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=RO
         gaps.append({"kind": "unsupported_test_claim", "severity": "high", "file": present[0] if present else "",
                      "symbol": required_missing[0], "line": None,
                      "detail": f"{len(required_missing)} of {len(required)} required tests are not in the index"})
+    if required_ignored_ungated:
+        name = required_ignored_ungated[0]
+        gaps.append({"kind": "ignored_required_test", "severity": "medium",
+                     "file": ignored[name], "symbol": name, "line": None,
+                     "detail": "required test is #[ignore]d and no gate runs its target "
+                               "with --ignored; a skipped test is not a passing test"})
     code_paths = [rel for rel, entry in items if entry.get("lang") in CODE_LANGS]
     if int(feature.get("tested") or 0) >= 50 and test_items == 0 and code_paths:
         # Only where the declared home is library source. A row whose only path
@@ -333,6 +382,7 @@ def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=RO
             "markers": markers,
             "required_tests": len(required),
             "required_tests_missing": len(required_missing),
+            "required_tests_ignored_ungated": len(required_ignored_ungated),
         },
         "gaps": gaps,
         "declared_blockers": [b for b in (feature.get("blockers") or []) if not is_external(b)][:3],
@@ -343,7 +393,10 @@ def analyze(index, matrix, features, root=ROOT):
     tests = test_symbol_names(index)
     dependents = crate_dependents(index, root)
     binaries = binary_crates(index, root)
-    return [analyze_feature(feature, index, tests, dependents, binaries, matrix, root)
+    ignored = ignored_test_symbols(index)
+    gated = gated_ignored_targets(root)
+    return [analyze_feature(feature, index, tests, dependents, binaries, matrix, root,
+                            ignored=ignored, gated=gated)
             for feature in features]
 
 

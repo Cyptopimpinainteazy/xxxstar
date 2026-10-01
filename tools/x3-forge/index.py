@@ -35,7 +35,9 @@ INDEX_VERSION = 1
 # parser leaves every unchanged file holding results the old parser produced —
 # silently reverting the improvement. Version 3 split string-literal mentions out
 # of `items` into `strings` (see below), which changes the stored schema.
-PARSER_VERSION = 3
+# Version 4 parses multi-line attributes, so `#[ignore = "..."]` tests keep
+# their `test`/`ignored` markers instead of disappearing from the index.
+PARSER_VERSION = 4
 DEFAULT_INDEX = ".x3-forge/index.json"
 
 # Directories that are never source of truth for an engineering index.
@@ -122,11 +124,37 @@ def load_crates(root: Path):
     return crates, [str(m.relative_to(root)) for m in manifests]
 
 
+def attribute_is_complete(text: str) -> bool:
+    """True when an attribute's closing `]` is present outside a string.
+
+    `#[ignore = "..."]` reasons are commonly spread over several lines with
+    backslash continuations and may contain a `]`; only a bracket that is not
+    inside the quoted reason ends the attribute.
+    """
+    in_string = False
+    escaped = False
+    for char in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char == "]":
+            return True
+    return False
+
+
 def parse_rust(text: str):
     """Line-oriented extraction. It reports shape, not semantics."""
     items = []
     pending_attrs = []
     in_block_comment = False
+    in_attribute = False
+    attribute_text = ""
     strings = 0
     for number, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
@@ -149,12 +177,32 @@ def parse_rust(text: str):
         # An attribute belongs to the item on a *later* line. Falling through to
         # the `pending_attrs = []` reset at the bottom of the loop is what made
         # every `#[test]` disappear, so attribute lines end the iteration here.
+        # A multi-line attribute (`#[ignore = "..."]` with continuations) is
+        # buffered until its closing bracket, or the `fn` after it would lose
+        # its `test`/`ignore` attributes and the test would vanish from the
+        # index — a false "required test missing" finding in completion.
+        if in_attribute:
+            attribute_text += "\n" + raw
+            if attribute_is_complete(attribute_text):
+                in_attribute = False
+                attr = RUST_ATTR.match(attribute_text)
+                if attr:
+                    name = attr.group("attr")
+                    pending_attrs.append(name)
+                    if name in ("test", "tokio::test"):
+                        pending_attrs.append("test")
+            continue
         if line.startswith("#["):
+            if not attribute_is_complete(raw):
+                in_attribute = True
+                attribute_text = raw
+                continue
             attr = RUST_ATTR.match(raw)
             if attr:
-                pending_attrs.append(attr.group("attr"))
-            if line.startswith("#[test]") or line.startswith("#[tokio::test]"):
-                pending_attrs.append("test")
+                name = attr.group("attr")
+                pending_attrs.append(name)
+                if name in ("test", "tokio::test"):
+                    pending_attrs.append("test")
             continue
 
         todo = TODO.search(raw)
@@ -179,6 +227,8 @@ def parse_rust(text: str):
             }
             if "test" in pending_attrs or "pallet::call" in pending_attrs:
                 entry["test"] = "test" in pending_attrs
+            if "ignore" in pending_attrs:
+                entry["ignored"] = True
             items.append(entry)
             pending_attrs = []
             continue

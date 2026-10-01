@@ -156,6 +156,37 @@ class CompletionTests(unittest.TestCase):
         analysis = self.analyze(files, [feature(required_tests=["test_lock"])])[0]
         self.assertNotIn("unsupported_test_claim", self.kinds(analysis))
 
+    def test_an_ignored_required_test_whose_target_is_gated_is_not_flagged(self):
+        (self.root / "node/tests").mkdir(parents=True)
+        (self.root / "scripts").mkdir(parents=True)
+        (self.root / "scripts/local-ci.sh").write_text(
+            "cargo test -p x3-chain-node --test supply_invariant_distributed "
+            "-- --ignored --nocapture\n")
+        files = {"node/tests/supply_invariant_distributed.rs": source(
+            "node/tests/supply_invariant_distributed.rs",
+            items=[{"kind": "fn", "name": "supply_is_conserved",
+                    "line": 9, "test": True, "ignored": True}])}
+        row = feature(paths=["node/tests/supply_invariant_distributed.rs"],
+                      required_tests=["supply_is_conserved"])
+        analysis = self.analyze(files, [row])[0]
+        self.assertNotIn("unsupported_test_claim", self.kinds(analysis))
+        self.assertNotIn("ignored_required_test", self.kinds(analysis))
+
+    def test_an_ignored_required_test_no_gate_runs_is_flagged(self):
+        (self.root / "node/tests").mkdir(parents=True)
+        (self.root / "scripts").mkdir(parents=True)
+        (self.root / "scripts/local-ci.sh").write_text("cargo test -p x3-chain-node\n")
+        files = {"node/tests/other.rs": source(
+            "node/tests/other.rs",
+            items=[{"kind": "fn", "name": "long_soak",
+                    "line": 3, "test": True, "ignored": True}])}
+        row = feature(paths=["node/tests/other.rs"], required_tests=["long_soak"])
+        analysis = self.analyze(files, [row])[0]
+        self.assertIn("ignored_required_test", self.kinds(analysis))
+        self.assertEqual(analysis["evidence"]["required_tests_ignored_ungated"], 1)
+        gap = next(g for g in analysis["gaps"] if g["kind"] == "ignored_required_test")
+        self.assertIn("skipped test is not a passing test", gap["detail"])
+
     def test_markers_are_reported_but_never_decide_the_state(self):
         (self.root / "pallets/x/src").mkdir(parents=True)
         files = {"pallets/x/src/lib.rs": source("pallets/x/src/lib.rs", items=[
