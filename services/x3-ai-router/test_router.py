@@ -506,6 +506,41 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(Provider.requests[0]["tools"][0]["function"]["name"], "exec_command")
         self.assertEqual(self.router.stats()[0]["provider"], "up", "budget accounting still applies")
 
+    def test_responses_endpoint_omitted_stream_returns_a_json_envelope(self):
+        # The Responses API defaults `stream` to false. A client that omits it
+        # must get one JSON envelope, never an SSE body it cannot parse.
+        server = self.serve()
+        try:
+            body = self.responses_body()
+            del body["stream"]
+            data = json.dumps(body).encode()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                             data, {"Content-Type": "application/json", "X-X3-Agent": "codex"})
+            with urllib.request.urlopen(request) as response:
+                content_type = response.headers.get("Content-Type", "")
+                payload = json.loads(response.read())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertIn("application/json", content_type)
+        self.assertEqual(payload["object"], "response")
+        self.assertEqual(payload["status"], "completed")
+        self.assertEqual(payload["output"][0]["content"][0]["text"], "ok")
+
+    def test_responses_endpoint_rejects_a_non_boolean_stream(self):
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream="yes")).encode()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                             data, {"Content-Type": "application/json", "X-X3-Agent": "codex"})
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                urllib.request.urlopen(request)
+            self.assertEqual(rejected.exception.code, 400)
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_responses_endpoint_streams_the_responses_event_sequence(self):
         server = self.serve()
         try:

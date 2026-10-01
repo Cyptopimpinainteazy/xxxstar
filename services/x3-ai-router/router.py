@@ -2419,6 +2419,11 @@ def handler_for(router):
             """
             if not isinstance(data.get("input"), (list, str)) or not data.get("input"):
                 return self.reply(400, {"error": {"message": "Expected an input list"}})
+            if not isinstance(data.get("stream", False), bool):
+                # An omitted `stream` means a JSON envelope: required by the
+                # Responses API contract, and the Codex client only switches
+                # to SSE when it explicitly asks for it.
+                return self.reply(400, {"error": {"message": "stream must be a boolean"}})
             if isinstance(data["input"], str):
                 data = dict(data, input=responses_input_items(data))
             chat, custom, disabled, chat_error = None, set(), [], None
@@ -2456,7 +2461,7 @@ def handler_for(router):
             response_id = "resp_" + uuid.uuid4().hex
             model = plan.model()
 
-            if not data.get("stream", True):
+            if not data.get("stream", False):
                 status, result = router.complete(plan, agent)
                 if status != 200:
                     return self.reply(status, result)
