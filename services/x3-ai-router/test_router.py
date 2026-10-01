@@ -2315,6 +2315,134 @@ class NativeResponsesTests(unittest.TestCase):
         self.assertIn("input", survivor, "the second provider gets the untouched body")
         self.assertNotIn("messages", survivor)
 
+    # ── A native failure is a failure, not an answer ─────────────────────
+
+    def script_native_failure(self, truncated=False):
+        """Answer the way a failing Responses provider does.
+
+        Non-streaming: HTTP 200 with `status: "failed"`. Streaming: a semantic
+        `response.failed` terminal event, or — when `truncated` — a stream that
+        closes after a delta and never terminates.
+        """
+        def script(handler, body):
+            if not body.get("stream"):
+                raw = json.dumps({
+                    "id": "resp_native", "object": "response", "status": "failed",
+                    "model": "deepseek-flash", "output": [],
+                    "error": {"code": "upstream_error", "message": "upstream exploded"},
+                    "usage": {"input_tokens": 11, "output_tokens": 0, "total_tokens": 11},
+                }).encode()
+                handler.send_response(200)
+                handler.send_header("Content-Type", "application/json")
+                handler.send_header("Content-Length", str(len(raw)))
+                handler.end_headers()
+                handler.wfile.write(raw)
+                return
+            events = [
+                ("response.created", {"type": "response.created",
+                                      "response": {"id": "resp_native", "status": "in_progress",
+                                                   "model": "deepseek-flash", "output": []}}),
+                ("response.output_text.delta", {"type": "response.output_text.delta", "item_id": "msg_1",
+                                                "output_index": 1, "content_index": 0, "delta": "partial"}),
+            ]
+            if not truncated:
+                events.append(("response.failed", {
+                    "type": "response.failed", "sequence_number": 2,
+                    "response": {"id": "resp_native", "object": "response", "status": "failed",
+                                 "model": "deepseek-flash", "output": [],
+                                 "error": {"code": "upstream_error", "message": "upstream exploded"},
+                                 "usage": {"input_tokens": 11, "output_tokens": 3, "total_tokens": 14}}}))
+            handler.send_response(200)
+            handler.send_header("Content-Type", "text/event-stream")
+            handler.end_headers()
+            for name, event in events:
+                handler.wfile.write(("event: " + name + "\ndata: " + json.dumps(event) + "\n\n").encode())
+                handler.wfile.flush()
+        NativeResponsesProvider.script = script
+
+    def test_native_nonstream_failed_response_falls_back_and_marks_health(self):
+        self.script_native_failure()
+        chat = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
+        chat.daemon_threads = True
+        threading.Thread(target=chat.serve_forever, daemon=True).start()
+        self.config["routes"] = {"routine": ["native", "chat"], "critical": ["native", "chat"]}
+        self.config["providers"]["chat"] = {
+            "base_url": f"http://127.0.0.1:{chat.server_port}/v1", "model": "chat-model",
+            "input_usd_per_million": 1, "output_usd_per_million": 1,
+            "supports_tools": True, "tool_probe": False}
+        router = router_module.Router(self.config, self.tmp.name + "/failed-native.db")
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            status, raw = self.post(server, self.body(stream=False))
+        finally:
+            server.shutdown()
+            server.server_close()
+            chat.shutdown()
+            chat.server_close()
+
+        self.assertEqual(status, 200)
+        answer = json.loads(raw)
+        self.assertEqual(answer["output"][0]["content"][0]["text"], "ok",
+                         "a 200 with a failed body must fail over, not reach the client")
+        health = {row["provider"]: row for row in router.provider_health()}
+        self.assertIn("response.failed", health["native"]["last_error"])
+
+    def test_native_stream_failed_terminal_is_not_recorded_as_success(self):
+        self.script_native_failure()
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.body(stream=True))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertIn("event: response.failed", raw)
+        self.assertNotIn("response.completed", raw)
+        health = {row["provider"]: row for row in self.router.provider_health()}
+        self.assertIn("response.failed", health["native"]["last_error"])
+
+    def test_truncated_native_stream_gets_explicit_failed_terminal_event(self):
+        self.script_native_failure(truncated=True)
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.body(stream=True))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertIn("event: response.failed", raw,
+                      "a stream that closes without a terminal event must not look finished")
+        self.assertNotIn("response.completed", raw)
+        health = {row["provider"]: row for row in self.router.provider_health()}
+        self.assertIn("terminal", health["native"]["last_error"])
+
+    def test_native_responses_preserves_custom_tool_history(self):
+        custom_input = [
+            {"type": "custom_tool_call", "call_id": "patch-1", "name": "apply_patch",
+             "input": "*** Begin Patch\n*** End Patch"},
+            {"type": "custom_tool_call_output", "call_id": "patch-1", "output": "Done!"},
+        ]
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.body(
+                stream=False, input=custom_input,
+                tools=[{"type": "custom", "name": "apply_patch"}]))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(raw)["status"], "completed")
+        sent = NativeResponsesProvider.requests[0]
+        self.assertEqual(sent["input"], custom_input,
+                         "custom tool history must reach the provider exactly as Codex sent it")
+        self.assertEqual(sent["tools"], [{"type": "custom", "name": "apply_patch"}],
+                         "a custom tool a Responses provider can run must not be stripped")
+
     def test_no_provider_failure_ever_prints_a_credential(self):
         # A 4xx is not retried, so this reaches the terminal failure path in one
         # attempt; a 5xx would be retried and the queued reply would be replaced

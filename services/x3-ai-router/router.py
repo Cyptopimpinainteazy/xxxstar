@@ -1956,6 +1956,21 @@ class Router:
                     if protocol == PROTOCOL_RESPONSES:
                         if not is_responses_object(result):
                             raise ValueError("Provider response is not a Responses object")
+                        if result.get("status") == "failed":
+                            # HTTP 200 with a failed body is the Responses
+                            # protocol's way of reporting an upstream failure.
+                            # Booking it as a success would hand the client an
+                            # empty answer and leave a broken provider marked
+                            # healthy, so it fails over like any other error.
+                            error = result.get("error") if isinstance(result.get("error"), dict) else {}
+                            detail = "response.failed"
+                            if error.get("message"):
+                                detail += ": " + sanitize_secret(str(error["message"]))[:160]
+                            self.note_attempt(name, model, self.elapsed_ms(started), False, attempt_index > 0)
+                            self.finish(reservation, agent)
+                            self.note_provider_failure(name, detail)
+                            failures.append(self.diagnostic(name, None, detail))
+                            break
                     elif not isinstance(result, dict) or "choices" not in result:
                         raise ValueError("Provider response lacks choices")
                     usage = normalize_usage(result.get("usage", {}))
@@ -2154,11 +2169,14 @@ class Router:
                     if reported:
                         # The provider reported its own failure once output had
                         # begun. It is relayed to the client, benched in provider
-                        # health, and never booked as a success.
+                        # health, and never booked as a success. What it already
+                        # produced is what it bills, so the usage it reported is
+                        # what is charged, not the reservation estimate.
+                        cost = ((usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000) if usage else estimate
                         self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started),
-                                          False, attempt_index > 0, usage or {}, estimate)
+                                          False, attempt_index > 0, usage or {}, cost)
                         self.note_provider_failure(name, reported)
-                        self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
+                        self.finish(reservation, agent, name, provider["model"], usage or {}, cost)
                         return None
                     cost = ((usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000) if usage else estimate
                     self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), True,
