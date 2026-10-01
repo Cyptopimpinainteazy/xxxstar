@@ -46,8 +46,12 @@ class CorpusTests(unittest.TestCase):
 
 
 class ClassificationTests(unittest.TestCase):
-    def classify(self, name, terms, executable=None, corpus=None, hints=()):
-        return toolchain.classify(name, terms, executable, corpus or {}, hints)
+    def classify(self, name, terms, executable=None, corpus=None, hints=(), recorded=None):
+        # `recorded` defaults to nothing here even though production scans the
+        # live evidence directories: a unit test must not let this repository's
+        # artifacts answer for the fixture.
+        return toolchain.classify(name, terms, executable, corpus or {}, hints,
+                                  recorded=[] if recorded is None else recorded)
 
     def test_a_library_dependency_counts_as_installed(self):
         row = self.classify("proptest", ("proptest",), None, {"Cargo.lock": "proptest 1.0"})
@@ -85,22 +89,40 @@ class ClassificationTests(unittest.TestCase):
     def test_nothing_here_claims_a_tool_was_exercised(self):
         row = self.classify("kani", ("kani",), None,
                             {".github/workflows/formal-verification.yml": "cargo kani"})
-        for state in ("exercised", "evidenced", "repeatable"):
+        for state in ("exercised", "repeatable"):
             self.assertEqual(row[state], "not_determinable", state)
+        # `evidenced` is the artifact-based rung: a bool, False with no
+        # recorded run, and still never an EXERCISED/VERIFIED claim.
+        self.assertIs(row["evidenced"], False)
         self.assertTrue(row["why_not_determinable"])
+
+    def test_a_recorded_artifact_is_evidenced_never_verified(self):
+        recorded = [{"file": "reports/x.json", "term": "k6", "mtime": 1}]
+        row = self.classify("k6", ("k6",), "python3", {}, recorded=recorded)
+        self.assertEqual(toolchain.status_of(row), "EVIDENCED")
+        self.assertEqual(row["exercised"], "not_determinable")
+        self.assertEqual(row["repeatable"], "not_determinable")
+        # A gate is the stronger claim and stays on top of the ladder.
+        gated = self.classify("kani", ("kani",), None,
+                              {".github/workflows/formal-verification.yml": "cargo kani"},
+                              recorded=recorded)
+        self.assertEqual(toolchain.status_of(gated), "GATED")
 
     def test_the_status_ladder_is_ordered(self):
         self.assertEqual(toolchain.status_of({"gated": True, "wired": True, "configured": True,
-                                              "installed": True, "available": True,
+                                              "installed": True, "available": True, "evidenced": False,
                                               "referenced_only": False}), "GATED")
         self.assertEqual(toolchain.status_of({"gated": False, "wired": True, "configured": True,
-                                              "installed": True, "available": True,
+                                              "installed": True, "available": True, "evidenced": False,
                                               "referenced_only": False}), "WIRED")
+        self.assertEqual(toolchain.status_of({"gated": False, "wired": False, "configured": False,
+                                              "installed": True, "available": True, "evidenced": True,
+                                              "referenced_only": False}), "EVIDENCED")
         self.assertEqual(toolchain.status_of({"gated": False, "wired": False, "configured": True,
-                                              "installed": True, "available": True,
+                                              "installed": True, "available": True, "evidenced": False,
                                               "referenced_only": False}), "CONFIGURED")
         self.assertEqual(toolchain.status_of({"gated": False, "wired": False, "configured": False,
-                                              "installed": False, "available": False,
+                                              "installed": False, "available": False, "evidenced": False,
                                               "referenced_only": False}), "MISSING")
 
 
@@ -119,7 +141,7 @@ class RealRepositoryTests(unittest.TestCase):
     def test_every_catalogue_entry_is_classified(self):
         self.assertEqual(len(self.rows), len(toolchain.CATALOG))
         statuses = {row["status"] for row in self.rows}
-        self.assertTrue(statuses <= {"GATED", "WIRED", "CONFIGURED", "INSTALLED_ONLY",
+        self.assertTrue(statuses <= {"GATED", "EVIDENCED", "WIRED", "CONFIGURED", "INSTALLED_ONLY",
                                      "REFERENCE_ONLY", "AVAILABLE", "MISSING"}, statuses)
 
     def test_every_wiring_claim_carries_a_file_and_a_line(self):

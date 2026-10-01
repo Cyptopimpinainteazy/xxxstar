@@ -707,6 +707,12 @@ GATES_FAST=(
   # when an operator asks for it, so a change to router.py was covered by
   # nothing on a normal commit. It is standard library only and takes seconds.
   "test x3-ai-router:python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'"
+  # The forge index and completion engine decide what other agents work on.
+  # Their suites pin parser traps, severity decisions and the file selection the
+  # tools make -- and no gate ran them; a false "required test is ignored"
+  # finding from a frozen audit extract reached a real report before anything
+  # noticed. Standard library only; the index test builds the repo index once.
+  "test x3-forge:python3 -m unittest discover -s tools/x3-forge -p 'test_*.py'"
   # `x3-sim` is the deterministic fault-injection simulator for that same
   # coordinator. It is its own workspace root for the same reason (it depends on
   # the coordinator by path), so `cargo test --workspace` never sees it and it

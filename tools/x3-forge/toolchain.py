@@ -23,6 +23,14 @@ file presence: a workflow that mentions `kani` is not proof that kani ran, let
 alone that its result was captured. Those are reported as `not_determinable`
 with what would be needed to establish them.
 
+EVIDENCED is the one partial exception, and it is deliberately weaker than the
+word suggests: a report, runlog or proof artifact under the evidence
+directories that names the tool means something ran and was written down —
+not that it succeeded, was bound to the commit under review, or is
+repeatable. It is reported as EVIDENCED with the artifact paths so a reader
+can judge, never as VERIFIED. EXERCISED and REPEATABLE stay
+`not_determinable`; a filesystem cannot establish them.
+
     python3 tools/x3-forge/toolchain.py inventory --out reports/toolchain
     python3 tools/x3-forge/toolchain.py show kani
     python3 tools/x3-forge/toolchain.py gaps
@@ -318,8 +326,13 @@ def mentions(corpus, terms, limit=12):
     return hits
 
 
-def classify(name, terms, executable, corpus, config_hints):
-    """The states a filesystem can actually establish, and nothing more."""
+def classify(name, terms, executable, corpus, config_hints, recorded=None):
+    """The states a filesystem can actually establish, and nothing more.
+
+    `recorded` is injectable so the classification can be tested without the
+    live evidence directories answering for the fixture; production callers
+    leave it None and get `recorded_runs`.
+    """
     kind = TOOL_KIND.get(name, "binary")
     installed_path = shutil.which(executable) if (executable and kind == "binary") else None
     found = mentions(corpus, terms)
@@ -338,7 +351,7 @@ def classify(name, terms, executable, corpus, config_hints):
     # A configuration file counts when it is on disk, not when a doc names it.
     configured = [hint for hint in config_hints if (ROOT / hint).exists()]
     fuzz_dir = any(rel.endswith("/fuzz/Cargo.toml") for rel in corpus)
-    recorded = recorded_runs(terms)
+    recorded = recorded_runs(terms) if recorded is None else recorded
 
     return {
         "tool": name,
