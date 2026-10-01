@@ -32,11 +32,32 @@ UNSUPPORTED_PATHS = ("/v1/embeddings", "/v1/audio")
 # like it chose not to call something it was never offered.
 UNSUPPORTED_TOOL_TYPES = ("file_search", "image_generation", "computer_use",
                           "code_interpreter", "mcp", "local_shell", "shell")
+# ── Provider protocol capability ─────────────────────────────────────────
+# Each provider declares the upstream wire protocol it speaks. The router never
+# infers this from the base URL or the model name: a guessed protocol turns a
+# provider's own errors into router bugs, and the two protocols are not
+# interchangeable (a Responses body sent to /chat/completions is a 400).
+PROTOCOL_RESPONSES = "responses"
+PROTOCOL_CHAT = "chat_completions"
+PROTOCOLS = (PROTOCOL_RESPONSES, PROTOCOL_CHAT)
+# Responses tool types the router understands structurally and keeps for any
+# provider that accepts the protocol. Everything else is a hosted tool a
+# provider only gets when it declares it in `hosted_tools`.
+NATIVE_TOOL_TYPES = ("function", "custom")
+HOSTED_TOOL_TYPES = ("web_search", "file_search", "computer_use", "code_interpreter",
+                     "mcp", "image_generation", "local_shell", "shell")
 # The single Chat Completions argument that carries a custom (freeform) tool's
 # body. Chat Completions has no freeform tool type, so the text travels as one
 # string argument and is lifted back out on the way to the client.
 CUSTOM_TOOL_INPUT = "input"
 TOOL_CAPABLE = "supports_tools"
+# Credential shapes scrubbed out of any provider error before it reaches a log
+# line, a client, or the provider-health table.
+SECRET_PATTERNS = (
+    re.compile(r"sk-[A-Za-z0-9_\-]{8,}"),
+    re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._\-]{8,}"),
+    re.compile(r"(?i)((?:api[_-]?key|authorization|token)\s*[=:]\s*)\S+"),
+)
 # A model can advertise tool support and still answer with JSON in the message
 # body. The only evidence that counts is a `tool_calls` array, so the probe asks
 # for one and will not take prose for an answer.
@@ -218,14 +239,58 @@ CRITICAL_TERMS = CRITICAL
 RETRYABLE_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 
 
-def task_text(request):
-    """The part of a request that describes the work.
+def input_item_text(item):
+    """The text a single Responses `input` item carries, if any."""
+    if not isinstance(item, dict):
+        return []
+    parts = []
+    content = item.get("content")
+    if isinstance(content, str):
+        parts.append(content)
+    elif isinstance(content, list):
+        parts.extend(part.get("text", "") for part in content
+                     if isinstance(part, dict) and isinstance(part.get("text"), str))
+    if item.get("type") == "custom_tool_call" and isinstance(item.get("input"), str):
+        parts.append(item["input"])
+    if isinstance(item.get("output"), str):
+        parts.append(item["output"])
+    return parts
 
-    System and developer messages are excluded on purpose. They carry the
-    agent's own instructions, which mention almost every class in the table and
-    would swamp the signal from the actual task.
+
+def responses_input_items(request):
+    """The Responses `input` as a list of items.
+
+    The Responses API accepts `input` as a plain string as well as a list of
+    items; a string stands for one user message. Codex sends a list, but the
+    string form is part of the protocol and a client that uses it must not be
+    turned away with "Expected an input list".
+    """
+    value = request.get("input")
+    if isinstance(value, str):
+        return [{"type": "message", "role": "user",
+                 "content": [{"type": "input_text", "text": value}]}]
+    return value if isinstance(value, list) else []
+
+
+def task_text(request):
+    """The part of a request that describes the work, for either wire surface.
+
+    A Chat Completions request carries the work in `messages`; system and
+    developer messages are excluded there because they restate the agent's own
+    instructions and would swamp the signal from the task.
+
+    A Responses request carries the work in `input` and `instructions`. The
+    `instructions` string is included on purpose: it is exactly where Codex
+    puts the project brief, and a consensus or slashing phrase written there
+    has to reach the classifier, or a critical request can be routed as
+    routine. Only `messages` can be excluded, so the two rules do not conflict.
     """
     parts = []
+    instructions = request.get("instructions")
+    if isinstance(instructions, str):
+        parts.append(instructions)
+    for item in responses_input_items(request):
+        parts.extend(input_item_text(item))
     for message in request.get("messages") or []:
         if not isinstance(message, dict):
             continue
@@ -241,6 +306,8 @@ def task_text(request):
             function = tool.get("function") or {}
             if function.get("name"):
                 parts.append(function["name"])
+            elif isinstance(tool.get("name"), str):
+                parts.append(tool["name"])
     return " ".join(parts).lower()
 
 
@@ -254,6 +321,10 @@ def classify(request):
     text = task_text(request)
     words = re.findall(r"[a-z0-9_]+", text)
     joined = " " + " ".join(words) + " "
+    # The keyword table matches on word-split text, where "cross-vm" has become
+    # "cross vm". Critical terms are matched against both forms so a hyphenated
+    # spelling ("cross-vm") is not silently treated as routine.
+    hyphenated = " " + " ".join(re.findall(r"[a-z0-9_\-]+", text)) + " "
 
     scores = {}
     for name in TASK_CLASSES:
@@ -283,7 +354,7 @@ def classify(request):
             best = scores[name]
             task_class = name
 
-    critical_terms = [term for term in CRITICAL_TERMS if term in joined]
+    critical_terms = [term for term in CRITICAL_TERMS if term in joined or term in hyphenated]
     blast_radius = sorted(set(critical_terms))
     risk = "critical" if (critical_terms or task_class in CRITICAL_CLASSES) else "low"
     if risk != "critical" and task_class in ("ARCHITECTURE", "DATABASE", "COMPILER_WORK",
@@ -475,7 +546,7 @@ def responses_messages(request):
     instructions = request.get("instructions")
     if isinstance(instructions, str) and instructions:
         messages.append({"role": "system", "content": instructions})
-    for item in request.get("input") or []:
+    for item in responses_input_items(request):
         if not isinstance(item, dict):
             continue
         kind = item.get("type", "message")
@@ -577,11 +648,88 @@ def responses_envelope(response_id, model, output, usage=None, status="completed
                 "status": status, "model": model, "output": output,
                 "parallel_tool_calls": False, "tool_choice": "auto", "tools": []}
     if usage is not None:
-        prompt = usage.get("prompt_tokens", 0) or 0
-        completion = usage.get("completion_tokens", 0) or 0
-        envelope["usage"] = {"input_tokens": prompt, "output_tokens": completion,
-                             "total_tokens": usage.get("total_tokens", prompt + completion)}
+        normalized = normalize_usage(usage)
+        envelope["usage"] = {"input_tokens": normalized["prompt_tokens"],
+                             "output_tokens": normalized["completion_tokens"],
+                             "total_tokens": normalized["total_tokens"]}
     return envelope
+
+
+def responses_failure_event(response_id, model, message, status=None):
+    """A terminal `response.failed` event for a stream the provider did not finish."""
+    envelope = responses_envelope(response_id, model, [], None, status="failed")
+    envelope["error"] = {"code": "upstream_error", "message": sanitize_secret(message)}
+    if status is not None:
+        envelope["error"]["status"] = status
+    return {"type": "response.failed", "response": envelope}
+
+
+class ResponsesEventReader:
+    """Terminal state of a native Responses SSE stream.
+
+    The Responses protocol terminates with a semantic event
+    (`response.completed`, `response.incomplete`, `response.failed`), not
+    `data: [DONE]`. Watching for `[DONE]` on this stream would read to the
+    socket close and report a finished answer as unfinished.
+    """
+
+    TERMINAL_TYPES = ("response.completed", "response.incomplete", "response.failed")
+
+    def __init__(self):
+        self.usage = None
+        self.model = None
+        self.status = None
+        self.failed = False
+        self.terminal = False
+
+    def begins(self, line):
+        return line.startswith(b"event: ") or line.startswith(b"data: ")
+
+    def stops(self, line):
+        return self.terminal
+
+    def first_event_type(self, line):
+        """The type of the first event on a stream, or None if it is not one."""
+        data = line[6:].strip() if line.startswith(b"data: ") else b""
+        if not data or data == b"[DONE]":
+            return None
+        try:
+            event = json.loads(data)
+        except ValueError:
+            return None
+        return event.get("type") if isinstance(event, dict) else None
+
+    def read(self, line):
+        if not line.startswith(b"data: "):
+            return
+        data = line[6:].strip()
+        if not data:
+            return
+        if data == b"[DONE]":
+            self.terminal = True
+            return
+        try:
+            event = json.loads(data)
+        except ValueError:
+            return
+        if not isinstance(event, dict):
+            return
+        response = event.get("response")
+        if isinstance(response, dict):
+            if response.get("usage"):
+                self.usage = response["usage"]
+            if isinstance(response.get("model"), str):
+                self.model = response["model"]
+        if event.get("type") in self.TERMINAL_TYPES:
+            self.terminal = True
+            self.status = event["type"]
+            self.failed = event["type"] == "response.failed"
+
+    def terminal_reason(self):
+        """None when the stream ended on a terminal event, else why not."""
+        if self.terminal:
+            return None
+        return "stream_ended_without_a_terminal_event"
 
 
 class ResponsesStream:
@@ -748,11 +896,13 @@ def output_bound(request, config):
     """The largest completion this request can be billed for.
 
     The reservation is an upper bound, so it has to bound whichever output
-    parameter the client actually set. Reading only `max_tokens` let a request
-    that set `max_completion_tokens` instead be reserved at the 4096 default
-    while the provider billed for whatever it asked for.
+    parameter the client actually set. A Responses request names it
+    `max_output_tokens`, a Chat Completions request `max_tokens` (or
+    `max_completion_tokens` for the models that moved to it). Reading only one
+    of them reserved the 4096 default while the provider billed for whatever
+    the request actually asked for.
     """
-    for key in ("max_tokens", "max_completion_tokens"):
+    for key in ("max_output_tokens", "max_completion_tokens", "max_tokens"):
         value = request.get(key)
         if type(value) is int:
             return value
@@ -766,7 +916,7 @@ def request_error(request, config):
     estimate does not read, and `n`/`best_of`, which multiply the completions
     the provider bills for while the estimate assumes exactly one.
     """
-    for key in ("max_tokens", "max_completion_tokens"):
+    for key in ("max_tokens", "max_completion_tokens", "max_output_tokens"):
         value = request.get(key)
         if value is not None and (type(value) is not int or not 1 <= value <= config.get("max_output_tokens", MAX_OUTPUT_TOKENS)):
             return "Invalid " + key
@@ -811,6 +961,222 @@ def may_serve_critical(provider):
     working when a paid provider is unavailable or over budget.
     """
     return bool(provider.get("critical_allowed", False)) or not provider.get("api_key_env")
+
+
+def provider_protocols(provider):
+    """The upstream protocols a provider declares, never inferred.
+
+    `protocols` lists everything the provider speaks. `protocol` names the one
+    it speaks when it only speaks one. A provider that declares neither keeps
+    the Chat Completions default that predates the field, so an older config
+    still routes; every provider this router ships is explicit.
+    """
+    declared = provider.get("protocols")
+    if isinstance(declared, list):
+        protocols = tuple(name for name in declared if name in PROTOCOLS)
+        if protocols:
+            return protocols
+    protocol = provider.get("protocol")
+    if protocol in PROTOCOLS:
+        return (protocol,)
+    return (PROTOCOL_CHAT,)
+
+
+def sanitize_secret(text):
+    """Strip credential-shaped substrings from text headed for a log or client."""
+    cleaned = str(text)
+    for pattern in SECRET_PATTERNS:
+        cleaned = pattern.sub(lambda match: (match.group(1) if match.groups() else "") + "[redacted]",
+                              cleaned)
+    return cleaned
+
+
+def http_error_detail(exc, limit=200):
+    """The provider's own error message, sanitized.
+
+    "HTTP 400" says a request was rejected but not what to change. The body
+    names the field; the body can also echo a credential if a client leaked one
+    into a header, so everything read here is scrubbed before it can reach a
+    log line, a failure response, or provider health.
+    """
+    try:
+        raw = exc.read()
+    except Exception:
+        return ""
+    text = raw.decode("utf-8", "replace").strip() if isinstance(raw, bytes) else str(raw)
+    if not text:
+        return ""
+    message = None
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        parsed = None
+    if isinstance(parsed, dict):
+        error = parsed.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+        elif isinstance(error, str):
+            message = error
+        if not isinstance(message, str):
+            message = parsed.get("message") if isinstance(parsed.get("message"), str) else None
+    if not isinstance(message, str):
+        message = text
+    return sanitize_secret(message)[:limit]
+
+
+def normalize_usage(usage):
+    """Either wire shape -> the router's internal token names.
+
+    Chat Completions reports `prompt_tokens`/`completion_tokens`; the Responses
+    API reports `input_tokens`/`output_tokens`. Reading only the chat names
+    silently booked zero for every token a Responses provider billed.
+    """
+    if not isinstance(usage, dict):
+        return {}
+    prompt = usage.get("prompt_tokens")
+    if not isinstance(prompt, int):
+        prompt = usage.get("input_tokens")
+    completion = usage.get("completion_tokens")
+    if not isinstance(completion, int):
+        completion = usage.get("output_tokens")
+    prompt = prompt if isinstance(prompt, int) else 0
+    completion = completion if isinstance(completion, int) else 0
+    normalized = dict(usage)
+    normalized["prompt_tokens"] = prompt
+    normalized["completion_tokens"] = completion
+    if not isinstance(normalized.get("total_tokens"), int):
+        normalized["total_tokens"] = prompt + completion
+    return normalized
+
+
+def is_responses_object(result):
+    """Whether an upstream body is a Responses object rather than a chat one."""
+    return (isinstance(result, dict) and result.get("object") == "response"
+            and isinstance(result.get("output"), list))
+
+
+def normalize_responses_tools(payload, provider):
+    """Keep the tools a Responses provider really supports; drop the rest.
+
+    Codex sends `function` tools, a freeform `custom` apply_patch, a
+    `namespace` of collaboration tools, and hosted tools it may or may not have
+    enabled. One hosted tool the provider does not implement must not sink the
+    whole agent request, and it must not be forwarded as though it worked:
+    namespaced tools are flattened into their members and unsupported hosted
+    tools are dropped and reported by name.
+    """
+    tools = payload.get("tools")
+    if not isinstance(tools, list):
+        return []
+    declared = set(provider.get("hosted_tools") or ())
+    kept, dropped = [], []
+
+    def walk(entries):
+        for tool in entries or []:
+            if not isinstance(tool, dict):
+                continue
+            kind = tool.get("type")
+            if kind == "namespace":
+                walk(tool.get("tools"))
+            elif kind in NATIVE_TOOL_TYPES or kind in declared:
+                kept.append(tool)
+            else:
+                dropped.append(str(kind))
+
+    walk(tools)
+    if not dropped:
+        return []
+    if kept:
+        payload["tools"] = kept
+    else:
+        payload.pop("tools", None)
+        # A forced choice with nothing left to call is a guaranteed 400, so it
+        # is relaxed rather than sent.
+        if payload.get("tool_choice") not in (None, "auto", "none"):
+            payload["tool_choice"] = "auto"
+    return dropped
+
+
+class UpstreamRequest:
+    """One inbound request, expressed in every protocol a provider may need.
+
+    A Chat Completions request only has the chat shape. A Responses request
+    keeps its native body so a provider that speaks the Responses protocol is
+    handed it un-translated, and carries the Chat Completions translation
+    alongside for the providers that only speak Chat Completions.
+    """
+
+    def __init__(self, surface, body, chat=None, responses=None,
+                 custom=frozenset(), disabled=(), chat_error=None):
+        self.surface = surface
+        self.body = body
+        self.chat = chat
+        self.responses = responses
+        self.custom = set(custom)
+        self.disabled = list(disabled)
+        self.chat_error = chat_error
+
+    def protocol_for(self, provider):
+        """The upstream protocol to use, or None when the provider cannot serve.
+
+        The surface's own protocol always wins when the provider speaks it: a
+        Responses request reaches a Responses provider natively. A Responses
+        request falls back to the Chat Completions translation only for a
+        provider that does not speak Responses. A Chat request is never handed
+        to a Responses-only provider — that translation does not exist, and a
+        clean refusal beats a malformed upstream request.
+        """
+        protocols = provider_protocols(provider)
+        if self.surface in protocols:
+            return self.surface
+        if self.surface == PROTOCOL_RESPONSES and PROTOCOL_CHAT in protocols and self.chat is not None:
+            return PROTOCOL_CHAT
+        return None
+
+    def supports(self, provider):
+        return self.protocol_for(provider) is not None
+
+    def refusal(self, provider):
+        """Why `protocol_for` returned None, named for the attempt list."""
+        protocols = provider_protocols(provider)
+        if self.surface == PROTOCOL_RESPONSES and PROTOCOL_CHAT in protocols and self.chat is None:
+            return "request has no Chat Completions form: " + str(self.chat_error)
+        return "provider does not declare the " + self.surface + " protocol"
+
+    def shape(self, protocol):
+        return self.responses if protocol == PROTOCOL_RESPONSES else self.chat
+
+    def control(self):
+        """The dict used for classification, budget and capability checks."""
+        return self.body
+
+    def model(self, fallback="x3-auto"):
+        value = self.body.get("model")
+        return value if isinstance(value, str) else fallback
+
+
+def coerce_plan(candidate):
+    """Accept a bare request body as well as a prepared `UpstreamRequest`.
+
+    The HTTP handler builds the full plan, because only it knows that a
+    Responses request also has a Chat Completions translation. Direct callers
+    hand in a body, and it is read as the shape it is written in:
+    `input`/`instructions` is a Responses request, `messages` a Chat
+    Completions one.
+    """
+    if isinstance(candidate, UpstreamRequest):
+        return candidate
+    if not isinstance(candidate, dict):
+        raise TypeError("Expected a request mapping")
+    if "input" in candidate and "messages" not in candidate:
+        try:
+            chat, custom, disabled = responses_request(candidate)
+        except UnsupportedFeature as exc:
+            return UpstreamRequest(PROTOCOL_RESPONSES, candidate, responses=candidate,
+                                   chat_error=str(exc))
+        return UpstreamRequest(PROTOCOL_RESPONSES, candidate, chat=chat, responses=candidate,
+                               custom=custom, disabled=disabled)
+    return UpstreamRequest(PROTOCOL_CHAT, candidate, chat=candidate)
 
 
 class Router:
@@ -1155,18 +1521,26 @@ class Router:
                 "daily_budget_usd": self.config["daily_budget_usd"],
                 "breakdown": [{"agent": a, "provider": p, "requests": n, "cost_usd": c} for a, p, n, c in rows]}
 
-    def diagnostic(self, provider, status, reason, attempt=None):
+    def diagnostic(self, provider, status, reason, attempt=None, message=None):
         """One sanitized refusal: who, what status, why, how long it is benched.
 
-        Deliberately no prompt text, no headers and no credential values: the
-        log line and the error body are read by operators and by failing
-        clients, and neither should carry repository contents.
+        `message` is the provider's own error text, already scrubbed of
+        credential shapes by the caller. Without it a failure says "HTTP 400"
+        and leaves the operator to guess which field was rejected; with it the
+        attempt list names the field. Prompt text, headers and credential
+        values never appear: the log line and the error body are read by
+        operators and by failing clients, and neither should carry repository
+        contents.
         """
         entry = {"provider": provider, "status": status, "reason": reason,
                  "cooldown_seconds": round(self.provider_cooldown(provider), 1),
                  "request_id": getattr(self.context, "request_id", None)}
+        if message:
+            entry["message"] = sanitize_secret(message)
         entry["attempt"] = attempt if attempt is not None else (
             provider + ": " + reason if provider else reason)
+        if provider and message:
+            entry["attempt"] = provider + ": " + reason + " message: " + entry["message"]
         self.log_diagnostic(entry)
         return entry
 
@@ -1174,7 +1548,9 @@ class Router:
         print("x3-ai-router request_id=" + str(entry.get("request_id"))
               + " provider=" + str(entry.get("provider")) + " status=" + str(entry.get("status"))
               + " cooldown=" + str(entry.get("cooldown_seconds"))
-              + " reason=" + str(entry.get("reason"))[:200], file=sys.stderr, flush=True)
+              + " reason=" + str(entry.get("reason"))[:200]
+              + (" message=" + str(entry["message"])[:200] if entry.get("message") else ""),
+              file=sys.stderr, flush=True)
 
     def provider_skip(self, name, provider, tier, request):
         """Why this provider cannot take this request, or None to try it.
@@ -1233,6 +1609,12 @@ class Router:
         if not provider.get("tool_probe"):
             return {"tools": None, "detail": "not probed", "checked_at": None,
                     "samples": 0, "genuine": 0, "success_rate": None}
+        if PROTOCOL_CHAT not in provider_protocols(provider):
+            # The probe is a Chat Completions request. A provider that does not
+            # speak it cannot be measured this way, and a verdict invented for
+            # it would be worse than no verdict.
+            return {"tools": None, "detail": "not probed: provider does not speak Chat Completions",
+                    "checked_at": None, "samples": 0, "genuine": 0, "success_rate": None}
         with self.lock:
             cached = self.capabilities.get(key)
         ttl = self.config.get("capability_probe_ttl_seconds", 3600)
@@ -1304,6 +1686,8 @@ class Router:
             report.append({
                 "provider": name,
                 "model": provider.get("model"),
+                "protocols": list(provider_protocols(provider)),
+                "hosted_tools": list(provider.get("hosted_tools") or ()),
                 "declared_tools": bool(provider.get(TOOL_CAPABLE, False)),
                 "probed_tools": verdict["tools"],
                 "probe_detail": verdict["detail"],
@@ -1327,23 +1711,38 @@ class Router:
                                          "status": None, "cooldown_seconds": 0,
                                          "reason": "probe raised " + type(exc).__name__})
 
-    def provider_payload(self, request, provider, stream):
-        """The upstream Chat Completions body for one provider attempt.
+    def provider_payload(self, plan, provider, stream):
+        """The upstream body for one provider attempt, in its own protocol.
 
-        The client's `model` is ignored: the router chooses. `max_tokens` is
-        always set, even when the client left it out, so the request can never
-        be billed for more than the reservation covers.
+        The client's `model` is always replaced: the router chooses. The output
+        bound is always set, in whichever parameter the protocol names, so a
+        request can never be billed for more than the reservation covers. A
+        native Responses body is not otherwise rewritten; the provider's own
+        fields (`instructions`, `input`, `reasoning`, `tool_choice`) ride along
+        unchanged, which is the whole point of forwarding it natively.
         """
-        payload = dict(request)
+        plan = coerce_plan(plan)
+        protocol = plan.protocol_for(provider)
+        payload = dict(plan.shape(protocol) or {})
         payload["model"] = provider["model"]
         payload["stream"] = stream
+        limit = output_bound(plan.control(), self.config)
+        if protocol == PROTOCOL_RESPONSES:
+            payload["max_output_tokens"] = limit
+            normalize_responses_tools(payload, provider)
+            return payload
         if stream:
             payload["stream_options"] = {"include_usage": True}
-        payload["max_tokens"] = output_bound(request, self.config)
+        payload["max_tokens"] = limit
         apply_provider_reasoning(payload, provider)
         if provider.get("output_token_parameter") == "max_completion_tokens":
             payload["max_completion_tokens"] = payload.pop("max_tokens", DEFAULT_OUTPUT_TOKENS)
         return payload
+
+    def provider_url(self, provider, protocol):
+        """The endpoint for the protocol, under the provider's base URL."""
+        suffix = "/responses" if protocol == PROTOCOL_RESPONSES else "/chat/completions"
+        return provider["base_url"].rstrip("/") + suffix
 
     def failure_body(self, diagnostics, kind="no_provider_succeeded", message="No provider succeeded"):
         return {"error": {"message": message, "type": kind,
@@ -1496,7 +1895,9 @@ class Router:
     def elapsed_ms(self, started):
         return (time.monotonic() - started) * 1000.0
 
-    def complete(self, request, agent):
+    def complete(self, plan, agent):
+        plan = coerce_plan(plan)
+        request = plan.control()
         # UTF-8 JSON bytes conservatively bound visible input tokens; reject
         # oversized requests instead of trusting a configured estimate.
         if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config.get("max_request_bytes", 8 * 1024 * 1024):
@@ -1514,7 +1915,12 @@ class Router:
             model = provider["model"]
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
+            protocol = plan.protocol_for(provider)
             skip = self.provider_skip(name, provider, tier, request)
+            if skip is None and protocol is None:
+                # The provider declared a protocol this surface cannot use. A
+                # clean named refusal beats sending a body it will reject.
+                skip = self.diagnostic(name, None, plan.refusal(provider))
             if skip is not None:
                 if not skip.get("quiet"):
                     failures.append(skip)
@@ -1534,11 +1940,11 @@ class Router:
                     budget_refused = True
                     failures.append(self.diagnostic(name, None, "daily budget exhausted"))
                     continue
-            payload = self.provider_payload(request, provider, False)
+            payload = self.provider_payload(plan, provider, False)
             headers = {"Content-Type": "application/json"}
             if key:
                 headers["Authorization"] = "Bearer " + key
-            url = provider["base_url"].rstrip("/") + "/chat/completions"
+            url = self.provider_url(provider, protocol)
             body = json.dumps(payload).encode()
             allowed = 1 + self.retry_budget(provider)
             for attempt_index in range(allowed):
@@ -1547,9 +1953,12 @@ class Router:
                     call = urllib.request.Request(url, body, headers, method="POST")
                     with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
                         result = json.load(response)
-                    if not isinstance(result, dict) or "choices" not in result:
+                    if protocol == PROTOCOL_RESPONSES:
+                        if not is_responses_object(result):
+                            raise ValueError("Provider response is not a Responses object")
+                    elif not isinstance(result, dict) or "choices" not in result:
                         raise ValueError("Provider response lacks choices")
-                    usage = result.get("usage", {})
+                    usage = normalize_usage(result.get("usage", {}))
                     cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000 if usage else estimate
                     self.note_attempt(name, model, self.elapsed_ms(started), True, attempt_index > 0, usage, cost)
                     self.note_provider_success(name)
@@ -1560,12 +1969,14 @@ class Router:
                     # caught first to read a rate-limit `Retry-After`.
                     self.note_attempt(name, model, self.elapsed_ms(started), False, attempt_index > 0)
                     retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                    detail = http_error_detail(exc)
                     if exc.code in RETRYABLE_STATUS and attempt_index + 1 < allowed:
                         time.sleep(self.retry_delay(provider, attempt_index))
                         continue
                     self.finish(reservation, agent)
-                    self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
-                    failures.append(self.diagnostic(name, exc.code, "HTTP " + str(exc.code)))
+                    self.note_provider_failure(
+                        name, "HTTP " + str(exc.code) + (": " + detail if detail else ""), retry_after)
+                    failures.append(self.diagnostic(name, exc.code, "HTTP " + str(exc.code), message=detail))
                     break
                 except (urllib.error.URLError, TimeoutError) as exc:
                     self.note_attempt(name, model, self.elapsed_ms(started), False, attempt_index > 0)
@@ -1593,7 +2004,87 @@ class Router:
             return 429, self.failure_body(failures, "budget_exceeded", "Daily budget exhausted")
         return 502, self.failure_body(failures)
 
-    def stream(self, request, agent, start, send):
+    def relay_chat_stream(self, response, started, start, send):
+        """Relay a Chat Completions SSE stream; return (usage, reported_failure).
+
+        `[DONE]` or a finish reason is the only evidence the answer finished.
+        Reading past `[DONE]` to wait for the socket to close hung the handler
+        on a keep-alive connection the provider never closed.
+        """
+        usage = None
+        finish_reason = None
+        saw_done = False
+        for line in response:
+            if len(line) > 1_000_000:
+                raise ValueError("Oversized SSE line")
+            if not line.startswith(b"data: "):
+                if started:
+                    send(line)
+                continue
+            data = line[6:].strip()
+            if not started:
+                start()
+                started.append(True)
+            if data == b"[DONE]":
+                saw_done = True
+                send(line)
+                break
+            event = json.loads(data)
+            if event.get("usage"):
+                usage = event["usage"]
+            for choice in event.get("choices") or []:
+                if choice.get("finish_reason"):
+                    finish_reason = choice["finish_reason"]
+            send(line)
+        if not started:
+            raise ValueError("Empty SSE response")
+        if not saw_done and finish_reason is None:
+            raise ValueError("Stream ended without a terminal event")
+        return normalize_usage(usage), None
+
+    def relay_responses_stream(self, response, started, start, send):
+        """Relay a native Responses SSE stream; return (usage, reported_failure).
+
+        The stream terminates with a semantic event, so `[DONE]` is never the
+        end of it. The first event is held until it is known not to be a
+        failure: a provider that fails before producing any output can then be
+        failed over without the client seeing a half-started stream.
+        """
+        reader = ResponsesEventReader()
+        held = []
+        for line in response:
+            if len(line) > 1_000_000:
+                raise ValueError("Oversized SSE line")
+            stripped = line.rstrip(b"\r\n")
+            if not started:
+                held.append(line)
+                if not reader.begins(stripped):
+                    continue
+                if reader.first_event_type(stripped) == "response.failed":
+                    raise ValueError("provider reported response.failed before any output")
+                start()
+                started.append(True)
+                for buffered in held:
+                    send(buffered)
+                held = []
+                reader.read(stripped)
+                if reader.stops(stripped):
+                    break
+                continue
+            reader.read(stripped)
+            send(line)
+            if reader.stops(stripped):
+                break
+        if not started:
+            raise ValueError("Empty SSE response")
+        if reader.terminal_reason() is not None:
+            raise ValueError("Stream ended without a terminal event")
+        reported = "provider reported " + str(reader.status) if reader.failed else None
+        return normalize_usage(reader.usage), reported
+
+    def stream(self, plan, agent, start, send):
+        plan = coerce_plan(plan)
+        request = plan.control()
         if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config.get("max_request_bytes", 8 * 1024 * 1024):
             return 413, {"error": "Request body exceeds configured byte limit"}
         error = request_error(request, self.config)
@@ -1608,11 +2099,15 @@ class Router:
             provider = self.config["providers"][name]
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
+            protocol = plan.protocol_for(provider)
             skip = self.provider_skip(name, provider, tier, request)
+            if skip is None and protocol is None:
+                skip = self.diagnostic(name, None, plan.refusal(provider))
             if skip is not None:
                 if not skip.get("quiet"):
                     failures.append(skip)
                 continue
+            payload = self.provider_payload(plan, provider, True)
             key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
             estimate = (output_bound(request, self.config) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
             # A provider that cannot bill needs no reservation, and must not be
@@ -1627,7 +2122,6 @@ class Router:
                     budget_refused = True
                     failures.append(self.diagnostic(name, None, "daily budget exhausted"))
                     continue
-            payload = self.provider_payload(request, provider, True)
             headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
             if key:
                 headers["Authorization"] = "Bearer " + key
@@ -1638,45 +2132,34 @@ class Router:
                 # Reset per attempt: a retry is only legal before any byte has
                 # reached the client, and a partial stream must never be
                 # stitched onto a fresh one.
-                emitted = False
+                started = []
                 usage = None
-                saw_done = False
-                finish_reason = None
                 try:
-                    call = urllib.request.Request(provider["base_url"].rstrip("/") + "/chat/completions",
+                    def begin():
+                        # Tell the caller's callback which protocol won, so a
+                        # Chat Completions stream is re-emitted as Responses
+                        # events while a native one is relayed verbatim.
+                        self.context.stream_protocol = protocol
+                        start()
+
+                    call = urllib.request.Request(self.provider_url(provider, protocol),
                                                   body, headers, method="POST")
                     with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
                         if "text/event-stream" not in response.headers.get("Content-Type", ""):
                             raise ValueError("Provider did not return SSE")
-                        for line in response:
-                            if len(line) > 1_000_000:
-                                raise ValueError("Oversized SSE line")
-                            if not line.startswith(b"data: "):
-                                if emitted:
-                                    send(line)
-                                continue
-                            data = line[6:].strip()
-                            if not emitted:
-                                start()
-                                emitted = True
-                            if data == b"[DONE]":
-                                # The stream is over. Reading until the socket
-                                # closes instead left the client waiting on a
-                                # keep-alive connection the provider never closed.
-                                saw_done = True
-                                send(line)
-                                break
-                            event = json.loads(data)
-                            if event.get("usage"):
-                                usage = event["usage"]
-                            for choice in event.get("choices") or []:
-                                if choice.get("finish_reason"):
-                                    finish_reason = choice["finish_reason"]
-                            send(line)
-                    if not emitted:
-                        raise ValueError("Empty SSE response")
-                    if not saw_done and finish_reason is None:
-                        raise ValueError("Stream ended without a terminal event")
+                        if protocol == PROTOCOL_RESPONSES:
+                            usage, reported = self.relay_responses_stream(response, started, begin, send)
+                        else:
+                            usage, reported = self.relay_chat_stream(response, started, begin, send)
+                    if reported:
+                        # The provider reported its own failure once output had
+                        # begun. It is relayed to the client, benched in provider
+                        # health, and never booked as a success.
+                        self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started),
+                                          False, attempt_index > 0, usage or {}, estimate)
+                        self.note_provider_failure(name, reported)
+                        self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
+                        return None
                     cost = ((usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000) if usage else estimate
                     self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), True,
                                       attempt_index > 0, usage or {}, cost)
@@ -1690,23 +2173,25 @@ class Router:
                     # printing.
                     self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), False,
                                       attempt_index > 0)
-                    self.finish(reservation, agent, name if emitted else None, provider["model"],
-                                usage or {}, estimate if emitted else 0)
+                    self.finish(reservation, agent, name if started else None, provider["model"],
+                                usage or {}, estimate if started else 0)
                     self.diagnostic(name, None, "client disconnected")
                     return None
                 except urllib.error.HTTPError as exc:
                     retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                    detail = http_error_detail(exc)
                     self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), False,
                                       attempt_index > 0)
                     # A 5xx or a 429 before the first byte is worth one more
                     # try; after the first byte it is not, because the client
                     # already has half an answer.
-                    if not emitted and exc.code in RETRYABLE_STATUS and attempt_index + 1 < allowed:
+                    if not started and exc.code in RETRYABLE_STATUS and attempt_index + 1 < allowed:
                         time.sleep(self.retry_delay(provider, attempt_index))
                         continue
-                    self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
-                    failure = self.diagnostic(name, exc.code, "HTTP " + str(exc.code))
-                    if emitted:
+                    self.note_provider_failure(
+                        name, "HTTP " + str(exc.code) + (": " + detail if detail else ""), retry_after)
+                    failure = self.diagnostic(name, exc.code, "HTTP " + str(exc.code), message=detail)
+                    if started:
                         self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
                         return 502, self.failure_body([failure])
                     self.finish(reservation, agent)
@@ -1715,12 +2200,12 @@ class Router:
                 except (urllib.error.URLError, TimeoutError, OSError) as exc:
                     self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), False,
                                       attempt_index > 0)
-                    if not emitted and attempt_index + 1 < allowed:
+                    if not started and attempt_index + 1 < allowed:
                         time.sleep(self.retry_delay(provider, attempt_index))
                         continue
                     self.note_provider_failure(name, type(exc).__name__)
                     failure = self.diagnostic(name, None, type(exc).__name__)
-                    if emitted:
+                    if started:
                         self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
                         return 502, self.failure_body([failure])
                     self.finish(reservation, agent)
@@ -1731,21 +2216,22 @@ class Router:
                     # the identical request produces the identical answer.
                     self.note_attempt(name, provider["model"], self.elapsed_ms(attempt_started), False,
                                       attempt_index > 0)
-                    self.note_provider_failure(name, type(exc).__name__)
-                    failure = self.diagnostic(name, None, type(exc).__name__)
-                    if emitted:
+                    self.note_provider_failure(name, str(exc)[:200])
+                    failure = self.diagnostic(name, None, sanitize_secret(str(exc)))
+                    if started:
                         self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
                         return 502, self.failure_body([failure])
                     self.finish(reservation, agent)
                     failures.append(failure)
                     break
                 except Exception:
-                    self.finish(reservation, agent, name if emitted else None, provider["model"], usage or {}, estimate if emitted else 0)
+                    self.finish(reservation, agent, name if started else None, provider["model"], usage or {}, estimate if started else 0)
                     self.note_provider_failure(name, "unexpected error")
                     raise
         if budget_refused:
             return 429, self.failure_body(failures, "budget_exceeded", "Daily budget exhausted")
         return 502, self.failure_body(failures)
+
 
 def dashboard(snapshot):
     rows = "".join("<tr>" + "".join(f"<td>{html.escape(str(item[key]))}</td>" for key in ("agent", "provider", "requests", "cost_usd")) + "</tr>"
@@ -1895,30 +2381,41 @@ def handler_for(router):
                 raise ClientDisconnected() from exc
 
         def serve_responses(self, data, agent):
-            """Serve `POST /v1/responses` by translating onto the chat path.
+            """Serve `POST /v1/responses` in whichever protocol the provider speaks.
 
-            Codex accepts only the Responses wire protocol for a custom
-            provider, while every provider this router talks to speaks Chat
-            Completions. Rather than duplicate provider selection, budgets,
-            cooldowns and fallback, the request is translated and handed to
-            `router.complete` / `router.stream`, and the answer is translated
-            back.
+            A provider that declares the Responses protocol is handed the
+            request natively — only `model`, the output bound and any tool the
+            provider cannot run are touched — so Codex and DeepSeek speak the
+            same protocol end to end. A provider that only speaks Chat
+            Completions still gets the tested translation, which is what keeps
+            it in the failover chain. The two shapes are built once and the
+            provider decides which one it gets, so provider selection, budgets,
+            cooldowns and fallback are not duplicated per protocol.
             """
-            if not isinstance(data.get("input"), list):
+            if not isinstance(data.get("input"), (list, str)) or not data.get("input"):
                 return self.reply(400, {"error": {"message": "Expected an input list"}})
+            if isinstance(data["input"], str):
+                data = dict(data, input=responses_input_items(data))
+            chat, custom, disabled, chat_error = None, set(), [], None
             try:
                 chat, custom, disabled = responses_request(data)
             except UnsupportedFeature as exc:
-                # Fail closed rather than silently dropping a capability the
-                # caller believed it had. The client can then pick a provider
-                # that speaks the Responses protocol natively.
-                return self.reply(400, {"error": {
-                    "message": "Unsupported feature for Chat Completions providers: " + str(exc),
-                    "type": "unsupported_feature",
-                    "unsupported": str(exc)}})
-            if not chat["messages"]:
+                # A hosted tool with no Chat Completions equivalent only rules
+                # out the Chat providers. It is not fatal while a provider that
+                # speaks Responses natively can still take the request.
+                chat_error = str(exc)
+            if chat is not None and not chat["messages"]:
                 return self.reply(400, {"error": {"message": "Expected at least one input message"}})
-            error = request_error(chat, router.config)
+            if chat is None and not any(
+                    PROTOCOL_RESPONSES in provider_protocols(router.config["providers"][name])
+                    for name in router.attempt_order(router.choose(data)[1])):
+                # Nothing in the chain can express this request. Fail closed,
+                # naming the capability rather than sending a malformed body.
+                return self.reply(400, {"error": {
+                    "message": "Unsupported feature for the available providers: " + str(chat_error),
+                    "type": "unsupported_feature",
+                    "unsupported": str(chat_error)}})
+            error = request_error(data, router.config)
             if error:
                 return self.reply(400, {"error": {"message": error}})
             for name in disabled:
@@ -1929,41 +2426,72 @@ def handler_for(router):
                     # the model.
                     self.log_message("tool disabled by the client, not offered to the model: %s", name)
 
+            plan = UpstreamRequest(PROTOCOL_RESPONSES, data, chat=chat, responses=data,
+                                   custom=custom, disabled=disabled, chat_error=chat_error)
             response_id = "resp_" + uuid.uuid4().hex
-            model = data.get("model") if isinstance(data.get("model"), str) else "x3-auto"
+            model = plan.model()
 
             if not data.get("stream", True):
-                status, result = router.complete(chat, agent)
+                status, result = router.complete(plan, agent)
                 if status != 200:
                     return self.reply(status, result)
+                if is_responses_object(result):
+                    # A native Responses provider already answered in the exact
+                    # shape the client speaks; re-wrapping it would only lose
+                    # fields (reasoning items, output indices, status).
+                    return self.reply(200, result)
                 message = (result.get("choices") or [{}])[0].get("message") or {}
                 envelope = responses_envelope(response_id, result.get("model", model),
                                               chat_message_to_response_output(message, response_id, custom),
                                               result.get("usage"))
                 return self.reply(200, envelope)
 
-            stream = ResponsesStream(self.stream_chunk, response_id, model, custom)
+            started = []
+            adapter = []
 
             def start():
+                started.append(True)
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
                 self.send_header("Connection", "close")
                 self.end_headers()
-                stream.start()
+                if getattr(router.context, "stream_protocol", None) != PROTOCOL_RESPONSES:
+                    # A Chat Completions provider answers a Responses client
+                    # through the adapter, which rebuilds the event sequence
+                    # from its chunks.
+                    adapter.append(ResponsesStream(self.stream_chunk, response_id, model, custom))
+                    adapter[0].start()
 
-            outcome = router.stream(chat, agent, start, stream.on_line)
-            try:
-                if outcome is not None and stream.started:
-                    # The response already began, so the only honest ending is
-                    # a failure event rather than a status code the client
-                    # cannot see any more.
-                    stream.fail(outcome[1].get("error", {}).get("message", "upstream failure"),
-                                status=outcome[0])
-                elif outcome is not None:
-                    return self.reply(*outcome)
+            def send(chunk):
+                if adapter:
+                    adapter[0].on_line(chunk)
                 else:
-                    stream.finish()
+                    self.stream_chunk(chunk)
+
+            outcome = router.stream(plan, agent, start, send)
+            try:
+                if adapter:
+                    if outcome is not None and adapter[0].started:
+                        # The response already began, so the only honest ending
+                        # is a failure event rather than a status code the
+                        # client can no longer see.
+                        adapter[0].fail(outcome[1].get("error", {}).get("message", "upstream failure"),
+                                        status=outcome[0])
+                    elif outcome is not None:
+                        return self.reply(*outcome)
+                    else:
+                        adapter[0].finish()
+                elif outcome is not None:
+                    if started:
+                        self.stream_chunk(
+                            b"event: response.failed\ndata: "
+                            + json.dumps(responses_failure_event(
+                                response_id, model,
+                                outcome[1].get("error", {}).get("message", "upstream failure"),
+                                status=outcome[0])).encode() + b"\n\n")
+                    else:
+                        return self.reply(*outcome)
             except ClientDisconnected:
                 pass
             self.close_connection = True
@@ -1994,9 +2522,14 @@ def handler_for(router):
                     data = json.loads(self.rfile.read(size))
                     if isinstance(data.get("input"), list):
                         chat, custom, disabled = responses_request(data)
+                        # Classify the request as the client wrote it: a
+                        # Responses request carries its signal in `input` and
+                        # `instructions`, not in the translated messages.
+                        classified = data
                     else:
                         chat, custom, disabled = data, set(), []
-                    tier, chain, classification, logical = router.choose(chat)
+                        classified = chat
+                    tier, chain, classification, logical = router.choose(classified)
                 except UnsupportedFeature as exc:
                     return self.reply(400, {"error": {"message": str(exc),
                                                       "type": "unsupported_feature"}})
@@ -2069,7 +2602,8 @@ def handler_for(router):
                             raise ClientDisconnected() from exc
 
                     try:
-                        outcome = router.stream(data, agent, start, send)
+                        outcome = router.stream(UpstreamRequest(PROTOCOL_CHAT, data, chat=data),
+                                                agent, start, send)
                     except ClientDisconnected:
                         self.close_connection = True
                         return
@@ -2077,7 +2611,7 @@ def handler_for(router):
                         return self.reply(*outcome)
                     self.close_connection = True
                     return
-                status, result = router.complete(data, agent)
+                status, result = router.complete(UpstreamRequest(PROTOCOL_CHAT, data, chat=data), agent)
                 return self.reply(status, result)
             except (ValueError, TypeError, KeyError):
                 return self.reply(400, {"error": "Invalid request"})

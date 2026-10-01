@@ -1,5 +1,7 @@
+import contextlib
 import importlib.util
 import itertools
+import io
 import json
 import os
 import tempfile
@@ -1874,6 +1876,466 @@ class FailureMemoryIntegrationTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+
+class NativeResponsesProvider(BaseHTTPRequestHandler):
+    """An upstream that speaks the Responses protocol natively.
+
+    Records the exact body, path and headers it is handed so a test can assert
+    what actually left the router, and answers with a real Responses object or
+    a semantic event stream (never `data: [DONE]`).
+    """
+
+    requests = []
+    paths = []
+    auth = []
+    headers = []
+    replies = []
+    script = None
+
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        NativeResponsesProvider.requests.append(body)
+        NativeResponsesProvider.paths.append(self.path)
+        NativeResponsesProvider.auth.append(self.headers.get("Authorization"))
+        NativeResponsesProvider.headers.append(dict(self.headers))
+        if NativeResponsesProvider.script is not None:
+            NativeResponsesProvider.script(self, body)
+            return
+        if NativeResponsesProvider.replies:
+            status, content_type, payload = NativeResponsesProvider.replies.pop(0)
+            raw = payload.encode() if isinstance(payload, str) else payload
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return
+        if body.get("stream"):
+            events = [
+                ("response.created",
+                 {"type": "response.created", "response": {"id": "resp_native", "status": "in_progress",
+                                                           "model": "deepseek-flash", "output": []}}),
+                ("response.output_text.delta",
+                 {"type": "response.output_text.delta", "item_id": "msg_1", "output_index": 1,
+                  "content_index": 0, "delta": "X3_ROUTER_OK"}),
+                ("response.completed",
+                 {"type": "response.completed", "response": {
+                     "id": "resp_native", "object": "response", "status": "completed",
+                     "model": "deepseek-flash",
+                     "output": [{"type": "message", "id": "msg_1", "role": "assistant",
+                                 "status": "completed",
+                                 "content": [{"type": "output_text", "text": "X3_ROUTER_OK",
+                                              "annotations": []}]}],
+                     "usage": {"input_tokens": 39, "output_tokens": 26, "total_tokens": 65}}}),
+            ]
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for name, event in events:
+                self.wfile.write(("event: " + name + "\ndata: " + json.dumps(event) + "\n\n").encode())
+                self.wfile.flush()
+            return
+        raw = json.dumps({
+            "id": "resp_native", "object": "response", "created_at": 1790806694,
+            "status": "completed", "model": "deepseek-flash",
+            "output": [{"type": "message", "id": "msg_1", "role": "assistant",
+                        "status": "completed",
+                        "content": [{"type": "output_text", "text": "X3_ROUTER_OK",
+                                     "annotations": []}]}],
+            "usage": {"input_tokens": 39, "output_tokens": 26, "total_tokens": 65},
+        }).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def log_message(self, *_):
+        pass
+
+
+SECRET = "sk-secret-should-never-leak-1234567890"
+
+
+class NativeResponsesTests(unittest.TestCase):
+    """The Responses surface served by a provider that speaks it natively.
+
+    These are the tests for the production bug: Codex's `/v1/responses` must
+    reach DeepSeek's own `/responses` endpoint with the Responses body, not a
+    Chat Completions translation posted to `/chat/completions`.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        for attribute in ("requests", "paths", "auth", "headers", "replies"):
+            setattr(NativeResponsesProvider, attribute, [])
+        NativeResponsesProvider.script = None
+        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), NativeResponsesProvider)
+        self.upstream.daemon_threads = True
+        threading.Thread(target=self.upstream.serve_forever, daemon=True).start()
+        os.environ["X3_TEST_DEEPSEEK_KEY"] = SECRET
+        base = f"http://127.0.0.1:{self.upstream.server_port}/v1"
+        self.config = {
+            "daily_budget_usd": 1, "agent_daily_budget_usd": 1,
+            "max_input_tokens": 100000, "max_request_bytes": 2000000,
+            "max_output_tokens": 32768, "default_max_output_tokens": 4096,
+            "routes": {"routine": ["native"], "critical": ["native"]},
+            "providers": {"native": {
+                "base_url": base, "protocol": "responses", "model": "deepseek-flash",
+                "api_key_env": "X3_TEST_DEEPSEEK_KEY",
+                "input_usd_per_million": 0.3, "output_usd_per_million": 1.2,
+                "pricing_checked_on": "2026-09-30", "critical_allowed": True,
+                "supports_tools": True, "tool_probe": False,
+            }},
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+
+    def tearDown(self):
+        self.upstream.shutdown()
+        self.upstream.server_close()
+        os.environ.pop("X3_TEST_DEEPSEEK_KEY", None)
+        self.tmp.cleanup()
+
+    def serve(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server
+
+    def post(self, server, body):
+        request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                         json.dumps(body).encode(),
+                                         {"Content-Type": "application/json", "X-X3-Agent": "codex"})
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.status, response.read().decode()
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read().decode()
+
+    def body(self, **overrides):
+        value = {"model": "x3-auto", "stream": False, "instructions": "be brief",
+                 "input": [{"type": "message", "role": "user",
+                            "content": [{"type": "input_text", "text": "hi"}]}]}
+        value.update(overrides)
+        return value
+
+    # ── Native forwarding ────────────────────────────────────────────────
+
+    def test_non_stream_responses_is_forwarded_to_the_responses_endpoint(self):
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.body(stream=False))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(NativeResponsesProvider.paths, ["/v1/responses"],
+                         "a responses provider must not be sent to /chat/completions")
+        sent = NativeResponsesProvider.requests[0]
+        self.assertIn("input", sent, "the native Responses body must survive")
+        self.assertNotIn("messages", sent, "the body must not be translated to chat")
+        self.assertEqual(sent["instructions"], "be brief")
+        answer = json.loads(raw)
+        self.assertEqual(answer["object"], "response")
+        self.assertEqual(answer["output"][0]["content"][0]["text"], "X3_ROUTER_OK")
+
+    def test_streaming_relays_semantic_events_and_never_expects_done(self):
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.body(stream=True))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertIn("response.created", raw)
+        self.assertIn("response.completed", raw)
+        self.assertNotIn("[DONE]", raw, "the Responses protocol does not terminate with [DONE]")
+        self.assertIn("X3_ROUTER_OK", raw)
+
+    def test_the_client_model_alias_is_replaced_with_the_provider_model(self):
+        server = self.serve()
+        try:
+            status, _ = self.post(server, self.body(model="x3-auto"))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(NativeResponsesProvider.requests[0]["model"], "deepseek-flash",
+                         "x3-auto is a routing alias, not a model the provider knows")
+
+    def test_a_plain_string_input_is_accepted(self):
+        """The Responses API allows `input` to be a string, not only a list."""
+        server = self.serve()
+        try:
+            status, raw = self.post(server, {"model": "x3-auto", "stream": False,
+                                             "input": "Reply with exactly X3_ROUTER_OK"})
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        sent = NativeResponsesProvider.requests[0]
+        self.assertEqual(sent["input"][0]["content"][0]["text"], "Reply with exactly X3_ROUTER_OK")
+        self.assertIn("X3_ROUTER_OK", raw)
+
+    def test_the_authorization_header_is_sent_without_being_logged(self):
+        server = self.serve()
+        try:
+            self.post(server, self.body(stream=False))
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(NativeResponsesProvider.auth[0], "Bearer " + SECRET)
+
+    # ── Token accounting ─────────────────────────────────────────────────
+
+    def test_max_output_tokens_bounds_the_reservation(self):
+        self.assertEqual(router_module.output_bound({"max_output_tokens": 1234}, {}), 1234)
+        self.assertEqual(router_module.output_bound({"max_completion_tokens": 77}, {}), 77)
+        self.assertEqual(router_module.output_bound({"max_tokens": 5}, {}), 5)
+        self.assertEqual(router_module.output_bound({}, {"default_max_output_tokens": 4096}), 4096)
+        self.assertIsNotNone(router_module.request_error({"max_output_tokens": 10 ** 9}, self.config),
+                             "an unbounded max_output_tokens must be rejected, not reserved at the default")
+
+        server = self.serve()
+        try:
+            status, _ = self.post(server, self.body(max_output_tokens=1234))
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(status, 200)
+        self.assertEqual(NativeResponsesProvider.requests[0]["max_output_tokens"], 1234)
+
+    def test_responses_usage_is_recorded_as_real_tokens(self):
+        server = self.serve()
+        try:
+            self.post(server, self.body(stream=False))
+        finally:
+            server.shutdown()
+            server.server_close()
+        row = self.router.stats()[0]
+        self.assertEqual(row["provider"], "native")
+        totals = self.router.snapshot()
+        self.assertEqual(totals["input_tokens"], 39, "input_tokens must not be booked as zero")
+        self.assertEqual(totals["output_tokens"], 26, "output_tokens must not be booked as zero")
+
+    def test_streaming_responses_usage_is_recorded(self):
+        server = self.serve()
+        try:
+            self.post(server, self.body(stream=True))
+        finally:
+            server.shutdown()
+            server.server_close()
+        totals = self.router.snapshot()
+        self.assertEqual(totals["input_tokens"], 39)
+        self.assertEqual(totals["output_tokens"], 26)
+
+    # ── Classification of the Responses shape ────────────────────────────
+
+    def test_a_critical_term_in_responses_input_is_classified_critical(self):
+        decision = router_module.classify({
+            "input": [{"type": "message", "role": "user",
+                       "content": [{"type": "input_text", "text": "audit the slashing path"}]}]})
+        self.assertEqual(decision["risk"], "critical")
+        self.assertIn("slashing", decision["critical_terms"])
+
+    def test_a_critical_term_in_instructions_is_classified_critical(self):
+        decision = router_module.classify({
+            "instructions": "You are reviewing X3 settlement and finality code.",
+            "input": [{"type": "message", "role": "user",
+                       "content": [{"type": "input_text", "text": "continue"}]}]})
+        self.assertEqual(decision["risk"], "critical")
+        self.assertIn("settlement", decision["critical_terms"])
+
+    def test_critical_routing_is_chosen_from_instructions(self):
+        for phrase, expected in (("settlement", "settlement"), ("finality", "finality"),
+                                 ("consensus", "consensus"), ("cross-vm", "cross-vm"),
+                                 ("runtime upgrade", "runtime upgrade")):
+            with self.subTest(phrase=phrase):
+                decision = router_module.classify({
+                    "instructions": "Follow the project rules about " + phrase + ".",
+                    "input": [{"type": "message", "role": "user",
+                               "content": [{"type": "input_text", "text": "go"}]}]})
+                self.assertEqual(decision["risk"], "critical")
+                self.assertIn(expected, decision["critical_terms"])
+
+        server = self.serve()
+        try:
+            body = json.dumps({"instructions": "settlement code", "input": [
+                {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]}]}).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/explain", body,
+                {"Content-Type": "application/json"})
+            with urllib.request.urlopen(request) as response:
+                decision = json.load(response)
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(decision["tier"], "critical")
+
+    # ── Tool capability normalization ────────────────────────────────────
+
+    def tools(self):
+        return [
+            {"type": "function", "name": "exec_command",
+             "parameters": {"type": "object", "properties": {"cmd": {"type": "string"}}}},
+            {"type": "custom", "name": "apply_patch",
+             "format": {"type": "grammar", "syntax": "lark", "definition": "start: x"}},
+            {"type": "web_search"},
+            {"type": "computer_use", "display_width": 1024},
+            {"type": "namespace", "name": "collaboration", "tools": [
+                {"type": "function", "name": "followup_task",
+                 "parameters": {"type": "object", "properties": {}}}]},
+        ]
+
+    def test_unsupported_hosted_tools_do_not_break_a_native_provider(self):
+        server = self.serve()
+        try:
+            status, _ = self.post(server, self.body(tools=self.tools()))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200, "a hosted tool must not sink the whole request")
+        sent = NativeResponsesProvider.requests[0]["tools"]
+        kinds = sorted(tool["type"] for tool in sent)
+        self.assertEqual(kinds, ["custom", "function", "function"],
+                         "only function and custom tools survive; namespaces flatten")
+        for tool in sent:
+            self.assertNotIn(tool["type"], router_module.HOSTED_TOOL_TYPES)
+
+    def test_function_and_apply_patch_tools_survive_unchanged(self):
+        server = self.serve()
+        try:
+            self.post(server, self.body(tools=self.tools()))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        sent = NativeResponsesProvider.requests[0]["tools"]
+        by_name = {tool.get("name"): tool for tool in sent}
+        self.assertEqual(by_name["exec_command"]["parameters"]["properties"]["cmd"]["type"], "string")
+        self.assertEqual(by_name["apply_patch"]["type"], "custom")
+        self.assertEqual(by_name["apply_patch"]["format"]["syntax"], "lark")
+        self.assertEqual(by_name["followup_task"]["type"], "function")
+
+    def test_tool_choice_is_relaxed_only_when_no_tool_is_left(self):
+        payload = {"tools": [{"type": "computer_use"}], "tool_choice": "required"}
+        dropped = router_module.normalize_responses_tools(payload, {"protocol": "responses"})
+        self.assertEqual(dropped, ["computer_use"])
+        self.assertNotIn("tools", payload)
+        self.assertEqual(payload["tool_choice"], "auto",
+                         "a forced choice with no tools left is a guaranteed 400")
+
+        payload = {"tools": [{"type": "function", "name": "f"}, {"type": "computer_use"}],
+                   "tool_choice": "required"}
+        router_module.normalize_responses_tools(payload, {"protocol": "responses"})
+        self.assertEqual(payload["tool_choice"], "required",
+                         "a real tool is still there, so the choice is not weakened")
+
+    # ── Failure reporting, failover and secret handling ──────────────────
+
+    def test_a_provider_error_is_reported_with_a_sanitized_message(self):
+        NativeResponsesProvider.replies = [(400, "application/json", json.dumps(
+            {"error": {"message": "unsupported field 'foo' for model deepseek-flash (key "
+                                 + SECRET + ")"}}))]
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.body(stream=False))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 502)
+        self.assertIn("HTTP 400", raw)
+        self.assertIn("unsupported field", raw, "the provider's own message must reach the operator")
+        self.assertNotIn(SECRET, raw, "an error body must never carry a credential")
+        self.assertNotIn("Bearer", raw)
+
+        health = {row["provider"]: row for row in self.router.provider_health()}
+        self.assertIn("HTTP 400", health["native"]["last_error"])
+        self.assertIn("unsupported field", health["native"]["last_error"])
+
+    def test_a_failing_provider_does_not_corrupt_the_next_one(self):
+        failing = ThreadingHTTPServer(("127.0.0.1", 0), NativeResponsesProvider)
+        failing.daemon_threads = True
+        threading.Thread(target=failing.serve_forever, daemon=True).start()
+
+        def script(handler, body):
+            if body.get("model") == "broken-model":
+                raw = json.dumps({"error": {"message": "upstream exploded"}}).encode()
+                handler.send_response(400)
+                handler.send_header("Content-Length", str(len(raw)))
+                handler.end_headers()
+                handler.wfile.write(raw)
+                return
+            raw = json.dumps({"id": "resp_ok", "object": "response", "status": "completed",
+                              "model": body["model"],
+                              "output": [{"type": "message", "role": "assistant", "status": "completed",
+                                          "content": [{"type": "output_text", "text": "SECOND",
+                                                       "annotations": []}]}],
+                              "usage": {"input_tokens": 3, "output_tokens": 1, "total_tokens": 4}}).encode()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(raw)))
+            handler.end_headers()
+            handler.wfile.write(raw)
+
+        NativeResponsesProvider.script = script
+        self.config["routes"] = {"routine": ["broken", "good"], "critical": ["broken", "good"]}
+        self.config["providers"]["broken"] = dict(self.config["providers"]["native"],
+                                                  model="broken-model", tool_probe=False)
+        self.config["providers"]["good"] = dict(self.config["providers"]["native"], model="good-model")
+        router = router_module.Router(self.config, self.tmp.name + "/failover.db")
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(router))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                             json.dumps(self.body(stream=False)).encode(),
+                                             {"Content-Type": "application/json"})
+            with urllib.request.urlopen(request, timeout=30) as response:
+                status = response.status
+                answer = json.loads(response.read())
+        finally:
+            server.shutdown()
+            server.server_close()
+            failing.shutdown()
+            failing.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(answer["output"][0]["content"][0]["text"], "SECOND")
+        models = [attempt["model"] for attempt in NativeResponsesProvider.requests]
+        self.assertEqual(models, ["broken-model", "good-model"])
+        survivor = NativeResponsesProvider.requests[1]
+        self.assertIn("input", survivor, "the second provider gets the untouched body")
+        self.assertNotIn("messages", survivor)
+
+    def test_no_provider_failure_ever_prints_a_credential(self):
+        # A 4xx is not retried, so this reaches the terminal failure path in one
+        # attempt; a 5xx would be retried and the queued reply would be replaced
+        # by the default success.
+        NativeResponsesProvider.replies = [(400, "application/json", json.dumps(
+            {"error": {"message": "boom " + SECRET}}))]
+        server = self.serve()
+        captured = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(captured):
+                status, raw = self.post(server, self.body(stream=False))
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 502)
+        logs = captured.getvalue()
+        self.assertNotIn(SECRET, raw)
+        self.assertNotIn(SECRET, logs)
+        self.assertNotIn("Bearer", logs)
+        self.assertIn("[redacted]", logs, "the credential must be visibly scrubbed, not quietly dropped")
 
 
 if __name__ == "__main__":
