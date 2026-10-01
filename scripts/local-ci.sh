@@ -248,6 +248,13 @@ GATES_FAST=(
   # on a *new* finding rather than on the years-old annotations that are already counted.
   "fake-code scan:python3 scripts/x3_fake_code_scan.py stubs"
   "test-cheat scan:python3 scripts/x3_fake_code_scan.py cheats"
+  # Both scans above walk with rg when it is installed and os.walk when it is not. The two
+  # enumerations drifted once: the globs listed exclusions first and rg gives the *last*
+  # matching glob precedence, so `node_modules/decimal.js` (a directory named like source),
+  # the scanner itself and every excluded name ending in a source suffix came back, and a
+  # dirty checkout read 152 findings above a clean extraction. The self-test builds one tree
+  # with every pruning shape and fails if the two enumerations disagree.
+  "fake-code scanner self-test:python3 scripts/x3_fake_code_scan.py --self-test"
   # The runtime-hash check exempts files that cannot reach the wasm target
   # (`#[cfg(test)] mod tests;`, `<package>/tests/*.rs`) so a test-only edit does
   # not demand a ten-minute double srtool rebuild. An exemption that is too wide

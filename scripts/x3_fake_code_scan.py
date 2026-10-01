@@ -53,6 +53,14 @@ SHA-256 is recorded). `--check` (the gate's mode) fails when
 
 It passes when the counts are at or below the baseline, and says so when the
 counts dropped, because that is the moment to refresh the baseline deliberately.
+
+`--self-test` builds one synthetic tree carrying every pruning shape (a
+`node_modules` entry whose directory name looks like source, both forge
+dependencies, build output, a `.wt-*` checkout, a self-exclude, hidden paths,
+plain source) and asserts that the rg glob set and the `os.walk` fallback
+report exactly the same file list. The two enumerations must agree, or a
+machine with rg reads different findings than one without it for the same
+commit.
 """
 
 from __future__ import annotations
@@ -84,6 +92,10 @@ PRUNE_DIR_NAMES = {
     "dist",
     "build",
     "forge-std",
+    # `forge install` checks out both dependencies under X3-contracts/evm/lib;
+    # `forge-std` was pruned from the start, openzeppelin-contracts was missed,
+    # so a working checkout read ~16 findings above a clean extraction.
+    "openzeppelin-contracts",
     "vendor",
     # The desktop app vendors whole crates under a compound name, so the
     # `vendor` entry above never matched it.
@@ -177,8 +189,16 @@ MOCK_REF_RE = r"\b(?:crate|super|self)::(?:mock|tests)\b"
 TEST_ATTR_RE = r"#\s*\[\s*(?:tokio::)?test\s*\]"
 
 # Supersets handed to `rg`, which finds *candidate* lines and files; the Python
-# matchers above stay authoritative for classification, so the two paths cannot
-# drift in what they report.
+# matchers above stay authoritative for classification. For the two paths to
+# report the same findings, candidate patterns must be supersets of what the
+# classifiers can match. `stubs` upholds that. `cheats` does not, for one
+# class: `PROD_MOCK_RE` matches `struct XStub`/`MockThing` shapes that the
+# `\b(mock|fake|stub|dummy)\b` candidate does not (no word boundary inside the
+# identifier), so with rg the `prod-mock` class reads 0 and without rg it reads
+# 239 on the same tree (`PATH=/usr/bin:/bin python3 scripts/x3_fake_code_scan.py
+# cheats`). Deciding which of those 239 are real needs the `#[cfg(test)] mod
+# mock;` question settled first; until then the ratchet records the rg-path
+# count (the CI path) and this divergence stays tracked, not silently fixed.
 STUB_CANDIDATE_PATTERNS = [
     r"\btodo!",
     r"\bunimplemented!",
@@ -229,10 +249,10 @@ def _is_pruned_dir(name: str) -> bool:
     )
 
 
-def iter_source_files() -> list[tuple[str, Path]]:
-    """Every scannable file, as `(repo-relative path, absolute path)`, sorted."""
+def iter_source_files(root: Path = REPO_ROOT) -> list[tuple[str, Path]]:
+    """Every scannable file, as `(root-relative path, absolute path)`, sorted."""
     found: list[tuple[str, Path]] = []
-    for dirpath, dirnames, filenames in os.walk(REPO_ROOT):
+    for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(name for name in dirnames if not _is_pruned_dir(name))
         for name in sorted(filenames):
             if name.startswith(".") or name.endswith(PRUNE_FILE_SUFFIXES):
@@ -240,7 +260,7 @@ def iter_source_files() -> list[tuple[str, Path]]:
             path = Path(dirpath) / name
             if path.suffix not in SOURCE_SUFFIXES:
                 continue
-            rel = path.relative_to(REPO_ROOT).as_posix()
+            rel = path.relative_to(root).as_posix()
             if rel in SELF_EXCLUDES:
                 continue
             found.append((rel, path))
@@ -248,20 +268,31 @@ def iter_source_files() -> list[tuple[str, Path]]:
 
 
 def _rg_args() -> list[str]:
-    """rg arguments whose pruning matches `iter_source_files` exactly."""
+    """rg arguments whose pruning matches `iter_source_files` exactly.
+
+    Order matters: when several globs match one path, rg gives the *last* glob
+    precedence. The suffix whitelists therefore come first and every exclusion
+    comes after them; negatives-first re-included `node_modules/decimal.js`
+    (a directory whose *name* matches `*.js`), the scanner itself (matches
+    `*.py`) and every other excluded name that happens to look like a source
+    file. `--self-test` pins the two enumerations together so that drift is a
+    test failure, not a silently higher count.
+    """
     args = ["rg", "--no-ignore", "--color", "never", "--no-heading"]
+    for suffix in sorted(SOURCE_SUFFIXES):
+        args += ["-g", f"*{suffix}"]
     for rel in sorted(SELF_EXCLUDES):
         args += ["-g", f"!{rel}"]
     for name in sorted(PRUNE_DIR_NAMES):
         args += ["-g", f"!**/{name}/**"]
     for prefix in PRUNE_DIR_PREFIXES:
         args += ["-g", f"!**/{prefix}*/**"]
-    for suffix in sorted(SOURCE_SUFFIXES):
-        args += ["-g", f"*{suffix}"]
     return args
 
 
-def rg_lines(patterns: list[str]) -> list[tuple[str, int, str]] | None:
+def rg_lines(
+    patterns: list[str], root: Path = REPO_ROOT
+) -> list[tuple[str, int, str]] | None:
     """Candidate `(path, line, text)` matches, or `None` when rg is absent."""
     if shutil.which("rg") is None:
         return None
@@ -269,7 +300,7 @@ def rg_lines(patterns: list[str]) -> list[tuple[str, int, str]] | None:
     for pattern in patterns:
         args += ["-e", pattern]
     args.append(".")
-    proc = subprocess.run(args, cwd=REPO_ROOT, capture_output=True, text=True)
+    proc = subprocess.run(args, cwd=root, capture_output=True, text=True)
     if proc.returncode not in (0, 1):
         return None
     found: list[tuple[str, int, str]] = []
@@ -287,7 +318,7 @@ def rg_lines(patterns: list[str]) -> list[tuple[str, int, str]] | None:
     return found
 
 
-def rg_files(patterns: list[str]) -> list[Path] | None:
+def rg_files(patterns: list[str], root: Path = REPO_ROOT) -> list[Path] | None:
     """Candidate files, or `None` when rg is absent."""
     if shutil.which("rg") is None:
         return None
@@ -295,13 +326,32 @@ def rg_files(patterns: list[str]) -> list[Path] | None:
     for pattern in patterns:
         args += ["-e", pattern]
     args.append(".")
-    proc = subprocess.run(args, cwd=REPO_ROOT, capture_output=True, text=True)
+    proc = subprocess.run(args, cwd=root, capture_output=True, text=True)
     if proc.returncode not in (0, 1):
         return None
     files = []
     for raw in proc.stdout.splitlines():
         rel = raw[2:] if raw.startswith("./") else raw
-        files.append(REPO_ROOT / rel)
+        files.append(root / rel)
+    return sorted(files)
+
+
+def rg_file_list(root: Path = REPO_ROOT) -> list[str] | None:
+    """Every file rg would scan under `root`, as paths relative to it.
+
+    This is `iter_source_files` in rg's glob language; `self_test` asserts the
+    two agree shape by shape. `None` when rg is not installed.
+    """
+    if shutil.which("rg") is None:
+        return None
+    args = _rg_args() + ["--files", "."]
+    proc = subprocess.run(args, cwd=root, capture_output=True, text=True)
+    if proc.returncode not in (0, 1):
+        return None
+    files: list[str] = []
+    for raw in proc.stdout.splitlines():
+        rel = raw[2:] if raw.startswith("./") else raw
+        files.append(rel)
     return sorted(files)
 
 
@@ -645,14 +695,108 @@ def check(mode: str, findings: list[dict[str, object]]) -> int:
     return 0
 
 
+def self_test() -> int:
+    """Pin the rg enumeration to the os.walk enumeration on a synthetic tree.
+
+    The tree carries one instance of every shape the pruning exists for, in
+    the exact arrangement that broke when the globs were ordered
+    exclusions-first: a directory literally named `decimal.js` inside
+    `node_modules`, both forge dependencies, a source-looking file under
+    build output, and the scanner itself. Anything the tests add or drop
+    shows up as a set difference instead of a count nobody can trace.
+    """
+    import tempfile
+
+    shapes = {
+        # Plain source: both must include these.
+        "src/keep.rs": "fn main() {}\n",
+        "src/keep.js": "console.log(1);\n",
+        "apps/dashboard/src/panel.tsx": "// TODO\n",
+        "tools/ok.py": "# placeholder\n",
+        # Not source by suffix: both must drop it.
+        "src/notes.txt": "not source\n",
+        # Vendored and build trees: both must drop everything inside.
+        "node_modules/decimal.js/decimal.js": "// TODO\n",
+        "node_modules/decimal.js/decimal.mjs": "// TODO\n",
+        "node_modules/pkg/index.mjs": "// fake\n",
+        "X3-contracts/evm/lib/openzeppelin-contracts/contracts/token.sol": "// TODO\n",
+        "X3-contracts/evm/lib/forge-std/src/Test.sol": "// TODO\n",
+        "target/debug/foo.rs": "// TODO\n",
+        "out/_next/chunk.js": "// TODO\n",
+        # Hidden paths and worktrees: both must drop them.
+        ".hidden_dir/leak.rs": "// TODO\n",
+        ".wt-abc/vendor/lib.rs": "// TODO\n",
+        # The detector itself: both must drop it even though it is `*.py`.
+        "scripts/x3_fake_code_scan.py": "# placeholder\n",
+        "scripts/x3-detect-stubs.sh": "# stub\n",
+        "scripts/x3-detect-test-cheats.sh": "# stub\n",
+    }
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        for rel, text in shapes.items():
+            path = tmp_path / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+
+        expected = sorted(rel for rel, _ in iter_source_files(tmp_path))
+        actual = rg_file_list(tmp_path)
+        if actual is None:
+            print(
+                "self-test: rg is not installed, so the enumerations cannot "
+                "be compared; install ripgrep",
+                file=sys.stderr,
+            )
+            return 1
+        if actual != expected:
+            print(
+                "fake-code scanner self-test FAILED: the rg glob set and the "
+                "os.walk fallback disagree",
+                file=sys.stderr,
+            )
+            print(f"  only the walker scans: {sorted(set(expected) - set(actual))}", file=sys.stderr)
+            print(f"  only rg scans:         {sorted(set(actual) - set(expected))}", file=sys.stderr)
+            return 1
+
+        included = {
+            "src/keep.rs",
+            "apps/dashboard/src/panel.tsx",
+            "tools/ok.py",
+        }
+        if not included <= set(expected):
+            print(
+                f"self-test: the tree stopped exercising inclusion: {sorted(included - set(expected))}",
+                file=sys.stderr,
+            )
+            return 1
+
+    print(
+        f"fake-code scanner self-test: PASS ({len(expected)} files scanned; "
+        "rg glob set == os.walk fallback)"
+    )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("mode", choices=sorted(MODES))
+    parser.add_argument("mode", nargs="?", choices=sorted(MODES))
     parser.add_argument("--json", action="store_true", help="emit JSON on stdout")
     parser.add_argument(
         "--update-baseline", action="store_true", help="record the current findings"
     )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="pin the rg glob set to the os.walk fallback on a synthetic tree",
+    )
     args = parser.parse_args()
+
+    if args.self_test:
+        if args.mode is not None or args.json or args.update_baseline:
+            parser.error("--self-test does not combine with a mode or other flags")
+        return self_test()
+    if args.mode is None:
+        parser.error("a mode is required unless --self-test is given")
 
     findings = MODES[args.mode]()
 
