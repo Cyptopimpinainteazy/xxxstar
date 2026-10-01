@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-09-27T16:04:28Z",
+  "generated_at": "2026-10-01T05:12:56Z",
   "scanner_sha256": "d2c4932a984cab4c600bc17a36a7567fd651494c36cb4e9405e2760a1d7b536d",
   "counts": {
     "critical-marker": 443,
     "explicit-stub": 74,
-    "marker": 1185
+    "marker": 1096
   },
-  "identity_digest": "83ec342e90870115c3e34b9304b2a91eb3eccffcb3c2cc4d2977a407bf560d6f",
+  "identity_digest": "912e2683e0e732f9eab946e40769a77343e4c758d924e96a0ac09d7262a447e6",
   "note": "Ratchet for scripts/x3_fake_code_scan.py. `counts` may only go down and `identity_digest` must not change while the total is unchanged: a fix that removes one finding and adds another is a regression. `scanner_sha256` pins the scanner this was measured with; refresh with `--update-baseline` and say in the commit message what grew."
 }
