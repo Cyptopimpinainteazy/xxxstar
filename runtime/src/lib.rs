@@ -605,6 +605,9 @@ construct_runtime!(
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
         NorthernSwarm: pallet_northern_swarm,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -683,6 +686,9 @@ construct_runtime!(
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
         NorthernSwarm: pallet_northern_swarm,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -750,6 +756,9 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         NorthernSwarm: pallet_northern_swarm,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -829,6 +838,9 @@ construct_runtime!(
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
         NorthernSwarm: pallet_northern_swarm,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -910,6 +922,9 @@ construct_runtime!(
         NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -3282,6 +3297,127 @@ impl pallet_x3_sentinel::Config for Runtime {
     // this deliberately defaults to the strongest, easiest-to-audit origin.
     type FreezeOrigin = frame_system::EnsureRoot<AccountId>;
     type WeightInfo = pallet_x3_sentinel::weights::SubstrateWeight<Runtime>;
+}
+
+// ===== X3 Guardian Configuration =====
+//
+// Guardian is the on-chain half of the application-trust system: the registry
+// binds a certification to an exact artifact hash, the security gate holds the
+// versioned rules an artifact must satisfy, and the trust gate holds the
+// privileged-capability census judged against the category an application
+// claims (Guardian spec §2, §3, §5, §16).
+//
+// Until these pallets were members of a `construct_runtime!` block, no Guardian
+// rule could refuse anything on chain — the pallets compiled as
+// members-of-nothing (see the checklist item WIRE-1). Wiring them makes their
+// privileged origins, and therefore their refusals, real.
+parameter_types! {
+    /// Hard ceiling on registered applications.
+    pub const GuardianMaxApplications: u32 = 10_000;
+    /// Hard ceiling on addresses bound to a single application.
+    pub const GuardianMaxAddressesPerApp: u32 = 16;
+    /// Hard ceiling on versions retained for a single application.
+    pub const GuardianMaxVersionsPerApp: u32 = 64;
+    /// Maximum length of a recorded severity-exception justification.
+    pub const GuardianMaxJustificationLen: u32 = 1_024;
+}
+
+parameter_types! {
+    /// The derived, non-signer account that Root-enacted Guardian actions are
+    /// attributed to. `Root` carries no `AccountId` in this SDK
+    /// (`EnsureRoot<AccountId>::Success = ()`), but the Guardian gates record the
+    /// acting account on every privileged action; a governance enactment arrives
+    /// as `Root` (see `pallet_governance::enact_proposal`), so it needs a stable
+    /// identity rather than a dropped attribution. Deriving it from a `PalletId`
+    /// keeps it provably distinct from any signer's key material (the same idiom
+    /// the treasury account uses).
+    pub const GuardianRootPalletId: PalletId = PalletId(*b"py/grdn!");
+    pub GuardianRootActor: AccountId = GuardianRootPalletId::get().into_account_truncating();
+}
+
+/// The Guardian authority: certification, restriction, revocation, ruleset
+/// activation and privilege censuses are security powers. They are available to
+/// a majority of the council (yielding the acting member) or to Root — the
+/// origin governance enacts approved proposals as — and never to a bare signed
+/// account, which is exactly what the pallets' `GuardianOrigin` docs require.
+///
+/// Both the security gate and the trust gate need `Success = AccountId`; the
+/// app registry's `GuardianOrigin` is account-less, so it reuses the same
+/// adapter and discards the account. One authority, one place to audit.
+pub struct GuardianAuthority;
+
+impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for GuardianAuthority {
+    type Success = AccountId;
+
+    fn try_origin(o: RuntimeOrigin) -> Result<AccountId, RuntimeOrigin> {
+        // Authorize exactly like the rest of the runtime's security powers:
+        // Root (a governance enactment) or a majority of the council. A bare
+        // signed account is refused here, before any attribution happens.
+        if <EnsureRootOrHalfCouncil as frame_support::traits::EnsureOrigin<RuntimeOrigin>>::try_origin(
+            o.clone(),
+        )
+        .is_err()
+        {
+            return Err(o);
+        }
+
+        // Attribute the action to the acting council member when the origin is a
+        // single member's signed origin. Root and motion-enacted calls carry no
+        // account, so they are attributed to the derived, non-signer actor.
+        if let Ok(member) = <EnsureCouncilMember as frame_support::traits::EnsureOrigin<
+            RuntimeOrigin,
+        >>::try_origin(o.clone())
+        {
+            return Ok(member);
+        }
+
+        Ok(GuardianRootActor::get())
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(frame_system::RawOrigin::Root.into())
+    }
+}
+
+/// `pallet-x3-app-registry`'s privileged origin discards the acting account.
+pub struct GuardianAuthorityAccountless;
+
+impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for GuardianAuthorityAccountless {
+    type Success = ();
+
+    fn try_origin(o: RuntimeOrigin) -> Result<(), RuntimeOrigin> {
+        <GuardianAuthority as frame_support::traits::EnsureOrigin<RuntimeOrigin>>::try_origin(o)
+            .map(|_| ())
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        <GuardianAuthority as frame_support::traits::EnsureOrigin<RuntimeOrigin>>::try_successful_origin()
+    }
+}
+
+impl pallet_x3_app_registry::Config for Runtime {
+    // Registration is permissionless by design (Guardian spec §4): any signed
+    // account may register an EXPERIMENTAL application; it inherits no
+    // privileges until the Guardian certifies its exact artifact hash.
+    type OwnerOrigin = frame_system::EnsureSigned<AccountId>;
+    type GuardianOrigin = GuardianAuthorityAccountless;
+    type MaxApplications = GuardianMaxApplications;
+    type MaxAddressesPerApp = GuardianMaxAddressesPerApp;
+    type MaxVersionsPerApp = GuardianMaxVersionsPerApp;
+    type WeightInfo = pallet_x3_app_registry::weights::SubstrateWeight<Runtime>;
+}
+
+impl pallet_x3_security_gate::Config for Runtime {
+    type GuardianOrigin = GuardianAuthority;
+    type MaxJustificationLen = GuardianMaxJustificationLen;
+    type WeightInfo = pallet_x3_security_gate::weights::SubstrateWeight<Runtime>;
+}
+
+impl pallet_x3_trust_gate::Config for Runtime {
+    type GuardianOrigin = GuardianAuthority;
+    type WeightInfo = pallet_x3_trust_gate::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Launchpad Configuration =====

@@ -1392,8 +1392,8 @@
       "id": "WIRE-1",
       "sec": "5",
       "item": "Guardian pallets are wired into a runtime: at least one production path consults the gates before granting privileges",
-      "status": "TODO",
-      "evidence": ""
+      "status": "DOING",
+      "evidence": "Landed: pallet-x3-app-registry, pallet-x3-security-gate and pallet-x3-trust-gate are members of all five construct_runtime! blocks (dev, dev+frontier, mainnet-rc1, default, production+frontier), appended so no existing pallet index shifts; every Guardian privileged path now refuses a bare signer on chain (GuardianAuthority = Root-or-half-council in runtime/src/lib.rs). Proof: runtime/src/tests.rs::the_guardian_gates_are_wired_and_refuse_an_unprivileged_caller passes (61/61 default, 59/59 mainnet-rc1); `SKIP_WASM_BUILD=1 cargo check -p x3-chain-runtime --offline` exit 0 for default/dev/mainnet-rc1; `SKIP_WASM_BUILD=1 cargo check --workspace --offline` exit 0. A negative control (inverting the origin check) makes the test fail with Err(BadOrigin), so the refusal is load-bearing. REMAINING: a non-Guardian production subsystem must consult has_guardian_privileges before granting its own privileges; which subsystem is an owner design decision, so this item stays open."
     },
     {
       "id": "PIPE-1",

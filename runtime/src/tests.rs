@@ -8,7 +8,7 @@
 //! using the same `TestExternalities` pattern as the inline tests in `lib.rs`.
 
 use super::*;
-use frame_support::{assert_err, assert_ok};
+use frame_support::{assert_err, assert_noop, assert_ok};
 use pallet_x3_settlement_engine::types::{AssetSpec, ExternalChainId, TokenId};
 use sp_runtime::DispatchError;
 
@@ -935,4 +935,226 @@ fn a_wired_rc1_excluded_pallet_charges_more_than_nothing() {
         weight.ref_time() > 0 || weight.proof_size() > 0,
         "x3-auction create_auction charges {weight:?} — a pallet wired to () charges Weight::zero()"
     );
+}
+
+/// WIRE-1: the Guardian pallets are members of *every* runtime, and their
+/// privileged paths refuse a bare signer on chain.
+///
+/// This is the guard against the state the Independent Guardian audit found:
+/// the registry, the security gate and the trust gate compiled as
+/// members-of-nothing, so no Guardian rule could refuse anything. A test that
+/// only called the pallet directly would still pass in that state — this one
+/// reaches them through the real `Runtime`, certifies through `Root` (how
+/// `pallet_governance` enacts an approved proposal), and asserts that an
+/// unprivileged signer is refused.
+#[test]
+fn the_guardian_gates_are_wired_and_refuse_an_unprivileged_caller() {
+    use pallet_x3_app_registry::{
+        ApplicationRegistryInspect, ArtifactHashes, CertificationTier, GuardianVm,
+        RestrictionReason, StandardRefs,
+    };
+    use pallet_x3_trust_gate::{Privilege, PrivilegeSet, TrustVerdict};
+
+    sp_io::TestExternalities::default().execute_with(|| {
+        let owner = account(0xA1);
+        let stranger = account(0xA2);
+        let bytecode = H256::from([0x7B; 32]);
+        let hashes = ArtifactHashes {
+            bytecode,
+            source: H256::from([0x7C; 32]),
+            manifest: H256::from([0x7D; 32]),
+        };
+        let standards = StandardRefs {
+            guardian_standard: 1,
+            trust_standard: 1,
+            exploit_corpus: 1,
+        };
+
+        // Membership, not just the ability to call the pallet: the three
+        // Guardian pallets must be registered in the runtime's `PalletInfo`.
+        // The audit's finding was precisely that they compiled but were not
+        // members of any runtime.
+        {
+            use frame_support::traits::PalletInfo as _;
+            assert!(
+                <Runtime as frame_system::Config>::PalletInfo::index::<
+                    pallet_x3_app_registry::Pallet<Runtime>,
+                >()
+                .is_some(),
+                "pallet-x3-app-registry is not a member of the runtime"
+            );
+            assert!(
+                <Runtime as frame_system::Config>::PalletInfo::index::<
+                    pallet_x3_security_gate::Pallet<Runtime>,
+                >()
+                .is_some(),
+                "pallet-x3-security-gate is not a member of the runtime"
+            );
+            assert!(
+                <Runtime as frame_system::Config>::PalletInfo::index::<
+                    pallet_x3_trust_gate::Pallet<Runtime>,
+                >()
+                .is_some(),
+                "pallet-x3-trust-gate is not a member of the runtime"
+            );
+        }
+
+        // Registration is permissionless by design (spec §4): a signed account
+        // may create an EXPERIMENTAL application, and it holds no privileges.
+        assert_ok!(
+            pallet_x3_app_registry::Pallet::<Runtime>::register_application(
+                RuntimeOrigin::signed(owner.clone()),
+                b"example-app".to_vec(),
+                GuardianVm::Evm,
+                7u16,
+                hashes,
+                standards,
+            )
+        );
+        let app_id = 0u64;
+        assert_eq!(
+            pallet_x3_app_registry::Pallet::<Runtime>::tier(app_id),
+            Some(CertificationTier::Experimental)
+        );
+        assert!(
+            !pallet_x3_app_registry::Pallet::<Runtime>::has_guardian_privileges(app_id),
+            "an EXPERIMENTAL application must not hold Guardian privileges"
+        );
+
+        // A bare signer is not the Guardian: certification is refused on chain.
+        assert_noop!(
+            pallet_x3_app_registry::Pallet::<Runtime>::certify_application(
+                RuntimeOrigin::signed(stranger.clone()),
+                app_id,
+                0,
+                hashes,
+                None,
+            ),
+            DispatchError::BadOrigin
+        );
+
+        // Root — the origin a governance enactment dispatches as — is the
+        // Guardian: the *exact* artifact hash is certified and privileges switch
+        // on for that hash alone.
+        assert_ok!(
+            pallet_x3_app_registry::Pallet::<Runtime>::certify_application(
+                RuntimeOrigin::root(),
+                app_id,
+                0,
+                hashes,
+                None,
+            )
+        );
+        assert_eq!(
+            pallet_x3_app_registry::Pallet::<Runtime>::tier(app_id),
+            Some(CertificationTier::X3Verified)
+        );
+        assert!(pallet_x3_app_registry::Pallet::<Runtime>::has_guardian_privileges(app_id));
+        assert!(
+            pallet_x3_app_registry::Pallet::<Runtime>::is_certified_artifact(app_id, bytecode),
+            "the certified bytecode must read as certified"
+        );
+        assert!(
+            !pallet_x3_app_registry::Pallet::<Runtime>::is_certified_artifact(
+                app_id,
+                H256::from([0x99; 32])
+            ),
+            "a different bytecode must not inherit the certification"
+        );
+
+        // ── the trust gate, through the same runtime ────────────────────────
+        let category = 7u16;
+        let allowed = [Privilege::Mint];
+        let forbidden = [
+            Privilege::ModifyBalances,
+            Privilege::Seize,
+            Privilege::Drain,
+            Privilege::Freeze,
+            Privilege::SellRestriction,
+            Privilege::Tax,
+            Privilege::Upgrade,
+            Privilege::ArbitraryCall,
+            Privilege::OracleControl,
+            Privilege::RouteControl,
+            Privilege::AdminRole,
+        ];
+
+        // A bare signer cannot set a category's trust policy either.
+        assert_noop!(
+            pallet_x3_trust_gate::Pallet::<Runtime>::set_category_policy(
+                RuntimeOrigin::signed(stranger.clone()),
+                category,
+                PrivilegeSet::from_privileges(&allowed),
+                PrivilegeSet::from_privileges(&[]),
+                PrivilegeSet::from_privileges(&forbidden),
+            ),
+            DispatchError::BadOrigin
+        );
+        assert_ok!(
+            pallet_x3_trust_gate::Pallet::<Runtime>::set_category_policy(
+                RuntimeOrigin::root(),
+                category,
+                PrivilegeSet::from_privileges(&allowed),
+                PrivilegeSet::from_privileges(&[]),
+                PrivilegeSet::from_privileges(&forbidden),
+            )
+        );
+
+        // A census holding only allowed privileges is compliant…
+        assert_ok!(pallet_x3_trust_gate::Pallet::<Runtime>::declare_privileges(
+            RuntimeOrigin::root(),
+            app_id,
+            category,
+            PrivilegeSet::from_privileges(&allowed),
+        ));
+        assert_eq!(
+            pallet_x3_trust_gate::Pallet::<Runtime>::evaluate(app_id),
+            Ok(TrustVerdict::Compliant)
+        );
+
+        // …and a census holding a forbidden privilege is a refusal, never an
+        // approval. This is the gate's whole job.
+        assert_ok!(pallet_x3_trust_gate::Pallet::<Runtime>::declare_privileges(
+            RuntimeOrigin::root(),
+            app_id,
+            category,
+            PrivilegeSet::from_privileges(&[Privilege::Drain]),
+        ));
+        assert_eq!(
+            pallet_x3_trust_gate::Pallet::<Runtime>::evaluate(app_id),
+            Err(pallet_x3_trust_gate::TrustError::ForbiddenPrivilege(
+                Privilege::Drain
+            ))
+        );
+
+        // ── the security gate is a member too ───────────────────────────────
+        assert_noop!(
+            pallet_x3_security_gate::Pallet::<Runtime>::create_ruleset(RuntimeOrigin::signed(
+                stranger
+            )),
+            DispatchError::BadOrigin
+        );
+        assert_ok!(pallet_x3_security_gate::Pallet::<Runtime>::create_ruleset(
+            RuntimeOrigin::root()
+        ));
+        assert_eq!(
+            pallet_x3_security_gate::Pallet::<Runtime>::next_ruleset_version(),
+            1u32
+        );
+
+        // Restricting the application through the runtime removes its
+        // privileges while the history stays readable.
+        assert_ok!(
+            pallet_x3_app_registry::Pallet::<Runtime>::restrict_application(
+                RuntimeOrigin::root(),
+                app_id,
+                RestrictionReason::SecurityFinding,
+            )
+        );
+        assert!(!pallet_x3_app_registry::Pallet::<Runtime>::has_guardian_privileges(app_id));
+        assert_eq!(
+            pallet_x3_app_registry::Pallet::<Runtime>::is_restricted(app_id),
+            Some(true)
+        );
+    });
 }
