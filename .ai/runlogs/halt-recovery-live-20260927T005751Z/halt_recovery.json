@@ -1,0 +1,15 @@
+{
+  "status": "failed",
+  "steps": [
+    {
+      "label": "council membership",
+      "detail": "3 members: 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty, 5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y, 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+    },
+    {
+      "label": "control transfer landed",
+      "detail": "block 42, +1000000000"
+    }
+  ],
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "error": "Error: createType(Call):: Call: failed decoding council.close:: Struct: failed on args: {\"proposal_hash\":\"H256\",\"index\":\"Compact<u32>\",\"proposal_weight_bound\":\"{\\\"refTime\\\":\\\"Compact<u64>\\\",\\\"proofSize\\\":\\\"Compact<u64>\\\"}\",\"length_bound\":\"Compact<u32>\"}:: Struct: failed on proposal_weight_bound: {\"refTime\":\"Compact<u64>\",\"proofSize\":\"Compact<u64>\"}:: Struct: Cannot decode value 1000000000 (typeof number), expected an input object, map or array\n    at createTypeUnsafe (/home/lojak/Desktop/xxxstar-main/packages/blockchain-connector/node_modules/@polkadot/types-create/cjs/create/type.js:71:18)\n    at TypeRegistry.createTypeUnsafe (/home/lojak/Desktop/xxxstar-main/packages/blockchain-connector/node_modules/@polkadot/types/cjs/create/registry.js:295:46)\n    at extrinsicFn (/home/lojak/Desktop/xxxstar-main/packages/blockchain-connector/node_modules/@polkadot/types/cjs/metadata/decorate/extrinsics/createUnchecked.js:26:21)\n    at Object.decorated [as close] (/home/lojak/Desktop/xxxstar-main/packages/blockchain-connector/node_modules/@polkadot/api/cjs/base/Decorate.js:542:22)\n    at councilDispatch (/home/lojak/Desktop/xxxstar-main/scripts/drills/halt_recovery_live_driver.cjs:140:20)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async main (/home/lojak/Desktop/xxxstar-main/scripts/drills/halt_recovery_live_driver.cjs:237:3)"
+}

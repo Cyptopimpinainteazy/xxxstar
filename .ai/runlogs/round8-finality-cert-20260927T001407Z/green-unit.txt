@@ -1,0 +1,8 @@
+test finality::tests::test_a_reported_count_the_anchor_does_not_imply_is_refused ... ok
+test finality::tests::test_a_certificate_for_the_wrong_chain_is_refused ... ok
+test finality::tests::test_a_certificate_at_exactly_the_required_depth_passes ... ok
+test finality::tests::test_a_stale_certificate_is_refused ... ok
+test finality::tests::test_a_rewound_anchor_is_refused ... ok
+test finality::tests::test_confirmations_at_counts_the_anchored_block ... ok
+test finality::tests::test_solana_finality_uses_the_certificate_commitment ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 661 filtered out; finished in 0.00s

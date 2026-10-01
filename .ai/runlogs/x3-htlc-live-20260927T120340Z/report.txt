@@ -1,0 +1,8 @@
+runlog: /home/lojak/Desktop/xxxstar-main/.ai/runlogs/x3-htlc-live-20260927T120340Z
+workdir: /tmp/x3-htlc-live.B1Ygc2
+rpc:     http://127.0.0.1:18511 (port 18511)
+=== build the SBF program ===
+
+warning: `x3_htlc` (lib) generated 13 warnings (5 duplicates)
+    Finished `release` profile [optimized] target(s) in 1.10s
+Error: /home/lojak/Desktop/xxxstar-main/X3-contracts/svm/programs/x3_htlc/target/deploy/x3_htlc.so missing after cargo build-sbf

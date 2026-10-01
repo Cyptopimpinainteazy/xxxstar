@@ -1,0 +1,8 @@
+{
+  "status": "failed",
+  "steps": [],
+  "settled_order": null,
+  "recomputed": null,
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "error": "privateExecution.setOrderingWindowsEnabled is missing from metadata"
+}

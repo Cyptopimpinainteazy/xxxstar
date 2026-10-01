@@ -1,0 +1,16 @@
+### 1. green
+check-halt-fund-holding: OK — 26 fund-holding dispatchable(s) classified; 1 releasable while halted, 2 transient, 23 exception(s)
+  - exception: pallet_agent_accounts/register_agent: released by pallet_agent_accounts/terminate_agent only after the halt is cleared
+
+### 2. remove the one while_halted(recoverable) entry -> the call becomes unclassified
+check-halt-fund-holding: FAIL — 1 problem(s)
+  - pallet_x3_atomic_kernel/submit_atomic_bundle: holds funds and is not classified in halt-fund-holding.toml — a new fund-holding dispatchable has to be reviewed against the halt
+
+### 3. mislabel a non-transient call as transient -> refused
+  - pallet_governance/submit_proposal: claims `transient`, but reaches no release primitive — the funds are not provably released before the call returns
+
+### 4. point recoverable_by at a non-release call -> refused
+  - pallet_x3_slash/post_bond: `recoverable_by` pallet_x3_slash/post_bond is not a release path
+
+### 5. restored -> green
+check-halt-fund-holding: OK — 26 fund-holding dispatchable(s) classified; 1 releasable while halted, 2 transient, 23 exception(s)

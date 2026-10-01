@@ -1,0 +1,50 @@
+{
+  "status": "failed",
+  "steps": [
+    {
+      "label": "read the window switch",
+      "detail": "enabled=false"
+    },
+    {
+      "label": "enable ordering windows: motion executed",
+      "detail": "block=33"
+    },
+    {
+      "label": "the ordering lane is enabled"
+    },
+    {
+      "label": "window opened",
+      "detail": "id=0 range=35..=74"
+    },
+    {
+      "label": "committed from alice",
+      "detail": "block=38"
+    },
+    {
+      "label": "committed from bob",
+      "detail": "block=41"
+    },
+    {
+      "label": "a reveal that does not hash to its commit was refused",
+      "detail": "privateExecution.OrderingRevealMismatch"
+    },
+    {
+      "label": "both reveals accepted at their own blocks"
+    },
+    {
+      "label": "window settled",
+      "detail": "block=77"
+    }
+  ],
+  "settled_order": [
+    "0x092836f4edbf22fa2a94826f44021a881619895c1c32377129b6cbbaa8aa857a",
+    "0x58bad719665f6e7caca9790a43b1012993a71515cd438aab1b1f2d2a76755aac"
+  ],
+  "recomputed": [
+    "0x58bad719665f6e7caca9790a43b1012993a71515cd438aab1b1f2d2a76755aac",
+    "0x092836f4edbf22fa2a94826f44021a881619895c1c32377129b6cbbaa8aa857a"
+  ],
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "beacon": "0x294a4bb72f13101743370d0c26b956b30e7c31a6c8f23ae75dd4183030de71ac",
+  "error": "the settled order is not the canonical order:\n  chain      0x092836f4edbf22fa2a94826f44021a881619895c1c32377129b6cbbaa8aa857a,0x58bad719665f6e7caca9790a43b1012993a71515cd438aab1b1f2d2a76755aac\n  recomputed 0x58bad719665f6e7caca9790a43b1012993a71515cd438aab1b1f2d2a76755aac,0x092836f4edbf22fa2a94826f44021a881619895c1c32377129b6cbbaa8aa857a"
+}

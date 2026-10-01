@@ -1,0 +1,88 @@
+{
+  "rpc": "http://127.0.0.1:51685",
+  "checks": [
+    {
+      "name": "node_reports_the_expected_chain",
+      "ok": true,
+      "detail": "0x7a69 vs 31337"
+    },
+    {
+      "name": "anchor_is_mined_and_succeeded",
+      "ok": true,
+      "detail": "\"0x1\""
+    },
+    {
+      "name": "anchor_hash_is_the_block_at_its_height",
+      "ok": true,
+      "detail": "0x424ae7879bf5494a52ab68b77961cefc675e241ab78a6e9549041219bcc6afdb vs 0x424ae7879bf5494a52ab68b77961cefc675e241ab78a6e9549041219bcc6afdb"
+    },
+    {
+      "name": "certificate_settles_on_real_depth",
+      "ok": true,
+      "detail": "{\"accepted_tip\":12,\"block_hash\":\"0x424ae7879bf5494a52ab68b77961cefc675e241ab78a6e9549041219bcc6afdb\",\"block_height\":1,\"chain\":\"eth\",\"confirmations\":12,\"observed_at\":12,\"outcome\":\"finalized\",\"store\":\"/tmp/x3-finality-cert.8A3dAN/oracle-store.json\",\"tx_id\":\"0x3da830c485c3545ecea66aa279537813a9876f8b43343f398847b9b84d46b939\"}"
+    },
+    {
+      "name": "accepted_tip_persisted_to_the_store",
+      "ok": true,
+      "detail": "store=/tmp/x3-finality-cert.8A3dAN/oracle-store.json exists=true"
+    },
+    {
+      "name": "fork_rewound_below_the_accepted_tip",
+      "ok": true,
+      "detail": "reverted=true tip 1 < 12"
+    },
+    {
+      "name": "rewound_fork_refused_from_reloaded_tip",
+      "ok": true,
+      "detail": "{\"accepted_tip\":12,\"block_height\":1,\"chain\":\"eth\",\"code\":\"CertificateRewindsAcceptedAnchor\",\"detail\":\"Finality certificate on Ethereum rewinds the chain: tip 1 is below the accepted tip 12\",\"observed_at\":1,\"outcome\":\"refused\",\"store\":\"/tmp/x3-finality-cert.8A3dAN/oracle-store.json\",\"tx_id\":\"0x3da830c485c3545ecea66aa279537813a9876f8b43343f398847b9b84d46b939\"}"
+    },
+    {
+      "name": "foreign_chain_refused_for_the_chain",
+      "ok": true,
+      "detail": "{\"code\":\"FinalityChainIdMismatch\",\"detail\":\"Finality producer: node reports chain id 31337 but chain id 31338 was required\",\"outcome\":\"refused\"}"
+    }
+  ],
+  "chain_id": "31337",
+  "contract": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "anchor_tx": "0x3da830c485c3545ecea66aa279537813a9876f8b43343f398847b9b84d46b939",
+  "anchor_height": 1,
+  "anchor_hash": "0x424ae7879bf5494a52ab68b77961cefc675e241ab78a6e9549041219bcc6afdb",
+  "tip_before_rewind": 12,
+  "tip_after_rewind": 1,
+  "settled": {
+    "exitCode": 0,
+    "json": {
+      "accepted_tip": 12,
+      "block_hash": "0x424ae7879bf5494a52ab68b77961cefc675e241ab78a6e9549041219bcc6afdb",
+      "block_height": 1,
+      "chain": "eth",
+      "confirmations": 12,
+      "observed_at": 12,
+      "outcome": "finalized",
+      "store": "/tmp/x3-finality-cert.8A3dAN/oracle-store.json",
+      "tx_id": "0x3da830c485c3545ecea66aa279537813a9876f8b43343f398847b9b84d46b939"
+    }
+  },
+  "rewound": {
+    "exitCode": 0,
+    "json": {
+      "accepted_tip": 12,
+      "block_height": 1,
+      "chain": "eth",
+      "code": "CertificateRewindsAcceptedAnchor",
+      "detail": "Finality certificate on Ethereum rewinds the chain: tip 1 is below the accepted tip 12",
+      "observed_at": 1,
+      "outcome": "refused",
+      "store": "/tmp/x3-finality-cert.8A3dAN/oracle-store.json",
+      "tx_id": "0x3da830c485c3545ecea66aa279537813a9876f8b43343f398847b9b84d46b939"
+    }
+  },
+  "foreign": {
+    "exitCode": 0,
+    "json": {
+      "code": "FinalityChainIdMismatch",
+      "detail": "Finality producer: node reports chain id 31337 but chain id 31338 was required",
+      "outcome": "refused"
+    }
+  }
+}

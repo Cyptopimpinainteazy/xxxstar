@@ -9387,3 +9387,131 @@ registration, with the outcome per file:
   the documented-exception path for `register_external_root`), `x3-asset-registry` (7),
   `x3-account-registry` (3, no mock and no tests), and `x3-settlement-engine`'s own weights can now be
   regenerated on a dev chain if the runtime's verifier accepts the fixture — worth trying next.
+
+## 2026-09-28 — claude (x3-lang agent) CLAIM: x3_swarm_core replica reconciler (P1)
+- Branch feat/swarm-replica-reconciler, worktree /tmp/x3-swarm-reconcile. Closing the registry blocker
+  "Partition settlement has no reconciler": crates/x3-swarm-core gains a reconciler that diffs two
+  SwarmScheduler replicas, asks a ClaimArbiter (the chain's claim_task is the real one) who holds each
+  conflicting task, converges both replicas and reports evicted holders. Touches only crates/x3-swarm-core
+  (+ its registry row). Please don't pick up the same blocker.
+
+## 2026-09-28 — claude (x3-lang agent): #530 MERGED (d295a5f7d) — swarm-core replica reconciler, claim released
+- `x3_swarm_core::reconcile(a, b, arbiter)` settles partitioned SwarmScheduler replicas; 10 tests in
+  tests/replica_reconcile.rs, mutation-checked. Score 51 -> 52 (row formula).
+- FACT for anyone touching swarm docs: pallet-northern-swarm `claim_task` is NOT exclusive — up to
+  MaxExecutorsPerTask (3) executors claim one task; `claimed_by` is the FIRST claimer. Old docs said
+  "a second executor is refused"; corrected in swarm-core.
+- Remaining swarm-core blocker (open for anyone): a ClaimArbiter that reads `claimed_by` from a node.
+- Pre-existing: crates/x3-swarm-core/src/{policy,sensitive}.rs and tests/sensitive_actions.rs are not
+  rustfmt-clean; no gate checks it (crate is outside the root workspace).
+
+## 2026-09-28 — claude (x3-lang agent) CLAIM: [x3_htlc] re-pointed to the native X3 HTLC (owner approved)
+- Branch fix/x3-htlc-registry-native, worktree /tmp/x3-htlc-reg. `[x3_htlc]` now = X3Native legs in
+  pallet-x3-settlement-engine (score derived 60); the orphan SVM program's row moved verbatim to
+  `[svm_x3_htlc_program]` (45).
+- BUG FIXED in my own #520: lock_escrow on an X3Native leg did not check the declared token, so a leg
+  promising X3Asset/Contract was locked by reserving native X3. Now requires TokenId::Native (fails closed).
+  Touches the runtime -> will re-attest runtime hashes before merge.
+- (x3_htlc PR, 2026-09-28) MASTER CLIPPY IS RED since 9be777e00: pallet-x3-token-factory's test runtime lacks
+  `type WeightInfo = ();` for pallet_x3_cross_vm_router (E0046). Fixed in my fix/x3-htlc-registry-native PR;
+  whoever adds WeightInfo to a pallet: grep every `impl <pallet>::Config for` in other crates' tests too.
+
+## 2026-09-28 — claude (x3-lang agent) CLAIM: x3_reactor "two halves unjoined" blocker (P2)
+- Branch feat/reactor-placement-attested, worktree /tmp/x3-reactor. x3-bench: a job carries the
+  reactor's Placement (backend id + accelerator); RunAttestation signs the backend it ran on;
+  publish_attested refuses PlacementMismatch. northern-swarm: ScheduleDecision::placement() -> x3_bench::Placement
+  (new dep northern-swarm -> x3-bench). Touches crates/x3-bench/src/job.rs, crates/northern-swarm/src/reactor.rs.
+
+## 2026-09-28 — claude (x3-lang agent) CLAIM: finishing x3-lang (owner: "get x3 lang done completely")
+Working, in order, one PR each (please don't pick these up):
+1. X3-LANG-001: optimizer order-sensitivity (entry fn first breaks 4 e2e programs) + E2E for match/strings/host calls.
+2. X3-LANG-010/TICKET-149: interpreter divergence (aggregates, inc/dec, mod_f, conversions, ctx_gas) — make engines agree or refuse at validation.
+3. X3-LANG-007: property test + independent reference for verify_trading_sequences.
+4. X3-LANG-009: signed/attested standalone X3BC artifact.
+5. X3-LANG-003: receipt attestation key registry/rotation.
+
+## 2026-09-28 — claude (x3-lang agent): SECURITY finding + CLAIM (x3-lang/vm TradingVm)
+- TradingVm::execute_atomic COMMITS operation sequences the compiler's verify_ir refuses: no
+  AssertMinNetProfit (trade commits with no profit check), no AssertAllDebtsClosed, op after commit,
+  duplicate receipt, receipt before guards. A peer-supplied/decoded IR bypasses verification.
+- Fixing on branch fix/trading-vm-verifies-peer-ir (/tmp/x3-tradeverify): run_atomic runs verify_ir first.
+- Also: the disk hit 100% (2.2T) at ~20:52Z from /tmp target dirs; I deleted only MY merged worktrees'
+  targets (272G). Please clean your own merged targets.
+
+## 2026-09-28 21:35Z — claude (x3-lang agent): state before the machine moves to the rack
+- MERGED today: #531 (x3_htlc registry + native-leg token fix), #532 (reactor placement attested),
+  #533 (x3-lang host calls/constants/strings/optimizer-order + `test x3 chain compiler` gate),
+  #534 (trading VM verifies peer programs).
+- PUSHED, NOT MERGED:
+  * fix/x3vm-engine-agreement (TICKET-149: both engines refuse conversions + ctx_gas at intake).
+    Pipeline was running at shutdown; it needs runtime re-attestation, then merge. Rerun:
+    scratchpad agree-finish.sh, or merge master, run gates, run update-runtime-hashes, then merge.
+  * feat/receipt-key-registry (X3-LANG-003 key registry). Needs gates + PR + merge after the
+    TICKET-149 PR (both touch feature-matrix/language-trading.toml). No runtime change.
+- x3-lang still open: X3-LANG-009 (signed standalone X3BC artifact), X3-LANG-007 independent second
+  implementation of the trading rules, and registry distribution/signing side for X3-LANG-003.
+- 21:45Z BACKUPS before the rack move (owner asked to push everyone's work): unpushed commits were
+  pushed to their own branches (main checkout feat/x3-prelaunch-economics-x3lang-cutover, +22).
+  Uncommitted and untracked work was snapshotted, WITHOUT touching any checkout or index, to
+  origin/wip-backup/<name>-20260928: main-checkout, freshness-control-3763659, panic-516,
+  rt-rebuild, rt2, upg-artifact-src, x3lang-finish, candidate-d1ea10558 (a detached head that was
+  on no remote branch). To recover: `git checkout wip-backup/<name>-20260928 -- <paths>`.
+- 21:55Z: #535 MERGED (TICKET-149 engine agreement, runtime re-attested 0x9949…5a84). Remaining
+  pushed-but-unmerged from this agent: feat/receipt-key-registry only (no runtime change; needs the
+  matrix/x3-lang gates, then PR + merge).
+
+## 2026-09-29 — claude (x3-lang agent) CLAIM: `emit` end to end (X3-LANG-001)
+- Branch feat/x3lang-emit, worktree /tmp/x3-emit. MIR refuses `emit`; NEITHER engine implements
+  opcode 0xA2 (x3-vm has VmEvent/drain_events that nothing fills); the backend's emit_emit encoder
+  is unused; X3ExecutionReceipt.logs is always set empty ("deferred to runtime integration").
+  Plan: lower emit -> 0xA2 with event_id = const-pool index of the name (exact, no collisions),
+  implement in BOTH engines with one journal shape, fill receipt.logs, cross-engine agreement test,
+  remove 0xA2 from the agreed-refusals table.
+- Also: after a reboot wipes /tmp, SRTOOL_CARGO_GIT_CACHE must be re-seeded world-writable or every
+  runtime attestation dies silently after "build 1/2" (Permission denied for uid 1001).
+
+## 2026-09-29 05:00Z — claude (x3-lang agent, VS Code session) CLAIM
+- #536 (receipt key registry) MERGED. Saw the parallel session's #537 (artifact attestation) and #539 (emit).
+- Taking, in order: (1) X3-LANG-007 independent reference implementation of the trading-sequence rules
+  + differential proptest vs verify_trading_program over random sequences (branch feat/trading-rules-reference);
+  (2) X3-LANG-003 signing side: `x3c receipt execute` refuses a key the registry says may not sign.
+  Not touching X3-LANG-009's sidecar unless it is still open when I get there.
+- 2026-09-29 14:50Z (x3-lang agent): #545 (trading-rules independent reference) and #546 (receipt
+  signing consults registry) MERGED. fix/x3-compile-writes-artifact in its pipeline: `x3 compile`/`x3 build`
+  wrote the code section only (unloadable .x3b); fixed + signing sidecar + `x3 verify-artifact` + new gate
+  `test x3-cli`. NOTE: master `format check` is RED on crates/x3-common/src/artifact.rs (one line, from
+  #537). Fixing it touches x3-common, so it needs a runtime re-attestation; left for the next x3-common PR.
+- 2026-09-29 15:10Z (x3-lang agent): MERGED #547 (x3 compile writes a loadable artifact + signs; `test x3-cli`
+  gate), #548 (replay re-derives max_gas + oracle firewall; receipt format 4), #549 (3-validator state round
+  trip runs compiled .x3 source; live gate passed 147.88s). Next: fix master's red `format check`
+  (x3-common/src/artifact.rs, needs runtime re-attest).
+- 2026-09-29 15:45Z (x3-lang agent): MERGED #550 (x3-common artifact.rs rustfmt; master format check green;
+  runtime re-attested 0x649d…6df7) and #551 (runtime_upgrade_rehearsal.sh now runs a compiled .x3 program
+  through AtlasKernel.submit_comit_v2 AFTER the governance upgrade: spec 20->21 at block 94, program returned
+  42 at block 99). NOTE for attestations after the reboot: /tmp/x3-srtool-cargo-git is root-owned; use
+  SRTOOL_CARGO_GIT_CACHE=/tmp/x3-srtool-cargo-git-lojak (world-writable). Next: submit_comit_v2 benchmark
+  EVM/SVM payload fixtures (X3-LANG-004's last item).
+
+## 2026-09-29 16:00Z — claude (x3-lang agent) CLAIM: X3-LANG-001 cross-VM calls from .x3 (evm_call / svm_*)
+- Branch feat/x3lang-cross-vm-calls, worktree /tmp/x3-xvm. Surveying first (kernel triple-VM path,
+  cross-VM router, hostcalls); will post the design before building. Please don't start the same.
+- 2026-09-29 20:51Z (x3-lang agent): #552 (X3-LANG-004/008 re-measured: submit_comit_v2 benchmark runs on
+  the real runtime) and #553 (X3-LANG-001: cross-VM calls from .x3 are a documented non-goal, owner's
+  choice; the chain's WASM EVM is stateless mini_evm, pallet_evm only in native+frontier builds) MERGED.
+  Main checkout switched to master at the owner's request (old edits stashed as stash@{0}, reapplied).
+
+## 2026-09-29 21:00Z — claude (x3-lang agent) CLAIM: signed key registries (X3-LANG-003 + X3-LANG-009)
+- Branch feat/signed-key-registries, worktree /tmp/x3-regsign. A registry file is signed by a root key
+  (detached <registry>.sig.json over its exact bytes); x3c (receipts) and the x3 CLI (artifacts) gain
+  --registry-root and refuse an unsigned/forged registry when a root is named (required on mainnet).
+  No runtime change.
+- 2026-09-29 21:40Z (x3-lang agent): #554 MERGED — signed key registries. Receipts: `x3c registry sign`,
+  `--registry-root` on receipt verify/execute (required on mainnet). Artifacts: `x3 sign-registry`,
+  `--registry-root` / explicit `--unsigned-registry` on `x3 compile` and `x3 verify-artifact`. Tools that
+  read a registry now need a signed one — pass the root. Remaining x3-lang item is operational only:
+  how the root key is distributed/rotated.
+
+## 2026-09-29 22:00Z — claude (x3-lang agent) CLAIM: real EVM in the production (WASM) runtime (owner request)
+- Branch design/onchain-evm, worktree /tmp/x3-evm. Step 1 is a measured design doc (does the WASM runtime
+  build with `frontier`? can NativeEvmAdapter run no_std? address mapping, fees, genesis, migration),
+  THEN a phased build. Consensus-critical: nothing lands without the owner's sign-off on the design.

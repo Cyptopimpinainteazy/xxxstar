@@ -80,3 +80,52 @@ Completion percent:
 # Task Management & TODO Guidelines
 - When viewing, querying, adding, updating, or deleting project tasks or TODOs, ALWAYS use the TODO MCP tools (`todo_get_tasks`, `todo_add_tasks`, `todo_update_tasks`, `todo_delete_tasks`, `todo_clear_category`, `todo_move_category`) on server `todo-mcp` or `todo-extension`.
 - NEVER edit the `.todo` file directly with file modification tools.
+
+# Autonomous Continuation Rule
+
+When the next valid engineering action is clear from the active task, repository
+state, tests, or master plan, continue without asking the user for confirmation.
+
+Do not end turns with:
+
+- Would you like me to continue?
+- Ready to proceed.
+- Shall I run the tests?
+- Would you like the audit?
+- Please confirm the next step.
+- I will wait for completion.
+
+If tests/builds are active, obtain their actual result. If they fail, diagnose
+and fix. If they pass, record evidence and continue to the next dependency-aware
+task.
+
+Only request user input when there is a genuine decision or blocker that cannot
+be resolved from:
+
+- source code
+- AGENTS.md
+- the master prompt
+- repository documentation
+- existing task state
+- available tools
+
+Reports are checkpoints, not stop conditions.
+No evidence = no completion. No unnecessary confirmation = uninterrupted progress.
+
+# Verification State Discipline
+
+Never mark a test suite, subsystem, or phase complete while its verification
+command is still running. Allowed verification states:
+
+```
+NOT RUN
+RUNNING
+PASS
+FAIL
+BLOCKED
+```
+
+Only PASS counts as completion evidence. `RUNNING` is not PASS and
+`NO FAILURE YET` is not PASS. A suite observed to still be executing may not be
+summarized as passing, and no downstream claim may cite it as evidence until the
+command has exited with a recorded exit status.
