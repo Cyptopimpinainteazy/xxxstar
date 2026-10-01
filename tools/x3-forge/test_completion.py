@@ -187,6 +187,43 @@ class CompletionTests(unittest.TestCase):
         gap = next(g for g in analysis["gaps"] if g["kind"] == "ignored_required_test")
         self.assertIn("skipped test is not a passing test", gap["detail"])
 
+    def test_a_name_ignored_in_one_file_but_live_in_another_is_not_flagged(self):
+        # The pack-05 false positive: a frozen extract kept `#[ignore]` on
+        # tests the live suite runs. The marker belongs to the declaration,
+        # not the name, so one un-ignored declaration means the test runs.
+        (self.root / "pallets/x/src").mkdir(parents=True)
+        files = {
+            "pallets/x/src/tests.rs": source("pallets/x/src/tests.rs", items=[
+                {"kind": "fn", "name": "test_roundtrip", "line": 9, "test": True}]),
+            "archive/extract/tests.rs": source("archive/extract/tests.rs", items=[
+                {"kind": "fn", "name": "test_roundtrip",
+                 "line": 3, "test": True, "ignored": True}]),
+        }
+        row = feature(paths=["pallets/x/src/tests.rs"], required_tests=["test_roundtrip"])
+        analysis = self.analyze(files, [row])[0]
+        self.assertNotIn("ignored_required_test", self.kinds(analysis))
+        self.assertEqual(analysis["evidence"]["required_tests_ignored_ungated"], 0)
+
+    def test_ignored_in_every_declaration_but_gated_in_one_is_not_flagged(self):
+        (self.root / "node/tests").mkdir(parents=True)
+        (self.root / "scripts").mkdir(parents=True)
+        (self.root / "scripts/local-ci.sh").write_text(
+            "cargo test -p x3-chain-node --test supply_invariant_distributed "
+            "-- --ignored --nocapture\n")
+        files = {
+            "node/tests/supply_invariant_distributed.rs": source(
+                "node/tests/supply_invariant_distributed.rs",
+                items=[{"kind": "fn", "name": "supply_is_conserved",
+                        "line": 9, "test": True, "ignored": True}]),
+            "archive/old/supply.rs": source("archive/old/supply.rs",
+                items=[{"kind": "fn", "name": "supply_is_conserved",
+                        "line": 4, "test": True, "ignored": True}]),
+        }
+        row = feature(paths=["node/tests/supply_invariant_distributed.rs"],
+                      required_tests=["supply_is_conserved"])
+        analysis = self.analyze(files, [row])[0]
+        self.assertNotIn("ignored_required_test", self.kinds(analysis))
+
     def test_markers_are_reported_but_never_decide_the_state(self):
         (self.root / "pallets/x/src").mkdir(parents=True)
         files = {"pallets/x/src/lib.rs": source("pallets/x/src/lib.rs", items=[

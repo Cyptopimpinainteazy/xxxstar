@@ -193,6 +193,15 @@ class RealRepositoryGroundTruth(unittest.TestCase):
         mirrored = [rel for rel in self.files if "/worktrees/" in rel or rel.startswith("vendor/")]
         self.assertEqual(mirrored, [], f"mirrored trees must not be indexed, got {mirrored[:5]}")
 
+    def test_frozen_audit_extracts_are_not_indexed(self):
+        # `launch-gates/sources/` is written by prepare-phase3-sources.sh:
+        # point-in-time copies of files that are indexed where they really
+        # live. Indexing the copies duplicated every declaration and let
+        # pack-05's stale `#[ignore]` markers speak for the live router suite,
+        # which had long since un-ignored those tests.
+        extracted = [rel for rel in self.files if rel.startswith("launch-gates/sources/")]
+        self.assertEqual(extracted, [], f"frozen extracts must not be indexed, got {extracted[:5]}")
+
 
 class IncrementalAndStaleness(unittest.TestCase):
     """The index is only trustworthy if a stale answer is detectable."""

@@ -37,7 +37,9 @@ INDEX_VERSION = 1
 # of `items` into `strings` (see below), which changes the stored schema.
 # Version 4 parses multi-line attributes, so `#[ignore = "..."]` tests keep
 # their `test`/`ignored` markers instead of disappearing from the index.
-PARSER_VERSION = 4
+# Version 5 stops indexing the frozen extract trees (see FROZEN_PREFIXES),
+# which changes the file set.
+PARSER_VERSION = 5
 DEFAULT_INDEX = ".x3-forge/index.json"
 
 # Directories that are never source of truth for an engineering index.
@@ -47,6 +49,16 @@ SKIP_DIRS = {
     ".kilo", ".worktrees", "vendor",
 }
 SKIP_SUFFIX = (".lock", ".min.js", ".map")
+
+# Frozen extract trees. `launch-gates/prepare-phase3-sources.sh` copies pallet
+# sources and test files into per-audit packs, and those copies are committed,
+# but they are point-in-time extracts of files that are indexed where they
+# really live. Indexing them again duplicates every declaration and lets an old
+# copy speak for a tree that has since changed: pack-05's router extract kept
+# 26 `#[ignore]` markers after the live suite dropped them, and the completion
+# engine reported a running required test as skipped. Evidence, not source of
+# truth.
+FROZEN_PREFIXES = ("launch-gates/sources/",)
 
 RUST_ITEM = re.compile(
     r"^\s*(?P<vis>pub(?:\([^)]*\))?\s+)?"
@@ -72,6 +84,8 @@ MAX_STRINGS_PER_FILE = 200
 
 def _skip(path: Path, root: Path) -> bool:
     rel = path.relative_to(root)
+    if rel.as_posix().startswith(FROZEN_PREFIXES):
+        return True
     if any(part in SKIP_DIRS or part.startswith(".wt-") for part in rel.parts):
         return True
     return path.name.endswith(SKIP_SUFFIX)

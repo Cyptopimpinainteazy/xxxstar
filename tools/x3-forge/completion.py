@@ -89,14 +89,23 @@ def test_symbol_names(index):
     return names
 
 
-def ignored_test_symbols(index):
-    """Test names marked `#[ignore]`, mapped to their declaring file."""
-    ignored = {}
+def test_occurrences(index):
+    """Test name -> every indexed declaration, with its `#[ignore]` marker.
+
+    A name is not a declaration: the same test function can be declared in
+    several files, and the marker belongs to the declaration. Keeping only the
+    last file seen (a dict overwrite) let a stale copy of a suite speak for the
+    live tree -- `launch-gates/sources/pack-05-test-gap` carried `#[ignore]`s
+    on tests the live router suite had un-ignored, and a running required test
+    was reported as skipped.
+    """
+    occurrences = {}
     for rel, entry in index["files"].items():
         for item in entry.get("items", []):
-            if item.get("test") and item.get("ignored") and item.get("name"):
-                ignored[item["name"]] = rel
-    return ignored
+            if item.get("test") and item.get("name"):
+                occurrences.setdefault(item["name"], []).append(
+                    {"file": rel, "ignored": bool(item.get("ignored"))})
+    return occurrences
 
 
 def gated_ignored_targets(root=ROOT):
@@ -257,9 +266,9 @@ def is_external(value):
 
 
 def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=ROOT,
-                    ignored=None, gated=None):
+                    occurrences=None, gated=None):
     """One feature row, cross-referenced against the index."""
-    ignored = ignored or {}
+    occurrences = occurrences or {}
     gated = gated or set()
     paths = [str(p) for p in (feature.get("paths") or [])]
     test_paths = [str(p) for p in (feature.get("test_paths") or [])]
@@ -281,12 +290,22 @@ def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=RO
 
     required = [str(name) for name in (feature.get("required_tests") or [])]
     required_missing = [name for name in required if name not in tests]
-    # A required test can exist and still prove nothing if it is `#[ignore]`d
-    # and no gate runs its target with `--ignored`. The gate corpus above is
-    # how that is distinguished from a test a dedicated gate really executes.
-    required_ignored_ungated = [name for name in required
-                                if name in ignored
-                                and Path(ignored[name]).stem not in gated]
+    # A required test can exist and still prove nothing if every indexed
+    # declaration of its name is `#[ignore]`d and no gate runs any declaring
+    # target with `--ignored`. One un-ignored declaration, or one gate that
+    # executes an ignored one, means the name is not evidence of a skipped
+    # test. The gate corpus above is how that is distinguished from a test a
+    # dedicated gate really executes.
+    required_ignored_ungated = []
+    for name in required:
+        declarations = occurrences.get(name)
+        if not declarations:
+            continue
+        if any(not d["ignored"] for d in declarations):
+            continue
+        if any(Path(d["file"]).stem in gated for d in declarations):
+            continue
+        required_ignored_ungated.append(name)
 
     crate = None
     for _, entry in items:
@@ -329,7 +348,7 @@ def analyze_feature(feature, index, tests, dependents, binaries, matrix, root=RO
     if required_ignored_ungated:
         name = required_ignored_ungated[0]
         gaps.append({"kind": "ignored_required_test", "severity": "medium",
-                     "file": ignored[name], "symbol": name, "line": None,
+                     "file": occurrences[name][0]["file"], "symbol": name, "line": None,
                      "detail": "required test is #[ignore]d and no gate runs its target "
                                "with --ignored; a skipped test is not a passing test"})
     code_paths = [rel for rel, entry in items if entry.get("lang") in CODE_LANGS]
@@ -393,10 +412,10 @@ def analyze(index, matrix, features, root=ROOT):
     tests = test_symbol_names(index)
     dependents = crate_dependents(index, root)
     binaries = binary_crates(index, root)
-    ignored = ignored_test_symbols(index)
+    occurrences = test_occurrences(index)
     gated = gated_ignored_targets(root)
     return [analyze_feature(feature, index, tests, dependents, binaries, matrix, root,
-                            ignored=ignored, gated=gated)
+                            occurrences=occurrences, gated=gated)
             for feature in features]
 
 
