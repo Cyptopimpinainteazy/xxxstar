@@ -1,6 +1,6 @@
 {
   "accepted_reasons": {
-    "construct_runtime_variants": "Regenerated after the Northern Swarm / Reactor merge (PR #519) added `NorthernSwarm: pallet_northern_swarm` to every variant. That is an index-renumbering change for every pallet declared after it, which is exactly what this baseline is for; it is accepted here because the merge is the change that introduced it and no chain runs this runtime yet (`transaction_version` stays 1: no existing call's encoding moved).",
+    "construct_runtime_variants": "Regenerated after the Northern Swarm / Reactor merge (PR #519) added `NorthernSwarm: pallet_northern_swarm` to every variant, and again on 2026-09-30 after the X3 guardian wiring commit f4c13ea25 appended `X3AppRegistry`, `X3SecurityGate` and `X3TrustGate` to every variant. Both are index-renumbering changes for every pallet declared after them, which is exactly what this baseline is for; they are accepted here because those commits are the changes that introduced them and no chain runs this runtime yet (`transaction_version` stays 1: no existing call's encoding moved). Appending at the end of each variant leaves every pre-existing pallet index where it was.",
     "runtime_version.spec_version": "The baseline was seeded at spec_version 10 and never regenerated, because the gate could not run: `sp_version::RuntimeVersion` dropped `state_version` in the pinned polkadot-sdk revision and the script required it, so every invocation exited before comparing anything. Regenerated 2026-09-27 at 20, which is the value `docs/reports/runtime-wasm-reproducibility.md` records across v10-v20 (v20 removed the unsigned `submit_finalization_result`).",
     "runtime_version.state_version": "Absent from the source in the pinned revision; the field no longer exists in `sp_version::RuntimeVersion`. `system_version` replaces it here.",
     "runtime_version.system_version": "Present from the v20 source (1).",
@@ -285,6 +285,18 @@
         [
           "NorthernSwarm",
           "pallet_northern_swarm"
+        ],
+        [
+          "X3AppRegistry",
+          "pallet_x3_app_registry"
+        ],
+        [
+          "X3SecurityGate",
+          "pallet_x3_security_gate"
+        ],
+        [
+          "X3TrustGate",
+          "pallet_x3_trust_gate"
         ]
       ]
     },
@@ -574,6 +586,18 @@
         [
           "NorthernSwarm",
           "pallet_northern_swarm"
+        ],
+        [
+          "X3AppRegistry",
+          "pallet_x3_app_registry"
+        ],
+        [
+          "X3SecurityGate",
+          "pallet_x3_security_gate"
+        ],
+        [
+          "X3TrustGate",
+          "pallet_x3_trust_gate"
         ]
       ]
     },
@@ -787,6 +811,18 @@
         [
           "NorthernSwarm",
           "pallet_northern_swarm"
+        ],
+        [
+          "X3AppRegistry",
+          "pallet_x3_app_registry"
+        ],
+        [
+          "X3SecurityGate",
+          "pallet_x3_security_gate"
+        ],
+        [
+          "X3TrustGate",
+          "pallet_x3_trust_gate"
         ]
       ]
     },
@@ -1064,6 +1100,18 @@
         [
           "NorthernSwarm",
           "pallet_northern_swarm"
+        ],
+        [
+          "X3AppRegistry",
+          "pallet_x3_app_registry"
+        ],
+        [
+          "X3SecurityGate",
+          "pallet_x3_security_gate"
+        ],
+        [
+          "X3TrustGate",
+          "pallet_x3_trust_gate"
         ]
       ]
     },
@@ -1349,6 +1397,18 @@
         [
           "Ethereum",
           "pallet_ethereum"
+        ],
+        [
+          "X3AppRegistry",
+          "pallet_x3_app_registry"
+        ],
+        [
+          "X3SecurityGate",
+          "pallet_x3_security_gate"
+        ],
+        [
+          "X3TrustGate",
+          "pallet_x3_trust_gate"
         ]
       ]
     }

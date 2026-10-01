@@ -14,6 +14,12 @@ exclude = [
     "programs/svm/*",
     # Cross-VM coordinator is intentionally a standalone crate.
     "crates/cross-vm-coordinator",
+    # x3-sim and x3-mc are standalone workspace roots for the same reason: they
+    # drive the excluded cross-vm-coordinator crate, so they path-depend on a
+    # crate the parent workspace does not build. Each has its own gate in
+    # scripts/local-ci.sh (`test x3-sim`, `test x3-mc`).
+    "crates/x3-sim",
+    "crates/x3-mc",
     # Each of these declares its own `[workspace]` (or path-depends on one that
     # does), so cargo refuses to have them as members: "multiple workspace roots
     # found in the same workspace". They are built by the `nested workspaces`
