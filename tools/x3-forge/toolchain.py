@@ -183,6 +183,46 @@ def evidence_strength(rel):
         return "infrastructure"
     return "prose"
 
+
+def recorded_runs(terms):
+    """Artifacts under the evidence directories that name this tool.
+
+    This is the closest a filesystem gets to EXERCISED: a report, a runlog or a
+    proof artifact that mentions the tool means something ran and was written
+    down. It still does not prove the run succeeded, was bound to the commit
+    under review, or is repeatable — so the state it produces is EVIDENCED, not
+    VERIFIED, and the artifact path is reported so a reader can judge.
+    """
+    lowered = [term.lower() for term in terms if term]
+    artifacts = []
+    for directory in EVIDENCE_DIRS:
+        base = ROOT / directory
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*"):
+            if not path.is_file() or path.suffix not in EVIDENCE_SUFFIXES:
+                continue
+            rel = path.relative_to(ROOT).as_posix()
+            if any(rel.startswith(prefix) for prefix in EVIDENCE_EXCLUDE):
+                continue
+            try:
+                if path.stat().st_size > 2_000_000:
+                    continue
+                text = path.read_text(encoding="utf-8", errors="ignore").lower()
+            except OSError:
+                continue
+            needle = next((term for term in lowered if term in text), None)
+            if needle is None:
+                continue
+            artifacts.append({
+                "file": rel,
+                "term": needle,
+                "mtime": int(path.stat().st_mtime),
+            })
+            if len(artifacts) >= 8:
+                return artifacts
+    return artifacts
+
 # Paths never worth searching for tool evidence.
 #
 # The `.wt-*` entries matter more than they look: this repo keeps several full
@@ -193,6 +233,20 @@ def evidence_strength(rel):
 SKIP_DIRS = {".git", "target", "node_modules", ".next", "dist", "__pycache__",
              "tauri-vendor", ".venv", "vendor", "reports"}
 KEEP_HIDDEN = {".github", ".cargo"}
+
+# Where recorded runs live. These are deliberately **not** in the search corpus:
+# an artifact that names a tool is evidence the tool ran, which is a different
+# and stronger claim than "the repo mentions it", and the two must not be
+# flattened into one set of hits.
+EVIDENCE_DIRS = (".ai/reports", ".ai/runlogs", "audit-artifacts", ".proof-results",
+                 "reports", ".ai/memory")
+EVIDENCE_SUFFIXES = {".md", ".json", ".txt", ".log", ".jsonl", ""}
+
+# This tool writes a report into `reports/` that names every catalogued tool.
+# Scanning it back as evidence made all 66 rows EVIDENCED — the third time this
+# inventory mistook its own output for a fact about the world. A report that
+# lists a tool is not a record of that tool running.
+EVIDENCE_EXCLUDE = ("reports/toolchain/",)
 
 # This file and its test name every tool in the catalogue. Left in the corpus
 # they are "evidence" that every tool is wired and gated — the inventory
@@ -284,6 +338,7 @@ def classify(name, terms, executable, corpus, config_hints):
     # A configuration file counts when it is on disk, not when a doc names it.
     configured = [hint for hint in config_hints if (ROOT / hint).exists()]
     fuzz_dir = any(rel.endswith("/fuzz/Cargo.toml") for rel in corpus)
+    recorded = recorded_runs(terms)
 
     return {
         "tool": name,
@@ -299,14 +354,17 @@ def classify(name, terms, executable, corpus, config_hints):
         "gated": bool(gated),
         "gate_files": gated,
         "evidence_strengths": sorted(strengths),
+        "recorded_runs": recorded,
+        "evidenced": bool(recorded),
         "fuzz_crates_present": fuzz_dir if name.startswith(("cargo-fuzz", "afl", "honggfuzz")) else None,
         # The prompt is explicit that this is the part file presence cannot prove.
         "exercised": "not_determinable",
-        "evidenced": "not_determinable",
         "repeatable": "not_determinable",
         "why_not_determinable": (
-            "a mention proves wiring, not execution. Establishing these needs a recorded run "
-            "bound to a commit with its configuration, result and artifacts."),
+            "a mention proves wiring, not execution, and an artifact proves something ran "
+            "without proving it succeeded on the commit under review. Establishing these "
+            "needs a recorded run bound to a commit with its configuration, result and "
+            "artifacts."),
     }
 
 
@@ -314,6 +372,8 @@ def status_of(row):
     """§85's ladder, stopping where the evidence stops."""
     if row["gated"]:
         return "GATED"
+    if row["evidenced"]:
+        return "EVIDENCED"
     if row["wired"]:
         return "WIRED"
     if row["configured"]:
@@ -340,8 +400,8 @@ def build():
 
 
 def summary_rows(rows):
-    order = {"GATED": 0, "WIRED": 1, "CONFIGURED": 2, "INSTALLED_ONLY": 3,
-             "REFERENCE_ONLY": 4, "AVAILABLE": 5, "MISSING": 6}
+    order = {"GATED": 0, "EVIDENCED": 1, "WIRED": 2, "CONFIGURED": 3,
+             "INSTALLED_ONLY": 4, "REFERENCE_ONLY": 5, "AVAILABLE": 6, "MISSING": 7}
     ranked = sorted(rows, key=lambda row: (order.get(row["status"], 9),
                                            row["priority_group"], row["tool"]))
     return ranked
@@ -364,8 +424,8 @@ def build_gap_markdown(rows, corpus):
         "## Status counts",
         "",
     ]
-    for status in ("GATED", "WIRED", "CONFIGURED", "INSTALLED_ONLY", "REFERENCE_ONLY",
-                   "AVAILABLE", "MISSING"):
+    for status in ("GATED", "EVIDENCED", "WIRED", "CONFIGURED", "INSTALLED_ONLY",
+                   "REFERENCE_ONLY", "AVAILABLE", "MISSING"):
         lines.append(f"- {status}: {counts.get(status, 0)}")
     lines += [
         "",
@@ -436,8 +496,9 @@ def main(argv=None):
     if args.command == "inventory":
         payload = {"root": str(ROOT), "tools": rows,
                    "counts": {status: sum(1 for r in rows if r["status"] == status)
-                              for status in ("GATED", "WIRED", "CONFIGURED", "INSTALLED_ONLY",
-                                             "REFERENCE_ONLY", "AVAILABLE", "MISSING")}}
+                              for status in ("GATED", "EVIDENCED", "WIRED", "CONFIGURED",
+                                             "INSTALLED_ONLY", "REFERENCE_ONLY",
+                                             "AVAILABLE", "MISSING")}}
         if args.out:
             out = Path(args.out)
             out.mkdir(parents=True, exist_ok=True)
@@ -464,6 +525,9 @@ def main(argv=None):
         print(f"  installed  {row['installed']}  {row['installed_path'] or ''}")
         print(f"  configured {row['configured']}  {', '.join(row['config_files'])}")
         print(f"  gated      {row['gated']}  {', '.join(row['gate_files'])}")
+        print(f"  evidenced  {row['evidenced']}  {len(row['recorded_runs'])} artifact(s)")
+        for artifact in row["recorded_runs"][:5]:
+            print(f"  recorded   {artifact['file']}")
         print(f"  exercised  {row['exercised']} — {row['why_not_determinable']}")
         for hit in row["evidence"][:8]:
             print(f"  wiring     {hit['file']}:{hit['line']} ({hit['term']})")

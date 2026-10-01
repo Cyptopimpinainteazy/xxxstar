@@ -6,10 +6,11 @@ Every row carries the files it was judged from; nothing here is a guess.
 ## Status counts
 
 - GATED: 45
-- WIRED: 8
+- EVIDENCED: 7
+- WIRED: 3
 - CONFIGURED: 0
-- INSTALLED_ONLY: 3
-- REFERENCE_ONLY: 4
+- INSTALLED_ONLY: 2
+- REFERENCE_ONLY: 3
 - AVAILABLE: 0
 - MISSING: 6
 
@@ -35,9 +36,9 @@ establishing them needs a recorded run bound to a commit.
 | echidna | GATED | no | yes |
 | foundry | GATED | yes | yes |
 | frame-benchmarking | GATED | yes | yes |
-| gitleaks | INSTALLED_ONLY | yes | no |
+| gitleaks | EVIDENCED | yes | no |
 | grafana | GATED | no | yes |
-| jsonrpsee | WIRED | yes | no |
+| jsonrpsee | EVIDENCED | yes | no |
 | k6 | GATED | no | yes |
 | kani | GATED | yes | yes |
 | litesvm | GATED | no | yes |
@@ -69,12 +70,12 @@ establishing them needs a recorded run bound to a commit.
 | grype | REFERENCE_ONLY | no | no |
 | halmos | INSTALLED_ONLY | yes | no |
 | honggfuzz | WIRED | no | no |
-| loki | WIRED | no | no |
+| loki | EVIDENCED | no | no |
 | loom | GATED | yes | yes |
-| medusa | REFERENCE_ONLY | no | no |
+| medusa | EVIDENCED | no | no |
 | miri | GATED | yes | yes |
-| mythril | WIRED | no | no |
-| opentelemetry | WIRED | yes | no |
+| mythril | EVIDENCED | no | no |
+| opentelemetry | EVIDENCED | yes | no |
 | osv-scanner | GATED | no | yes |
 | podman | GATED | no | yes |
 | pumba | MISSING | no | no |
@@ -100,7 +101,7 @@ establishing them needs a recorded run bound to a commit.
 | malachite | MISSING | no |
 | narwhal | WIRED | no |
 | paritydb | GATED | yes |
-| reth | WIRED | no |
+| reth | EVIDENCED | no |
 | rocksdb | GATED | no |
 
 ## Top gaps by launch value
@@ -114,8 +115,8 @@ a recorded run to move up.
 | mollusk | MISSING | no | — |
 | proptest-state-machine | MISSING | no | — |
 | ansible | INSTALLED_ONLY | yes | docs/runbooks/testing/VALIDATION_CHECKLIST.md |
-| gitleaks | INSTALLED_ONLY | yes | — |
-| jsonrpsee | WIRED | yes | Cargo.lock |
+| gitleaks | EVIDENCED | yes | — |
+| jsonrpsee | EVIDENCED | yes | Cargo.lock |
 
 ## Not covered by this scan
 

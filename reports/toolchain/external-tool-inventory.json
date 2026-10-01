@@ -2,11 +2,12 @@
   "counts": {
     "AVAILABLE": 0,
     "CONFIGURED": 0,
+    "EVIDENCED": 7,
     "GATED": 45,
-    "INSTALLED_ONLY": 3,
+    "INSTALLED_ONLY": 2,
     "MISSING": 6,
-    "REFERENCE_ONLY": 4,
-    "WIRED": 8
+    "REFERENCE_ONLY": 3,
+    "WIRED": 3
   },
   "root": "/home/lojak/Desktop/xxxstar-main",
   "tools": [
@@ -92,7 +93,7 @@
         "dependency",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "fuzzing",
       "fuzz_crates_present": true,
@@ -113,11 +114,53 @@
       "installed_path": "/home/lojak/.cargo/bin/cargo-fuzz",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/stale-fuzz-lockfiles-20260925.md",
+          "mtime": 1790356738,
+          "term": "cargo fuzz"
+        },
+        {
+          "file": ".ai/reports/fuzz-suite-20260925.md",
+          "mtime": 1790371216,
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": ".ai/reports/x3-vm-gas-and-bytecode-20260925.md",
+          "mtime": 1790361768,
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": ".ai/reports/packet-and-bridge-decoders-20260925.md",
+          "mtime": 1790369928,
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260928T065536Z-workspace-check.log",
+          "mtime": 1790578689,
+          "term": "libfuzzer"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "libfuzzer"
+        },
+        {
+          "file": "reports/X3_TOOL_STACK_PROOF_REPORT.md",
+          "mtime": 1790226334,
+          "term": "cargo-fuzz"
+        },
+        {
+          "file": "reports/TOOL_RUN_SUMMARY.md",
+          "mtime": 1790226334,
+          "term": "cargo-fuzz"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "cargo-fuzz",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -135,7 +178,7 @@
       "evidence_strengths": [
         "prose"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "fuzzing",
       "fuzz_crates_present": true,
@@ -145,11 +188,12 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": true,
       "repeatable": "not_determinable",
       "status": "REFERENCE_ONLY",
       "tool": "afl++",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -174,7 +218,7 @@
         "prose",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "fuzzing",
       "fuzz_crates_present": true,
@@ -184,11 +228,12 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "WIRED",
       "tool": "honggfuzz",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -275,7 +320,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "property",
       "fuzz_crates_present": null,
@@ -293,11 +338,53 @@
       "installed_path": "Cargo.lock",
       "kind": "crate",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/guardian-wire1-20260930T180545Z.md",
+          "mtime": 1790791603,
+          "term": "proptest"
+        },
+        {
+          "file": ".ai/reports/x3lang-phase-audit-20260918.md",
+          "mtime": 1790092964,
+          "term": "proptest"
+        },
+        {
+          "file": ".ai/reports/x3lang-round29-20260918.md",
+          "mtime": 1790092964,
+          "term": "proptest"
+        },
+        {
+          "file": ".ai/runlogs/runtime-variant-20260926T115911Z-full.log",
+          "mtime": 1790423953,
+          "term": "proptest"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T013033Z-test-atomic-kernel.log",
+          "mtime": 1790386379,
+          "term": "proptest"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-test-settlement-engine.log",
+          "mtime": 1790262301,
+          "term": "proptest"
+        },
+        {
+          "file": ".ai/runlogs/runtime-variant-20260926T082916Z-testnet.log",
+          "mtime": 1790411371,
+          "term": "proptest"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260928T065536Z-test-atomic-kernel.log",
+          "mtime": 1790579112,
+          "term": "proptest"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "proptest",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -306,7 +393,7 @@
       "configured": false,
       "evidence": [],
       "evidence_strengths": [],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "property",
       "fuzz_crates_present": null,
@@ -316,11 +403,12 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 1,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "MISSING",
       "tool": "proptest-state-machine",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -405,7 +493,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "correctness",
       "fuzz_crates_present": null,
@@ -420,11 +508,53 @@
       "installed_path": "/home/lojak/.cargo/bin/cargo-miri",
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/local-ci-20260926T013033Z-test-atomic-kernel.log",
+          "mtime": 1790386379,
+          "term": "miri"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260928T065536Z-test-atomic-kernel.log",
+          "mtime": 1790579112,
+          "term": "miri"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T133558Z-test-atomic-kernel.log",
+          "mtime": 1790343470,
+          "term": "miri"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T022135Z-test-atomic-kernel.log",
+          "mtime": 1790389509,
+          "term": "miri"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T221049Z-test-atomic-kernel.log",
+          "mtime": 1790374500,
+          "term": "miri"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T144946Z-test-atomic-kernel.log",
+          "mtime": 1790347970,
+          "term": "miri"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T021137Z-test-atomic-kernel.log",
+          "mtime": 1790388937,
+          "term": "miri"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T084157Z-test-atomic-kernel.log",
+          "mtime": 1790325841,
+          "term": "miri"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "miri",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -509,7 +639,7 @@
         "dependency",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "concurrency",
       "fuzz_crates_present": null,
@@ -530,11 +660,53 @@
       "installed_path": "Cargo.lock",
       "kind": "crate",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/x3lang-round53-20260919.md",
+          "mtime": 1790092964,
+          "term": "loom"
+        },
+        {
+          "file": ".ai/reports/gate-census-20260925.md",
+          "mtime": 1790369590,
+          "term": "loom"
+        },
+        {
+          "file": ".ai/reports/packet-and-bridge-decoders-20260925.md",
+          "mtime": 1790369928,
+          "term": "loom"
+        },
+        {
+          "file": ".ai/reports/dependabot-triage-20260925.md",
+          "mtime": 1790358301,
+          "term": "loom"
+        },
+        {
+          "file": ".ai/reports/x3lang-tickets-20260918.md",
+          "mtime": 1790315120,
+          "term": "loom"
+        },
+        {
+          "file": ".ai/reports/full-branch-reconciliation-20260922.md",
+          "mtime": 1790092964,
+          "term": "loom"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T132444Z-test-x3-asset-registry.log",
+          "mtime": 1790342808,
+          "term": "loom"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T004849Z-test-x3-dex.log",
+          "mtime": 1790384005,
+          "term": "loom"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "loom",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -620,7 +792,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "concurrency",
       "fuzz_crates_present": null,
@@ -637,11 +809,53 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/local-ci-20260925T121812Z-test-workspace.log",
+          "mtime": 1790339324,
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/report-source.json",
+          "mtime": 1790226333,
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/source.md",
+          "mtime": 1790226333,
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/component-map.json",
+          "mtime": 1790226333,
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/api-inventory.txt",
+          "mtime": 1790226333,
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "shuttle"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/tests-inventory.txt",
+          "mtime": 1790226333,
+          "term": "shuttle"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "shuttle",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -727,7 +941,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "formal",
       "fuzz_crates_present": null,
@@ -746,11 +960,53 @@
       "installed_path": "/home/lojak/.cargo/bin/kani",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "kani"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "kani"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "mtime": 1788656218,
+          "term": "kani"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "mtime": 1788670384,
+          "term": "kani"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T015707-933420ee/summary.json",
+          "mtime": 1788659828,
+          "term": "kani"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T193358-6c1c2848/summary.json",
+          "mtime": 1788723238,
+          "term": "kani"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T043039-2d3520fd/summary.json",
+          "mtime": 1788669039,
+          "term": "kani"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T195410-e7c263e5/summary.json",
+          "mtime": 1788724450,
+          "term": "kani"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "kani",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -835,7 +1091,7 @@
         "prose",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "mutation",
       "fuzz_crates_present": null,
@@ -855,11 +1111,23 @@
       "installed_path": "/home/lojak/.cargo/bin/cargo-mutants",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": "reports/X3_TOOL_STACK_PROOF_REPORT.md",
+          "mtime": 1790226334,
+          "term": "cargo-mutants"
+        },
+        {
+          "file": "reports/TOOL_RUN_SUMMARY.md",
+          "mtime": 1790226334,
+          "term": "cargo-mutants"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "cargo-mutants",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -947,7 +1215,7 @@
         "source",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "multi-validator",
       "fuzz_crates_present": null,
@@ -967,11 +1235,53 @@
       "installed_path": "/home/lojak/.nvm/versions/node/v22.23.2/bin/zombienet",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/archival-branch-inventory-20260922.md",
+          "mtime": 1790092964,
+          "term": "zombienet"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/fbd4613b/COMPLETION_REPORT.md",
+          "mtime": 1790226333,
+          "term": "zombienet"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/fbd4613b/executive-summary.md",
+          "mtime": 1790226333,
+          "term": "zombienet"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/fbd4613b/README.md",
+          "mtime": 1790226333,
+          "term": "zombienet"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/report-source.json",
+          "mtime": 1790226333,
+          "term": "zombienet"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/source.md",
+          "mtime": 1790226333,
+          "term": "zombienet"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "zombienet"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "zombienet"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "zombienet",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1058,7 +1368,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "runtime-testing",
       "fuzz_crates_present": null,
@@ -1076,11 +1386,53 @@
       "installed_path": "/home/lojak/.nvm/versions/node/v22.23.2/bin/chopsticks",
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "chopsticks"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "chopsticks"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "chopsticks"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "mtime": 1788656218,
+          "term": "chopsticks"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "mtime": 1788670384,
+          "term": "chopsticks"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T015707-933420ee/summary.json",
+          "mtime": 1788659828,
+          "term": "chopsticks"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T193358-6c1c2848/summary.json",
+          "mtime": 1788723238,
+          "term": "chopsticks"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T043039-2d3520fd/summary.json",
+          "mtime": 1788669039,
+          "term": "chopsticks"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "chopsticks",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1166,7 +1518,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "runtime-testing",
       "fuzz_crates_present": null,
@@ -1187,11 +1539,53 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/guardian-wire1-20260930T180545Z.md",
+          "mtime": 1790791603,
+          "term": "try-runtime"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260922T083812Z-clippy-workspace.log",
+          "mtime": 1790066530,
+          "term": "try-runtime"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-clippy-workspace.log",
+          "mtime": 1790261573,
+          "term": "try-runtime"
+        },
+        {
+          "file": ".ai/runlogs/master-2c6062687-check.log",
+          "mtime": 1789695282,
+          "term": "try-runtime"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T165147Z-clippy-node-rc1.log",
+          "mtime": 1790355548,
+          "term": "try-runtime"
+        },
+        {
+          "file": ".ai/runlogs/clippy-matrix.log",
+          "mtime": 1789708754,
+          "term": "try-runtime"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T165147Z-clippy-runtime-rc1.log",
+          "mtime": 1790355447,
+          "term": "try-runtime"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T010019Z-test-runtime-frontier.log",
+          "mtime": 1790472160,
+          "term": "try-runtime"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "try-runtime",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1277,7 +1671,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "runtime-testing",
       "fuzz_crates_present": null,
@@ -1298,11 +1692,53 @@
       "installed_path": "Cargo.lock",
       "kind": "crate",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/multi-node-proof-and-runtime-blob-20260925.md",
+          "mtime": 1790373221,
+          "term": "benchmarking"
+        },
+        {
+          "file": ".ai/reports/benchmark-regeneration-20260925.md",
+          "mtime": 1790349252,
+          "term": "benchmarking"
+        },
+        {
+          "file": ".ai/reports/archival-branch-inventory-20260922.md",
+          "mtime": 1790092964,
+          "term": "frame-benchmarking"
+        },
+        {
+          "file": ".ai/reports/btc-spv-trust-root-20260922.md",
+          "mtime": 1790220824,
+          "term": "benchmarking"
+        },
+        {
+          "file": ".ai/reports/branch-consolidation-20260920.md",
+          "mtime": 1790092964,
+          "term": "frame-benchmarking"
+        },
+        {
+          "file": ".ai/reports/full-branch-reconciliation-20260922.md",
+          "mtime": 1790092964,
+          "term": "frame-benchmarking"
+        },
+        {
+          "file": ".ai/reports/master-consolidation-20260923.md",
+          "mtime": 1790228474,
+          "term": "frame-benchmarking"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-clippy-workspace.log",
+          "mtime": 1790261573,
+          "term": "frame-benchmarking"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "frame-benchmarking",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1387,7 +1823,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "reproducibility",
       "fuzz_crates_present": null,
@@ -1410,11 +1846,53 @@
       "installed_path": "/home/lojak/.local/bin/srtool",
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/integrated-blockers-20260924.md",
+          "mtime": 1790351682,
+          "term": "srtool"
+        },
+        {
+          "file": ".ai/reports/evm-svm-payload-convention-20260926.md",
+          "mtime": 1790397071,
+          "term": "srtool"
+        },
+        {
+          "file": ".ai/reports/gateway-withdrawal-id-20260922.md",
+          "mtime": 1790092964,
+          "term": "srtool"
+        },
+        {
+          "file": ".ai/reports/mainnet-release-gate-20260922.md",
+          "mtime": 1790092964,
+          "term": "srtool"
+        },
+        {
+          "file": ".ai/reports/btc-pow-wire-header-20260922.md",
+          "mtime": 1790092964,
+          "term": "srtool"
+        },
+        {
+          "file": ".ai/reports/full-branch-reconciliation-20260922.md",
+          "mtime": 1790092964,
+          "term": "srtool"
+        },
+        {
+          "file": ".ai/reports/mainnet-release-gate-229d08caa.md",
+          "mtime": 1790092964,
+          "term": "srtool"
+        },
+        {
+          "file": ".ai/reports/tmp-not-durable-20260923.md",
+          "mtime": 1790220824,
+          "term": "srtool"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "srtool",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1500,7 +1978,7 @@
         "prose",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "reproducibility",
       "fuzz_crates_present": null,
@@ -1515,11 +1993,53 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "mtime": 1788656218,
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "mtime": 1788670384,
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T015707-933420ee/summary.json",
+          "mtime": 1788659828,
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T193358-6c1c2848/summary.json",
+          "mtime": 1788723238,
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T043039-2d3520fd/summary.json",
+          "mtime": 1788669039,
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T195410-e7c263e5/summary.json",
+          "mtime": 1788724450,
+          "term": "subwasm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T041020-aa871a1a/summary.json",
+          "mtime": 1788667820,
+          "term": "subwasm"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "subwasm",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1605,7 +2125,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "evm",
       "fuzz_crates_present": null,
@@ -1625,11 +2145,53 @@
       "installed_path": "/home/lojak/.foundry/bin/forge",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/x3lang-round51-20260919.md",
+          "mtime": 1790092964,
+          "term": "foundry"
+        },
+        {
+          "file": ".ai/reports/foundry-real-evm-deploy-20260921.md",
+          "mtime": 1790092964,
+          "term": "foundry"
+        },
+        {
+          "file": ".ai/reports/integrated-blockers-20260924.md",
+          "mtime": 1790351682,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/matrix-tests-exist-gate-20260926.md",
+          "mtime": 1790386582,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/x3lang-round70-20260919.md",
+          "mtime": 1790092964,
+          "term": "cast "
+        },
+        {
+          "file": ".ai/reports/x3lang-round49-20260919.md",
+          "mtime": 1790092964,
+          "term": "foundry"
+        },
+        {
+          "file": ".ai/reports/atomic-audit-addendum-20260922.md",
+          "mtime": 1790093580,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/evm-receipt-proofs-20260921.md",
+          "mtime": 1790092964,
+          "term": "anvil"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "foundry",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1714,7 +2276,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "evm",
       "fuzz_crates_present": null,
@@ -1737,11 +2299,53 @@
       "installed_path": "/home/lojak/.foundry/bin/anvil",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/foundry-real-evm-deploy-20260921.md",
+          "mtime": 1790092964,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/integrated-blockers-20260924.md",
+          "mtime": 1790351682,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/matrix-tests-exist-gate-20260926.md",
+          "mtime": 1790386582,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/atomic-audit-addendum-20260922.md",
+          "mtime": 1790093580,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/evm-receipt-proofs-20260921.md",
+          "mtime": 1790092964,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/cross-domain-live-verification-20260926.md",
+          "mtime": 1790385905,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/evm-rlp-non-minimal-signature-20260922.md",
+          "mtime": 1790092964,
+          "term": "anvil"
+        },
+        {
+          "file": ".ai/reports/branch-consolidation-20260920.md",
+          "mtime": 1790092964,
+          "term": "anvil"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "anvil",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1827,7 +2431,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "evm-static",
       "fuzz_crates_present": null,
@@ -1843,11 +2447,53 @@
       "installed_path": "/home/lojak/.local/bin/slither",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/local-ci-20260925T023344Z-agent-guards.log",
+          "mtime": 1790303876,
+          "term": "slither"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "slither"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "slither"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "slither"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/tests-inventory.txt",
+          "mtime": 1790226333,
+          "term": "slither"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/verification/source-change-detected.json",
+          "mtime": 1790226333,
+          "term": "slither"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/verification/implementation-verification.json",
+          "mtime": 1790226333,
+          "term": "slither"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "mtime": 1788656218,
+          "term": "slither"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "slither",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -1932,7 +2578,7 @@
         "prose",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "evm-fuzz",
       "fuzz_crates_present": null,
@@ -1946,11 +2592,53 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/x3vm-evm-live-gate.log",
+          "mtime": 1789700334,
+          "term": "echidna"
+        },
+        {
+          "file": ".ai/runlogs/x3vm-evm-live-gate2.log",
+          "mtime": 1789700628,
+          "term": "echidna"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/contracts-inventory.txt",
+          "mtime": 1790226333,
+          "term": "echidna"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "echidna"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "echidna"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "echidna"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/tests-inventory.txt",
+          "mtime": 1790226333,
+          "term": "echidna"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/verification/source-change-detected.json",
+          "mtime": 1790226333,
+          "term": "echidna"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "echidna",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2034,7 +2722,7 @@
       "evidence_strengths": [
         "prose"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "evm-fuzz",
       "fuzz_crates_present": null,
@@ -2044,11 +2732,53 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/tests-inventory.txt",
+          "mtime": 1790226333,
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/verification/source-change-detected.json",
+          "mtime": 1790226333,
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/verification/implementation-verification.json",
+          "mtime": 1790226333,
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "mtime": 1788656218,
+          "term": "medusa"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "mtime": 1788670384,
+          "term": "medusa"
+        }
+      ],
       "referenced_only": true,
       "repeatable": "not_determinable",
-      "status": "REFERENCE_ONLY",
+      "status": "EVIDENCED",
       "tool": "medusa",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -2066,7 +2796,7 @@
       "evidence_strengths": [
         "prose"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "evm-symbolic",
       "fuzz_crates_present": null,
@@ -2076,11 +2806,12 @@
       "installed_path": "/home/lojak/.local/bin/halmos",
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "INSTALLED_ONLY",
       "tool": "halmos",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -2105,7 +2836,7 @@
         "prose",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "evm-symbolic",
       "fuzz_crates_present": null,
@@ -2115,11 +2846,18 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/local-ci-20260925T023344Z-agent-guards.log",
+          "mtime": 1790303876,
+          "term": "mythril"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
-      "status": "WIRED",
+      "status": "EVIDENCED",
       "tool": "mythril",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2193,7 +2931,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "evm-oracle",
       "fuzz_crates_present": null,
@@ -2205,11 +2943,23 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/evm-svm-payload-convention-20260926.md",
+          "mtime": 1790397071,
+          "term": "revm"
+        },
+        {
+          "file": ".ai/reports/runtime-native-adapters-packet-guard-20260926.md",
+          "mtime": 1790394692,
+          "term": "revm"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "revm",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2293,7 +3043,7 @@
       "evidence_strengths": [
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "evm-reference",
       "fuzz_crates_present": null,
@@ -2303,11 +3053,18 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 3,
+      "recorded_runs": [
+        {
+          "file": ".ai/memory/agent-memory.md",
+          "mtime": 1790717633,
+          "term": "reth"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
-      "status": "WIRED",
+      "status": "EVIDENCED",
       "tool": "reth",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2337,7 +3094,7 @@
       "evidence_strengths": [
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "svm",
       "fuzz_crates_present": null,
@@ -2351,11 +3108,23 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": "reports/TOOL_RUN_SUMMARY.md",
+          "mtime": 1790226334,
+          "term": "litesvm"
+        },
+        {
+          "file": "reports/integration-source-audit/atlas-sphere-clean.missing.txt",
+          "mtime": 1790226334,
+          "term": "litesvm"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "litesvm",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2364,7 +3133,7 @@
       "configured": false,
       "evidence": [],
       "evidence_strengths": [],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "svm",
       "fuzz_crates_present": null,
@@ -2374,11 +3143,12 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 1,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "MISSING",
       "tool": "mollusk",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -2421,7 +3191,7 @@
         "prose",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "svm-fuzz",
       "fuzz_crates_present": null,
@@ -2431,11 +3201,12 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "WIRED",
       "tool": "trident",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2451,7 +3222,7 @@
         },
         {
           "file": "scripts/local-ci.sh",
-          "line": 826,
+          "line": 835,
           "strength": "script",
           "term": "solana-test-validator"
         },
@@ -2523,7 +3294,7 @@
         "source",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "svm",
       "fuzz_crates_present": null,
@@ -2539,11 +3310,53 @@
       "installed_path": "/home/lojak/.local/share/solana/install/active_release/bin/solana-test-validator",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/atomic-audit-addendum-20260922.md",
+          "mtime": 1790093580,
+          "term": "solana-test-validator"
+        },
+        {
+          "file": ".ai/reports/cross-domain-live-verification-20260926.md",
+          "mtime": 1790385905,
+          "term": "solana-test-validator"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T082454Z-test-node.log",
+          "mtime": 1790498057,
+          "term": "solana-test-validator"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T160828Z-test-node.log",
+          "mtime": 1790266394,
+          "term": "solana-test-validator"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T084157Z-svm-contract-lifecycle.log",
+          "mtime": 1790326159,
+          "term": "solana-test-validator"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T113308Z-svm-contract-lifecycle.log",
+          "mtime": 1790336546,
+          "term": "solana-test-validator"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T045010Z-svm-contract-lifecycle.log",
+          "mtime": 1790312292,
+          "term": "solana-test-validator"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T032636Z-test-node.log",
+          "mtime": 1790307038,
+          "term": "solana-test-validator"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "solana-test-validator",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2592,7 +3405,7 @@
         "prose",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "chaos",
       "fuzz_crates_present": null,
@@ -2607,11 +3420,18 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": "reports/TOOL_RUN_SUMMARY.md",
+          "mtime": 1790226334,
+          "term": "toxiproxy"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "toxiproxy",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2680,7 +3500,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "chaos",
       "fuzz_crates_present": null,
@@ -2693,11 +3513,12 @@
       "installed_path": "/usr/sbin/tc",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "tc/netem",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2706,7 +3527,7 @@
       "configured": false,
       "evidence": [],
       "evidence_strengths": [],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "chaos",
       "fuzz_crates_present": null,
@@ -2716,11 +3537,12 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "MISSING",
       "tool": "pumba",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -2738,7 +3560,7 @@
       "evidence_strengths": [
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "chaos",
       "fuzz_crates_present": null,
@@ -2750,11 +3572,12 @@
       "installed_path": null,
       "kind": "reference",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "chaos-mesh",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2839,7 +3662,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "load",
       "fuzz_crates_present": null,
@@ -2861,11 +3684,53 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/local-ci-20260925T113308Z-svm-contract-lifecycle.log",
+          "mtime": 1790336546,
+          "term": "k6"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T041836Z-svm-contract-lifecycle.log",
+          "mtime": 1790310417,
+          "term": "k6"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T114708Z-harden-validator-check.log",
+          "mtime": 1790510071,
+          "term": "k6"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T073056Z-test-x3-lang.log",
+          "mtime": 1790321653,
+          "term": "k6"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T125437Z-svm-htlc-x3_htlc-lifecycle.log",
+          "mtime": 1790513827,
+          "term": "k6"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T134600Z-fake-code-scan.log",
+          "mtime": 1790516774,
+          "term": "k6"
+        },
+        {
+          "file": ".ai/runlogs/x3lang-guard-direction-tests.log",
+          "mtime": 1789791002,
+          "term": "k6"
+        },
+        {
+          "file": ".ai/runlogs/x3lang-wire2.log",
+          "mtime": 1789757486,
+          "term": "k6"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "k6",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -2949,7 +3814,7 @@
       "evidence_strengths": [
         "prose"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "load",
       "fuzz_crates_present": null,
@@ -2959,11 +3824,12 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": true,
       "repeatable": "not_determinable",
       "status": "REFERENCE_ONLY",
       "tool": "wrk2",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -3048,7 +3914,7 @@
         "prose",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "static",
       "fuzz_crates_present": null,
@@ -3061,11 +3927,53 @@
       "installed_path": "/home/lojak/.local/bin/semgrep",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/master-verification-20260918.md",
+          "mtime": 1790092964,
+          "term": "semgrep"
+        },
+        {
+          "file": "audit-artifacts/current/feature-status.json",
+          "mtime": 1790791687,
+          "term": "semgrep"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/fbd4613b/executive-summary.md",
+          "mtime": 1790226333,
+          "term": "semgrep"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "semgrep"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "semgrep"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "semgrep"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/tests-inventory.txt",
+          "mtime": 1790226333,
+          "term": "semgrep"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/workflows-inventory.txt",
+          "mtime": 1790226333,
+          "term": "semgrep"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "semgrep",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3151,7 +4059,7 @@
         "source",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "static",
       "fuzz_crates_present": null,
@@ -3168,11 +4076,53 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/master-verification-20260918.md",
+          "mtime": 1790092964,
+          "term": "codeql"
+        },
+        {
+          "file": "audit-artifacts/current/feature-status.json",
+          "mtime": 1790791687,
+          "term": "codeql"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/fbd4613b/executive-summary.md",
+          "mtime": 1790226333,
+          "term": "codeql"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "codeql"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "codeql"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "codeql"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/workflows-inventory.txt",
+          "mtime": 1790226333,
+          "term": "codeql"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/fbd4613b/findings/findings.json",
+          "mtime": 1790226333,
+          "term": "codeql"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "codeql",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3259,7 +4209,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "supply-chain",
       "fuzz_crates_present": null,
@@ -3282,11 +4232,53 @@
       "installed_path": "/home/lojak/.local/bin/cargo-audit",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/dependabot-triage-20260925.md",
+          "mtime": 1790358301,
+          "term": "cargo-audit"
+        },
+        {
+          "file": ".ai/reports/dependency-deny-20260925.md",
+          "mtime": 1790359583,
+          "term": "cargo-audit"
+        },
+        {
+          "file": ".ai/reports/dependency-audit-20260925.md",
+          "mtime": 1790358301,
+          "term": "cargo-audit"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T181223Z-dependency-audit.log",
+          "mtime": 1790359954,
+          "term": "cargo audit"
+        },
+        {
+          "file": ".ai/runlogs/full-default-gates.log",
+          "mtime": 1790499820,
+          "term": "cargo-audit"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T191747Z-dependency-audit.log",
+          "mtime": 1790363897,
+          "term": "cargo audit"
+        },
+        {
+          "file": ".ai/runlogs/full-gates-morning.log",
+          "mtime": 1790504916,
+          "term": "cargo-audit"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T134600Z-dependency-audit.log",
+          "mtime": 1790516868,
+          "term": "cargo audit"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "cargo-audit",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3373,7 +4365,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "supply-chain",
       "fuzz_crates_present": null,
@@ -3396,11 +4388,53 @@
       "installed_path": "/home/lojak/.local/bin/cargo-deny",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/dependabot-triage-20260925.md",
+          "mtime": 1790358301,
+          "term": "cargo-deny"
+        },
+        {
+          "file": ".ai/reports/dependency-deny-20260925.md",
+          "mtime": 1790359583,
+          "term": "cargo-deny"
+        },
+        {
+          "file": ".ai/reports/dependency-audit-20260925.md",
+          "mtime": 1790358301,
+          "term": "cargo-deny"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T181223Z-dependency-audit.log",
+          "mtime": 1790359954,
+          "term": "cargo deny"
+        },
+        {
+          "file": ".ai/runlogs/full-default-gates.log",
+          "mtime": 1790499820,
+          "term": "cargo-deny"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T191747Z-dependency-audit.log",
+          "mtime": 1790363897,
+          "term": "cargo deny"
+        },
+        {
+          "file": ".ai/runlogs/full-gates-morning.log",
+          "mtime": 1790504916,
+          "term": "cargo-deny"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T134600Z-dependency-audit.log",
+          "mtime": 1790516868,
+          "term": "cargo deny"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "cargo-deny",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3485,7 +4519,7 @@
         "prose",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "supply-chain",
       "fuzz_crates_present": null,
@@ -3497,11 +4531,53 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/master-verification-20260918.md",
+          "mtime": 1790092964,
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/workflows-inventory.txt",
+          "mtime": 1790226333,
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/fbd4613b/findings/findings.json",
+          "mtime": 1790226333,
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "mtime": 1788656218,
+          "term": "osv-scan"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "mtime": 1788670384,
+          "term": "osv-scan"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "osv-scanner",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3541,7 +4617,7 @@
         },
         {
           "file": "audit-artifacts/current/feature-status.json",
-          "line": 4792,
+          "line": 4793,
           "strength": "prose",
           "term": "trivy"
         },
@@ -3586,7 +4662,7 @@
         "prose",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "supply-chain",
       "fuzz_crates_present": null,
@@ -3598,11 +4674,53 @@
       "installed_path": "/home/lojak/.local/bin/trivy",
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/master-verification-20260918.md",
+          "mtime": 1790092964,
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/current/feature-status.json",
+          "mtime": 1790791687,
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/configuration-inventory.txt",
+          "mtime": 1790226333,
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/source-hashes.json",
+          "mtime": 1790226333,
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/inventory.json",
+          "mtime": 1790226333,
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/evidence/workflows-inventory.txt",
+          "mtime": 1790226333,
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "mtime": 1788656218,
+          "term": "trivy"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "mtime": 1788670384,
+          "term": "trivy"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "trivy",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3611,7 +4729,7 @@
       "configured": false,
       "evidence": [],
       "evidence_strengths": [],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "sbom",
       "fuzz_crates_present": null,
@@ -3621,11 +4739,12 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "MISSING",
       "tool": "syft",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -3643,7 +4762,7 @@
       "evidence_strengths": [
         "prose"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "sbom",
       "fuzz_crates_present": null,
@@ -3653,11 +4772,12 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": true,
       "repeatable": "not_determinable",
       "status": "REFERENCE_ONLY",
       "tool": "grype",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -3666,7 +4786,7 @@
       "configured": false,
       "evidence": [],
       "evidence_strengths": [],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "secrets",
       "fuzz_crates_present": null,
@@ -3676,11 +4796,18 @@
       "installed_path": "/home/lojak/.local/bin/gitleaks",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": "reports/integration-source-audit/atlas-sphere-clean.missing.txt",
+          "mtime": 1790226334,
+          "term": "gitleaks"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
-      "status": "INSTALLED_ONLY",
+      "status": "EVIDENCED",
       "tool": "gitleaks",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -3723,7 +4850,7 @@
         "prose",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "secrets",
       "fuzz_crates_present": null,
@@ -3735,11 +4862,18 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-fbd4613b/findings.json",
+          "mtime": 1790226333,
+          "term": "trufflehog"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "trufflehog",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3824,7 +4958,7 @@
         "dependency",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "observability",
       "fuzz_crates_present": null,
@@ -3845,11 +4979,53 @@
       "installed_path": "/home/linuxbrew/.linuxbrew/bin/prometheus",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/integrated-blockers-20260924.md",
+          "mtime": 1790351682,
+          "term": "prometheus"
+        },
+        {
+          "file": ".ai/reports/local3-bootnode-and-metrics-20260925.md",
+          "mtime": 1790377815,
+          "term": "prometheus"
+        },
+        {
+          "file": ".ai/reports/master-consolidation-20260923.md",
+          "mtime": 1790228474,
+          "term": "prometheus"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T131831Z-nested-workspaces.log",
+          "mtime": 1790342587,
+          "term": "prometheus"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T125004Z-nested-workspaces.log",
+          "mtime": 1790340960,
+          "term": "prometheus"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-test-settlement-engine.log",
+          "mtime": 1790262301,
+          "term": "prometheus"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T023736Z-test-x3-sidecar.log",
+          "mtime": 1790390676,
+          "term": "prometheus"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260922T083812Z-clippy-workspace.log",
+          "mtime": 1790066530,
+          "term": "prometheus"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "prometheus",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3933,7 +5109,7 @@
       "evidence_strengths": [
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "observability",
       "fuzz_crates_present": null,
@@ -3956,11 +5132,53 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/local-ci-20260927T100129Z-observability-across-seven-validators.log",
+          "mtime": 1790503429,
+          "term": "grafana"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T163949Z-observability-across-seven-validators.log",
+          "mtime": 1790440842,
+          "term": "grafana"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T160102Z-observability-across-seven-validators.log",
+          "mtime": 1790438513,
+          "term": "grafana"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T163724Z-observability-across-seven-validators.log",
+          "mtime": 1790440724,
+          "term": "grafana"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T160641Z-observability-across-seven-validators.log",
+          "mtime": 1790438853,
+          "term": "grafana"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T163242Z-observability-across-seven-validators.log",
+          "mtime": 1790440443,
+          "term": "grafana"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T180247Z-observability-across-seven-validators.log",
+          "mtime": 1790446718,
+          "term": "grafana"
+        },
+        {
+          "file": ".ai/runlogs/observability-seven-port-preflight-20260926.md",
+          "mtime": 1790440746,
+          "term": "grafana"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "grafana",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -3994,7 +5212,7 @@
         },
         {
           "file": "feature-matrix/operations-user-tools.toml",
-          "line": 267,
+          "line": 268,
           "strength": "prose",
           "term": "loki"
         },
@@ -4006,7 +5224,7 @@
         },
         {
           "file": "audit-artifacts/current/feature-status.json",
-          "line": 3802,
+          "line": 3803,
           "strength": "prose",
           "term": "loki"
         },
@@ -4045,7 +5263,7 @@
         "prose",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "observability",
       "fuzz_crates_present": null,
@@ -4055,11 +5273,33 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": "audit-artifacts/current/feature-status.json",
+          "mtime": 1790791687,
+          "term": "loki"
+        },
+        {
+          "file": "reports/integration-source-audit/atlas-sphere-clean.missing.txt",
+          "mtime": 1790226334,
+          "term": "loki"
+        },
+        {
+          "file": "reports/feature-matrix/X3_FEATURE_MATRIX.md",
+          "mtime": 1790516934,
+          "term": "loki"
+        },
+        {
+          "file": "reports/feature-matrix/X3_FEATURE_MATRIX.json",
+          "mtime": 1790516934,
+          "term": "loki"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
-      "status": "WIRED",
+      "status": "EVIDENCED",
       "tool": "loki",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4144,7 +5384,7 @@
         "dependency",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "observability",
       "fuzz_crates_present": null,
@@ -4154,11 +5394,53 @@
       "installed_path": "Cargo.lock",
       "kind": "crate",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/x3lang-benchmarks-20260919.md",
+          "mtime": 1790092964,
+          "term": "otel"
+        },
+        {
+          "file": ".ai/reports/repo-consolidation-20260917_ledger.md",
+          "mtime": 1790092964,
+          "term": "otel"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T132901Z-test-svm-counter.log",
+          "mtime": 1790515879,
+          "term": "opentelemetry"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T180247Z-test-x3-svm-integration.log",
+          "mtime": 1790446354,
+          "term": "opentelemetry"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-clippy-workspace.log",
+          "mtime": 1790261573,
+          "term": "opentelemetry"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T140852Z-test-x3-svm-integration.log",
+          "mtime": 1790518699,
+          "term": "opentelemetry"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260928T061336Z-test-svm-counter.log",
+          "mtime": 1790577453,
+          "term": "opentelemetry"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T134600Z-test-svm-counter.log",
+          "mtime": 1790518024,
+          "term": "opentelemetry"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
-      "status": "WIRED",
+      "status": "EVIDENCED",
       "tool": "opentelemetry",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4242,7 +5524,7 @@
       "evidence_strengths": [
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "observability",
       "fuzz_crates_present": null,
@@ -4265,11 +5547,53 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/x3lang-super-prompt-source.txt",
+          "mtime": 1790092964,
+          "term": "tempo"
+        },
+        {
+          "file": ".ai/reports/evm-svm-payload-convention-20260926.md",
+          "mtime": 1790397071,
+          "term": "tempo"
+        },
+        {
+          "file": ".ai/reports/x3lang-round64-20260919.md",
+          "mtime": 1790092964,
+          "term": "tempo"
+        },
+        {
+          "file": ".ai/reports/x3vm-live-restart-and-replay-20260925.md",
+          "mtime": 1790379917,
+          "term": "tempo"
+        },
+        {
+          "file": ".ai/reports/push-merge-20260918.md",
+          "mtime": 1790092964,
+          "term": "tempo"
+        },
+        {
+          "file": ".ai/reports/evm-payload-never-executed-20260926.md",
+          "mtime": 1790390246,
+          "term": "tempo"
+        },
+        {
+          "file": ".ai/reports/x3lang-tickets-20260918.md",
+          "mtime": 1790315120,
+          "term": "tempo"
+        },
+        {
+          "file": ".ai/reports/x3lang-round59-20260919.md",
+          "mtime": 1790092964,
+          "term": "tempo"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "tempo",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4354,7 +5678,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "infrastructure",
       "fuzz_crates_present": null,
@@ -4377,11 +5701,53 @@
       "installed_path": "/usr/bin/docker",
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/round2-partition-20260926.md",
+          "mtime": 1790424054,
+          "term": "docker"
+        },
+        {
+          "file": ".ai/reports/multi-node-proof-and-runtime-blob-20260925.md",
+          "mtime": 1790373221,
+          "term": "docker"
+        },
+        {
+          "file": ".ai/reports/integrated-blockers-20260924.md",
+          "mtime": 1790351682,
+          "term": "docker"
+        },
+        {
+          "file": ".ai/reports/mainnet-release-gate-20260922.md",
+          "mtime": 1790092964,
+          "term": "docker"
+        },
+        {
+          "file": ".ai/reports/branch-consolidation-20260920.md",
+          "mtime": 1790092964,
+          "term": "docker"
+        },
+        {
+          "file": ".ai/reports/mainnet-release-gate-229d08caa.md",
+          "mtime": 1790092964,
+          "term": "docker"
+        },
+        {
+          "file": ".ai/reports/runtime-hash-reattestation-20260926.md",
+          "mtime": 1790395783,
+          "term": "docker"
+        },
+        {
+          "file": ".ai/runlogs/full-default-gates.log",
+          "mtime": 1790499820,
+          "term": "docker"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "docker",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4399,7 +5765,7 @@
       "evidence_strengths": [
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "infrastructure",
       "fuzz_crates_present": null,
@@ -4411,11 +5777,12 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "podman",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4501,7 +5868,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "infrastructure",
       "fuzz_crates_present": null,
@@ -4515,11 +5882,53 @@
       "installed_path": "/home/lojak/.local/bin/kubectl",
       "kind": "binary",
       "priority_group": 3,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/archival-branch-inventory-20260922.md",
+          "mtime": 1790092964,
+          "term": "helm"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/2026-09-05-fbd4613b/findings.json",
+          "mtime": 1790226333,
+          "term": "kubernetes"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T005658-9e023292/summary.json",
+          "mtime": 1788656218,
+          "term": "kubernetes"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T045304-b9bb8929/summary.json",
+          "mtime": 1788670384,
+          "term": "kubernetes"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T015707-933420ee/summary.json",
+          "mtime": 1788659828,
+          "term": "kubernetes"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T193358-6c1c2848/summary.json",
+          "mtime": 1788723238,
+          "term": "kubernetes"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T043039-2d3520fd/summary.json",
+          "mtime": 1788669039,
+          "term": "kubernetes"
+        },
+        {
+          "file": "audit-artifacts/mainnet-readiness/live/snapshots/20260906T195410-e7c263e5/summary.json",
+          "mtime": 1788724450,
+          "term": "kubernetes"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "kubernetes",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4537,7 +5946,7 @@
       "evidence_strengths": [
         "prose"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "infrastructure",
       "fuzz_crates_present": null,
@@ -4547,11 +5956,12 @@
       "installed_path": "/home/lojak/.local/bin/ansible",
       "kind": "binary",
       "priority_group": 1,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "INSTALLED_ONLY",
       "tool": "ansible",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -4636,7 +6046,7 @@
         "dependency",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "networking",
       "fuzz_crates_present": null,
@@ -4657,11 +6067,53 @@
       "installed_path": "Cargo.lock",
       "kind": "crate",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/round2-partition-20260926.md",
+          "mtime": 1790424054,
+          "term": "libp2p"
+        },
+        {
+          "file": ".ai/reports/fuzz-suite-20260925.md",
+          "mtime": 1790371216,
+          "term": "libp2p"
+        },
+        {
+          "file": ".ai/reports/multi-node-proof-and-runtime-blob-20260925.md",
+          "mtime": 1790373221,
+          "term": "libp2p"
+        },
+        {
+          "file": ".ai/reports/multi-validator-launcher-20260922.md",
+          "mtime": 1790092964,
+          "term": "libp2p"
+        },
+        {
+          "file": ".ai/reports/live-seven-validator-testnet-20260922.md",
+          "mtime": 1790092964,
+          "term": "libp2p"
+        },
+        {
+          "file": ".ai/reports/testnet-ceremony-manifest-20260922.md",
+          "mtime": 1790092964,
+          "term": "libp2p"
+        },
+        {
+          "file": ".ai/reports/local3-bootnode-and-metrics-20260925.md",
+          "mtime": 1790377815,
+          "term": "libp2p"
+        },
+        {
+          "file": ".ai/reports/dependabot-triage-20260925.md",
+          "mtime": 1790358301,
+          "term": "libp2p"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "rust-libp2p",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4670,7 +6122,7 @@
       "configured": false,
       "evidence": [],
       "evidence_strengths": [],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "consensus-reference",
       "fuzz_crates_present": null,
@@ -4680,11 +6132,12 @@
       "installed_path": null,
       "kind": "reference",
       "priority_group": 3,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "MISSING",
       "tool": "malachite",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -4769,7 +6222,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "consensus-reference",
       "fuzz_crates_present": null,
@@ -4782,11 +6235,43 @@
       "installed_path": null,
       "kind": "reference",
       "priority_group": 3,
+      "recorded_runs": [
+        {
+          "file": ".ai/runlogs/local-ci-20260927T122146Z-fake-code-scan.log",
+          "mtime": 1790511708,
+          "term": "tendermint"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T134600Z-fake-code-scan.log",
+          "mtime": 1790516774,
+          "term": "tendermint"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T124332Z-fake-code-scan.log",
+          "mtime": 1790513015,
+          "term": "tendermint"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260928T060707Z-fake-code-scan.log",
+          "mtime": 1790575653,
+          "term": "tendermint"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T121812Z-test-workspace.log",
+          "mtime": 1790339324,
+          "term": "tendermint"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T140450Z-fake-code-scan.log",
+          "mtime": 1790517896,
+          "term": "tendermint"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "cometbft",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4820,7 +6305,7 @@
         },
         {
           "file": "scripts/local-ci.sh",
-          "line": 871,
+          "line": 880,
           "strength": "script",
           "term": "hive"
         },
@@ -4872,7 +6357,7 @@
         "script",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "conformance-reference",
       "fuzz_crates_present": null,
@@ -4894,11 +6379,53 @@
       "installed_path": null,
       "kind": "reference",
       "priority_group": 3,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/claims-scanner-surfaces-20260926.md",
+          "mtime": 1790444018,
+          "term": "hive"
+        },
+        {
+          "file": ".ai/reports/integrated-blockers-20260924.md",
+          "mtime": 1790351682,
+          "term": "hive"
+        },
+        {
+          "file": ".ai/reports/x3lang-round92-20260920.md",
+          "mtime": 1790092964,
+          "term": "hive"
+        },
+        {
+          "file": ".ai/reports/push-merge-20260920.md",
+          "mtime": 1790092964,
+          "term": "hive"
+        },
+        {
+          "file": ".ai/reports/provider-endpoint-drill-20260923.md",
+          "mtime": 1790220824,
+          "term": "hive"
+        },
+        {
+          "file": ".ai/reports/x3lang-round72-20260919.md",
+          "mtime": 1790092964,
+          "term": "hive"
+        },
+        {
+          "file": ".ai/reports/x3lang-intent-guards-20260918.md",
+          "mtime": 1790092964,
+          "term": "hive"
+        },
+        {
+          "file": ".ai/reports/branch-consolidation-20260918.md",
+          "mtime": 1790092964,
+          "term": "hive"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "ethereum-hive",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -4985,7 +6512,7 @@
         "source",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "cross-chain-reference",
       "fuzz_crates_present": null,
@@ -5002,11 +6529,53 @@
       "installed_path": null,
       "kind": "reference",
       "priority_group": 3,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/adapter-readiness-claims-all-adapters-20260926.md",
+          "mtime": 1790383715,
+          "term": "ibc"
+        },
+        {
+          "file": ".ai/reports/x3lang-current-green-20260921.md",
+          "mtime": 1790092964,
+          "term": "ibc"
+        },
+        {
+          "file": ".ai/reports/dependency-audit-20260925.md",
+          "mtime": 1790358301,
+          "term": "ibc"
+        },
+        {
+          "file": ".ai/reports/full-branch-reconciliation-20260922.md",
+          "mtime": 1790092964,
+          "term": "ibc"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T132901Z-test-svm-counter.log",
+          "mtime": 1790515879,
+          "term": "ibc"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T003837Z-test-atomic-swap-std.log",
+          "mtime": 1790383329,
+          "term": "ibc"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T055913Z-test-atomic-swap-std.log",
+          "mtime": 1790316142,
+          "term": "ibc"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T233212Z-test-atomic-swap-std.log",
+          "mtime": 1790379351,
+          "term": "ibc"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "hermes",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -5024,7 +6593,7 @@
       "evidence_strengths": [
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "da-reference",
       "fuzz_crates_present": null,
@@ -5034,11 +6603,12 @@
       "installed_path": null,
       "kind": "reference",
       "priority_group": 3,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "WIRED",
       "tool": "narwhal",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -5100,7 +6670,7 @@
         "prose",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "storage",
       "fuzz_crates_present": null,
@@ -5113,11 +6683,53 @@
       "installed_path": "Cargo.lock",
       "kind": "crate",
       "priority_group": 3,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/integrated-blockers-20260924.md",
+          "mtime": 1790351682,
+          "term": "paritydb"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-clippy-workspace.log",
+          "mtime": 1790261573,
+          "term": "parity-db"
+        },
+        {
+          "file": ".ai/runlogs/master-2c6062687-check.log",
+          "mtime": 1789695282,
+          "term": "parity-db"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260920T132623Z-clippy-workspace.log",
+          "mtime": 1789911311,
+          "term": "parity-db"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-test-node.log",
+          "mtime": 1790262590,
+          "term": "parity-db"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260922T091541Z-clippy-node-rc1.log",
+          "mtime": 1790069945,
+          "term": "parity-db"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-clippy-node-rc1.log",
+          "mtime": 1790262041,
+          "term": "parity-db"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260920T132623Z-clippy-node-rc1.log",
+          "mtime": 1789911450,
+          "term": "parity-db"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "paritydb",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -5203,7 +6815,7 @@
         "script",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "storage",
       "fuzz_crates_present": null,
@@ -5219,11 +6831,48 @@
       "installed_path": null,
       "kind": "crate",
       "priority_group": 3,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/integrated-blockers-20260924.md",
+          "mtime": 1790351682,
+          "term": "rocksdb"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T010930Z-snapshot-restore-across-a-live-chain.log",
+          "mtime": 1790471422,
+          "term": "rocksdb"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T180247Z-snapshot-restore-across-a-live-chain.log",
+          "mtime": 1790446805,
+          "term": "rocksdb"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260927T153446Z-snapshot-restore-across-a-live-chain.log",
+          "mtime": 1790523313,
+          "term": "rocksdb"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260926T072141Z-snapshot-restore-across-a-live-chain.log",
+          "mtime": 1790407325,
+          "term": "rocksdb"
+        },
+        {
+          "file": "reports/rc1_live_internal_testnet_report.md",
+          "mtime": 1790226334,
+          "term": "rocksdb"
+        },
+        {
+          "file": "reports/integration-source-audit/x3-chain-master.missing.txt",
+          "mtime": 1790226334,
+          "term": "rocksdb"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "rocksdb",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -5309,7 +6958,7 @@
         "infrastructure",
         "source"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "rpc",
       "fuzz_crates_present": null,
@@ -5319,11 +6968,53 @@
       "installed_path": "Cargo.lock",
       "kind": "crate",
       "priority_group": 1,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/full-branch-reconciliation-20260922.md",
+          "mtime": 1790092964,
+          "term": "jsonrpsee"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-test-settlement-engine.log",
+          "mtime": 1790262301,
+          "term": "jsonrpsee"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T174510Z-test-x3-kernel.log",
+          "mtime": 1790358572,
+          "term": "jsonrpsee"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260924T144509Z-clippy-workspace.log",
+          "mtime": 1790261573,
+          "term": "jsonrpsee"
+        },
+        {
+          "file": ".ai/runlogs/master-2c6062687-check.log",
+          "mtime": 1789695282,
+          "term": "jsonrpsee"
+        },
+        {
+          "file": ".ai/runlogs/clippy-matrix.log",
+          "mtime": 1789708754,
+          "term": "jsonrpsee"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260922T091541Z-test-settlement-engine.log",
+          "mtime": 1790070262,
+          "term": "jsonrpsee"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260920T132623Z-clippy-workspace.log",
+          "mtime": 1789911311,
+          "term": "jsonrpsee"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
-      "status": "WIRED",
+      "status": "EVIDENCED",
       "tool": "jsonrpsee",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -5410,7 +7101,7 @@
         "source",
         "workflow"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "formal",
       "fuzz_crates_present": null,
@@ -5425,11 +7116,28 @@
       "installed_path": null,
       "kind": "binary",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": "audit-artifacts/current/feature-status.json",
+          "mtime": 1790791687,
+          "term": "tla+"
+        },
+        {
+          "file": "reports/final_complete_repo_gaps_report_2026-05-09.md",
+          "mtime": 1790226334,
+          "term": "tla+"
+        },
+        {
+          "file": ".ai/memory/agent-memory.md",
+          "mtime": 1790717633,
+          "term": "tla+"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "tla+/apalache",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     },
     {
@@ -5438,7 +7146,7 @@
       "configured": false,
       "evidence": [],
       "evidence_strengths": [],
-      "evidenced": "not_determinable",
+      "evidenced": false,
       "exercised": "not_determinable",
       "family": "failure-corpus",
       "fuzz_crates_present": null,
@@ -5448,11 +7156,12 @@
       "installed_path": null,
       "kind": "reference",
       "priority_group": 2,
+      "recorded_runs": [],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "MISSING",
       "tool": "defihacklabs",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": false
     },
     {
@@ -5537,7 +7246,7 @@
         "dependency",
         "script"
       ],
-      "evidenced": "not_determinable",
+      "evidenced": true,
       "exercised": "not_determinable",
       "family": "failure-corpus",
       "fuzz_crates_present": null,
@@ -5559,11 +7268,53 @@
       "installed_path": null,
       "kind": "reference",
       "priority_group": 2,
+      "recorded_runs": [
+        {
+          "file": ".ai/reports/round2-integration-20260926.md",
+          "mtime": 1790415353,
+          "term": "cve"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260925T094813Z-svm-contract-lifecycle.log",
+          "mtime": 1790330238,
+          "term": "nvd"
+        },
+        {
+          "file": ".ai/runlogs/local-ci-20260920T132623Z-nested-workspaces.log",
+          "mtime": 1789911771,
+          "term": "cve"
+        },
+        {
+          "file": ".ai/runlogs/rehearsal-genesis-rc1.log",
+          "mtime": 1789720289,
+          "term": "cve"
+        },
+        {
+          "file": ".ai/runlogs/x3-htlc-live-20260927T122723Z/report.txt",
+          "mtime": 1790512173,
+          "term": "cve"
+        },
+        {
+          "file": ".ai/runlogs/sentinel-privileged-origin-20260927T141212Z/sentinel_privileged_origin.json",
+          "mtime": 1790518336,
+          "term": "cve"
+        },
+        {
+          "file": ".ai/runlogs/sentinel-privileged-origin-20260927T141303Z/sentinel_privileged_origin.json",
+          "mtime": 1790518386,
+          "term": "cve"
+        },
+        {
+          "file": ".ai/runlogs/sentinel-privileged-origin-20260927T141333Z/sentinel_privileged_origin.json",
+          "mtime": 1790518418,
+          "term": "cve"
+        }
+      ],
       "referenced_only": false,
       "repeatable": "not_determinable",
       "status": "GATED",
       "tool": "cve-datasets",
-      "why_not_determinable": "a mention proves wiring, not execution. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
+      "why_not_determinable": "a mention proves wiring, not execution, and an artifact proves something ran without proving it succeeded on the commit under review. Establishing these needs a recorded run bound to a commit with its configuration, result and artifacts.",
       "wired": true
     }
   ]
