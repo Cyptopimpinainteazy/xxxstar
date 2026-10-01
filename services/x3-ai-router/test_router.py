@@ -1110,6 +1110,15 @@ class CapabilityProbeTests(unittest.TestCase):
 
         self.assertEqual(ScriptedProvider.requests[0]["thinking"], {"type": "disabled"})
 
+    def test_the_probe_honours_a_provider_token_budget(self):
+        """A thinking model can spend a 64-token budget before it emits the call."""
+        self.genuine_tool_call()
+        provider = dict(self.config["providers"]["up"], tool_probe_max_tokens=512)
+
+        self.router.probe_tools("up", provider)
+
+        self.assertEqual(ScriptedProvider.requests[0]["max_tokens"], 512)
+
     def test_a_genuine_tool_call_keeps_the_provider_for_agent_requests(self):
         self.genuine_tool_call()
         verdict = self.router.probe_tools("up", self.config["providers"]["up"])

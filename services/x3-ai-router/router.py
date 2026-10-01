@@ -51,6 +51,10 @@ HOSTED_TOOL_TYPES = ("web_search", "file_search", "computer_use", "code_interpre
 # string argument and is lifted back out on the way to the client.
 CUSTOM_TOOL_INPUT = "input"
 TOOL_CAPABLE = "supports_tools"
+# A probe that cannot be answered inside its token budget is not evidence of
+# anything. Thinking models can spend an entire small budget before they emit
+# the call, so providers may raise this with `tool_probe_max_tokens`.
+PROBE_MAX_TOKENS = 64
 # Credential shapes scrubbed out of any provider error before it reaches a log
 # line, a client, or the provider-health table.
 SECRET_PATTERNS = (
@@ -520,10 +524,10 @@ def apply_provider_reasoning(payload, provider):
         payload.pop("reasoning_effort", None)
 
 
-def tool_probe_request(model):
+def tool_probe_request(model, max_tokens=PROBE_MAX_TOKENS):
     """A request whose only purpose is to be answered with a tool call."""
     return {
-        "model": model, "stream": False, "max_tokens": 64, "tool_choice": "required",
+        "model": model, "stream": False, "max_tokens": max_tokens, "tool_choice": "required",
         "tools": [{"type": "function", "function": {
             "name": PROBE_TOOL, "description": "Report a capability value.",
             "parameters": {"type": "object", "required": [PROBE_ARGUMENT],
@@ -1631,7 +1635,10 @@ class Router:
             # The probe is a required tool choice, so it has to obey the same
             # provider reasoning rules as a real forced-tool turn: DeepSeek
             # rejects `required` outright while thinking mode is on.
-            probe_body = tool_probe_request(provider["model"])
+            probe_body = tool_probe_request(
+                provider["model"],
+                provider.get("tool_probe_max_tokens",
+                             self.config.get("capability_probe_max_tokens", PROBE_MAX_TOKENS)))
             apply_provider_reasoning(probe_body, provider)
             payload = json.dumps(probe_body).encode()
             for _ in range(samples):

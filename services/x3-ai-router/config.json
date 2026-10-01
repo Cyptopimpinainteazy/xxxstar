@@ -34,7 +34,7 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "ollama"
+                "ollama_qwen3"
             ]
         },
         "x3-fast": {
@@ -50,7 +50,7 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "ollama"
+                "ollama_qwen3"
             ]
         },
         "x3-deep": {
@@ -58,7 +58,7 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "ollama"
+                "ollama_qwen3"
             ]
         },
         "x3-security": {
@@ -73,13 +73,14 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "ollama"
+                "ollama_qwen3"
             ]
         },
         "x3-local": {
             "tier": "routine",
             "order": [
-                "ollama"
+                "ollama",
+                "ollama_qwen3"
             ]
         }
     },
@@ -87,7 +88,7 @@
         "routine": [
             "deepseek_flash",
             "deepseek_pro",
-            "ollama"
+            "ollama_qwen3"
         ],
         "critical": [
             "deepseek_flash",
@@ -95,6 +96,7 @@
         ]
     },
     "budget_fallback": [
+        "ollama_qwen3",
         "ollama",
         "nemotron_lightning_free",
         "nemotron_ultra_free"
@@ -108,6 +110,17 @@
             "tool_probe": true,
             "critical_allowed": true,
             "probe_samples": 2
+        },
+        "ollama_qwen3": {
+            "base_url": "http://127.0.0.1:11434/v1",
+            "protocol": "chat_completions",
+            "model": "qwen3:8b",
+            "supports_tools": true,
+            "tool_probe": true,
+            "tool_probe_max_tokens": 512,
+            "probe_timeout_seconds": 120,
+            "probe_samples": 2,
+            "critical_allowed": false
         },
         "nemotron_lightning_free": {
             "base_url": "https://openrouter.ai/api/v1",
