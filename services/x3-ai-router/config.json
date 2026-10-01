@@ -34,10 +34,7 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "openrouter",
-                "ollama",
-                "nemotron_lightning_free",
-                "direct"
+                "ollama"
             ]
         },
         "x3-fast": {
@@ -45,8 +42,7 @@
             "order": [
                 "ollama",
                 "deepseek_flash",
-                "deepseek_pro",
-                "openrouter"
+                "deepseek_pro"
             ]
         },
         "x3-code": {
@@ -54,7 +50,6 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "openrouter",
                 "ollama"
             ]
         },
@@ -63,16 +58,14 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "openrouter",
-                "direct"
+                "ollama"
             ]
         },
         "x3-security": {
             "tier": "critical",
             "order": [
                 "deepseek_flash",
-                "deepseek_pro",
-                "direct"
+                "deepseek_pro"
             ]
         },
         "x3-review": {
@@ -80,7 +73,7 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "openrouter"
+                "ollama"
             ]
         },
         "x3-local": {
@@ -94,17 +87,11 @@
         "routine": [
             "deepseek_flash",
             "deepseek_pro",
-            "openrouter",
-            "ollama",
-            "nemotron_lightning_free",
-            "nemotron_ultra_free",
-            "direct"
+            "ollama"
         ],
         "critical": [
             "deepseek_flash",
-            "deepseek_pro",
-            "direct",
-            "openrouter"
+            "deepseek_pro"
         ]
     },
     "budget_fallback": [
