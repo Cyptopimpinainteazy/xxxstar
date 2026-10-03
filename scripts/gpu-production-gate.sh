@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Physical-GPU gate. Runs on the GPU node itself; fails (nonzero) on any
 # correctness failure or if no GPU is present. Evidence:
-#   audit-artifacts/gpu-production/<commit>/{gpu-info.json,hash-parity.json,summary.json}
+#   audit-artifacts/gpu-production/<commit>/{gpu-info.csv,hash-parity.json,summary.json}
 #
 # What it covers today (wgpu/Vulkan; no CUDA toolkit is required):
 #   - driver + GPU enumeration
@@ -17,8 +17,8 @@ set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo"
 commit="$(git rev-parse HEAD)"
-dirty="$(test -n "$(git status --porcelain)" && echo true || echo false)"
 out="audit-artifacts/gpu-production/$commit"
+dirty="$(test -n "$(git status --porcelain -- . ':(exclude)audit-artifacts/gpu-production/**')" && echo true || echo false)"
 mkdir -p "$out"
 results=()
 step() {  # step NAME CMD...
@@ -27,9 +27,7 @@ step() {  # step NAME CMD...
     if "$@"; then results+=("{\"step\":\"$name\",\"pass\":true}"); else results+=("{\"step\":\"$name\",\"pass\":false}"); fi
 }
 
-nvidia-smi --query-gpu=index,name,pci.bus_id,memory.total,compute_cap,driver_version,pcie.link.gen.current,pcie.link.width.current \
-    --format=csv > "$out/gpu-info.csv"
-step gpu_enumeration test "$(nvidia-smi -L | wc -l)" -ge 1
+step gpu_enumeration bash -c 'nvidia-smi --query-gpu=index,name,pci.bus_id,memory.total,compute_cap,driver_version,pcie.link.gen.current,pcie.link.width.current --format=csv > "$1/gpu-info.csv" && test "$(nvidia-smi -L | wc -l)" -ge 1' _ "$out"
 step crate_gpu_tests env X3_REQUIRE_GPU=1 cargo test -q -p x3-accel-wgpu
 step hash_parity_all_gpus cargo run --release -q -p x3-accel-wgpu --example gpu_parity -- --out "$out/hash-parity.json"
 step secp256k1_parity_vs_cpu env X3_REQUIRE_GPU=1 X3_REQUIRE_MULTI_GPU=1 cargo test --release -q -p x3-accel --features wgpu --test secp256k1_gpu_parity
@@ -39,9 +37,9 @@ pass=true
 for r in "${results[@]}"; do [[ "$r" == *'"pass":false'* ]] && pass=false; done
 cat > "$out/summary.json" <<JSON
 {"label":"PHYSICAL","host":"$(hostname)","commit":"$commit","dirty":$dirty,"collected":"$(date -u +%FT%TZ)",
- "driver":"$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)",
+ "driver":"$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1 || true)",
  "steps":[$(IFS=,; echo "${results[*]}")],"pass":$pass,
- "not_covered":["ed25519 GPU verification (no kernel)","CUDA backend (no nvcc)","multi-GPU parity needs 2+ adapters (required here via X3_REQUIRE_MULTI_GPU)"]}
+ "not_covered":["ed25519 GPU verification (no kernel)","CUDA backend (no nvcc)"]}
 JSON
 echo "summary: $out/summary.json pass=$pass"
 $pass
