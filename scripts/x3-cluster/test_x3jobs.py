@@ -138,5 +138,68 @@ class LocalRun(unittest.TestCase):
             del root
 
 
+import x3cluster  # noqa: E402
+
+HERE = Path(__file__).resolve().parent
+
+
+class Discovery(unittest.TestCase):
+    INV = {"nodes": {"x3star1": {"role": "control", "ip": "192.168.0.70"},
+                     "x3gpu1": {"role": "gpu", "ip": "192.168.0.30"},
+                     "x3gpu2": {"role": "gpu", "ip": None}}}
+
+    def test_node_is_claimed_only_by_its_own_hostname(self):
+        found, pending, conflicts = x3cluster.classify_hosts(
+            self.INV, {"192.168.0.41": "x3gpu2", "192.168.0.42": "laptop", "192.168.0.43": None})
+        self.assertEqual(found, {"x3gpu2": "192.168.0.41"})
+        self.assertEqual(pending, ["192.168.0.43"])
+        self.assertEqual(conflicts, [])
+
+    def test_fixed_ip_is_not_silently_overridden(self):
+        found, _, conflicts = x3cluster.classify_hosts(self.INV, {"192.168.0.99": "x3gpu1"})
+        self.assertEqual(found, {})
+        self.assertIn("inventory.json says 192.168.0.30", conflicts[0])
+
+    def test_overlay_fills_only_missing_ips(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old = x3cluster.DISCOVERED
+            x3cluster.DISCOVERED = Path(tmp) / "discovered.json"
+            x3cluster.DISCOVERED.write_text(json.dumps({"x3gpu2": {"ip": "192.168.0.41"}, "x3gpu1": {"ip": "10.9.9.9"}}))
+            try:
+                inv = x3cluster.load_inventory()
+            finally:
+                x3cluster.DISCOVERED = old
+        self.assertEqual(inv["nodes"]["x3gpu2"]["ip"], "192.168.0.41")
+        self.assertTrue(inv["nodes"]["x3gpu2"]["discovered"])
+        self.assertEqual(inv["nodes"]["x3gpu1"]["ip"], "192.168.0.30")
+
+
+class JoinScript(unittest.TestCase):
+    def test_constants_match_inventory(self):
+        inv = json.loads((HERE / "inventory.json").read_text())
+        text = (HERE / "x3-join.sh").read_text()
+        self.assertIn(f'LAN="{inv["lan"]}"', text)
+        self.assertIn(f'CONTROL_IP="{inv["nodes"]["x3star1"]["ip"]}"', text)
+        self.assertIn(f'CONTROL_KEY="{inv["control_ssh_pubkey"]}"', text)
+        self.assertNotIn("PRIVATE KEY", text)
+
+    def test_dry_run_changes_nothing_and_opens_ssh_before_enabling_ufw(self):
+        with tempfile.TemporaryDirectory() as home:
+            out = subprocess.run(["bash", str(HERE / "x3-join.sh"), "--role", "gpu", "--name", "x3gpu2", "--dry-run"],
+                                 capture_output=True, text=True, timeout=60, env={"HOME": home, "PATH": "/usr/bin:/bin",
+                                                                                   "USER": "lojak"})
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertEqual(Path(home, ".ssh", "authorized_keys").read_text(), "")
+        lines = out.stdout.splitlines()
+        ssh_rule = next(i for i, l in enumerate(lines) if "port 22" in l)
+        enable = next(i for i, l in enumerate(lines) if "ufw --force enable" in l)
+        self.assertLess(ssh_rule, enable)
+        self.assertTrue(all(l.startswith("+ ") for l in lines if "sudo" in l))
+
+    def test_rejects_unknown_role(self):
+        out = subprocess.run(["bash", str(HERE / "x3-join.sh"), "--role", "miner"], capture_output=True, text=True)
+        self.assertEqual(out.returncode, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

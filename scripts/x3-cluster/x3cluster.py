@@ -14,6 +14,9 @@
                                                 that owns class C; evidence per job
     x3cluster.py pipeline [--spec FILE]         staged distributed pipeline (pipeline.json)
     x3cluster.py ssh-config [--write]           Host aliases for every node with a known IP
+    x3cluster.py discover [--onboard]           find inventory nodes on the LAN; onboard new ones
+    x3cluster.py onboard NODE [--ip IP]         tooling, checkout, bootstrap, workers, models,
+                                                router registration, bench, first job (no sudo)
 
 Anything that needs root is never run: it is written to
 ~/.config/x3-cluster/staged-privileged.sh for an operator to review and run.
@@ -23,6 +26,7 @@ PHYSICAL (measured on real hardware) or LOCAL (this node only).
 import argparse
 import datetime as dt
 import hashlib
+import io
 import json
 import os
 import platform
@@ -31,6 +35,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import urllib.request
@@ -40,7 +45,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import x3jobs  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[1]
+# X3_REPO lets the tooling run from a copy outside the checkout (as onboarded nodes do).
+REPO = Path(os.environ["X3_REPO"]).expanduser() if os.environ.get("X3_REPO") else HERE.parents[1]
+DISCOVERED = Path.home() / ".config" / "x3-cluster" / "discovered.json"
 CONFIG = Path.home() / ".config" / "x3-cluster"
 USER_UNITS = Path.home() / ".config" / "systemd" / "user"
 ROLES = ("control", "gpu", "build", "sim", "data", "net", "ops")
@@ -162,6 +169,28 @@ def inventory():
         "failed_user_units": [l.split()[0] for l in user_failed.splitlines() if l.strip()],
         "tools": tools, "repo": git_identity(),
     }
+
+
+def load_inventory():
+    """inventory.json plus IPs this control node discovered for nodes the file has no IP for."""
+    inv = json.loads((HERE / "inventory.json").read_text())
+    try:
+        found = json.loads(DISCOVERED.read_text())
+    except (OSError, ValueError):
+        found = {}
+    for name, entry in found.items():
+        node = inv["nodes"].get(name)
+        if node is not None and not node.get("ip") and entry.get("ip"):
+            node["ip"] = entry["ip"]
+            node["discovered"] = entry.get("seen", True)
+    return inv
+
+
+def firewall_enabled():
+    try:
+        return "ENABLED=yes" in Path("/etc/ufw/ufw.conf").read_text()
+    except OSError:
+        return False
 
 
 def read_env(path):
@@ -343,7 +372,7 @@ def control_firewall_block(lan):
 
 def bootstrap(args):
     node = socket.gethostname()
-    inv = json.loads((HERE / "inventory.json").read_text())
+    inv = load_inventory()
     known = inv["nodes"].get(node, {})
     if known and known.get("role") != args.role:
         sys.exit(f"{node} is listed as role {known.get('role')!r} in inventory.json, not {args.role!r}")
@@ -388,8 +417,18 @@ def bootstrap(args):
         staged.append(control_firewall_block(inv["lan"]))
 
     if args.role == "gpu":
-        bind = "0.0.0.0" if args.lan else "127.0.0.1"
-        plan, dropins = plan_gpu_workers(node, node_ip, bind)
+        if not shutil.which("nvidia-smi"):
+            staged.append("# No NVIDIA driver: install the recommended one, then reboot and re-run bootstrap\n"
+                          "sudo ubuntu-drivers install\n")
+        if not shutil.which("ollama"):
+            staged.append("# Ollama (official installer); per-GPU workers replace its default service\n"
+                          "curl -fsSL https://ollama.com/install.sh | sh\n"
+                          "sudo systemctl disable --now ollama.service\n")
+        # A worker is only bound to the LAN once the firewall is on; until then it stays
+        # on loopback and the staged block rebinds it after enabling ufw.
+        lan_now = args.lan and firewall_enabled()
+        bind = "0.0.0.0" if lan_now else "127.0.0.1"
+        plan, dropins = plan_gpu_workers(node, node_ip, "0.0.0.0" if args.lan else "127.0.0.1")
         staged.extend(dropins)
         for entry in plan:
             if entry["state"] == "create":
@@ -411,8 +450,12 @@ def bootstrap(args):
         if args.lan:
             router_hosts = [n["ip"] for n in inv["nodes"].values() if n["role"] in ("control", "ops") and n.get("ip")]
             staged.append(firewall_block(inv["lan"], router_hosts, [e["port"] for e in plan]))
-            # Rebind adopted loopback user workers only after the firewall is on.
+            # Rebind loopback user workers only after the firewall is on.
             for entry in plan:
+                if entry["state"] == "create" and not lan_now:
+                    path = USER_UNITS / entry["unit"]
+                    staged.append(f"sed -i 's|OLLAMA_HOST=127.0.0.1:{entry['port']}|OLLAMA_HOST=0.0.0.0:{entry['port']}|' {path}\n"
+                                  f"systemctl --user daemon-reload && systemctl --user restart {entry['unit']}\n")
                 if entry["state"] == "adopted" and str(entry.get("bind", "")).startswith("127."):
                     pid, _ = ollama_process_on(entry["port"])
                     _, unit = run(["ps", "-o", "uunit=", "-p", str(pid)])
@@ -436,7 +479,7 @@ def bootstrap(args):
 
 # ---------------------------------------------------------------- bench
 
-def bench(_args):
+def bench(args):
     result = {"node": socket.gethostname(), "label": "PHYSICAL", "collected": now(), "repo": git_identity()}
     # CPU: SHA-256 over 256 MiB, single process and one per thread.
     block = os.urandom(1 << 20)
@@ -471,7 +514,7 @@ def bench(_args):
     result["disk"] = {"seq_write_mb_s": to_mb(write), "seq_read_mb_s": to_mb(read), "method": "dd 1GiB O_DIRECT"}
 
     # Network: link speeds and latency to every known peer that answers.
-    inv = json.loads((HERE / "inventory.json").read_text())
+    inv = load_inventory()
     latency = {}
     for name, node in inv["nodes"].items():
         if node.get("ip") and name != socket.gethostname():
@@ -482,7 +525,10 @@ def bench(_args):
                          "iperf3": "not measured: iperf3 missing or no peer server" if not shutil.which("iperf3") else None}
 
     # Rust: clean release-less build of one small workspace crate, isolated target dir.
-    if shutil.which("cargo"):
+    free_gb = shutil.disk_usage(str(Path.home())).free / 1e9
+    if getattr(args, "no_rust", False) or free_gb < 50:
+        result["rust_build"] = {"skipped": "--no-rust" if getattr(args, "no_rust", False) else f"{free_gb:.0f} GB free < 50 GB"}
+    elif shutil.which("cargo"):
         with tempfile.TemporaryDirectory(dir=str(Path.home())) as target:
             started = time.perf_counter()
             code, out = run(f"cd {REPO} && CARGO_TARGET_DIR={target} cargo build -q -p gpu-sig-verifier 2>&1 | tail -3", 1800)
@@ -601,7 +647,7 @@ def remote_health(host):
 
 
 def health(args, quiet=False):
-    inv = json.loads((HERE / "inventory.json").read_text())
+    inv = load_inventory()
     me = socket.gethostname()
     rows = []
     for name, node in inv["nodes"].items():
@@ -723,7 +769,7 @@ def stream_line(line):
 
 
 def job(args):
-    inv = json.loads((HERE / "inventory.json").read_text())
+    inv = load_inventory()
     cmd = " ".join(args.command[1:] if args.command[:1] == ["--"] else args.command)
     if not cmd:
         sys.exit("job: no command given (use: job --class TEST -- cargo test -p crate)")
@@ -738,7 +784,7 @@ def job(args):
 
 
 def pipeline(args):
-    inv = json.loads((HERE / "inventory.json").read_text())
+    inv = load_inventory()
     spec = json.loads(Path(args.spec).read_text())
     commit = resolve_commit(args.ref)
     root = REPO / "audit-artifacts" / "x3-cluster"
@@ -757,7 +803,7 @@ def pipeline(args):
 
 def ssh_config(args):
     """Host blocks for inventory nodes with an IP that ~/.ssh/config does not already define."""
-    inv = json.loads((HERE / "inventory.json").read_text())
+    inv = load_inventory()
     existing = Path.home() / ".ssh" / "config"
     defined = set(re.findall(r"^\s*Host\s+(.+)$", existing.read_text(), re.M)) if existing.exists() else set()
     defined = {h for line in defined for h in line.split()}
@@ -782,6 +828,262 @@ def ssh_config(args):
         print(text)
 
 
+# ---------------------------------------------------------------- discover / onboard
+
+ONBOARDED = CONFIG / "onboarded"
+EVENTS = Path.home() / ".local" / "state" / "x3-cluster" / "events.log"
+TOOL_FILES = ("x3cluster.py", "x3jobs.py", "inventory.json", "x3-cluster-health", "x3-node-bootstrap", "x3-join.sh")
+RETRY_SECONDS = 1800
+
+
+def event(message):
+    """One line per state change, for the operator to read later."""
+    EVENTS.parent.mkdir(parents=True, exist_ok=True)
+    with open(EVENTS, "a") as f:
+        f.write(f"{now()} {message}\n")
+    print(message, flush=True)
+
+
+def sweep_ssh(lan, skip, port=22, timeout=0.7):
+    """IPs in `lan` with something listening on :22 (ICMP is often filtered; SSH is what we need)."""
+    import concurrent.futures
+    import ipaddress
+    hosts = [str(h) for h in ipaddress.ip_network(lan, strict=False).hosts() if str(h) not in skip]
+    with concurrent.futures.ThreadPoolExecutor(64) as pool:
+        return sorted((ip for ip, ok in zip(hosts, pool.map(lambda h: tcp_open(h, port, timeout), hosts)) if ok),
+                      key=lambda ip: tuple(int(o) for o in ip.split(".")))
+
+
+def ssh_run(host, command, timeout=60, stdin=None):
+    try:
+        out = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6", "-o", "StrictHostKeyChecking=accept-new",
+                              host, command], input=stdin, capture_output=True, timeout=timeout)
+        return out.returncode, out.stdout.decode(errors="replace").strip(), out.stderr.decode(errors="replace").strip()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 124, "", str(exc)
+
+
+def classify_hosts(inv, answers):
+    """Map {ip: hostname-or-None} from a sweep onto the inventory.
+
+    Returns (found {node: ip}, pending [ip], conflicts [str]). A host only claims a
+    node if its own hostname says so; an IP is never guessed from position."""
+    found, pending, conflicts = {}, [], []
+    for ip, hostname in answers.items():
+        if hostname is None:
+            pending.append(ip)
+            continue
+        node = inv["nodes"].get(hostname)
+        if node is None:
+            continue
+        if node.get("ip") and node["ip"] != ip and not node.get("discovered"):
+            conflicts.append(f"{hostname} answers at {ip} but inventory.json says {node['ip']}")
+            continue
+        found[hostname] = ip
+    return found, pending, conflicts
+
+
+def discover(args):
+    inv = load_inventory()
+    me = socket.gethostname()
+    own = {n["ipv4"].split("/")[0] for n in nics() if n["ipv4"]}
+    known = {n["ip"]: name for name, n in inv["nodes"].items() if n.get("ip") and not n.get("discovered")}
+    open_ssh = [ip for ip in sweep_ssh(inv["lan"], own) if ip not in known]
+    answers = {}
+    for ip in open_ssh:
+        code, out, _ = ssh_run(ip, "hostname", 15)
+        answers[ip] = out.splitlines()[-1].strip() if code == 0 and out else None
+    found, pending, conflicts = classify_hosts(inv, answers)
+    try:
+        state = json.loads(DISCOVERED.read_text())
+    except (OSError, ValueError):
+        state = {}
+    for name, ip in found.items():
+        if state.get(name, {}).get("ip") != ip:
+            event(f"discovered {name} ({inv['nodes'][name]['role']}) at {ip}")
+        _, neigh = run(["ip", "neigh", "show", ip])
+        mac = re.search(r"lladdr (\S+)", neigh)
+        state[name] = {"ip": ip, "seen": now(), "mac": mac.group(1) if mac else None}
+    DISCOVERED.parent.mkdir(parents=True, exist_ok=True)
+    DISCOVERED.write_text(json.dumps(state, indent=2) + "\n")
+    for ip in pending:
+        event(f"sshd at {ip} refuses {me}'s key; run x3-join.sh on it to join the cluster")
+    for line in conflicts:
+        event(f"CONFLICT {line}")
+    print(json.dumps({"from": me, "swept": inv["lan"], "ssh_hosts": open_ssh, "found": found,
+                      "pending_key": pending, "conflicts": conflicts}, indent=2))
+    if args.onboard:
+        for name, ip in found.items():
+            try:
+                last = json.loads((ONBOARDED / f"{name}.json").read_text())
+            except (OSError, ValueError):
+                last = {}
+            if last.get("status") == "ok" and last.get("ip") == ip:
+                continue
+            if last and time.time() - last.get("attempted_epoch", 0) < RETRY_SECONDS and not args.force:
+                continue
+            onboard_node(name, ip, load_inventory())
+    return 0
+
+
+def router_static_endpoints():
+    """base_urls the router's own config.json already routes to (the live one and this checkout's)."""
+    urls = set()
+    for path in (Path.home() / "Desktop/xxxstar-main/services/x3-ai-router/config.json",
+                 REPO / "services/x3-ai-router/config.json"):
+        try:
+            urls |= {p.get("base_url", "").rstrip("/") for p in json.loads(path.read_text()).get("providers", {}).values()}
+        except (OSError, ValueError):
+            pass
+    return urls
+
+
+def onboard_node(name, ip, inv):
+    """Bring a discovered node into the cluster with no sudo: tooling, checkout, role bootstrap,
+    (gpu) per-GPU workers + models + router registration, benchmark, and a real job on it."""
+    role = inv["nodes"][name]["role"]
+    inv["nodes"][name]["ip"] = ip
+    me = socket.gethostname()
+    steps = []
+    record = {"node": name, "ip": ip, "role": role, "controller": me, "started": now(), "label": "PHYSICAL",
+              "tool_commit": git_identity()["commit"], "attempted_epoch": time.time(), "steps": steps}
+
+    def step(title, ok, detail=None):
+        steps.append({"step": title, "pass": bool(ok), "detail": detail})
+        return bool(ok)
+
+    def finish(status):
+        record.update(status=status, finished=now())
+        ONBOARDED.mkdir(parents=True, exist_ok=True)
+        (ONBOARDED / f"{name}.json").write_text(json.dumps(record, indent=2, default=str) + "\n")
+        out = REPO / "audit-artifacts" / "x3-cluster" / (record["tool_commit"] or "unknown")
+        out.mkdir(parents=True, exist_ok=True)
+        (out / f"onboard-{name}.json").write_text(json.dumps(record, indent=2, default=str) + "\n")
+        failed = [s["step"] for s in steps if not s["pass"]]
+        event(f"onboard {name}: {status}" + (f" (failed: {', '.join(failed)})" if failed else ""))
+        return record
+
+    event(f"onboarding {name} ({role}) at {ip}")
+    code, out, err = ssh_run(ip, "hostname", 15)
+    if not step("identity", code == 0 and out.strip() == name, out or err):
+        return finish("failed")
+
+    # 1. tooling, copied from this control node so every node runs the same version
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as tar:
+        for f in TOOL_FILES:
+            if (HERE / f).exists():
+                tar.add(HERE / f, arcname=f)
+    code, _, err = ssh_run(ip, "mkdir -p ~/.local/share/x3-cluster ~/.local/bin && tar -xf - -C ~/.local/share/x3-cluster && "
+                               "for t in x3-cluster-health x3-node-bootstrap; do ln -sf ~/.local/share/x3-cluster/$t ~/.local/bin/$t; done",
+                           60, stdin=buf.getvalue())
+    if not step("install_tooling", code == 0, err or "~/.local/share/x3-cluster"):
+        return finish("failed")
+
+    # 2. a checkout to run jobs in (partial clone: commits and trees now, blobs on checkout)
+    remote = inv.get("canonical_repo", x3jobs.CANONICAL_REMOTE)
+    code, out, err = ssh_run(ip, f"""set -e
+for r in ~/Desktop/xxxstar-main ~/Desktop/xxxstar-master ~/xxxstar; do [ -e "$r/.git" ] && {{ echo "$r"; exit 0; }}; done
+command -v git >/dev/null || {{ echo "git missing: run x3-join.sh" >&2; exit 3; }}
+git clone -q --filter=blob:none --no-checkout {remote} ~/xxxstar && echo ~/xxxstar""", 1800)
+    repo = out.splitlines()[-1] if code == 0 and out else None
+    if not step("checkout", repo, repo or err):
+        return finish("failed")
+    ssh_run(ip, f"mkdir -p ~/.config/x3-cluster && f=~/.config/x3-cluster/node.env && touch $f && "
+                f"(grep -q ^X3_REPO= $f || echo X3_REPO={repo} >> $f)", 15)
+
+    # 3. role bootstrap (creates one Ollama worker per GPU for role=gpu)
+    tool = f"X3_REPO={repo} python3 ~/.local/share/x3-cluster/x3cluster.py"
+    code, out, err = ssh_run(ip, f"{tool} bootstrap --role {role} --apply --lan", 300)
+    try:
+        boot = json.loads(out[out.index("{"):])
+    except ValueError:
+        boot = {}
+    if not step("bootstrap", code == 0 and boot, boot.get("missing_tools") if boot else (err or out)[-500:]):
+        return finish("failed")
+    record["bootstrap"] = boot
+    _, staged, _ = ssh_run(ip, "cat ~/.config/x3-cluster/staged-privileged.sh 2>/dev/null", 15)
+    record["staged_privileged"] = staged or None
+
+    if role == "gpu":
+        workers = boot.get("gpu_workers", [])
+        if not step("gpus_detected", workers, [w["gpu"] for w in workers] or "no NVIDIA GPU visible: driver missing?"):
+            return finish("blocked")
+        bad = [w for w in workers if w["state"] not in ("create", "adopted")]
+        step("workers_planned", not bad, [{k: w.get(k) for k in ("worker", "port", "state", "gpu")} for w in workers])
+        time.sleep(5)
+        code, out, _ = ssh_run(ip, "for p in " + " ".join(str(w["port"]) for w in workers) +
+                               "; do curl -fsS -m 5 127.0.0.1:$p/api/version >/dev/null && echo $p; done", 60)
+        up = [int(p) for p in out.split()] if out else []
+        if not step("workers_up", len(up) == len(workers), {"up": up, "expected": [w["port"] for w in workers]}):
+            return finish("blocked")
+        # Models: the coding model on every worker; the tool-capable model too if disk allows.
+        _, free, _ = ssh_run(ip, "df -P --block-size=1G ~ | awk 'NR==2{print $4}'", 15)
+        free_gb = int(free) if free.isdigit() else 0
+        models = ["qwen2.5-coder:7b"] + (["qwen3:8b"] if free_gb >= 12 * len(workers) + 20 else [])
+        pulled = {}
+        for w in workers:
+            for m in models:
+                code, _, _ = ssh_run(ip, f"OLLAMA_HOST=127.0.0.1:{w['port']} ollama pull {m} >/dev/null 2>&1", 3600)
+                pulled[f"{w['port']}:{m}"] = code == 0
+        step("models_pulled", all(pulled.values()), {"free_gb_before": free_gb, "pulled": pulled})
+        ssh_run(ip, f"{tool} bootstrap --role gpu --apply --lan", 300)  # re-register with the models now present
+        _, reg, _ = ssh_run(ip, f"cat ~/.config/x3-cluster/registration/{name}.json", 15)
+        try:
+            reg = json.loads(reg)
+        except ValueError:
+            reg = {}
+        hosts_ok = all(p["base_url"].startswith(f"http://{ip}:") for p in reg.get("providers", {}).values())
+        static = router_static_endpoints()
+        already = sorted(n for n, p in reg.get("providers", {}).items() if p["base_url"].rstrip("/") in static)
+        if already and len(already) == len(reg.get("providers", {})):
+            step("registration", hosts_ok, f"skipped drop-in: router config.json already routes to {sorted(static & {p['base_url'].rstrip('/') for p in reg['providers'].values()})}")
+        elif step("registration", reg.get("providers") and hosts_ok, sorted(reg.get("providers", {}))):
+            drop = Path.home() / ".config" / "x3-router" / "providers.d"
+            drop.mkdir(parents=True, exist_ok=True)
+            (drop / f"{name}.json").write_text(json.dumps(reg, indent=2) + "\n")
+            record["router_dropin"] = str(drop / f"{name}.json")
+        reachable = {w["port"]: tcp_open(ip, w["port"]) for w in workers}
+        step(f"workers_reachable_from_{me}", all(reachable.values()),
+             reachable if all(reachable.values()) else f"{reachable}: run the staged firewall block on {name}")
+
+    # 4. baseline benchmark (the clean Rust build is skipped automatically below 50 GB free)
+    code, out, err = ssh_run(ip, f"{tool} bench", 2400)
+    try:
+        record["bench"] = json.loads(out[out.index("{"):])
+    except ValueError:
+        record["bench"] = None
+    step("bench", record["bench"], None if record["bench"] else (err or out)[-300:])
+
+    # 5. a real job routed to it by name, at the control node's (pushed) commit
+    if role == "gpu":
+        cls = "INFERENCE"
+        cmd = ("for p in " + " ".join(str(w["port"]) for w in boot.get("gpu_workers", [])) + "; do "
+               "curl -fsS -m 600 http://127.0.0.1:$p/api/generate -d '{\"model\":\"qwen2.5-coder:7b\","
+               "\"prompt\":\"Reply with the single word: ok\",\"stream\":false,\"options\":{\"num_predict\":8}}' "
+               "-o \"$X3_JOB_OUT/worker-$p.json\" || exit 1; done")
+    else:
+        cls = {"build": "BUILD", "sim": "SIMULATION", "data": "DATABASE", "net": "NETWORK", "ops": "NETWORK"}.get(role, "TEST")
+        cmd = "git rev-parse HEAD && uname -a && nproc && free -g"
+    job = x3jobs.new_job(cls, cmd, git_identity()["commit"], "HEAD", "NORMAL", 3600, name, 1, f"onboard-{name}")
+    result = x3jobs.run_job(job, inv, me, REPO / "audit-artifacts" / "x3-cluster")
+    step(f"first_job_{cls.lower()}", result["result"] == "PASS",
+         {k: result.get(k) for k in ("id", "worker", "label", "result", "exit_code", "detail")})
+    return finish("ok" if all(s["pass"] for s in steps) else "partial")
+
+
+def onboard(args):
+    inv = load_inventory()
+    if args.node not in inv["nodes"]:
+        sys.exit(f"{args.node} is not in inventory.json")
+    ip = args.ip or inv["nodes"][args.node].get("ip")
+    if not ip:
+        sys.exit(f"no IP for {args.node}: run `discover` or pass --ip")
+    record = onboard_node(args.node, ip, inv)
+    print(json.dumps({k: record[k] for k in ("node", "status", "steps")}, indent=2, default=str))
+    return 0 if record["status"] == "ok" else 1
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -791,7 +1093,8 @@ def main():
     p.add_argument("--role", choices=ROLES, required=True)
     p.add_argument("--apply", action="store_true", help="create/enable user units (default: plan only)")
     p.add_argument("--lan", action="store_true", help="bind GPU workers to 0.0.0.0 and stage firewall rules")
-    sub.add_parser("bench")
+    p = sub.add_parser("bench")
+    p.add_argument("--no-rust", action="store_true", help="skip the clean Rust build")
     p = sub.add_parser("health")
     p.add_argument("--json", action="store_true")
     sub.add_parser("gate")
@@ -809,6 +1112,12 @@ def main():
     p.add_argument("--spec", default=str(HERE / "pipeline.json"))
     p.add_argument("--ref", default="HEAD")
     p.add_argument("--quiet", action="store_true")
+    p = sub.add_parser("discover", help="sweep the LAN for inventory nodes answering SSH with our key")
+    p.add_argument("--onboard", action="store_true", help="onboard newly found nodes")
+    p.add_argument("--force", action="store_true", help="retry onboarding now, ignoring the 30 min back-off")
+    p = sub.add_parser("onboard", help="bring one node into the cluster (no sudo)")
+    p.add_argument("node")
+    p.add_argument("--ip")
     p = sub.add_parser("ssh-config")
     p.add_argument("--write", action="store_true", help="write ~/.ssh/x3-cluster.conf and Include it")
     args = parser.parse_args()
@@ -826,6 +1135,10 @@ def main():
         sys.exit(job(args))
     elif args.cmd == "pipeline":
         sys.exit(pipeline(args))
+    elif args.cmd == "discover":
+        sys.exit(discover(args))
+    elif args.cmd == "onboard":
+        sys.exit(onboard(args))
     elif args.cmd == "ssh-config":
         ssh_config(args)
 

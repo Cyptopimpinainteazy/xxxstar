@@ -85,5 +85,6 @@
       "x3gpu1 192.168.0.30"
     ],
     "note": "other live hosts were the modem, a Wi-Fi extender and TVs; no x3gpu2/x3build1/x3sim1/x3data1/x3net1/x3ops1 on the LAN or tailnet"
-  }
+  },
+  "control_ssh_pubkey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJEW3gU29rVC93o1TVD5i6yA09ewbV9eo+upTr3pw14S x3star1-to-x3gpu1"
 }
