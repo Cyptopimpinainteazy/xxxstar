@@ -29,5 +29,15 @@ if [[ -z "$DEV_BIN" ]]; then
 fi
 [[ -x "$DEV_BIN" ]] || { echo "[push-drill] no node binary at $DEV_BIN" >&2; exit 2; }
 
+# `push-headers.mjs` resolves `@polkadot/api` from `packages/ts-sdk`, so the
+# gate installs that package's dependencies itself when a fresh checkout has no
+# `node_modules`. Without this the drill fails with "cannot load
+# @polkadot/api" on any machine that never ran `npm ci` there by hand.
+if [[ ! -d "$ROOT/packages/ts-sdk/node_modules" ]]; then
+  echo "[push-drill] packages/ts-sdk has no node_modules; running npm ci"
+  (cd "$ROOT/packages/ts-sdk" && npm ci --no-audit --no-fund --prefer-offline) \
+    || { echo "[push-drill] npm ci failed in packages/ts-sdk" >&2; exit 2; }
+fi
+
 exec python3 "$ROOT/scripts/testnet/btc-header-push-drill.py" \
   --node-bin "$DEV_BIN" --bitcoind-dir "$X3_BITCOIND_DIR" "$@"

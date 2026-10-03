@@ -540,12 +540,20 @@ pub fn run(config: &SimConfig) -> SimOutcome {
             }
 
             let id = session_ids[entry.op.session()].clone();
-            shadow.insert(
-                id.clone(),
-                persistence
-                    .load(&id)
-                    .unwrap_or_else(|| panic!("session {id} vanished from persistence")),
-            );
+            let restored = match persistence.load(&id) {
+                Some(session) => session,
+                None => {
+                    // Unreachable in practice: the id was just created and the
+                    // simulator owns the persistence handle. Record the anomaly
+                    // instead of aborting the whole hunt, so the seed can still
+                    // be inspected.
+                    trace.push(format!(
+                        "{step:04} ERROR session {id} vanished from persistence"
+                    ));
+                    continue;
+                }
+            };
+            shadow.insert(id.clone(), restored);
             let before = serde_json::to_value(persistence.load(&id)).ok();
 
             match apply_op(&mut coord, entry, &session_ids, &secrets, now_secs) {

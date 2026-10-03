@@ -26,6 +26,16 @@ CONSTANTS
     CpuDigest,       \* function Vectors -> Nat
     GpuDigest        \* function Vectors -> Nat
 
+\* TLC config-file values. The config parser accepts only literals and
+\* `X <- Impl` operator references, so the digest maps are defined here and
+\* wired in via CpuGpuParity.cfg.
+SpecDigestImpl ==
+    ("v_sha256_empty" :> 1 @@ "v_sha256_abc" :> 2 @@ "v_blake3_empty" :> 3 @@ "v_keccak256_empty" :> 4)
+CpuDigestImpl ==
+    ("v_sha256_empty" :> 1 @@ "v_sha256_abc" :> 2 @@ "v_blake3_empty" :> 3 @@ "v_keccak256_empty" :> 4)
+GpuDigestImpl ==
+    ("v_sha256_empty" :> 1 @@ "v_sha256_abc" :> 2 @@ "v_blake3_empty" :> 3 @@ "v_keccak256_empty" :> 4)
+
 ASSUME
     /\ Vectors # {}
     /\ DOMAIN SpecDigest = Vectors

@@ -132,10 +132,12 @@ pub fn check_session(session: &SwapSession) -> Vec<Violation> {
     // `record_refunds` sets both legs to `Refunded`, so a refund that happened
     // *after* a claim leaves no trace in `status` — only in the journal. This
     // is the check that catches a swap paying out and then refunding.
-    let journal_has_claim = session
-        .operation_journal
-        .iter()
-        .any(|r| matches!(r.operation, CoordinatorOperation::FastClaim | CoordinatorOperation::SlowClaim));
+    let journal_has_claim = session.operation_journal.iter().any(|r| {
+        matches!(
+            r.operation,
+            CoordinatorOperation::FastClaim | CoordinatorOperation::SlowClaim
+        )
+    });
     let journal_has_refund = session
         .operation_journal
         .iter()
@@ -144,8 +146,7 @@ pub fn check_session(session: &SwapSession) -> Vec<Violation> {
         out.push(violation(
             "REFUND_AFTER_CLAIM",
             session,
-            "journal records a claim and then a refund — both sides were paid"
-                .to_string(),
+            "journal records a claim and then a refund — both sides were paid".to_string(),
         ));
     }
 
@@ -186,15 +187,16 @@ pub fn check_sessions(sessions: &[SwapSession]) -> Vec<Violation> {
             // seeds that expose the same defect still dedupe to one
             // signature.
             completed.sort_by(|a, b| a.session_id.cmp(&b.session_id));
-            let blamed = completed.last().expect("completed.len() > 1");
-            out.push(Violation {
-                code: "DOUBLE_SETTLE",
-                session_id: blamed.session_id.clone(),
-                detail: format!(
-                    "{} sessions completed against one hash lock",
-                    completed.len()
-                ),
-            });
+            if let Some(blamed) = completed.last() {
+                out.push(Violation {
+                    code: "DOUBLE_SETTLE",
+                    session_id: blamed.session_id.clone(),
+                    detail: format!(
+                        "{} sessions completed against one hash lock",
+                        completed.len()
+                    ),
+                });
+            }
         }
     }
 

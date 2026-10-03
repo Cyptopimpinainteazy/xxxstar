@@ -11,6 +11,7 @@ import unittest
 import unittest.mock
 import urllib.error
 import urllib.request
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -45,6 +46,70 @@ class Provider(BaseHTTPRequestHandler):
 
     def log_message(self, *_):
         pass
+
+
+class DatabaseStartupTests(unittest.TestCase):
+    def test_creates_nested_parent_and_preserves_usage_after_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state" / "router" / "usage.sqlite3"
+            router = router_module.Router({}, path)
+            try:
+                router.db.execute("INSERT INTO usage (day, agent, cost_usd) VALUES (?, ?, ?)",
+                                  ("2026-10-01", "alice", 0.25))
+                router.db.commit()
+            finally:
+                router.db.close()
+            restarted = router_module.Router({}, path)
+            try:
+                self.assertEqual(restarted.db.execute("SELECT agent, cost_usd FROM usage").fetchall(),
+                                 [("alice", 0.25)])
+            finally:
+                restarted.db.close()
+
+    def test_memory_database_remains_supported(self):
+        router = router_module.Router({}, ":memory:")
+        try:
+            self.assertEqual(router.db.execute("PRAGMA database_list").fetchone()[2], "")
+        finally:
+            router.db.close()
+
+    def test_parent_file_reports_database_location(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "file"
+            parent.write_text("keep me", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "initialize router database") as failure:
+                router_module.Router({}, parent / "usage.sqlite3")
+            self.assertIn(str(parent), str(failure.exception))
+            self.assertEqual(parent.read_text(encoding="utf-8"), "keep me")
+
+    def test_invalid_database_reports_location(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "usage.sqlite3"
+            path.write_bytes(b"not a sqlite database")
+            with self.assertRaisesRegex(RuntimeError, "initialize router database") as failure:
+                router_module.Router({}, path)
+            self.assertIn(str(path), str(failure.exception))
+
+    def test_all_startup_failures_close_the_opened_connection(self):
+        original = router_module.sqlite3.connect
+        for config, corrupt in (({"reservation_ttl_seconds": "invalid"}, False), ({}, True)):
+            with self.subTest(config=config), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "usage.sqlite3"
+                if corrupt:
+                    path.write_bytes(b"not a database")
+                connections = []
+
+                def connect(*args, **kwargs):
+                    connection = original(*args, **kwargs)
+                    connections.append(connection)
+                    return connection
+
+                with patch.object(router_module.sqlite3, "connect", side_effect=connect):
+                    with self.assertRaisesRegex(RuntimeError, "initialize router database"):
+                        router_module.Router(config, path)
+                self.assertEqual(len(connections), 1)
+                with self.assertRaises(router_module.sqlite3.ProgrammingError):
+                    connections[0].execute("SELECT 1")
 
 
 class RouterTests(unittest.TestCase):
@@ -442,6 +507,7 @@ class RouterTests(unittest.TestCase):
         body.update(overrides)
         return body
 
+
     def serve(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -657,6 +723,123 @@ class ProtocolTests(unittest.TestCase):
                            "content": [{"type": "input_text", "text": "hi"}]}]}
         body.update(overrides)
         return body
+
+    def test_malformed_choices_fail_closed_without_booking_success(self):
+        for choices in (None, [], "invalid", {}, [None], [{}], [{"message": "invalid"}],
+                        [{"message": {}}], [{"message": {"role": "assistant", "content": 123}}],
+                        [{"message": {"role": "assistant", "refusal": 123}}],
+                        [{"message": {"role": "assistant", "tool_calls": "invalid"}}],
+                        [{"message": {"role": "assistant", "tool_calls": [{}]}}],
+                        [{"message": {"role": "user", "content": "wrong role"}}]):
+            with self.subTest(choices=choices):
+                self.router.note_provider_success("up")
+
+                def malformed(handler, body):
+                    payload = json.dumps({"choices": choices}).encode()
+                    handler.send_response(200)
+                    handler.send_header("Content-Length", str(len(payload)))
+                    handler.end_headers()
+                    handler.wfile.write(payload)
+
+                ScriptedProvider.script = malformed
+                status, _ = self.router.complete({"messages": [{"role": "user", "content": "hello"}],
+                                                  "max_tokens": 10}, "alice")
+                self.assertEqual(status, 502)
+                self.assertEqual(self.router.stats(), [])
+                self.assertEqual(self.router.snapshot()["reserved_usd"], 0)
+
+    def test_provider_recovers_after_persisted_cooldown_and_router_restart(self):
+        self.config["retry_attempts"] = 0
+        self.config["provider_cooldown_seconds"] = 2
+        self.config["providers"]["backup"] = {**self.config["providers"]["up"], "model": "backup"}
+        self.config["routes"]["routine"] = ["up", "backup"]
+        healthy = False
+
+        def respond(handler, body):
+            if body["model"] == "up-model" and not healthy:
+                handler.send_response(503)
+                handler.send_header("Content-Length", "2")
+                handler.end_headers()
+                handler.wfile.write(b"{}")
+            else:
+                payload = json.dumps({"model": body["model"], "choices": [{
+                    "message": {"role": "assistant", "content": "recovered"}}]}).encode()
+                handler.send_response(200)
+                handler.send_header("Content-Length", str(len(payload)))
+                handler.end_headers()
+                handler.wfile.write(payload)
+
+        ScriptedProvider.script = respond
+        request = {"messages": [{"role": "user", "content": "hello"}], "max_tokens": 10}
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "backup"))
+        self.assertGreater(self.router.provider_cooldown("up"), 0)
+        self.router.db.close()
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+        healthy = True
+        count = len(ScriptedProvider.requests)
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "backup"))
+        self.assertEqual([r["model"] for r in ScriptedProvider.requests[count:]], ["backup"])
+        deadline = time.monotonic() + 5
+        while self.router.provider_cooldown("up") > 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(self.router.provider_cooldown("up"), 0)
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "up-model"))
+        self.assertNotIn("up", [row["provider"] for row in self.router.provider_health()])
+
+    def test_valid_tool_calls_and_refusals_survive_responses_translation(self):
+        messages = [
+            {"role": "assistant", "content": None, "tool_calls": [{
+                "id": "call_1", "type": "function",
+                "function": {"name": "read_file", "arguments": '{"path":"README.md"}'}}]},
+            {"role": "assistant", "content": None, "refusal": "I cannot fulfill that request."},
+        ]
+        server = self.serve()
+        try:
+            for message in messages:
+                with self.subTest(message=message):
+                    def respond(handler, body):
+                        payload = json.dumps({"choices": [{"message": message}]}).encode()
+                        handler.send_response(200)
+                        handler.send_header("Content-Length", str(len(payload)))
+                        handler.end_headers()
+                        handler.wfile.write(payload)
+
+                    ScriptedProvider.script = respond
+                    status, raw = self.post(server, self.responses_body(stream=False))
+                    self.assertEqual(status, 200, raw)
+                    output = json.loads(raw)["output"]
+                    if message.get("tool_calls"):
+                        self.assertEqual(output[0]["type"], "function_call")
+                        self.assertEqual(output[0]["call_id"], "call_1")
+                        self.assertEqual(output[0]["arguments"], '{"path":"README.md"}')
+                    else:
+                        self.assertEqual(output[0]["content"], [{"type": "refusal", "refusal": message["refusal"]}])
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_malformed_completion_is_reported_as_upstream_failure_on_responses_endpoint(self):
+        def malformed(handler, body):
+            payload = b'{"choices":null}'
+            handler.send_response(200)
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+
+        ScriptedProvider.script = malformed
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body(stream=False))
+            self.assertEqual(status, 502)
+            self.assertEqual(json.loads(raw)["error"]["type"], "no_provider_succeeded")
+            self.assertEqual(self.router.stats(), [])
+        finally:
+            server.shutdown()
+            server.server_close()
+
 
     # ── Named tool_choice ────────────────────────────────────────────────
 

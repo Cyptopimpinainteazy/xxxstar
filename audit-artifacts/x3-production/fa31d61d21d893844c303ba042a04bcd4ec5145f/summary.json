@@ -1,0 +1,26 @@
+{
+  "tested_code_commit": "fa31d61d21d893844c303ba042a04bcd4ec5145f",
+  "tested_code_tree": "b94f229662526f7173e290d3bfda57b39f7756dc",
+  "checks": [
+    {
+      "command": "python3 tests/test_snapshot_rpc_export.py",
+      "exit_code": 0,
+      "tests": 23,
+      "result": "PASS"
+    },
+    {
+      "command": "python3 -m py_compile scripts/snapshot-rpc-export.py",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "fixed": "Cache starting finalized height before export; pruning the starting header later no longer rejects complete exported state; end-header failures still preserve old files",
+  "limitations": [
+    "Local HTTP fixtures only; no live chain or state-root reconstruction proof"
+  ]
+}

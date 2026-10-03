@@ -219,3 +219,29 @@ apps/x3-desktop/dist/
 # process-scoped state, not evidence: it exists so a second run of either one
 # refuses instead of racing the first through `runtime/target/srtool`.
 .x3-release-build.lock
+
+# Coq compiler output produced by the formal gate (`x3-proof formal` runs
+# coqc, directly or via the tools/coqc docker fallback). These are build
+# products, not evidence: the tracked source is SupplyInvariant.v, and the
+# gate reruns coqc. Without these the gate dirties the tree and the next
+# `git add -A` can commit stale proof objects.
+formal-proofs/coq/*.vo
+formal-proofs/coq/*.vok
+formal-proofs/coq/*.vos
+formal-proofs/coq/*.glob
+formal-proofs/coq/.*.aux
+
+# cargo-mutants output; the gate moves a previous run aside to mutants.out.old
+mutants.out/
+mutants.out.old/
+
+
+# Referents that dangling tracked symlinks (or their tooling) can materialize
+# as untracked files: an `npm install` under apps/x3-funding, a `dpkg-deb -x`
+# of libprotobuf, or a local ralph checkout. local-ci's freshness touch uses
+# `touch -h`, but ignoring the referents keeps `git status` clean (required by
+# --publish-status) even when other tools create them. The symlinks stay
+# tracked.
+apps/x3-funding/node_modules
+libproto_lib/usr/share/doc/libprotobuf23
+/ralph

@@ -1,0 +1,52 @@
+{
+  "scope": "AI router malformed completions, provider recovery, SQLite SIGKILL recovery",
+  "git_commit": "94036ab8f93bdcc1388d6f0d33e32ae0de3976dd",
+  "tested_code_tree": "25c58a96d85804693aee3476ce8890984312c2fe",
+  "checks": [
+    {
+      "command": "python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'",
+      "exit_code": 0,
+      "result": "PASS",
+      "tests": 141
+    },
+    {
+      "command": "python3 tests/test_validator_launcher.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "tests": 5
+    },
+    {
+      "command": "python3 -m py_compile services/x3-ai-router/router.py services/x3-ai-router/test_router.py services/x3-ai-router/test_durability.py",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "python3 scripts/x3_fake_code_scan.py stubs",
+      "exit_code": 0,
+      "result": "PASS",
+      "findings": 1573,
+      "baseline": 1702
+    },
+    {
+      "command": "python3 scripts/x3_fake_code_scan.py cheats",
+      "exit_code": 1,
+      "result": "FAIL",
+      "reason": "Existing master failure: skip findings 141, baseline 139."
+    }
+  ],
+  "regression": "Seven malformed choices shapes returned HTTP 200 before fix; after fix they fail through the upstream failure path without usage success or remaining reservation.",
+  "provider_recovery": "Actual local HTTP 503 causes fallback; persisted cooldown is honored after router restart; recovered primary is retried after cooldown expiry and its health failure entry is cleared.",
+  "durability": "SIGKILL of a child router with an open SQLite transaction: committed usage and cooldown persisted, pending write rolled back, integrity_check ok, writes resumed.",
+  "limitations": [
+    "Local HTTP test providers, not commercial provider validation",
+    "SQLite router evidence does not prove node database durability",
+    "Live validator, cross-domain atomic, nonce stress and production gate not run"
+  ],
+  "production_gate": "NOT_RUN",
+  "completion_percent": null
+}

@@ -4,8 +4,8 @@
   "image_digest": "sha256:8638a668bd6d29111dc01953fbead6eb08c062e1cc62d3047a245a52b6edb3bf",
   "srtool": "0.18.4",
   "rustc": "1.93.0",
-  "recorded_at": "2026-09-29",
-  "recorded_revision": "7a105da31",
+  "recorded_at": "2026-10-02",
+  "recorded_revision": "cb6ec45b1",
   "runtime_version": "x3-chain-20 (x3-chain-1.tx1.au1)",
   "metadata": "V14",
   "runtimes": {

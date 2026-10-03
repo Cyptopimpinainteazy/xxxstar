@@ -1,0 +1,56 @@
+{
+  "scope": "Snapshot export JSON-RPC validation and output preservation",
+  "git_commit": "c65abb5ba001eafccbb2b03584ef2467b28c03cf",
+  "tested_code_tree": "542255a71dcb568cc9a05dbaf6fe21779f7a9452",
+  "specification": "https://www.jsonrpc.org/specification",
+  "checks": [
+    {
+      "command": "python3 tests/test_snapshot_rpc_export.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "tests": 22
+    },
+    {
+      "command": "python3 -m py_compile scripts/snapshot-rpc-export.py tests/test_snapshot_rpc_export.py",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "python3 scripts/x3_fake_code_scan.py cheats",
+      "exit_code": 0,
+      "result": "PASS",
+      "findings": 151
+    },
+    {
+      "command": "python3 scripts/x3_fake_code_scan.py stubs",
+      "exit_code": 0,
+      "result": "PASS",
+      "findings": 1573
+    }
+  ],
+  "regressions_reproduced": {
+    "protocol": "15 failing assertions before fix: uncorrelated/version/ambiguous envelopes, malformed errors and reused request IDs",
+    "missing_headers": "Two errors before fix: finalized header null or missing number",
+    "late_refusal": "Existing snapshot overwritten before final report RPC refusal; now old snapshot/report preserved"
+  },
+  "behavior": [
+    "Distinct sequential request IDs, exact protocol version, correlated numeric IDs excluding booleans",
+    "Exactly one result/error; structured integer-code/string-message errors",
+    "Valid null results remain supported",
+    "Missing head headers produce Refused, not uncaught exceptions",
+    "All RPC verification completes before writing artifacts"
+  ],
+  "limitations": [
+    "Real loopback HTTP fixtures; no live X3 node",
+    "Snapshot trie-root and finality verification gates not run here",
+    "Writes across both output files are not one filesystem transaction",
+    "Source-scan gate fixes depend on PR #566"
+  ],
+  "production_gate": "NOT_RUN",
+  "completion_percent": null
+}

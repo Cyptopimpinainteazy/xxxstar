@@ -201,6 +201,12 @@ fi
 start_fake_rpc "$RPC_MATCH_PORT" 4242
 say "stub X3 RPC reporting finalized head #4242 at $RPC_MATCH"
 if [[ ! -d "$ROOT_DIR/apps/explorer/.next" ]]; then
+    if [[ ! -d "$ROOT_DIR/apps/explorer/node_modules" ]]; then
+        say "apps/explorer has no node_modules; running 'npm ci' first (this takes a few minutes)"
+        (cd "$ROOT_DIR/apps/explorer" && npm ci --no-audit --no-fund --prefer-offline) \
+            > "$WORK_DIR/explorer-npm-ci.log" 2>&1 \
+            || die "apps/explorer npm ci failed — see $WORK_DIR/explorer-npm-ci.log"
+    fi
     say "no .next build; running 'npm run build' in apps/explorer (this takes a few minutes)"
     (cd "$ROOT_DIR/apps/explorer" && npm run build) > "$WORK_DIR/explorer-build.log" 2>&1 \
         || die "apps/explorer failed to build — see $WORK_DIR/explorer-build.log"

@@ -1,0 +1,34 @@
+{
+  "tested_code_commit": "a98d607c4b21ee480fba47c795a77e2808b0ddf1",
+  "tested_code_tree": "b4bb1df1cbc75d5066b95b720efc50fa939c773e",
+  "checks": {
+    "router_tests": 143,
+    "launcher_tests": 13,
+    "scanner_tests": 3,
+    "python_compile": "passed",
+    "bash_syntax": "passed",
+    "diff_check": "passed",
+    "cheats": {
+      "constant_assert": 14,
+      "noop_test": 2,
+      "skip": 131
+    },
+    "stubs": {
+      "critical_marker": 442,
+      "explicit_stub": 72,
+      "marker": 1036
+    }
+  },
+  "review_claims_verified": {
+    "wrong_router_test_class": "Correct tests are ProtocolTests, both passed in isolation",
+    "tree_hash": "f8c68136f689b4baa8bc574f4cf087ec7d2f973b is a tree, exactly 0ba554a3^{tree}, not a missing commit",
+    "scan_exclusions": "New finding IDs are a strict subset of previous results; removed scanner documentation and generated dist bundles only",
+    "multi_host": "Documented command sets SKIP_BOOTNODE_MEMBERSHIP_CHECK=1; covered by selection test"
+  },
+  "limitations": [
+    "No live seven-validator finality proof",
+    "Test node argv comes from test-only Python process",
+    "Full production gate not passed",
+    "Historical artifacts retain their original fields"
+  ]
+}

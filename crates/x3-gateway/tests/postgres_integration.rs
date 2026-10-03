@@ -52,7 +52,9 @@ async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
         .expect("read grants back through the production database API");
 
     assert!(
-        grants.iter().any(|grant| grant.grant_id == created.grant_id),
+        grants
+            .iter()
+            .any(|grant| grant.grant_id == created.grant_id),
         "newly inserted grant must be visible through the admin list path"
     );
 

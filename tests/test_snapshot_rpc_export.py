@@ -184,6 +184,88 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
 
+class RpcProtocolCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.requests = []
+        self.reply = lambda request: {"jsonrpc": "2.0", "id": request["id"], "result": None}
+        case = self
+
+        class ProtocolHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                case.requests.append(request)
+                payload = json.dumps(case.reply(request)).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *_):
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), ProtocolHandler)
+        self.server.daemon_threads = True
+        self.worker = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.worker.start()
+        self.rpc = exporter.Rpc(f"http://127.0.0.1:{self.server.server_port}", timeout=2)
+        self.addCleanup(self.cleanup_server)
+
+    def cleanup_server(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.worker.join(timeout=2)
+
+    def test_rejects_malformed_or_uncorrelated_envelopes(self):
+        mutations = [
+            lambda doc: doc.pop("jsonrpc"),
+            lambda doc: doc.update(jsonrpc="1.0"),
+            lambda doc: doc.pop("id"),
+            lambda doc: doc.update(id=99999),
+            lambda doc: doc.update(id=str(doc["id"])),
+            lambda doc: doc.update(id=True),
+            lambda doc: doc.update(error={"code": -32601, "message": "Unknown method"}),
+            lambda doc: doc.update(error=None),
+        ]
+        for index, mutate in enumerate(mutations):
+            with self.subTest(case=index):
+                def reply(request):
+                    document = {"jsonrpc": "2.0", "id": request["id"], "result": None}
+                    mutate(document)
+                    return document
+
+                self.reply = reply
+                with self.assertRaises(exporter.RpcError):
+                    self.rpc.call("chain_getHeader", [])
+
+    def test_null_result_is_a_valid_rpc_answer(self):
+        self.assertIsNone(self.rpc.call("chain_getHeader", []))
+
+    def test_sequential_calls_use_distinct_ids(self):
+        self.rpc.call("chain_getHeader", [])
+        self.rpc.call("chain_getFinalizedHead", [])
+        self.assertNotEqual(self.requests[0]["id"], self.requests[1]["id"])
+
+    def test_rejects_malformed_error_objects(self):
+        errors = [None, [], "failure", {}, {"code": True, "message": "bad code"},
+                  {"code": -32601}, {"code": -32601, "message": 42}]
+        for error in errors:
+            with self.subTest(error=error):
+                self.reply = lambda request: {"jsonrpc": "2.0", "id": request["id"], "error": error}
+                with self.assertRaisesRegex(exporter.RpcError, "invalid error"):
+                    self.rpc.call("chain_getHeader", [])
+
+    def test_valid_rpc_error_keeps_method_and_provider_message(self):
+        self.reply = lambda request: {"jsonrpc": "2.0", "id": request["id"],
+                                      "error": {"code": -32601, "message": "Unknown method"}}
+        with self.assertRaisesRegex(exporter.RpcError, "chain_getHeader.*Unknown method"):
+            self.rpc.call("chain_getHeader", [])
+
+    def test_boolean_id_cannot_match_numeric_request_id(self):
+        self.reply = lambda request: {"jsonrpc": "2.0", "id": True, "result": None}
+        with self.assertRaises(exporter.RpcError):
+            self.rpc.call("chain_getHeader", [])
+
+
 class ExportCase(unittest.TestCase):
     def setUp(self) -> None:
         self.work = tempfile.TemporaryDirectory()
@@ -218,6 +300,70 @@ class ExportCase(unittest.TestCase):
         return code, spec, report
 
     # ── the happy path, measured rather than assumed ─────────────────────────
+    def test_missing_finalized_header_refuses_without_writing_snapshot(self):
+        for missing in (None, {}, {"number": None}):
+            with self.subTest(header=missing):
+                class MissingHeader(Chain):
+                    def header(self, block_hash):
+                        if block_hash == self.hash_at(self.height):
+                            return missing
+                        return super().header(block_hash)
+
+                chain = MissingHeader()
+                code, spec, report = self.run_export(chain, "--at", chain.hash_at(3))
+                self.assertEqual(code, 1)
+                self.assertFalse(spec.exists())
+                self.assertFalse(report.exists())
+
+    def test_late_rpc_refusal_preserves_existing_snapshot_and_report(self):
+        class LateMissingHeader(Chain):
+            finishing = False
+            finishing_reads = 0
+
+            def dispatch(self, method, params):
+                if method == "state_getRuntimeVersion":
+                    self.finishing = True
+                return super().dispatch(method, params)
+
+            def header(self, block_hash):
+                if self.finishing:
+                    self.finishing_reads += 1
+                    if self.finishing_reads == 1:
+                        return None
+                return super().header(block_hash)
+
+        spec = self.dir / "out.json"
+        report = self.dir / "anchor.json"
+        spec.write_text("old snapshot")
+        report.write_text("old report")
+        code, _, _ = self.run_export(LateMissingHeader())
+        self.assertEqual(code, 1)
+        self.assertEqual(spec.read_text(), "old snapshot")
+        self.assertEqual(report.read_text(), "old report")
+
+    def test_report_does_not_reread_pruned_start_header(self):
+        class PruningChain(Chain):
+            finished = False
+            start = None
+
+            def dispatch(self, method, params):
+                if method == 'chain_getFinalizedHead' and self.start is None:
+                    self.start = self.hash_at(self.height)
+                if method == 'state_getRuntimeVersion':
+                    self.finished = True
+                    self.height += 1
+                return super().dispatch(method, params)
+
+            def header(self, block_hash):
+                if self.finished and block_hash == self.start:
+                    return None
+                return super().header(block_hash)
+
+        code, spec, report = self.run_export(PruningChain())
+        self.assertEqual(code, 0)
+        self.assertTrue(spec.exists())
+        self.assertEqual(json.loads(report.read_text())['finalized_head_advanced_by'], 1)
+
     def test_export_writes_the_served_state_and_the_chains_anchor(self) -> None:
         chain = Chain(height=4, state={"0x01": "0xaa", "0x02": "0xbb", "0x03": "0x"})
         code, spec, report = self.run_export(chain)

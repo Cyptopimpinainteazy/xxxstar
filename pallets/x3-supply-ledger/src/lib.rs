@@ -38,7 +38,13 @@ mod tests_conservation;
 #[cfg(test)]
 mod tests_halt;
 #[cfg(test)]
+mod tests_public_api;
+#[cfg(test)]
+mod tests_retention;
+#[cfg(test)]
 mod tests_s0_1;
+#[cfg(test)]
+mod tests_weights;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -57,7 +63,7 @@ pub mod pallet {
     };
 
     /// Keep only the latest N block proofs to prevent unbounded storage growth.
-    const HISTORICAL_PROOF_RETENTION_BLOCKS: u32 = 1_000;
+    pub const HISTORICAL_PROOF_RETENTION_BLOCKS: u32 = 1_000;
 
     /// Runtime response policy when a supply invariant violation is detected
     /// during block finalization.
@@ -260,10 +266,15 @@ pub mod pallet {
             CurrentSupplyProof::<T>::put(proof.clone());
             HistoricalProofs::<T>::insert(Self::block_number_to_u32(block_number), proof.clone());
 
-            // Prune old proofs to keep storage bounded.
+            // Prune old proofs to keep storage bounded. `checked_sub` is the exact window
+            // boundary: before the window fills there is nothing to evict, and at block
+            // `current_block` the proof that has just fallen out is `current_block -
+            // RETENTION`. This also evicts a proof at block 0 when block `RETENTION`
+            // finalizes, so storage that carries a key below the first finalized block
+            // (state restore, migration) can never sit one entry over the documented bound.
             let current_block = Self::block_number_to_u32(block_number);
-            if current_block > HISTORICAL_PROOF_RETENTION_BLOCKS {
-                let prune_block = current_block - HISTORICAL_PROOF_RETENTION_BLOCKS;
+            if let Some(prune_block) = current_block.checked_sub(HISTORICAL_PROOF_RETENTION_BLOCKS)
+            {
                 HistoricalProofs::<T>::remove(prune_block);
             }
 
