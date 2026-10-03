@@ -1,0 +1,94 @@
+X3JOB-META free_gb=11
+X3JOB-META host=x3gpu1
+X3JOB-META repo=/home/lojak/Desktop/xxxstar-master
+X3JOB-META kernel=6.8.0-146-generic
+X3JOB-META rustc=rustc 1.90.0 (1159e78c4 2025-09-14)
+X3JOB-META cargo=cargo 1.90.0 (840b83a10 2025-07-30)
+X3JOB-META cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+X3JOB-META target_dir=/home/lojak/Desktop/xxxstar-master/target
+X3JOB-META start=2026-10-03T08:25:37Z
+== gpu_enumeration
+== crate_gpu_tests
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.61s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== hash_parity_all_gpus
+== adapter 0: NVIDIA GeForce GTX 1070 (Vulkan, driver 580.178.04)
+   keccak256 parity over 4354871 vectors, deterministic=true
+   sha256    parity over 4354871 vectors, deterministic=true
+   keccak256  32B x      1: gpu       1113/s (  0.898 ms)  cpu1t    2024291/s  cpu8t       8242/s  gpu/cpu8t 0.14x
+   keccak256  32B x     16: gpu      19224/s (  0.832 ms)  cpu1t    2245929/s  cpu8t      89900/s  gpu/cpu8t 0.21x
+   keccak256  32B x    256: gpu     307149/s (  0.833 ms)  cpu1t    2254057/s  cpu8t    1529125/s  gpu/cpu8t 0.20x
+   keccak256  32B x   4096: gpu    4197500/s (  0.976 ms)  cpu1t    2249505/s  cpu8t    7165198/s  gpu/cpu8t 0.59x
+   keccak256  32B x  65536: gpu    4987780/s ( 13.139 ms)  cpu1t    2264400/s  cpu8t    8995681/s  gpu/cpu8t 0.55x
+   keccak256 256B x      1: gpu        712/s (  1.404 ms)  cpu1t    1092896/s  cpu8t       9690/s  gpu/cpu8t 0.07x
+   keccak256 256B x     16: gpu      10514/s (  1.522 ms)  cpu1t     461334/s  cpu8t      40011/s  gpu/cpu8t 0.26x
+   keccak256 256B x    256: gpu     167720/s (  1.526 ms)  cpu1t     460439/s  cpu8t     479938/s  gpu/cpu8t 0.35x
+   keccak256 256B x   4096: gpu    1830567/s (  2.238 ms)  cpu1t     910815/s  cpu8t    2638441/s  gpu/cpu8t 0.69x
+   keccak256 256B x  65536: gpu    2326973/s ( 28.164 ms)  cpu1t    1153080/s  cpu8t    4595563/s  gpu/cpu8t 0.51x
+   sha256     32B x      1: gpu       6380/s (  0.157 ms)  cpu1t    3095975/s  cpu8t       9992/s  gpu/cpu8t 0.64x
+   sha256     32B x     16: gpu     106055/s (  0.151 ms)  cpu1t    3689186/s  cpu8t     103181/s  gpu/cpu8t 1.03x
+   sha256     32B x    256: gpu    1792541/s (  0.143 ms)  cpu1t    3756199/s  cpu8t    1526745/s  gpu/cpu8t 1.17x
+   sha256     32B x   4096: gpu   11977869/s (  0.342 ms)  cpu1t    3612805/s  cpu8t    9978926/s  gpu/cpu8t 1.20x
+   sha256     32B x  65536: gpu   14184317/s (  4.620 ms)  cpu1t    3718818/s  cpu8t   14104959/s  gpu/cpu8t 1.01x
+   sha256    256B x      1: gpu       1931/s (  0.518 ms)  cpu1t     714796/s  cpu8t       8152/s  gpu/cpu8t 0.24x
+   sha256    256B x     16: gpu      32118/s (  0.498 ms)  cpu1t     757719/s  cpu8t      87927/s  gpu/cpu8t 0.37x
+   sha256    256B x    256: gpu     490371/s (  0.522 ms)  cpu1t     740938/s  cpu8t    1162875/s  gpu/cpu8t 0.42x
+   sha256    256B x   4096: gpu    3651411/s (  1.122 ms)  cpu1t     740356/s  cpu8t    2704994/s  gpu/cpu8t 1.35x
+   sha256    256B x  65536: gpu    3108920/s ( 21.080 ms)  cpu1t     744150/s  cpu8t    2975404/s  gpu/cpu8t 1.04x
+== adapter 1: NVIDIA GeForce RTX 2060 SUPER (Vulkan, driver 580.178.04)
+   keccak256 parity over 4354871 vectors, deterministic=true
+   sha256    parity over 4354871 vectors, deterministic=true
+   keccak256  32B x      1: gpu       1670/s (  0.599 ms)  cpu1t    2074689/s  cpu8t       8155/s  gpu/cpu8t 0.20x
+   keccak256  32B x     16: gpu      36641/s (  0.437 ms)  cpu1t    2302490/s  cpu8t      81546/s  gpu/cpu8t 0.45x
+   keccak256  32B x    256: gpu     936545/s (  0.273 ms)  cpu1t    2066483/s  cpu8t    1169740/s  gpu/cpu8t 0.80x
+   keccak256  32B x   4096: gpu    8600326/s (  0.476 ms)  cpu1t    2232799/s  cpu8t    6836169/s  gpu/cpu8t 1.26x
+   keccak256  32B x  65536: gpu   17198197/s (  3.811 ms)  cpu1t    2258473/s  cpu8t    8727919/s  gpu/cpu8t 1.97x
+   keccak256 256B x      1: gpu       1652/s (  0.605 ms)  cpu1t    1123596/s  cpu8t      14055/s  gpu/cpu8t 0.12x
+   keccak256 256B x     16: gpu      26543/s (  0.603 ms)  cpu1t    1181509/s  cpu8t      62992/s  gpu/cpu8t 0.42x
+   keccak256 256B x    256: gpu     417081/s (  0.614 ms)  cpu1t    1112410/s  cpu8t    1223534/s  gpu/cpu8t 0.34x
+   keccak256 256B x   4096: gpu    3197462/s (  1.281 ms)  cpu1t     632259/s  cpu8t    3543924/s  gpu/cpu8t 0.90x
+   keccak256 256B x  65536: gpu    6263619/s ( 10.463 ms)  cpu1t    1130884/s  cpu8t    4593605/s  gpu/cpu8t 1.36x
+   sha256     32B x      1: gpu       8221/s (  0.122 ms)  cpu1t    3205128/s  cpu8t      25967/s  gpu/cpu8t 0.32x
+   sha256     32B x     16: gpu     169232/s (  0.095 ms)  cpu1t    3683241/s  cpu8t     100187/s  gpu/cpu8t 1.69x
+   sha256     32B x    256: gpu    2256501/s (  0.113 ms)  cpu1t    3381368/s  cpu8t    1638715/s  gpu/cpu8t 1.38x
+   sha256     32B x   4096: gpu   18931236/s (  0.216 ms)  cpu1t    3664967/s  cpu8t    9510541/s  gpu/cpu8t 1.99x
+   sha256     32B x  65536: gpu   25005924/s (  2.621 ms)  cpu1t    3672238/s  cpu8t   14241922/s  gpu/cpu8t 1.76x
+   sha256    256B x      1: gpu       3290/s (  0.304 ms)  cpu1t     669792/s  cpu8t       9151/s  gpu/cpu8t 0.36x
+   sha256    256B x     16: gpu      70209/s (  0.228 ms)  cpu1t     739884/s  cpu8t      95813/s  gpu/cpu8t 0.73x
+   sha256    256B x    256: gpu    1122216/s (  0.228 ms)  cpu1t     741616/s  cpu8t    1125522/s  gpu/cpu8t 1.00x
+   sha256    256B x   4096: gpu    7669608/s (  0.534 ms)  cpu1t     739354/s  cpu8t    2679203/s  gpu/cpu8t 2.86x
+   sha256    256B x  65536: gpu    6772662/s (  9.677 ms)  cpu1t     734517/s  cpu8t    2969896/s  gpu/cpu8t 2.28x
+== multi-GPU keccak256 32B x 262144: 2 adapters 29.9 ms vs adapter 0 alone 162.0 ms, merged order ok=true
+PASS
+== secp256k1_parity_vs_cpu
+
+running 2 tests
+.test multi_gpu_split_matches_cpu_on_every_job has been running for over 60 seconds
+.
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 64.52s
+
+== secp256k1_bench_all_gpus
+cpu 1 thread: 25552 verifies/s   cpu 8 threads: 104134 verifies/s
+== NVIDIA GeForce GTX 1070: first call (shader compile + 1 job) 28.60s
+       64 jobs:     70.0 ms        914 verifies/s  vs cpu8t 0.009x
+     1024 jobs:     99.5 ms      10291 verifies/s  vs cpu8t 0.099x
+     8192 jobs:    329.9 ms      24835 verifies/s  vs cpu8t 0.238x
+    65536 jobs:   2074.1 ms      31597 verifies/s  vs cpu8t 0.303x
+== NVIDIA GeForce RTX 2060 SUPER: first call (shader compile + 1 job) 30.19s
+       64 jobs:     36.6 ms       1746 verifies/s  vs cpu8t 0.017x
+     1024 jobs:     48.1 ms      21305 verifies/s  vs cpu8t 0.205x
+     8192 jobs:    126.6 ms      64717 verifies/s  vs cpu8t 0.621x
+    65536 jobs:    613.4 ms     106847 verifies/s  vs cpu8t 1.026x
+== all 2 adapters split by weight [59062.0, 89956.0]
+     8192 jobs:     76.5 ms     107109 verifies/s  vs cpu8t 1.029x
+    65536 jobs:    392.9 ms     166790 verifies/s  vs cpu8t 1.602x
+summary: audit-artifacts/gpu-production/6c9a6d66dc454c837edcda6215ee30c50318e9bf/summary.json pass=true
+X3JOB-META end=2026-10-03T08:30:34Z

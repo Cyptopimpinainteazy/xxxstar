@@ -1,0 +1,20 @@
+X3JOB-META free_gb=11
+X3JOB-META host=x3gpu1
+X3JOB-META repo=/home/lojak/Desktop/xxxstar-master
+X3JOB-META kernel=6.8.0-146-generic
+X3JOB-META rustc=none
+X3JOB-META cargo=none
+X3JOB-META cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+X3JOB-META target_dir=/home/lojak/Desktop/xxxstar-master/target
+X3JOB-META start=2026-10-03T08:21:37Z
+== gpu_enumeration
+== crate_gpu_tests
+env: ‘cargo’: No such file or directory
+== hash_parity_all_gpus
+scripts/gpu-production-gate.sh: line 27: cargo: command not found
+== secp256k1_parity_vs_cpu
+env: ‘cargo’: No such file or directory
+== secp256k1_bench_all_gpus
+scripts/gpu-production-gate.sh: line 27: cargo: command not found
+summary: audit-artifacts/gpu-production/cc3e8dd45f444dafb67005d50ac3551205028e72/summary.json pass=false
+X3JOB-META end=2026-10-03T08:21:53Z

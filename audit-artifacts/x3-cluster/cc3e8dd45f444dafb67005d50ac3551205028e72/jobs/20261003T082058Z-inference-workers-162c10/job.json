@@ -1,0 +1,52 @@
+{
+  "id": "20261003T082058Z-inference-workers-162c10",
+  "name": "inference-workers",
+  "class": "INFERENCE",
+  "cmd": "for p in $(ss -H -ltn | awk '{print $4}' | sed -n 's/.*:\\(114[34][0-9]\\)$/\\1/p' | grep -vx 11435 | sort -u); do curl -fsS -m 300 http://127.0.0.1:$p/api/generate -d '{\"model\":\"qwen2.5-coder:7b\",\"prompt\":\"Reply with the single word: ok\",\"stream\":false,\"options\":{\"num_predict\":8}}' -o \"$X3_JOB_OUT/worker-$p.json\" || { echo \"worker :$p failed\"; exit 1; }; echo \"worker :$p ok\"; done; ls \"$X3_JOB_OUT\"/worker-*.json",
+  "commit": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "ref": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "priority": "NORMAL",
+  "timeout": 600,
+  "node": null,
+  "min_free_gb": 1,
+  "submitted": "2026-10-03T08:20:58+00:00",
+  "controller": "x3star1",
+  "worker": "x3gpu1",
+  "label": "PHYSICAL",
+  "rejected_workers": [
+    {
+      "node": "x3gpu2",
+      "reason": "unreachable or SSH key auth failed"
+    }
+  ],
+  "exit_code": 0,
+  "result": "PASS",
+  "seconds": 264.5,
+  "machine": "x3gpu1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "none",
+    "cargo": "none",
+    "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+  },
+  "start": "2026-10-03T08:21:34Z",
+  "end": "2026-10-03T08:25:22Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-master",
+  "target_dir": "/home/lojak/Desktop/xxxstar-master/target",
+  "worker_free_gb": "11",
+  "log_sha256": "46de17062147d63513e40e105c1b0047b6adefc8faf63cc32c45b5c453d85bc2",
+  "log_tail": "X3JOB-META free_gb=11\nX3JOB-META host=x3gpu1\nX3JOB-META repo=/home/lojak/Desktop/xxxstar-master\nX3JOB-META kernel=6.8.0-146-generic\nX3JOB-META rustc=none\nX3JOB-META cargo=none\nX3JOB-META cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nX3JOB-META target_dir=/home/lojak/Desktop/xxxstar-master/target\nX3JOB-META start=2026-10-03T08:21:34Z\nworker :11434 ok\nworker :11436 ok\n/home/lojak/.cache/x3-cluster/out/20261003T082058Z-inference-workers-162c10/worker-11434.json\n/home/lojak/.cache/x3-cluster/out/20261003T082058Z-inference-workers-162c10/worker-11436.json\nX3JOB-META end=2026-10-03T08:25:22Z\n",
+  "artifacts": [
+    {
+      "path": "worker-11434.json",
+      "sha256": "aff0d935c540064183cbd4bb573f73b99afbdb60b74fd7e6d5f9e80d632e718d",
+      "bytes": 500
+    },
+    {
+      "path": "worker-11436.json",
+      "sha256": "e4765e0a3252ba46ec071c715a29efd68930e58ef5c98c8d5db4b71e88008090",
+      "bytes": 500
+    }
+  ],
+  "finished": "2026-10-03T08:25:24+00:00"
+}

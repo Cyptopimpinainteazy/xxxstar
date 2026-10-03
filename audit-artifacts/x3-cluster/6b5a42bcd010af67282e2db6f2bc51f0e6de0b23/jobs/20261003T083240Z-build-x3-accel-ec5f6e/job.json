@@ -1,0 +1,41 @@
+{
+  "id": "20261003T083240Z-build-x3-accel-ec5f6e",
+  "name": "build-x3-accel",
+  "class": "BUILD",
+  "cmd": "cargo build --locked -p x3-accel -p x3-accel-wgpu",
+  "commit": "6b5a42bcd010af67282e2db6f2bc51f0e6de0b23",
+  "ref": "6b5a42bcd010af67282e2db6f2bc51f0e6de0b23",
+  "priority": "HIGH",
+  "timeout": 3600,
+  "node": null,
+  "min_free_gb": 30,
+  "submitted": "2026-10-03T08:32:40+00:00",
+  "controller": "x3star1",
+  "worker": "x3star1",
+  "label": "LOCAL-FALLBACK",
+  "rejected_workers": [
+    {
+      "node": "x3build1",
+      "reason": "unreachable or SSH key auth failed"
+    }
+  ],
+  "exit_code": 0,
+  "result": "PASS",
+  "seconds": 12.9,
+  "machine": "x3star1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "cc": "cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0"
+  },
+  "start": "2026-10-03T08:32:48Z",
+  "end": "2026-10-03T08:32:52Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-main",
+  "target_dir": "/home/lojak/.cache/x3-cluster/target",
+  "worker_free_gb": "275",
+  "log_sha256": "847eeaa00e6e875283432ba501c0c37ce0027302911ed9596efa39eb031544f0",
+  "log_tail": "cc=cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nX3JOB-META target_dir=/home/lojak/.cache/x3-cluster/target\nX3JOB-META start=2026-10-03T08:32:48Z\nwarning: /home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package\nwarning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.\nPerhaps you misspelled the source URL being patched.\nPossible URLs for `[patch.<URL>]`:\n    /home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/sp-wasm-interface\nwarning: Patch `fastbloom v0.14.1 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/fastbloom)` was not used in the crate graph.\nPatch `rustix v1.1.2 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/rustix)` was not used in the crate graph.\nCheck that the patched package version and available features are compatible\nwith the dependency requirements. If the patch has a different version from\nwhat is locked in the Cargo.lock file, run `cargo update` to use the new\nversion. This may also occur with an optional dependency that is not enabled.\n   Compiling crypto-common v0.1.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/crypto-common)\n   Compiling x3-accel-wgpu v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/crates/x3-accel-wgpu)\n   Compiling digest v0.10.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/digest)\n   Compiling curve25519-dalek v4.1.3\n   Compiling sha2 v0.10.9\n   Compiling blake2 v0.10.6\n   Compiling ed25519-dalek v2.2.0\n   Compiling x3-accel v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/crates/x3-accel)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.07s\nX3JOB-META end=2026-10-03T08:32:52Z\n",
+  "artifacts": [],
+  "finished": "2026-10-03T08:32:53+00:00"
+}

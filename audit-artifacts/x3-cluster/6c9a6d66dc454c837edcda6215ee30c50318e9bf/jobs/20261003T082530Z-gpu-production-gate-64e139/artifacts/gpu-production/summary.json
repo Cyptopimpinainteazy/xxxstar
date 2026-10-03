@@ -1,0 +1,4 @@
+{"label":"PHYSICAL","host":"x3gpu1","commit":"6c9a6d66dc454c837edcda6215ee30c50318e9bf","dirty":false,"collected":"2026-10-03T08:30:34Z",
+ "driver":"580.178.04",
+ "steps":[{"step":"gpu_enumeration","pass":true},{"step":"crate_gpu_tests","pass":true},{"step":"hash_parity_all_gpus","pass":true},{"step":"secp256k1_parity_vs_cpu","pass":true},{"step":"secp256k1_bench_all_gpus","pass":true}],"pass":true,
+ "not_covered":["ed25519 GPU verification (no kernel)","CUDA backend (no nvcc)","multi-GPU parity needs 2+ adapters (required here via X3_REQUIRE_MULTI_GPU)"]}

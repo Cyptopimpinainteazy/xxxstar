@@ -1,0 +1,105 @@
+{
+  "commit": "6b5a42bcd010af67282e2db6f2bc51f0e6de0b23",
+  "ref": "6b5a42bcd010af67282e2db6f2bc51f0e6de0b23",
+  "controller": "x3star1",
+  "finished": "2026-10-03T08:37:50+00:00",
+  "stages": [
+    {
+      "stage": "build",
+      "jobs": [
+        {
+          "id": "20261003T083240Z-build-x3-accel-ec5f6e",
+          "name": "build-x3-accel",
+          "class": "BUILD",
+          "worker": "x3star1",
+          "label": "LOCAL-FALLBACK",
+          "result": "PASS",
+          "exit_code": 0,
+          "seconds": 12.9,
+          "detail": null,
+          "optional": false
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "stage": "verify",
+      "jobs": [
+        {
+          "id": "20261003T083253Z-test-x3-accel-ce6132",
+          "name": "test-x3-accel",
+          "class": "TEST",
+          "worker": "x3star1",
+          "label": "LOCAL-FALLBACK",
+          "result": "PASS",
+          "exit_code": 0,
+          "seconds": 18.8,
+          "detail": null,
+          "optional": false
+        },
+        {
+          "id": "20261003T083253Z-fuzz-atomic-kernel-rollback-722e6b",
+          "name": "fuzz-atomic-kernel-rollback",
+          "class": "FUZZ",
+          "worker": "x3star1",
+          "label": "LOCAL-FALLBACK",
+          "result": "PASS",
+          "exit_code": 0,
+          "seconds": 296.4,
+          "detail": null,
+          "optional": false
+        },
+        {
+          "id": "20261003T083253Z-sim-partition-storm-hunt-15e447",
+          "name": "sim-partition-storm-hunt",
+          "class": "SIMULATION",
+          "worker": "x3star1",
+          "label": "LOCAL-FALLBACK",
+          "result": "PASS",
+          "exit_code": 0,
+          "seconds": 43.9,
+          "detail": null,
+          "optional": false
+        },
+        {
+          "id": "20261003T083253Z-sim-crash-recovery-hunt-d83e2d",
+          "name": "sim-crash-recovery-hunt",
+          "class": "SIMULATION",
+          "worker": "x3star1",
+          "label": "LOCAL-FALLBACK",
+          "result": "PASS",
+          "exit_code": 0,
+          "seconds": 28.8,
+          "detail": null,
+          "optional": false
+        },
+        {
+          "id": "20261003T083253Z-gpu-production-gate-4209a5",
+          "name": "gpu-production-gate",
+          "class": "GPU",
+          "worker": "x3gpu1",
+          "label": "PHYSICAL",
+          "result": "PASS",
+          "exit_code": 0,
+          "seconds": 125.7,
+          "detail": null,
+          "optional": false
+        },
+        {
+          "id": "20261003T083253Z-inference-workers-bfc0ba",
+          "name": "inference-workers",
+          "class": "INFERENCE",
+          "worker": "x3gpu1",
+          "label": "PHYSICAL",
+          "result": "PASS",
+          "exit_code": 0,
+          "seconds": 21.5,
+          "detail": null,
+          "optional": false
+        }
+      ],
+      "result": "PASS"
+    }
+  ],
+  "result": "PASS"
+}
