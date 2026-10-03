@@ -48,7 +48,7 @@ jobs:
       - name: Run critical path tests
         run: cargo test --release -p x3-chain-node --features testnet -- --nocapture
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: x3-chain-node
           path: target/release/x3-chain-node
@@ -107,7 +107,7 @@ jobs:
           done
           echo "✅ No dev keys found in generated chain spec."
       - name: Upload generated specs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: chain-specs
           path: chain-specs/generated/
