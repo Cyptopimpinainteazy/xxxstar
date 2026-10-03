@@ -211,8 +211,11 @@ impl WgpuBackend {
         let max_bytes = MAX_DISPATCH_DATA_BYTES
             .min(u64::from(limits.max_storage_buffer_binding_size))
             .min(limits.max_buffer_size);
-        // meta holds 2 words per message plus the header.
-        let max_messages = ((max_bytes / 4) as usize / 2).saturating_sub(META_HEADER_WORDS);
+        // meta holds 2 words per message plus the header; the hash output is
+        // 32 bytes per message and must fit the same storage-binding limit.
+        let meta_max_messages = ((max_bytes / 4) as usize / 2).saturating_sub(META_HEADER_WORDS);
+        let output_max_messages = (max_bytes / 32) as usize;
+        let max_messages = meta_max_messages.min(output_max_messages);
         let mut outputs = Vec::with_capacity(inputs.len());
         let mut start = 0;
         while start < inputs.len() {
@@ -285,6 +288,12 @@ impl WgpuBackend {
     ) -> Result<Vec<u8>, WgpuAccelError> {
         let count_u32 =
             u32::try_from(count).map_err(|_| WgpuAccelError::InvalidInput("batch exceeds u32"))?;
+        let limit_words = (self.device.limits().max_storage_buffer_binding_size / 4) as usize;
+        let meta_limit = limit_words.saturating_sub(META_HEADER_WORDS) / 2;
+        let output_limit = limit_words / kernel.output_words.max(1);
+        if count > meta_limit.min(output_limit) {
+            return Err(WgpuAccelError::InvalidInput("batch exceeds device storage binding limit"));
+        }
         // A batch of empty messages still needs a non-empty data binding.
         let data_words = data_words.max(1);
         let entry_words = META_HEADER_WORDS + 2 * count;
@@ -421,7 +430,9 @@ impl ComputeKernel {
             .next_power_of_two()
             .min(limit_words)
             .max(data_words);
-        let message_limit = limit_words.saturating_sub(META_HEADER_WORDS) / 2;
+        let meta_message_limit = limit_words.saturating_sub(META_HEADER_WORDS) / 2;
+        let output_message_limit = limit_words / self.output_words.max(1);
+        let message_limit = meta_message_limit.min(output_message_limit);
         let message_capacity = messages
             .next_power_of_two()
             .min(message_limit)
@@ -494,11 +505,9 @@ fn hardware_adapters_raw() -> Vec<wgpu::Adapter> {
         let info = adapter.get_info();
         (info.vendor, info.device, info.name)
     });
-    // One entry per physical device even if several backends expose it.
-    adapters.dedup_by_key(|adapter| {
-        let info = adapter.get_info();
-        (info.vendor, info.device, info.name)
-    });
+    // Do not deduplicate by vendor/device/name: two separate physical cards are
+    // commonly identical. The selected backend set is platform-native enough
+    // that preserving real devices is safer than collapsing identical GPUs.
     adapters
 }
 
