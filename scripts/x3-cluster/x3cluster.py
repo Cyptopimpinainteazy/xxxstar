@@ -297,7 +297,7 @@ def plan_gpu_workers(node, node_ip, bind):
                 # Unpinned is only unambiguous while there is one GPU; a second card makes it a conflict.
                 entry["state"] = "adopted"
                 entry["unit"] = unit
-                entry["bind"] = unit_env.get("OLLAMA_HOST")
+                entry["bind"] = unit_env.get("OLLAMA_HOST") or "127.0.0.1:11434"
                 if not unit_env.get("CUDA_VISIBLE_DEVICES"):
                     entry["detail"] = "unpinned system worker, adopted because this node has one GPU"
             else:
@@ -341,6 +341,8 @@ def registration(node, host, plan):
     """The providers.d drop-in a router loads to use this node's GPUs."""
     providers, policies = {}, {}
     for entry in plan:
+        if entry.get("state") not in ("create", "adopted"):
+            continue
         for model in entry["models"]:
             name = f"{node}_gpu{entry['rank']}_" + re.sub(r"[^a-z0-9]+", "_", model.lower()).strip("_")
             tools = ADVERTISED_MODELS[model]["supports_tools"]
@@ -457,7 +459,7 @@ def bootstrap(args):
         # on loopback and the staged block rebinds it after enabling ufw.
         lan_now = args.lan and firewall_enabled()
         bind = "0.0.0.0" if lan_now else "127.0.0.1"
-        plan, dropins = plan_gpu_workers(node, node_ip, "0.0.0.0" if args.lan else "127.0.0.1")
+        plan, dropins = plan_gpu_workers(node, node_ip, bind)
         staged.extend(dropins)
         for entry in plan:
             if entry["state"] == "create":
@@ -486,6 +488,12 @@ def bootstrap(args):
                     staged.append(f"sed -i 's|OLLAMA_HOST=127.0.0.1:{entry['port']}|OLLAMA_HOST=0.0.0.0:{entry['port']}|' {path}\n"
                                   f"systemctl --user daemon-reload && systemctl --user restart {entry['unit']}\n")
                 if entry["state"] == "adopted" and str(entry.get("bind", "")).startswith("127."):
+                    unit = entry.get("unit")
+                    if unit and unit.endswith(".service") and not (USER_UNITS / unit).exists():
+                        # Adopted system unit: keep it loopback-only until UFW is enabled, then
+                        # install a root-owned override that pins the GPU and opens only the LAN port.
+                        staged.append(system_dropin(entry["gpu"], entry["port"], "0.0.0.0"))
+                        continue
                     pid, _ = ollama_process_on(entry["port"])
                     _, unit = run(["ps", "-o", "uunit=", "-p", str(pid)])
                     if not unit.endswith(".service") or not (USER_UNITS / unit).exists():
@@ -751,9 +759,13 @@ def health(args, quiet=False):
                 row["detail"] = "sshd answers but refuses this node's key: run x3-join.sh on it"
                 seen = metrics_health(ip)
                 if seen and seen.get("hostname") == name:
+                    workers = {p: {**w, "loaded": w.get("loaded", w.get("models", []))}
+                               for p, w in seen["ollama_workers"].items()}
                     row.update(label="PHYSICAL-METRICS", metrics=seen, cpu=f"{seen['threads']}t",
                                ram=f"{seen['ram_gb']}G", gpu=f"{len(seen['gpus'])}x{int(seen['gpus'][0]['memory_total_mib']) // 1024}GB"
-                               if seen["gpus"] else "-", ollama_workers=seen["ollama_workers"])
+                               if seen["gpus"] else "-", ollama_workers=workers,
+                               disk_free_gb=seen.get("free_gb"), clock_synced=seen.get("clock_synced", False),
+                               failed_units=seen.get("failed_units", []), repo_head=seen.get("repo_head"))
             elif reachable:
                 row["detail"] = "pings but no sshd on :22"
             if node["role"] == "control":
@@ -1095,6 +1107,11 @@ git clone -q --filter=blob:none --no-checkout {remote} ~/xxxstar && echo ~/xxxst
     if not step("bootstrap", code == 0 and boot, boot.get("missing_tools") if boot else (err or out)[-500:]):
         return finish("failed")
     record["bootstrap"] = boot
+    missing_tools = boot.get("missing_tools", [])
+    if missing_tools:
+        step("role_tools_ready", False, {"missing": missing_tools,
+                                         "action": "run ~/.config/x3-cluster/staged-privileged.sh on the node, then discovery will retry"})
+        return finish("blocked")
     _, staged, _ = ssh_run(ip, "cat ~/.config/x3-cluster/staged-privileged.sh 2>/dev/null", 15)
     record["staged_privileged"] = staged or None
 
@@ -1136,6 +1153,9 @@ git clone -q --filter=blob:none --no-checkout {remote} ~/xxxstar && echo ~/xxxst
             drop.mkdir(parents=True, exist_ok=True)
             (drop / f"{name}.json").write_text(json.dumps(reg, indent=2) + "\n")
             record["router_dropin"] = str(drop / f"{name}.json")
+            rc, _ = run(["systemctl", "--user", "restart", "x3-ai-router.service"], 30)
+            if not step("router_reload", rc == 0, "restarted x3-ai-router.service" if rc == 0 else "router restart failed"):
+                return finish("blocked")
         reachable = {w["port"]: tcp_open(ip, w["port"]) for w in workers}
         step(f"workers_reachable_from_{me}", all(reachable.values()),
              reachable if all(reachable.values()) else f"{reachable}: run the staged firewall block on {name}")
