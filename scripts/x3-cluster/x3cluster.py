@@ -368,7 +368,11 @@ def bootstrap(args):
         apt["sshd"] = "openssh-server"
     packages = sorted({apt[t] for t in missing if t in apt and t != "nvcc"})
     if packages:
-        staged.append("sudo apt-get update && sudo apt-get install -y " + " ".join(packages) + "\n"
+        # packagekitd (desktop updater) holds the apt lock for long stretches; it is
+        # D-Bus activated and comes back on demand. apt then waits rather than failing.
+        staged.append("sudo systemctl stop packagekit 2>/dev/null || true\n"
+                      "sudo apt-get -o DPkg::Lock::Timeout=600 update\n"
+                      "sudo apt-get -o DPkg::Lock::Timeout=600 install -y " + " ".join(packages) + "\n"
                       + ("sudo systemctl enable --now ssh\n" if "openssh-server" in packages else ""))
     if "nvcc" in missing:
         staged.append("# CUDA toolkit (needed to build the .cu kernels): install " + apt["nvcc"] + "\n")
