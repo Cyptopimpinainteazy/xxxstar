@@ -1,0 +1,169 @@
+{
+  "collected": "2026-10-03T09:39:48+00:00",
+  "from": "x3star1",
+  "repo": {
+    "commit": "9aa250ebfe3a2baf87d62dae25771fad57d78d65",
+    "branch": "feat/x3-cluster-control",
+    "dirty": false
+  },
+  "nodes": [
+    {
+      "node": "x3star1",
+      "role": "control",
+      "ip": "192.168.0.70",
+      "required": true,
+      "reachable": true,
+      "ssh": true,
+      "label": "LOCAL",
+      "cpu": "32t load 17.6",
+      "ram": "81.7G",
+      "gpu": "-",
+      "services": {
+        "ssh": "active",
+        "x3-ai-router": "active"
+      },
+      "ollama_workers": {
+        "11434": {
+          "ok": true,
+          "loaded": []
+        }
+      },
+      "router": {
+        "status": "ok"
+      },
+      "disk_free_gb": 260.1,
+      "clock_synced": true,
+      "failed_units": [],
+      "repo": {
+        "commit": "9aa250ebfe3a2baf87d62dae25771fad57d78d65",
+        "branch": "feat/x3-cluster-control",
+        "dirty": false
+      }
+    },
+    {
+      "node": "x3gpu1",
+      "role": "gpu",
+      "ip": "192.168.0.30",
+      "required": true,
+      "reachable": true,
+      "ssh": true,
+      "ssh_port": true,
+      "label": "PHYSICAL",
+      "remote": {
+        "hostname": "x3gpu1",
+        "threads": 8,
+        "load": 3.7294921875,
+        "ram_gb": 32.8,
+        "free_gb": 10.2,
+        "gpus": [
+          "NVIDIA GeForce GTX 1070",
+          "NVIDIA GeForce RTX 2060 SUPER"
+        ],
+        "ollama_workers": {
+          "11436": {
+            "ok": true,
+            "bind": "*",
+            "loaded": []
+          },
+          "11434": {
+            "ok": true,
+            "bind": "*",
+            "loaded": []
+          }
+        },
+        "router": {
+          "status": "ok",
+          "in_flight": {}
+        },
+        "clock_synced": true,
+        "failed_units": [],
+        "role": "gpu",
+        "repo_head": "f464c06c23416f51ba9605c0a44381b9affead1e"
+      },
+      "cpu": "8t load 3.7",
+      "ram": "32.8G",
+      "gpu": "GTX 1070,RTX 2060 SUPER",
+      "ollama_workers": {
+        "11436": {
+          "ok": true,
+          "bind": "*",
+          "loaded": []
+        },
+        "11434": {
+          "ok": true,
+          "bind": "*",
+          "loaded": []
+        }
+      },
+      "router": {
+        "status": "ok",
+        "in_flight": {}
+      },
+      "disk_free_gb": 10.2,
+      "clock_synced": true,
+      "failed_units": [],
+      "node_role": "gpu",
+      "repo_head": "f464c06c23416f51ba9605c0a44381b9affead1e"
+    },
+    {
+      "node": "x3gpu2",
+      "role": "gpu",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3build1",
+      "role": "build",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3sim1",
+      "role": "sim",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3data1",
+      "role": "data",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3net1",
+      "role": "net",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3ops1",
+      "role": "ops",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    }
+  ]
+}
