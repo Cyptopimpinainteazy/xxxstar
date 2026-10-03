@@ -19,7 +19,7 @@ DeepSeek runs **thinking mode by default**, which has two consequences the route
 
 Routine requests try DeepSeek first, then OpenRouter, then local Ollama, then the two explicitly free NVIDIA models, then the remaining paid providers. A provider the operator has not opted into is skipped quietly, and a provider that is not declared tool-capable is skipped for any request carrying tools. To opt in to the free cloud endpoints, set `X3_ENABLE_FREE_CLOUD=1` and `OPENROUTER_API_KEY`. They have rate/availability limits and must retain a `:free` model ID with zero prices. NVIDIA warns that its free endpoints log prompts for product improvement; never send secrets or confidential code through them. For a local-only setup, remove cloud names from `routes.routine`. Critical requests never use the free models, not even through `budget_fallback` (see below).
 
-Start with `python3 router.py --db /path/to/usage.sqlite3`. Point an OpenAI-compatible client at `http://127.0.0.1:11435/v1`, model `x3-auto`. Set `X3_ROUTER_TOKEN` to require bearer authorization, and set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` for cloud providers. `X-X3-Agent` identifies a caller for per-agent budgets. `GET /v1/usage` returns spend accounting. The service binds to loopback; put authenticated TLS in front of it for remote access.
+Start with `python3 router.py` (or `deploy/install.sh`, below). The usage database defaults to `$X3_ROUTER_DB`, else `~/.local/share/x3-router/usage.sqlite3`; its directory is created and it runs in WAL mode with a 30 s busy timeout. `--host` / `X3_ROUTER_HOST` binds a non-loopback address and is refused unless `X3_ROUTER_TOKEN` is set. Point an OpenAI-compatible client at `http://127.0.0.1:11435/v1`, model `x3-auto`. Set `X3_ROUTER_TOKEN` to require bearer authorization, and set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` for cloud providers. `X-X3-Agent` identifies a caller for per-agent budgets. `GET /v1/usage` returns spend accounting. The service binds to loopback; put authenticated TLS in front of it for remote access.
 
 Edit `config.json` for installed Ollama models, provider models, prices, and budgets. Prices are examples and must be set to current provider rates before relying on cost limits. Paid providers with zero prices are skipped. Requests whose JSON exceeds `max_input_tokens` UTF-8 bytes are rejected as a conservative input bound. SQLite reservations enforce the configured budgets across concurrent workers; a provider returning no usage is charged the reserved estimate. Failed requests are not charged locally even if a provider billed them. Provider-side hidden tokens or prices that change without a config update can still produce a higher actual bill.
 
@@ -381,3 +381,42 @@ Still missing, in the order they matter for relying on this with X3 agents:
 - **Operational security.** One router token, no per-agent credentials; the usage database is an unencrypted SQLite file.
 
 The service does not persist prompts or credentials.
+
+## Dual local GPU workers (x3gpu1)
+
+Two independent Ollama processes, one per card, each pinned by **UUID**
+(`nvidia-smi` lists the GTX 1070 as 0 and the RTX as 1; CUDA's default
+fastest-first order is the reverse, so a bare index lands on the wrong card):
+
+| Worker | Port | GPU | Unit | Providers |
+| --- | --- | --- | --- | --- |
+| A | 127.0.0.1:11434 | RTX 2060 SUPER | system `ollama.service` + `deploy/ollama-rtx.conf` | `ollama`, `ollama_qwen3` (worker `gpu-rtx`) |
+| B | 127.0.0.1:11436 | GTX 1070 | user `ollama-worker-b.service` | `ollama_gtx`, `ollama_gtx_qwen3` (worker `gpu-gtx`) |
+
+Each worker runs one slot (`OLLAMA_NUM_PARALLEL=1`: parallel slots multiply
+the KV cache and push qwen3:8b off an 8 GB card) with flash attention and a
+q8_0 KV cache. Providers that share a `worker` share its `max_in_flight`
+slots; when a worker is full, `attempt_order` moves its providers to the back,
+so a second concurrent request goes to the other card instead of queueing.
+The slot is claimed atomically when the provider is chosen. A dead worker
+goes on the usual exponential cooldown and its requests fail over to the
+other card, then to DeepSeek if `DEEPSEEK_API_KEY` is set.
+
+Policies: `x3-code` → RTX first; `x3-review` → GTX first; `x3-fast` → GTX
+coder first; `x3-local` → both cards only. `GET /health` reports `in_flight`
+per worker.
+
+Install (survives logout/reboot; linger is enabled):
+
+```bash
+services/x3-ai-router/deploy/install.sh            # router + GTX worker (user units)
+services/x3-ai-router/deploy/install.sh --system   # also pin ollama.service to the RTX (sudo)
+```
+
+Secrets go in `~/.config/x3-router/env` (mode 600). Live check + benchmark on
+the real cards (stops/starts worker B to prove failover), evidence written to
+`audit-artifacts/gpu-ai/`:
+
+```bash
+python3 services/x3-ai-router/live_dual_gpu_check.py --iterations 5
+```

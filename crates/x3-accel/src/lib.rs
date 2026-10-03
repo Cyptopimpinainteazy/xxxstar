@@ -9,6 +9,11 @@ use ed25519_dalek::{Signature as Ed25519Signature, Verifier, VerifyingKey};
 use secp256k1::{ecdsa::Signature as Secp256k1Signature, Message, PublicKey, Secp256k1};
 use sha2::{Digest as ShaDigest, Sha256};
 
+mod multi_device;
+mod shadow;
+pub use multi_device::{MultiDevice, DEFAULT_MIN_SPLIT};
+pub use shadow::{ShadowStats, ShadowVerifier};
+
 /// Accelerator backend selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendKind {
@@ -265,6 +270,62 @@ impl WgpuBackend {
             .map(|inner| Self { inner })
             .map_err(|_| AccelError::BackendUnavailable(BackendKind::Wgpu))
     }
+
+    /// Use one specific hardware adapter (index into
+    /// `x3_accel_wgpu::WgpuBackend::hardware_adapters`), e.g. one per GPU.
+    pub fn from_adapter(index: usize) -> Result<Self, AccelError> {
+        x3_accel_wgpu::WgpuBackend::initialize_adapter(index)
+            .map(|inner| Self { inner })
+            .map_err(|_| AccelError::BackendUnavailable(BackendKind::Wgpu))
+    }
+}
+
+#[cfg(feature = "wgpu")]
+fn wgpu_error(algorithm: &'static str) -> impl Fn(x3_accel_wgpu::WgpuAccelError) -> AccelError {
+    move |err| match err {
+        x3_accel_wgpu::WgpuAccelError::InvalidInput(message) => AccelError::InvalidInput(message),
+        x3_accel_wgpu::WgpuAccelError::AdapterUnavailable
+        | x3_accel_wgpu::WgpuAccelError::DeviceRequestFailed(_)
+        | x3_accel_wgpu::WgpuAccelError::BufferMapFailed(_) => {
+            AccelError::BackendUnavailable(BackendKind::Wgpu)
+        }
+        x3_accel_wgpu::WgpuAccelError::KernelUnavailable(_) => AccelError::KernelUnavailable {
+            backend: BackendKind::Wgpu,
+            algorithm,
+        },
+    }
+}
+
+/// Apply libsecp256k1's input rules on the host, with the same library the
+/// CPU backend uses, and hand the GPU only well-formed jobs.
+///
+/// `None` means `CpuBackend` would return `false` before doing any curve
+/// arithmetic: a non-canonical signature (r or s >= n), a high-S signature
+/// (libsecp256k1's verify rejects these), r or s = 0, or a public key that does
+/// not parse (bad length/prefix, coordinate >= p, off-curve, hybrid parity).
+#[cfg(feature = "wgpu")]
+fn prepare_secp256k1(job: &Secp256k1VerifyJob) -> Option<x3_accel_wgpu::Secp256k1Prepared> {
+    let signature = Secp256k1Signature::from_compact(&job.signature).ok()?;
+    let mut low_s = signature;
+    low_s.normalize_s();
+    if low_s != signature {
+        return None;
+    }
+    let r: [u8; 32] = job.signature[..32].try_into().expect("32 bytes");
+    let s: [u8; 32] = job.signature[32..].try_into().expect("32 bytes");
+    if r == [0; 32] || s == [0; 32] {
+        return None;
+    }
+    let point = PublicKey::from_slice(&job.public_key)
+        .ok()?
+        .serialize_uncompressed();
+    Some(x3_accel_wgpu::Secp256k1Prepared {
+        r,
+        s,
+        z: job.message_hash,
+        qx: point[1..33].try_into().expect("32 bytes"),
+        qy: point[33..65].try_into().expect("32 bytes"),
+    })
 }
 
 #[cfg(feature = "wgpu")]
@@ -275,12 +336,25 @@ impl AccelBackend for WgpuBackend {
 
     fn verify_secp256k1_batch(
         &self,
-        _batch: &[Secp256k1VerifyJob],
+        batch: &[Secp256k1VerifyJob],
     ) -> Result<Vec<bool>, AccelError> {
-        Err(AccelError::KernelUnavailable {
-            backend: BackendKind::Wgpu,
-            algorithm: "secp256k1",
-        })
+        let mut results = vec![false; batch.len()];
+        let (slots, prepared): (Vec<usize>, Vec<_>) = batch
+            .iter()
+            .enumerate()
+            .filter_map(|(slot, job)| prepare_secp256k1(job).map(|p| (slot, p)))
+            .unzip();
+        let verdicts = self
+            .inner
+            .secp256k1_verify_prepared(&prepared)
+            .map_err(wgpu_error("secp256k1"))?;
+        if verdicts.len() != slots.len() {
+            return Err(AccelError::BackendUnavailable(BackendKind::Wgpu));
+        }
+        for (slot, verdict) in slots.into_iter().zip(verdicts) {
+            results[slot] = verdict;
+        }
+        Ok(results)
     }
 
     fn verify_ed25519_batch(&self, _batch: &[Ed25519VerifyJob]) -> Result<Vec<bool>, AccelError> {
@@ -291,37 +365,15 @@ impl AccelBackend for WgpuBackend {
     }
 
     fn keccak256_batch(&self, inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
-        self.inner.keccak256_batch(inputs).map_err(|err| match err {
-            x3_accel_wgpu::WgpuAccelError::InvalidInput(message) => {
-                AccelError::InvalidInput(message)
-            }
-            x3_accel_wgpu::WgpuAccelError::AdapterUnavailable
-            | x3_accel_wgpu::WgpuAccelError::DeviceRequestFailed(_)
-            | x3_accel_wgpu::WgpuAccelError::BufferMapFailed(_) => {
-                AccelError::BackendUnavailable(BackendKind::Wgpu)
-            }
-            x3_accel_wgpu::WgpuAccelError::KernelUnavailable(_) => AccelError::KernelUnavailable {
-                backend: BackendKind::Wgpu,
-                algorithm: "keccak256",
-            },
-        })
+        self.inner
+            .keccak256_batch(inputs)
+            .map_err(wgpu_error("keccak256"))
     }
 
     fn sha256_batch(&self, inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
-        self.inner.sha256_batch(inputs).map_err(|err| match err {
-            x3_accel_wgpu::WgpuAccelError::InvalidInput(message) => {
-                AccelError::InvalidInput(message)
-            }
-            x3_accel_wgpu::WgpuAccelError::AdapterUnavailable
-            | x3_accel_wgpu::WgpuAccelError::DeviceRequestFailed(_)
-            | x3_accel_wgpu::WgpuAccelError::BufferMapFailed(_) => {
-                AccelError::BackendUnavailable(BackendKind::Wgpu)
-            }
-            x3_accel_wgpu::WgpuAccelError::KernelUnavailable(_) => AccelError::KernelUnavailable {
-                backend: BackendKind::Wgpu,
-                algorithm: "sha256",
-            },
-        })
+        self.inner
+            .sha256_batch(inputs)
+            .map_err(wgpu_error("sha256"))
     }
 
     fn blake2b256_batch(&self, _inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
