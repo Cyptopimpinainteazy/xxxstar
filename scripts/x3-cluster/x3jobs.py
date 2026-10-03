@@ -205,12 +205,12 @@ def parse_meta(log):
 def result_for(code, meta):
     if code in REJECT_CODES or "reject" in meta:
         return "REJECTED"
-    if code == 124 or code == 137:
+    if code == 124:
         return "TIMEOUT"
     return "PASS" if code == 0 else "FAIL"
 
 
-def fetch_artifacts(name, me, facts, job_id, dest):
+def fetch_artifacts(name, me, facts, job_id, dest, required=False):
     """Copy the worker's $X3_JOB_OUT into dest, then delete it on the worker.
     Returns [{path, sha256, bytes}]. Crash reproducers are only removed after the copy."""
     remote_out = f".cache/x3-cluster/out/{job_id}"
@@ -220,11 +220,17 @@ def fetch_artifacts(name, me, facts, job_id, dest):
         if src.exists():
             shutil.copytree(src, dest, dirs_exist_ok=True)
             shutil.rmtree(src)
+        elif required:
+            raise RuntimeError(f"required artifact directory missing: {src}")
     else:
         host = name if name_resolves(name) else facts["_ip"]
-        out = subprocess.run(ssh_cmd(host) + [f"test -d {remote_out} && tar -C {remote_out} -cf - . || true"],
-                             capture_output=True, timeout=600)
-        if out.returncode == 0 and out.stdout:
+        remote_cmd = f"test -d {remote_out} && tar -C {remote_out} -cf - ."
+        if not required:
+            remote_cmd += " || true"
+        out = subprocess.run(ssh_cmd(host) + [remote_cmd], capture_output=True, timeout=600)
+        if out.returncode != 0 or (required and not out.stdout):
+            raise RuntimeError(f"artifact transfer failed from {host}: rc={out.returncode}")
+        if out.stdout:
             with tarfile.open(fileobj=io.BytesIO(out.stdout)) as tar:
                 tar.extractall(dest, filter="data")
             subprocess.run(ssh_cmd(host) + [f"rm -rf {remote_out}"], capture_output=True, timeout=60)
@@ -245,7 +251,7 @@ def sha256_file(path):
 def run_job(job, inv, me, evidence_root, probe_fn=probe, stream=None):
     """Route, execute and record one job. Returns the job record (also written to job.json)."""
     spec = CLASSES[job["class"]]
-    need = job.get("min_free_gb") or spec["min_free_gb"]
+    need = spec["min_free_gb"] if job.get("min_free_gb") is None else job["min_free_gb"]
     record = dict(job, min_free_gb=need, submitted=now(), controller=me)
     out_dir = Path(evidence_root) / job["commit"] / "jobs" / job["id"]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -258,7 +264,7 @@ def run_job(job, inv, me, evidence_root, probe_fn=probe, stream=None):
         return record
     facts["_ip"] = inv["nodes"][name].get("ip")
     target = facts.get("env", {}).get("X3_CARGO_TARGET_DIR")
-    script = job_script(job, worker_repo(facts), target, need)
+    script = job_script(job, worker_repo(facts), target, need, inv.get("canonical_repo", CANONICAL_REMOTE))
     cmd = ["bash", "-s"] if name == me else ssh_cmd(name if name_resolves(name) else facts["_ip"]) + ["bash -s"]
     started = time.monotonic()
     log_path = out_dir / "log.txt"
@@ -283,7 +289,15 @@ def run_job(job, inv, me, evidence_root, probe_fn=probe, stream=None):
                   worker_free_gb=meta.get("free_gb"), log_sha256=sha256_file(log_path), log_tail=text[-2000:])
     if "reject" in meta:
         record["detail"] = meta["reject"]
-    record["artifacts"] = fetch_artifacts(name, me, facts, job["id"], out_dir / "artifacts")
+    try:
+        record["artifacts"] = fetch_artifacts(
+            name, me, facts, job["id"], out_dir / "artifacts",
+            required=job["class"] in {"GPU", "INFERENCE", "FUZZ", "SIMULATION"},
+        )
+    except Exception as exc:  # evidence is part of the gate for these job classes
+        record["artifacts"] = []
+        record["result"] = "FAIL"
+        record["detail"] = f"artifact collection failed: {exc}"
     record["finished"] = now()
     (out_dir / "job.json").write_text(json.dumps(record, indent=2) + "\n")
     return record
@@ -318,7 +332,11 @@ def run_pipeline(spec, inv, me, commit, ref, evidence_root, probe_fn=probe, stre
         records = [None] * len(jobs)
 
         def work(i):
-            records[i] = run_job(jobs[i], inv, me, evidence_root, probe_fn, stream)
+            try:
+                records[i] = run_job(jobs[i], inv, me, evidence_root, probe_fn, stream)
+            except Exception as exc:
+                records[i] = {**jobs[i], "result": "FAIL", "exit_code": None,
+                              "detail": f"runner exception: {type(exc).__name__}: {exc}"}
 
         threads = [threading.Thread(target=work, args=(i,)) for i in range(len(jobs))]
         for t in threads:
