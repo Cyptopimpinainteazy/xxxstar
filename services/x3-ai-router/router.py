@@ -1187,6 +1187,8 @@ class Router:
     def __init__(self, config, db_path):
         self.config = config
         self.db = sqlite3.connect(db_path, check_same_thread=False)
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA busy_timeout=5000")
         self.lock = threading.Lock()
         self.context = threading.local()
         self.db.execute("CREATE TABLE IF NOT EXISTS usage (day TEXT, agent TEXT, provider TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL)")
@@ -2499,7 +2501,16 @@ def handler_for(router):
                 else:
                     self.stream_chunk(chunk)
 
-            outcome = router.stream(plan, agent, start, send)
+            try:
+                outcome = router.stream(plan, agent, start, send)
+            except ClientDisconnected:
+                self.close_connection = True
+                return
+            except Exception as exc:
+                # Once SSE headers are out, every exit path must still emit a
+                # terminal event; a socket that just closes mid-stream reads
+                # as "stream disconnected before completion" on the client.
+                outcome = (502, {"error": {"message": sanitize_secret(str(exc))}})
             try:
                 if adapter:
                     if outcome is not None and adapter[0].started:
@@ -2637,8 +2648,21 @@ def handler_for(router):
                     except ClientDisconnected:
                         self.close_connection = True
                         return
+                    except Exception as exc:
+                        outcome = (502, {"error": {"message": sanitize_secret(str(exc))}})
                     if outcome is not None and not started_stream:
                         return self.reply(*outcome)
+                    if outcome is not None and started_stream:
+                        # The headers and part of the answer are already out:
+                        # end the stream with an explicit error and [DONE]
+                        # instead of dropping the socket mid-answer.
+                        try:
+                            self.wfile.write(b"data: " + json.dumps(
+                                {"error": outcome[1].get("error", {})}).encode() + b"\n\n")
+                            self.wfile.write(b"data: [DONE]\n\n")
+                            self.wfile.flush()
+                        except (BrokenPipeError, ConnectionResetError, OSError):
+                            pass
                     self.close_connection = True
                     return
                 status, result = router.complete(UpstreamRequest(PROTOCOL_CHAT, data, chat=data), agent)
@@ -2655,6 +2679,7 @@ def main():
     parser.add_argument("--config", default=os.path.join(os.path.dirname(__file__), "config.json"))
     parser.add_argument("--db", default="x3-router.sqlite3")
     parser.add_argument("--port", type=int, default=11435)
+    parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args()
     with open(args.config, encoding="utf-8") as source:
         config = json.load(source)
@@ -2662,7 +2687,7 @@ def main():
     # Probe in the background: a slow or unreachable provider must not hold up
     # the listener, and the verdict is what makes an agent route provable.
     threading.Thread(target=router.warm_capabilities, daemon=True).start()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), handler_for(router))
+    server = ThreadingHTTPServer((args.host, args.port), handler_for(router))
     server.serve_forever()
 
 
