@@ -20,6 +20,7 @@ CONTROL_IP="192.168.0.70"
 CONTROL_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJEW3gU29rVC93o1TVD5i6yA09ewbV9eo+upTr3pw14S x3star1-to-x3gpu1"
 ROLES="gpu build sim data net ops"
 WORKER_PORTS="11434:11449"
+CLUSTER_USER="${X3_CLUSTER_USER:-lojak}"
 
 role="" name="" dry=0
 while [ $# -gt 0 ]; do
@@ -32,7 +33,9 @@ while [ $# -gt 0 ]; do
     esac
 done
 case " $ROLES " in *" $role "*) ;; *) echo "--role must be one of: $ROLES" >&2; exit 2 ;; esac
+[ -n "$name" ] || { echo "--name is required and must match inventory.json (for example x3build1)" >&2; exit 2; }
 [ "$(id -u)" -ne 0 ] || { echo "run as the normal user (it uses sudo itself), not as root" >&2; exit 2; }
+[ "$USER" = "$CLUSTER_USER" ] || { echo "cluster SSH expects user $CLUSTER_USER; rerun as that account or set X3_CLUSTER_USER consistently on the controller and node" >&2; exit 2; }
 
 do_() { echo "+ $*"; [ "$dry" = 1 ] || "$@"; }
 need_reboot=0
@@ -49,16 +52,29 @@ fi
 
 # 2. Base packages. packagekitd (desktop updater) often holds the apt lock; apt waits instead of failing.
 do_ sudo systemctl stop packagekit 2>/dev/null || true
-do_ sudo apt-get -o DPkg::Lock::Timeout=600 update
+if [ "$dry" = 1 ]; then
+    echo "+ apt-get update (retry up to 10 minutes on lock contention)"
+else
+    for attempt in $(seq 1 60); do
+        sudo apt-get -o DPkg::Lock::Timeout=600 update && break
+        [ "$attempt" -lt 60 ] || exit 1
+        sleep 10
+    done
+fi
 do_ sudo apt-get -o DPkg::Lock::Timeout=600 install -y openssh-server git python3 curl ca-certificates \
     tmux jq iperf3 ethtool ufw pciutils
 do_ sudo systemctl enable --now ssh
 
 # 3. Let the control node in with its key (public key only; nothing secret is copied anywhere).
-mkdir -p ~/.ssh && chmod 700 ~/.ssh
-touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
-if ! grep -qF "$CONTROL_KEY" ~/.ssh/authorized_keys; then
-    echo "+ authorize x3star1's public key"; [ "$dry" = 1 ] || echo "$CONTROL_KEY" >> ~/.ssh/authorized_keys
+if [ "$dry" = 1 ]; then
+    echo "+ prepare ~/.ssh/authorized_keys and authorize x3star1's public key"
+else
+    mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+    if ! grep -qF "$CONTROL_KEY" ~/.ssh/authorized_keys; then
+        echo "+ authorize x3star1's public key"
+        echo "$CONTROL_KEY" >> ~/.ssh/authorized_keys
+    fi
 fi
 
 # 4. User services (the per-GPU workers) must survive logout and start at boot.
