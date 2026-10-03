@@ -189,7 +189,8 @@ class JoinScript(unittest.TestCase):
                                  capture_output=True, text=True, timeout=60, env={"HOME": home, "PATH": "/usr/bin:/bin",
                                                                                    "USER": "lojak"})
             self.assertEqual(out.returncode, 0, out.stderr)
-            self.assertEqual(Path(home, ".ssh", "authorized_keys").read_text(), "")
+            # A dry run writes nothing at all, not even an empty authorized_keys.
+            self.assertFalse(Path(home, ".ssh", "authorized_keys").exists())
         lines = out.stdout.splitlines()
         ssh_rule = next(i for i, l in enumerate(lines) if "port 22" in l)
         enable = next(i for i, l in enumerate(lines) if "ufw --force enable" in l)
