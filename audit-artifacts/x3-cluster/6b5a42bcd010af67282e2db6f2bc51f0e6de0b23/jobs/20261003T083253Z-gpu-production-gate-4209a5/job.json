@@ -1,0 +1,62 @@
+{
+  "id": "20261003T083253Z-gpu-production-gate-4209a5",
+  "name": "gpu-production-gate",
+  "class": "GPU",
+  "cmd": "bash scripts/gpu-production-gate.sh && cp -r audit-artifacts/gpu-production/\"$X3_COMMIT\" \"$X3_JOB_OUT/gpu-production\"",
+  "commit": "6b5a42bcd010af67282e2db6f2bc51f0e6de0b23",
+  "ref": "6b5a42bcd010af67282e2db6f2bc51f0e6de0b23",
+  "priority": "HIGH",
+  "timeout": 3600,
+  "node": null,
+  "min_free_gb": 8,
+  "submitted": "2026-10-03T08:32:53+00:00",
+  "controller": "x3star1",
+  "worker": "x3gpu1",
+  "label": "PHYSICAL",
+  "rejected_workers": [
+    {
+      "node": "x3gpu2",
+      "reason": "unreachable or SSH key auth failed"
+    }
+  ],
+  "exit_code": 0,
+  "result": "PASS",
+  "seconds": 125.7,
+  "machine": "x3gpu1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+  },
+  "start": "2026-10-03T08:32:59Z",
+  "end": "2026-10-03T08:34:37Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-master",
+  "target_dir": "/home/lojak/Desktop/xxxstar-master/target",
+  "worker_free_gb": "11",
+  "log_sha256": "a6a09b0494fb6c124ac2d00403c7cd6fa5afb44e579a311e84aa7f7310e10058",
+  "log_tail": "5 ms)  cpu1t    3674796/s  cpu8t   14044674/s  gpu/cpu8t 1.77x\n   sha256    256B x      1: gpu       2555/s (  0.391 ms)  cpu1t     711238/s  cpu8t       9904/s  gpu/cpu8t 0.26x\n   sha256    256B x     16: gpu      53512/s (  0.299 ms)  cpu1t     745782/s  cpu8t      92250/s  gpu/cpu8t 0.58x\n   sha256    256B x    256: gpu     889998/s (  0.288 ms)  cpu1t     729521/s  cpu8t    1045517/s  gpu/cpu8t 0.85x\n   sha256    256B x   4096: gpu    5904519/s (  0.694 ms)  cpu1t     739868/s  cpu8t    2652989/s  gpu/cpu8t 2.23x\n   sha256    256B x  65536: gpu    6630325/s (  9.884 ms)  cpu1t     703784/s  cpu8t    2967751/s  gpu/cpu8t 2.23x\n== multi-GPU keccak256 32B x 262144: 2 adapters 65.1 ms vs adapter 0 alone 159.7 ms, merged order ok=true\nPASS\n== secp256k1_parity_vs_cpu\n\nrunning 2 tests\n..\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.27s\n\n== secp256k1_bench_all_gpus\ncpu 1 thread: 25261 verifies/s   cpu 8 threads: 106380 verifies/s\n== NVIDIA GeForce GTX 1070: first call (shader compile + 1 job) 234.95ms\n       64 jobs:     32.4 ms       1975 verifies/s  vs cpu8t 0.019x\n     1024 jobs:     54.6 ms      18738 verifies/s  vs cpu8t 0.176x\n     8192 jobs:    129.8 ms      63129 verifies/s  vs cpu8t 0.593x\n    65536 jobs:    853.1 ms      76820 verifies/s  vs cpu8t 0.722x\n== NVIDIA GeForce RTX 2060 SUPER: first call (shader compile + 1 job) 305.71ms\n       64 jobs:     36.9 ms       1737 verifies/s  vs cpu8t 0.016x\n     1024 jobs:     54.0 ms      18966 verifies/s  vs cpu8t 0.178x\n     8192 jobs:    128.6 ms      63711 verifies/s  vs cpu8t 0.599x\n    65536 jobs:    626.2 ms     104655 verifies/s  vs cpu8t 0.984x\n== all 2 adapters split by weight [56664.0, 89803.0]\n     8192 jobs:     74.1 ms     110503 verifies/s  vs cpu8t 1.039x\n    65536 jobs:    409.7 ms     159954 verifies/s  vs cpu8t 1.504x\nsummary: audit-artifacts/gpu-production/6b5a42bcd010af67282e2db6f2bc51f0e6de0b23/summary.json pass=true\nX3JOB-META end=2026-10-03T08:34:37Z\n",
+  "artifacts": [
+    {
+      "path": "gpu-production/gpu-info.csv",
+      "sha256": "fc0095402923f6b9b0c0e32c928567d5937db919a45193fa4ddfc56458bed4cb",
+      "bytes": 283
+    },
+    {
+      "path": "gpu-production/hash-parity.json",
+      "sha256": "424be2df8c27d56beb0e220ead82a462dde250fdd28bf3d0f174c0f21ba7f3a8",
+      "bytes": 8700
+    },
+    {
+      "path": "gpu-production/secp256k1-bench.json",
+      "sha256": "347b7a36bf6dc8effcdf3e95adfd3fa213fea9261150b4c63b8ec72a50511199",
+      "bytes": 1238
+    },
+    {
+      "path": "gpu-production/summary.json",
+      "sha256": "f26712d4b333523edd0531bfcb89f218a32c9fe10d86f2f033e671dcbdb7f301",
+      "bytes": 563
+    }
+  ],
+  "finished": "2026-10-03T08:35:00+00:00"
+}

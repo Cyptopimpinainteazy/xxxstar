@@ -1,0 +1,41 @@
+{
+  "id": "20261003T082058Z-fuzz-atomic-kernel-rollback-d90a5e",
+  "name": "fuzz-atomic-kernel-rollback",
+  "class": "FUZZ",
+  "cmd": "mkdir -p \"$X3_JOB_OUT/crashes\" \"$X3_JOB_OUT/corpus\" && cd pallets/x3-atomic-kernel && cargo +nightly fuzz run fuzz_rollback \"$X3_JOB_OUT/corpus\" -- -max_total_time=120 -seed=1 -artifact_prefix=\"$X3_JOB_OUT/crashes/\"",
+  "commit": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "ref": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "priority": "NORMAL",
+  "timeout": 2400,
+  "node": null,
+  "min_free_gb": 30,
+  "submitted": "2026-10-03T08:20:58+00:00",
+  "controller": "x3star1",
+  "worker": "x3star1",
+  "label": "LOCAL-FALLBACK",
+  "rejected_workers": [
+    {
+      "node": "x3sim1",
+      "reason": "unreachable or SSH key auth failed"
+    }
+  ],
+  "exit_code": 1,
+  "result": "FAIL",
+  "seconds": 334.6,
+  "machine": "x3star1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "cc": "cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0"
+  },
+  "start": "2026-10-03T08:21:08Z",
+  "end": "2026-10-03T08:26:32Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-main",
+  "target_dir": "/home/lojak/.cache/x3-cluster/target",
+  "worker_free_gb": "282",
+  "log_sha256": "ffe30eeada3d44361cdd95d0727b6da386569ac8a4a20f31d58aab33dda386b9",
+  "log_tail": "/src/scope_limited.rs:22:1\n   |\n22 | environmental::environmental!(ext: trait Externalities);\n   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = note: `thread_local` is in scope, but it is an attribute: `#[thread_local]`\n   = note: this error originates in the macro `$crate::thread_local_impl` which comes from the expansion of the macro `environmental::environmental` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nerror[E0425]: cannot find value `GLOBAL` in this scope\n  --> /home/lojak/.cargo/git/checkouts/polkadot-sdk-dee0edd6eefa0594/2e4dd0b/substrate/primitives/externalities/src/scope_limited.rs:22:1\n   |\n22 | environmental::environmental!(ext: trait Externalities);\n   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope\n   |\n   = note: this error originates in the macro `$crate::environmental` which comes from the expansion of the macro `environmental::environmental` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nFor more information about this error, try `rustc --explain E0425`.\nerror: could not compile `sp-externalities` (lib) due to 4 previous errors\nwarning: build failed, waiting for other jobs to finish...\nError: failed to build fuzz script: ASAN_OPTIONS=\"detect_odr_violation=0\" RUSTFLAGS=\" -Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Cllvm-args=-sanitizer-coverage-inline-8bit-counters -Cllvm-args=-sanitizer-coverage-pc-table -Cllvm-args=-sanitizer-coverage-trace-compares --cfg fuzzing -Cllvm-args=-simplifycfg-branch-fold-threshold=0 -Zsanitizer=address -Cllvm-args=-sanitizer-coverage-stack-depth -Cdebug-assertions -Ccodegen-units=1\" \"cargo\" \"build\" \"--manifest-path\" \"/home/lojak/.cache/x3-cluster/jobs/20261003T082058Z-fuzz-atomic-kernel-rollback-d90a5e/pallets/x3-atomic-kernel/fuzz/Cargo.toml\" \"--target\" \"x86_64-unknown-linux-gnu\" \"--release\" \"--config\" \"profile.release.debug=\\\"line-tables-only\\\"\" \"--bin\" \"fuzz_rollback\"\nX3JOB-META end=2026-10-03T08:26:32Z\n",
+  "artifacts": [],
+  "finished": "2026-10-03T08:26:33+00:00"
+}

@@ -1,0 +1,10 @@
+X3JOB-META free_gb=10
+X3JOB-META host=x3gpu1
+X3JOB-META repo=/home/lojak/Desktop/xxxstar-master
+X3JOB-META kernel=6.8.0-146-generic
+X3JOB-META rustc=rustc 1.90.0 (1159e78c4 2025-09-14)
+X3JOB-META cargo=cargo 1.90.0 (840b83a10 2025-07-30)
+X3JOB-META cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+X3JOB-META target_dir=/home/lojak/Desktop/xxxstar-master/target
+X3JOB-META start=2026-10-03T09:47:49Z
+X3JOB-META end=2026-10-03T09:48:23Z

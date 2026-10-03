@@ -1,0 +1,30 @@
+X3JOB-META free_gb=275
+X3JOB-META host=x3star1
+X3JOB-META repo=/home/lojak/Desktop/xxxstar-main
+X3JOB-META kernel=6.8.0-146-generic
+X3JOB-META rustc=rustc 1.90.0 (1159e78c4 2025-09-14)
+X3JOB-META cargo=cargo 1.90.0 (840b83a10 2025-07-30)
+X3JOB-META cc=cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+X3JOB-META target_dir=/home/lojak/.cache/x3-cluster/target
+X3JOB-META start=2026-10-03T08:32:48Z
+warning: /home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+   Compiling crypto-common v0.1.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/crypto-common)
+   Compiling x3-accel-wgpu v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/crates/x3-accel-wgpu)
+   Compiling digest v0.10.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/patches/digest)
+   Compiling curve25519-dalek v4.1.3
+   Compiling sha2 v0.10.9
+   Compiling blake2 v0.10.6
+   Compiling ed25519-dalek v2.2.0
+   Compiling x3-accel v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T083240Z-build-x3-accel-ec5f6e/crates/x3-accel)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.07s
+X3JOB-META end=2026-10-03T08:32:52Z

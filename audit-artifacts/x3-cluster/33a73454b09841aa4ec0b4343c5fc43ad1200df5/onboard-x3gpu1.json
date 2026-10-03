@@ -1,0 +1,216 @@
+{
+  "node": "x3gpu1",
+  "ip": "192.168.0.30",
+  "role": "gpu",
+  "controller": "x3star1",
+  "started": "2026-10-03T09:49:45+00:00",
+  "label": "PHYSICAL",
+  "tool_commit": "33a73454b09841aa4ec0b4343c5fc43ad1200df5",
+  "attempted_epoch": 1791020985.2992294,
+  "steps": [
+    {
+      "step": "identity",
+      "pass": true,
+      "detail": "x3gpu1"
+    },
+    {
+      "step": "install_tooling",
+      "pass": true,
+      "detail": "~/.local/share/x3-cluster"
+    },
+    {
+      "step": "checkout",
+      "pass": true,
+      "detail": "/home/lojak/Desktop/xxxstar-master"
+    },
+    {
+      "step": "bootstrap",
+      "pass": true,
+      "detail": [
+        "nvcc"
+      ]
+    },
+    {
+      "step": "gpus_detected",
+      "pass": true,
+      "detail": [
+        "NVIDIA GeForce RTX 2060 SUPER",
+        "NVIDIA GeForce GTX 1070"
+      ]
+    },
+    {
+      "step": "workers_planned",
+      "pass": true,
+      "detail": [
+        {
+          "worker": "x3gpu1-gpu0",
+          "port": 11434,
+          "state": "adopted",
+          "gpu": "NVIDIA GeForce RTX 2060 SUPER"
+        },
+        {
+          "worker": "x3gpu1-gpu1",
+          "port": 11436,
+          "state": "adopted",
+          "gpu": "NVIDIA GeForce GTX 1070"
+        }
+      ]
+    },
+    {
+      "step": "workers_up",
+      "pass": true,
+      "detail": {
+        "up": [
+          11434,
+          11436
+        ],
+        "expected": [
+          11434,
+          11436
+        ]
+      }
+    },
+    {
+      "step": "models_pulled",
+      "pass": true,
+      "detail": {
+        "free_gb_before": 10,
+        "pulled": {
+          "11434:qwen2.5-coder:7b": true,
+          "11436:qwen2.5-coder:7b": true
+        }
+      }
+    },
+    {
+      "step": "registration",
+      "pass": true,
+      "detail": "skipped drop-in: router config.json already routes to ['http://192.168.0.30:11434/v1', 'http://192.168.0.30:11436/v1']"
+    },
+    {
+      "step": "workers_reachable_from_x3star1",
+      "pass": true,
+      "detail": {
+        "11434": true,
+        "11436": true
+      }
+    },
+    {
+      "step": "bench",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "step": "first_job_inference",
+      "pass": true,
+      "detail": {
+        "id": "20261003T095154Z-onboard-x3gpu1-05377b",
+        "worker": "x3gpu1",
+        "label": "PHYSICAL",
+        "result": "PASS",
+        "exit_code": 0,
+        "detail": null
+      }
+    }
+  ],
+  "bootstrap": {
+    "node": "x3gpu1",
+    "role": "gpu",
+    "ip": "192.168.0.30",
+    "apply": true,
+    "actions": [
+      "wrote /home/lojak/.config/x3-cluster/node.env"
+    ],
+    "staged": "/home/lojak/.config/x3-cluster/staged-privileged.sh",
+    "missing_tools": [
+      "nvcc"
+    ],
+    "gpu_workers": [
+      {
+        "rank": 0,
+        "port": 11434,
+        "worker": "x3gpu1-gpu0",
+        "state": "adopted",
+        "unit": "ollama.service",
+        "bind": "0.0.0.0:11434",
+        "models": [
+          "qwen2.5-coder:7b",
+          "qwen3:8b"
+        ],
+        "gpu": "NVIDIA GeForce RTX 2060 SUPER",
+        "uuid": "GPU-baea27c9-70a5-1025-e717-01005f5da6b0"
+      },
+      {
+        "rank": 1,
+        "port": 11436,
+        "worker": "x3gpu1-gpu1",
+        "state": "adopted",
+        "bind": "0.0.0.0:11436",
+        "models": [
+          "qwen2.5-coder:7b",
+          "qwen3:8b"
+        ],
+        "gpu": "NVIDIA GeForce GTX 1070",
+        "uuid": "GPU-e0897c2d-090a-da7b-5679-f5338c4f9f02"
+      }
+    ],
+    "registration": "/home/lojak/.config/x3-cluster/registration/x3gpu1.json"
+  },
+  "staged_privileged": "#!/usr/bin/env bash\n# Review, then run: bash /home/lojak/.config/x3-cluster/staged-privileged.sh\nset -euo pipefail\n\n# CUDA toolkit (needed to build the .cu kernels): install cuda-toolkit-12-8  # from NVIDIA's apt repo; CUDA 13 dropped Pascal (sm_61)\n\n# Stable-name fallback until DHCP reservations/DNS exist. Skips names already present.\ngrep -qw 'x3star1' /etc/hosts || echo '192.168.0.70 x3star1  # x3-cluster' | sudo tee -a /etc/hosts\n\n# Firewall: LAN SSH, GPU workers only to the router/ops hosts. SSH is allowed before enabling.\nsudo ufw allow from 192.168.0.0/24 to any port 22 proto tcp\nsudo ufw allow from 192.168.0.70 to any port 11434 proto tcp\nsudo ufw allow from 192.168.0.70 to any port 11436 proto tcp\nsudo ufw --force enable && sudo ufw status numbered",
+  "bench": {
+    "node": "x3gpu1",
+    "label": "PHYSICAL",
+    "collected": "2026-10-03T09:50:13+00:00",
+    "repo": {
+      "commit": "f464c06c23416f51ba9605c0a44381b9affead1e",
+      "branch": "feat/x3gpu1-dual-gpu-accel",
+      "dirty": true
+    },
+    "cpu": {
+      "sha256_mib_s_1thread": 396.8,
+      "sha256_mib_s_all": 1093.8,
+      "threads": 8
+    },
+    "disk": {
+      "seq_write_mb_s": 13.5,
+      "seq_read_mb_s": 62.0,
+      "method": "dd 1GiB O_DIRECT"
+    },
+    "network": {
+      "nics": [
+        {
+          "name": "enp0s31f6",
+          "mac": "1c:1b:0d:69:19:ac",
+          "state": "up",
+          "speed_mbps": 1000,
+          "ipv4": "192.168.0.30/24"
+        },
+        {
+          "name": "enp13s0",
+          "mac": "1c:1b:0d:69:19:ae",
+          "state": "down",
+          "speed_mbps": null,
+          "ipv4": null
+        },
+        {
+          "name": "wlp5s0",
+          "mac": "74:19:f8:10:90:97",
+          "state": "down",
+          "speed_mbps": null,
+          "ipv4": null
+        }
+      ],
+      "latency": {
+        "x3star1": {
+          "avg_ms": 0.862,
+          "max_ms": 1.195
+        }
+      },
+      "iperf3": null
+    },
+    "rust_build": {
+      "skipped": "10 GB free < 50 GB"
+    }
+  },
+  "status": "ok",
+  "finished": "2026-10-03T09:52:48+00:00"
+}

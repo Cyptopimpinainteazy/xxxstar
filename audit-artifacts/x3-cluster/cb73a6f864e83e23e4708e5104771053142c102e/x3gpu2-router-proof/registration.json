@@ -1,0 +1,43 @@
+{
+  "node": "x3gpu2",
+  "generated": "2026-10-03T09:57:31+00:00",
+  "providers": {
+    "x3gpu2_gpu0_qwen2_5_coder_7b": {
+      "base_url": "http://192.168.0.23:11434/v1",
+      "model": "qwen2.5-coder:7b",
+      "supports_tools": false,
+      "tool_probe": true,
+      "probe_samples": 2,
+      "probe_timeout_seconds": 120,
+      "critical_allowed": false,
+      "max_in_flight": 1,
+      "worker": "x3gpu2-gpu0"
+    },
+    "x3gpu2_gpu0_qwen3_8b": {
+      "base_url": "http://192.168.0.23:11434/v1",
+      "model": "qwen3:8b",
+      "supports_tools": true,
+      "tool_probe": true,
+      "probe_samples": 2,
+      "probe_timeout_seconds": 120,
+      "critical_allowed": false,
+      "max_in_flight": 1,
+      "worker": "x3gpu2-gpu0"
+    }
+  },
+  "policies": {
+    "x3-local": [
+      "x3gpu2_gpu0_qwen2_5_coder_7b",
+      "x3gpu2_gpu0_qwen3_8b"
+    ],
+    "x3-code": [
+      "x3gpu2_gpu0_qwen2_5_coder_7b",
+      "x3gpu2_gpu0_qwen3_8b"
+    ],
+    "x3-deep": [
+      "x3gpu2_gpu0_qwen2_5_coder_7b",
+      "x3gpu2_gpu0_qwen3_8b"
+    ]
+  },
+  "source": "generated on x3star1 from x3gpu2's live /api/tags (no SSH yet); onboarding regenerates it on the node"
+}

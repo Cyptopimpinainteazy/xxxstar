@@ -1,0 +1,41 @@
+{
+  "id": "20261003T082058Z-gpu-production-gate-759aeb",
+  "name": "gpu-production-gate",
+  "class": "GPU",
+  "cmd": "bash scripts/gpu-production-gate.sh && cp -r audit-artifacts/gpu-production/\"$X3_COMMIT\" \"$X3_JOB_OUT/gpu-production\"",
+  "commit": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "ref": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "priority": "HIGH",
+  "timeout": 3600,
+  "node": null,
+  "min_free_gb": 8,
+  "submitted": "2026-10-03T08:20:58+00:00",
+  "controller": "x3star1",
+  "worker": "x3gpu1",
+  "label": "PHYSICAL",
+  "rejected_workers": [
+    {
+      "node": "x3gpu2",
+      "reason": "unreachable or SSH key auth failed"
+    }
+  ],
+  "exit_code": 1,
+  "result": "FAIL",
+  "seconds": 100.6,
+  "machine": "x3gpu1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "none",
+    "cargo": "none",
+    "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+  },
+  "start": "2026-10-03T08:21:37Z",
+  "end": "2026-10-03T08:21:53Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-master",
+  "target_dir": "/home/lojak/Desktop/xxxstar-master/target",
+  "worker_free_gb": "11",
+  "log_sha256": "db473964d4a958f240fa739788a13076ea3d381d06538302caa2d5db533bf722",
+  "log_tail": "X3JOB-META free_gb=11\nX3JOB-META host=x3gpu1\nX3JOB-META repo=/home/lojak/Desktop/xxxstar-master\nX3JOB-META kernel=6.8.0-146-generic\nX3JOB-META rustc=none\nX3JOB-META cargo=none\nX3JOB-META cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nX3JOB-META target_dir=/home/lojak/Desktop/xxxstar-master/target\nX3JOB-META start=2026-10-03T08:21:37Z\n== gpu_enumeration\n== crate_gpu_tests\nenv: \u2018cargo\u2019: No such file or directory\n== hash_parity_all_gpus\nscripts/gpu-production-gate.sh: line 27: cargo: command not found\n== secp256k1_parity_vs_cpu\nenv: \u2018cargo\u2019: No such file or directory\n== secp256k1_bench_all_gpus\nscripts/gpu-production-gate.sh: line 27: cargo: command not found\nsummary: audit-artifacts/gpu-production/cc3e8dd45f444dafb67005d50ac3551205028e72/summary.json pass=false\nX3JOB-META end=2026-10-03T08:21:53Z\n",
+  "artifacts": [],
+  "finished": "2026-10-03T08:22:40+00:00"
+}

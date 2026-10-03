@@ -5,7 +5,13 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 units="$HOME/.config/systemd/user"
-mkdir -p "$units" "$HOME/.config/x3-router" "$HOME/.local/share/x3-router"
+case "${1:-}" in
+    ""|--system) ;;
+    -h|--help) sed -n '1,4p' "$0"; exit 0 ;;
+    *) echo "usage: $0 [--system]" >&2; exit 2 ;;
+esac
+mkdir -p "$units" "$HOME/.config/x3-router/providers.d" "$HOME/.local/share/x3-router"
+install -m 755 "$here/../router.py" "$HOME/.local/share/x3-router/router.py"
 env_file="$HOME/.config/x3-router/env"
 if [ ! -f "$env_file" ]; then
     printf '# DEEPSEEK_API_KEY=\n# X3_ROUTER_TOKEN=\n# X3_ROUTER_HOST=127.0.0.1\n' > "$env_file"

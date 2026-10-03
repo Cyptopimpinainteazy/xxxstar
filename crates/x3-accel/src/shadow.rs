@@ -51,6 +51,7 @@ pub struct ShadowVerifier<B> {
     accelerator: B,
     sample_per_million: u32,
     key: RandomState,
+    sample_nonce: AtomicU64,
     disabled: AtomicBool,
     accelerated: AtomicU64,
     accepted_unchecked: AtomicU64,
@@ -69,6 +70,7 @@ impl<B: AccelBackend> ShadowVerifier<B> {
             accelerator,
             sample_per_million: sample_per_million.min(1_000_000),
             key: RandomState::new(),
+            sample_nonce: AtomicU64::new(0),
             disabled: AtomicBool::new(false),
             accelerated: AtomicU64::new(0),
             accepted_unchecked: AtomicU64::new(0),
@@ -101,6 +103,8 @@ impl<B: AccelBackend> ShadowVerifier<B> {
         job.message_hash.hash(&mut hasher);
         job.signature.hash(&mut hasher);
         job.public_key.hash(&mut hasher);
+        // Fresh per-call entropy prevents replaying the same unsampled acceptance forever.
+        self.sample_nonce.fetch_add(1, Ordering::Relaxed).hash(&mut hasher);
         hasher.finish() % 1_000_000 < u64::from(self.sample_per_million)
     }
 
@@ -121,7 +125,8 @@ impl<B: AccelBackend> ShadowVerifier<B> {
         let verdicts = match self.accelerator.verify_secp256k1_batch(batch) {
             Ok(verdicts) if verdicts.len() == batch.len() => verdicts,
             _ => {
-                self.accelerator_errors.fetch_add(1, Ordering::Relaxed);
+                self.accelerator_errors
+                    .fetch_add(batch.len() as u64, Ordering::Relaxed);
                 return self.cpu(batch);
             }
         };
@@ -148,6 +153,12 @@ impl<B: AccelBackend> ShadowVerifier<B> {
                 self.disable(index, verdicts[index], expected);
                 return self.cpu(batch);
             }
+        }
+        // Another concurrent batch may have disabled the accelerator while this
+        // one was being checked. Never publish unsampled accelerator verdicts
+        // after disablement becomes visible.
+        if self.disabled.load(Ordering::SeqCst) {
+            return self.cpu(batch);
         }
         let sampled_count = sampled.iter().filter(|s| **s).count() as u64;
         let accepted = verdicts.iter().filter(|v| **v).count() as u64;

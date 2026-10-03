@@ -7,7 +7,7 @@ Wants=ollama-worker-b.service
 Type=simple
 # Secrets (DEEPSEEK_API_KEY, X3_ROUTER_TOKEN, ...) live here, mode 600.
 EnvironmentFile=-%h/.config/x3-router/env
-ExecStart=/usr/bin/python3 %h/Desktop/xxxstar-master/services/x3-ai-router/router.py --db %h/.local/share/x3-router/usage.sqlite3
+ExecStart=/usr/bin/python3 %h/.local/share/x3-router/router.py --db %h/.local/share/x3-router/usage.sqlite3
 Restart=always
 RestartSec=3
 
