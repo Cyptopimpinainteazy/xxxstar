@@ -9,6 +9,11 @@
     x3cluster.py bench                          CPU / disk / network / Rust build baseline
     x3cluster.py health [--json]                cluster table from inventory.json
     x3cluster.py gate                           health + evidence; nonzero on failure
+    x3cluster.py job --class C [--priority P] [--node N] [--ref R] -- CMD...
+                                                run CMD at an exact commit on the node
+                                                that owns class C; evidence per job
+    x3cluster.py pipeline [--spec FILE]         staged distributed pipeline (pipeline.json)
+    x3cluster.py ssh-config [--write]           Host aliases for every node with a known IP
 
 Anything that needs root is never run: it is written to
 ~/.config/x3-cluster/staged-privileged.sh for an operator to review and run.
@@ -30,6 +35,9 @@ import tempfile
 import time
 import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import x3jobs  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -298,6 +306,41 @@ def firewall_block(lan, allowed, ports):
     return "\n".join(lines) + "\n"
 
 
+def hosts_block(inv, me):
+    """/etc/hosts fallback for peers with a known IP that do not resolve yet (no DHCP-reservation DNS)."""
+    lines = []
+    for name, node in inv["nodes"].items():
+        if name == me or not node.get("ip"):
+            continue
+        try:
+            if socket.gethostbyname(name) == node["ip"]:
+                continue
+        except OSError:
+            pass
+        lines.append(f"{node['ip']} {name}")
+    if not lines:
+        return ""
+    body = "\n".join(lines)
+    return ("# Stable-name fallback until DHCP reservations/DNS exist. Skips names already present.\n"
+            + "".join(f"grep -qw '{l.split()[1]}' /etc/hosts || echo '{l}  # x3-cluster' | sudo tee -a /etc/hosts\n"
+                      for l in body.splitlines()))
+
+
+def control_firewall_block(lan):
+    """Default-deny inbound, keeping every service that already listens beyond loopback
+    reachable from the LAN and over Tailscale, so enabling ufw breaks nothing in use."""
+    lines = ["# Firewall for the control node. Existing LAN listeners stay LAN-reachable; nothing is public.",
+             "sudo ufw default deny incoming", "sudo ufw default allow outgoing",
+             f"sudo ufw allow from {lan} to any port 22 proto tcp"]
+    for port in sorted(p for p, hosts in listening_ports().items()
+                       if p != 22 and any(not h.startswith(("127.", "[::1]", "[::ffff:127.", "100.", "[fd7a:")) for h in hosts)):
+        lines.append(f"sudo ufw allow from {lan} to any port {port} proto tcp")
+    if Path("/sys/class/net/tailscale0").exists():
+        lines.append("sudo ufw allow in on tailscale0")
+    lines.append("sudo ufw --force enable && sudo ufw status numbered")
+    return "\n".join(lines) + "\n"
+
+
 def bootstrap(args):
     node = socket.gethostname()
     inv = json.loads((HERE / "inventory.json").read_text())
@@ -307,8 +350,10 @@ def bootstrap(args):
     up = [n for n in nics() if n["ipv4"] and n["state"] == "up"]
     node_ip = up[0]["ipv4"].split("/")[0] if up else None
     CONFIG.mkdir(parents=True, exist_ok=True)
-    env = {"X3_NODE_NAME": node, "X3_NODE_ROLE": args.role, "X3_NODE_IP": node_ip or "",
-           "X3_NODE_BOOTSTRAPPED": now()}
+    # Keys an operator added (X3_REPO, X3_CARGO_TARGET_DIR, ...) survive a re-bootstrap.
+    env = read_env(CONFIG / "node.env")
+    env.update({"X3_NODE_NAME": node, "X3_NODE_ROLE": args.role, "X3_NODE_IP": node_ip or "",
+                "X3_NODE_BOOTSTRAPPED": now()})
     report = {"node": node, "role": args.role, "ip": node_ip, "apply": args.apply, "actions": [], "staged": []}
 
     staged = []
@@ -317,15 +362,26 @@ def bootstrap(args):
            "ssh": "openssh-client openssh-server", "clang": "clang", "cmake": "cmake", "pkg-config": "pkg-config",
            "psql": "postgresql-client", "pg_dump": "postgresql-client", "tc": "iproute2",
            "nvcc": "cuda-toolkit-12-8  # from NVIDIA's apt repo; CUDA 13 dropped Pascal (sm_61)"}
+    if not Path("/usr/sbin/sshd").exists():
+        # `ssh` on PATH is only the client; peers, x3ops1 and VS Code Remote need the server.
+        missing.append("sshd")
+        apt["sshd"] = "openssh-server"
     packages = sorted({apt[t] for t in missing if t in apt and t != "nvcc"})
     if packages:
-        staged.append("sudo apt-get update && sudo apt-get install -y " + " ".join(packages) + "\n")
+        staged.append("sudo apt-get update && sudo apt-get install -y " + " ".join(packages) + "\n"
+                      + ("sudo systemctl enable --now ssh\n" if "openssh-server" in packages else ""))
     if "nvcc" in missing:
         staged.append("# CUDA toolkit (needed to build the .cu kernels): install " + apt["nvcc"] + "\n")
     report["missing_tools"] = missing
     _, linger = run(["loginctl", "show-user", os.environ.get("USER", ""), "-p", "Linger", "--value"])
     if linger != "yes":
         staged.append(f"sudo loginctl enable-linger {os.environ.get('USER')}\n")
+
+    hosts = hosts_block(inv, node)
+    if hosts:
+        staged.append(hosts)
+    if args.role == "control" and args.lan:
+        staged.append(control_firewall_block(inv["lan"]))
 
     if args.role == "gpu":
         bind = "0.0.0.0" if args.lan else "127.0.0.1"
@@ -484,11 +540,54 @@ def local_health(inv_node):
             "repo": inv["repo"]}
 
 
+# Runs on the peer over SSH. Workers often listen on loopback only, so they are probed
+# from the peer itself rather than across the LAN.
+REMOTE_HEALTH = r"""python3 - <<'PY'
+import json, os, re, shutil, subprocess, urllib.request
+from pathlib import Path
+def sh(c):
+    try:
+        return subprocess.run(c, shell=True, capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:
+        return ""
+def get(url):
+    try:
+        with urllib.request.urlopen(url, timeout=3) as r:
+            return json.load(r)
+    except Exception:
+        return None
+env = {}
+p = Path.home() / ".config/x3-cluster/node.env"
+if p.exists():
+    for line in p.read_text().splitlines():
+        if "=" in line and not line.lstrip().startswith("#"):
+            k, _, v = line.partition("=")
+            env[k.strip()] = v.strip()
+mem = int(re.search(r"MemTotal:\s+(\d+)", Path("/proc/meminfo").read_text()).group(1))
+workers = {}
+for line in sh("ss -H -ltn").splitlines():
+    parts = line.split()
+    if len(parts) < 4:
+        continue
+    host, _, port = parts[3].rpartition(":")
+    port = int(port)
+    if 11434 <= port < 11450 and port != 11435 and port not in workers and get(f"http://127.0.0.1:{port}/api/version"):
+        ps = get(f"http://127.0.0.1:{port}/api/ps") or {}
+        workers[port] = {"ok": True, "bind": host, "loaded": [m["name"] for m in ps.get("models", [])]}
+failed = [l.split()[0] for c in ("systemctl --failed --no-legend --plain", "systemctl --user --failed --no-legend --plain")
+          for l in sh(c).splitlines() if l.strip()]
+repo = env.get("X3_REPO") or str(Path.home() / "Desktop/xxxstar-main")
+print(json.dumps({"hostname": os.uname().nodename, "threads": os.cpu_count(), "load": os.getloadavg()[0],
+    "ram_gb": round(mem / 1e6, 1), "free_gb": round(shutil.disk_usage(str(Path.home())).free / 1e9, 1),
+    "gpus": [g for g in sh("nvidia-smi --query-gpu=name --format=csv,noheader").splitlines() if g],
+    "ollama_workers": workers, "router": get("http://127.0.0.1:11435/health"),
+    "clock_synced": sh("timedatectl show -p NTPSynchronized --value") == "yes", "failed_units": failed,
+    "role": env.get("X3_NODE_ROLE"), "repo_head": sh(f"git -C '{repo}' rev-parse HEAD 2>/dev/null")}))
+PY"""
+
+
 def remote_health(host):
-    script = ("python3 - <<'PY'\nimport json,os,shutil\n"
-              "print(json.dumps({'threads':os.cpu_count(),'load':os.getloadavg()[0],"
-              "'free_gb':round(shutil.disk_usage('/').free/1e9,1)}))\nPY")
-    code, out = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=4", host, script], 15)
+    code, out = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=4", host, REMOTE_HEALTH], 25)
     if code != 0:
         return None
     try:
@@ -511,8 +610,18 @@ def health(args, quiet=False):
         else:
             reachable = run(["ping", "-c", "1", "-W", "1", ip])[0] == 0
             ssh_port = tcp_open(ip, 22)
-            remote = remote_health(name if ssh_port else ip) if ssh_port else None
+            remote = remote_health(name if x3jobs.name_resolves(name) else ip) if ssh_port else None
             row.update(reachable=reachable, ssh=bool(remote), ssh_port=ssh_port, label="PHYSICAL", remote=remote)
+            if remote:
+                row.update(cpu=f"{remote['threads']}t load {remote['load']:.1f}", ram=f"{remote['ram_gb']}G",
+                           gpu=",".join(g.replace("NVIDIA GeForce ", "") for g in remote["gpus"]) or "-",
+                           ollama_workers=remote["ollama_workers"], router=remote["router"],
+                           disk_free_gb=remote["free_gb"], clock_synced=remote["clock_synced"],
+                           failed_units=remote["failed_units"], node_role=remote["role"], repo_head=remote["repo_head"])
+            elif ssh_port:
+                row["detail"] = "sshd answers but key auth failed (BatchMode)"
+            elif reachable:
+                row["detail"] = "pings but no sshd on :22"
             if node["role"] == "control":
                 row["router_port"] = tcp_open(ip, 11435)
         rows.append(row)
@@ -528,6 +637,14 @@ def health(args, quiet=False):
                 cpu = r.get("cpu") or (f"{r['remote']['threads']}t load {r['remote']['load']:.1f}" if r.get("remote") else "-")
                 print(f"{r['node']:10} {r['role']:8} {str(r['ip'] or '-'):15} {mark(r['reachable']):6} {mark(r['ssh']):5} "
                       f"{cpu:16} {r.get('ram', '-'):6} {r.get('gpu', '-')[:28]:28} {services or r.get('detail', '')}")
+            for r in rows:
+                if r["node"] != me and r.get("ollama_workers") is not None:
+                    for port, w in r["ollama_workers"].items():
+                        lan = tcp_open(r["ip"], int(port))
+                        print(f"ollama {r['node']}:{port}  ok bind={w['bind']} reachable-from-{me}={'yes' if lan else 'NO'}"
+                              f"  loaded={','.join(w['loaded']) or '-'}")
+                    print(f"{r['node']}: disk free {r['disk_free_gb']} GB  clock synced {r['clock_synced']}  "
+                          f"failed units {r['failed_units'] or 'none'}  repo {str(r.get('repo_head'))[:12]}")
             local = next(r for r in rows if r["node"] == me) if any(r["node"] == me for r in rows) else None
             if local:
                 print(f"\nrouter@{me}:11435  {'ok ' + json.dumps(local['router'].get('in_flight')) if local['router'] else 'DOWN'}")
@@ -555,11 +672,22 @@ def gate(args):
         if row["node"] == me:
             meta = read_env(CONFIG / "node.env")
             check(f"{me}.role_identity", meta.get("X3_NODE_ROLE") == row["role"], meta.get("X3_NODE_ROLE"))
-            check(f"{me}.clock_synced", row["clock_synced"])
-            check(f"{me}.disk_free_10gb", row["disk_free_gb"] >= 10, row["disk_free_gb"])
-            check(f"{me}.no_failed_units", not row["failed_units"], row["failed_units"])
-            if row["role"] == "gpu":
-                check(f"{me}.gpu_workers", len(row["ollama_workers"]) >= max(1, len(gpus())), sorted(row["ollama_workers"]))
+            gpu_count = len(gpus())
+        elif row.get("remote"):
+            check(f"{row['node']}.role_identity", row["node_role"] == row["role"], row["node_role"])
+            gpu_count = len(row["remote"]["gpus"])
+        else:
+            continue
+        n = row["node"]
+        check(f"{n}.clock_synced", row["clock_synced"])
+        check(f"{n}.disk_free_10gb", row["disk_free_gb"] >= 10, row["disk_free_gb"])
+        check(f"{n}.no_failed_units", not row["failed_units"], row["failed_units"])
+        if row["role"] == "gpu":
+            check(f"{n}.gpu_workers", len(row["ollama_workers"]) >= max(1, gpu_count), sorted(row["ollama_workers"]))
+            if n != me:
+                # The router on the control node has to reach every worker it routes to.
+                closed = [p for p in row["ollama_workers"] if not tcp_open(row["ip"], int(p))]
+                check(f"{n}.workers_reachable_from_{me}", not closed, f"closed: {closed}" if closed else "all")
     storage = Path("/x3-storage")
     check("storage.mounted", storage.is_mount() or any(p.is_mount() for p in storage.glob("*")) if storage.exists() else False,
           "/x3-storage")
@@ -576,6 +704,80 @@ def gate(args):
     return 0 if summary["failed"] == 0 else 1
 
 
+# ---------------------------------------------------------------- jobs
+
+def resolve_commit(ref):
+    code, sha = run(["git", "-C", str(REPO), "rev-parse", "--verify", f"{ref}^{{commit}}"])
+    if code != 0:
+        sys.exit(f"cannot resolve {ref!r} to a commit in {REPO}")
+    return sha
+
+
+def stream_line(line):
+    sys.stdout.write(line)
+    sys.stdout.flush()
+
+
+def job(args):
+    inv = json.loads((HERE / "inventory.json").read_text())
+    cmd = " ".join(args.command[1:] if args.command[:1] == ["--"] else args.command)
+    if not cmd:
+        sys.exit("job: no command given (use: job --class TEST -- cargo test -p crate)")
+    j = x3jobs.new_job(args.cls, cmd, resolve_commit(args.ref), args.ref, args.priority, args.timeout, args.node,
+                       args.min_free_gb, args.name)
+    record = x3jobs.run_job(j, inv, socket.gethostname(), REPO / "audit-artifacts" / "x3-cluster",
+                            stream=None if args.quiet else stream_line)
+    summary = {k: record.get(k) for k in ("id", "class", "worker", "label", "result", "exit_code", "seconds", "detail")}
+    print(json.dumps(summary, indent=2))
+    print(f"evidence: {REPO / 'audit-artifacts' / 'x3-cluster' / j['commit'] / 'jobs' / j['id']}")
+    return 0 if record["result"] == "PASS" else 1
+
+
+def pipeline(args):
+    inv = json.loads((HERE / "inventory.json").read_text())
+    spec = json.loads(Path(args.spec).read_text())
+    commit = resolve_commit(args.ref)
+    root = REPO / "audit-artifacts" / "x3-cluster"
+    result = x3jobs.run_pipeline(spec, inv, socket.gethostname(), commit, args.ref, root,
+                                 stream=None if args.quiet else stream_line)
+    out = root / commit / f"pipeline-{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+    out.write_text(json.dumps(result, indent=2) + "\n")
+    for stage in result["stages"]:
+        print(f"== {stage['stage']}: {stage['result']}")
+        for j in stage["jobs"]:
+            print(f"   {j['result']:8} {j['class']:11} {j.get('name', ''):24} {j.get('worker') or '-':10} "
+                  f"{j.get('label') or '-':15} {j.get('seconds') or '':>8}  {j.get('detail') or ''}")
+    print(f"\npipeline {result['result']} @ {commit[:12]} -> {out}")
+    return 0 if result["result"] == "PASS" else 1
+
+
+def ssh_config(args):
+    """Host blocks for inventory nodes with an IP that ~/.ssh/config does not already define."""
+    inv = json.loads((HERE / "inventory.json").read_text())
+    existing = Path.home() / ".ssh" / "config"
+    defined = set(re.findall(r"^\s*Host\s+(.+)$", existing.read_text(), re.M)) if existing.exists() else set()
+    defined = {h for line in defined for h in line.split()}
+    blocks = []
+    for name, node in inv["nodes"].items():
+        if name == socket.gethostname() or not node.get("ip") or name in defined:
+            continue
+        blocks.append(f"Host {name}\n    HostName {node['ip']}\n    User {os.environ.get('USER', 'lojak')}\n"
+                      "    IdentityFile ~/.ssh/id_ed25519\n    IdentitiesOnly yes\n    StrictHostKeyChecking accept-new\n"
+                      "    ConnectTimeout 8\n    ServerAliveInterval 30\n    ServerAliveCountMax 6\n    TCPKeepAlive yes\n")
+    text = "# Generated by scripts/x3-cluster/x3cluster.py ssh-config from inventory.json\n" + "\n".join(blocks)
+    if args.write:
+        target = Path.home() / ".ssh" / "x3-cluster.conf"
+        target.write_text(text)
+        target.chmod(0o600)
+        if existing.exists() and "Include ~/.ssh/x3-cluster.conf" not in existing.read_text():
+            shutil.copy2(existing, existing.with_name(f"config.bak-{dt.datetime.now().strftime('%Y%m%dT%H%M%S')}"))
+            # Include must come before any Host block to apply globally.
+            existing.write_text("Include ~/.ssh/x3-cluster.conf\n\n" + existing.read_text())
+        print(f"wrote {target} ({len(blocks)} hosts)")
+    else:
+        print(text)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -589,6 +791,22 @@ def main():
     p = sub.add_parser("health")
     p.add_argument("--json", action="store_true")
     sub.add_parser("gate")
+    p = sub.add_parser("job")
+    p.add_argument("--class", dest="cls", choices=sorted(x3jobs.CLASSES), required=True)
+    p.add_argument("--priority", choices=list(x3jobs.PRIORITIES), default="NORMAL")
+    p.add_argument("--timeout", type=int, default=3600, help="seconds")
+    p.add_argument("--node", help="pin to this node instead of routing by class")
+    p.add_argument("--ref", default="HEAD", help="commit-ish; must be fetchable from GitHub for remote workers")
+    p.add_argument("--min-free-gb", type=int)
+    p.add_argument("--name")
+    p.add_argument("--quiet", action="store_true")
+    p.add_argument("command", nargs=argparse.REMAINDER)
+    p = sub.add_parser("pipeline")
+    p.add_argument("--spec", default=str(HERE / "pipeline.json"))
+    p.add_argument("--ref", default="HEAD")
+    p.add_argument("--quiet", action="store_true")
+    p = sub.add_parser("ssh-config")
+    p.add_argument("--write", action="store_true", help="write ~/.ssh/x3-cluster.conf and Include it")
     args = parser.parse_args()
     if args.cmd == "inventory":
         print(json.dumps(inventory(), indent=2))
@@ -600,6 +818,12 @@ def main():
         health(args)
     elif args.cmd == "gate":
         sys.exit(gate(args))
+    elif args.cmd == "job":
+        sys.exit(job(args))
+    elif args.cmd == "pipeline":
+        sys.exit(pipeline(args))
+    elif args.cmd == "ssh-config":
+        ssh_config(args)
 
 
 if __name__ == "__main__":
