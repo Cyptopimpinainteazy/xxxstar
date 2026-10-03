@@ -995,10 +995,12 @@ def discover(args):
         _, neigh = run(["ip", "neigh", "show", ip])
         mac = re.search(r"lladdr (\S+)", neigh)
         state[name] = {"ip": ip, "seen": now(), "mac": mac.group(1) if mac else None}
+    # Log a refusing host once, not on every 5-minute sweep.
+    for ip in sorted(set(pending) - set(state.get("_pending_key", []))):
+        event(f"sshd at {ip} refuses {me}'s key; run x3-join.sh on it to join the cluster")
+    state["_pending_key"] = sorted(pending)
     DISCOVERED.parent.mkdir(parents=True, exist_ok=True)
     DISCOVERED.write_text(json.dumps(state, indent=2) + "\n")
-    for ip in pending:
-        event(f"sshd at {ip} refuses {me}'s key; run x3-join.sh on it to join the cluster")
     for line in conflicts:
         event(f"CONFLICT {line}")
     print(json.dumps({"from": me, "swept": inv["lan"], "ssh_hosts": open_ssh, "found": found,
