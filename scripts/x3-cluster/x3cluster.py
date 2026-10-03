@@ -219,6 +219,23 @@ def ollama_process_on(port):
     return pid, dict(item.split("=", 1) for item in raw.decode(errors="replace").split("\0") if "=" in item)
 
 
+def system_unit_env_for_port(port):
+    """(unit, environment) of an active system Ollama unit configured for `port`.
+
+    A root-owned process's /proc environ is unreadable, but the unit's configured
+    Environment= (drop-ins included) is visible to any user through systemctl show."""
+    import shlex
+    _, units = run(["systemctl", "list-units", "--type=service", "--state=active", "--no-legend", "--plain",
+                    "ollama*", "x3-ollama*"])
+    for line in units.splitlines():
+        unit = line.split()[0] if line.split() else ""
+        _, raw = run(["systemctl", "show", "-p", "Environment", "--value", unit])
+        env = dict(item.split("=", 1) for item in shlex.split(raw) if "=" in item)
+        if env.get("OLLAMA_HOST", "").rsplit(":", 1)[-1] == str(port):
+            return unit, env
+    return None, None
+
+
 def ollama_models(port):
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/tags", timeout=5) as response:
@@ -271,10 +288,16 @@ def plan_gpu_workers(node, node_ip, bind):
             entry["state"] = "create"
             entry["unit"] = f"x3-ollama-gpu{rank}.service"
         elif env is None:
-            # A root/ollama-owned service: its pinning cannot be read or changed here.
-            entry["state"] = "system-unverified"
-            entry["unit"] = "ollama.service"
-            staged.append(system_dropin(gpu, port, bind))
+            # A root/ollama-owned service: read its configured pinning from systemd instead.
+            unit, unit_env = system_unit_env_for_port(port)
+            if unit_env and unit_env.get("CUDA_VISIBLE_DEVICES") == gpu["uuid"]:
+                entry["state"] = "adopted"
+                entry["unit"] = unit
+                entry["bind"] = unit_env.get("OLLAMA_HOST")
+            else:
+                entry["state"] = "system-unverified"
+                entry["unit"] = unit or "ollama.service"
+                staged.append(system_dropin(gpu, port, bind))
         elif env.get("CUDA_VISIBLE_DEVICES") == gpu["uuid"]:
             entry["state"] = "adopted"
             entry["bind"] = env.get("OLLAMA_HOST")
