@@ -93,6 +93,40 @@ forever — it now unreserves before slashing, mirroring rollback. Final campaig
 187 mutants, 150 caught, 37 unviable, 0 missed, 0 TIMEOUT (six shards in
 parallel, ~20 minutes wall on a 32-core box).
 
+The fourth campaign covers `pallet-x3-settlement-engine` — intents, escrow, the
+atomic lock manager, the BTC gateway, the SPV verifier, the finality oracle and
+the cross-domain proof checks. Its first pass (`bac836ea2`) left 383 distinct
+survivors, the largest census so far: `decode_compact_u32` (51), the
+receipt-trie fixture (20), `is_valid_receipt_rlp` (16), `btc_target_le` (12),
+`check_no_cross_vm_partial_state` (11), `should_wait` (9) and all 27
+`WeightInfo` bodies carried most of them, the rest spread over money-path
+helpers no test observed. All 383 are resolved without skips: the decoders were
+restructured so the remaining mutants are behavioural (`decode_compact_u32` no
+longer ORs disjoint lanes, `is_valid_receipt_rlp` matches on the list tag,
+`verify_svm_proof` drops length checks subsumed by the parser, `btc_target_le`
+copies within a bounded window), and ~40 tests in `tests_gate_pins.rs`,
+`mod gate_pins_money_path`, `tests_weights.rs`, the atomic-lock manager tests
+and `benchmarking.rs`'s `mod gate_pins` pin the rest: RLP and compact-u32
+boundaries, a full EVM receipt-proof trie walk, a signed SVM transaction at the
+account boundary, native custody and its expiry index, the intent deadline
+index, finality urgency and the reorg curve, escrow ops, intent planning,
+adaptor recovery against real secp256k1, the SPV merkle walk and every
+invariant checker. Pinning surfaced a real defect:
+`AdaptorSignature::verify_with_recovery_id` compared the recovered key against
+the struct's own `adapted_pubkey` and ignored its `pubkey` argument, so the
+caller's claimed key was never checked; it now compares `r == *pubkey`. The
+re-run over the pinned revision classified 776 mutants (702 caught, 55
+unviable, 19 missed, 0 timeouts); those 19 are then pinned or restructured
+away — boundaries on the EVM confirmation floor, the SVM account boundary and
+the BTC admission guard, zero claimed legs, `FromIntentError`'s Display arms
+and `proof_domain_key`'s chain/VM/operation binding, plus equivalent mutants
+deleted outright (dead fixed-size `len()` checks, subsumed Solana bounds, an
+empty BTC "invariant" loop, and a benchmark dedup comparing a field the local
+match derives). Final pass at the pinned revision: 744 mutants, 689 caught, 55
+unviable, 0 missed, 0 TIMEOUT, run with `--test-tool cargo` on 16 shards
+(~45 s per mutant in steady state; the gate itself still runs nextest, so the
+census is a phase of the campaign, not a change to the gate).
+
 A full campaign is tens of minutes of parallel cargo builds, so it is opt-in like
 `--loom`/`--fuzz`; `X3_MUTANTS_JOBS` (default 4) and `X3_MUTANTS_TIMEOUT`
 (default 600s, generous enough that build contention under `--jobs` cannot turn a

@@ -12,8 +12,13 @@
 # after e1246e477) left 141 survivors (57 lib.rs, 84 vm_revert.rs); the diff decoders were
 # rewritten around a checked reader, an expiry bond-lock defect was found and fixed, and every
 # survivor is now pinned. The re-run at that revision: 187 mutants, 150 caught, 37 unviable,
-# 0 missed. Every surviving mutant is a behaviour change no test observed, and the gate fails
-# until a test pins it.
+# 0 missed. The third package is pallet-x3-settlement-engine: intents, escrow, atomic locks, the
+# BTC gateway and the finality gate. Its first campaign (2026-10-03, base bac836ea2) left the
+# largest census yet — 383 survivors across the compact-u32 and receipt decoders, the target
+# encoder and the weight bodies — all now pinned; the campaign also exposed
+# `verify_with_recovery_id` ignoring its `pubkey` argument. The pinned revision re-runs clean:
+# 744 mutants, 689 caught, 55 unviable, 0 missed. Every surviving mutant is a behaviour change
+# no test observed, and the gate fails until a test pins it.
 #
 # Opt-in (--mutants), like --loom/--fuzz: a full campaign is minutes, not seconds.
 #
