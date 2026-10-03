@@ -70,11 +70,20 @@ impl<D: AccelBackend> MultiDevice<D> {
         if len < self.min_split || self.devices.len() == 1 {
             return vec![(self.fastest(), 0..len)];
         }
-        let total: f64 = self.weights.iter().sum();
+        // Normalize before summing: a set of finite weights can still overflow
+        // when added directly, which would collapse the split onto one device.
+        let scale = self
+            .weights
+            .iter()
+            .copied()
+            .fold(0.0_f64, f64::max)
+            .max(f64::MIN_POSITIVE);
+        let normalized: Vec<f64> = self.weights.iter().map(|w| *w / scale).collect();
+        let total: f64 = normalized.iter().sum();
         let mut parts = Vec::with_capacity(self.devices.len());
         let mut start = 0;
         let mut cumulative = 0.0;
-        for (device, weight) in self.weights.iter().enumerate() {
+        for (device, weight) in normalized.iter().enumerate() {
             cumulative += weight;
             // The last device takes the remainder so rounding never drops items.
             let end = if device + 1 == self.devices.len() {
@@ -178,7 +187,21 @@ impl<D: AccelBackend> AccelBackend for MultiDevice<D> {
 
     /// A Merkle root is one value over all leaves; it cannot be split by range.
     fn build_merkle_root(&self, leaves: &[[u8; 32]]) -> Result<[u8; 32], AccelError> {
-        self.devices[self.fastest()].build_merkle_root(leaves)
+        let fastest = self.fastest();
+        match self.devices[fastest].build_merkle_root(leaves) {
+            Ok(root) => Ok(root),
+            Err(first_error) => {
+                for (index, device) in self.devices.iter().enumerate() {
+                    if index == fastest {
+                        continue;
+                    }
+                    if let Ok(root) = device.build_merkle_root(leaves) {
+                        return Ok(root);
+                    }
+                }
+                Err(first_error)
+            }
+        }
     }
 }
 
