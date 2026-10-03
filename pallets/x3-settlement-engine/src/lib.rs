@@ -2938,50 +2938,30 @@ pub mod pallet {
                 return false;
             }
 
-            // First byte encodes signature count (compact encoding)
-            // Signatures can be variable-length encoded
-            let mut offset = 0;
-            let (sig_count, bytes_read) = match Self::decode_compact_u32(&tx_data[offset..]) {
-                Some(result) => result,
-                None => return false,
+            // First byte(s) encode the signature count (compact encoding).
+            let Some((sig_count, bytes_read)) = Self::decode_compact_u32(tx_data) else {
+                return false;
             };
-            offset += bytes_read;
 
-            // Each signature is 64 bytes
+            // Each signature is 64 bytes; the message starts after them.
             let sig_data_len = (sig_count as usize).saturating_mul(64);
-            if offset.saturating_add(sig_data_len) > tx_data.len() {
+            let Some(rest) = tx_data.get(bytes_read.saturating_add(sig_data_len)..) else {
                 return false;
-            }
-            offset += sig_data_len;
+            };
 
-            // After signatures comes the message
-            // Message starts with header byte
-            if offset >= tx_data.len() {
+            // Message: [header byte][number of static accounts][32-byte recent
+            // blockhash][instructions]. Slicing rather than indexing keeps every
+            // short input a refusal instead of a panic, and the one comparison
+            // left is the observable rule: a message that ends at the blockhash
+            // carries no instructions.
+            let Some((_header, rest)) = rest.split_first() else {
                 return false;
-            }
-
-            let _header = tx_data[offset];
-            offset += 1;
-
-            // Next is number of static accounts (max 255)
-            if offset >= tx_data.len() {
+            };
+            let Some((_num_accounts, rest)) = rest.split_first() else {
                 return false;
-            }
+            };
 
-            let _num_accounts = tx_data[offset];
-            offset += 1;
-
-            // Next 32 bytes should be the recent blockhash
-            if offset.saturating_add(32) > tx_data.len() {
-                return false;
-            }
-
-            // Blockhash is 32 bytes, followed by instruction count
-            offset += 32;
-
-            // If we got here, the basic structure is valid
-            // A real implementation would validate instruction encoding
-            offset < tx_data.len()
+            rest.len() > 32
         }
 
         /// Decode a compact u32 from Solana's encoding
@@ -3066,7 +3046,9 @@ pub mod pallet {
             }
         }
 
-        fn proof_domain_key(
+        // Visible to the crate's tests: the domain key is a KAT-pinned
+        // invariant of the settlement path, not a public API.
+        pub(crate) fn proof_domain_key(
             chain_id: &str,
             vm_type: ProofVmType,
             operation: CrossDomainOperation,
@@ -3225,15 +3207,9 @@ pub mod pallet {
             let now = T::UnixTime::now().as_secs();
             ensure!(now < intent.timeout, Error::<T>::TimeoutExpired);
 
-            // INVARIANT 4: For BTC legs, verify confirmation depth
-            for leg_idx in 0..intent.legs_total {
-                if let Some(escrow) = EscrowStates::<T>::get(intent_id, leg_idx) {
-                    if escrow.chain == ExternalChainId::Bitcoin {
-                        // Check BTC has sufficient confirmations
-                        // (handled by separate BTC proof submission)
-                    }
-                }
-            }
+            // INVARIANT 4: for BTC legs the confirmation depth is enforced
+            // when the BTC proof itself is submitted and verified; by the time
+            // this checker runs there is nothing left here to re-check.
 
             Ok(())
         }
@@ -3475,13 +3451,16 @@ pub mod pallet {
         fn verify_btc_settlement_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
             use crate::btc_gateway::BtcSpvProof;
 
-            // Need at least 4 bytes for the tx_index prefix.
-            if proof.receipt_data.len() < 4 {
+            // Need at least 4 bytes for the tx_index prefix. A `get` slice
+            // makes a short buffer a refusal instead of an indexing panic.
+            let Some(tx_index_bytes) = proof.receipt_data.get(0..4) else {
                 return Ok(false);
-            }
-
-            let tx_index =
-                u32::from_le_bytes(proof.receipt_data[0..4].try_into().unwrap_or([0u8; 4]));
+            };
+            let tx_index = u32::from_le_bytes(
+                tx_index_bytes
+                    .try_into()
+                    .expect("get(0..4) yields exactly four bytes"),
+            );
             let tail = &proof.receipt_data[4..];
 
             // SCALE-decode the BtcBlockHeader from the head of `tail`.
@@ -3509,10 +3488,10 @@ pub mod pallet {
             // BtcBlockHeader::encoded_size gives us the SCALE length so we can
             // split cleanly. Fall back to scanning only if encoding is unavailable.
             let header_encoded_len = codec::Encode::encoded_size(&header);
-            if tail.len() < header_encoded_len {
+            let Some(raw_tx) = tail.get(header_encoded_len..) else {
                 return Ok(false);
-            }
-            let tx_bytes = tail[header_encoded_len..].to_vec();
+            };
+            let tx_bytes = raw_tx.to_vec();
 
             // Sanity: tx_hash must match the double-SHA256 of the tx bytes.
             let computed_txid = {
@@ -4546,6 +4525,16 @@ pub mod pallet {
                     "a receipt with a valid trie path must verify"
                 );
 
+                // The depth floor is inclusive: one confirmation clears it, and
+                // a `< 1` turned into `<= 1` refuses every real proof.
+                let mut one_confirmation = good.clone();
+                one_confirmation.confirmations = 1;
+                assert!(
+                    Pallet::<Test>::verify_evm_receipt_proof(&one_confirmation)
+                        .expect("no dispatch error"),
+                    "one confirmation must clear the depth floor"
+                );
+
                 // Wrong proof-category.
                 let mut wrong_type = good.clone();
                 wrong_type.proof_type = ProofType::SolanaProof;
@@ -4652,6 +4641,23 @@ pub mod pallet {
             assert!(
                 Pallet::<Test>::verify_svm_proof(&good).expect("no dispatch error"),
                 "a signed transaction naming the attested blockhash must verify"
+            );
+
+            // The account boundary is inclusive: a message that ends exactly at
+            // the attested blockhash (no instruction tail) is at the boundary,
+            // not past it, and must verify. A `<` length check turned into `<=`
+            // refuses this otherwise-valid proof.
+            let mut boundary_message = vec![0x01u8, 0x00, 0x00, 0x01];
+            boundary_message.extend_from_slice(&signer);
+            boundary_message.extend_from_slice(block_hash.as_bytes());
+            let boundary_signature = pair.sign(&boundary_message);
+            let mut boundary_tx = vec![1u8];
+            boundary_tx.extend_from_slice(&boundary_signature.0);
+            boundary_tx.extend_from_slice(&boundary_message);
+            assert!(
+                Pallet::<Test>::verify_svm_proof(&svm_proof(boundary_tx, block_hash))
+                    .expect("no dispatch error"),
+                "a message ending exactly at the blockhash is at the account boundary"
             );
 
             // The transaction must name the attested blockhash, not another.
@@ -5050,6 +5056,18 @@ pub mod pallet {
                     &[],
                 )
                 .expect("no error"));
+
+                // Zero claimed legs is not a partial execution: the violation
+                // requires at least one claimed (`> 0` mutated to `>= 0`).
+                intent.legs_claimed = 0;
+                SettlementIntents::<Test>::insert(id, intent.clone());
+                assert!(!Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::PartialExecution,
+                    &[],
+                )
+                .expect("no error"));
+
                 intent.legs_claimed = 2;
                 SettlementIntents::<Test>::insert(id, intent.clone());
                 assert!(!Pallet::<Test>::verify_violation(

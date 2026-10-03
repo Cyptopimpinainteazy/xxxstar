@@ -4450,6 +4450,37 @@ fn a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored() {
             Ok(true),
             "once anchored, the real node's bytes verify"
         );
+
+        // The admission guard is two conditions, not one: the record must say
+        // anchored AND name the header's own height. Replacing the guard with
+        // `true`, or its `&&` with `||`, accepts one of these two proofs; the
+        // chain must refuse both.
+        let block_hash = Pallet::<Test>::compute_btc_block_hash(&header);
+        crate::BtcHeaderMetaStore::<Test>::insert(
+            block_hash,
+            crate::types::BtcHeaderMeta {
+                height: regtest_capture::HEIGHT,
+                anchored: false,
+            },
+        );
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(false),
+            "an unanchored record must not be accepted on the strength of its height"
+        );
+
+        crate::BtcHeaderMetaStore::<Test>::insert(
+            block_hash,
+            crate::types::BtcHeaderMeta {
+                height: regtest_capture::HEIGHT + 1,
+                anchored: true,
+            },
+        );
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(false),
+            "an anchored record at another height is a statement about another block"
+        );
     });
 }
 /// Genesis pins the SPV trust root, so a chain can be born anchored.

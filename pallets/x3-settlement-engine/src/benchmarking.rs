@@ -69,10 +69,10 @@ fn refund_proof_set<T: Config>(
             ExternalChainId::Bitcoin => ("bitcoin-mainnet", VmType::BitcoinScript, 3),
             _ => ("ethereum-mainnet", VmType::Evm, 4),
         };
-        if bundles
-            .iter()
-            .any(|b| b.chain_id == chain_id && b.vm_type == vm_type)
-        {
+        // `chain_id` and `vm_type` are produced together by the match above
+        // (each chain arm names one VM), so the chain alone identifies the
+        // bundle; a second condition can never disagree with the first.
+        if bundles.iter().any(|b| b.chain_id == chain_id) {
             continue;
         }
         let mut bundle = CrossDomainProofBundle {

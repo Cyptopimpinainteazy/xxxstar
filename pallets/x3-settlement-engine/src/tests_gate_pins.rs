@@ -371,6 +371,14 @@ fn cross_vm_partial_state_is_reported_in_both_shapes() {
         enforcer.check_no_cross_vm_partial_state(false, false, false, false, false),
         InvariantCheckResult::Pass
     );
+    // Two of three executed with the executed part "successful" but nothing
+    // reverted is still partial: the third leg never ran, so the only clean
+    // shape is a revert. (`all_executed = e && s && x` mutated to
+    // `e || (s && x)` answers Pass here.)
+    assert_eq!(
+        enforcer.check_no_cross_vm_partial_state(false, true, true, true, false),
+        partial()
+    );
 }
 
 #[test]
@@ -1694,4 +1702,82 @@ fn invariant_partial_execution_timeout_and_reentrancy_are_pinned() {
     let results = enforcer.check_all(2, 0, IntentState::FullyFunded, false, false, 0, 0, 100, 50);
     assert_eq!(results.len(), 3);
     assert!(results.iter().all(|result| *result == pass));
+}
+
+#[test]
+fn intent_error_display_names_each_failure() {
+    use crate::intent::FromIntentError;
+
+    // Every adapter refusal carries a message; a `fmt` body replaced by
+    // `Ok(Default::default())` writes nothing and would render as "".
+    assert_eq!(
+        format!(
+            "{}",
+            FromIntentError::UnsupportedChain { chain: "x3".into() }
+        ),
+        "settlement: unsupported chain 'x3'"
+    );
+    assert_eq!(
+        format!("{}", FromIntentError::EmptyIntent),
+        "settlement: empty intent"
+    );
+    assert_eq!(
+        format!("{}", FromIntentError::ZeroTimeout),
+        "settlement: zero timeout"
+    );
+    let mismatch = format!(
+        "{}",
+        FromIntentError::HashMismatch {
+            stored: [1u8; 32],
+            recomputed: [2u8; 32]
+        }
+    );
+    assert!(
+        mismatch.starts_with("settlement: hash mismatch (stored=[1"),
+        "{mismatch}"
+    );
+    assert!(mismatch.contains("recomputed=[2"), "{mismatch}");
+}
+
+#[test]
+fn proof_domain_key_binds_chain_vm_and_operation() {
+    // A body replaced by `Default::default()` (the zero hash) would make every
+    // domain collide, so a proof stored under one would authorize the others.
+    let key = Pallet::<Test>::proof_domain_key(
+        "ethereum-mainnet",
+        ProofVmType::Evm,
+        CrossDomainOperation::Claim,
+    );
+    assert_ne!(
+        key,
+        H256::zero(),
+        "the domain key must not be the zero hash"
+    );
+    assert_ne!(
+        key,
+        Pallet::<Test>::proof_domain_key(
+            "solana-mainnet",
+            ProofVmType::Evm,
+            CrossDomainOperation::Claim,
+        ),
+        "the chain is part of the domain"
+    );
+    assert_ne!(
+        key,
+        Pallet::<Test>::proof_domain_key(
+            "ethereum-mainnet",
+            ProofVmType::Svm,
+            CrossDomainOperation::Claim,
+        ),
+        "the VM is part of the domain"
+    );
+    assert_ne!(
+        key,
+        Pallet::<Test>::proof_domain_key(
+            "ethereum-mainnet",
+            ProofVmType::Evm,
+            CrossDomainOperation::Refund,
+        ),
+        "the operation is part of the domain"
+    );
 }

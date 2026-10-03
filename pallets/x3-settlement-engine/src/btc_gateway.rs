@@ -315,9 +315,9 @@ impl BtcAdaptorSignature {
         pubkey: &[u8; 33],
         recovery_id: u8,
     ) -> bool {
-        if pubkey.len() != 33 || self.pre_signature.len() != 64 || self.adapted_pubkey.len() != 33 {
-            return false;
-        }
+        // `pubkey`, `pre_signature` and `adapted_pubkey` are fixed-size
+        // arrays, so their lengths cannot differ from what the types state;
+        // only the recovery id needs a runtime check.
         if recovery_id > 3 {
             return false;
         }
