@@ -29,10 +29,29 @@ PROMPT = ("Write a Rust function `fn checked_sum(xs: &[u64]) -> Option<u64>` tha
           "then a unit test for it. Code only.")
 
 
+def router_token():
+    token = os.environ.get("X3_ROUTER_TOKEN", "").strip()
+    if token:
+        return token
+    path = Path.home() / ".config" / "x3-router" / "env"
+    try:
+        for line in path.read_text().splitlines():
+            if line.startswith("X3_ROUTER_TOKEN="):
+                return line.partition("=")[2].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
+ROUTER_TOKEN = router_token()
+
+
 def http(url, body=None, headers=None, timeout=300):
     data = json.dumps(body).encode() if body is not None else None
-    request = urllib.request.Request(url, data, {"Content-Type": "application/json", **(headers or {})},
-                                     method="POST" if data else "GET")
+    request_headers = {"Content-Type": "application/json", **(headers or {})}
+    if url.startswith(ROUTER) and ROUTER_TOKEN:
+        request_headers.setdefault("Authorization", f"Bearer {ROUTER_TOKEN}")
+    request = urllib.request.Request(url, data, request_headers, method="POST" if data else "GET")
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.load(response)
 
@@ -189,12 +208,15 @@ def main():
                   failed_over["providers"] and worker_of(failed_over["providers"][0]) == "rtx", failed_over)
         finally:
             subprocess.run(["systemctl", "--user", "start", "ollama-worker-b"], check=True)
+            recovered = False
             for _ in range(60):
                 try:
                     http(WORKERS["gtx"] + "/api/version")
+                    recovered = True
                     break
                 except Exception:  # noqa: BLE001
                     time.sleep(1)
+            check("gtx_worker_recovers", recovered, {"worker": WORKERS["gtx"]})
 
     evidence["checks"] = checks
     evidence["finished"] = dt.datetime.now(dt.timezone.utc).isoformat()
