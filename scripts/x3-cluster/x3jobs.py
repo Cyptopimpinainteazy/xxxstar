@@ -155,6 +155,9 @@ def job_script(job, repo, target_dir, min_free_gb, remote=CANONICAL_REMOTE):
     # An explicit X3_REPO is quoted as-is; the conventional paths expand $HOME on the worker.
     repos =" ".join(([q(repo)] if repo else []) + [f'"$HOME/{r[2:]}"' for r in DEFAULT_REPOS])
     return f"""set -uo pipefail
+# Non-interactive SSH skips ~/.profile, so rustup's PATH has to be set here.
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+case ":$PATH:" in *":$HOME/.cargo/bin:"*) ;; *) export PATH="$HOME/.cargo/bin:$PATH" ;; esac
 base="$HOME/.cache/x3-cluster"; id={q(job['id'])}; sha={q(job['commit'])}
 wt="$base/jobs/$id"; out="$base/out/$id"
 repo=""
