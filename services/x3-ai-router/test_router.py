@@ -187,6 +187,33 @@ class RouterTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_chat_stream_escaped_exception_ends_with_error_and_done(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        original = self.router.stream
+
+        def exploding(plan, agent, start, send):
+            start()
+            send(b'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n')
+            raise RuntimeError("synthetic internal failure")
+
+        self.router.stream = exploding
+        try:
+            data = json.dumps({"model": "x3-auto", "messages": [{"role": "user", "content": "format"}],
+                               "max_tokens": 10, "stream": True}).encode()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/chat/completions",
+                                             data, {"Content-Type": "application/json", "X-X3-Agent": "alice"})
+            with urllib.request.urlopen(request) as response:
+                raw = response.read()
+        finally:
+            self.router.stream = original
+            server.shutdown()
+            server.server_close()
+        self.assertIn(b'"error"', raw)
+        self.assertIn(b"data: [DONE]", raw,
+                      "a stream cut by an internal error must still close with [DONE]")
+
     def test_dashboard_metrics_and_auth(self):
         self.router.finish(self.router.reserve("<script>", 0.001), "<script>", "up", "up",
                            {"prompt_tokens": 10, "completion_tokens": 5}, 0.000015)
@@ -2646,6 +2673,30 @@ class NativeResponsesTests(unittest.TestCase):
         self.assertNotIn("response.completed", raw)
         health = {row["provider"]: row for row in self.router.provider_health()}
         self.assertIn("terminal", health["native"]["last_error"])
+
+    def test_escaped_stream_exception_emits_failed_terminal_event(self):
+        original = self.router.stream
+
+        def exploding(plan, agent, start, send):
+            start()
+            send(b'event: response.output_text.delta\ndata: '
+                 b'{"type":"response.output_text.delta","item_id":"m","output_index":0,'
+                 b'"content_index":0,"delta":"partial"}\n\n')
+            raise RuntimeError("synthetic internal failure")
+
+        self.router.stream = exploding
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.body(stream=True))
+        finally:
+            self.router.stream = original
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertIn("response.failed", raw,
+                      "an internal error after the stream began must still emit a terminal event")
+        self.assertNotIn("response.completed", raw)
 
     def test_native_responses_preserves_custom_tool_history(self):
         custom_input = [
