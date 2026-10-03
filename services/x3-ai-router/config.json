@@ -17,13 +17,17 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "ollama_qwen3"
+                "ollama_qwen3",
+                "ollama_gtx_qwen3"
             ]
         },
         "x3-fast": {
             "tier": "routine",
             "order": [
+                "ollama_gtx",
                 "ollama",
+                "ollama_gtx_qwen3",
+                "ollama_qwen3",
                 "deepseek_flash",
                 "deepseek_pro"
             ]
@@ -31,9 +35,12 @@
         "x3-code": {
             "tier": "routine",
             "order": [
+                "ollama_qwen3",
+                "ollama",
+                "ollama_gtx_qwen3",
+                "ollama_gtx",
                 "deepseek_flash",
-                "deepseek_pro",
-                "ollama_qwen3"
+                "deepseek_pro"
             ]
         },
         "x3-deep": {
@@ -41,7 +48,8 @@
             "order": [
                 "deepseek_flash",
                 "deepseek_pro",
-                "ollama_qwen3"
+                "ollama_qwen3",
+                "ollama_gtx_qwen3"
             ]
         },
         "x3-security": {
@@ -54,16 +62,20 @@
         "x3-review": {
             "tier": "routine",
             "order": [
+                "ollama_gtx_qwen3",
+                "ollama_gtx",
+                "ollama_qwen3",
                 "deepseek_flash",
-                "deepseek_pro",
-                "ollama_qwen3"
+                "deepseek_pro"
             ]
         },
         "x3-local": {
             "tier": "routine",
             "order": [
                 "ollama",
-                "ollama_qwen3"
+                "ollama_qwen3",
+                "ollama_gtx",
+                "ollama_gtx_qwen3"
             ]
         }
     },
@@ -71,7 +83,8 @@
         "routine": [
             "deepseek_flash",
             "deepseek_pro",
-            "ollama_qwen3"
+            "ollama_qwen3",
+            "ollama_gtx_qwen3"
         ],
         "critical": [
             "deepseek_flash",
@@ -81,6 +94,8 @@
     "budget_fallback": [
         "ollama_qwen3",
         "ollama",
+        "ollama_gtx_qwen3",
+        "ollama_gtx",
         "nemotron_lightning_free",
         "nemotron_ultra_free"
     ],
@@ -92,7 +107,9 @@
             "supports_tools": false,
             "tool_probe": true,
             "critical_allowed": true,
-            "probe_samples": 2
+            "probe_samples": 2,
+            "max_in_flight": 1,
+            "worker": "gpu-rtx"
         },
         "ollama_qwen3": {
             "base_url": "http://127.0.0.1:11434/v1",
@@ -103,7 +120,9 @@
             "tool_probe_max_tokens": 512,
             "probe_timeout_seconds": 120,
             "probe_samples": 2,
-            "critical_allowed": false
+            "critical_allowed": false,
+            "max_in_flight": 1,
+            "worker": "gpu-rtx"
         },
         "nemotron_lightning_free": {
             "base_url": "https://openrouter.ai/api/v1",
@@ -201,6 +220,30 @@
                 "disable_when_tool_choice_forced": true
             },
             "critical_allowed": true
+        },
+        "ollama_gtx": {
+            "base_url": "http://127.0.0.1:11436/v1",
+            "protocol": "chat_completions",
+            "model": "qwen2.5-coder:7b",
+            "supports_tools": false,
+            "tool_probe": true,
+            "critical_allowed": true,
+            "probe_samples": 2,
+            "max_in_flight": 1,
+            "worker": "gpu-gtx"
+        },
+        "ollama_gtx_qwen3": {
+            "base_url": "http://127.0.0.1:11436/v1",
+            "protocol": "chat_completions",
+            "model": "qwen3:8b",
+            "supports_tools": true,
+            "tool_probe": true,
+            "tool_probe_max_tokens": 512,
+            "probe_timeout_seconds": 120,
+            "probe_samples": 2,
+            "critical_allowed": false,
+            "max_in_flight": 1,
+            "worker": "gpu-gtx"
         }
     },
     "capability_probe_samples": 3
