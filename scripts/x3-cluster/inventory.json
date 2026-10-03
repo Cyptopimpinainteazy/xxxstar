@@ -1,0 +1,16 @@
+{
+  "lan": "192.168.0.0/24",
+  "nodes": {
+    "x3star1": {"role": "control", "ip": "192.168.0.70", "services": ["ssh", "x3-ai-router"], "required": true},
+    "x3gpu1": {"role": "gpu", "ip": "192.168.0.30", "services": ["ssh", "ollama", "ollama-worker-b", "x3-ai-router"], "required": true},
+    "x3gpu2": {"role": "gpu", "ip": null, "services": ["ssh"], "required": true},
+    "x3build1": {"role": "build", "ip": null, "services": ["ssh"], "required": true},
+    "x3sim1": {"role": "sim", "ip": null, "services": ["ssh"], "required": true},
+    "x3data1": {"role": "data", "ip": null, "services": ["ssh", "postgresql"], "required": true},
+    "x3net1": {"role": "net", "ip": null, "services": ["ssh"], "required": true},
+    "x3ops1": {"role": "ops", "ip": null, "services": ["ssh"], "required": true}
+  },
+  "unidentified": {
+    "192.168.0.23": "OpenSSH 8.9p1 (Ubuntu 22.04); ~/.ssh/config comment calls it the control machine; x3-admin and default keys refused (2026-10-02)"
+  }
+}
