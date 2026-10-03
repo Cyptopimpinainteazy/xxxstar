@@ -381,9 +381,15 @@ def hosts_block(inv, me):
     if not lines:
         return ""
     body = "\n".join(lines)
-    return ("# Stable-name fallback until DHCP reservations/DNS exist. Skips names already present.\n"
-            + "".join(f"grep -qw '{l.split()[1]}' /etc/hosts || echo '{l}  # x3-cluster' | sudo tee -a /etc/hosts\n"
-                      for l in body.splitlines()))
+    commands = ["# Stable-name fallback until DHCP reservations/DNS exist. Replace stale mappings safely."]
+    for line in body.splitlines():
+        ip, name = line.split()
+        commands.append(
+            f"if grep -Eq '^[^#]*[[:space:]]{name}([[:space:]]|$)' /etc/hosts; then "
+            f"sudo sed -i -E 's|^[^#]*[[:space:]]{name}([[:space:]].*)?$|{ip} {name}  # x3-cluster|' /etc/hosts; "
+            f"else echo '{ip} {name}  # x3-cluster' | sudo tee -a /etc/hosts >/dev/null; fi"
+        )
+    return "\n".join(commands) + "\n"
 
 
 def control_firewall_block(lan):
