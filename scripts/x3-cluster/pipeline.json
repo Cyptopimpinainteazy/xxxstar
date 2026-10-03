@@ -14,7 +14,7 @@
         {"name": "test-x3-accel", "class": "TEST", "priority": "HIGH", "timeout": 3600,
          "cmd": "cargo test --locked -p x3-accel -p x3-accel-wgpu"},
         {"name": "fuzz-atomic-kernel-rollback", "class": "FUZZ", "priority": "NORMAL", "timeout": 2400,
-         "cmd": "mkdir -p \"$X3_JOB_OUT/crashes\" \"$X3_JOB_OUT/corpus\" && cd pallets/x3-atomic-kernel && cargo +nightly fuzz run fuzz_rollback \"$X3_JOB_OUT/corpus\" -- -max_total_time=120 -seed=1 -artifact_prefix=\"$X3_JOB_OUT/crashes/\""},
+         "cmd": "mkdir -p \"$X3_JOB_OUT/crashes\" \"$X3_JOB_OUT/corpus\" && cd pallets/x3-atomic-kernel && cargo +nightly-2026-08-21 fuzz run fuzz_rollback \"$X3_JOB_OUT/corpus\" -- -max_total_time=120 -seed=1 -artifact_prefix=\"$X3_JOB_OUT/crashes/\""},
         {"name": "sim-partition-storm-hunt", "class": "SIMULATION", "priority": "BACKGROUND", "timeout": 2400,
          "cmd": "cargo run --release --manifest-path crates/x3-sim/Cargo.toml -- --scenario partition-storm --seed 1000 --hunt 200 --out \"$X3_JOB_OUT/partition-storm\" --packet \"$X3_JOB_OUT/packets\""},
         {"name": "sim-crash-recovery-hunt", "class": "SIMULATION", "priority": "BACKGROUND", "timeout": 2400,

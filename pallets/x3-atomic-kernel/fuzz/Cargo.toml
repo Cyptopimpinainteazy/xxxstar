@@ -13,7 +13,9 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 parity-scale-codec = { version = "3", features = ["derive"] }
-sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+# Same polkadot-sdk branch as the pallet, so this unifies with its std-enabled sp-core
+# instead of pulling a second, no_std sp-externalities that cannot build on the host.
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 
 [dependencies.pallet-x3-atomic-kernel]
 path = ".."
