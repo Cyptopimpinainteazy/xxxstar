@@ -1211,6 +1211,34 @@ def onboard(args):
     return 0 if record["status"] == "ok" else 1
 
 
+# ---------------------------------------------------------------- ansible
+
+def ansible_inventory(inv, me=None):
+    """Ansible dynamic-inventory JSON: one group per role plus `cluster`, `ssh_ok`-independent.
+
+    Only nodes with a known IP are listed (an IP-less node would only make every play fail).
+    No secrets: user and addresses only; keys come from the operator's ssh config/agent."""
+    me = me or socket.gethostname()
+    groups = {"cluster": {"hosts": [], "children": []}}
+    hostvars = {}
+    for name, node in inv["nodes"].items():
+        if not node.get("ip"):
+            continue
+        role = node["role"]
+        groups.setdefault(role, {"hosts": []})["hosts"].append(name)
+        if role not in groups["cluster"]["children"]:
+            groups["cluster"]["children"].append(role)
+        hv = {"ansible_host": node["ip"], "x3_role": role, "x3_required": bool(node.get("required"))}
+        if name == me:
+            hv["ansible_connection"] = "local"
+        if node.get("discovered"):
+            hv["x3_discovered"] = True
+        hostvars[name] = hv
+    groups["all"] = {"vars": {"ansible_user": os.environ.get("X3_ANSIBLE_USER", "lojak")}}
+    groups["_meta"] = {"hostvars": hostvars}
+    return groups
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -1245,6 +1273,9 @@ def main():
     p = sub.add_parser("onboard", help="bring one node into the cluster (no sudo)")
     p.add_argument("node")
     p.add_argument("--ip")
+    p = sub.add_parser("ansible-inventory", help="Ansible dynamic inventory (--list / --host NAME)")
+    p.add_argument("--list", action="store_true")
+    p.add_argument("--host")
     p = sub.add_parser("ssh-config")
     p.add_argument("--write", action="store_true", help="write ~/.ssh/x3-cluster.conf and Include it")
     args = parser.parse_args()
@@ -1266,6 +1297,9 @@ def main():
         sys.exit(discover(args))
     elif args.cmd == "onboard":
         sys.exit(onboard(args))
+    elif args.cmd == "ansible-inventory":
+        data = ansible_inventory(load_inventory())
+        print(json.dumps(data["_meta"]["hostvars"].get(args.host, {}) if args.host else data, indent=2))
     elif args.cmd == "ssh-config":
         ssh_config(args)
 

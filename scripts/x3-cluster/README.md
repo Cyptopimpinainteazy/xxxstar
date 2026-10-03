@@ -52,3 +52,15 @@ A worker's `node.env` may set `X3_REPO` (its checkout) and `X3_CARGO_TARGET_DIR`
 target dir instead of `~/.cache/x3-cluster/target`); `bootstrap` keeps those keys.
 
 Tests: `python3 -m unittest scripts/x3-cluster/test_x3jobs.py`.
+
+## Ansible
+
+`x3-ansible-inventory` is an Ansible dynamic inventory built from `inventory.json` plus the IPs
+`discover` found: one group per role (`control`, `gpu`, `build`, `sim`, `data`, `net`, `ops`) under
+`cluster`. Nodes without an IP are left out; the control node uses a local connection.
+
+    ansible-inventory -i scripts/x3-cluster/x3-ansible-inventory --graph
+    ansible -i scripts/x3-cluster/x3-ansible-inventory gpu -m ping
+
+It carries no secrets (user from `X3_ANSIBLE_USER`, default `lojak`). The validator-net playbooks
+under `ansible/` keep their own inventory; this one covers the build cluster.

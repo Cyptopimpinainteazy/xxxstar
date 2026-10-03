@@ -227,5 +227,21 @@ x3_gpu_temperature_celsius{gpu="0",uuid="GPU-1"} 33
         self.assertEqual(f["failed_units"], ["bad.service"])
 
 
+class AnsibleInventory(unittest.TestCase):
+    def test_groups_by_role_and_skips_nodes_without_ip(self):
+        inv = {"nodes": {"ctl": {"role": "control", "ip": "10.0.0.1", "required": True},
+                         "g1": {"role": "gpu", "ip": "10.0.0.2"},
+                         "b1": {"role": "build", "ip": None},
+                         "g2": {"role": "gpu", "ip": "10.0.0.3", "discovered": True}}}
+        out = x3cluster.ansible_inventory(inv, me="ctl")
+        self.assertEqual(out["gpu"]["hosts"], ["g1", "g2"])
+        self.assertNotIn("build", out)
+        self.assertEqual(sorted(out["cluster"]["children"]), ["control", "gpu"])
+        self.assertEqual(out["_meta"]["hostvars"]["ctl"]["ansible_connection"], "local")
+        self.assertEqual(out["_meta"]["hostvars"]["g1"]["ansible_host"], "10.0.0.2")
+        self.assertTrue(out["_meta"]["hostvars"]["g2"]["x3_discovered"])
+        self.assertNotIn("b1", out["_meta"]["hostvars"])
+
+
 if __name__ == "__main__":
     unittest.main()
