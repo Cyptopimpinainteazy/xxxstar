@@ -1,0 +1,47 @@
+{
+  "id": "20261003T094737Z-onboard-x3gpu1-d7cb18",
+  "name": "onboard-x3gpu1",
+  "class": "INFERENCE",
+  "cmd": "for p in 11434 11436; do curl -fsS -m 600 http://127.0.0.1:$p/api/generate -d '{\"model\":\"qwen2.5-coder:7b\",\"prompt\":\"Reply with the single word: ok\",\"stream\":false,\"options\":{\"num_predict\":8}}' -o \"$X3_JOB_OUT/worker-$p.json\" || exit 1; done",
+  "commit": "02499dd58645fee8cfcd7ba08d6fa6321c01a5a9",
+  "ref": "HEAD",
+  "priority": "NORMAL",
+  "timeout": 3600,
+  "node": "x3gpu1",
+  "min_free_gb": 1,
+  "submitted": "2026-10-03T09:47:37+00:00",
+  "controller": "x3star1",
+  "worker": "x3gpu1",
+  "label": "PHYSICAL",
+  "rejected_workers": [],
+  "exit_code": 0,
+  "result": "PASS",
+  "seconds": 51.2,
+  "machine": "x3gpu1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+  },
+  "start": "2026-10-03T09:47:49Z",
+  "end": "2026-10-03T09:48:23Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-master",
+  "target_dir": "/home/lojak/Desktop/xxxstar-master/target",
+  "worker_free_gb": "10",
+  "log_sha256": "87782e32b07938804226506d5a5a4124781e8d26f783555436beb6fbd8652c7d",
+  "log_tail": "X3JOB-META free_gb=10\nX3JOB-META host=x3gpu1\nX3JOB-META repo=/home/lojak/Desktop/xxxstar-master\nX3JOB-META kernel=6.8.0-146-generic\nX3JOB-META rustc=rustc 1.90.0 (1159e78c4 2025-09-14)\nX3JOB-META cargo=cargo 1.90.0 (840b83a10 2025-07-30)\nX3JOB-META cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nX3JOB-META target_dir=/home/lojak/Desktop/xxxstar-master/target\nX3JOB-META start=2026-10-03T09:47:49Z\nX3JOB-META end=2026-10-03T09:48:23Z\n",
+  "artifacts": [
+    {
+      "path": "worker-11434.json",
+      "sha256": "7c50984ecf49b12b8f8e8e706c1e1be77cfce5f6ab4087814a79b5621f89c48c",
+      "bytes": 500
+    },
+    {
+      "path": "worker-11436.json",
+      "sha256": "6b865a5212c706f0ead41b93a1ad437a180cfb93370eb05485ddf83267cee5f1",
+      "bytes": 493
+    }
+  ],
+  "finished": "2026-10-03T09:48:29+00:00"
+}
