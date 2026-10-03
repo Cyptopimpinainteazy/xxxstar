@@ -248,12 +248,18 @@ impl ReorgDetector {
         }
     }
 
-    /// Record a new block
-    pub fn record_block(&mut self, height: u64, hash: H256) {
+    /// Record a new block.
+    ///
+    /// Returns `true` when this height was already tracked under a different
+    /// hash — a reorg — and `false` when the height is new or a duplicate of
+    /// the hash already held for it.
+    pub fn record_block(&mut self, height: u64, hash: H256) -> bool {
         // Check for reorg
+        let mut reorg = false;
         if let Some(existing) = self.recent_hashes.iter().find(|(h, _)| *h == height) {
             if existing.1 != hash {
                 // Reorg detected! This height has a different hash
+                reorg = true;
                 log::warn!(
                     "Reorg detected on {:?} at height {}: {} -> {}",
                     self.chain,
@@ -273,6 +279,13 @@ impl ReorgDetector {
             self.recent_hashes.sort_by_key(|(h, _)| *h);
             self.recent_hashes.remove(0);
         }
+        reorg
+    }
+
+    /// Number of block hashes currently tracked (never more than `max_depth`
+    /// after a trim).
+    pub fn tracked_len(&self) -> usize {
+        self.recent_hashes.len()
     }
 
     /// Check if a block at given height is stable

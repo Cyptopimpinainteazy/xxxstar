@@ -1028,12 +1028,14 @@ GATES_FUZZ=(
 # hours of parallel cargo builds, not a fast gate. The first campaign found two survivors
 # in the supply ledger's `on_finalize` proof pruning that no test observed (#576); this gate
 # keeps that loop running so the next survivor fails a gate instead of shipping. The atomic
-# kernel (submit/finalize/rollback, bond accounting, VM reversion) is the second package.
+# kernel (submit/finalize/rollback, bond accounting, VM reversion) is the second package; the
+# settlement engine (intents, escrow, atomic locks, BTC gateway, finality) the third.
 # One entry per package so `--only 'mutants atomic kernel'` scopes the campaign. A box
 # without cargo-mutants reports BLOCKED, which is the honest answer.
 GATES_MUTANTS=(
   "mutants supply ledger:bash scripts/x3-mutants-gate.sh pallet-x3-supply-ledger"
   "mutants atomic kernel:bash scripts/x3-mutants-gate.sh pallet-x3-atomic-kernel"
+  "mutants settlement engine:bash scripts/x3-mutants-gate.sh pallet-x3-settlement-engine"
 )
 
 # What the consensus network does when validators die. Opt-in and separate from

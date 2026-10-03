@@ -40,6 +40,7 @@ else
   PACKAGES=(
     pallet-x3-supply-ledger
     pallet-x3-atomic-kernel
+    pallet-x3-settlement-engine
   )
 fi
 JOBS="${X3_MUTANTS_JOBS:-4}"

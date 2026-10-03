@@ -119,7 +119,7 @@ impl BtcHtlcParams {
     /// We use the `ripemd` crate (supports `no_std`) because `sp_io::hashing`
     /// does not expose RIPEMD-160.  This is the same path used by Bitcoin Core
     /// for P2PKH/P2SH address derivation: RIPEMD160(SHA256(redeemScript)).
-    fn ripemd160(data: &[u8]) -> [u8; 20] {
+    pub(crate) fn ripemd160(data: &[u8]) -> [u8; 20] {
         let mut hasher = Ripemd160::new();
         hasher.update(data);
         let digest = hasher.finalize();
@@ -128,7 +128,7 @@ impl BtcHtlcParams {
         result
     }
 
-    fn double_sha256(data: &[u8]) -> [u8; 32] {
+    pub(crate) fn double_sha256(data: &[u8]) -> [u8; 32] {
         let first = sp_io::hashing::sha2_256(data);
         sp_io::hashing::sha2_256(&first)
     }
@@ -330,8 +330,13 @@ impl BtcAdaptorSignature {
         let mut sig_rsv = [0u8; 65];
         sig_rsv[..64].copy_from_slice(&self.pre_signature);
         sig_rsv[64] = v;
+        // The point of the explicit-recovery-id form is that the caller names
+        // the publisher key it is verifying against: compare with the argument,
+        // not with this struct's own field. (The previous `self.adapted_pubkey`
+        // comparison made the `pubkey` argument dead weight: any 33 bytes
+        // passed the length check and the caller's actual claim was ignored.)
         sp_io::crypto::secp256k1_ecdsa_recover_compressed(&sig_rsv, message)
-            .map(|r| r == self.adapted_pubkey)
+            .map(|r| r == *pubkey)
             .unwrap_or(false)
     }
 

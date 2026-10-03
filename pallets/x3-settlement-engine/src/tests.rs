@@ -2952,7 +2952,7 @@ fn adaptor_swap_completion_rejects_non_taker_caller() {
 use secp256k1::ecdsa::RecoverableSignature;
 use secp256k1::{Message, PublicKey, Scalar, Secp256k1, SecretKey};
 
-fn real_adaptor_signature(
+pub(crate) fn real_adaptor_signature(
     msg: [u8; 32],
 ) -> (BtcAdaptorSignature, [u8; 33], BtcSignature65, [u8; 32]) {
     let secp = Secp256k1::new();
@@ -3119,7 +3119,7 @@ fn hex32(value: H256) -> String {
 /// passed validation before this change, which is exactly the gap these tests
 /// pin. `bundle_needs_verified_proof` is the rule that now refuses it on a Live
 /// network.
-fn fabricated_bundle(
+pub(crate) fn fabricated_bundle(
     runtime_intent_id: [u8; 32],
     chain_id: &str,
     vm_type: VmType,
@@ -3157,7 +3157,7 @@ fn fabricated_bundle(
 }
 
 /// Create an intent with an Ethereum leg and a Solana leg, both escrowed.
-fn intent_with_two_external_legs() -> H256 {
+pub(crate) fn intent_with_two_external_legs() -> H256 {
     let maker = ALICE;
     let taker = BOB;
     let secret_hash = H256::from(sp_io::hashing::sha2_256(
