@@ -231,7 +231,9 @@ def system_unit_env_for_port(port):
         unit = line.split()[0] if line.split() else ""
         _, raw = run(["systemctl", "show", "-p", "Environment", "--value", unit])
         env = dict(item.split("=", 1) for item in shlex.split(raw) if "=" in item)
-        if env.get("OLLAMA_HOST", "").rsplit(":", 1)[-1] == str(port):
+        # Ollama's default when OLLAMA_HOST is unset (or has no port) is :11434.
+        host = env.get("OLLAMA_HOST") or "127.0.0.1:11434"
+        if (host.rsplit(":", 1)[-1] if ":" in host else "11434") == str(port):
             return unit, env
     return None, None
 
