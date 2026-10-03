@@ -808,6 +808,12 @@ def gate(args):
         elif row.get("remote"):
             check(f"{row['node']}.role_identity", row["node_role"] == row["role"], row["node_role"])
             gpu_count = len(row["remote"]["gpus"])
+        elif row.get("metrics"):
+            # No SSH: what node_exporter and Ollama report over the LAN, labelled as such.
+            m = row["metrics"]
+            row.update(clock_synced=m["clock_synced"], disk_free_gb=m["free_gb"], failed_units=m["failed_units"])
+            check(f"{row['node']}.hostname_identity", m.get("hostname") == row["node"], f"{m.get('hostname')} (via node_exporter)")
+            gpu_count = len(m["gpus"])
         else:
             continue
         n = row["node"]
