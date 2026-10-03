@@ -290,10 +290,14 @@ def plan_gpu_workers(node, node_ip, bind):
         elif env is None:
             # A root/ollama-owned service: read its configured pinning from systemd instead.
             unit, unit_env = system_unit_env_for_port(port)
-            if unit_env and unit_env.get("CUDA_VISIBLE_DEVICES") == gpu["uuid"]:
+            if unit_env and (unit_env.get("CUDA_VISIBLE_DEVICES") == gpu["uuid"]
+                             or (len(ranked) == 1 and not unit_env.get("CUDA_VISIBLE_DEVICES"))):
+                # Unpinned is only unambiguous while there is one GPU; a second card makes it a conflict.
                 entry["state"] = "adopted"
                 entry["unit"] = unit
                 entry["bind"] = unit_env.get("OLLAMA_HOST")
+                if not unit_env.get("CUDA_VISIBLE_DEVICES"):
+                    entry["detail"] = "unpinned system worker, adopted because this node has one GPU"
             else:
                 entry["state"] = "system-unverified"
                 entry["unit"] = unit or "ollama.service"
@@ -659,6 +663,56 @@ print(json.dumps({"hostname": os.uname().nodename, "threads": os.cpu_count(), "l
 PY"""
 
 
+def parse_exporter(text):
+    """Facts from a Prometheus node_exporter page (plus the x3_gpu_* textfile metrics)."""
+    facts = {"threads": 0, "ram_gb": None, "free_gb": None, "gpus": [], "units": {}, "clock_synced": None, "os": None}
+    gpus = {}
+    for line in text.splitlines():
+        if line.startswith("#") or " " not in line:
+            continue
+        key, _, value = line.rpartition(" ")
+        try:
+            num = float(value)
+        except ValueError:
+            continue
+        name, _, labels = key.partition("{")
+        lab = dict(re.findall(r'(\w+)="([^"]*)"', labels))
+        if name == "node_cpu_seconds_total" and lab.get("mode") == "idle":
+            facts["threads"] += 1
+        elif name == "node_memory_MemTotal_bytes":
+            facts["ram_gb"] = round(num / 1e9, 1)
+        elif name == "node_filesystem_avail_bytes" and lab.get("mountpoint") == "/":
+            facts["free_gb"] = round(num / 1e9, 1)
+        elif name == "node_timex_sync_status":
+            facts["clock_synced"] = num == 1
+        elif name == "node_os_info":
+            facts["os"] = lab.get("pretty_name")
+        elif name == "node_uname_info":
+            facts["hostname"], facts["kernel"] = lab.get("nodename"), lab.get("release")
+        elif name == "node_systemd_unit_state" and num == 1 and lab.get("state") in ("active", "failed"):
+            facts["units"][lab["name"]] = lab["state"]
+        elif name.startswith("x3_gpu_") and "uuid" in lab:
+            gpus.setdefault(lab["uuid"], {"uuid": lab["uuid"]})[name[len("x3_gpu_"):]] = num
+    facts["gpus"] = list(gpus.values())
+    facts["failed_units"] = sorted(u for u, st in facts["units"].items() if st == "failed")
+    return facts
+
+
+def metrics_health(ip):
+    """What a node reveals without SSH: node_exporter on :9100 and Ollama on its worker ports."""
+    try:
+        with urllib.request.urlopen(f"http://{ip}:9100/metrics", timeout=4) as response:
+            facts = parse_exporter(response.read().decode(errors="replace"))
+    except Exception:  # noqa: BLE001
+        return None
+    facts["ollama_workers"] = {}
+    for port in range(OLLAMA_BASE_PORT, OLLAMA_BASE_PORT + 16):
+        if port != 11435 and tcp_open(ip, port, 0.5) and http_json(f"http://{ip}:{port}/api/version"):
+            tags = http_json(f"http://{ip}:{port}/api/tags") or {}
+            facts["ollama_workers"][port] = {"ok": True, "bind": "LAN", "models": [m["name"] for m in tags.get("models", [])]}
+    return facts
+
+
 def remote_health(host):
     code, out = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=4", host, REMOTE_HEALTH], 25)
     if code != 0:
@@ -692,7 +746,12 @@ def health(args, quiet=False):
                            disk_free_gb=remote["free_gb"], clock_synced=remote["clock_synced"],
                            failed_units=remote["failed_units"], node_role=remote["role"], repo_head=remote["repo_head"])
             elif ssh_port:
-                row["detail"] = "sshd answers but key auth failed (BatchMode)"
+                row["detail"] = "sshd answers but refuses this node's key: run x3-join.sh on it"
+                seen = metrics_health(ip)
+                if seen and seen.get("hostname") == name:
+                    row.update(label="PHYSICAL-METRICS", metrics=seen, cpu=f"{seen['threads']}t",
+                               ram=f"{seen['ram_gb']}G", gpu=f"{len(seen['gpus'])}x{int(seen['gpus'][0]['memory_total_mib']) // 1024}GB"
+                               if seen["gpus"] else "-", ollama_workers=seen["ollama_workers"])
             elif reachable:
                 row["detail"] = "pings but no sshd on :22"
             if node["role"] == "control":
@@ -910,8 +969,9 @@ def discover(args):
     inv = load_inventory()
     me = socket.gethostname()
     own = {n["ipv4"].split("/")[0] for n in nics() if n["ipv4"]}
-    known = {n["ip"]: name for name, n in inv["nodes"].items() if n.get("ip") and not n.get("discovered")}
-    open_ssh = [ip for ip in sweep_ssh(inv["lan"], own) if ip not in known]
+    # Every sshd is asked who it is: a node with a fixed inventory IP still needs onboarding
+    # the first time it accepts this node's key (x3gpu2 had an IP before it had our key).
+    open_ssh = sweep_ssh(inv["lan"], own)
     answers = {}
     for ip in open_ssh:
         code, out, _ = ssh_run(ip, "hostname", 15)

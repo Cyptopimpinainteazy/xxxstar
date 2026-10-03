@@ -164,13 +164,13 @@ class Discovery(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             old = x3cluster.DISCOVERED
             x3cluster.DISCOVERED = Path(tmp) / "discovered.json"
-            x3cluster.DISCOVERED.write_text(json.dumps({"x3gpu2": {"ip": "192.168.0.41"}, "x3gpu1": {"ip": "10.9.9.9"}}))
+            x3cluster.DISCOVERED.write_text(json.dumps({"x3build1": {"ip": "192.168.0.41"}, "x3gpu1": {"ip": "10.9.9.9"}}))
             try:
                 inv = x3cluster.load_inventory()
             finally:
                 x3cluster.DISCOVERED = old
-        self.assertEqual(inv["nodes"]["x3gpu2"]["ip"], "192.168.0.41")
-        self.assertTrue(inv["nodes"]["x3gpu2"]["discovered"])
+        self.assertEqual(inv["nodes"]["x3build1"]["ip"], "192.168.0.41")
+        self.assertTrue(inv["nodes"]["x3build1"]["discovered"])
         self.assertEqual(inv["nodes"]["x3gpu1"]["ip"], "192.168.0.30")
 
 
@@ -199,6 +199,32 @@ class JoinScript(unittest.TestCase):
     def test_rejects_unknown_role(self):
         out = subprocess.run(["bash", str(HERE / "x3-join.sh"), "--role", "miner"], capture_output=True, text=True)
         self.assertEqual(out.returncode, 2)
+
+
+class ExporterParsing(unittest.TestCase):
+    SAMPLE = """# HELP x
+node_cpu_seconds_total{cpu="0",mode="idle"} 10
+node_cpu_seconds_total{cpu="0",mode="user"} 3
+node_cpu_seconds_total{cpu="1",mode="idle"} 11
+node_memory_MemTotal_bytes 2.5061326848e+10
+node_filesystem_avail_bytes{device="/dev/sda2",fstype="ext4",mountpoint="/"} 8.88809472e+09
+node_filesystem_avail_bytes{device="/dev/sdb1",fstype="ext4",mountpoint="/data"} 1e+12
+node_timex_sync_status 1
+node_uname_info{nodename="x3gpu2",release="6.8.0-138-generic"} 1
+node_systemd_unit_state{name="ollama.service",state="active",type="simple"} 1
+node_systemd_unit_state{name="ollama.service",state="failed",type="simple"} 0
+node_systemd_unit_state{name="bad.service",state="failed",type="simple"} 1
+x3_gpu_memory_total_mib{gpu="0",uuid="GPU-1"} 8192
+x3_gpu_temperature_celsius{gpu="0",uuid="GPU-1"} 33
+"""
+
+    def test_parse(self):
+        f = x3cluster.parse_exporter(self.SAMPLE)
+        self.assertEqual((f["threads"], f["ram_gb"], f["free_gb"], f["clock_synced"]), (2, 25.1, 8.9, True))
+        self.assertEqual((f["hostname"], f["kernel"]), ("x3gpu2", "6.8.0-138-generic"))
+        self.assertEqual(f["gpus"], [{"uuid": "GPU-1", "memory_total_mib": 8192.0, "temperature_celsius": 33.0}])
+        self.assertEqual(f["units"]["ollama.service"], "active")
+        self.assertEqual(f["failed_units"], ["bad.service"])
 
 
 if __name__ == "__main__":

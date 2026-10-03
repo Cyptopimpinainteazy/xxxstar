@@ -1,0 +1,12 @@
+[Unit]
+Description=X3 cluster: find new nodes on the LAN and onboard them
+Documentation=file:@X3_CLUSTER_DIR@/README.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Installed by: sed "s|@X3_CLUSTER_DIR@|$PWD|" systemd/x3-cluster-discover.service > ~/.config/systemd/user/...
+ExecStart=/usr/bin/python3 @X3_CLUSTER_DIR@/x3cluster.py discover --onboard
+# Onboarding pulls models and runs a benchmark and a job; bound it.
+TimeoutStartSec=3h
+Nice=10

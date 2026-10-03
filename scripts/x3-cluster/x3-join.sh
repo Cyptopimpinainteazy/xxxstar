@@ -67,6 +67,8 @@ do_ sudo loginctl enable-linger "$USER"
 # 5. Firewall: default deny inbound; SSH from the LAN; GPU worker ports only from the control node.
 #    SSH is allowed before ufw is enabled, so this cannot lock out the session running it.
 do_ sudo ufw allow from "$LAN" to any port 22 proto tcp
+# Prometheus node_exporter, if present, stays readable by the control node (health without SSH).
+do_ sudo ufw allow from "$CONTROL_IP" to any port 9100 proto tcp
 if [ "$role" = gpu ]; then
     do_ sudo ufw allow from "$CONTROL_IP" to any port "$WORKER_PORTS" proto tcp
 fi
@@ -85,12 +87,17 @@ if [ "$role" = gpu ]; then
             echo "WARNING: no NVIDIA device on the PCI bus; this machine cannot be a GPU worker" >&2
         fi
     fi
+    fresh_ollama=0
     if ! command -v ollama >/dev/null; then
         echo "+ install Ollama (https://ollama.com/install.sh)"
         [ "$dry" = 1 ] || curl -fsSL https://ollama.com/install.sh | sh
+        fresh_ollama=1
     fi
-    # The stock service would take :11434 on every GPU; the cluster runs one pinned worker per GPU instead.
-    if systemctl list-unit-files ollama.service >/dev/null 2>&1 && systemctl is-enabled ollama.service >/dev/null 2>&1; then
+    # With several GPUs the cluster runs one pinned worker per GPU, so the stock service (which
+    # spans every GPU on :11434) is replaced. On a single-GPU node an existing, working stock
+    # service is kept: it is adopted as that GPU's worker, models and dependants intact.
+    gpu_count=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU' || true)
+    if { [ "$fresh_ollama" = 1 ] || [ "${gpu_count:-0}" -gt 1 ]; } && systemctl is-enabled ollama.service >/dev/null 2>&1; then
         do_ sudo systemctl disable --now ollama.service
     fi
 fi

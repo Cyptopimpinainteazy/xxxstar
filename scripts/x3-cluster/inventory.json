@@ -23,11 +23,13 @@
     },
     "x3gpu2": {
       "role": "gpu",
-      "ip": null,
+      "ip": "192.168.0.23",
       "services": [
-        "ssh"
+        "ssh",
+        "ollama"
       ],
-      "required": true
+      "required": true,
+      "mac": "60:45:cb:81:d5:5c"
     },
     "x3build1": {
       "role": "build",
@@ -72,7 +74,6 @@
     }
   },
   "unidentified": {
-    "192.168.0.23": "OpenSSH 8.9p1 (Ubuntu 22.04); seen 2026-10-02, absent from the 2026-10-03 ICMP + :22 sweep of 192.168.0.0/24",
     "tailscale:x3star (100.69.96.9)": "Linux Tailscale peer, answers tailscale ping via DERP (~140 ms, remote site); :22 refused (2026-10-03)"
   },
   "canonical_repo": "https://github.com/Cyptopimpinainteazy/xxxstar.git",
@@ -82,9 +83,10 @@
     "lan": "192.168.0.0/24",
     "x3_hosts_found": [
       "x3star1 192.168.0.70",
-      "x3gpu1 192.168.0.30"
+      "x3gpu1 192.168.0.30",
+      "x3gpu2 192.168.0.23 (sshd refuses x3star1's key; identified by reverse DNS, mDNS and its node_exporter nodename)"
     ],
-    "note": "other live hosts were the modem, a Wi-Fi extender and TVs; no x3gpu2/x3build1/x3sim1/x3data1/x3net1/x3ops1 on the LAN or tailnet"
+    "note": "x3gpu2 came online 2026-10-03 ~09:50Z; no x3build1/x3sim1/x3data1/x3net1/x3ops1 on the LAN or tailnet"
   },
   "control_ssh_pubkey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJEW3gU29rVC93o1TVD5i6yA09ewbV9eo+upTr3pw14S x3star1-to-x3gpu1"
 }
