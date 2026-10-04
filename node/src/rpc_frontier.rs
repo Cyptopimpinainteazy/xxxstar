@@ -11,6 +11,9 @@ use hex;
 use jsonrpsee::RpcModule;
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sc_client_api::BlockBackend;
+use sc_transaction_pool_api::TransactionPool;
+#[cfg(feature = "frontier")]
+use sc_transaction_pool_api::TransactionSource;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_runtime::DigestItem;
@@ -383,10 +386,12 @@ fn block_timestamp_from_header(header: &x3_chain_runtime::opaque::Header) -> u64
 /// Create a Frontier-compatible JSON-RPC module backed by runtime API calls.
 /// Provides eth_getBalance, eth_getCode, eth_getStorageAt,
 /// eth_getTransactionCount (nonce), eth_call, and eth_estimateGas.
-pub fn create_frontier_rpc<C>(
+pub fn create_frontier_rpc<C, P>(
     client: Arc<C>,
+    pool: Arc<P>,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
+    P: TransactionPool<Block = Block> + Send + Sync + 'static,
     C: Send
         + Sync
         + 'static
@@ -561,47 +566,56 @@ where
         },
     )?;
 
-    // eth_sendRawTransaction — submit a signed RLP-encoded Ethereum transaction
-    // Executes via the X3 kernel EVM adapter and returns the keccak256 tx hash.
-    let c = client.clone();
-    module.register_method(
-        "eth_sendRawTransaction",
-        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let raw_hex: String = params.one()?;
-            let stripped = raw_hex.strip_prefix("0x").unwrap_or(&raw_hex);
-            let raw_bytes = hex::decode(stripped).map_err(|e| {
-                jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Invalid hex: {}", e),
-                    None::<()>,
+    // eth_sendRawTransaction — submit a signed, EIP-2718 enveloped Ethereum transaction to the
+    // transaction pool. The runtime recovers the sender from the transaction's ECDSA signature
+    // when the pool validates it (`x3_chain_runtime::ethereum_tx`); a forged or malformed
+    // transaction is refused there. Returns the Ethereum transaction hash.
+    #[cfg(feature = "frontier")]
+    {
+        let c = client.clone();
+        let pool = pool.clone();
+        module.register_async_method("eth_sendRawTransaction", move |params, _, _| {
+            let c = c.clone();
+            let pool = pool.clone();
+            async move {
+                let rpc_error = |message: String| {
+                    jsonrpsee::types::ErrorObjectOwned::owned(-32603, message, None::<()>)
+                };
+                let raw_hex: String = params.one()?;
+                let stripped = raw_hex.strip_prefix("0x").unwrap_or(&raw_hex);
+                let raw_bytes =
+                    hex::decode(stripped).map_err(|e| rpc_error(format!("Invalid hex: {e}")))?;
+                let (extrinsic, tx_hash) =
+                    x3_chain_runtime::ethereum_tx::signed_ethereum_extrinsic(&raw_bytes)
+                        .map_err(|e| rpc_error(e.to_string()))?;
+                pool.submit_one(
+                    c.info().best_hash,
+                    TransactionSource::External,
+                    extrinsic.into(),
                 )
-            })?;
-            let api = c.runtime_api();
-            let at = c.info().best_hash;
-            let result: Result<Vec<u8>, Vec<u8>> =
-                api.submit_evm_transaction(at, raw_bytes).map_err(|e| {
-                    jsonrpsee::types::ErrorObjectOwned::owned(
-                        -32603,
-                        format!("Runtime error: {:?}", e),
-                        None::<()>,
-                    )
-                })?;
-            match result {
-                Ok(tx_hash) => Ok(serde_json::Value::String(format!(
+                .await
+                .map_err(|e| rpc_error(format!("Transaction rejected: {e}")))?;
+                Ok::<_, jsonrpsee::types::ErrorObjectOwned>(serde_json::Value::String(format!(
                     "0x{}",
-                    hex::encode(tx_hash)
-                ))),
-                Err(err_bytes) => Err(jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!(
-                        "EVM execution failed: {}",
-                        String::from_utf8_lossy(&err_bytes)
-                    ),
-                    None::<()>,
-                )),
+                    hex::encode(tx_hash.as_bytes())
+                )))
             }
-        },
-    )?;
+        })?;
+    }
+    #[cfg(not(feature = "frontier"))]
+    {
+        let _ = &pool;
+        module.register_method(
+            "eth_sendRawTransaction",
+            |_, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                Err(jsonrpsee::types::ErrorObjectOwned::owned(
+                    -32601,
+                    "EVM disabled in RC-1 (frontier feature off)",
+                    None::<()>,
+                ))
+            },
+        )?;
+    }
 
     // eth_getTransactionByHash — returns EVM transaction object by hash
     let c = client.clone();

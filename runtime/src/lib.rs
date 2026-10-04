@@ -134,6 +134,8 @@ use sp_std::prelude::*;
 use x3_asset_kernel_types::DomainId;
 
 #[cfg(feature = "frontier")]
+pub mod ethereum_tx;
+#[cfg(feature = "frontier")]
 mod precompiles;
 #[cfg(feature = "frontier")]
 use precompiles::FrontierPrecompiles;
@@ -914,8 +916,44 @@ construct_runtime!(
 );
 
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+#[cfg(not(feature = "frontier"))]
 pub type UncheckedExtrinsic =
     generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+/// With Frontier, a signed Ethereum transaction is a self-contained extrinsic whose sender the
+/// runtime recovers from its ECDSA signature (see `ethereum_tx`).
+#[cfg(feature = "frontier")]
+pub type UncheckedExtrinsic =
+    fp_self_contained::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+
+/// The generic extrinsic inside an [`UncheckedExtrinsic`], whichever extrinsic type this build
+/// uses, so native code can read the preamble and call without its own `frontier` switch.
+pub fn generic_extrinsic(
+    xt: UncheckedExtrinsic,
+) -> generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra> {
+    #[cfg(feature = "frontier")]
+    {
+        xt.0
+    }
+    #[cfg(not(feature = "frontier"))]
+    {
+        xt
+    }
+}
+
+/// For a signed Ethereum transaction: the account its signature-recovered sender maps to, and
+/// its nonce. `None` for every other call, for a signature that does not recover, and on builds
+/// without Frontier.
+pub fn ethereum_sender_and_nonce(call: &RuntimeCall) -> Option<(AccountId, u64)> {
+    #[cfg(feature = "frontier")]
+    {
+        ethereum_tx::sender_and_nonce(call)
+    }
+    #[cfg(not(feature = "frontier"))]
+    {
+        let _ = call;
+        None
+    }
+}
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 // Runtime storage migrations tuple. Add migration structs for pallets that need upgrades.
 pub type Migrations = (
@@ -3896,239 +3934,12 @@ impl_runtime_apis! {
             balance > 0
         }
 
-        #[allow(unused_variables)]
-        fn submit_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
-            #[cfg(feature = "frontier")]
-            {
-            #[cfg(feature = "frontier")]
-            {
-            // Payload contract:
-            // [caller(20)] [to(20)] [value(16 LE)] [data_len(4 LE)] [data...]
-            use sp_io::hashing::keccak_256;
-            use fp_evm::ExitReason;
-            use pallet_evm::Runner;
-            use sp_core::{H160, H256, U256};
-            use codec::Encode;
-
-            // Compute tx_hash once at the start for replay prevention check
-            let tx_hash = keccak_256(&raw_tx);
-
-            // Check for replay - reject if this transaction was already submitted
-            if pallet_x3_kernel::SubmittedComits::<Runtime>::contains_key(H256::from_slice(tx_hash.as_ref())) {
-                return Err(b"transaction already submitted (replay detected)".to_vec());
-            }
-
-            if raw_tx.len() < (20 + 20 + 16 + 4) {
-                return Err(b"invalid payload: too short".to_vec());
-            }
-
-            let caller = {
-                let mut bytes = [0u8; 20];
-                bytes.copy_from_slice(&raw_tx[0..20]);
-                H160::from(bytes)
-            };
-            let to = {
-                let mut bytes = [0u8; 20];
-                bytes.copy_from_slice(&raw_tx[20..40]);
-                H160::from(bytes)
-            };
-            let value = U256::from_little_endian(&raw_tx[40..56]);
-            let data_len = u32::from_le_bytes(raw_tx[56..60].try_into().unwrap_or([0u8; 4])) as usize;
-            if raw_tx.len() < 60 + data_len {
-                return Err(b"invalid payload: data_len out of bounds".to_vec());
-            }
-            let data = raw_tx[60..60 + data_len].to_vec();
-
-            use sp_runtime::traits::BlakeTwo256;
-            let caller_account: AccountId = <pallet_evm::HashedAddressMapping<BlakeTwo256>
-                as pallet_evm::AddressMapping<AccountId>>::into_account_id(caller);
-            let tx_nonce = frame_system::Pallet::<Runtime>::account_nonce(&caller_account) as u64;
-
-            log::info!(
-                target: "runtime::evm",
-                "submit_evm_transaction caller=0x{:?} to=0x{:?} value={} data_len={}",
-                caller,
-                to,
-                value,
-                data_len,
-            );
-
-            let evm_config = fp_evm::Config::shanghai();
-
-            // Persist full tx metadata for eth_getTransactionByHash compatibility.
-            let tx_data = pallet_x3_kernel::pallet::EvmTransactionData {
-                raw: raw_tx.clone(),
-                from: caller.as_bytes().to_vec(),
-                to: to.as_bytes().to_vec(),
-                value: value.as_u128(),
-                gas: 10_000_000u64,
-                input: data.clone(),
-                nonce: tx_nonce,
-                gas_price: NATIVE_GAS_PRICE as u128,
-            };
-            pallet_x3_kernel::EvmTransactions::<Runtime>::insert(
-                H256::from_slice(tx_hash.as_ref()),
-                tx_data,
-            );
-            let result = <Runtime as pallet_evm::Config>::Runner::call(
-                caller,
-                to,
-                data,
-                value,
-                10_000_000u64,
-                Some(U256::from(NATIVE_GAS_PRICE)),
-                None,
-                None,
-                Vec::new(),
-                Vec::new(), // authorization_list
-                false,
-                false,
-                None,
-                None,
-                &evm_config,
-            );
-
-            match result {
-                Ok(info) => match info.exit_reason {
-                    ExitReason::Succeed(_) => {
-                        // Build execution receipt
-                        let receipt = pallet_x3_kernel::ExecutionReceipt {
-                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
-                            success: true,
-                            gas_used: info.used_gas.standard.low_u64(),
-                            return_data: info.value.to_vec(),
-                            logs: info
-                                .logs
-                                .into_iter()
-                                .map(|log| pallet_x3_kernel::ExecutionLog {
-                                    address: log.address.as_bytes().to_vec(),
-                                    topics: log.topics,
-                                    data: log.data,
-                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
-                                })
-                                .collect(),
-                            state_changes: Vec::new(),
-                            storage_writes: Vec::new(),
-                            protocol_version: 1,
-                            migration_history: Vec::new(),
-                            compatibility_flags: 0,
-                            from: caller.as_bytes().to_vec(),
-                            to: to.as_bytes().to_vec(),
-                            value: value.as_u128(),
-                        };
-                        // Store receipt keyed by transaction hash
-                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
-                            H256::from_slice(tx_hash.as_ref()),
-                            receipt,
-                        );
-                        // Record transaction as submitted for replay prevention
-                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
-                        Ok(tx_hash.to_vec())
-                    }
-                    ExitReason::Revert(_) => {
-                        // Build execution receipt for reverted transaction
-                        let receipt = pallet_x3_kernel::ExecutionReceipt {
-                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
-                            success: false,
-                            gas_used: info.used_gas.standard.low_u64(),
-                            return_data: info.value.to_vec(),
-                            logs: info
-                                .logs
-                                .into_iter()
-                                .map(|log| pallet_x3_kernel::ExecutionLog {
-                                    address: log.address.as_bytes().to_vec(),
-                                    topics: log.topics,
-                                    data: log.data,
-                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
-                                })
-                                .collect(),
-                            state_changes: Vec::new(),
-                            storage_writes: Vec::new(),
-                            protocol_version: 1,
-                            migration_history: Vec::new(),
-                            compatibility_flags: 0,
-                            from: caller.as_bytes().to_vec(),
-                            to: to.as_bytes().to_vec(),
-                            value: value.as_u128(),
-                        };
-                        // Store receipt keyed by transaction hash
-                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
-                            H256::from_slice(tx_hash.as_ref()),
-                            receipt,
-                        );
-                        // Record transaction as submitted for replay prevention
-                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
-                        Err(info.value)
-                    }
-                    ExitReason::Error(_) | ExitReason::Fatal(_) => {
-                        // Build execution receipt for failed transaction
-                        let receipt = pallet_x3_kernel::ExecutionReceipt {
-                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
-                            success: false,
-                            gas_used: info.used_gas.standard.low_u64(),
-                            return_data: info.value.to_vec(),
-                            logs: info
-                                .logs
-                                .into_iter()
-                                .map(|log| pallet_x3_kernel::ExecutionLog {
-                                    address: log.address.as_bytes().to_vec(),
-                                    topics: log.topics,
-                                    data: log.data,
-                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
-                                })
-                                .collect(),
-                            state_changes: Vec::new(),
-                            storage_writes: Vec::new(),
-                            protocol_version: 1,
-                            migration_history: Vec::new(),
-                            compatibility_flags: 0,
-                            from: caller.as_bytes().to_vec(),
-                            to: to.as_bytes().to_vec(),
-                            value: value.as_u128(),
-                        };
-                        // Store receipt keyed by transaction hash
-                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
-                            H256::from_slice(tx_hash.as_ref()),
-                            receipt,
-                        );
-                        // Record transaction as submitted for replay prevention
-                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
-                        Err(info.value)
-                    }
-                },
-                Err(_) => {
-                    // Build execution receipt for runner failure
-                    let receipt = pallet_x3_kernel::ExecutionReceipt {
-                        version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
-                        success: false,
-                        gas_used: 0,
-                        return_data: b"EVM runner call failed".to_vec(),
-                        logs: Vec::new(),
-                        state_changes: Vec::new(),
-                        storage_writes: Vec::new(),
-                        protocol_version: 1,
-                        migration_history: Vec::new(),
-                        compatibility_flags: 0,
-                        from: caller.as_bytes().to_vec(),
-                        to: to.as_bytes().to_vec(),
-                        value: value.as_u128(),
-                    };
-                    // Store receipt keyed by transaction hash
-                    pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
-                        H256::from_slice(tx_hash.as_ref()),
-                        receipt,
-                    );
-                    // Record transaction as submitted for replay prevention
-                    pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
-                    Err(b"EVM runner call failed".to_vec())
-                }
-            }
-            }
-            #[cfg(not(feature = "frontier"))]
-            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
-            }
-            #[cfg(not(feature = "frontier"))]
-            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
+        // Refused on every build. The payload named its own `caller`, and the EVM ran as that
+        // address with no signature checked. A signed Ethereum transaction goes through the
+        // transaction pool as a self-contained extrinsic (`eth_sendRawTransaction`), where the
+        // runtime recovers the sender from the signature (`ethereum_tx`).
+        fn submit_evm_transaction(_raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
+            Err(b"unsigned EVM payloads are refused; submit a signed Ethereum transaction with eth_sendRawTransaction".to_vec())
         }
 
         fn submit_svm_instruction(program_id: [u8; 32], instruction_data: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {

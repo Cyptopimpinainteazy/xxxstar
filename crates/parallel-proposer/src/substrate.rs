@@ -488,6 +488,7 @@ fn address_to_account(address: Address) -> Option<x3_chain_runtime::AccountId> {
 pub fn extract_tx_metadata<E: Encode>(extrinsic: &E, tx_hash: [u8; 32]) -> TxMetadata {
     let bytes = extrinsic.encode();
     if let Ok(decoded) = UncheckedExtrinsic::decode(&mut &bytes[..]) {
+        let decoded = x3_chain_runtime::generic_extrinsic(decoded);
         let mut sender = tx_hash;
         let mut nonce = 0u64;
 
@@ -499,6 +500,14 @@ pub fn extract_tx_metadata<E: Encode>(extrinsic: &E, tx_hash: [u8; 32]) -> TxMet
 
             let (_, _, _, _, _, check_nonce, _, _, _, _) = extra;
             nonce = check_nonce.0.saturated_into::<u64>();
+        } else if let Some((account, eth_nonce)) =
+            x3_chain_runtime::ethereum_sender_and_nonce(&decoded.function)
+        {
+            // A signed Ethereum transaction is a bare extrinsic; its sender comes from its own
+            // signature. Keying it on the tx hash instead would let two transactions from one
+            // address land in different parallel shards.
+            sender.copy_from_slice(account.as_ref());
+            nonce = eth_nonce;
         }
 
         let call_bytes = decoded.function.encode();
