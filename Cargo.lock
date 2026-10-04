@@ -26728,6 +26728,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid 1.21.0",
  "x3-accel",
+ "x3-accel-wgpu",
  "x3-backend",
  "x3-orchestra-control-plane",
  "x3-vm",
