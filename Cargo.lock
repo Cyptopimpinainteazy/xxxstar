@@ -25986,6 +25986,7 @@ dependencies = [
  "contention-predictor",
  "criterion",
  "cross-chain-gpu-validator",
+ "cumulus-primitives-proof-size-hostfunction",
  "env_logger 0.10.2",
  "frame-benchmarking-cli",
  "frame-support",

@@ -322,8 +322,16 @@ impl Default for GpuSidecarHealthMonitor {
 ///
 /// The wrapper adds per-runtime-call timing and changes nothing else; see
 /// [`crate::timed_executor`] for what that does and does not attribute.
-pub type Executor =
-    crate::timed_executor::TimedExecutor<sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>>;
+pub type Executor = crate::timed_executor::TimedExecutor<sc_executor::WasmExecutor<HostFunctions>>;
+
+/// Host functions the node offers its runtime. `storage_proof_size` is imported by a runtime
+/// built with `frontier` (pallet-evm's proof-size gas accounting); offering it costs a runtime
+/// that does not import it nothing, and a node without it cannot run a `frontier` runtime at all,
+/// including one that arrives as an upgrade.
+pub type HostFunctions = (
+    sp_io::SubstrateHostFunctions,
+    cumulus_primitives_proof_size_hostfunction::storage_proof_size::HostFunctions,
+);
 
 /// Full client type alias
 pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
@@ -596,7 +604,7 @@ pub fn new_partial(
         }
     });
     let executor = Executor::new(
-        sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor),
+        sc_service::new_wasm_executor::<HostFunctions>(&config.executor),
         runtime_call_metrics,
     );
 
