@@ -392,6 +392,7 @@ pub fn create_frontier_rpc<C, P>(
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
     P: TransactionPool<Block = Block> + Send + Sync + 'static,
+    C: sc_client_api::AuxStore,
     C: Send
         + Sync
         + 'static
@@ -638,6 +639,20 @@ where
                     None::<()>,
                 ));
             }
+            #[cfg(feature = "frontier")]
+            if let Some(entry) =
+                crate::eth_index::lookup(&*c, &sp_core::H256::from_slice(&tx_hash_bytes)).map_err(
+                    |e| {
+                        jsonrpsee::types::ErrorObjectOwned::owned(
+                            -32603,
+                            format!("Index error: {e}"),
+                            None::<()>,
+                        )
+                    },
+                )?
+            {
+                return Ok(crate::eth_index::transaction_json(&entry));
+            }
             let api = c.runtime_api();
             let at = c.info().best_hash;
             let tx_opt: Option<Vec<u8>> = api
@@ -760,6 +775,12 @@ where
             .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid tx hash: {}", e), None::<()>))?;
         if tx_hash_bytes.len() != 32 {
             return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
+        }
+        #[cfg(feature = "frontier")]
+        if let Some(entry) = crate::eth_index::lookup(&*c, &sp_core::H256::from_slice(&tx_hash_bytes))
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Index error: {e}"), None::<()>))?
+        {
+            return Ok(crate::eth_index::receipt_json(&entry));
         }
         let api = c.runtime_api();
         let at = c.info().best_hash;

@@ -1503,6 +1503,14 @@ pub fn new_full_with_atomic_gateway<
         config.chain_spec.chain_type(),
         ChainType::Development | ChainType::Local
     );
+    // Ethereum tx/receipt lookups read this index; pallet-ethereum keeps only the latest block.
+    #[cfg(feature = "frontier")]
+    task_manager.spawn_handle().spawn(
+        "eth-tx-index",
+        Some("frontier"),
+        crate::eth_index::run(client.clone()),
+    );
+
     let rpc_builder = {
         let client = client.clone();
         let transaction_pool = transaction_pool.clone();

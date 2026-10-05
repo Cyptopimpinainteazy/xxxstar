@@ -625,7 +625,10 @@ fn extrinsics_in_block(port: u16, hash: &str) -> Vec<String> {
         };
         match x3_chain_runtime::UncheckedExtrinsic::decode(&mut &bytes[..]) {
             Ok(decoded) => {
-                let text = format!("{:?}", decoded.function);
+                let text = format!(
+                    "{:?}",
+                    x3_chain_runtime::generic_extrinsic(decoded).function
+                );
                 out.push(text.chars().take(140).collect::<String>());
             }
             Err(error) => out.push(format!("<undecodable: {error}>")),

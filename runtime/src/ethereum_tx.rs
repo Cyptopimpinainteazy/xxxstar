@@ -18,6 +18,22 @@ use sp_runtime::transaction_validity::{
     InvalidTransaction, TransactionSource, TransactionValidity, TransactionValidityError,
 };
 
+/// Ethereum types the node needs to read `pallet-ethereum`'s per-block records, re-exported so the
+/// node uses exactly the versions the runtime encodes with.
+pub use ethereum;
+pub use pallet_ethereum::{Receipt, Transaction, TransactionStatus};
+
+/// Storage keys of `pallet-ethereum`'s per-block records, in the post-state of each block:
+/// `(CurrentBlock, CurrentReceipts, CurrentTransactionStatuses)`. Each is overwritten by the
+/// next block, so a node that wants them later has to copy them out as blocks are imported.
+pub fn current_block_storage_keys() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    (
+        pallet_ethereum::CurrentBlock::<Runtime>::hashed_key().to_vec(),
+        pallet_ethereum::CurrentReceipts::<Runtime>::hashed_key().to_vec(),
+        pallet_ethereum::CurrentTransactionStatuses::<Runtime>::hashed_key().to_vec(),
+    )
+}
+
 /// Decode a signed, EIP-2718 enveloped Ethereum transaction (the bytes a wallet sends to
 /// `eth_sendRawTransaction`) and wrap it as the extrinsic the transaction pool accepts, with the
 /// transaction's Ethereum hash.
@@ -333,6 +349,29 @@ mod tests {
 
             let remark = RuntimeCall::System(frame_system::Call::remark { remark: vec![1] });
             assert_eq!(sender_and_nonce(&remark), None);
+        });
+    }
+
+    #[test]
+    fn current_block_storage_keys_address_pallet_ethereum_records() {
+        sp_io::TestExternalities::default().execute_with(|| {
+            let pair = ecdsa::Pair::from_seed(&[0x11; 32]);
+            let statuses = vec![pallet_ethereum::TransactionStatus {
+                transaction_hash: signed_legacy(&pair, 0, 1).hash(),
+                transaction_index: 0,
+                from: address_of(&pair),
+                to: None,
+                contract_address: None,
+                logs: vec![],
+                logs_bloom: Default::default(),
+            }];
+            pallet_ethereum::CurrentTransactionStatuses::<Runtime>::put(statuses.clone());
+            let (_, _, statuses_key) = current_block_storage_keys();
+            let raw = sp_io::storage::get(&statuses_key).expect("written under this key");
+            assert_eq!(
+                Vec::<pallet_ethereum::TransactionStatus>::decode(&mut &raw[..]).unwrap(),
+                statuses
+            );
         });
     }
 

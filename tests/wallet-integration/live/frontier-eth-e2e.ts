@@ -109,9 +109,44 @@ async function main(): Promise<void> {
   }
   console.log(`  ok  included: sender nonce ${nonce0 + 1}, recipient credited ${value}, gas used ${fee / GAS_PRICE}`);
 
+  // Lookups come from the node's index (pallet-ethereum keeps only the latest block).
+  let receipt: any = null;
+  await waitFor("receipt", async () => (receipt = await rpc("eth_getTransactionReceipt", [hash])) !== null, 30);
+  const gasUsed = fee / GAS_PRICE;
+  const lower = (x: unknown) => String(x).toLowerCase();
+  const expectEq = (label: string, got: unknown, want: unknown) => {
+    if (lower(got) !== lower(want)) throw new Error(`${label}: got ${got}, want ${want}`);
+  };
+  expectEq("receipt.transactionHash", receipt.transactionHash, hash);
+  expectEq("receipt.status", receipt.status, "0x1");
+  expectEq("receipt.from", receipt.from, sender.address);
+  expectEq("receipt.to", receipt.to, recipient);
+  expectEq("receipt.gasUsed", BigInt(receipt.gasUsed), gasUsed);
+  expectEq("receipt.effectiveGasPrice", BigInt(receipt.effectiveGasPrice), GAS_PRICE);
+  const block = await rpc("chain_getBlockHash", [Number(receipt.blockNumber)]);
+  expectEq("receipt.blockHash", receipt.blockHash, block);
+
+  const fetched: any = await rpc("eth_getTransactionByHash", [hash]);
+  if (!fetched) throw new Error("eth_getTransactionByHash returned null for an included tx");
+  expectEq("tx.from", fetched.from, sender.address);
+  expectEq("tx.to", fetched.to, recipient);
+  expectEq("tx.value", BigInt(fetched.value), value);
+  expectEq("tx.nonce", BigInt(fetched.nonce), BigInt(nonce0));
+  expectEq("tx.blockHash", fetched.blockHash, receipt.blockHash);
+  // Rebuilding the transaction from the RPC fields must reproduce the hash the wallet signed.
+  const rebuilt = Transaction.from({
+    type: 0, chainId, nonce: Number(fetched.nonce), gasPrice: BigInt(fetched.gasPrice),
+    gasLimit: BigInt(fetched.gas), to: fetched.to, value: BigInt(fetched.value), data: fetched.input,
+    signature: { r: fetched.r, s: fetched.s, v: Number(fetched.v) },
+  });
+  expectEq("tx rebuilt hash", rebuilt.hash, hash);
+  const unknown = "0x" + "ab".repeat(32);
+  if ((await rpc("eth_getTransactionReceipt", [unknown])) !== null) throw new Error("receipt for unknown hash");
+  console.log(`  ok  lookups: receipt in block ${Number(receipt.blockNumber)}, tx fields rebuild the signed hash`);
+
   await expectRejected("replay", raw);
-  const block = Number(await rpc("eth_blockNumber"));
-  await waitFor("next block", async () => Number(await rpc("eth_blockNumber")) > block + 1);
+  const height = Number(await rpc("eth_blockNumber"));
+  await waitFor("next block", async () => Number(await rpc("eth_blockNumber")) > height + 1);
   if ((await nativeFree(recipient)) !== value) throw new Error("replay credited the recipient again");
   if ((await nonceOf(sender.address)) !== nonce0 + 1) throw new Error("replay moved the nonce");
   console.log("  ok  replay had no effect");
