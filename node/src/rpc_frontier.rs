@@ -815,6 +815,20 @@ where
     let c = client.clone();
     module.register_method("eth_getLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or(serde_json::Value::Null);
+        // EIP-234: a `blockHash` filter names one block; Ethereum logs come from the node's index.
+        #[cfg(feature = "frontier")]
+        let index_filter = crate::eth_index::LogFilter::from_json(&filter)
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32602, format!("Invalid filter: {e}"), None::<()>))?;
+        #[cfg(feature = "frontier")]
+        if let Some(block_hash) = filter.get("blockHash").and_then(|v| v.as_str()) {
+            let bytes = hex::decode(block_hash.trim_start_matches("0x"))
+                .ok()
+                .filter(|b| b.len() == 32)
+                .ok_or_else(|| jsonrpsee::types::ErrorObjectOwned::owned(-32602, "Invalid blockHash".to_string(), None::<()>))?;
+            let logs = crate::eth_index::logs_in_block(&*c, &sp_core::H256::from_slice(&bytes), &index_filter)
+                .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Index error: {e}"), None::<()>))?;
+            return Ok(serde_json::Value::Array(logs));
+        }
         let latest_block = c.info().best_number as u64;
         let from_block = filter.get("fromBlock")
             .and_then(|v| v.as_str())
@@ -825,7 +839,7 @@ where
                 let stripped = s.strip_prefix("0x").unwrap_or(s);
                 u64::from_str_radix(stripped, 16)
                     .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid fromBlock: {}", e), None::<()>))
-            }).unwrap_or(Ok(0))?;
+            }).unwrap_or(Ok(latest_block))?; // JSON-RPC default: "latest"
         let to_block = filter.get("toBlock")
             .and_then(|v| v.as_str())
             .map(|s| {
@@ -841,6 +855,9 @@ where
             .map(decode_address)
             .transpose()?;
         validate_log_block_range("eth_getLogs", from_block, to_block)?;
+        #[cfg(feature = "frontier")]
+        let index_logs = crate::eth_index::logs_in_range(&*c, from_block as u32, to_block as u32, &index_filter)
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Index error: {e}"), None::<()>))?;
         // Encode filter as SCALE tuple: (from_block: u64, to_block: u64, address: Option<[u8; 20]>)
         // SCALE encoding: u64 (8 bytes LE) + u64 (8 bytes LE) + Option tag (0x00/0x01) + [u8; 20] (if Some)
         let mut filter_bytes = Vec::new();
@@ -877,6 +894,8 @@ where
                 }
             })
             .collect();
+        #[cfg(feature = "frontier")]
+        let logs = index_logs.into_iter().chain(logs).collect::<Vec<_>>();
         Ok(serde_json::Value::Array(logs))
     })?;
 
@@ -1214,7 +1233,7 @@ where
     module.register_method(
         "eth_getBlockByNumber",
         move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let (block_param, _full): (serde_json::Value, bool) = params
+            let (block_param, full): (serde_json::Value, bool) = params
                 .parse()
                 .unwrap_or_else(|_| (serde_json::Value::String("latest".to_string()), false));
 
@@ -1287,13 +1306,14 @@ where
             let number = header.number;
             let timestamp = block_timestamp_from_header(&header);
 
-            Ok(serde_json::json!({
+            #[allow(unused_mut)]
+            let mut block_json = serde_json::json!({
                 "number": format!("0x{:x}", number),
                 "hash": format!("0x{}", hex::encode(hash.as_bytes())),
                 "parentHash": format!("0x{}", hex::encode(parent_hash.as_bytes())),
                 "stateRoot": format!("0x{}", hex::encode(state_root.as_bytes())),
                 "extrinsicsRoot": format!("0x{}", hex::encode(extrinsics_root.as_bytes())),
-                "logsBloom": "0x0",
+                "logsBloom": format!("0x{}", "00".repeat(256)),
                 "transactionsRoot": format!("0x{}", hex::encode(hash.as_bytes())),
                 "miner": "0x0000000000000000000000000000000000000000",
                 "gasLimit": format!("0xc350"),
@@ -1304,7 +1324,23 @@ where
                 "size": format!("0x0"),
                 "extraData": "0x",
                 "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
-            }))
+            });
+            // Ethereum transactions, gas used, logs bloom and gas limit from the node's index.
+            #[cfg(feature = "frontier")]
+            if let Some(fields) = crate::eth_index::block_fields(&*c, &hash, full).map_err(|e| {
+                jsonrpsee::types::ErrorObjectOwned::owned(
+                    -32603,
+                    format!("Index error: {e}"),
+                    None::<()>,
+                )
+            })? {
+                if let Some(object) = block_json.as_object_mut() {
+                    object.extend(fields);
+                }
+            }
+            #[cfg(not(feature = "frontier"))]
+            let _ = full;
+            Ok(block_json)
         },
     )?;
 
@@ -1313,7 +1349,7 @@ where
     module.register_method(
         "eth_getBlockByHash",
         move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let (hash_hex, _full): (String, bool) =
+            let (hash_hex, full): (String, bool) =
                 params.parse().unwrap_or_else(|_| ("0x".to_string(), false));
 
             let stripped = hash_hex.strip_prefix("0x").unwrap_or(&hash_hex);
@@ -1355,13 +1391,14 @@ where
             let number = header.number;
             let timestamp = block_timestamp_from_header(&header);
 
-            Ok(serde_json::json!({
+            #[allow(unused_mut)]
+            let mut block_json = serde_json::json!({
                 "number": format!("0x{:x}", number),
                 "hash": format!("0x{}", hex::encode(hash.as_bytes())),
                 "parentHash": format!("0x{}", hex::encode(parent_hash.as_bytes())),
                 "stateRoot": format!("0x{}", hex::encode(state_root.as_bytes())),
                 "extrinsicsRoot": format!("0x{}", hex::encode(extrinsics_root.as_bytes())),
-                "logsBloom": "0x0",
+                "logsBloom": format!("0x{}", "00".repeat(256)),
                 "transactionsRoot": format!("0x{}", hex::encode(hash.as_bytes())),
                 "miner": "0x0000000000000000000000000000000000000000",
                 "gasLimit": format!("0xc350"),
@@ -1372,7 +1409,23 @@ where
                 "size": format!("0x0"),
                 "extraData": "0x",
                 "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
-            }))
+            });
+            // Ethereum transactions, gas used, logs bloom and gas limit from the node's index.
+            #[cfg(feature = "frontier")]
+            if let Some(fields) = crate::eth_index::block_fields(&*c, &hash, full).map_err(|e| {
+                jsonrpsee::types::ErrorObjectOwned::owned(
+                    -32603,
+                    format!("Index error: {e}"),
+                    None::<()>,
+                )
+            })? {
+                if let Some(object) = block_json.as_object_mut() {
+                    object.extend(fields);
+                }
+            }
+            #[cfg(not(feature = "frontier"))]
+            let _ = full;
+            Ok(block_json)
         },
     )?;
 

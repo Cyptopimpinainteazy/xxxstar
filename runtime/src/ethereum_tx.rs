@@ -34,6 +34,11 @@ pub fn current_block_storage_keys() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     )
 }
 
+/// The EVM block gas limit (`pallet_evm::Config::BlockGasLimit`), for the block RPCs.
+pub fn block_gas_limit() -> sp_core::U256 {
+    <<Runtime as pallet_evm::Config>::BlockGasLimit as frame_support::traits::Get<_>>::get()
+}
+
 /// Decode a signed, EIP-2718 enveloped Ethereum transaction (the bytes a wallet sends to
 /// `eth_sendRawTransaction`) and wrap it as the extrinsic the transaction pool accepts, with the
 /// transaction's Ethereum hash.

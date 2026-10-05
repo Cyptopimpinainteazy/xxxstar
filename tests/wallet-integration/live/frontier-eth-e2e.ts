@@ -6,7 +6,7 @@
 // mapped Substrate account (`DEV_EVM_CALLERS` in node/src/chain_spec.rs). Balances are read from
 // `System.Account` storage directly: `eth_getBalance` reports the kernel's `CanonicalLedger`,
 // which is not the balance the EVM spends from.
-import { Transaction, Wallet, getBytes, hexlify, keccak256, toUtf8Bytes } from "ethers";
+import { Transaction, Wallet, getBytes, getCreateAddress, hexlify, keccak256, toUtf8Bytes } from "ethers";
 import { blake2b } from "@noble/hashes/blake2b";
 
 const RPC = process.env.X3_RPC ?? "http://127.0.0.1:9944";
@@ -150,6 +150,41 @@ async function main(): Promise<void> {
   if ((await nativeFree(recipient)) !== value) throw new Error("replay credited the recipient again");
   if ((await nonceOf(sender.address)) !== nonce0 + 1) throw new Error("replay moved the nonce");
   console.log("  ok  replay had no effect");
+  // A contract whose constructor emits one LOG1: PUSH32 topic, PUSH1 0, PUSH1 0, LOG1, STOP.
+  const topic = keccak256(toUtf8Bytes("X3FrontierE2E()"));
+  const deploy = await sender.signTransaction({
+    type: 0, chainId, nonce: nonce0 + 1, gasPrice: GAS_PRICE, gasLimit: 200_000n, to: null,
+    data: "0x7f" + topic.slice(2) + "60006000a100",
+  });
+  const deployHash: string = await rpc("eth_sendRawTransaction", [deploy]);
+  let deployed: any = null;
+  await waitFor("deploy receipt", async () => (deployed = await rpc("eth_getTransactionReceipt", [deployHash])) !== null, 60);
+  const contract = getCreateAddress({ from: sender.address, nonce: nonce0 + 1 });
+  expectEq("deploy.status", deployed.status, "0x1");
+  expectEq("deploy.contractAddress", deployed.contractAddress, contract);
+  expectEq("deploy.to", deployed.to, null);
+  if (deployed.logs.length !== 1) throw new Error(`deploy emitted ${deployed.logs.length} logs, want 1`);
+  expectEq("deploy log address", deployed.logs[0].address, contract);
+  expectEq("deploy log topic", deployed.logs[0].topics[0], topic);
+
+  const n = deployed.blockNumber;
+  const logs: any[] = await rpc("eth_getLogs", [{ fromBlock: n, toBlock: n, address: contract, topics: [topic] }]);
+  if (logs.length !== 1) throw new Error(`eth_getLogs by address+topic returned ${logs.length}, want 1`);
+  expectEq("getLogs txHash", logs[0].transactionHash, deployHash);
+  const byHash: any[] = await rpc("eth_getLogs", [{ blockHash: deployed.blockHash, topics: [[topic, keccak256("0x01")]] }]);
+  if (byHash.length !== 1) throw new Error(`eth_getLogs by blockHash returned ${byHash.length}, want 1`);
+  const wrongTopic: any[] = await rpc("eth_getLogs", [{ fromBlock: n, toBlock: n, topics: [keccak256("0x02")] }]);
+  if (wrongTopic.length !== 0) throw new Error(`eth_getLogs with a non-matching topic returned ${wrongTopic.length}`);
+
+  const deployBlock: any = await rpc("eth_getBlockByNumber", [n, false]);
+  if (!deployBlock.transactions.map(lower).includes(lower(deployHash))) throw new Error("block does not list the deploy tx");
+  if (BigInt(deployBlock.gasUsed) < BigInt(deployed.gasUsed)) throw new Error("block gasUsed below the deploy's gasUsed");
+  if (/^0x0*$/.test(deployBlock.logsBloom) || deployBlock.logsBloom.length !== 2 + 512) throw new Error(`bad logsBloom ${deployBlock.logsBloom}`);
+  const fullBlock: any = await rpc("eth_getBlockByHash", [deployed.blockHash, true]);
+  const fullTx = fullBlock.transactions.find((t: any) => lower(t.hash) === lower(deployHash));
+  if (!fullTx || fullTx.to !== null) throw new Error("full block does not carry the deploy as a create tx");
+  console.log(`  ok  logs: contract ${contract} emitted 1 log; getLogs (range, blockHash, topic sets) and block fields agree`);
+
   console.log("PASS");
 }
 
