@@ -7,9 +7,9 @@
 //! node's aux store, keyed by transaction hash. A lookup returns an entry only while its block is
 //! still canonical at that height, so a reorg cannot surface a transaction from a retracted fork.
 //!
-//! Coverage: blocks this node imports as best while running, plus a startup backfill of blocks
-//! it missed whose state is still available. Blocks imported during a major sync are not
-//! announced on the import stream and are not indexed.
+//! Coverage: every canonical block whose state is still readable when the task reaches it —
+//! new best blocks as they are imported, and, on a timer, blocks a major sync imported without
+//! announcing them. History older than the state pruning window needs `--state-pruning archive`.
 
 use codec::{Decode, Encode};
 use futures::StreamExt;
@@ -26,9 +26,15 @@ use crate::service::FullClient;
 const LOG_TARGET: &str = "eth-index";
 const TX_PREFIX: &[u8] = b"x3/eth-index/tx/";
 const BLOCK_PREFIX: &[u8] = b"x3/eth-index/block/";
+/// Height the catch-up walk has covered contiguously. Only `catch_up` moves it: a new best block
+/// indexed from the import stream must not let the walk skip the blocks below it.
 const LAST_INDEXED: &[u8] = b"x3/eth-index/last";
 /// How far back the startup backfill reaches: the SDK's default state pruning window.
 const BACKFILL_WINDOW: u32 = 256;
+/// How often the canonical chain is walked for blocks the import stream did not announce.
+const CATCH_UP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(6);
+/// Most blocks one catch-up pass indexes, so a long sync does not starve the import handler.
+const CATCH_UP_BATCH: u32 = 512;
 
 /// One Ethereum transaction as included in a block.
 #[derive(Clone, Debug, PartialEq, Encode, Decode)]
@@ -127,18 +133,12 @@ pub fn block_entries(client: &FullClient, hash: H256) -> Result<Vec<IndexedTrans
 /// Index block `hash`; returns how many Ethereum transactions it held.
 pub fn index_block(client: &FullClient, hash: H256) -> Result<usize, String> {
     let entries = block_entries(client, hash)?;
-    let number = client
-        .number(hash)
-        .map_err(|e| e.to_string())?
-        .unwrap_or_default();
-    let last = last_indexed(client)?.unwrap_or_default().max(number);
     let mut writes: Vec<(Vec<u8>, Vec<u8>)> = entries
         .iter()
         .map(|e| (tx_key(&e.status.transaction_hash), e.encode()))
         .collect();
     // Written even when empty: "indexed, no Ethereum transactions" differs from "not indexed".
     writes.push((block_key(&hash), entries.encode()));
-    writes.push((LAST_INDEXED.to_vec(), last.encode()));
     let pairs: Vec<(&[u8], &[u8])> = writes.iter().map(|(k, v)| (&k[..], &v[..])).collect();
     let deletes: [&[u8]; 0] = [];
     client
@@ -340,28 +340,55 @@ fn index_logged(client: &FullClient, hash: H256) {
 pub async fn run(client: Arc<FullClient>) {
     // Subscribe before backfilling: a block imported between the two would otherwise be missed.
     let mut imports = client.import_notification_stream();
+    let floor = client.info().best_number.saturating_sub(BACKFILL_WINDOW);
+    catch_up(&client, floor, u32::MAX);
+
+    // Blocks imported during a major sync are not announced on the import stream, so the
+    // canonical chain is also walked on a timer.
+    let mut tick = tokio::time::interval(CATCH_UP_INTERVAL);
+    loop {
+        tokio::select! {
+            notification = imports.next() => {
+                let Some(notification) = notification else { break };
+                if !notification.is_new_best {
+                    continue;
+                }
+                if let Some(route) = &notification.tree_route {
+                    for enacted in route.enacted() {
+                        index_logged(&client, enacted.hash);
+                    }
+                }
+                index_logged(&client, notification.hash);
+            }
+            _ = tick.tick() => catch_up(&client, 0, CATCH_UP_BATCH),
+        }
+    }
+}
+
+/// Index up to `limit` canonical blocks after the last indexed one (and not below `floor`).
+///
+/// A block whose state is already pruned cannot be read; it is logged and passed over, so it stays
+/// unindexed and the lookups report it as such instead of as "no transactions". Run the node with
+/// `--state-pruning archive` to index history a sync imports faster than this task reads it.
+fn catch_up(client: &FullClient, floor: u32, limit: u32) {
     let best = client.info().best_number;
-    let start = match last_indexed(&client) {
+    let start = match last_indexed(client) {
         Ok(Some(last)) => last.saturating_add(1),
         _ => 0,
     }
-    .max(best.saturating_sub(BACKFILL_WINDOW));
-    for number in start..=best {
+    .max(floor);
+    if start > best {
+        return;
+    }
+    let end = best.min(start.saturating_add(limit.saturating_sub(1)));
+    for number in start..=end {
         if let Ok(Some(hash)) = client.hash(number) {
-            index_logged(&client, hash);
+            index_logged(client, hash);
         }
     }
-
-    while let Some(notification) = imports.next().await {
-        if !notification.is_new_best {
-            continue;
-        }
-        if let Some(route) = &notification.tree_route {
-            for enacted in route.enacted() {
-                index_logged(&client, enacted.hash);
-            }
-        }
-        index_logged(&client, notification.hash);
+    // Move past blocks that could not be read, so one pruned block does not stall the index.
+    if let Err(e) = client.insert_aux(&[(LAST_INDEXED, &end.encode()[..])], &[] as &[&[u8]]) {
+        log::warn!(target: LOG_TARGET, "could not record catch-up progress: {e}");
     }
 }
 

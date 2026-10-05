@@ -8,6 +8,7 @@
 // which is not the balance the EVM spends from.
 import { Transaction, Wallet, getBytes, getCreateAddress, hexlify, keccak256, toUtf8Bytes } from "ethers";
 import { blake2b } from "@noble/hashes/blake2b";
+import { readFileSync, writeFileSync } from "fs";
 
 const RPC = process.env.X3_RPC ?? "http://127.0.0.1:9944";
 const HARDHAT_0 = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
@@ -185,10 +186,48 @@ async function main(): Promise<void> {
   if (!fullTx || fullTx.to !== null) throw new Error("full block does not carry the deploy as a create tx");
   console.log(`  ok  logs: contract ${contract} emitted 1 log; getLogs (range, blockHash, topic sets) and block fields agree`);
 
+  // Hand the included transactions to the synced-node check (X3_SYNC_FILE, see the gate script).
+  if (process.env.X3_SYNC_FILE) {
+    writeFileSync(process.env.X3_SYNC_FILE, JSON.stringify({ hashes: [hash, deployHash], topic, block: Number(n) }));
+  }
   console.log("PASS");
 }
 
-main().catch((e) => {
+/** On a node that synced the chain, the same transactions, receipts and logs must be served. */
+async function verifySynced(): Promise<void> {
+  const want = JSON.parse(readFileSync(process.env.X3_SYNC_FILE!, "utf8"));
+  const source = process.env.X3_SOURCE_RPC!;
+  const at = async (url: string, method: string, params: unknown[]) => {
+    const res = await fetch(url, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    });
+    const body: any = await res.json();
+    if (body.error) throw new Error(`${method} @ ${url}: ${body.error.message}`);
+    return body.result;
+  };
+  // The synced node indexes on its catch-up timer; give it a few ticks.
+  await waitFor("synced receipts", async () => {
+    for (const h of want.hashes) if ((await at(RPC, "eth_getTransactionReceipt", [h])) === null) return false;
+    return true;
+  }, 120);
+  for (const h of want.hashes) {
+    const a = JSON.stringify(await at(source, "eth_getTransactionReceipt", [h]));
+    const b = JSON.stringify(await at(RPC, "eth_getTransactionReceipt", [h]));
+    if (a !== b) throw new Error(`receipt ${h} differs on the synced node:\n${a}\n${b}`);
+    const ta = JSON.stringify(await at(source, "eth_getTransactionByHash", [h]));
+    const tb = JSON.stringify(await at(RPC, "eth_getTransactionByHash", [h]));
+    if (ta !== tb) throw new Error(`tx ${h} differs on the synced node`);
+  }
+  const filter = [{ fromBlock: "0x1", toBlock: "0x" + want.block.toString(16), topics: [want.topic] }];
+  const la = JSON.stringify(await at(source, "eth_getLogs", filter));
+  const lb = JSON.stringify(await at(RPC, "eth_getLogs", filter));
+  if (la !== lb || JSON.parse(lb).length !== 1) throw new Error(`eth_getLogs differs on the synced node:\n${la}\n${lb}`);
+  console.log(`  ok  synced node serves identical receipts, transactions and logs (blocks 1..${want.block})`);
+  console.log("PASS");
+}
+
+(process.env.X3_MODE === "verify-synced" ? verifySynced() : main()).catch((e) => {
   console.error(`FAIL: ${(e as Error).message}`);
   process.exit(1);
 });
