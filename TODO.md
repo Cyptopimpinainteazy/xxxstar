@@ -17,12 +17,3 @@
 
 - [ ] Run full `cargo test -p x3-gateway` with live Postgres + migration `0006_funding_swarm_public_ledger.sql` applied
 - [ ] Add CI pipeline step for gateway integration tests with a testcontainer Postgres instance
-
-</file_contents>
-<task_progress>
-- [x] Phase 3.1: Replace PENDING_SYNC.md placeholder
-- [x] Phase 3.2: Clean up x3-lang/PLAN.md
-- [x] Phase 3.3: Complete TODO.md Step 7 — marked complete with test infrastructure verified
-- [ ] Phase 3.4: Update DOCUMENTATION_INDEX.md
-</task_progress>
-</write_to_file>
