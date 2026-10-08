@@ -1,0 +1,49 @@
+name: X3 Compiled Storage Build
+
+on:
+  pull_request:
+    paths:
+      - 'crates/x3-integration/**'
+      - 'crates/x3-compiler/**'
+      - 'crates/x3-hir/**'
+      - 'crates/x3-mir/**'
+      - 'crates/x3-backend/**'
+      - 'pallets/x3-kernel/**'
+      - '.github/workflows/x3-compiled-storage-build.yml'
+  push:
+    paths:
+      - 'crates/x3-integration/**'
+      - 'crates/x3-compiler/**'
+      - 'crates/x3-hir/**'
+      - 'crates/x3-mir/**'
+      - 'crates/x3-backend/**'
+      - 'pallets/x3-kernel/**'
+      - '.github/workflows/x3-compiled-storage-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-test-storage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate compiler and storage code formatting
+        run: cargo fmt --all -- --check
+      - name: Check chain-facing language compiler
+        run: cargo check -p x3-compiler -p x3-x3-integration --all-features
+      - name: Compile kernel storage integration test
+        run: cargo test -p pallet-x3-kernel --test x3_storage_channel --features std --no-run
+      - name: Run source-to-bytecode storage lifecycle
+        run: cargo test -p pallet-x3-kernel --test x3_storage_channel --features std -- --nocapture
+      - name: Verify source-language agreement
+        run: cargo test -p x3-x3-integration --test source_language --features 'std compile' -- --nocapture
