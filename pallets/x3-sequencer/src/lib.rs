@@ -42,17 +42,29 @@ mod tests;
 #[frame_support::pallet]
 pub mod pallet {
     use crate::weights::WeightInfo;
-    use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::ReservableCurrency};
+    use frame_support::{
+        dispatch::DispatchResult,
+        pallet_prelude::*,
+        traits::{Currency, ExistenceRequirement, WithdrawReasons},
+    };
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
+    use sp_runtime::traits::{Saturating, Zero};
     use sp_runtime::SaturatedConversion;
+
+    type BalanceOf<T> =
+        <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
     // ── Config ─────────────────────────────────────────────────────────────
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// Currency for sequencing fees.
-        type Currency: ReservableCurrency<Self::AccountId>;
+        type Currency: Currency<Self::AccountId>;
+
+        /// Account the anti-spam fee is paid to. It must exist (hold at least the existential
+        /// deposit) for any fee below that deposit to be accepted.
+        type ProtocolTreasury: Get<Self::AccountId>;
 
         /// Maximum transactions per batch.
         #[pallet::constant]
@@ -173,6 +185,11 @@ pub mod pallet {
             tx_count: u32,
             sealed_at: u32,
         },
+        /// The sequencing fee for a submission was paid to the protocol treasury.
+        SequencingFeeCollected {
+            who: T::AccountId,
+            fee: BalanceOf<T>,
+        },
     }
 
     // ── Errors ─────────────────────────────────────────────────────────────
@@ -185,6 +202,9 @@ pub mod pallet {
         PayloadTooLarge,
         /// Insufficient funds for sequencing fee.
         InsufficientFee,
+        /// The fee could not be credited to the protocol treasury, although the submitter can
+        /// pay it. A treasury holding less than the existential deposit refuses small fees.
+        FeeDestinationRefused,
         /// Invalid source chain identifier.
         InvalidSourceChain,
     }
@@ -274,8 +294,7 @@ pub mod pallet {
                 .saturating_add(T::PerByteFee::get().saturating_mul(payload_size as u128));
             let fee = fee_u128.saturated_into();
 
-            // Charge fee via T::Currency
-            T::Currency::reserve(&submitter, fee).map_err(|_| Error::<T>::InsufficientFee)?;
+            Self::charge_sequencing_fee(&submitter, fee)?;
 
             let now = <frame_system::Pallet<T>>::block_number();
             let sequence = GlobalSequence::<T>::mutate(|seq| {
@@ -310,6 +329,47 @@ pub mod pallet {
     // ── Internal Helpers ───────────────────────────────────────────────────
 
     impl<T: Config> Pallet<T> {
+        /// Charge the anti-spam sequencing fee by moving it to the protocol treasury.
+        ///
+        /// This used to `reserve` the fee, and nothing in the pallet ever released it, so every
+        /// submission locked part of the submitter's balance for good (TICKET-154). The fee now
+        /// leaves the account. It is not waived when the treasury refuses the deposit (a dead
+        /// treasury refuses any amount below the existential deposit): a waived anti-spam fee
+        /// makes spam free, so the submission is refused instead, with an error that names the
+        /// treasury rather than the payer.
+        fn charge_sequencing_fee(who: &T::AccountId, fee: BalanceOf<T>) -> DispatchResult {
+            if fee.is_zero() {
+                return Ok(());
+            }
+            let free = T::Currency::free_balance(who);
+            let payer_covers_it = free >= fee.saturating_add(T::Currency::minimum_balance())
+                && T::Currency::ensure_can_withdraw(
+                    who,
+                    fee,
+                    WithdrawReasons::TRANSFER,
+                    free.saturating_sub(fee),
+                )
+                .is_ok();
+            T::Currency::transfer(
+                who,
+                &T::ProtocolTreasury::get(),
+                fee,
+                ExistenceRequirement::KeepAlive,
+            )
+            .map_err(|_| {
+                if payer_covers_it {
+                    Error::<T>::FeeDestinationRefused
+                } else {
+                    Error::<T>::InsufficientFee
+                }
+            })?;
+            Self::deposit_event(Event::SequencingFeeCollected {
+                who: who.clone(),
+                fee,
+            });
+            Ok(())
+        }
+
         /// Compute a simple binary Merkle root over ordered hashes.
         fn compute_merkle_root(hashes: &[H256]) -> H256 {
             if hashes.is_empty() {

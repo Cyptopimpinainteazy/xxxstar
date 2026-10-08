@@ -2980,6 +2980,7 @@ impl pallet_private_execution::Config for Runtime {
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_sequencer::Config for Runtime {
     type Currency = Balances;
+    type ProtocolTreasury = TreasuryAccountId;
     type MaxTxsPerBatch = SeqMaxTxsPerBatch;
     type MaxPayloadSize = SeqMaxPayloadSize;
     type PerByteFee = SeqPerByteFee;
@@ -3012,6 +3013,7 @@ impl ProposerQuery<AccountId> for Runtime {
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_da::Config for Runtime {
     type Currency = Balances;
+    type ProtocolTreasury = TreasuryAccountId;
     type MaxBlobSize = DaMaxBlobSize;
     type PerByteFee = DaPerByteFee;
     type MaxShardProofs = DaMaxShardProofs;
