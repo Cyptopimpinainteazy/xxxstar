@@ -2952,7 +2952,7 @@ fn adaptor_swap_completion_rejects_non_taker_caller() {
 use secp256k1::ecdsa::RecoverableSignature;
 use secp256k1::{Message, PublicKey, Scalar, Secp256k1, SecretKey};
 
-fn real_adaptor_signature(
+pub(crate) fn real_adaptor_signature(
     msg: [u8; 32],
 ) -> (BtcAdaptorSignature, [u8; 33], BtcSignature65, [u8; 32]) {
     let secp = Secp256k1::new();
@@ -3119,7 +3119,7 @@ fn hex32(value: H256) -> String {
 /// passed validation before this change, which is exactly the gap these tests
 /// pin. `bundle_needs_verified_proof` is the rule that now refuses it on a Live
 /// network.
-fn fabricated_bundle(
+pub(crate) fn fabricated_bundle(
     runtime_intent_id: [u8; 32],
     chain_id: &str,
     vm_type: VmType,
@@ -3157,7 +3157,7 @@ fn fabricated_bundle(
 }
 
 /// Create an intent with an Ethereum leg and a Solana leg, both escrowed.
-fn intent_with_two_external_legs() -> H256 {
+pub(crate) fn intent_with_two_external_legs() -> H256 {
     let maker = ALICE;
     let taker = BOB;
     let secret_hash = H256::from(sp_io::hashing::sha2_256(
@@ -4450,6 +4450,37 @@ fn a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored() {
             Ok(true),
             "once anchored, the real node's bytes verify"
         );
+
+        // The admission guard is two conditions, not one: the record must say
+        // anchored AND name the header's own height. Replacing the guard with
+        // `true`, or its `&&` with `||`, accepts one of these two proofs; the
+        // chain must refuse both.
+        let block_hash = Pallet::<Test>::compute_btc_block_hash(&header);
+        crate::BtcHeaderMetaStore::<Test>::insert(
+            block_hash,
+            crate::types::BtcHeaderMeta {
+                height: regtest_capture::HEIGHT,
+                anchored: false,
+            },
+        );
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(false),
+            "an unanchored record must not be accepted on the strength of its height"
+        );
+
+        crate::BtcHeaderMetaStore::<Test>::insert(
+            block_hash,
+            crate::types::BtcHeaderMeta {
+                height: regtest_capture::HEIGHT + 1,
+                anchored: true,
+            },
+        );
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(false),
+            "an anchored record at another height is a statement about another block"
+        );
     });
 }
 /// Genesis pins the SPV trust root, so a chain can be born anchored.
@@ -5495,7 +5526,7 @@ fn finalize_evm_settlement_with(before_last_claim: impl FnOnce(u64)) -> H256 {
 #[test]
 fn a_collected_settlement_fee_reaches_the_treasury() {
     new_test_ext().execute_with(|| {
-        crate::mock::SettlementFeeBps::set(20);
+        crate::mock::set_settlement_fee_bps(20);
         let intent_id = finalize_evm_settlement_with(|_| {});
         // 20 bps of the 2000 settled volume.
         let fee = 4u128;
@@ -5512,7 +5543,7 @@ fn a_collected_settlement_fee_reaches_the_treasury() {
 #[test]
 fn an_uncollected_settlement_fee_is_recorded_as_waived() {
     new_test_ext().execute_with(|| {
-        crate::mock::SettlementFeeBps::set(20);
+        crate::mock::set_settlement_fee_bps(20);
         // The maker cannot pay: finalization still succeeds, and the lost fee is now on record.
         let intent_id = finalize_evm_settlement_with(|maker| {
             use frame_support::traits::Currency;

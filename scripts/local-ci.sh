@@ -13,6 +13,7 @@
 #   scripts/local-ci.sh --variants      # + the runtime migration dry-run for all six variants
 #   scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
 #   scripts/local-ci.sh --fuzz          # + the cargo-fuzz gate (needs a nightly toolchain)
+#   scripts/local-ci.sh --mutants       # + the cargo-mutants campaigns on the P0 packages
 #   scripts/local-ci.sh --failure       # + the validator failure drill (boots and kills validators)
 #   scripts/local-ci.sh --testnet       # + the testnet ceremony drill (records and verifies a launch)
 #   scripts/local-ci.sh --soak          # + a 10-minute consensus soak (MINUTES= to change it)
@@ -29,6 +30,8 @@
 #   --skip a,b        drop these gate slugs; the summary records the skip loudly
 #   --dry-run         print the gate list that would run, then exit
 #   --fail-fast       stop scheduling new gates once one has failed
+#   --publish-status  post the verdict as the x3/local-ci GitHub commit status
+#                     for the tested SHA (needs gh; success only on a clean tree)
 #   --changed-from R  add gates implied by the files changed in R...HEAD
 #   --pre-push        the push-time set: fast gates + diff-scoped gates, plus the
 #                     release/variant gates when pushing the default branch
@@ -119,6 +122,7 @@ RUN_VARIANTS=0
 RUN_DEEP=0
 RUN_LOOM=0
 RUN_FUZZ=0
+RUN_MUTANTS=0
 RUN_FAILURE=0
 RUN_TESTNET=0
 RUN_SOAK=0
@@ -126,6 +130,7 @@ RUN_ROTATION=0
 RUN_PREPUSH=0
 LIST_ONLY=0
 DRY_RUN=0
+PUBLISH_STATUS=0
 FAIL_FAST=0
 JOBS="${X3_LOCAL_CI_JOBS:-3}"
 CARGO_JOBS="${CARGO_BUILD_JOBS:-10}"
@@ -146,13 +151,15 @@ while [ "$#" -gt 0 ]; do
     --soak) RUN_SOAK=1 ;;
     --rotation) RUN_ROTATION=1 ;;
     --deep) RUN_DEEP=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_MUTANTS=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
     --loom) RUN_LOOM=1 ;;
     --fuzz) RUN_FUZZ=1 ;;
+    --mutants) RUN_MUTANTS=1 ;;
     --pre-push) RUN_PREPUSH=1 ;;
     --list) LIST_ONLY=1 ;;
     --dry-run) DRY_RUN=1 ;;
     --fail-fast) FAIL_FAST=1 ;;
+    --publish-status) PUBLISH_STATUS=1 ;;
     --jobs) JOBS="${2:-}"; shift ;;
     --cargo-jobs) CARGO_JOBS="${2:-}"; shift ;;
     --only) ONLY="${2:-}"; shift ;;
@@ -243,6 +250,15 @@ GATES_FAST=(
   # modules counted as production and the release gate read 570 against a 516
   # baseline. This pins the classification and the empty result for runtime/src.
   "panic scan self-test:python3 scripts/audit/panic_unwrap_self_test.py"
+  # The verification harness (Kani, Miri, Shuttle, sanitizers, cargo-mutants)
+  # used to end every section with `|| echo "FAILED"` and exit 0, so a run
+  # where every tool failed still read as "harness complete" to anything
+  # checking the status. This pins the honest classification: all pass -> 0,
+  # a failing tool -> 1, a tool that is missing -> 2 (BLOCKED, skip loudly),
+  # and a failure does not hide the sections after it. The full harness stays
+  # operator-invoked (it compiles with Kani/Miri and takes hours); this gate
+  # covers the contract that makes its exit status worth reading.
+  "verification harness self-test:bash scripts/x3-verification-harness.sh --self-test"
   # The two detectors `AGENTS.md` names under "Forbidden" had never completed: they walked build
   # output and vendored trees (`x3fronend/out/_next`, `*/node_modules`, a `.wt-*` worktree's
   # `tauri-vendor/cc`) and died at the 240 s timeout, so a mandated check read as satisfied while it
@@ -596,6 +612,11 @@ GATES_FAST=(
   "test x3 parity-core:env CARGO_TARGET_DIR=/tmp/x3-nested-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/parity-core/Cargo.toml"
   "test x3 gpu-parity-core:env CARGO_TARGET_DIR=/tmp/x3-nested-gpu-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/gpu-parity-core/Cargo.toml"
   "test x3-adapters:env CARGO_TARGET_DIR=/tmp/x3-nested-adapters cargo test --locked --all-targets --manifest-path adapters/Cargo.toml"
+  # `tools/tool-validation` is the known-good / known-bad fixture pair external testing tools are
+  # validated against (crash_if_magic.rs fuzz target + FORBIDDEN_TAG helpers). It has two unit
+  # tests that no gate ran, which the repo scanner ratchets as `ungated-crate` — the whole point
+  # of the fixture is that it is itself exercised, so gate it rather than baseline the debt.
+  "test x3-tool-validation:env CARGO_TARGET_DIR=/tmp/x3-nested-tool-validation cargo test --locked --manifest-path tools/tool-validation/Cargo.toml -p x3-tool-validation"
   # `programs/svm/x3_atomic_swap` — the on-chain half of the SVM swap — covers both packages in its
   # workspace. Ten tests pass; the three "ignored" a reader will see in the output are ```` ```ignore ````
   # documentation examples, not disabled tests.
@@ -659,6 +680,7 @@ GATES_FAST=(
   # that is not canonical, a pruned anchor, a child trie) are the whole point of
   # it, and each one is a case against a real loopback JSON-RPC server.
   "snapshot export unit tests:python3 tests/test_snapshot_rpc_export.py"
+  "snapshot archive restore tests:python3 tests/test_snapshot_archive_restore.py"
   # The ceremony manifest's operator attestations: SS58 and SCALE decoding, the
   # ed25519 derivation the node's own CLI produces, the threshold rule, and every
   # way a signature can be wrong. The live four-validator half is the
@@ -706,6 +728,8 @@ GATES_FAST=(
   # when an operator asks for it, so a change to router.py was covered by
   # nothing on a normal commit. It is standard library only and takes seconds.
   "test x3-ai-router:python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'"
+  "test validator launcher:python3 tests/test_validator_launcher.py"
+  "test source scan:python3 tests/test_fake_code_scan.py"
   # x3-gateway is Postgres-backed in production, but its normal unit/concurrency tests never
   # connect to a server. This gate owns a disposable Postgres container, runs the crate's
   # migrations through Database::connect(), and proves a Funding Swarm write/read/scoreboard
@@ -729,6 +753,14 @@ GATES_FAST=(
   # subsystem (kernel, settlement, supply ledger, runtime) relies on next.
   "test x3-sim root-cause:python3 crates/x3-sim/scripts/test_root_cause.py"
   "test x3-failure-packet:bash scripts/test_x3_failure_packet.sh"
+  # The forge tools that turn a failure into reusable evidence are code too,
+  # and their contracts are refusals: failure_memory must deduplicate by
+  # fingerprint, and bisect_runner must refuse a dirty tree, a non-ancestor
+  # range, and a reproducer that cannot tell the two ends apart — and must
+  # discard its verdict (not guess one) when a probe hangs. test_failure_memory
+  # only ran when the router suite happened to find it; neither had a gate.
+  # Standard library only, seconds to run.
+  "test x3-forge tools:python3 -m unittest discover -s tools/x3-forge -p 'test_*.py'"
   # The crates below are `exclude`d from the root workspace: each declares its
   # own `[workspace]` (or path-depends on one that does), and cargo refuses to
   # have them as members ("multiple workspace roots found in the same
@@ -996,6 +1028,20 @@ GATES_FUZZ=(
   "fuzz x3-language and detection:bash scripts/external-toolchain/fuzz-gate.sh"
 )
 
+# Mutation testing on the money path. Opt-in like `--loom`/`--fuzz`: a full campaign is
+# hours of parallel cargo builds, not a fast gate. The first campaign found two survivors
+# in the supply ledger's `on_finalize` proof pruning that no test observed (#576); this gate
+# keeps that loop running so the next survivor fails a gate instead of shipping. The atomic
+# kernel (submit/finalize/rollback, bond accounting, VM reversion) is the second package; the
+# settlement engine (intents, escrow, atomic locks, BTC gateway, finality) the third.
+# One entry per package so `--only 'mutants atomic kernel'` scopes the campaign. A box
+# without cargo-mutants reports BLOCKED, which is the honest answer.
+GATES_MUTANTS=(
+  "mutants supply ledger:bash scripts/x3-mutants-gate.sh pallet-x3-supply-ledger"
+  "mutants atomic kernel:bash scripts/x3-mutants-gate.sh pallet-x3-atomic-kernel"
+  "mutants settlement engine:bash scripts/x3-mutants-gate.sh pallet-x3-settlement-engine"
+)
+
 # What the consensus network does when validators die. Opt-in and separate from
 # `--live` because it boots four to seven validators, kills a minority and then a
 # supermajority-breaking number, and restarts them: finality must continue in the
@@ -1121,6 +1167,8 @@ describe_all() {
   printf '  - %s\n' "${GATES_LOOM[@]%%:*}"
   echo "fuzz gates (--fuzz, also implied by --all; needs a nightly toolchain):"
   printf '  - %s\n' "${GATES_FUZZ[@]%%:*}"
+  echo "mutants gates (--mutants, also implied by --all; needs cargo-mutants):"
+  printf '  - %s\n' "${GATES_MUTANTS[@]%%:*}"
   echo
   echo "failure drills (--failure, also implied by --all):"
   printf '  - %s\n' "${GATES_FAILURE[@]%%:*}"
@@ -1135,7 +1183,7 @@ describe_all() {
   printf '  - %s\n' "${GATES_ROTATION[@]%%:*}"
   echo "deep gates (--deep, also implied by --all):"
   printf '  - %s\n' "${GATES_DEEP[@]%%:*}"
-  echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast"
+  echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast --publish-status"
 }
 
 if [ "$LIST_ONLY" = 1 ]; then
@@ -1200,6 +1248,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_ROTATION" = 1 ] && for spec in "${GATES_ROTATION[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_LOOM" = 1 ] && for spec in "${GATES_LOOM[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_FUZZ" = 1 ] && for spec in "${GATES_FUZZ[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_MUTANTS" = 1 ] && for spec in "${GATES_MUTANTS[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_DEEP" = 1 ] && for spec in "${GATES_DEEP[@]}"; do SELECTED+=("$spec"); done
 
 if [ -n "$ONLY" ]; then
@@ -1284,7 +1333,13 @@ if [ -n "${CARGO_TARGET_DIR:-}" ] && [ "$CARGO_TARGET_DIR" != "$ROOT/target" ]; 
     # are not materialized in every checkout — a failed touch on those is
     # harmless (nothing to mark fresh), so stderr is discarded rather than
     # letting a wall of "No such file or directory" bury the real warning.
-    git ls-files -z 2>/dev/null | xargs -0 -r touch 2>/dev/null
+    # -h (no-dereference) is load-bearing: plain `touch` follows dangling
+    # tracked symlinks and materializes their missing targets as untracked
+    # 0-byte files — apps/x3-funding/node_modules (via
+    # apps/x3-transparency/node_modules), libproto_lib/usr/share/doc/
+    # libprotobuf23 (via libprotobuf-dev), and ./ralph (via ralph-coding) —
+    # dirtying the tree that --publish-status requires to be clean.
+    git ls-files -z 2>/dev/null | xargs -0 -r touch -h 2>/dev/null
   fi
   printf '%s' "$TARGET_DIR_STAMP" >"$TARGET_DIR_MARKER"
 fi
@@ -1332,7 +1387,7 @@ export CARGO_TERM_COLOR=never
   echo "local-ci $STAMP"
   echo "root=$ROOT"
   echo "branch=$BRANCH head=$HEAD_SHA tree=$DIRTY"
-  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM fuzz=$RUN_FUZZ failure=$RUN_FAILURE testnet=$RUN_TESTNET soak=$RUN_SOAK rotation=$RUN_ROTATION jobs=$JOBS cargo_jobs=$CARGO_JOBS"
+  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM fuzz=$RUN_FUZZ mutants=$RUN_MUTANTS failure=$RUN_FAILURE testnet=$RUN_TESTNET soak=$RUN_SOAK rotation=$RUN_ROTATION jobs=$JOBS cargo_jobs=$CARGO_JOBS"
 } >"$LOG"
 
 # run_gate <name> <slug> <command> — one process per gate so the parent keeps the
@@ -1614,6 +1669,43 @@ fi
 } >"$LOG_DIR/local-ci-$STAMP-summary.json"
 
 echo "local-ci: summary json -> .ai/runlogs/local-ci-$STAMP-summary.json"
+
+# Opt-in: post the verdict for the exact commit this run tested. `success` means
+# "the gate of record passed for this SHA", so it is only posted when every gate
+# passed, the tree was clean, and the run was the unscoped set — a subset posts
+# `error`, because branch protection must not accept a two-gate run as the bar.
+if [ "$PUBLISH_STATUS" = 1 ]; then
+  pub_state="success"
+  pub_desc="all gates passed"
+  if [ "$FAILED" = 1 ]; then
+    n_failed=0
+    n_blocked=0
+    for i in "${!GATE_STATUS[@]}"; do
+      case "${GATE_STATUS[$i]}" in
+        FAIL) n_failed=$((n_failed + 1)) ;;
+        BLOCKED) n_blocked=$((n_blocked + 1)) ;;
+      esac
+    done
+    if [ "$n_failed" -gt 0 ]; then
+      pub_state="failure"
+      pub_desc="$n_failed gate(s) failed"
+    else
+      pub_state="error"
+      pub_desc="$n_blocked gate(s) BLOCKED - no verdict"
+    fi
+  elif [ -n "$ONLY" ] || [ -n "$SKIP" ] || [ -n "$CHANGED_FROM" ] || [ "$RUN_PREPUSH" = 1 ]; then
+    pub_state="error"
+    pub_desc="scoped run - not the full gate set"
+  elif [ "$DIRTY" != "clean" ]; then
+    pub_state="error"
+    pub_desc="dirty tree - not evidence for this SHA"
+  fi
+  if bash scripts/x3-publish-status.sh --state "$pub_state" --sha "$HEAD_SHA" --description "$pub_desc"; then
+    :
+  else
+    echo "local-ci: WARNING: could not publish the x3/local-ci commit status for $HEAD_SHA"
+  fi
+fi
 
 if [ "$FAILED" = 1 ]; then
   echo ""

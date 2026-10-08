@@ -166,16 +166,18 @@ pub async fn execute(args: CompileArgs) -> Result<()> {
 
     // Sign before writing anything, so a refused signature leaves no half-produced output.
     let attestation = match &args.sign_key_hex {
-        Some(seed_hex) => Some(sign_artifact(
-            &artifact,
-            seed_hex,
-            args.key_id.as_deref().unwrap_or_default(),
-            // clap enforces this for the command line; `execute` is also callable directly.
-            args.signing_registry.as_ref().ok_or_else(|| {
-                CliError::Config("--sign-key-hex requires --signing-registry".to_string())
-            })?,
-            &args.registry_trust,
-        )?),
+        Some(seed_hex) => {
+            let signing_registry = args.signing_registry.as_ref().ok_or_else(|| {
+                CliError::InvalidArgument("--sign-key-hex requires --signing-registry".to_string())
+            })?;
+            Some(sign_artifact(
+                &artifact,
+                seed_hex,
+                args.key_id.as_deref().unwrap_or_default(),
+                signing_registry,
+                &args.registry_trust,
+            )?)
+        }
         None => None,
     };
 

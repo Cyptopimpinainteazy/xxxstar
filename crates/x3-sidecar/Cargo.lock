@@ -7318,6 +7318,7 @@ dependencies = [
 name = "pallet-x3-account-registry"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -7480,6 +7481,7 @@ dependencies = [
 name = "pallet-x3-cross-vm-router"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -7501,6 +7503,7 @@ dependencies = [
 name = "pallet-x3-crosschain-gateway"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -7517,6 +7520,7 @@ dependencies = [
 name = "pallet-x3-custody"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -7545,6 +7549,7 @@ dependencies = [
 name = "pallet-x3-dapp-hub"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -7723,6 +7728,7 @@ dependencies = [
 name = "pallet-x3-partner"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-x3-inventory",
@@ -7840,6 +7846,7 @@ dependencies = [
  "pallet-x3-kernel",
  "parity-scale-codec",
  "ripemd",
+ "rlp 0.5.2",
  "scale-info",
  "serde",
  "sp-api",
@@ -13940,7 +13947,6 @@ dependencies = [
 name = "x3-common"
 version = "0.1.0"
 dependencies = [
- "ed25519-dalek",
  "hex",
  "secp256k1",
  "serde",
@@ -14104,6 +14110,7 @@ dependencies = [
  "x3-ast",
  "x3-common",
  "x3-hir",
+ "x3-typeck",
 ]
 
 [[package]]

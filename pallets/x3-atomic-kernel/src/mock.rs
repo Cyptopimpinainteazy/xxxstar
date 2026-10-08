@@ -9,6 +9,10 @@ use frame_support::{
     traits::{ConstU32, EnsureOrigin},
 };
 use frame_system as system;
+use sp_core::offchain::{
+    testing::{TestOffchainExt, TestTransactionPoolExt},
+    OffchainDbExt, TransactionPoolExt,
+};
 use sp_core::H256;
 use sp_io::TestExternalities;
 use sp_runtime::{
@@ -87,6 +91,59 @@ impl EconomicHaltGuard {
 impl Drop for EconomicHaltGuard {
     fn drop(&mut self) {
         ECONOMIC_HALTED.with(|halted| halted.set(false));
+    }
+}
+
+// ── Switchable VM reverter ────────────────────────────────────────────────
+//
+// `NoopVmReverter` always succeeds, so `do_revert_bundle_legs`'s failure path
+// (its count, the `IncompleteVmRevert` event, and the rollback log) had no way
+// to be observed. This reverter behaves exactly like the no-op unless a test
+// flips the thread-local flag; the guard clears it on drop, even on panic, so a
+// failing test cannot leak the flag into the next test on the same thread.
+
+thread_local! {
+    static VM_REVERT_FAILS: Cell<bool> = const { Cell::new(false) };
+}
+
+pub struct SwitchableVmReverter;
+
+impl pallet_x3_atomic_kernel::vm_revert::VmReverter for SwitchableVmReverter {
+    fn revert_leg(
+        _vm_type: pallet_x3_atomic_kernel::proof::VmType,
+        _state_diff: &pallet_x3_atomic_kernel::vm_revert::StateDiff,
+    ) -> Result<
+        pallet_x3_atomic_kernel::vm_revert::RevertOutcome,
+        pallet_x3_atomic_kernel::vm_revert::RevertError,
+    > {
+        if VM_REVERT_FAILS.with(Cell::get) {
+            Err(pallet_x3_atomic_kernel::vm_revert::RevertError::InvalidStateDiff)
+        } else {
+            Ok(pallet_x3_atomic_kernel::vm_revert::RevertOutcome::Reverted)
+        }
+    }
+}
+
+/// Make every subsequent revert fail on this thread; cleared on drop.
+#[allow(dead_code)]
+pub fn vm_revert_failing() -> VmRevertGuard {
+    VM_REVERT_FAILS.with(|fails| fails.set(true));
+    VmRevertGuard
+}
+
+/// Make every subsequent revert succeed on this thread; cleared on drop.
+#[allow(dead_code)]
+pub fn vm_revert_ok() -> VmRevertGuard {
+    VM_REVERT_FAILS.with(|fails| fails.set(false));
+    VmRevertGuard
+}
+
+#[allow(dead_code)]
+pub struct VmRevertGuard;
+
+impl Drop for VmRevertGuard {
+    fn drop(&mut self) {
+        VM_REVERT_FAILS.with(|fails| fails.set(false));
     }
 }
 
@@ -232,7 +289,7 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type EconomicHalt = SwitchableEconomicHalt;
     type X3LangOrigin = RootOrSignedAccount;
     type SettlementOrigin = SettlementOnlyOrigin;
-    type VmReverter = crate::vm_revert::NoopVmReverter;
+    type VmReverter = SwitchableVmReverter;
 }
 
 // ── Test Externalities Builder ────────────────────────────────────────────
@@ -278,4 +335,22 @@ impl ExtBuilder {
 #[allow(dead_code)]
 pub fn new_test_ext() -> TestExternalities {
     ExtBuilder::default().build()
+}
+
+/// Test environment with the offchain extensions registered.
+///
+/// `offchain_worker` reads and clears `sp_io::offchain::local_storage_*`, and
+/// submits unsigned transactions through the host transaction pool. Neither
+/// works under the plain [`new_test_ext`]: the offchain DB calls panic without
+/// `OffchainDbExt` and the submits panic without `TransactionPoolExt`. This
+/// builder registers both and returns an accessor for the submitted extrinsics.
+#[allow(dead_code)]
+pub fn new_test_ext_offchain() -> (TestExternalities, impl Fn() -> Vec<Vec<u8>>) {
+    let (offchain, _offchain_state) = TestOffchainExt::new();
+    let (pool, pool_state) = TestTransactionPoolExt::new();
+
+    let mut ext = ExtBuilder::default().build();
+    ext.register_extension(OffchainDbExt::new(offchain));
+    ext.register_extension(TransactionPoolExt::new(pool));
+    (ext, move || pool_state.read().transactions.clone())
 }

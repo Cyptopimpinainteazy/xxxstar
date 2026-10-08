@@ -230,6 +230,60 @@ pub struct EvmStorageChange {
 }
 
 /// Decode an EVM state diff into a list of storage changes.
+/// Checked byte reader for state-diff parsing.
+///
+/// Diff bytes come from stored leg receipts, so a truncated or hostile diff
+/// must reject the rollback with `InvalidStateDiff` — never panic on a slice
+/// index, never reserve memory proportional to an attacker-chosen count.
+/// Every read goes through `take`, which is bounds-checked by construction;
+/// the `BoundedVec` ceiling on `StateDiff` (65,536 bytes) bounds the work per
+/// decode, because the loop stops on the first read that does not fit.
+struct DiffReader<'a> {
+    bytes: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> DiffReader<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, offset: 0 }
+    }
+
+    /// Read `len` bytes and advance, or fail without panicking.
+    fn take(&mut self, len: usize) -> Result<&'a [u8], RevertError> {
+        let end = self
+            .offset
+            .checked_add(len)
+            .ok_or(RevertError::InvalidStateDiff)?;
+        let out = self
+            .bytes
+            .get(self.offset..end)
+            .ok_or(RevertError::InvalidStateDiff)?;
+        self.offset = end;
+        Ok(out)
+    }
+
+    fn u8(&mut self) -> Result<u8, RevertError> {
+        Ok(self.take(1)?[0])
+    }
+
+    fn u32(&mut self) -> Result<u32, RevertError> {
+        let raw = self.take(4)?;
+        Ok(u32::from_le_bytes(
+            raw.try_into().map_err(|_| RevertError::InvalidStateDiff)?,
+        ))
+    }
+
+    fn array32(&mut self) -> Result<[u8; 32], RevertError> {
+        let raw = self.take(32)?;
+        raw.try_into().map_err(|_| RevertError::InvalidStateDiff)
+    }
+
+    /// Bytes left after the cursor.
+    fn remaining(&self) -> usize {
+        self.bytes.len().saturating_sub(self.offset)
+    }
+}
+
 pub fn decode_evm_state_diff(diff: &StateDiff) -> Result<Vec<EvmStorageChange>, RevertError> {
     let bytes = diff.as_bytes();
     if bytes.is_empty() {
@@ -237,67 +291,28 @@ pub fn decode_evm_state_diff(diff: &StateDiff) -> Result<Vec<EvmStorageChange>, 
         // construct `StateDiff::from(Vec::new())` to mean "nothing to revert".
         return Ok(Vec::new());
     }
-    if bytes.len() < 4 {
-        return Err(RevertError::InvalidStateDiff);
-    }
-    let entry_count = u32::from_le_bytes(
-        bytes[..4]
-            .try_into()
-            .map_err(|_| RevertError::InvalidStateDiff)?,
-    );
-    if entry_count > MAX_EVM_DIFF_ENTRIES {
-        return Err(RevertError::InvalidStateDiff);
-    }
-    let mut offset = 4usize;
-    let mut changes = Vec::with_capacity(entry_count as usize);
+    let mut r = DiffReader::new(bytes);
+    let entry_count = r.u32()?;
+    // The `StateDiff` byte ceiling (65,536) already bounds entry count: the
+    // smallest EVM entry is 40 bytes, so no representable diff can hold more
+    // than ~1,600 entries. The loop therefore fails on exhaustion instead of
+    // iterating `entry_count` times, and the vector grows lazily — a hostile
+    // `entry_count` costs nothing.
+    let mut changes = Vec::new();
     for _ in 0..entry_count {
-        if offset + 32 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        if offset + 4 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let old_len = u32::from_le_bytes(
-            bytes[offset..offset + 4]
-                .try_into()
-                .map_err(|_| RevertError::InvalidStateDiff)?,
-        ) as usize;
-        offset += 4;
-        if offset + old_len > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let old_value = bytes[offset..offset + old_len].to_vec();
-        offset += old_len;
-
-        if offset + 4 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let new_len = u32::from_le_bytes(
-            bytes[offset..offset + 4]
-                .try_into()
-                .map_err(|_| RevertError::InvalidStateDiff)?,
-        ) as usize;
-        offset += 4;
-        if offset + new_len > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let new_value = bytes[offset..offset + new_len].to_vec();
-        offset += new_len;
-
-        // Contract address: if there are at least 20 bytes remaining, read it.
-        let contract = if offset + 20 <= bytes.len() {
+        let key = r.array32()?;
+        let old_len = r.u32()? as usize;
+        let old_value = r.take(old_len)?.to_vec();
+        let new_len = r.u32()? as usize;
+        let new_value = r.take(new_len)?.to_vec();
+        // Contract address: present only when a full 20 bytes remain.
+        let contract = if r.remaining() >= 20 {
             let mut addr = [0u8; 20];
-            addr.copy_from_slice(&bytes[offset..offset + 20]);
-            offset += 20;
+            addr.copy_from_slice(r.take(20)?);
             Some(addr)
         } else {
             None
         };
-
         changes.push(EvmStorageChange {
             key,
             old_value,
@@ -328,6 +343,17 @@ pub fn encode_evm_state_diff(
     StateDiff::from(bytes)
 }
 
+/// Split of a decoded EVM diff for logging/metrics: `(restored, deleted)`.
+///
+/// A pure function so the tally is asserted directly by tests — counters
+/// mutated to `*= 1` or `-= 1` would otherwise only change log text and no
+/// test could observe the difference.
+fn evm_slot_tally(changes: &[EvmStorageChange]) -> (u32, u32) {
+    let deleted = changes.iter().filter(|c| c.old_value.is_empty()).count() as u32;
+    let restored = changes.len() as u32 - deleted;
+    (restored, deleted)
+}
+
 /// EVM reverter that restores storage slots to their pre-execution values
 /// **by writing reverted state to the FRAME storage overlay**.
 pub struct EvmReverter;
@@ -346,8 +372,7 @@ impl EvmReverter {
             return Ok(RevertOutcome::NoSideEffects);
         }
 
-        let mut reverted_slots: u32 = 0;
-        let mut deleted_slots: u32 = 0;
+        let (reverted_slots, deleted_slots) = evm_slot_tally(&changes);
 
         for change in &changes {
             let contract = change.contract.unwrap_or_default();
@@ -356,12 +381,10 @@ impl EvmReverter {
                 // Slot did not exist before — delete it from EVM storage
                 let storage_key = evm_storage_slot_key(&contract, &change.key);
                 sp_io::storage::clear(&storage_key);
-                deleted_slots += 1;
             } else {
                 // Slot had a previous value — restore it
                 let storage_key = evm_storage_slot_key(&contract, &change.key);
                 sp_io::storage::set(&storage_key, &change.old_value);
-                reverted_slots += 1;
             }
         }
 
@@ -403,57 +426,17 @@ pub fn decode_svm_state_diff(diff: &StateDiff) -> Result<Vec<SvmStorageChange>, 
     if bytes.is_empty() {
         return Ok(Vec::new());
     }
-    if bytes.len() < 4 {
-        return Err(RevertError::InvalidStateDiff);
-    }
-    let entry_count = u32::from_le_bytes(
-        bytes[..4]
-            .try_into()
-            .map_err(|_| RevertError::InvalidStateDiff)?,
-    );
-    if entry_count > MAX_SVM_DIFF_ENTRIES {
-        return Err(RevertError::InvalidStateDiff);
-    }
-    let mut offset = 4usize;
-    let mut changes = Vec::with_capacity(entry_count as usize);
+    let mut r = DiffReader::new(bytes);
+    let entry_count = r.u32()?;
+    // See decode_evm_state_diff: the byte ceiling, not an entry-count guard,
+    // bounds this loop.
+    let mut changes = Vec::new();
     for _ in 0..entry_count {
-        if offset + 32 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let mut account = [0u8; 32];
-        account.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        if offset + 4 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let key_len = u32::from_le_bytes(
-            bytes[offset..offset + 4]
-                .try_into()
-                .map_err(|_| RevertError::InvalidStateDiff)?,
-        ) as usize;
-        offset += 4;
-        if offset + key_len > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let key = bytes[offset..offset + key_len].to_vec();
-        offset += key_len;
-
-        if offset + 4 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let old_len = u32::from_le_bytes(
-            bytes[offset..offset + 4]
-                .try_into()
-                .map_err(|_| RevertError::InvalidStateDiff)?,
-        ) as usize;
-        offset += 4;
-        if offset + old_len > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let old_value = bytes[offset..offset + old_len].to_vec();
-        offset += old_len;
-
+        let account = r.array32()?;
+        let key_len = r.u32()? as usize;
+        let key = r.take(key_len)?.to_vec();
+        let old_len = r.u32()? as usize;
+        let old_value = r.take(old_len)?.to_vec();
         changes.push(SvmStorageChange {
             account,
             key,
@@ -492,7 +475,6 @@ impl SvmReverter {
             return Ok(RevertOutcome::NoSideEffects);
         }
 
-        let mut reverted: u32 = 0;
         for change in &changes {
             if change.old_value.is_empty() {
                 let key = svm_account_data_key(&change.account);
@@ -501,13 +483,12 @@ impl SvmReverter {
                 let key = svm_account_data_key(&change.account);
                 sp_io::storage::set(&key, &change.old_value);
             }
-            reverted += 1;
         }
 
         log::info!(
             target: "x3-atomic-kernel",
             "SvmReverter: reverted {} account storage entry(s)",
-            reverted
+            changes.len()
         );
         Ok(RevertOutcome::Reverted)
     }
@@ -545,36 +526,16 @@ pub fn decode_x3vm_state_diff(diff: &StateDiff) -> Result<Vec<X3VmStorageChange>
     if bytes.is_empty() {
         return Ok(Vec::new());
     }
-    if bytes.len() < 4 {
-        return Err(RevertError::InvalidStateDiff);
-    }
-    let entry_count = u32::from_le_bytes(
-        bytes[..4]
-            .try_into()
-            .map_err(|_| RevertError::InvalidStateDiff)?,
-    );
-    if entry_count > MAX_X3VM_DIFF_ENTRIES {
-        return Err(RevertError::InvalidStateDiff);
-    }
-    let mut offset = 4usize;
-    let mut changes = Vec::with_capacity(entry_count as usize);
+    let mut r = DiffReader::new(bytes);
+    let entry_count = r.u32()?;
+    // See decode_evm_state_diff: the byte ceiling, not an entry-count guard,
+    // bounds this loop.
+    let mut changes = Vec::new();
     for _ in 0..entry_count {
-        if offset + 32 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        if offset + 4 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let old_len = u32::from_le_bytes(
-            bytes[offset..offset + 4]
-                .try_into()
-                .map_err(|_| RevertError::InvalidStateDiff)?,
-        ) as usize;
-        offset += 4;
+        let key = r.array32()?;
+        let old_len = r.u32()? as usize;
+        // X3VM values are fixed-size 32-byte slots; anything longer is
+        // malformed and is rejected here (before the value is sliced).
         if old_len > 32 {
             return Err(RevertError::InvalidStateDiff);
         }
@@ -582,11 +543,9 @@ pub fn decode_x3vm_state_diff(diff: &StateDiff) -> Result<Vec<X3VmStorageChange>
             None
         } else {
             let mut val = [0u8; 32];
-            val[..old_len].copy_from_slice(&bytes[offset..offset + old_len]);
-            offset += old_len;
+            val[..old_len].copy_from_slice(r.take(old_len)?);
             Some(val)
         };
-
         changes.push(X3VmStorageChange { key, old_value });
     }
     Ok(changes)
@@ -628,14 +587,13 @@ impl X3VmReverter {
             return Ok(RevertOutcome::NoSideEffects);
         }
 
-        let mut reverted: u32 = 0;
+        let restored = x3vm_restored_count(&changes);
         for change in &changes {
             // Derive key for x3_vm::VmStorage[blake2_128_concat(key)]
             let storage_key = x3vm_storage_slot_key(&change.key);
             match &change.old_value {
                 Some(val) => {
                     sp_io::storage::set(&storage_key, val);
-                    reverted += 1;
                 }
                 None => {
                     sp_io::storage::clear(&storage_key);
@@ -646,10 +604,15 @@ impl X3VmReverter {
         log::info!(
             target: "x3-atomic-kernel",
             "X3VmReverter: reverted {} storage slot(s)",
-            reverted
+            restored
         );
         Ok(RevertOutcome::Reverted)
     }
+}
+
+/// Number of slots restored (as opposed to cleared) by an X3VM revert.
+fn x3vm_restored_count(changes: &[X3VmStorageChange]) -> u32 {
+    changes.iter().filter(|c| c.old_value.is_some()).count() as u32
 }
 
 /// Storage key for `x3_vm::VmStorage(key)` — StorageMap<blake2_128_concat([u8;32])>.
@@ -717,61 +680,31 @@ pub fn decode_overlay_state_diff(diff: &StateDiff) -> Result<Vec<OverlayLegChang
     if bytes.is_empty() {
         return Ok(Vec::new());
     }
-    if bytes.len() < 8 || bytes[..8] != OVERLAY_DIFF_MAGIC {
+    if bytes.get(..8) != Some(OVERLAY_DIFF_MAGIC.as_slice()) {
         return Err(RevertError::InvalidStateDiff);
     }
-    if bytes.len() < 12 {
-        return Err(RevertError::InvalidStateDiff);
-    }
-    let entry_count = u32::from_le_bytes(
-        bytes[8..12]
-            .try_into()
-            .map_err(|_| RevertError::InvalidStateDiff)?,
-    );
-    if entry_count > MAX_OVERLAY_DIFF_ENTRIES {
-        return Err(RevertError::InvalidStateDiff);
-    }
-
-    let mut offset = 12usize;
-    let mut changes = Vec::with_capacity(entry_count as usize);
+    let mut r = DiffReader::new(bytes);
+    r.take(8)?; // magic
+    let entry_count = r.u32()?;
+    // See decode_evm_state_diff: the byte ceiling, not an entry-count guard,
+    // bounds this loop.
+    let mut changes = Vec::new();
     for _ in 0..entry_count {
-        if offset + 1 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let domain = match bytes[offset] {
+        let domain = match r.u8()? {
             0 => OverlayDomain::Evm,
             1 => OverlayDomain::Svm,
             2 => OverlayDomain::X3,
             _ => return Err(RevertError::InvalidStateDiff),
         };
-        offset += 1;
-
-        if offset + 4 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let addr_len =
-            u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap_or_default()) as usize;
-        offset += 4;
-        if offset + addr_len > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let address = bytes[offset..offset + addr_len].to_vec();
-        offset += addr_len;
-
-        if offset + 32 > bytes.len() {
-            return Err(RevertError::InvalidStateDiff);
-        }
-        let mut key_bytes = [0u8; 32];
-        key_bytes.copy_from_slice(&bytes[offset..offset + 32]);
-        offset += 32;
-
-        let old_value = decode_optional_h256(bytes, &mut offset)?;
-        let new_value = decode_optional_h256(bytes, &mut offset)?;
-
+        let addr_len = r.u32()? as usize;
+        let address = r.take(addr_len)?.to_vec();
+        let key = H256(r.array32()?);
+        let old_value = decode_optional_h256(&mut r)?;
+        let new_value = decode_optional_h256(&mut r)?;
         changes.push(OverlayLegChange {
             domain,
             address,
-            key: H256(key_bytes),
+            key,
             old_value,
             new_value,
         });
@@ -779,25 +712,10 @@ pub fn decode_overlay_state_diff(diff: &StateDiff) -> Result<Vec<OverlayLegChang
     Ok(changes)
 }
 
-fn decode_optional_h256(bytes: &[u8], offset: &mut usize) -> Result<Option<H256>, RevertError> {
-    if *offset >= bytes.len() {
-        return Err(RevertError::InvalidStateDiff);
-    }
-    match bytes[*offset] {
-        0 => {
-            *offset += 1;
-            Ok(None)
-        }
-        1 => {
-            *offset += 1;
-            if *offset + 32 > bytes.len() {
-                return Err(RevertError::InvalidStateDiff);
-            }
-            let mut val = [0u8; 32];
-            val.copy_from_slice(&bytes[*offset..*offset + 32]);
-            *offset += 32;
-            Ok(Some(H256(val)))
-        }
+fn decode_optional_h256(r: &mut DiffReader) -> Result<Option<H256>, RevertError> {
+    match r.u8()? {
+        0 => Ok(None),
+        1 => Ok(Some(H256(r.array32()?))),
         _ => Err(RevertError::InvalidStateDiff),
     }
 }
@@ -832,6 +750,11 @@ fn encode_optional_h256(out: &mut Vec<u8>, value: Option<H256>) {
     }
 }
 
+/// Number of overlay entries restored (as opposed to cleared) by a revert.
+fn overlay_restored_count(changes: &[OverlayLegChange]) -> u32 {
+    changes.iter().filter(|c| c.old_value.is_some()).count() as u32
+}
+
 /// Storage key for the atomic-kernel overlay ledger map.
 ///
 /// Mirrors FRAME's `StorageMap<_, Blake2_128Concat, RawOverlayKey, H256>`:
@@ -864,13 +787,12 @@ impl OverlayReverter {
             return Ok(RevertOutcome::NoSideEffects);
         }
 
-        let mut reverted: u32 = 0;
+        let restored = overlay_restored_count(&changes);
         for change in &changes {
             let storage_key = overlay_ledger_storage_key(change);
             match change.old_value {
                 Some(value) => {
                     sp_io::storage::set(&storage_key, value.as_bytes());
-                    reverted += 1;
                 }
                 None => {
                     sp_io::storage::clear(&storage_key);
@@ -881,7 +803,7 @@ impl OverlayReverter {
         log::info!(
             target: "x3-atomic-kernel",
             "OverlayReverter: reverted {} overlay ledger entry(s)",
-            reverted
+            restored
         );
         Ok(RevertOutcome::Reverted)
     }
@@ -1008,6 +930,10 @@ impl LegReceipt {
         self.state_diff = state_diff;
     }
 }
+
+#[cfg(test)]
+#[path = "tests_vm_revert_hardening.rs"]
+mod tests_vm_revert_hardening;
 
 #[cfg(test)]
 mod tests {

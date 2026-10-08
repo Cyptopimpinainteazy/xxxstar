@@ -161,6 +161,20 @@ SKIP_RES = (
     re.compile(r"\bxit\s*\("),
 )
 
+
+def is_skip_marker(rel: str, line: str) -> bool:
+    """Whether a candidate line is a skip marker rather than prose about one.
+
+    `#[ignore]` is a Rust attribute. The same characters inside a shell or
+    Python comment (e.g. `scripts/local-ci.sh` explaining that its Postgres
+    test is `#[ignore]`d because the gate runs it explicitly) describe a skip,
+    they do not create one — counting them grew the skip ratchet by a finding
+    that no test suite ever lost.
+    """
+    if rel.endswith(".rs") and SKIP_RES[0].search(line):
+        return True
+    return any(rx.search(line) for rx in SKIP_RES[1:])
+
 # Only a *definition or construction* of a mock counts. A bare word match fires
 # on every sentence that mentions mocks — including this file's own header.
 PROD_MOCK_RE = re.compile(
@@ -248,16 +262,26 @@ def iter_source_files() -> list[tuple[str, Path]]:
 
 
 def _rg_args() -> list[str]:
-    """rg arguments whose pruning matches `iter_source_files` exactly."""
+    """rg arguments whose pruning matches `iter_source_files` exactly.
+
+    Order matters: ripgrep resolves overlapping globs with *last match wins*,
+    so the exclude globs must come after the source-suffix include globs.
+    With the includes last (the pre-2026-10-02 order) `-g '*.js'` re-included
+    `apps/explorer/node_modules/decimal.js` and friends over
+    `-g '!**/node_modules/**'`, and the marker count depended on whether some
+    earlier gate had run `npm ci` in that worktree — a false red on a box and
+    a false green in a clean checkout for the same tree.
+    """
     args = ["rg", "--no-ignore", "--color", "never", "--no-heading"]
+    # rg applies the last matching glob: exclusions must follow inclusions.
+    for suffix in sorted(SOURCE_SUFFIXES):
+        args += ["-g", f"*{suffix}"]
     for rel in sorted(SELF_EXCLUDES):
         args += ["-g", f"!{rel}"]
     for name in sorted(PRUNE_DIR_NAMES):
         args += ["-g", f"!**/{name}/**"]
     for prefix in PRUNE_DIR_PREFIXES:
         args += ["-g", f"!**/{prefix}*/**"]
-    for suffix in sorted(SOURCE_SUFFIXES):
-        args += ["-g", f"*{suffix}"]
     return args
 
 
@@ -465,11 +489,16 @@ def scan_cheats() -> list[dict[str, object]]:
             # A commented-out assertion is not an assertion. Rust `#[ignore]`
             # arrives as `#...`, so this does not hide the skip class.
             continue
+        # A leading hash is a comment in shell/Python files, but a Rust
+        # attribute can disable an executable test. Keep Rust attributes visible.
+        if (Path(rel).suffix in {".py", ".sh"}
+                and line.lstrip().startswith("#")):
+            continue
         in_tests = rel in test_files
         kind = None
         if in_tests and _constant_assertion(line):
             kind = "constant-assert"
-        elif any(rx.search(line) for rx in SKIP_RES):
+        elif is_skip_marker(rel, line):
             kind = "skip"
         elif (
             # A mock *definition* on a production path. `crate::mock::…` inside a

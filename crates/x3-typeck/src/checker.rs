@@ -501,18 +501,20 @@ impl TypeChecker {
             Expression::Literal(lit) => self.infer_literal_type(lit),
             // `-42` is negation applied to the literal `42` in the AST; as a *type* it is one
             // literal whose value is -42, so it cannot take an unsigned type.
-            Expression::Unary(unary) => match (&unary.op, &*unary.expr) {
-                (
-                    x3_ast::UnaryOp::Negate,
+            Expression::Unary(unary) if matches!(unary.op, x3_ast::UnaryOp::Negate) => {
+                match &*unary.expr {
                     Expression::Literal(LiteralExpression {
                         literal: Literal::Integer(n),
                         ..
-                    }),
-                ) => self.int_literal(-(*n as i128)),
-                _ => self.infer_unary_type(unary, resolved),
-            },
+                    }) => self.int_literal(-(*n as i128)),
+                    // Anything else keeps the ordinary unary inference, which is what the guard in
+                    // front of this arm used to fall through to.
+                    _ => self.infer_unary_type(unary, resolved),
+                }
+            }
             Expression::Identifier(ident) => self.infer_identifier_type(ident, resolved),
             Expression::Binary(bin) => self.infer_binary_type(bin, resolved),
+            Expression::Unary(unary) => self.infer_unary_type(unary, resolved),
             Expression::Call(call) => self.infer_call_type(call, resolved),
             Expression::Assign(assign) => self.infer_assign_type(assign, resolved),
             Expression::FieldAccess(field) => self.infer_field_access_type(field, resolved),

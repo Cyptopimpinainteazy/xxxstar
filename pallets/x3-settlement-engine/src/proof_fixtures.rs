@@ -35,16 +35,18 @@ pub(crate) fn receipt_trie(receipt_rlp: &[u8], index: u32) -> (H256, Vec<u8>) {
         stream.out().to_vec()
     }
     // The receipts-trie key is `rlp(index)`, the RLP of the integer.
-    let key = if index == 0 {
-        vec![0x80]
-    } else {
+    let key = {
         let be = index.to_be_bytes();
-        let first = be
-            .iter()
-            .position(|byte| *byte != 0)
-            .unwrap_or(be.len() - 1);
-        let significant = &be[first..];
-        if significant.len() == 1 && significant[0] < 0x80 {
+        let first = be.iter().position(|byte| *byte != 0);
+        // No nonzero byte means the integer is zero. RLP encodes zero as 0x80;
+        // the empty slice makes that case fall out of the length checks below.
+        let significant: &[u8] = match first {
+            None => &be[be.len()..],
+            Some(first) => &be[first..],
+        };
+        if significant.is_empty() {
+            vec![0x80]
+        } else if significant.len() == 1 && significant[0] < 0x80 {
             vec![significant[0]]
         } else {
             let mut out = vec![0x80 + significant.len() as u8];
@@ -53,23 +55,17 @@ pub(crate) fn receipt_trie(receipt_rlp: &[u8], index: u32) -> (H256, Vec<u8>) {
         }
     };
     // Hex-prefix leaf encoding of the key's nibbles (yellow paper appendix C).
+    // The key has two nibbles per byte, so the nibble count is always even and
+    // the leaf carries the 0x20 | length form; there is no odd-tail branch.
     let mut nibbles = Vec::new();
     for byte in &key {
         nibbles.push(byte >> 4);
         nibbles.push(byte & 0x0F);
     }
-    let mut path = Vec::new();
-    if nibbles.len() % 2 == 0 {
-        path.push(0x20 | (nibbles.len() / 2) as u8);
-        for pair in nibbles.chunks(2) {
-            path.push((pair[0] << 4) | pair[1]);
-        }
-    } else {
-        path.push(0x30 | (nibbles.len() / 2) as u8);
-        path.push(nibbles[0] << 4 | nibbles[1]);
-        for pair in nibbles[2..].chunks(2) {
-            path.push((pair[0] << 4) | pair[1]);
-        }
+    let mut path = Vec::with_capacity(1 + nibbles.len() / 2);
+    path.push(0x20 + (nibbles.len() / 2) as u8);
+    for pair in nibbles.chunks(2) {
+        path.push(pair[0] * 16 + pair[1]);
     }
     let leaf = rlp_list(&[rlp_bytes(&path), rlp_bytes(receipt_rlp)]);
     let root = H256::from(sp_io::hashing::keccak_256(&leaf));

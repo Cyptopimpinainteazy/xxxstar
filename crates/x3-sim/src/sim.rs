@@ -540,17 +540,20 @@ pub fn run(config: &SimConfig) -> SimOutcome {
             }
 
             let id = session_ids[entry.op.session()].clone();
-            match persistence.load(&id) {
-                Some(snapshot) => {
-                    shadow.insert(id.clone(), snapshot);
-                }
-                // A stale-write fault has nothing to restore for a session that is gone;
-                // the trace records it so the digest still tells the two runs apart.
+            let restored = match persistence.load(&id) {
+                Some(session) => session,
                 None => {
-                    shadow.remove(&id);
-                    trace.push(format!("{step:04} s={id} MISSING from persistence"));
+                    // Unreachable in practice: the id was just created and the
+                    // simulator owns the persistence handle. Record the anomaly
+                    // instead of aborting the whole hunt, so the seed can still
+                    // be inspected.
+                    trace.push(format!(
+                        "{step:04} ERROR session {id} vanished from persistence"
+                    ));
+                    continue;
                 }
-            }
+            };
+            shadow.insert(id.clone(), restored);
             let before = serde_json::to_value(persistence.load(&id)).ok();
 
             match apply_op(&mut coord, entry, &session_ids, &secrets, now_secs) {

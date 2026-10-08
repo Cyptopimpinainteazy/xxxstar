@@ -29,6 +29,16 @@ CONSTANTS
     StepOutcome,        \* function Steps -> {"ok", "failed"}
     Budget              \* Nat: total seconds budget (e.g. 600)
 
+\* TLC config-file values. The config parser accepts only literals and
+\* `X <- Impl` operator references, so the step maps are defined here and
+\* wired in via OnboardingTtfv.cfg.
+StepOrderImpl ==
+    ("build" :> 1 @@ "verify_flashloans" :> 2 @@ "verify_evm_svm" :> 3)
+StepDurationImpl ==
+    ("build" :> 23 @@ "verify_flashloans" :> 2 @@ "verify_evm_svm" :> 1)
+StepOutcomeImpl ==
+    ("build" :> "ok" @@ "verify_flashloans" :> "ok" @@ "verify_evm_svm" :> "ok")
+
 ASSUME
     /\ Steps # {}
     /\ DOMAIN StepOrder    = Steps

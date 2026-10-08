@@ -625,13 +625,44 @@ def responses_request_to_chat(request):
     return responses_request(request)[0]
 
 
+def valid_completion_message(message):
+    """Validate the assistant payload before accepting upstream success."""
+    if not isinstance(message, dict) or message.get("role") != "assistant":
+        return False
+    content, refusal, calls = message.get("content"), message.get("refusal"), message.get("tool_calls")
+    if content is not None and not isinstance(content, str):
+        return False
+    if refusal is not None and not isinstance(refusal, str):
+        return False
+    if calls is not None:
+        if not isinstance(calls, list):
+            return False
+        ids = set()
+        for call in calls:
+            if not isinstance(call, dict) or call.get("type") != "function":
+                return False
+            identifier, function = call.get("id"), call.get("function")
+            if (not isinstance(identifier, str) or not identifier or identifier in ids
+                    or not isinstance(function, dict)
+                    or not isinstance(function.get("name"), str) or not function["name"]
+                    or not isinstance(function.get("arguments"), str)):
+                return False
+            ids.add(identifier)
+    return bool(content or refusal or calls)
+
+
 def chat_message_to_response_output(message, prefix, custom=frozenset()):
     """Chat Completions message -> the Responses `output` list."""
     output = []
     content = message.get("content")
+    parts = []
     if content:
+        parts.append({"type": "output_text", "text": content, "annotations": []})
+    if message.get("refusal"):
+        parts.append({"type": "refusal", "refusal": message["refusal"]})
+    if parts:
         output.append({"id": prefix + "msg", "type": "message", "role": "assistant", "status": "completed",
-                       "content": [{"type": "output_text", "text": content, "annotations": []}]})
+                       "content": parts})
     for index, call in enumerate(message.get("tool_calls") or []):
         function = call.get("function") or {}
         name = function.get("name", "")
@@ -1186,22 +1217,37 @@ def coerce_plan(candidate):
 class Router:
     def __init__(self, config, db_path):
         self.config = config
-        if db_path != ":memory:":
-            directory = os.path.dirname(os.path.abspath(db_path))
-            os.makedirs(directory, exist_ok=True)
-        self.db = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
-        # WAL lets the dashboard and a second router process read while a
-        # request thread writes; the busy timeout absorbs short lock waits
-        # instead of failing the request with "database is locked".
-        self.db.execute("PRAGMA busy_timeout=30000")
-        if db_path != ":memory:":
-            self.db.execute("PRAGMA journal_mode=WAL")
         self.lock = threading.Lock()
         # Requests currently running against each provider. In memory only:
         # it describes this process's load, which a restart resets anyway.
         self.in_flight = {}
         self.in_flight_lock = threading.Lock()
         self.context = threading.local()
+        self.db = None
+        self.reconciled_orphans = 0
+        self.capabilities = {}
+        # SQLite creates the file, but cannot create its parent directories.
+        # Preserve special in-memory databases used by embedded callers/tests.
+        db_path = os.fsdecode(db_path)
+        try:
+            if db_path and db_path != ":memory:":
+                parent = os.path.dirname(os.path.abspath(db_path))
+                os.makedirs(parent, exist_ok=True)
+            self.db = sqlite3.connect(db_path, check_same_thread=False)
+            # WAL keeps a reader (dashboard, evidence query) from blocking the
+            # writer; busy_timeout turns lock contention into a bounded wait
+            # instead of an immediate "database is locked" failure.
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA busy_timeout=5000")
+            self.initialize_database()
+            self.reconcile_reservations()
+        except Exception as exc:
+            if self.db is not None:
+                self.db.close()
+            raise RuntimeError(f"Could not initialize router database {db_path!r}: {exc}") from exc
+
+    def initialize_database(self):
+        """Create tables and migrate older router databases on startup."""
         self.db.execute("CREATE TABLE IF NOT EXISTS usage (day TEXT, agent TEXT, provider TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL)")
         if "task_id" not in {row[1] for row in self.db.execute("PRAGMA table_info(usage)")}:
             self.db.execute("ALTER TABLE usage ADD COLUMN task_id TEXT")
@@ -1225,9 +1271,6 @@ class Router:
             "input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0, cost_usd REAL DEFAULT 0, "
             "PRIMARY KEY (provider, model))")
         self.db.commit()
-        self.reconciled_orphans = 0
-        self.capabilities = {}
-        self.reconcile_reservations()
 
     def choose(self, request):
         """Pick the tier, the provider order, and the reasoning behind them.
@@ -2062,8 +2105,13 @@ class Router:
                             self.note_provider_failure(name, detail)
                             failures.append(self.diagnostic(name, None, detail))
                             break
-                    elif not isinstance(result, dict) or "choices" not in result:
-                        raise ValueError("Provider response lacks choices")
+                    else:
+                        choices = result.get("choices") if isinstance(result, dict) else None
+                        if (not isinstance(choices, list) or not choices
+                                or any(not isinstance(choice, dict)
+                                       or not valid_completion_message(choice.get("message"))
+                                       for choice in choices)):
+                            raise ValueError("Provider response has invalid completion choices")
                     usage = normalize_usage(result.get("usage", {}))
                     cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000 if usage else estimate
                     self.note_attempt(name, model, self.elapsed_ms(started), True, attempt_index > 0, usage, cost)
@@ -2583,7 +2631,16 @@ def handler_for(router):
                 else:
                     self.stream_chunk(chunk)
 
-            outcome = router.stream(plan, agent, start, send)
+            try:
+                outcome = router.stream(plan, agent, start, send)
+            except ClientDisconnected:
+                self.close_connection = True
+                return
+            except Exception as exc:
+                # Once SSE headers are out, every exit path must still emit a
+                # terminal event; a socket that just closes mid-stream reads
+                # as "stream disconnected before completion" on the client.
+                outcome = (502, {"error": {"message": sanitize_secret(str(exc))}})
             try:
                 if adapter:
                     if outcome is not None and adapter[0].started:
@@ -2721,8 +2778,21 @@ def handler_for(router):
                     except ClientDisconnected:
                         self.close_connection = True
                         return
+                    except Exception as exc:
+                        outcome = (502, {"error": {"message": sanitize_secret(str(exc))}})
                     if outcome is not None and not started_stream:
                         return self.reply(*outcome)
+                    if outcome is not None and started_stream:
+                        # The headers and part of the answer are already out:
+                        # end the stream with an explicit error and [DONE]
+                        # instead of dropping the socket mid-answer.
+                        try:
+                            self.wfile.write(b"data: " + json.dumps(
+                                {"error": outcome[1].get("error", {})}).encode() + b"\n\n")
+                            self.wfile.write(b"data: [DONE]\n\n")
+                            self.wfile.flush()
+                        except (BrokenPipeError, ConnectionResetError, OSError):
+                            pass
                     self.close_connection = True
                     return
                 status, result = router.complete(UpstreamRequest(PROTOCOL_CHAT, data, chat=data), agent)

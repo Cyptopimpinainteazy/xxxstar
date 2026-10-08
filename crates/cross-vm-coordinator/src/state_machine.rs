@@ -1481,4 +1481,68 @@ mod state_machine_regression_tests {
             "the swap must abort rather than advance once its timelock has passed"
         );
     }
+
+    /// The phase-edge table is the security boundary; the TLA+ model at
+    /// `formal-proofs/tla/atomic_settlement/AtomicSettlement.tla` mirrors it
+    /// edge for edge, and PR #558 is exactly what a guard that skips an edge
+    /// costs (a Complete swap walked back to Aborting and refunded). Pin
+    /// every one of the 11x11 phase pairs so a table edit is a deliberate act
+    /// in both files, not an accident in one. Keep the two in sync: changing
+    /// the `matches!` table without updating `expected` below (and the TLA
+    /// action guards) fails here.
+    #[test]
+    fn validate_phase_transition_matches_the_pinned_edge_table() {
+        use SwapPhase::*;
+
+        let expected: &[(SwapPhase, SwapPhase)] = &[
+            (Setup, LockingHtlcs),
+            (LockingHtlcs, LockingHtlcs),
+            (LockingHtlcs, HtlcsLocked),
+            (HtlcsLocked, ExecutingFlashLegs),
+            (ExecutingFlashLegs, LegsComplete),
+            (LegsComplete, ClaimingFast),
+            (ClaimingFast, ClaimingFast),
+            (ClaimingFast, ClaimingSlow),
+            (ClaimingSlow, ClaimingSlow),
+            (ClaimingSlow, Complete),
+            // Abort from any active phase. ClaimingSlow is refused: once the
+            // secret is on the fast chain it is public, so the slow leg must
+            // be claimed, not refunded.
+            (Setup, Aborting),
+            (LockingHtlcs, Aborting),
+            (HtlcsLocked, Aborting),
+            (ExecutingFlashLegs, Aborting),
+            (LegsComplete, Aborting),
+            (ClaimingFast, Aborting),
+            (Aborting, Refunded),
+        ];
+
+        let all = [
+            Setup,
+            LockingHtlcs,
+            HtlcsLocked,
+            ExecutingFlashLegs,
+            LegsComplete,
+            ClaimingFast,
+            ClaimingSlow,
+            Complete,
+            Aborting,
+            Refunded,
+            Failed,
+        ];
+
+        for &from in &all {
+            for &to in &all {
+                let allowed =
+                    SwapCoordinator::<InMemoryPersistence>::validate_phase_transition(from, to)
+                        .is_ok();
+                let want = expected.contains(&(from, to));
+                assert_eq!(
+                    allowed, want,
+                    "validate_phase_transition({from:?}, {to:?}): \
+                     allowed={allowed}, expected={want}"
+                );
+            }
+        }
+    }
 }

@@ -73,6 +73,10 @@ pub use pallet::*;
 mod mock;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_gate_pins;
+#[cfg(test)]
+mod tests_weights;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
@@ -641,10 +645,22 @@ pub mod pallet {
                         updated_record.status = BundleStatus::RolledBack;
                         Bundles::<T>::insert(bundle_id, updated_record);
 
-                        // Slash for deadline exceeded (5%)
+                        // Release the expired bond before slashing it.
+                        //
+                        // `Currency::slash` consumes free balance first, and a
+                        // `RolledBack` bundle is terminal — no path may ever
+                        // unreserve again — so slashing first would leave
+                        // everything except the 5% penalty stranded in reserve
+                        // forever. Mirrors `do_rollback_atomic_bundle`.
+                        T::Currency::unreserve(&record.submitter, record.bond);
+
+                        // Slash for deadline exceeded (5%). `!= 0` and `> 0` are
+                        // the same predicate for an unsigned balance; the `!=`
+                        // spelling has no `>=`-shaped surface that a bond of
+                        // exactly zero would be needed to distinguish.
                         let bond = T::MinBond::get();
                         let slash_amount = bond.saturating_div(20);
-                        if slash_amount > 0 {
+                        if slash_amount != 0 {
                             let slash: BalanceOf<T> = slash_amount.saturated_into();
                             let _ = T::Currency::slash(&record.submitter, slash);
                         }
@@ -657,18 +673,10 @@ pub mod pallet {
                             reason: BundleRollbackReason::DeadlineExceeded,
                         });
 
-                        if revert_failures > 0 {
-                            log::error!(
-                                target: "x3-atomic-kernel",
-                                "Bundle {:?}: {} legs failed VM revert on auto-expiry",
-                                bundle_id, revert_failures
-                            );
-                        }
-
                         log::warn!(
                             target: "x3-atomic-kernel",
-                            "Bundle {:?} expired at block {:?}, slashed {}",
-                            bundle_id, now, slash_amount
+                            "Bundle {:?} expired at block {:?}, slashed {} ({} legs failed VM revert)",
+                            bundle_id, now, slash_amount, revert_failures
                         );
 
                         processed_count += 1;
@@ -1263,7 +1271,7 @@ pub mod pallet {
                 T::Currency::unreserve(&record.submitter, bond);
 
                 // Slash the penalty; the imbalance is deposited into the treasury.
-                if slash_amount > Zero::zero() {
+                if slash_amount != Zero::zero() {
                     let (imbalance, _actual) = T::Currency::slash(&record.submitter, slash_amount);
                     let treasury = Self::treasury_account();
                     T::Currency::resolve_creating(&treasury, imbalance);
@@ -1284,18 +1292,10 @@ pub mod pallet {
 
                 Self::deposit_event(Event::BundleRolledBack { bundle_id, reason });
 
-                if revert_failures > 0 {
-                    log::error!(
-                        target: "x3-atomic-kernel",
-                        "Bundle {:?}: {}/legs failed VM revert — side effects may persist",
-                        bundle_id, revert_failures
-                    );
-                }
-
                 log::warn!(
                     target: "x3-atomic-kernel",
-                    "Bundle {:?} rolled back (slashed {:?})",
-                    bundle_id, slash_amount
+                    "Bundle {:?} rolled back (slashed {:?}, {} legs failed VM revert)",
+                    bundle_id, slash_amount, revert_failures
                 );
 
                 Ok(())

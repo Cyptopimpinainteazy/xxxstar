@@ -390,4 +390,32 @@ mod tests {
         // Should fail verification
         assert!(!proofs[0].verify_merkle_branch(root));
     }
+
+    /// `hash_pair` is the merkle combinator, and replacing it with a constant survived the
+    /// whole suite (cargo-mutants, 2026-10-02): the builder and the verifier both call it, so
+    /// a degenerate tree is still self-consistent and every proof verifies against a root
+    /// built with the same constant. The combinator must bind both children and their order,
+    /// because `verify_merkle_branch` walks the branch positionally.
+    #[test]
+    fn hash_pair_binds_both_children_and_their_order() {
+        let a = H256::repeat_byte(0x11);
+        let b = H256::repeat_byte(0x22);
+        let c = H256::repeat_byte(0x33);
+
+        assert_ne!(
+            AssetSupplyProof::hash_pair(a, b),
+            H256::zero(),
+            "the combinator must not be a constant"
+        );
+        assert_ne!(
+            AssetSupplyProof::hash_pair(a, b),
+            AssetSupplyProof::hash_pair(a, c),
+            "a changed right child must change the parent"
+        );
+        assert_ne!(
+            AssetSupplyProof::hash_pair(a, b),
+            AssetSupplyProof::hash_pair(b, a),
+            "the verifier walks positionally, so the parent must bind child order"
+        );
+    }
 }
