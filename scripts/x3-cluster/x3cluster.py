@@ -182,6 +182,20 @@ def ollama_process_on(port):
     return pid, dict(item.split("=", 1) for item in raw.decode(errors="replace").split("\0") if "=" in item)
 
 
+def is_ollama(port):
+    version = http_json(f"http://127.0.0.1:{port}/api/version")
+    return isinstance(version, dict) and "version" in version
+
+
+def wait_for_ollama(port, seconds=60):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if is_ollama(port):
+            return True
+        time.sleep(1)
+    return False
+
+
 def ollama_models(port):
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/tags", timeout=5) as response:
@@ -234,10 +248,20 @@ def plan_gpu_workers(node, node_ip, bind):
             entry["state"] = "create"
             entry["unit"] = f"x3-ollama-gpu{rank}.service"
         elif env is None:
-            # A root/ollama-owned service: its pinning cannot be read or changed here.
-            entry["state"] = "system-unverified"
-            entry["unit"] = "ollama.service"
-            staged.append(system_dropin(gpu, port, bind))
+            # Owned by another user, so its environment (and pinning) cannot be read.
+            # Treat it as the system ollama.service only when it answers as Ollama and
+            # that unit is running; anything else on the port is a conflict, not a
+            # service to overwrite and restart.
+            if not is_ollama(port):
+                entry["state"] = "conflict"
+                entry["detail"] = f"port {port} is served by a process that does not answer as Ollama"
+            elif run(["systemctl", "is-active", "ollama.service"])[1] != "active":
+                entry["state"] = "conflict"
+                entry["detail"] = f"port {port} is an Ollama this user cannot inspect, and ollama.service is not running"
+            else:
+                entry["state"] = "system-unverified"
+                entry["unit"] = "ollama.service"
+                staged.append(system_dropin(gpu, port, bind))
         elif env.get("CUDA_VISIBLE_DEVICES") == gpu["uuid"]:
             entry["state"] = "adopted"
             entry["bind"] = env.get("OLLAMA_HOST")
@@ -271,10 +295,21 @@ sudo systemctl daemon-reload && sudo systemctl restart ollama.service
 """
 
 
-def registration(node, host, plan):
-    """The providers.d drop-in a router loads to use this node's GPUs."""
+def registrable(entry):
+    """Only workers known to be pinned to their GPU and running: adopted ones, and
+    ones this run created and saw answer. A conflicting or unverified listener may
+    be on another card, so advertising it would put two providers on one GPU."""
+    return entry["state"] == "adopted" or (entry["state"] == "create" and entry.get("started", False))
+
+
+def registration(node, host, plan, scope):
+    """The providers.d drop-in a router loads to use this node's GPUs, or None when
+    no worker is registrable with an advertised model (a router rejects an empty
+    drop-in, and an empty one would only hide that the node cannot serve)."""
     providers, policies = {}, {}
     for entry in plan:
+        if not registrable(entry):
+            continue
         for model in entry["models"]:
             name = f"{node}_gpu{entry['rank']}_" + re.sub(r"[^a-z0-9]+", "_", model.lower()).strip("_")
             tools = ADVERTISED_MODELS[model]["supports_tools"]
@@ -285,7 +320,9 @@ def registration(node, host, plan):
             roles = ["x3-local", "x3-code", "x3-deep"] if entry["rank"] == 0 else ["x3-local", "x3-review", "x3-fast"]
             for policy in roles:
                 policies.setdefault(policy, []).append(name)
-    return {"node": node, "generated": now(), "providers": providers, "policies": policies}
+    if not providers:
+        return None
+    return {"node": node, "generated": now(), "scope": scope, "providers": providers, "policies": policies}
 
 
 def firewall_block(lan, allowed, ports):
@@ -328,29 +365,56 @@ def bootstrap(args):
         staged.append(f"sudo loginctl enable-linger {os.environ.get('USER')}\n")
 
     if args.role == "gpu":
-        bind = "0.0.0.0" if args.lan else "127.0.0.1"
-        plan, dropins = plan_gpu_workers(node, node_ip, bind)
-        staged.extend(dropins)
+        # Every worker this run starts listens on loopback. With --lan the staged
+        # script enables the firewall first and only then rebinds to 0.0.0.0, so an
+        # unauthenticated Ollama API is never open to the LAN without it.
+        lan_bind = "0.0.0.0" if args.lan else "127.0.0.1"
+        plan, dropins = plan_gpu_workers(node, node_ip, lan_bind)
+        rebinds = list(dropins)  # the system drop-in binds too: after the firewall
         for entry in plan:
             if entry["state"] == "create":
                 path = USER_UNITS / entry["unit"]
                 report["actions"].append(f"{'write' if args.apply else 'would write'} {path}")
                 if args.apply:
                     USER_UNITS.mkdir(parents=True, exist_ok=True)
-                    path.write_text(worker_unit(entry["rank"], entry["gpu"], entry["port"], bind))
+                    path.write_text(worker_unit(entry["rank"], entry["gpu"], entry["port"], "127.0.0.1"))
                     run(["systemctl", "--user", "daemon-reload"])
                     run(["systemctl", "--user", "enable", "--now", entry["unit"]])
+                    entry["started"] = wait_for_ollama(entry["port"])
+                    # Probed again now that it runs: the plan probed before it existed.
+                    entry["models"] = [m for m in ollama_models(entry["port"]) if m in ADVERTISED_MODELS]
+                    if entry["started"] and not entry["models"]:
+                        staged.extend(f"OLLAMA_HOST=127.0.0.1:{entry['port']} ollama pull {model}\n"
+                                      for model in ADVERTISED_MODELS)
+                        report["actions"].append(f"{entry['worker']} has no advertised model yet: pull staged; "
+                                                 "re-run bootstrap afterwards to register it")
+                    if args.lan:
+                        rebinds.append(f"sed -i 's|OLLAMA_HOST=127.0.0.1:{entry['port']}|OLLAMA_HOST=0.0.0.0:{entry['port']}|' "
+                                       f"{path}\nsystemctl --user daemon-reload && systemctl --user restart {entry['unit']}\n")
         env["X3_GPU_WORKERS"] = ",".join(f"{e['worker']}:{e['port']}" for e in plan)
         # IP, not hostname: peers cannot resolve cluster names until DNS/DHCP reservations exist.
-        reg = registration(node, node_ip or node, plan)
+        # Without --lan the workers only listen on loopback, so only a router on this node
+        # can use them, and the registration says so.
+        if args.lan:
+            reg = registration(node, node_ip or node, plan, "lan (reachable once staged-privileged.sh has run)")
+        else:
+            reg = registration(node, "127.0.0.1", plan, "local (workers bound to loopback; use --lan for remote routers)")
+        reg_path = CONFIG / "registration" / f"{node}.json"
         (CONFIG / "registration").mkdir(exist_ok=True)
-        (CONFIG / "registration" / f"{node}.json").write_text(json.dumps(reg, indent=2) + "\n")
+        if reg is None:
+            if reg_path.exists():
+                reg_path.unlink()
+            report["registration"] = None
+            report["registration_withheld"] = "no running, GPU-verified worker has an advertised model"
+        else:
+            reg_path.write_text(json.dumps(reg, indent=2) + "\n")
+            report["registration"] = str(reg_path)
         report["gpu_workers"] = [{k: v for k, v in e.items() if k != "gpu"} | {"gpu": e["gpu"]["name"], "uuid": e["gpu"]["uuid"]}
                                  for e in plan]
-        report["registration"] = str(CONFIG / "registration" / f"{node}.json")
         if args.lan:
             router_hosts = [n["ip"] for n in inv["nodes"].values() if n["role"] in ("control", "ops") and n.get("ip")]
             staged.append(firewall_block(inv["lan"], router_hosts, [e["port"] for e in plan]))
+            staged.extend(rebinds)
             # Rebind adopted loopback user workers only after the firewall is on.
             for entry in plan:
                 if entry["state"] == "adopted" and str(entry.get("bind", "")).startswith("127."):
@@ -361,6 +425,8 @@ def bootstrap(args):
                         continue
                     staged.append(f"sed -i 's|OLLAMA_HOST={entry['bind']}|OLLAMA_HOST=0.0.0.0:{entry['port']}|' "
                                   f"{USER_UNITS / unit}\nsystemctl --user daemon-reload && systemctl --user restart {unit}\n")
+        else:
+            staged.extend(rebinds)  # without --lan these are loopback drop-ins only
 
     (CONFIG / "node.env").write_text("# Non-secret node metadata. Never put tokens or passwords here.\n"
                                      + "".join(f"{k}={v}\n" for k, v in env.items()))
@@ -425,7 +491,9 @@ def bench(_args):
     if shutil.which("cargo"):
         with tempfile.TemporaryDirectory(dir=str(Path.home())) as target:
             started = time.perf_counter()
-            code, out = run(f"cd {REPO} && CARGO_TARGET_DIR={target} cargo build -q -p gpu-sig-verifier 2>&1 | tail -3", 1800)
+            # pipefail: without it the status is tail's, and a failed build reads as ok.
+            code, out = run(["bash", "-o", "pipefail", "-c",
+                             f"cd {REPO} && CARGO_TARGET_DIR={target} cargo build -q -p gpu-sig-verifier 2>&1 | tail -3"], 1800)
             result["rust_build"] = {"crate": "gpu-sig-verifier", "profile": "dev", "clean": True,
                                     "seconds": round(time.perf_counter() - started, 1), "ok": code == 0,
                                     "tail": out[-300:] if code else ""}
@@ -450,6 +518,13 @@ def resolve(name, node):
         return node.get("ip")
     # Debian maps the own hostname to 127.0.1.1; that is not the LAN address.
     return node.get("ip") or ip if ip.startswith("127.") else ip
+
+
+def ssh_target(name, ip):
+    try:
+        return name if socket.gethostbyname(name) == ip else ip
+    except OSError:
+        return ip
 
 
 def http_json(url, timeout=3):
@@ -485,9 +560,17 @@ def local_health(inv_node):
 
 
 def remote_health(host):
-    script = ("python3 - <<'PY'\nimport json,os,shutil\n"
+    # Identity comes back with the numbers: an inventory IP reassigned to another
+    # machine would otherwise pass as the expected node.
+    script = ("python3 - <<'PY'\nimport json,os,shutil,socket,pathlib\n"
+              "env={}\np=pathlib.Path.home()/'.config'/'x3-cluster'/'node.env'\n"
+              "if p.exists():\n"
+              "    for l in p.read_text().splitlines():\n"
+              "        k,_,v=l.partition('=')\n"
+              "        if v and not l.lstrip().startswith('#'): env[k.strip()]=v.strip().strip('\"')\n"
               "print(json.dumps({'threads':os.cpu_count(),'load':os.getloadavg()[0],"
-              "'free_gb':round(shutil.disk_usage('/').free/1e9,1)}))\nPY")
+              "'free_gb':round(shutil.disk_usage('/').free/1e9,1),'hostname':socket.gethostname(),"
+              "'node_name':env.get('X3_NODE_NAME'),'role':env.get('X3_NODE_ROLE')}))\nPY")
     code, out = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=4", host, script], 15)
     if code != 0:
         return None
@@ -511,7 +594,9 @@ def health(args, quiet=False):
         else:
             reachable = run(["ping", "-c", "1", "-W", "1", ip])[0] == 0
             ssh_port = tcp_open(ip, 22)
-            remote = remote_health(name if ssh_port else ip) if ssh_port else None
+            # SSH to the address that was actually probed; the name only when it
+            # resolves to that address (so ~/.ssh/config aliases still apply).
+            remote = remote_health(ssh_target(name, ip)) if ssh_port else None
             row.update(reachable=reachable, ssh=bool(remote), ssh_port=ssh_port, label="PHYSICAL", remote=remote)
             if node["role"] == "control":
                 row["router_port"] = tcp_open(ip, 11435)
@@ -560,6 +645,17 @@ def gate(args):
             check(f"{me}.no_failed_units", not row["failed_units"], row["failed_units"])
             if row["role"] == "gpu":
                 check(f"{me}.gpu_workers", len(row["ollama_workers"]) >= max(1, len(gpus())), sorted(row["ollama_workers"]))
+            # Every service the inventory declares must be running: a cleanly stopped
+            # unit is not in `systemctl --failed`, so that check alone misses it.
+            for unit, state in (row.get("services") or {}).items():
+                check(f"{me}.service.{unit}", state == "active", state)
+            if "x3-ai-router" in (row.get("services") or {}):
+                check(f"{me}.router_health", row.get("router") is not None, "http://127.0.0.1:11435/health")
+        elif row.get("remote") is not None:
+            remote = row["remote"]
+            same_node = remote.get("node_name") == row["node"] or remote.get("hostname") == row["node"]
+            check(f"{row['node']}.identity", same_node and remote.get("role") == row["role"],
+                  f"hostname={remote.get('hostname')} node={remote.get('node_name')} role={remote.get('role')}")
     storage = Path("/x3-storage")
     check("storage.mounted", storage.is_mount() or any(p.is_mount() for p in storage.glob("*")) if storage.exists() else False,
           "/x3-storage")
