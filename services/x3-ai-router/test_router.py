@@ -2746,12 +2746,20 @@ class NativeResponsesTests(unittest.TestCase):
 
 
 class SlowProvider(BaseHTTPRequestHandler):
-    """Answers after a delay and records which port served each request."""
+    """Answers after a delay and records which port served each request.
+
+    A test that needs two requests to overlap sets `barrier`: each request then
+    waits until the other is also inside a provider, which proves concurrency
+    without a wall-clock bound (that failed on a loaded machine)."""
     delay = 0.4
+    barrier = None
 
     def do_POST(self):
         self.rfile.read(int(self.headers["Content-Length"]))
-        time.sleep(self.delay)
+        if self.barrier is not None:
+            self.barrier.wait()
+        else:
+            time.sleep(self.delay)
         body = json.dumps({"choices": [{"message": {"role": "assistant", "content": str(self.server.server_port)}}],
                            "usage": {"prompt_tokens": 1, "completion_tokens": 1}}).encode()
         self.send_response(200)
@@ -2826,12 +2834,15 @@ class DualGpuTests(unittest.TestCase):
             self.assertEqual(self.router.load(), {"card0": 1})
 
     def test_concurrent_requests_use_both_workers(self):
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            started = time.monotonic()
-            ports = set(pool.map(lambda _: self.ask(), range(2)))
-            elapsed = time.monotonic() - started
-        self.assertEqual(ports, {s.server_port for s in self.servers})
-        self.assertLess(elapsed, 2 * SlowProvider.delay, "the two requests must run in parallel")
+        # Both requests must be in flight at once: a serialized pair breaks the
+        # barrier (BrokenBarrierError -> a provider error) instead of passing.
+        SlowProvider.barrier = threading.Barrier(2, timeout=30)
+        try:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                ports = set(pool.map(lambda _: self.ask(), range(2)))
+        finally:
+            SlowProvider.barrier = None
+        self.assertEqual(ports, {s.server_port for s in self.servers}, "the two requests must run in parallel")
 
     def test_dead_worker_fails_over_to_the_other(self):
         dead = self.servers.pop(0)
@@ -2897,6 +2908,44 @@ class RegistrationTests(unittest.TestCase):
 
     def test_missing_directory_is_not_an_error(self):
         self.assertEqual(router_module.apply_registrations(self.config, self.tmp.name + "/none"), ([], []))
+
+    def test_registration_values_are_type_checked(self):
+        bad = {"a": {"max_in_flight": "1"}, "b": {"max_in_flight": 0}, "c": {"max_in_flight": True},
+               "d": {"worker": ["x3gpu2-gpu0"]}, "e": {"supports_tools": "yes"}, "f": {"critical_allowed": True},
+               "g": {"probe_timeout_seconds": -1}}
+        for name, extra in bad.items():
+            self.write(f"{name}.json", {"providers": {name: dict({"base_url": "http://h/v1", "model": "m"}, **extra)}})
+        accepted, rejected = router_module.apply_registrations(self.config, self.tmp.name)
+        self.assertEqual(accepted, [])
+        self.assertEqual(len(rejected), len(bad))
+        self.assertEqual(set(self.config["providers"]), {"ollama"})
+
+    def test_a_registered_provider_never_serves_critical_requests(self):
+        self.write("x3gpu2.json", {"providers": {"g2": {"base_url": "http://x3gpu2:11434/v1", "model": "m"}}})
+        router_module.apply_registrations(self.config, self.tmp.name)
+        registered = self.config["providers"]["g2"]
+        self.assertNotIn("api_key_env", registered)
+        self.assertFalse(router_module.may_serve_critical(registered),
+                         "no credentials does not mean the model is on this machine")
+        self.assertTrue(router_module.may_serve_critical(self.config["providers"]["ollama"]))
+
+
+class ServerTests(unittest.TestCase):
+    def test_an_ipv6_host_gets_an_ipv6_server(self):
+        import socket
+        self.assertEqual(router_module.server_class_for("::1").address_family, socket.AF_INET6)
+        self.assertEqual(router_module.server_class_for("127.0.0.1").address_family, socket.AF_INET)
+
+    def test_zero_max_in_flight_is_zero_slots_not_unlimited(self):
+        config = {"providers": {"p": {"base_url": "http://h/v1", "model": "m", "max_in_flight": 0},
+                                "q": {"base_url": "http://h/v1", "model": "m"}},
+                  "policies": {}, "budget_fallback": []}
+        router = router_module.Router(config, ":memory:")
+        try:
+            self.assertTrue(router.saturated("p"))
+            self.assertFalse(router.saturated("q"), "no limit is unlimited")
+        finally:
+            router.db.close()
 
 
 if __name__ == "__main__":

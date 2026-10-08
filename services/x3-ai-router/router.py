@@ -7,6 +7,7 @@ import html
 import json
 import os
 import re
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -995,6 +996,11 @@ def may_serve_critical(provider):
     request to anyone and stays eligible — that is how a critical request keeps
     working when a paid provider is unavailable or over budget.
     """
+    if provider.get("origin") == "registration":
+        # A drop-in from another node: having no credentials says nothing about
+        # where the model runs, so only the explicit flag counts, and a drop-in
+        # cannot set it (apply_registrations pins it to False).
+        return bool(provider.get("critical_allowed", False))
     return bool(provider.get("critical_allowed", False)) or not provider.get("api_key_env")
 
 
@@ -1374,7 +1380,8 @@ class Router:
     def saturated(self, name):
         """True when `name`'s worker is at its `max_in_flight`. Caller holds the lock."""
         limit = self.config["providers"].get(name, {}).get("max_in_flight")
-        return bool(limit) and self.in_flight.get(self.worker_of(name), 0) >= limit
+        # None is unlimited; 0 is zero slots, not "unlimited".
+        return limit is not None and self.in_flight.get(self.worker_of(name), 0) >= limit
 
     def track(self, name):
         """Context manager counting one running request against `name`."""
@@ -2809,6 +2816,38 @@ REGISTRATION_KEYS = {"base_url", "protocol", "model", "supports_tools", "tool_pr
                      "timeout_seconds"}
 
 
+def registration_type_error(name, spec):
+    """Raise ValueError when a drop-in value has the wrong type.
+
+    Keys are checked against REGISTRATION_KEYS; this checks values, so a bad
+    file is rejected here instead of failing requests later (a string
+    `max_in_flight` compared with an int, an unhashable `worker` used as a key).
+    """
+    def is_int(value):
+        return isinstance(value, int) and not isinstance(value, bool)
+
+    def is_positive_number(value):
+        return (is_int(value) or isinstance(value, float)) and value > 0
+
+    checks = {
+        "base_url": lambda v: isinstance(v, str),
+        "model": lambda v: isinstance(v, str),
+        "protocol": lambda v: isinstance(v, str),
+        "worker": lambda v: isinstance(v, str) and bool(v),
+        "supports_tools": lambda v: isinstance(v, bool),
+        "tool_probe": lambda v: isinstance(v, bool),
+        "critical_allowed": lambda v: v is False,
+        "max_in_flight": lambda v: is_int(v) and v >= 1,
+        "probe_samples": lambda v: is_int(v) and v >= 1,
+        "tool_probe_max_tokens": lambda v: is_int(v) and v >= 1,
+        "probe_timeout_seconds": is_positive_number,
+        "timeout_seconds": is_positive_number,
+    }
+    for key, value in spec.items():
+        if key in checks and not checks[key](value):
+            raise ValueError(f"provider {name!r} has an invalid {key}: {value!r}")
+
+
 def apply_registrations(config, directory):
     """Merge GPU worker drop-ins from `directory` into `config`.
 
@@ -2847,6 +2886,7 @@ def apply_registrations(config, directory):
                     raise ValueError(f"provider {name!r} has unsupported keys {sorted(set(spec) - REGISTRATION_KEYS)}")
                 if not str(spec.get("base_url", "")).startswith(("http://", "https://")) or not spec.get("model"):
                     raise ValueError(f"provider {name!r} needs an http(s) base_url and a model")
+                registration_type_error(name, spec)
             policies = data.get("policies") or {}
             for policy, names in policies.items():
                 if policy not in config.get("policies", {}):
@@ -2857,13 +2897,24 @@ def apply_registrations(config, directory):
             rejected.append({"file": filename, "error": str(exc)})
             continue
         for name, spec in providers.items():
-            config["providers"][name] = dict({"protocol": "chat_completions", "critical_allowed": False}, **spec)
+            # critical_allowed is the router operator's decision, never a drop-in's.
+            config["providers"][name] = dict({"protocol": "chat_completions"}, **spec,
+                                             critical_allowed=False, origin="registration")
         for policy, names in policies.items():
             config["policies"][policy]["order"] = config["policies"][policy].get("order", []) + list(names)
         fallback = config.setdefault("budget_fallback", [])
         fallback.extend(name for name in providers if name not in fallback)
         accepted.append({"file": filename, "node": data.get("node"), "providers": sorted(providers)})
     return accepted, rejected
+
+
+class ThreadingHTTPServerV6(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
+def server_class_for(host):
+    """ThreadingHTTPServer is AF_INET; an IPv6 address such as ::1 needs AF_INET6."""
+    return ThreadingHTTPServerV6 if ":" in host else ThreadingHTTPServer
 
 
 def default_db_path():
@@ -2902,7 +2953,7 @@ def main():
     threading.Thread(target=router.warm_capabilities, daemon=True).start()
     if args.host not in ("127.0.0.1", "localhost", "::1") and not os.environ.get("X3_ROUTER_TOKEN"):
         parser.error("--host other than loopback requires X3_ROUTER_TOKEN")
-    server = ThreadingHTTPServer((args.host, args.port), handler_for(router))
+    server = server_class_for(args.host)((args.host, args.port), handler_for(router))
     server.serve_forever()
 
 

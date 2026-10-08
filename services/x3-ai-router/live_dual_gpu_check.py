@@ -5,7 +5,7 @@ RTX 2060 SUPER, worker B :11436 on the GTX 1070) and writes JSON evidence to
 audit-artifacts/gpu-ai/<timestamp>.json. Exits nonzero if a routing or
 failover expectation fails.
 
-    python3 services/x3-ai-router/live_dual_gpu_check.py [--iterations 5] [--no-failover]
+    python3 services/x3-ai-router/live_dual_gpu_check.py [--iterations 5] [--no-failover] [--token T]
 
 The failover step stops and restarts the `ollama-worker-b` user service.
 """
@@ -29,9 +29,29 @@ PROMPT = ("Write a Rust function `fn checked_sum(xs: &[u64]) -> Option<u64>` tha
           "then a unit test for it. Code only.")
 
 
+# Bearer token for the router, when it requires one (X3_ROUTER_TOKEN); set in main().
+ROUTER_TOKEN = None
+
+
+def router_token(explicit):
+    """--token, else $X3_ROUTER_TOKEN, else the installed env file (deploy/install.sh)."""
+    if explicit:
+        return explicit
+    if os.environ.get("X3_ROUTER_TOKEN"):
+        return os.environ["X3_ROUTER_TOKEN"]
+    env_file = Path.home() / ".config" / "x3-router" / "env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            key, _, value = line.partition("=")
+            if key.strip() == "X3_ROUTER_TOKEN" and not line.lstrip().startswith("#") and value.strip():
+                return value.strip().strip('"')
+    return None
+
+
 def http(url, body=None, headers=None, timeout=300):
     data = json.dumps(body).encode() if body is not None else None
-    request = urllib.request.Request(url, data, {"Content-Type": "application/json", **(headers or {})},
+    auth = {"Authorization": f"Bearer {ROUTER_TOKEN}"} if ROUTER_TOKEN and url.startswith(ROUTER) else {}
+    request = urllib.request.Request(url, data, {"Content-Type": "application/json", **auth, **(headers or {})},
                                      method="POST" if data else "GET")
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.load(response)
@@ -132,7 +152,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--iterations", type=int, default=5)
     parser.add_argument("--no-failover", action="store_true")
+    parser.add_argument("--token", help="router bearer token (default: $X3_ROUTER_TOKEN or ~/.config/x3-router/env)")
     args = parser.parse_args()
+    global ROUTER_TOKEN
+    ROUTER_TOKEN = router_token(args.token)
     checks, evidence = [], {"started": dt.datetime.now(dt.timezone.utc).isoformat()}
 
     def check(name, ok, detail):
@@ -189,12 +212,17 @@ def main():
                   failed_over["providers"] and worker_of(failed_over["providers"][0]) == "rtx", failed_over)
         finally:
             subprocess.run(["systemctl", "--user", "start", "ollama-worker-b"], check=True)
-            for _ in range(60):
+            # A worker that does not come back leaves the host at half capacity;
+            # that is a failure of this run, not something to fall through.
+            for waited in range(60):
                 try:
                     http(WORKERS["gtx"] + "/api/version")
+                    check("gtx_worker_recovered", True, {"after_seconds": waited})
                     break
                 except Exception:  # noqa: BLE001
                     time.sleep(1)
+            else:
+                check("gtx_worker_recovered", False, {"timeout_seconds": 60})
 
     evidence["checks"] = checks
     evidence["finished"] = dt.datetime.now(dt.timezone.utc).isoformat()

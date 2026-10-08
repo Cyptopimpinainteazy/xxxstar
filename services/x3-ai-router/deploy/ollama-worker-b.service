@@ -4,7 +4,8 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/ollama serve
+# Template: deploy/install.sh replaces @OLLAMA@ with the ollama binary on PATH.
+ExecStart=@OLLAMA@ serve
 # Pin by UUID: nvidia-smi and CUDA enumerate these two cards in opposite
 # orders, so a bare index silently put this worker on the RTX 2060 SUPER.
 Environment="CUDA_DEVICE_ORDER=PCI_BUS_ID"
@@ -15,7 +16,7 @@ Environment="CUDA_VISIBLE_DEVICES=GPU-e0897c2d-090a-da7b-5679-f5338c4f9f02"
 Environment="OLLAMA_VULKAN=0"
 Environment="GGML_VK_VISIBLE_DEVICES="
 Environment="OLLAMA_HOST=127.0.0.1:11436"
-Environment="OLLAMA_MODELS=/home/lojak/.ollama-worker-b/models"
+Environment="OLLAMA_MODELS=%h/.ollama-worker-b/models"
 Environment="OLLAMA_SCHED_SPREAD=false"
 Environment="OLLAMA_MAX_LOADED_MODELS=1"
 Environment="OLLAMA_NUM_PARALLEL=1"
