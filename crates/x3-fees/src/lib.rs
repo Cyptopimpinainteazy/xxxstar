@@ -64,9 +64,13 @@ impl Eip1559FeeMarket {
         }
     }
 
-    /// Split fee: 70% burn, 30% to validators
+    /// Split fee: 70% burn, 30% to validators.
+    ///
+    /// Computed without ever multiplying the whole total_fee by 70, so a fee
+    /// near u128::MAX cannot overflow (which panicked in debug builds and
+    /// wrapped in release). The result is bit-for-bit floor(total_fee * 70 / 100).
     pub fn split_fee(&self, total_fee: u128) -> (u128, u128) {
-        let burn = (total_fee * 70) / 100;
+        let burn = (total_fee / 100) * 70 + ((total_fee % 100) * 70) / 100;
         let validator = total_fee - burn;
         (burn, validator)
     }
@@ -138,12 +142,16 @@ impl SlashingInsuranceFund {
         }
     }
 
-    /// Contribute when slash occurs (5% of slash amount)
+    /// Contribute when slash occurs (5% of slash amount).
+    ///
+    /// Uses full-width arithmetic: truncating the slash to u64 and then
+    /// saturating the multiply silently under-counted for large slashes. This
+    /// is exact floor(slash_amount * rate / 1_000_000) with no overflow.
     pub fn contribute_from_slash(&mut self, slash_amount: u128) {
-        let contribution = (slash_amount as u64)
-            .saturating_mul(self.contribution_rate.deconstruct() as u64)
-            / 1_000_000;
-        self.pool_balance = self.pool_balance.saturating_add(contribution as u128);
+        let parts = self.contribution_rate.deconstruct() as u128;
+        let contribution =
+            (slash_amount / 1_000_000) * parts + ((slash_amount % 1_000_000) * parts) / 1_000_000;
+        self.pool_balance = self.pool_balance.saturating_add(contribution);
     }
 
     /// File new claim (e.g., validator recovery)
@@ -296,6 +304,40 @@ mod resource_accounting_tests {
         let mut fund = SlashingInsuranceFund::new();
         fund.file_claim("claim-100k".to_string(), 100000);
         assert!(!fund.process_claim("claim-100k", true)); // insufficient funds
+    }
+
+    #[test]
+    fn split_fee_conserves_the_total_and_rounds_burn_down() {
+        let market = Eip1559FeeMarket::new(0);
+        assert_eq!(market.split_fee(0), (0, 0));
+        assert_eq!(market.split_fee(1_000), (700, 300));
+        // Non-multiples: burn takes the floor, validator keeps the remainder.
+        assert_eq!(market.split_fee(1), (0, 1));
+        assert_eq!(market.split_fee(3), (2, 1));
+        assert_eq!(market.split_fee(11), (7, 4));
+        for fee in [0u128, 1, 2, 7, 99, 100, 101, 12_345] {
+            let (burned, validator) = market.split_fee(fee);
+            assert_eq!(burned + validator, fee, "split must conserve fee {fee}");
+        }
+    }
+
+    #[test]
+    fn split_fee_handles_a_fee_near_the_u128_ceiling() {
+        let market = Eip1559FeeMarket::new(u128::MAX);
+        // Regression: total_fee * 70 overflowed u128 here.
+        let (burned, validator) = market.split_fee(u128::MAX);
+        assert_eq!(burned + validator, u128::MAX);
+        assert!(burned > validator, "the burn leg stays the 70% majority");
+    }
+
+    #[test]
+    fn contribute_from_slash_does_not_truncate_large_slashes() {
+        let mut fund = SlashingInsuranceFund::new();
+        fund.contribute_from_slash(0);
+        assert_eq!(fund.pool_balance, 0);
+        // 2^64 truncated to u64 as 0, so this previously contributed nothing.
+        fund.contribute_from_slash(1u128 << 64);
+        assert_eq!(fund.pool_balance, 922_337_203_685_477_580);
     }
 }
 
