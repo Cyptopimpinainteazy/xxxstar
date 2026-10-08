@@ -211,8 +211,11 @@ impl WgpuBackend {
         let max_bytes = MAX_DISPATCH_DATA_BYTES
             .min(u64::from(limits.max_storage_buffer_binding_size))
             .min(limits.max_buffer_size);
-        // meta holds 2 words per message plus the header.
-        let max_messages = ((max_bytes / 4) as usize / 2).saturating_sub(META_HEADER_WORDS);
+        // meta holds 2 words per message plus the header; the output holds
+        // `output_words` per message. Both have to fit the device.
+        let max_messages = ((max_bytes / 4) as usize / 2)
+            .saturating_sub(META_HEADER_WORDS)
+            .min(kernel.max_items(&limits));
         let mut outputs = Vec::with_capacity(inputs.len());
         let mut start = 0;
         while start < inputs.len() {
@@ -283,6 +286,13 @@ impl WgpuBackend {
     ) -> Result<Vec<u8>, WgpuAccelError> {
         let count_u32 =
             u32::try_from(count).map_err(|_| WgpuAccelError::InvalidInput("batch exceeds u32"))?;
+        // Callers split by `max_items`; a larger batch would need a binding the
+        // device cannot provide, which wgpu reports as a validation panic.
+        if count > kernel.max_items(&self.device.limits()) {
+            return Err(WgpuAccelError::InvalidInput(
+                "batch exceeds one dispatch for this kernel",
+            ));
+        }
         // A batch of empty messages still needs a non-empty data binding.
         let data_words = data_words.max(1);
         let entry_words = META_HEADER_WORDS + 2 * count;
@@ -407,6 +417,21 @@ impl ComputeKernel {
         }
     }
 
+    /// The most items one dispatch of this kernel can carry on `limits`.
+    ///
+    /// Both the metadata (2 words per item plus a header) and the output
+    /// (`output_words` per item) are storage bindings, and the output is also
+    /// copied into a mappable readback buffer of the same size, so every one of
+    /// them has to fit the binding limit and the buffer limit.
+    pub(crate) fn max_items(&self, limits: &wgpu::Limits) -> usize {
+        let limit_words = (u64::from(limits.max_storage_buffer_binding_size)
+            .min(limits.max_buffer_size)
+            / 4) as usize;
+        let by_meta = limit_words.saturating_sub(META_HEADER_WORDS) / 2;
+        let by_output = limit_words / self.output_words.max(1);
+        by_meta.min(by_output)
+    }
+
     /// Buffers grow to the next power of two and are then reused, so a steady
     /// stream of similar batches allocates nothing after warm-up.
     fn create_buffers(
@@ -422,7 +447,7 @@ impl ComputeKernel {
             .next_power_of_two()
             .min(limit_words)
             .max(data_words);
-        let message_limit = limit_words.saturating_sub(META_HEADER_WORDS) / 2;
+        let message_limit = self.max_items(&device.limits());
         let message_capacity = messages
             .next_power_of_two()
             .min(message_limit)
@@ -491,12 +516,32 @@ fn hardware_adapters_raw() -> Vec<wgpu::Adapter> {
             )
         })
         .collect();
+    // A GPU that several backends can drive (Vulkan and DX12 on Windows) is
+    // listed once per backend. Collapsing those by vendor/device/name would also
+    // collapse two identical physical cards, which share all three, so instead
+    // keep a single backend: the one that exposes the most adapters, with ties
+    // going to Vulkan, then Metal, then DX12. Within one backend every entry is a
+    // distinct physical device.
+    let preference = [
+        wgpu::Backend::Vulkan,
+        wgpu::Backend::Metal,
+        wgpu::Backend::Dx12,
+    ];
+    let count = |backend: wgpu::Backend| {
+        adapters
+            .iter()
+            .filter(|adapter| adapter.get_info().backend == backend)
+            .count()
+    };
+    let mut chosen = preference[0];
+    for backend in preference {
+        if count(backend) > count(chosen) {
+            chosen = backend;
+        }
+    }
+    adapters.retain(|adapter| adapter.get_info().backend == chosen);
+    // Stable: identical cards keep the backend's enumeration order.
     adapters.sort_by_key(|adapter| {
-        let info = adapter.get_info();
-        (info.vendor, info.device, info.name)
-    });
-    // One entry per physical device even if several backends expose it.
-    adapters.dedup_by_key(|adapter| {
         let info = adapter.get_info();
         (info.vendor, info.device, info.name)
     });

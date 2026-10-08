@@ -752,6 +752,40 @@ pub mod vectors {
 mod tests {
     use super::*;
 
+    /// The CPU reference rejects high-S signatures (libsecp256k1's verify only
+    /// accepts the lower-S form), which is the rule the GPU path's host check and
+    /// kernel both apply. Without a GPU this is the half of the parity contract
+    /// that can still be pinned.
+    #[test]
+    fn cpu_backend_rejects_the_high_s_twin_of_a_valid_signature() {
+        use num_bigint::BigUint;
+        let secp = Secp256k1::new();
+        let sk = secp256k1::SecretKey::from_slice(&[0x42; 32]).unwrap();
+        let z = [0x24u8; 32];
+        let low = secp
+            .sign_ecdsa(&Message::from_digest(z), &sk)
+            .serialize_compact();
+        let n = BigUint::parse_bytes(
+            b"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+            16,
+        )
+        .unwrap();
+        let high_s = (&n - BigUint::from_bytes_be(&low[32..])).to_bytes_be();
+        let mut high = low;
+        high[32..].fill(0);
+        high[64 - high_s.len()..].copy_from_slice(&high_s);
+        let public_key = PublicKey::from_secret_key(&secp, &sk).serialize().to_vec();
+        let job = |signature| Secp256k1VerifyJob {
+            message_hash: z,
+            signature,
+            public_key: public_key.clone(),
+        };
+        assert_eq!(
+            CpuBackend::secp256k1_verdicts(&[job(low), job(high)]),
+            vec![true, false]
+        );
+    }
+
     #[test]
     fn cpu_hash_batches_are_deterministic() {
         let backend = CpuBackend::new();

@@ -363,3 +363,44 @@ fn multi_gpu_split_matches_cpu_on_every_job() {
         multi.weights()
     );
 }
+
+/// The kernel enforces low-S itself, so a host-side check that let a high-S
+/// signature through could only cause a rejection. Fed straight to the kernel,
+/// past `prepare_secp256k1`, the high-S twin of a valid signature is refused
+/// while the signature itself is accepted.
+#[test]
+fn kernel_rejects_high_s_without_the_host_check() {
+    let gpu = match x3_accel_wgpu::WgpuBackend::initialize() {
+        Ok(gpu) => gpu,
+        Err(err) => {
+            assert!(
+                std::env::var("X3_REQUIRE_GPU").as_deref() != Ok("1"),
+                "X3_REQUIRE_GPU=1 but no GPU backend: {err}"
+            );
+            eprintln!("kernel_rejects_high_s_without_the_host_check: SKIPPED ({err})");
+            return;
+        }
+    };
+    let secp = Secp256k1::new();
+    let sk = SecretKey::from_slice(&[0x42; 32]).unwrap();
+    let z = [0x24u8; 32];
+    let sig = secp
+        .sign_ecdsa(&Message::from_digest(z), &sk)
+        .serialize_compact();
+    let point = PublicKey::from_secret_key(&secp, &sk).serialize_uncompressed();
+    let mut r = [0u8; 32];
+    r.copy_from_slice(&sig[..32]);
+    let mut low_s = [0u8; 32];
+    low_s.copy_from_slice(&sig[32..]);
+    let high_s = be32(&(n() - BigUint::from_bytes_be(&low_s)));
+    let mut qx = [0u8; 32];
+    qx.copy_from_slice(&point[1..33]);
+    let mut qy = [0u8; 32];
+    qy.copy_from_slice(&point[33..65]);
+    let job = |s| x3_accel_wgpu::Secp256k1Prepared { r, s, z, qx, qy };
+    assert_eq!(
+        gpu.secp256k1_verify_prepared(&[job(low_s), job(high_s)])
+            .unwrap(),
+        vec![true, false]
+    );
+}

@@ -23,8 +23,9 @@
 //! (it uses Jacobian coordinates, hence `r·Z²` there).
 //!
 //! The kernel still re-checks the preconditions it relies on (r, s in
-//! [1, n), Qx, Qy < p, Q on the curve) and returns `false` if any fails, so a
-//! host-side bug can only cause a rejection, never an acceptance.
+//! [1, n), s low (s <= n/2), Qx, Qy < p, Q on the curve) and returns `false`
+//! if any fails, so a host-side bug can only cause a rejection, never an
+//! acceptance.
 //!
 //! # Arithmetic
 //!
@@ -76,10 +77,12 @@ impl WgpuBackend {
         &self,
         jobs: &[Secp256k1Prepared],
     ) -> Result<Vec<bool>, WgpuAccelError> {
+        let kernel = &self.secp256k1_kernels().0;
+        let per_dispatch = self.items_per_dispatch(kernel, JOB_WORDS, MAX_JOBS_PER_DISPATCH)?;
         let mut results = Vec::with_capacity(jobs.len());
-        for chunk in jobs.chunks(MAX_JOBS_PER_DISPATCH) {
+        for chunk in jobs.chunks(per_dispatch) {
             let bytes = self.execute(
-                &self.secp256k1_kernels().0,
+                kernel,
                 chunk.len(),
                 chunk.len() * JOB_WORDS,
                 |entries, data| {
@@ -120,34 +123,57 @@ impl WgpuBackend {
         &self,
         cases: &[([u32; 8], [u32; 8])],
     ) -> Result<Vec<[[u32; 8]; 3]>, WgpuAccelError> {
-        let bytes = self.execute(
-            &self.secp256k1_kernels().1,
-            cases.len(),
-            cases.len() * 16,
-            |entries, data| {
+        let kernel = &self.secp256k1_kernels().1;
+        // 24 output words per case: three 8-limb results.
+        let per_dispatch = self.items_per_dispatch(kernel, 16, MAX_JOBS_PER_DISPATCH)?;
+        let mut results = Vec::with_capacity(cases.len());
+        for chunk in cases.chunks(per_dispatch) {
+            let bytes = self.execute(kernel, chunk.len(), chunk.len() * 16, |entries, data| {
                 entries.fill(0);
-                for (index, (a, b)) in cases.iter().enumerate() {
+                for (index, (a, b)) in chunk.iter().enumerate() {
                     for (limb, word) in a.iter().chain(b.iter()).enumerate() {
                         let at = (index * 16 + limb) * 4;
                         data[at..at + 4].copy_from_slice(&word.to_le_bytes());
                     }
                 }
-                let used = cases.len() * 16 * 4;
+                let used = chunk.len() * 16 * 4;
                 data[used..].fill(0);
-            },
-        )?;
-        let (le_words, _) = bytes.as_chunks::<4>();
-        let words: Vec<u32> = le_words.iter().map(|w| u32::from_le_bytes(*w)).collect();
-        Ok(words
-            .chunks_exact(24)
-            .map(|case| {
+            })?;
+            let (le_words, _) = bytes.as_chunks::<4>();
+            let words: Vec<u32> = le_words.iter().map(|w| u32::from_le_bytes(*w)).collect();
+            results.extend(words.chunks_exact(24).map(|case| {
                 let mut out = [[0u32; 8]; 3];
                 for (i, value) in out.iter_mut().enumerate() {
                     value.copy_from_slice(&case[i * 8..i * 8 + 8]);
                 }
                 out
-            })
-            .collect())
+            }));
+        }
+        Ok(results)
+    }
+
+    /// Items per dispatch for `kernel`: its metadata/output bound, the data
+    /// binding at `data_words_per_item`, and `cap`, whichever is smallest.
+    fn items_per_dispatch(
+        &self,
+        kernel: &crate::ComputeKernel,
+        data_words_per_item: usize,
+        cap: usize,
+    ) -> Result<usize, WgpuAccelError> {
+        let limits = self.device.limits();
+        let data_limit_words = (u64::from(limits.max_storage_buffer_binding_size)
+            .min(limits.max_buffer_size)
+            / 4) as usize;
+        let items = kernel
+            .max_items(&limits)
+            .min(data_limit_words / data_words_per_item.max(1))
+            .min(cap);
+        if items == 0 {
+            return Err(WgpuAccelError::InvalidInput(
+                "the device cannot hold one secp256k1 item per dispatch",
+            ));
+        }
+        Ok(items)
     }
 }
 
@@ -162,6 +188,9 @@ const P: U256 = U256(0xfffffc2fu, 0xfffffffeu, 0xffffffffu, 0xffffffffu, 0xfffff
 const N: U256 = U256(0xd0364141u, 0xbfd25e8cu, 0xaf48a03bu, 0xbaaedce6u, 0xfffffffeu, 0xffffffffu, 0xffffffffu, 0xffffffffu);
 const N_MINV: u32 = 0x5588b13fu;
 const N_R2: U256 = U256(0x67d7d140u, 0x896cf214u, 0x0e7cf878u, 0x741496c2u, 0x5bcd07c6u, 0xe697f5e4u, 0x81c69bc5u, 0x9d671cd5u);
+// n/2 + 1 (n is odd, so this is (n + 1) / 2): s >= this is high-S, which the reference library
+// rejects. Checked here as well as on the host.
+const HALF_N_PLUS_1: U256 = U256(0x681b20a1u, 0xdfe92f46u, 0x57a4501du, 0x5d576e73u, 0xffffffffu, 0xffffffffu, 0xffffffffu, 0x7fffffffu);
 const N_MINUS_2: U256 = U256(0xd036413fu, 0xbfd25e8cu, 0xaf48a03bu, 0xbaaedce6u, 0xfffffffeu, 0xffffffffu, 0xffffffffu, 0xffffffffu);
 const P_MINUS_N: U256 = U256(0x2fc9baeeu, 0x402da172u, 0x50b75fc4u, 0x45512319u, 0x00000001u, 0x00000000u, 0x00000000u, 0x00000000u);
 const GX: U256 = U256(0x16f81798u, 0x59f2815bu, 0x2dce28d9u, 0x029bfcdbu, 0xce870b07u, 0x55a06295u, 0xf9dcbbacu, 0x79be667eu);
@@ -692,7 +721,7 @@ fn load(base: u32) -> U256 {
 fn verify(r: U256, s: U256, z_raw: U256, qx: U256, qy: U256) -> bool {
     // Preconditions the host already enforced; re-checked so a host bug can
     // only reject.
-    if (is_zero(r) || is_zero(s) || geq(r, N) || geq(s, N) || geq(qx, P) || geq(qy, P)) {
+    if (is_zero(r) || is_zero(s) || geq(r, N) || geq(s, HALF_N_PLUS_1) || geq(qx, P) || geq(qy, P)) {
         return false;
     }
     // y^2 == x^3 + 7

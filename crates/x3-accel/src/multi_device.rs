@@ -75,12 +75,15 @@ impl<D: AccelBackend> MultiDevice<D> {
         if len < self.min_split || self.devices.len() == 1 {
             return vec![(self.fastest(), 0..len)];
         }
-        let total: f64 = self.weights.iter().sum();
+        // Scale by the largest weight first: two finite weights near f64::MAX
+        // would otherwise sum to infinity and send everything to the last device.
+        let largest = self.weights[self.fastest()];
+        let total: f64 = self.weights.iter().map(|w| w / largest).sum();
         let mut parts = Vec::with_capacity(self.devices.len());
         let mut start = 0;
         let mut cumulative = 0.0;
         for (device, weight) in self.weights.iter().enumerate() {
-            cumulative += weight;
+            cumulative += weight / largest;
             // The last device takes the remainder so rounding never drops items.
             let end = if device + 1 == self.devices.len() {
                 len
@@ -182,8 +185,18 @@ impl<D: AccelBackend> AccelBackend for MultiDevice<D> {
     }
 
     /// A Merkle root is one value over all leaves; it cannot be split by range.
+    /// It runs on the fastest device and, like every split operation, moves to
+    /// the other devices if that one fails; the first error is returned only
+    /// when none of them can compute it.
     fn build_merkle_root(&self, leaves: &[[u8; 32]]) -> Result<[u8; 32], AccelError> {
-        self.devices[self.fastest()].build_merkle_root(leaves)
+        let fastest = self.fastest();
+        match self.devices[fastest].build_merkle_root(leaves) {
+            Ok(root) => Ok(root),
+            Err(first_error) => (0..self.devices.len())
+                .filter(|&device| device != fastest)
+                .find_map(|device| self.devices[device].build_merkle_root(leaves).ok())
+                .ok_or(first_error),
+        }
     }
 }
 
@@ -314,8 +327,52 @@ mod tests {
             self.answer(i.len(), CpuBackend::new().blake2b256_batch(i)?)
         }
         fn build_merkle_root(&self, l: &[[u8; 32]]) -> Result<[u8; 32], AccelError> {
+            self.seen.fetch_add(l.len(), Ordering::SeqCst);
+            if self.fail {
+                return Err(AccelError::InvalidInput("injected"));
+            }
             CpuBackend::new().build_merkle_root(l)
         }
+    }
+
+    #[test]
+    fn merkle_root_moves_to_another_device_when_the_fastest_fails() {
+        let leaves = [[1u8; 32], [2u8; 32], [3u8; 32]];
+        let multi =
+            MultiDevice::new(vec![Device::ok(), Device::failing()], vec![1.0, 2.0], 1).unwrap();
+        assert_eq!(
+            multi.build_merkle_root(&leaves).unwrap(),
+            CpuBackend::new().build_merkle_root(&leaves).unwrap()
+        );
+        assert_eq!(
+            multi.devices[1].seen.load(Ordering::SeqCst),
+            3,
+            "fastest tried first"
+        );
+        assert_eq!(
+            multi.devices[0].seen.load(Ordering::SeqCst),
+            3,
+            "then the other"
+        );
+
+        let all_failing = MultiDevice::new(
+            vec![Device::failing(), Device::failing()],
+            vec![1.0, 2.0],
+            1,
+        )
+        .unwrap();
+        assert!(all_failing.build_merkle_root(&leaves).is_err());
+    }
+
+    #[test]
+    fn huge_finite_weights_still_split_proportionally() {
+        let multi = MultiDevice::new(
+            vec![Device::ok(), Device::ok()],
+            vec![f64::MAX, f64::MAX],
+            1,
+        )
+        .unwrap();
+        assert_eq!(multi.plan(10), vec![(0, 0..5), (1, 5..10)]);
     }
 
     fn inputs(n: usize) -> Vec<Vec<u8>> {
