@@ -63,9 +63,9 @@ pub struct Secp256k1Prepared {
 
 fn push_be_limbs(out: &mut [u8], value: &[u8; 32]) {
     // Limb i (little-endian order) is big-endian bytes [28-4i, 32-4i).
-    for limb in 0..8 {
-        let start = 28 - 4 * limb;
-        let word = u32::from_be_bytes(value[start..start + 4].try_into().expect("4 bytes"));
+    let (be_words, _) = value.as_chunks::<4>();
+    for (limb, bytes) in be_words.iter().rev().enumerate() {
+        let word = u32::from_be_bytes(*bytes);
         out[4 * limb..4 * limb + 4].copy_from_slice(&word.to_le_bytes());
     }
 }
@@ -136,10 +136,8 @@ impl WgpuBackend {
                 data[used..].fill(0);
             },
         )?;
-        let words: Vec<u32> = bytes
-            .chunks_exact(4)
-            .map(|w| u32::from_le_bytes(w.try_into().expect("4 bytes")))
-            .collect();
+        let (le_words, _) = bytes.as_chunks::<4>();
+        let words: Vec<u32> = le_words.iter().map(|w| u32::from_le_bytes(*w)).collect();
         Ok(words
             .chunks_exact(24)
             .map(|case| {

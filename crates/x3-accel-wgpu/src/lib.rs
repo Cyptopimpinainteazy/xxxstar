@@ -263,10 +263,8 @@ impl WgpuBackend {
             data[byte..].fill(0);
         })?;
         // Both hash kernels write digest bytes in final order, so this is a copy.
-        Ok(bytes
-            .chunks_exact(32)
-            .map(|chunk| chunk.try_into().expect("32-byte chunk"))
-            .collect())
+        let (digests, _) = bytes.as_chunks::<32>();
+        Ok(digests.to_vec())
     }
 
     /// Run `kernel` over `count` items in one dispatch and return its raw
@@ -295,20 +293,21 @@ impl WgpuBackend {
             .as_ref()
             .is_some_and(|b| b.data_word_capacity >= data_words && b.message_capacity >= count)
         {
-            *guard = Some(kernel.create_buffers(&self.device, data_words, count));
+            *guard = None;
         }
-        let buffers = guard.as_ref().expect("buffers created above");
+        let buffers =
+            &*guard.get_or_insert_with(|| kernel.create_buffers(&self.device, data_words, count));
 
         {
             let mut entries = self
                 .queue
-                .write_buffer_with(&buffers.meta_buffer, 0, non_zero_bytes(entry_words))
+                .write_buffer_with(&buffers.meta_buffer, 0, non_zero_bytes(entry_words)?)
                 .ok_or_else(|| WgpuAccelError::BufferMapFailed("entries staging".into()))?;
             entries[0..4].copy_from_slice(&count_u32.to_le_bytes());
             entries[4..8].fill(0);
             let mut data = self
                 .queue
-                .write_buffer_with(&buffers.data_buffer, 0, non_zero_bytes(data_words))
+                .write_buffer_with(&buffers.data_buffer, 0, non_zero_bytes(data_words)?)
                 .ok_or_else(|| WgpuAccelError::BufferMapFailed("data staging".into()))?;
             fill(&mut entries[META_HEADER_WORDS * 4..], &mut data);
         }
@@ -361,8 +360,10 @@ impl WgpuBackend {
     }
 }
 
-fn non_zero_bytes(words: usize) -> NonZeroU64 {
-    NonZeroU64::new((words * 4) as u64).expect("callers pass at least one word")
+fn non_zero_bytes(words: usize) -> Result<NonZeroU64, WgpuAccelError> {
+    NonZeroU64::new((words * 4) as u64).ok_or(WgpuAccelError::InvalidInput(
+        "a staging write must cover at least one word",
+    ))
 }
 
 impl ComputeKernel {

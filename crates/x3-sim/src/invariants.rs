@@ -186,7 +186,9 @@ pub fn check_sessions(sessions: &[SwapSession]) -> Vec<Violation> {
             // seeds that expose the same defect still dedupe to one
             // signature.
             completed.sort_by(|a, b| a.session_id.cmp(&b.session_id));
-            let blamed = completed.last().expect("completed.len() > 1");
+            let Some(blamed) = completed.last() else {
+                continue;
+            };
             out.push(Violation {
                 code: "DOUBLE_SETTLE",
                 session_id: blamed.session_id.clone(),

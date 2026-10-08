@@ -107,9 +107,7 @@ impl<B: AccelBackend> ShadowVerifier<B> {
     fn cpu(&self, batch: &[Secp256k1VerifyJob]) -> Vec<bool> {
         self.cpu_only
             .fetch_add(batch.len() as u64, Ordering::Relaxed);
-        CpuBackend::new()
-            .verify_secp256k1_batch(batch)
-            .expect("the CPU backend is infallible")
+        CpuBackend::secp256k1_verdicts(batch)
     }
 
     /// Verify a batch. Never fails: every path ends in a CPU answer or an
@@ -140,9 +138,7 @@ impl<B: AccelBackend> ShadowVerifier<B> {
             })
             .unzip();
         let jobs: Vec<_> = recheck.iter().map(|&index| batch[index].clone()).collect();
-        let truth = CpuBackend::new()
-            .verify_secp256k1_batch(&jobs)
-            .expect("the CPU backend is infallible");
+        let truth = CpuBackend::secp256k1_verdicts(&jobs);
         for (&index, &expected) in recheck.iter().zip(&truth) {
             if verdicts[index] != expected {
                 self.disable(index, verdicts[index], expected);

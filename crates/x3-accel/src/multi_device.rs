@@ -56,10 +56,15 @@ impl<D: AccelBackend> MultiDevice<D> {
         &self.weights
     }
 
+    /// The highest-weight device; ties go to the later index, as `max_by` would.
     fn fastest(&self) -> usize {
-        (0..self.weights.len())
-            .max_by(|&a, &b| self.weights[a].total_cmp(&self.weights[b]))
-            .expect("at least one device")
+        let mut best = 0;
+        for (index, weight) in self.weights.iter().enumerate().skip(1) {
+            if weight.total_cmp(&self.weights[best]).is_ge() {
+                best = index;
+            }
+        }
+        best
     }
 
     /// Contiguous `(device, range)` parts covering `0..len` in order.
@@ -190,7 +195,7 @@ impl MultiDevice<crate::WgpuBackend> {
     /// The first run on a machine also pays the one-time shader compile
     /// (~30 s per device); the driver caches it afterwards.
     pub fn calibrated_wgpu(min_split: usize) -> Result<Self, AccelError> {
-        let jobs = calibration_jobs(8192);
+        let jobs = calibration_jobs(8192)?;
         let mut devices = Vec::new();
         let mut weights = Vec::new();
         for index in 0..x3_accel_wgpu::WgpuBackend::hardware_adapters().len() {
@@ -219,12 +224,13 @@ impl MultiDevice<crate::WgpuBackend> {
 }
 
 #[cfg(feature = "wgpu")]
-fn calibration_jobs(count: usize) -> Vec<Secp256k1VerifyJob> {
+fn calibration_jobs(count: usize) -> Result<Vec<Secp256k1VerifyJob>, AccelError> {
     use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
     let secp = Secp256k1::new();
-    let sk = SecretKey::from_slice(&[0x5a; 32]).expect("valid key");
+    let sk = SecretKey::from_slice(&[0x5a; 32])
+        .map_err(|_| AccelError::InvalidInput("calibration secret key"))?;
     let public_key = PublicKey::from_secret_key(&secp, &sk).serialize().to_vec();
-    (0..count as u32)
+    Ok((0..count as u32)
         .map(|i| {
             let mut z = [0x33u8; 32];
             z[..4].copy_from_slice(&i.to_le_bytes());
@@ -236,7 +242,7 @@ fn calibration_jobs(count: usize) -> Vec<Secp256k1VerifyJob> {
                 public_key: public_key.clone(),
             }
         })
-        .collect()
+        .collect())
 }
 
 #[cfg(test)]

@@ -170,9 +170,10 @@ pub async fn execute(args: CompileArgs) -> Result<()> {
             &artifact,
             seed_hex,
             args.key_id.as_deref().unwrap_or_default(),
-            args.signing_registry
-                .as_ref()
-                .expect("clap requires --signing-registry"),
+            // clap enforces this for the command line; `execute` is also callable directly.
+            args.signing_registry.as_ref().ok_or_else(|| {
+                CliError::Config("--sign-key-hex requires --signing-registry".to_string())
+            })?,
             &args.registry_trust,
         )?),
         None => None,

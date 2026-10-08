@@ -540,12 +540,17 @@ pub fn run(config: &SimConfig) -> SimOutcome {
             }
 
             let id = session_ids[entry.op.session()].clone();
-            shadow.insert(
-                id.clone(),
-                persistence
-                    .load(&id)
-                    .unwrap_or_else(|| panic!("session {id} vanished from persistence")),
-            );
+            match persistence.load(&id) {
+                Some(snapshot) => {
+                    shadow.insert(id.clone(), snapshot);
+                }
+                // A stale-write fault has nothing to restore for a session that is gone;
+                // the trace records it so the digest still tells the two runs apart.
+                None => {
+                    shadow.remove(&id);
+                    trace.push(format!("{step:04} s={id} MISSING from persistence"));
+                }
+            }
             let before = serde_json::to_value(persistence.load(&id)).ok();
 
             match apply_op(&mut coord, entry, &session_ids, &secrets, now_secs) {

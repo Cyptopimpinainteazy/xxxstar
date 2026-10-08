@@ -94,18 +94,11 @@ impl CpuBackend {
     pub fn new() -> Self {
         Self
     }
-}
 
-impl AccelBackend for CpuBackend {
-    fn name(&self) -> &'static str {
-        "cpu"
-    }
-
-    fn verify_secp256k1_batch(
-        &self,
-        batch: &[Secp256k1VerifyJob],
-    ) -> Result<Vec<bool>, AccelError> {
-        Ok(batch
+    /// The secp256k1 verdicts, without the `Result` the trait needs for other backends:
+    /// every malformed job is a `false`, so the CPU path has no error to report.
+    pub fn secp256k1_verdicts(batch: &[Secp256k1VerifyJob]) -> Vec<bool> {
+        batch
             .iter()
             .map(|job| {
                 let Ok(message) = Message::from_digest_slice(&job.message_hash) else {
@@ -121,7 +114,20 @@ impl AccelBackend for CpuBackend {
                     .verify_ecdsa(&message, &signature, &public_key)
                     .is_ok()
             })
-            .collect())
+            .collect()
+    }
+}
+
+impl AccelBackend for CpuBackend {
+    fn name(&self) -> &'static str {
+        "cpu"
+    }
+
+    fn verify_secp256k1_batch(
+        &self,
+        batch: &[Secp256k1VerifyJob],
+    ) -> Result<Vec<bool>, AccelError> {
+        Ok(Self::secp256k1_verdicts(batch))
     }
 
     fn verify_ed25519_batch(&self, batch: &[Ed25519VerifyJob]) -> Result<Vec<bool>, AccelError> {
@@ -311,8 +317,8 @@ fn prepare_secp256k1(job: &Secp256k1VerifyJob) -> Option<x3_accel_wgpu::Secp256k
     if low_s != signature {
         return None;
     }
-    let r: [u8; 32] = job.signature[..32].try_into().expect("32 bytes");
-    let s: [u8; 32] = job.signature[32..].try_into().expect("32 bytes");
+    let r: [u8; 32] = *job.signature.first_chunk::<32>()?;
+    let s: [u8; 32] = *job.signature.last_chunk::<32>()?;
     if r == [0; 32] || s == [0; 32] {
         return None;
     }
@@ -323,8 +329,8 @@ fn prepare_secp256k1(job: &Secp256k1VerifyJob) -> Option<x3_accel_wgpu::Secp256k
         r,
         s,
         z: job.message_hash,
-        qx: point[1..33].try_into().expect("32 bytes"),
-        qy: point[33..65].try_into().expect("32 bytes"),
+        qx: point[1..33].try_into().ok()?,
+        qy: point[33..65].try_into().ok()?,
     })
 }
 
@@ -649,6 +655,7 @@ pub fn backend_available(kind: BackendKind) -> bool {
 ///   SHA-256 of the data, internal node = SHA-256 of `left || right`, an odd node hashes against
 ///   itself), and the pinned roots are that rule over `sha256("a")`, `sha256("b")`, `sha256("c")`,
 ///   reproducible with any SHA-256 tool.
+#[cfg(test)]
 pub mod vectors {
     /// Decode exactly 32 bytes of hex. A vector that will not decode is a broken test, not a
     /// runtime condition, so this panics rather than returning an `Option` a caller might ignore.
