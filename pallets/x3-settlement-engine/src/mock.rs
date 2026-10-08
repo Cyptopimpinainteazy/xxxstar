@@ -103,7 +103,7 @@ parameter_types! {
     pub const SomeDeposit: u128 = 1000;
     pub const MockBridgeEvmEscrow: H160 = H160([0x00; 20]);
     pub const MockBridgeSvmEscrow: [u8; 32] = [0x00; 32];
-    pub const SettlementFeeBps: u32 = 0;
+    pub static SettlementFeeBps: u32 = 0;
     pub const ProtocolTreasury: u64 = 99;
     pub const AtomicMinBond: u128 = 1_000;
     pub const AtomicMaxLegsPerBundle: u32 = 16;

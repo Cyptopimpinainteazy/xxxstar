@@ -5431,3 +5431,99 @@ fn a_refund_by_a_third_party_or_before_the_timeout_is_refused() {
         assert_eq!(reserved(ALICE), held, "the held funds stay held");
     });
 }
+
+// ── GAP-SILENT-FEE-WAIVER: a settlement fee the treasury did not receive is recorded ──
+
+/// Runs the EVM→EVM lifecycle of `settlement_lifecycle_evm_to_evm` to finalization, calling
+/// `before_last_claim` just before the claim that finalizes. Returns the intent id.
+fn finalize_evm_settlement_with(before_last_claim: impl FnOnce(u64)) -> H256 {
+    let (maker, taker) = (ALICE, BOB);
+    let secret = H256::from([43u8; 32]);
+    let secret_hash = H256::from(sp_io::hashing::sha2_256(secret.as_bytes()));
+    let asset = AssetSpec {
+        chain: ExternalChainId::Ethereum,
+        token: TokenId::Native,
+        amount: 1000u128,
+    };
+    assert_ok!(Pallet::<Test>::create_intent(
+        RuntimeOrigin::signed(maker),
+        taker,
+        asset.clone(),
+        asset,
+        secret_hash,
+        Some(3600),
+    ));
+    let intent_id = SettlementIntents::<Test>::iter()
+        .find(|(_, intent)| intent.maker == maker)
+        .map(|(id, _)| id)
+        .expect("intent exists");
+    for (who, leg) in [(taker, 0), (maker, 1)] {
+        assert_ok!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(who),
+            intent_id,
+            leg,
+            ExternalChainId::Ethereum,
+            1000u128,
+            vec![],
+        ));
+    }
+    assert_ok!(Pallet::<Test>::submit_proof(
+        RuntimeOrigin::signed(maker),
+        intent_id,
+        ExternalChainId::Ethereum,
+        create_evm_receipt_proof(),
+    ));
+    submit_canonical_claim_proof_set(intent_id);
+    assert_ok!(Pallet::<Test>::claim_settlement(
+        RuntimeOrigin::signed(taker),
+        intent_id,
+        secret,
+    ));
+    before_last_claim(maker);
+    assert_ok!(Pallet::<Test>::claim_settlement(
+        RuntimeOrigin::signed(maker),
+        intent_id,
+        secret,
+    ));
+    assert!(matches!(
+        crate::IntentStates::<Test>::get(intent_id),
+        IntentState::Finalized
+    ));
+    intent_id
+}
+
+#[test]
+fn a_collected_settlement_fee_reaches_the_treasury() {
+    new_test_ext().execute_with(|| {
+        crate::mock::SettlementFeeBps::set(20);
+        let intent_id = finalize_evm_settlement_with(|_| {});
+        // 20 bps of the 2000 settled volume.
+        let fee = 4u128;
+        assert_eq!(
+            pallet_balances::Pallet::<Test>::free_balance(crate::mock::ProtocolTreasury::get()),
+            fee
+        );
+        frame_system::Pallet::<Test>::assert_has_event(RuntimeEvent::from(
+            crate::Event::<Test>::SettlementFeeCollected { intent_id, fee },
+        ));
+    });
+}
+
+#[test]
+fn an_uncollected_settlement_fee_is_recorded_as_waived() {
+    new_test_ext().execute_with(|| {
+        crate::mock::SettlementFeeBps::set(20);
+        // The maker cannot pay: finalization still succeeds, and the lost fee is now on record.
+        let intent_id = finalize_evm_settlement_with(|maker| {
+            use frame_support::traits::Currency;
+            pallet_balances::Pallet::<Test>::make_free_balance_be(&maker, 0);
+        });
+        frame_system::Pallet::<Test>::assert_has_event(RuntimeEvent::from(
+            crate::Event::<Test>::SettlementFeeWaived { intent_id, fee: 4 },
+        ));
+        assert_eq!(
+            pallet_balances::Pallet::<Test>::free_balance(crate::mock::ProtocolTreasury::get()),
+            0
+        );
+    });
+}

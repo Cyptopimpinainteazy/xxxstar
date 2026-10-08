@@ -339,7 +339,7 @@ parameter_types! {
     pub const DefaultTradeEvmGasLimit: u64 = 500_000;
     pub const DefaultTradeSvmComputeLimit: u64 = 500_000;
     pub const DefaultTradeX3GasLimit: u64 = 500_000;
-    pub const ProtocolFeeBps: u32 = 0;
+    pub static ProtocolFeeBps: u32 = 0;
     pub const ProtocolTreasury: u64 = 999;
     pub const MaxSlippageBps: u32 = 500; // 5% default max slippage
     pub const MinSlippageBps: u32 = 1;
