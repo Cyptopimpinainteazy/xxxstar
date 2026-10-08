@@ -43,3 +43,20 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Run compiler and VM test suite
         run: cargo test --workspace --all-targets --all-features
+
+  python-intent:
+    name: Python intent DSL regression tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: x3-lang/requirements.txt
+      - name: Install intent DSL dependencies
+        run: |
+          python -m pip install -r x3-lang/requirements.txt
+          python -m pip install pytest
+      - name: Exercise the production intent DSL
+        run: python -m pytest -q x3-lang/tests
