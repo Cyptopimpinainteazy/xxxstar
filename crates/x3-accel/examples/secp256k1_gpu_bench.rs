@@ -27,6 +27,22 @@ fn jobs(count: usize) -> Vec<Secp256k1VerifyJob> {
         .collect()
 }
 
+/// A JSON string literal: the adapter name comes from the driver.
+fn json_str(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
 fn main() {
     let mut out = None;
     let mut args = std::env::args().skip(1);
@@ -77,8 +93,8 @@ fn main() {
                 rate / cpu_all
             );
             rows.push(format!(
-                "{{\"gpu\":\"{}\",\"first_call_s\":{:.2},\"batch\":{count},\"ms\":{:.2},\"verifies_s\":{rate:.0},\"vs_cpu_all\":{:.3}}}",
-                info.name,
+                "{{\"gpu\":{},\"first_call_s\":{:.2},\"batch\":{count},\"ms\":{:.2},\"verifies_s\":{rate:.0},\"vs_cpu_all\":{:.3}}}",
+                json_str(&info.name),
                 first.as_secs_f64(),
                 secs * 1e3,
                 rate / cpu_all

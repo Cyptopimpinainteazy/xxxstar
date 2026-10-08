@@ -74,7 +74,18 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 fn json_str(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 fn median(mut values: Vec<f64>) -> f64 {
@@ -105,7 +116,8 @@ fn compare(name: &str, inputs: &[Vec<u8>], gpu: &Digests, cpu: &Digests) -> Opti
 }
 
 fn vector_sets(seed: u64, random: usize) -> Vec<(&'static str, Vec<Vec<u8>>)> {
-    let mut rng = Rng(seed | 1);
+    // xorshift has one fixed point, zero; every other seed is its own stream.
+    let mut rng = Rng(if seed == 0 { 1 } else { seed });
     // Every length where a padding or block-absorb bug would show: around
     // SHA-256's 64-byte block (55/56 is where the length no longer fits) and
     // Keccak-256's 136-byte rate, and multiples of both.
@@ -209,7 +221,9 @@ fn main() {
                 set_names.push(json_str(set));
             }
             // Determinism: the same batch three times must give identical bytes.
-            let batch = &sets[1].1;
+            // The boundary set, which is never empty (the random set is with
+            // `--random 0`).
+            let batch = &sets[0].1;
             let runs: Vec<_> = (0..3)
                 .filter_map(|_| algo.gpu(&backend, batch).ok())
                 .collect();
