@@ -1,0 +1,62 @@
+name: X3 Language Workspace Gate
+
+on:
+  push:
+    paths:
+      - 'x3-lang/**'
+      - '.github/workflows/x3-lang-nested-workspace.yml'
+  pull_request:
+    paths:
+      - 'x3-lang/**'
+      - '.github/workflows/x3-lang-nested-workspace.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x3-lang-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  language:
+    name: Nested Rust compiler and VM checks
+    runs-on: [self-hosted, Linux, X64, x3]
+    defaults:
+      run:
+        working-directory: x3-lang
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: x3-lang -> target
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check workspace compilation
+        run: cargo check --workspace --all-targets --all-features
+      - name: Lint all targets
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Run compiler and VM test suite
+        run: cargo test --workspace --all-targets --all-features
+
+  python-intent:
+    name: Python intent DSL regression tests
+    runs-on: [self-hosted, Linux, X64, x3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: x3-lang/requirements.txt
+      - name: Install intent DSL dependencies
+        run: |
+          python -m pip install -r x3-lang/requirements.txt
+          python -m pip install pytest
+      - name: Exercise the production intent DSL
+        run: python -m pytest -q x3-lang/tests
