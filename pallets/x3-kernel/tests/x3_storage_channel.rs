@@ -34,6 +34,7 @@ use sp_runtime::{
 
 use pallet_x3_kernel::{MockEvmAdapter, MockSvmAdapter, X3ExecutorAdapter, X3VmAdapter};
 use x3_backend::{BytecodeModule, FunctionEntry};
+use x3_x3_integration::compiler_bridge::compile_source;
 
 type AccountId = u64;
 type Balance = u128;
@@ -397,6 +398,56 @@ fn a_store_reaches_chain_storage_through_the_receipt() {
 /// view and `evm_sload` answered EVM's zero for a slot the chain had held a value in since the
 /// previous comit. Contract state was write-only. The control below is the same program on a chain
 /// that never wrote the slot, so a pass here cannot come from the opcode returning a constant.
+/// This is intentionally compiled from actual .x3 source rather than assembly.
+/// It pins the entire source -> bytecode -> real kernel state lifecycle and
+/// protects against a compiler that drops a storage call while the hand-written
+/// bytecode path continues to pass.
+#[test]
+fn compiled_x3_source_persists_a_slot_and_a_later_comit_reads_it() {
+    let writer = compile_source(
+        "fn main() -> i64 { evm_sstore(7, 41); return evm_sload(7); }",
+    )
+    .expect("storage writer source must compile");
+    let reader =
+        compile_source("fn main() -> i64 { return evm_sload(7); }")
+            .expect("storage reader source must compile");
+
+    new_test_ext().execute_with(|| {
+        assert_eq!(Kernel::x3_contract_slot(evm_slot_key(7)), None);
+
+        submit_v2(H256::from_low_u64_be(0x5721), Vec::new(), writer)
+            .expect("compiled writer accepted");
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(7)),
+            Some(encoded_i64_payload(41)),
+            "compiled source must actually persist its write"
+        );
+
+        submit_v2_from(
+            BOB,
+            H256::from_low_u64_be(0x5722),
+            Vec::new(),
+            reader.clone(),
+        )
+        .expect("compiled reader accepted");
+        let receipt = Kernel::x3_execution_receipt(H256::from_low_u64_be(0x5722))
+            .expect("reader receipt");
+        assert!(receipt.success);
+        assert_eq!(receipt.return_data, 41i64.to_le_bytes().to_vec());
+        assert!(receipt.storage_writes.is_empty());
+    });
+
+    new_test_ext().execute_with(|| {
+        submit_v2(H256::from_low_u64_be(0x5723), Vec::new(), reader)
+            .expect("reader accepted against empty state");
+        let receipt = Kernel::x3_execution_receipt(H256::from_low_u64_be(0x5723))
+            .expect("empty-state reader receipt");
+        assert!(receipt.success);
+        assert_eq!(receipt.return_data, 0i64.to_le_bytes().to_vec());
+        assert!(receipt.storage_writes.is_empty());
+    });
+}
+
 #[test]
 fn a_second_comit_reads_the_slot_the_first_one_wrote() {
     new_test_ext().execute_with(|| {
