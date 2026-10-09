@@ -1,0 +1,45 @@
+name: X3Lang Control Flow Parity
+
+on:
+  push:
+    paths:
+      - 'crates/x3-integration/**'
+      - 'crates/x3-compiler/**'
+      - 'crates/x3-mir/**'
+      - 'crates/x3-backend/**'
+      - '.github/workflows/x3lang-control-flow-parity.yml'
+  pull_request:
+    paths:
+      - 'crates/x3-integration/**'
+      - 'crates/x3-compiler/**'
+      - 'crates/x3-mir/**'
+      - 'crates/x3-backend/**'
+      - '.github/workflows/x3lang-control-flow-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x3lang-control-flow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-parity:
+    name: Compile and execute X3 source in three engines
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check source file formatting
+        run: cargo fmt --all -- --check
+      - name: Build source-language integration test
+        run: cargo test -p x3-x3-integration --test source_language --features 'std compile' --no-run
+      - name: Verify control flow across standard, mini and on-chain engines
+        run: cargo test -p x3-x3-integration --test source_language --features 'std compile' -- --nocapture
