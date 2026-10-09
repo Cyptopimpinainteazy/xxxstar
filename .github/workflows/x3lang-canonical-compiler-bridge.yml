@@ -1,0 +1,29 @@
+name: X3Lang Canonical Compiler Bridge
+
+on:
+  pull_request:
+    paths:
+      - 'x3-lang/compiler/**'
+      - 'crates/x3-integration/**'
+      - '.github/workflows/x3lang-canonical-compiler-bridge.yml'
+  push:
+    paths:
+      - 'x3-lang/compiler/**'
+      - 'crates/x3-integration/**'
+      - '.github/workflows/x3lang-canonical-compiler-bridge.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compiler-identity-red-green:
+    name: Canonical compiler identity contract
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run identity contract
+        working-directory: x3-lang
+        run: cargo test -p x3-lang-compiler compiler_exports_stable_identity -- --exact
