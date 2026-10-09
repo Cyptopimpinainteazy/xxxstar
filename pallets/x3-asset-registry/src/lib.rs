@@ -282,6 +282,10 @@ pub mod pallet {
                 |maybe_cfg| -> DispatchResult {
                     let cfg = maybe_cfg.as_mut().ok_or(Error::<T>::UnknownAsset)?;
                     cfg.enabled = enabled;
+                    // Enabling re-checks the same limits invariant as
+                    // do_configure_route, so a route stored while disabled cannot
+                    // be switched on with limits an enabled route must never have.
+                    Self::ensure_route_limits_valid(cfg)?;
                     Self::deposit_event(Event::RouteToggled {
                         asset_id,
                         source,
@@ -297,6 +301,24 @@ pub mod pallet {
     // ── Internal helpers ───────────────────────────────────────────────────
 
     impl<T: Config> Pallet<T> {
+        /// An enabled route must carry positive, self-consistent limits. Shared
+        /// by route creation (do_configure_route) and by enabling an existing
+        /// route (set_route_enabled) so the two paths cannot disagree.
+        fn ensure_route_limits_valid(config: &RouteConfig) -> DispatchResult {
+            if config.enabled {
+                ensure!(config.limits.max_amount > 0, Error::<T>::InvalidRouteLimits);
+                ensure!(
+                    config.limits.daily_limit >= config.limits.max_amount,
+                    Error::<T>::InvalidRouteLimits
+                );
+                ensure!(
+                    config.limits.per_wallet_daily_limit >= config.limits.max_amount,
+                    Error::<T>::InvalidRouteLimits
+                );
+            }
+            Ok(())
+        }
+
         fn set_status(asset_id: AssetId, new: AssetStatus) -> DispatchResult {
             Assets::<T>::try_mutate(asset_id, |maybe_meta| -> DispatchResult {
                 let meta = maybe_meta.as_mut().ok_or(Error::<T>::UnknownAsset)?;
@@ -396,17 +418,7 @@ pub mod pallet {
                 Error::<T>::UnknownAsset
             );
             ensure!(source != destination, Error::<T>::SelfLoopRoute);
-            if config.enabled {
-                ensure!(config.limits.max_amount > 0, Error::<T>::InvalidRouteLimits);
-                ensure!(
-                    config.limits.daily_limit >= config.limits.max_amount,
-                    Error::<T>::InvalidRouteLimits
-                );
-                ensure!(
-                    config.limits.per_wallet_daily_limit >= config.limits.max_amount,
-                    Error::<T>::InvalidRouteLimits
-                );
-            }
+            Self::ensure_route_limits_valid(&config)?;
             Routes::<T>::insert(*asset_id, (source, destination), config);
             Self::deposit_event(Event::RouteConfigured {
                 asset_id: *asset_id,
@@ -718,6 +730,116 @@ mod tests {
                 Error::<Test>::MetadataFieldTooLong
             );
             assert_eq!(AssetRegistry::total_assets(), 0);
+        });
+    }
+
+    #[test]
+    fn register_asset_accepts_symbol_at_max_length() {
+        new_test_ext().execute_with(|| {
+            // MaxSymbolLen = 32; exactly 32 bytes is the inclusive boundary.
+            let sym = vec![b'X'; 32];
+            assert_ok!(Pallet::<Test>::do_register_asset(
+                sym,
+                b"Name".to_vec(),
+                18,
+                DomainId::Ethereum,
+                1,
+                vec![0u8; 20],
+                SupplyPolicy::LockMint,
+            ));
+            assert_eq!(AssetRegistry::total_assets(), 1);
+        });
+    }
+
+    #[test]
+    fn register_asset_accepts_name_at_max_length() {
+        new_test_ext().execute_with(|| {
+            // MaxNameLen = 64; exactly 64 bytes is the inclusive boundary.
+            let name = vec![b'N'; 64];
+            assert_ok!(Pallet::<Test>::do_register_asset(
+                b"SYM".to_vec(),
+                name,
+                18,
+                DomainId::Ethereum,
+                1,
+                vec![0u8; 20],
+                SupplyPolicy::LockMint,
+            ));
+            assert_eq!(AssetRegistry::total_assets(), 1);
+        });
+    }
+
+    #[test]
+    fn register_asset_rejects_name_above_max_length() {
+        new_test_ext().execute_with(|| {
+            // MaxNameLen = 64; 65 bytes must be rejected.
+            let long_name = vec![b'N'; 65];
+            assert_noop!(
+                Pallet::<Test>::do_register_asset(
+                    b"SYM".to_vec(),
+                    long_name,
+                    18,
+                    DomainId::Ethereum,
+                    1,
+                    vec![0u8; 20],
+                    SupplyPolicy::LockMint,
+                ),
+                Error::<Test>::MetadataFieldTooLong
+            );
+            assert_eq!(AssetRegistry::total_assets(), 0);
+        });
+    }
+
+    #[test]
+    fn register_asset_accepts_origin_address_at_max_length() {
+        new_test_ext().execute_with(|| {
+            // MaxOriginAddressLen = 64; exactly 64 bytes is the inclusive boundary.
+            let addr = vec![0xAB; 64];
+            assert_ok!(Pallet::<Test>::do_register_asset(
+                b"SYM".to_vec(),
+                b"Name".to_vec(),
+                18,
+                DomainId::Ethereum,
+                1,
+                addr,
+                SupplyPolicy::LockMint,
+            ));
+            assert_eq!(AssetRegistry::total_assets(), 1);
+        });
+    }
+
+    #[test]
+    fn register_asset_rejects_origin_address_above_max_length() {
+        new_test_ext().execute_with(|| {
+            // MaxOriginAddressLen = 64; 65 bytes must be rejected.
+            let long_addr = vec![0xAB; 65];
+            assert_noop!(
+                Pallet::<Test>::do_register_asset(
+                    b"SYM".to_vec(),
+                    b"Name".to_vec(),
+                    18,
+                    DomainId::Ethereum,
+                    1,
+                    long_addr,
+                    SupplyPolicy::LockMint,
+                ),
+                Error::<Test>::MetadataFieldTooLong
+            );
+            assert_eq!(AssetRegistry::total_assets(), 0);
+        });
+    }
+
+    #[test]
+    fn register_asset_accepts_zero_decimals() {
+        new_test_ext().execute_with(|| {
+            // 0 decimals (integer-only asset) is valid and stored verbatim.
+            let (sym, name, _, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, 0, dom, chain, addr, policy).unwrap();
+            assert_eq!(
+                <Pallet<Test> as AssetRegistryInspect>::canonical_decimals(&id),
+                Some(0)
+            );
         });
     }
 
@@ -1099,6 +1221,60 @@ mod tests {
                 ),
                 Error::<Test>::UnknownAsset
             );
+        });
+    }
+
+    #[test]
+    fn set_route_enabled_refuses_to_enable_a_route_with_invalid_limits() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
+            // A disabled route is allowed to carry unusable limits ...
+            let disabled_bad = RouteConfig {
+                enabled: false,
+                limits: RouteLimits {
+                    min_amount: 0,
+                    max_amount: 0,
+                    daily_limit: 0,
+                    per_wallet_daily_limit: 0,
+                    pending_limit: 0,
+                },
+                fee_bps: 0,
+                expiry_blocks: 100,
+                proof_tier: x3_asset_kernel_types::ProofTier::TrustedInternal,
+            };
+            assert_ok!(Pallet::<Test>::do_configure_route(
+                &id,
+                DomainId::X3Native,
+                DomainId::X3Evm,
+                disabled_bad,
+            ));
+
+            // ... but it must not be switchable on with those limits.
+            assert_noop!(
+                AssetRegistry::set_route_enabled(
+                    RuntimeOrigin::root(),
+                    id,
+                    DomainId::X3Native,
+                    DomainId::X3Evm,
+                    true,
+                ),
+                Error::<Test>::InvalidRouteLimits
+            );
+            // The refused enable must not have flipped the flag.
+            let stored =
+                <Pallet<Test> as RouteInspect>::route(&id, DomainId::X3Native, DomainId::X3Evm);
+            assert!(!stored.unwrap().enabled);
+
+            // Toggling an already-disabled route succeeds without changing its state.
+            assert_ok!(AssetRegistry::set_route_enabled(
+                RuntimeOrigin::root(),
+                id,
+                DomainId::X3Native,
+                DomainId::X3Evm,
+                false,
+            ));
         });
     }
 

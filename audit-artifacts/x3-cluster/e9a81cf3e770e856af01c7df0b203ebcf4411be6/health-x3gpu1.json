@@ -1,0 +1,127 @@
+{
+  "collected": "2026-10-02T23:50:21+00:00",
+  "from": "x3gpu1",
+  "repo": {
+    "commit": "e9a81cf3e770e856af01c7df0b203ebcf4411be6",
+    "branch": "master",
+    "dirty": true
+  },
+  "nodes": [
+    {
+      "node": "x3star1",
+      "role": "control",
+      "ip": "192.168.0.70",
+      "required": true,
+      "reachable": true,
+      "ssh": false,
+      "ssh_port": false,
+      "label": "PHYSICAL",
+      "remote": null,
+      "router_port": false
+    },
+    {
+      "node": "x3gpu1",
+      "role": "gpu",
+      "ip": "192.168.0.30",
+      "required": true,
+      "reachable": true,
+      "ssh": true,
+      "label": "LOCAL",
+      "cpu": "8t load 4.9",
+      "ram": "32.8G",
+      "gpu": "GTX 1070,RTX 2060 SUPER",
+      "services": {
+        "ssh": "active",
+        "ollama": "active",
+        "ollama-worker-b": "active",
+        "x3-ai-router": "active"
+      },
+      "ollama_workers": {
+        "11434": {
+          "ok": true,
+          "loaded": [
+            "qwen3:8b"
+          ]
+        },
+        "11436": {
+          "ok": true,
+          "loaded": [
+            "qwen3:8b"
+          ]
+        }
+      },
+      "router": {
+        "status": "ok",
+        "in_flight": {}
+      },
+      "disk_free_gb": 71.4,
+      "clock_synced": true,
+      "failed_units": [],
+      "repo": {
+        "commit": "e9a81cf3e770e856af01c7df0b203ebcf4411be6",
+        "branch": "master",
+        "dirty": true
+      }
+    },
+    {
+      "node": "x3gpu2",
+      "role": "gpu",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3build1",
+      "role": "build",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3sim1",
+      "role": "sim",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3data1",
+      "role": "data",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3net1",
+      "role": "net",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3ops1",
+      "role": "ops",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    }
+  ]
+}

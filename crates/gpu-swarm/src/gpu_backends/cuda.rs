@@ -318,21 +318,28 @@ impl CudaExecutor {
                         task.id,
                         payload.len()
                     );
-                    // Generate SHA-256 bytecode module
-                    let module = bytecode_gen::generate_sha256_batch_bytecode(payload.clone(), 1);
-                    // Convert module to bytes
-                    Some(module.to_bytes())
+                    // A payload the generator refuses runs on the CPU path instead.
+                    match bytecode_gen::generate_sha256_batch_bytecode(payload.clone(), 1) {
+                        Ok(module) => Some(module.to_bytes()),
+                        Err(err) => {
+                            warn!("[CudaExecutor] SHA-256 bytecode for task {} refused: {err}; CPU path", task.id);
+                            None
+                        }
+                    }
                 } else if task_type.contains("keccak") {
                     debug!(
                         "[CudaExecutor] Custom Keccak-256 task {} with {} bytes of input",
                         task.id,
                         payload.len()
                     );
-                    // Generate Keccak-256 bytecode module
-                    let module =
-                        bytecode_gen::generate_keccak256_batch_bytecode(payload.clone(), 1);
-                    // Convert module to bytes
-                    Some(module.to_bytes())
+                    // A payload the generator refuses runs on the CPU path instead.
+                    match bytecode_gen::generate_keccak256_batch_bytecode(payload.clone(), 1) {
+                        Ok(module) => Some(module.to_bytes()),
+                        Err(err) => {
+                            warn!("[CudaExecutor] Keccak-256 bytecode for task {} refused: {err}; CPU path", task.id);
+                            None
+                        }
+                    }
                 } else {
                     debug!(
                         "[CudaExecutor] Custom task {} type {} not GPU-acceleratable",

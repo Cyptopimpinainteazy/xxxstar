@@ -9,6 +9,11 @@ use ed25519_dalek::{Signature as Ed25519Signature, Verifier, VerifyingKey};
 use secp256k1::{ecdsa::Signature as Secp256k1Signature, Message, PublicKey, Secp256k1};
 use sha2::{Digest as ShaDigest, Sha256};
 
+mod multi_device;
+mod shadow;
+pub use multi_device::{MultiDevice, DEFAULT_MIN_SPLIT};
+pub use shadow::{ShadowStats, ShadowVerifier};
+
 /// Accelerator backend selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendKind {
@@ -89,18 +94,11 @@ impl CpuBackend {
     pub fn new() -> Self {
         Self
     }
-}
 
-impl AccelBackend for CpuBackend {
-    fn name(&self) -> &'static str {
-        "cpu"
-    }
-
-    fn verify_secp256k1_batch(
-        &self,
-        batch: &[Secp256k1VerifyJob],
-    ) -> Result<Vec<bool>, AccelError> {
-        Ok(batch
+    /// The secp256k1 verdicts, without the `Result` the trait needs for other backends:
+    /// every malformed job is a `false`, so the CPU path has no error to report.
+    pub fn secp256k1_verdicts(batch: &[Secp256k1VerifyJob]) -> Vec<bool> {
+        batch
             .iter()
             .map(|job| {
                 let Ok(message) = Message::from_digest_slice(&job.message_hash) else {
@@ -116,7 +114,20 @@ impl AccelBackend for CpuBackend {
                     .verify_ecdsa(&message, &signature, &public_key)
                     .is_ok()
             })
-            .collect())
+            .collect()
+    }
+}
+
+impl AccelBackend for CpuBackend {
+    fn name(&self) -> &'static str {
+        "cpu"
+    }
+
+    fn verify_secp256k1_batch(
+        &self,
+        batch: &[Secp256k1VerifyJob],
+    ) -> Result<Vec<bool>, AccelError> {
+        Ok(Self::secp256k1_verdicts(batch))
     }
 
     fn verify_ed25519_batch(&self, batch: &[Ed25519VerifyJob]) -> Result<Vec<bool>, AccelError> {
@@ -265,6 +276,62 @@ impl WgpuBackend {
             .map(|inner| Self { inner })
             .map_err(|_| AccelError::BackendUnavailable(BackendKind::Wgpu))
     }
+
+    /// Use one specific hardware adapter (index into
+    /// `x3_accel_wgpu::WgpuBackend::hardware_adapters`), e.g. one per GPU.
+    pub fn from_adapter(index: usize) -> Result<Self, AccelError> {
+        x3_accel_wgpu::WgpuBackend::initialize_adapter(index)
+            .map(|inner| Self { inner })
+            .map_err(|_| AccelError::BackendUnavailable(BackendKind::Wgpu))
+    }
+}
+
+#[cfg(feature = "wgpu")]
+fn wgpu_error(algorithm: &'static str) -> impl Fn(x3_accel_wgpu::WgpuAccelError) -> AccelError {
+    move |err| match err {
+        x3_accel_wgpu::WgpuAccelError::InvalidInput(message) => AccelError::InvalidInput(message),
+        x3_accel_wgpu::WgpuAccelError::AdapterUnavailable
+        | x3_accel_wgpu::WgpuAccelError::DeviceRequestFailed(_)
+        | x3_accel_wgpu::WgpuAccelError::BufferMapFailed(_) => {
+            AccelError::BackendUnavailable(BackendKind::Wgpu)
+        }
+        x3_accel_wgpu::WgpuAccelError::KernelUnavailable(_) => AccelError::KernelUnavailable {
+            backend: BackendKind::Wgpu,
+            algorithm,
+        },
+    }
+}
+
+/// Apply libsecp256k1's input rules on the host, with the same library the
+/// CPU backend uses, and hand the GPU only well-formed jobs.
+///
+/// `None` means `CpuBackend` would return `false` before doing any curve
+/// arithmetic: a non-canonical signature (r or s >= n), a high-S signature
+/// (libsecp256k1's verify rejects these), r or s = 0, or a public key that does
+/// not parse (bad length/prefix, coordinate >= p, off-curve, hybrid parity).
+#[cfg(feature = "wgpu")]
+fn prepare_secp256k1(job: &Secp256k1VerifyJob) -> Option<x3_accel_wgpu::Secp256k1Prepared> {
+    let signature = Secp256k1Signature::from_compact(&job.signature).ok()?;
+    let mut low_s = signature;
+    low_s.normalize_s();
+    if low_s != signature {
+        return None;
+    }
+    let r: [u8; 32] = *job.signature.first_chunk::<32>()?;
+    let s: [u8; 32] = *job.signature.last_chunk::<32>()?;
+    if r == [0; 32] || s == [0; 32] {
+        return None;
+    }
+    let point = PublicKey::from_slice(&job.public_key)
+        .ok()?
+        .serialize_uncompressed();
+    Some(x3_accel_wgpu::Secp256k1Prepared {
+        r,
+        s,
+        z: job.message_hash,
+        qx: point[1..33].try_into().ok()?,
+        qy: point[33..65].try_into().ok()?,
+    })
 }
 
 #[cfg(feature = "wgpu")]
@@ -275,12 +342,25 @@ impl AccelBackend for WgpuBackend {
 
     fn verify_secp256k1_batch(
         &self,
-        _batch: &[Secp256k1VerifyJob],
+        batch: &[Secp256k1VerifyJob],
     ) -> Result<Vec<bool>, AccelError> {
-        Err(AccelError::KernelUnavailable {
-            backend: BackendKind::Wgpu,
-            algorithm: "secp256k1",
-        })
+        let mut results = vec![false; batch.len()];
+        let (slots, prepared): (Vec<usize>, Vec<_>) = batch
+            .iter()
+            .enumerate()
+            .filter_map(|(slot, job)| prepare_secp256k1(job).map(|p| (slot, p)))
+            .unzip();
+        let verdicts = self
+            .inner
+            .secp256k1_verify_prepared(&prepared)
+            .map_err(wgpu_error("secp256k1"))?;
+        if verdicts.len() != slots.len() {
+            return Err(AccelError::BackendUnavailable(BackendKind::Wgpu));
+        }
+        for (slot, verdict) in slots.into_iter().zip(verdicts) {
+            results[slot] = verdict;
+        }
+        Ok(results)
     }
 
     fn verify_ed25519_batch(&self, _batch: &[Ed25519VerifyJob]) -> Result<Vec<bool>, AccelError> {
@@ -291,37 +371,15 @@ impl AccelBackend for WgpuBackend {
     }
 
     fn keccak256_batch(&self, inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
-        self.inner.keccak256_batch(inputs).map_err(|err| match err {
-            x3_accel_wgpu::WgpuAccelError::InvalidInput(message) => {
-                AccelError::InvalidInput(message)
-            }
-            x3_accel_wgpu::WgpuAccelError::AdapterUnavailable
-            | x3_accel_wgpu::WgpuAccelError::DeviceRequestFailed(_)
-            | x3_accel_wgpu::WgpuAccelError::BufferMapFailed(_) => {
-                AccelError::BackendUnavailable(BackendKind::Wgpu)
-            }
-            x3_accel_wgpu::WgpuAccelError::KernelUnavailable(_) => AccelError::KernelUnavailable {
-                backend: BackendKind::Wgpu,
-                algorithm: "keccak256",
-            },
-        })
+        self.inner
+            .keccak256_batch(inputs)
+            .map_err(wgpu_error("keccak256"))
     }
 
     fn sha256_batch(&self, inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
-        self.inner.sha256_batch(inputs).map_err(|err| match err {
-            x3_accel_wgpu::WgpuAccelError::InvalidInput(message) => {
-                AccelError::InvalidInput(message)
-            }
-            x3_accel_wgpu::WgpuAccelError::AdapterUnavailable
-            | x3_accel_wgpu::WgpuAccelError::DeviceRequestFailed(_)
-            | x3_accel_wgpu::WgpuAccelError::BufferMapFailed(_) => {
-                AccelError::BackendUnavailable(BackendKind::Wgpu)
-            }
-            x3_accel_wgpu::WgpuAccelError::KernelUnavailable(_) => AccelError::KernelUnavailable {
-                backend: BackendKind::Wgpu,
-                algorithm: "sha256",
-            },
-        })
+        self.inner
+            .sha256_batch(inputs)
+            .map_err(wgpu_error("sha256"))
     }
 
     fn blake2b256_batch(&self, _inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
@@ -597,6 +655,7 @@ pub fn backend_available(kind: BackendKind) -> bool {
 ///   SHA-256 of the data, internal node = SHA-256 of `left || right`, an odd node hashes against
 ///   itself), and the pinned roots are that rule over `sha256("a")`, `sha256("b")`, `sha256("c")`,
 ///   reproducible with any SHA-256 tool.
+#[cfg(test)]
 pub mod vectors {
     /// Decode exactly 32 bytes of hex. A vector that will not decode is a broken test, not a
     /// runtime condition, so this panics rather than returning an `Option` a caller might ignore.
@@ -692,6 +751,40 @@ pub mod vectors {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The CPU reference rejects high-S signatures (libsecp256k1's verify only
+    /// accepts the lower-S form), which is the rule the GPU path's host check and
+    /// kernel both apply. Without a GPU this is the half of the parity contract
+    /// that can still be pinned.
+    #[test]
+    fn cpu_backend_rejects_the_high_s_twin_of_a_valid_signature() {
+        use num_bigint::BigUint;
+        let secp = Secp256k1::new();
+        let sk = secp256k1::SecretKey::from_slice(&[0x42; 32]).unwrap();
+        let z = [0x24u8; 32];
+        let low = secp
+            .sign_ecdsa(&Message::from_digest(z), &sk)
+            .serialize_compact();
+        let n = BigUint::parse_bytes(
+            b"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+            16,
+        )
+        .unwrap();
+        let high_s = (&n - BigUint::from_bytes_be(&low[32..])).to_bytes_be();
+        let mut high = low;
+        high[32..].fill(0);
+        high[64 - high_s.len()..].copy_from_slice(&high_s);
+        let public_key = PublicKey::from_secret_key(&secp, &sk).serialize().to_vec();
+        let job = |signature| Secp256k1VerifyJob {
+            message_hash: z,
+            signature,
+            public_key: public_key.clone(),
+        };
+        assert_eq!(
+            CpuBackend::secp256k1_verdicts(&[job(low), job(high)]),
+            vec![true, false]
+        );
+    }
 
     #[test]
     fn cpu_hash_batches_are_deterministic() {

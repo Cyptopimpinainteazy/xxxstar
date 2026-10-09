@@ -5899,6 +5899,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "fp-self-contained"
+version = "1.0.0-dev"
+source = "git+https://github.com/polkadot-evm/frontier?branch=stable2512#9d49e36ed5bac38241594f8ba055fdb94991483a"
+dependencies = [
+ "frame-support",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-runtime",
+]
+
+[[package]]
 name = "fp-storage"
 version = "2.0.0"
 source = "git+https://github.com/polkadot-evm/frontier?branch=stable2512#9d49e36ed5bac38241594f8ba055fdb94991483a"
@@ -25670,6 +25682,7 @@ dependencies = [
  "blake2 0.10.6",
  "ed25519-dalek 2.2.0",
  "keccak-hash",
+ "num-bigint 0.4.8",
  "secp256k1 0.28.2",
  "sha2 0.10.9",
  "thiserror 1.0.69",
@@ -25973,6 +25986,7 @@ dependencies = [
  "contention-predictor",
  "criterion",
  "cross-chain-gpu-validator",
+ "cumulus-primitives-proof-size-hostfunction",
  "env_logger 0.10.2",
  "frame-benchmarking-cli",
  "frame-support",
@@ -26080,8 +26094,10 @@ dependencies = [
 name = "x3-chain-runtime"
 version = "0.1.0"
 dependencies = [
+ "ethereum",
  "fp-ethereum",
  "fp-evm",
+ "fp-self-contained",
  "frame-benchmarking",
  "frame-executive",
  "frame-support",
@@ -26727,6 +26743,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid 1.21.0",
  "x3-accel",
+ "x3-accel-wgpu",
  "x3-backend",
  "x3-orchestra-control-plane",
  "x3-vm",

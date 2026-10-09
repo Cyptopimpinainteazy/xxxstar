@@ -12,8 +12,9 @@ use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
-    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, TreasuryConfig, X3CoinConfig,
-    X3CrosschainGatewayConfig, X3CustodyConfig, X3SettlementEngineConfig, WASM_BINARY,
+    CouncilConfig, ExistentialDeposit, GrandpaConfig, RuntimeGenesisConfig, Signature,
+    TreasuryAccountId, TreasuryConfig, X3CoinConfig, X3CrosschainGatewayConfig, X3CustodyConfig,
+    X3SettlementEngineConfig, WASM_BINARY,
 };
 
 /// Chain specification specialized to this runtime's genesis configuration.
@@ -1075,11 +1076,21 @@ fn x3_chain_genesis(
         endowed.insert(account_id);
     }
 
-    let balances = endowed
+    let mut balances = endowed
         .iter()
         .cloned()
         .map(|account| (account, ENDOWMENT))
         .collect::<Vec<_>>();
+
+    // The protocol treasury has to exist from block 0. Fees are paid into it, and an account
+    // that does not exist refuses any deposit below the existential deposit: the DA and
+    // sequencer anti-spam fees would refuse every small submission (TICKET-154), and the
+    // router, trade and settlement fees would be waived. The existential deposit is all it needs
+    // — this creates the account, it does not fund it.
+    let treasury = TreasuryAccountId::get();
+    if !endowed.contains(&treasury) {
+        balances.push((treasury, ExistentialDeposit::get()));
+    }
 
     let grandpa_authorities: Vec<(GrandpaId, u64)> = initial_authorities
         .iter()
@@ -1279,5 +1290,61 @@ mod council_quorum_tests {
     fn live_council_accepts_two_or_more_members() {
         assert!(validate_live_council_quorum_count("Testnet network", 2).is_ok());
         assert!(validate_live_council_quorum_count("Production network", 5).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod treasury_genesis_tests {
+    use super::{x3_chain_genesis, ENDOWMENT};
+    use x3_chain_runtime::{
+        AccountId, ExistentialDeposit, TreasuryAccountId, X3CrosschainGatewayConfig,
+    };
+
+    fn genesis_with(endowed: Vec<AccountId>) -> Vec<(AccountId, u128)> {
+        x3_chain_genesis(
+            Vec::new(),
+            endowed,
+            Vec::new(),
+            Vec::new(),
+            Default::default(),
+            [0u8; 32],
+            X3CrosschainGatewayConfig::dev_defaults(),
+            true,
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("genesis builds")
+        .balances
+        .balances
+    }
+
+    /// Fees are paid into the treasury, and a treasury with no account refuses every fee below the
+    /// existential deposit (TICKET-154). Every chain is born with it existing.
+    #[test]
+    fn the_treasury_exists_at_genesis_with_the_existential_deposit() {
+        let balances = genesis_with(Vec::new());
+        let treasury = TreasuryAccountId::get();
+        assert_eq!(
+            balances
+                .iter()
+                .filter(|(who, _)| *who == treasury)
+                .collect::<Vec<_>>(),
+            vec![&(treasury, ExistentialDeposit::get())]
+        );
+    }
+
+    /// A spec that already endows the treasury keeps its endowment, and the account is not listed
+    /// twice (pallet-balances refuses a duplicate genesis entry).
+    #[test]
+    fn an_endowed_treasury_is_not_listed_twice() {
+        let treasury = TreasuryAccountId::get();
+        let balances = genesis_with(vec![treasury.clone()]);
+        assert_eq!(
+            balances
+                .iter()
+                .filter(|(who, _)| *who == treasury)
+                .collect::<Vec<_>>(),
+            vec![&(treasury, ENDOWMENT)]
+        );
     }
 }

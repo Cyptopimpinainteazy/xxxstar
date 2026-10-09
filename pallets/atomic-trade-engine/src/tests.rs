@@ -913,3 +913,57 @@ fn concurrent_batches_per_account() {
         assert_eq!(pending.len(), 5);
     });
 }
+
+// ── GAP-SILENT-FEE-WAIVER: a protocol fee the treasury did not receive is recorded ──
+
+fn execute_one_evm_batch(who: u64) -> u128 {
+    let amount = 1_000_000_000_000_000_000u128;
+    assert_ok!(AtomicTradeEngine::create_trade_batch(
+        RuntimeOrigin::signed(account(who)),
+        vec![evm_leg(amount, amount * 97 / 100)],
+        100,
+        100,
+        0,
+    ));
+    let batch_id = AtomicTradeEngine::pending_batches(account(who))[0];
+    assert_ok!(AtomicTradeEngine::execute_trade_batch(
+        RuntimeOrigin::signed(account(who)),
+        batch_id,
+    ));
+    assert_eq!(
+        AtomicTradeEngine::trade_batches(batch_id).unwrap().status,
+        BatchStatus::Completed
+    );
+    amount
+}
+
+#[test]
+fn a_collected_protocol_fee_reaches_the_treasury() {
+    new_test_ext().execute_with(|| {
+        ProtocolFeeBps::set(20);
+        let fee = execute_one_evm_batch(1) * 20 / 10_000;
+        assert_eq!(Balances::free_balance(ProtocolTreasury::get()), fee);
+        System::assert_has_event(RuntimeEvent::AtomicTradeEngine(
+            Event::ProtocolFeeCollected {
+                who: account(1),
+                fee,
+            },
+        ));
+    });
+}
+
+#[test]
+fn an_uncollected_protocol_fee_is_recorded_as_waived() {
+    new_test_ext().execute_with(|| {
+        ProtocolFeeBps::set(20);
+        // The submitter cannot pay the fee: the batch still completes, and the lost fee is on
+        // record instead of vanishing.
+        Balances::make_free_balance_be(&account(1), 1);
+        let fee = execute_one_evm_batch(1) * 20 / 10_000;
+        System::assert_has_event(RuntimeEvent::AtomicTradeEngine(Event::ProtocolFeeWaived {
+            who: account(1),
+            fee,
+        }));
+        assert_eq!(Balances::free_balance(ProtocolTreasury::get()), 0);
+    });
+}

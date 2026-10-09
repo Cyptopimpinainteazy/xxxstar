@@ -433,6 +433,13 @@ pub mod pallet {
 
         /// A trade batch was executed via X3 Kernel v2 comit.
         TradeBatchExecutedViaKernelComitV2 { batch_id: H256, comit_id: H256 },
+        /// The protocol fee on a completed batch could not be paid to the treasury, so it was
+        /// not collected. The batch still completes; this records the uncollected revenue that a
+        /// failed transfer used to drop without a trace.
+        ProtocolFeeWaived {
+            who: T::AccountId,
+            fee: BalanceOf<T>,
+        },
     }
 
     #[pallet::error]
@@ -715,6 +722,11 @@ pub mod pallet {
                             .is_ok()
                             {
                                 Self::deposit_event(Event::ProtocolFeeCollected {
+                                    who: who.clone(),
+                                    fee,
+                                });
+                            } else {
+                                Self::deposit_event(Event::ProtocolFeeWaived {
                                     who: who.clone(),
                                     fee,
                                 });

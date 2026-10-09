@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 import urllib.error
 import urllib.request
 from unittest.mock import patch
@@ -2742,6 +2743,209 @@ class NativeResponsesTests(unittest.TestCase):
         self.assertNotIn(SECRET, logs)
         self.assertNotIn("Bearer", logs)
         self.assertIn("[redacted]", logs, "the credential must be visibly scrubbed, not quietly dropped")
+
+
+class SlowProvider(BaseHTTPRequestHandler):
+    """Answers after a delay and records which port served each request.
+
+    A test that needs two requests to overlap sets `barrier`: each request then
+    waits until the other is also inside a provider, which proves concurrency
+    without a wall-clock bound (that failed on a loaded machine)."""
+    delay = 0.4
+    barrier = None
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers["Content-Length"]))
+        if self.barrier is not None:
+            self.barrier.wait()
+        else:
+            time.sleep(self.delay)
+        body = json.dumps({"choices": [{"message": {"role": "assistant", "content": str(self.server.server_port)}}],
+                           "usage": {"prompt_tokens": 1, "completion_tokens": 1}}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+class DualGpuTests(unittest.TestCase):
+    """Two local workers: saturation spills to the idle card, death fails over."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.servers = []
+        for _ in range(2):
+            server = ThreadingHTTPServer(("127.0.0.1", 0), SlowProvider)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            self.servers.append(server)
+        rtx, gtx = (s.server_port for s in self.servers)
+        local = {"protocol": "chat_completions", "supports_tools": False, "critical_allowed": True,
+                 "max_in_flight": 1}
+        self.config = {
+            "daily_budget_usd": 1, "agent_daily_budget_usd": 1, "max_input_tokens": 1000,
+            "max_output_tokens": 100, "default_max_output_tokens": 16, "retry_attempts": 0,
+            "providers": {
+                "rtx": dict(local, base_url=f"http://127.0.0.1:{rtx}/v1", model="m"),
+                "gtx": dict(local, base_url=f"http://127.0.0.1:{gtx}/v1", model="m"),
+            },
+            "policies": {"x3-local": {"tier": "routine", "order": ["rtx", "gtx"]}},
+            "routes": {"routine": ["rtx", "gtx"], "critical": ["rtx", "gtx"]},
+            "budget_fallback": [],
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/nested/dir/usage.db")
+
+    def tearDown(self):
+        for server in self.servers:
+            server.shutdown()
+            server.server_close()
+        self.router.db.close()
+        self.tmp.cleanup()
+
+    def ask(self):
+        status, body = self.router.complete({"model": "x3-local", "messages": [{"role": "user", "content": "hi"}]}, "a")
+        self.assertEqual(status, 200, body)
+        return int(body["choices"][0]["message"]["content"])
+
+    def test_database_directory_is_created_and_uses_wal(self):
+        self.assertTrue(os.path.isdir(self.tmp.name + "/nested/dir"))
+        self.assertEqual(self.router.db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
+
+    def test_default_db_path_is_absolute_and_overridable(self):
+        with unittest.mock.patch.dict(os.environ, {"X3_ROUTER_DB": "", "XDG_DATA_HOME": "/data"}):
+            self.assertEqual(router_module.default_db_path(), "/data/x3-router/usage.sqlite3")
+        with unittest.mock.patch.dict(os.environ, {"X3_ROUTER_DB": "/x/u.db"}):
+            self.assertEqual(router_module.default_db_path(), "/x/u.db")
+
+    def test_saturated_worker_is_moved_last_not_dropped(self):
+        self.assertEqual(self.router.attempt_order(["rtx", "gtx"]), ["rtx", "gtx"])
+        with self.router.track("rtx"):
+            self.assertEqual(self.router.attempt_order(["rtx", "gtx"]), ["gtx", "rtx"])
+        self.assertEqual(self.router.load(), {})
+
+    def test_providers_sharing_a_worker_share_its_slots(self):
+        self.config["providers"]["rtx_big"] = dict(self.config["providers"]["rtx"], worker="card0")
+        self.config["providers"]["rtx"]["worker"] = "card0"
+        with self.router.track("rtx"):
+            self.assertEqual(self.router.attempt_order(["rtx", "rtx_big", "gtx"]), ["gtx", "rtx", "rtx_big"])
+            self.assertEqual(self.router.load(), {"card0": 1})
+
+    def test_concurrent_requests_use_both_workers(self):
+        # Both requests must be in flight at once: a serialized pair breaks the
+        # barrier (BrokenBarrierError -> a provider error) instead of passing.
+        SlowProvider.barrier = threading.Barrier(2, timeout=30)
+        try:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                ports = set(pool.map(lambda _: self.ask(), range(2)))
+        finally:
+            SlowProvider.barrier = None
+        self.assertEqual(ports, {s.server_port for s in self.servers}, "the two requests must run in parallel")
+
+    def test_dead_worker_fails_over_to_the_other(self):
+        dead = self.servers.pop(0)
+        dead.shutdown()
+        dead.server_close()
+        self.assertEqual(self.ask(), self.servers[0].server_port)
+        self.assertGreater(self.router.provider_cooldown("rtx"), 0, "a dead worker must be put on cooldown")
+        self.assertEqual(self.ask(), self.servers[0].server_port)
+
+    def test_both_workers_dead_reports_every_failure(self):
+        for server in self.servers:
+            server.shutdown()
+            server.server_close()
+        self.servers = []
+        status, body = self.router.complete({"model": "x3-local", "messages": [{"role": "user", "content": "hi"}]}, "a")
+        self.assertGreaterEqual(status, 500)
+        text = json.dumps(body)
+        self.assertIn("rtx", text)
+        self.assertIn("gtx", text)
+
+
+class RegistrationTests(unittest.TestCase):
+    """GPU nodes join through providers.d drop-ins, not config edits."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.config = {"providers": {"ollama": {"base_url": "http://127.0.0.1:11434/v1", "model": "m"}},
+                       "policies": {"x3-local": {"tier": "routine", "order": ["ollama"]}},
+                       "budget_fallback": ["ollama"]}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, name, data):
+        Path(self.tmp.name, name).write_text(json.dumps(data))
+
+    def test_registration_appends_providers_after_configured_ones(self):
+        self.write("x3gpu2.json", {"node": "x3gpu2",
+                                   "providers": {"g2": {"base_url": "http://x3gpu2:11434/v1", "model": "qwen3:8b",
+                                                        "worker": "x3gpu2-gpu0", "max_in_flight": 1}},
+                                   "policies": {"x3-local": ["g2"]}})
+        accepted, rejected = router_module.apply_registrations(self.config, self.tmp.name)
+        self.assertEqual(rejected, [])
+        self.assertEqual(accepted[0]["providers"], ["g2"])
+        self.assertEqual(self.config["policies"]["x3-local"]["order"], ["ollama", "g2"])
+        self.assertEqual(self.config["budget_fallback"], ["ollama", "g2"])
+        self.assertFalse(self.config["providers"]["g2"]["critical_allowed"], "registered workers are not critical by default")
+
+    def test_registration_cannot_carry_credentials_prices_or_overwrite(self):
+        self.write("a.json", {"providers": {"x": {"base_url": "http://h/v1", "model": "m", "api_key_env": "HOME"}}})
+        self.write("b.json", {"providers": {"y": {"base_url": "http://h/v1", "model": "m",
+                                                  "input_usd_per_million": 9}}})
+        self.write("c.json", {"providers": {"ollama": {"base_url": "http://h/v1", "model": "evil"}}})
+        self.write("d.json", {"providers": {"z": {"base_url": "file:///etc/passwd", "model": "m"}}})
+        self.write("e.json", {"providers": {"w": {"base_url": "http://h/v1", "model": "m"}},
+                              "policies": {"x3-local": ["ollama"]}})
+        self.write("f.json", "not an object")
+        accepted, rejected = router_module.apply_registrations(self.config, self.tmp.name)
+        self.assertEqual(accepted, [])
+        self.assertEqual(len(rejected), 6)
+        self.assertEqual(self.config["providers"]["ollama"]["model"], "m")
+        self.assertEqual(self.config["policies"]["x3-local"]["order"], ["ollama"])
+
+    def test_missing_directory_is_not_an_error(self):
+        self.assertEqual(router_module.apply_registrations(self.config, self.tmp.name + "/none"), ([], []))
+
+    def test_registration_values_are_type_checked(self):
+        bad = {"a": {"max_in_flight": "1"}, "b": {"max_in_flight": 0}, "c": {"max_in_flight": True},
+               "d": {"worker": ["x3gpu2-gpu0"]}, "e": {"supports_tools": "yes"}, "f": {"critical_allowed": True},
+               "g": {"probe_timeout_seconds": -1}}
+        for name, extra in bad.items():
+            self.write(f"{name}.json", {"providers": {name: dict({"base_url": "http://h/v1", "model": "m"}, **extra)}})
+        accepted, rejected = router_module.apply_registrations(self.config, self.tmp.name)
+        self.assertEqual(accepted, [])
+        self.assertEqual(len(rejected), len(bad))
+        self.assertEqual(set(self.config["providers"]), {"ollama"})
+
+    def test_a_registered_provider_never_serves_critical_requests(self):
+        self.write("x3gpu2.json", {"providers": {"g2": {"base_url": "http://x3gpu2:11434/v1", "model": "m"}}})
+        router_module.apply_registrations(self.config, self.tmp.name)
+        registered = self.config["providers"]["g2"]
+        self.assertNotIn("api_key_env", registered)
+        self.assertFalse(router_module.may_serve_critical(registered),
+                         "no credentials does not mean the model is on this machine")
+        self.assertTrue(router_module.may_serve_critical(self.config["providers"]["ollama"]))
+
+
+class ServerTests(unittest.TestCase):
+    def test_an_ipv6_host_gets_an_ipv6_server(self):
+        import socket
+        self.assertEqual(router_module.server_class_for("::1").address_family, socket.AF_INET6)
+        self.assertEqual(router_module.server_class_for("127.0.0.1").address_family, socket.AF_INET)
+
+    def test_zero_max_in_flight_is_zero_slots_not_unlimited(self):
+        config = {"providers": {"p": {"base_url": "http://h/v1", "model": "m", "max_in_flight": 0},
+                                "q": {"base_url": "http://h/v1", "model": "m"}},
+                  "policies": {}, "budget_fallback": []}
+        router = router_module.Router(config, ":memory:")
+        try:
+            self.assertTrue(router.saturated("p"))
+            self.assertFalse(router.saturated("q"), "no limit is unlimited")
+        finally:
+            router.db.close()
 
 
 if __name__ == "__main__":

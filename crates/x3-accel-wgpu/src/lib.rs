@@ -4,17 +4,24 @@
 //! implementations are deliberately explicit: algorithms without a WGSL kernel
 //! return an error instead of silently falling back inside the backend.
 
-use std::sync::{mpsc, Mutex, MutexGuard};
+use std::num::NonZeroU64;
+use std::sync::{mpsc, Mutex, OnceLock};
 
-const SHA256_WORDS: usize = 8;
-const SHA256_BLOCK_WORDS: usize = 16;
-/// Keccak-256 output is 4 lanes = 8 little-endian u32 words.
-const KECCAK_WORDS: usize = 8;
-/// Keccak-256 absorbs at 1088 bits = 136 bytes = 34 little-endian u32 words
-/// per block.
-const KECCAK_BLOCK_WORDS: usize = 34;
-const KECCAK_RATE_BYTES: usize = KECCAK_BLOCK_WORDS * 4;
+mod secp256k1;
+pub use secp256k1::Secp256k1Prepared;
+
 const WORKGROUP_SIZE: u32 = 64;
+/// Both digests are 32 bytes = 8 u32 words.
+const DIGEST_WORDS: usize = 8;
+/// Two header words (message count, reserved) precede the per-message
+/// `(word_offset, byte_len)` pairs in the meta buffer.
+const META_HEADER_WORDS: usize = 2;
+/// Upper bound on message bytes uploaded per dispatch. Larger batches are split;
+/// this keeps per-call staging memory bounded regardless of device limits.
+const MAX_DISPATCH_DATA_BYTES: u64 = 64 << 20;
+/// A message must leave room for its padding without the kernel's u32 byte
+/// arithmetic wrapping.
+const MAX_MESSAGE_BYTES: usize = (u32::MAX - 256) as usize;
 
 /// Error returned by the wgpu support layer.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -31,38 +38,38 @@ pub enum WgpuAccelError {
     BufferMapFailed(String),
 }
 
-/// Minimal wgpu backend handle with cached SHA256 compute resources.
+/// wgpu backend handle with cached SHA-256 and Keccak-256 compute resources.
 pub struct WgpuBackend {
     adapter_info: wgpu::AdapterInfo,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    sha256_bind_group_layout: wgpu::BindGroupLayout,
-    sha256_pipeline: wgpu::ComputePipeline,
-    sha256_buffers: Mutex<Option<Sha256Buffers>>,
-    keccak_bind_group_layout: wgpu::BindGroupLayout,
-    keccak_pipeline: wgpu::ComputePipeline,
-    keccak_buffers: Mutex<Option<KeccakBuffers>>,
+    sha256: ComputeKernel,
+    keccak: ComputeKernel,
+    // Built on first use: the shader is large and hash-only callers never need it.
+    secp256k1_kernels: OnceLock<(ComputeKernel, ComputeKernel)>,
 }
 
-struct Sha256Buffers {
-    block_word_capacity: usize,
-    message_capacity: usize,
-    output_word_capacity: usize,
-    blocks_buffer: wgpu::Buffer,
-    block_offsets_buffer: wgpu::Buffer,
-    block_counts_buffer: wgpu::Buffer,
-    output_buffer: wgpu::Buffer,
-    readback_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+/// One hash kernel and its reusable buffers.
+///
+/// Input layout shared by both kernels: `data` holds every message's raw
+/// bytes, each starting on a 4-byte boundary and zero-filled to it; `meta`
+/// holds `[count, 0, (word_offset, byte_len) * count]`. Padding is computed by
+/// the kernel, so the host does one `memcpy` per message straight into staging
+/// memory instead of building padded blocks.
+pub(crate) struct ComputeKernel {
+    label: &'static str,
+    /// u32 words of output per item.
+    output_words: usize,
+    layout: wgpu::BindGroupLayout,
+    pipeline: wgpu::ComputePipeline,
+    buffers: Mutex<Option<HashBuffers>>,
 }
 
-struct KeccakBuffers {
-    block_word_capacity: usize,
+struct HashBuffers {
+    data_word_capacity: usize,
     message_capacity: usize,
-    output_word_capacity: usize,
-    blocks_buffer: wgpu::Buffer,
-    block_offsets_buffer: wgpu::Buffer,
-    block_counts_buffer: wgpu::Buffer,
+    data_buffer: wgpu::Buffer,
+    meta_buffer: wgpu::Buffer,
     output_buffer: wgpu::Buffer,
     readback_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
@@ -75,15 +82,7 @@ impl WgpuBackend {
     }
 
     async fn initialize_async() -> Result<Self, WgpuAccelError> {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::VULKAN
-                | wgpu::Backends::METAL
-                | wgpu::Backends::DX12
-                | wgpu::Backends::GL,
-            ..Default::default()
-        });
-
-        let adapter = instance
+        let adapter = instance()
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: None,
@@ -91,33 +90,61 @@ impl WgpuBackend {
             })
             .await
             .ok_or(WgpuAccelError::AdapterUnavailable)?;
+        // A software rasterizer (llvmpipe/lavapipe) is a CPU wearing a GPU
+        // label: slower than the native CPU path and misleading in metrics.
+        if adapter.get_info().device_type == wgpu::DeviceType::Cpu {
+            return Err(WgpuAccelError::AdapterUnavailable);
+        }
+        Self::from_adapter(adapter).await
+    }
 
+    /// Hardware GPU adapters, in a stable order (vendor, device id, name).
+    ///
+    /// Software rasterizers (llvmpipe) are excluded: a "GPU" result computed
+    /// on the CPU would make a parity or throughput run meaningless. The
+    /// index into this list is what [`WgpuBackend::initialize_adapter`] takes.
+    pub fn hardware_adapters() -> Vec<wgpu::AdapterInfo> {
+        hardware_adapters_raw()
+            .into_iter()
+            .map(|adapter| adapter.get_info())
+            .collect()
+    }
+
+    /// Initialize on one specific hardware adapter from [`Self::hardware_adapters`].
+    pub fn initialize_adapter(index: usize) -> Result<Self, WgpuAccelError> {
+        let adapter = hardware_adapters_raw()
+            .into_iter()
+            .nth(index)
+            .ok_or(WgpuAccelError::AdapterUnavailable)?;
+        pollster::block_on(Self::from_adapter(adapter))
+    }
+
+    async fn from_adapter(adapter: wgpu::Adapter) -> Result<Self, WgpuAccelError> {
         let adapter_info = adapter.get_info();
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: Some("x3-accel-wgpu"),
                     required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::downlevel_defaults(),
+                    // The adapter's own limits: downlevel defaults cap storage
+                    // bindings at 128 MiB, far below what these cards allow.
+                    required_limits: adapter.limits(),
                 },
                 None,
             )
             .await
             .map_err(|err| WgpuAccelError::DeviceRequestFailed(err.to_string()))?;
 
-        let (sha256_bind_group_layout, sha256_pipeline) = create_sha256_pipeline(&device);
-        let (keccak_bind_group_layout, keccak_pipeline) = create_keccak_pipeline(&device);
+        let sha256 = ComputeKernel::new(&device, "x3-sha256", SHA256_WGSL, "main", DIGEST_WORDS);
+        let keccak = ComputeKernel::new(&device, "x3-keccak", KECCAK_WGSL, "main", DIGEST_WORDS);
 
         Ok(Self {
             adapter_info,
             device,
             queue,
-            sha256_bind_group_layout,
-            sha256_pipeline,
-            sha256_buffers: Mutex::new(None),
-            keccak_bind_group_layout,
-            keccak_pipeline,
-            keccak_buffers: Mutex::new(None),
+            sha256,
+            keccak,
+            secp256k1_kernels: OnceLock::new(),
         })
     }
 
@@ -143,178 +170,191 @@ impl WgpuBackend {
         &self.adapter_info
     }
 
-    /// SHA256 compute kernel entrypoint.
+    /// SHA-256 of every input, in input order.
     pub fn sha256_batch(&self, inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, WgpuAccelError> {
-        if inputs.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let mut block_words = Vec::new();
-        let mut block_offsets = Vec::with_capacity(inputs.len());
-        let mut block_counts = Vec::with_capacity(inputs.len());
-        for input in inputs {
-            block_offsets.push(
-                u32::try_from(block_words.len() / SHA256_BLOCK_WORDS)
-                    .map_err(|_| WgpuAccelError::InvalidInput("block offset exceeds u32"))?,
-            );
-            let before = block_words.len();
-            append_padded_sha256_blocks(input, &mut block_words)?;
-            block_counts.push(
-                u32::try_from((block_words.len() - before) / SHA256_BLOCK_WORDS)
-                    .map_err(|_| WgpuAccelError::InvalidInput("block count exceeds u32"))?,
-            );
-        }
-
-        let output_words = inputs.len() * SHA256_WORDS;
-        let output_size = (output_words * std::mem::size_of::<u32>()) as wgpu::BufferAddress;
-        let buffers_guard = self.sha256_buffers(block_words.len(), inputs.len(), output_words)?;
-        let buffers = buffers_guard
-            .as_ref()
-            .expect("sha256 buffers initialized after capacity check");
-
-        self.queue.write_buffer(
-            &buffers.blocks_buffer,
-            0,
-            bytemuck::cast_slice(&block_words),
-        );
-        self.queue.write_buffer(
-            &buffers.block_offsets_buffer,
-            0,
-            bytemuck::cast_slice(&block_offsets),
-        );
-        self.queue.write_buffer(
-            &buffers.block_counts_buffer,
-            0,
-            bytemuck::cast_slice(&block_counts),
-        );
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("x3-sha256-encoder"),
-            });
-        {
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("x3-sha256-compute-pass"),
-                timestamp_writes: None,
-            });
-            compute_pass.set_pipeline(&self.sha256_pipeline);
-            compute_pass.set_bind_group(0, &buffers.bind_group, &[]);
-            let workgroups = (inputs.len() as u32).div_ceil(WORKGROUP_SIZE);
-            compute_pass.dispatch_workgroups(workgroups, 1, 1);
-        }
-        encoder.copy_buffer_to_buffer(
-            &buffers.output_buffer,
-            0,
-            &buffers.readback_buffer,
-            0,
-            output_size,
-        );
-        self.queue.submit(Some(encoder.finish()));
-
-        let slice = buffers.readback_buffer.slice(0..output_size);
-        let (sender, receiver) = mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |result| {
-            let _ = sender.send(result);
-        });
-        self.device.poll(wgpu::Maintain::Wait);
-        receiver
-            .recv()
-            .map_err(|err| WgpuAccelError::BufferMapFailed(err.to_string()))?
-            .map_err(|err| WgpuAccelError::BufferMapFailed(err.to_string()))?;
-
-        let mapped = slice.get_mapped_range();
-        let words = bytemuck::cast_slice::<u8, u32>(&mapped).to_vec();
-        drop(mapped);
-        buffers.readback_buffer.unmap();
-
-        let mut outputs = Vec::with_capacity(inputs.len());
-        for chunk in words.chunks_exact(SHA256_WORDS) {
-            let mut output = [0u8; 32];
-            for (index, word) in chunk.iter().enumerate() {
-                output[index * 4..index * 4 + 4].copy_from_slice(&word.to_be_bytes());
-            }
-            outputs.push(output);
-        }
-
-        Ok(outputs)
+        self.hash_batch(&self.sha256, inputs)
     }
 
-    /// Keccak-256 compute kernel entrypoint (Ethereum's legacy-padded variant).
-    ///
-    /// Same buffer discipline as `sha256_batch`: one thread per message, one
-    /// dispatch for the whole batch, single readback. Before this existed the
-    /// backend returned `KernelUnavailable` for keccak256, so every EVM-facing
-    /// hash batch fell back to CPU even with a working device.
+    /// Keccak-256 (Ethereum's legacy `0x01`-domain padding, not SHA3-256) of
+    /// every input, in input order.
     pub fn keccak256_batch(&self, inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, WgpuAccelError> {
-        if inputs.is_empty() {
+        self.hash_batch(&self.keccak, inputs)
+    }
+
+    fn secp256k1_kernels(&self) -> &(ComputeKernel, ComputeKernel) {
+        self.secp256k1_kernels.get_or_init(|| {
+            let verify = ComputeKernel::new(
+                &self.device,
+                "x3-secp256k1",
+                secp256k1::SECP256K1_WGSL,
+                "main",
+                1,
+            );
+            let selftest = ComputeKernel::new(
+                &self.device,
+                "x3-secp256k1-selftest",
+                secp256k1::SECP256K1_WGSL,
+                "selftest",
+                24,
+            );
+            (verify, selftest)
+        })
+    }
+
+    /// Split `inputs` into dispatches that fit the device and run them in order.
+    fn hash_batch(
+        &self,
+        kernel: &ComputeKernel,
+        inputs: &[Vec<u8>],
+    ) -> Result<Vec<[u8; 32]>, WgpuAccelError> {
+        let limits = self.device.limits();
+        let max_bytes = MAX_DISPATCH_DATA_BYTES
+            .min(u64::from(limits.max_storage_buffer_binding_size))
+            .min(limits.max_buffer_size);
+        // meta holds 2 words per message plus the header; the output holds
+        // `output_words` per message. Both have to fit the device.
+        let max_messages = ((max_bytes / 4) as usize / 2)
+            .saturating_sub(META_HEADER_WORDS)
+            .min(kernel.max_items(&limits));
+        let mut outputs = Vec::with_capacity(inputs.len());
+        let mut start = 0;
+        while start < inputs.len() {
+            let mut end = start;
+            let mut bytes = 0u64;
+            while end < inputs.len() && end - start < max_messages {
+                if inputs[end].len() > MAX_MESSAGE_BYTES {
+                    return Err(WgpuAccelError::InvalidInput(
+                        "message exceeds u32 byte length",
+                    ));
+                }
+                let padded = (inputs[end].len() as u64).div_ceil(4) * 4;
+                if padded > max_bytes {
+                    return Err(WgpuAccelError::InvalidInput(
+                        "message larger than one GPU dispatch buffer",
+                    ));
+                }
+                if end > start && bytes + padded > max_bytes {
+                    break;
+                }
+                bytes += padded;
+                end += 1;
+            }
+            outputs.extend(self.dispatch(kernel, &inputs[start..end], (bytes / 4) as usize)?);
+            start = end;
+        }
+        Ok(outputs)
+    }
+
+    fn dispatch(
+        &self,
+        kernel: &ComputeKernel,
+        inputs: &[Vec<u8>],
+        data_words: usize,
+    ) -> Result<Vec<[u8; 32]>, WgpuAccelError> {
+        let bytes = self.execute(kernel, inputs.len(), data_words, |entries, data| {
+            let mut byte = 0usize;
+            for (index, input) in inputs.iter().enumerate() {
+                let entry = 8 * index;
+                entries[entry..entry + 4].copy_from_slice(&((byte / 4) as u32).to_le_bytes());
+                entries[entry + 4..entry + 8].copy_from_slice(&(input.len() as u32).to_le_bytes());
+                let padded = input.len().div_ceil(4) * 4;
+                data[byte..byte + input.len()].copy_from_slice(input);
+                // Staging memory is not zeroed; the kernels rely on these bytes being 0.
+                data[byte + input.len()..byte + padded].fill(0);
+                byte += padded;
+            }
+            data[byte..].fill(0);
+        })?;
+        // Both hash kernels write digest bytes in final order, so this is a copy.
+        let (digests, _) = bytes.as_chunks::<32>();
+        Ok(digests.to_vec())
+    }
+
+    /// Run `kernel` over `count` items in one dispatch and return its raw
+    /// output (`count * kernel.output_words` words, little-endian).
+    ///
+    /// `fill(entries, data)` writes the per-item entries (2 words each, after
+    /// the count header this function writes) and `data_words` words of input.
+    /// Both slices are wgpu staging memory, which is not zeroed: `fill` must
+    /// write every byte it is given.
+    pub(crate) fn execute(
+        &self,
+        kernel: &ComputeKernel,
+        count: usize,
+        data_words: usize,
+        fill: impl FnOnce(&mut [u8], &mut [u8]),
+    ) -> Result<Vec<u8>, WgpuAccelError> {
+        let count_u32 =
+            u32::try_from(count).map_err(|_| WgpuAccelError::InvalidInput("batch exceeds u32"))?;
+        // Callers split by `max_items`; a larger batch would need a binding the
+        // device cannot provide, which wgpu reports as a validation panic.
+        if count > kernel.max_items(&self.device.limits()) {
+            return Err(WgpuAccelError::InvalidInput(
+                "batch exceeds one dispatch for this kernel",
+            ));
+        }
+        // A batch of empty messages still needs a non-empty data binding.
+        let data_words = data_words.max(1);
+        let entry_words = META_HEADER_WORDS + 2 * count;
+        let mut guard = kernel.buffers.lock().map_err(|_| {
+            WgpuAccelError::BufferMapFailed(format!("{} buffer lock poisoned", kernel.label))
+        })?;
+        if !guard
+            .as_ref()
+            .is_some_and(|b| b.data_word_capacity >= data_words && b.message_capacity >= count)
+        {
+            *guard = None;
+        }
+        let buffers =
+            &*guard.get_or_insert_with(|| kernel.create_buffers(&self.device, data_words, count));
+
+        {
+            let mut entries = self
+                .queue
+                .write_buffer_with(&buffers.meta_buffer, 0, non_zero_bytes(entry_words)?)
+                .ok_or_else(|| WgpuAccelError::BufferMapFailed("entries staging".into()))?;
+            entries[0..4].copy_from_slice(&count_u32.to_le_bytes());
+            entries[4..8].fill(0);
+            let mut data = self
+                .queue
+                .write_buffer_with(&buffers.data_buffer, 0, non_zero_bytes(data_words)?)
+                .ok_or_else(|| WgpuAccelError::BufferMapFailed("data staging".into()))?;
+            fill(&mut entries[META_HEADER_WORDS * 4..], &mut data);
+        }
+
+        let output_bytes = (count * kernel.output_words * 4) as wgpu::BufferAddress;
+        if output_bytes == 0 {
             return Ok(Vec::new());
         }
-
-        let mut block_words = Vec::new();
-        let mut block_offsets = Vec::with_capacity(inputs.len());
-        let mut block_counts = Vec::with_capacity(inputs.len());
-        for input in inputs {
-            block_offsets.push(
-                u32::try_from(block_words.len() / KECCAK_BLOCK_WORDS)
-                    .map_err(|_| WgpuAccelError::InvalidInput("block offset exceeds u32"))?,
-            );
-            let before = block_words.len();
-            append_padded_keccak_blocks(input, &mut block_words)?;
-            block_counts.push(
-                u32::try_from((block_words.len() - before) / KECCAK_BLOCK_WORDS)
-                    .map_err(|_| WgpuAccelError::InvalidInput("block count exceeds u32"))?,
-            );
-        }
-
-        let output_words = inputs.len() * KECCAK_WORDS;
-        let output_size = (output_words * std::mem::size_of::<u32>()) as wgpu::BufferAddress;
-        let buffers_guard = self.keccak_buffers(block_words.len(), inputs.len(), output_words)?;
-        let buffers = buffers_guard
-            .as_ref()
-            .expect("keccak buffers initialized after capacity check");
-
-        self.queue.write_buffer(
-            &buffers.blocks_buffer,
-            0,
-            bytemuck::cast_slice(&block_words),
-        );
-        self.queue.write_buffer(
-            &buffers.block_offsets_buffer,
-            0,
-            bytemuck::cast_slice(&block_offsets),
-        );
-        self.queue.write_buffer(
-            &buffers.block_counts_buffer,
-            0,
-            bytemuck::cast_slice(&block_counts),
-        );
-
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("x3-keccak-encoder"),
+                label: Some(kernel.label),
             });
         {
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("x3-keccak-compute-pass"),
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some(kernel.label),
                 timestamp_writes: None,
             });
-            compute_pass.set_pipeline(&self.keccak_pipeline);
-            compute_pass.set_bind_group(0, &buffers.bind_group, &[]);
-            let workgroups = (inputs.len() as u32).div_ceil(WORKGROUP_SIZE);
-            compute_pass.dispatch_workgroups(workgroups, 1, 1);
+            pass.set_pipeline(&kernel.pipeline);
+            pass.set_bind_group(0, &buffers.bind_group, &[]);
+            // 2-D grid: one dimension is capped at 65535 workgroups (~4.2M
+            // items); the kernels fold y back into a linear index.
+            let groups = count_u32.div_ceil(WORKGROUP_SIZE);
+            let max_x = self.device.limits().max_compute_workgroups_per_dimension;
+            let x = groups.min(max_x);
+            pass.dispatch_workgroups(x, groups.div_ceil(x), 1);
         }
         encoder.copy_buffer_to_buffer(
             &buffers.output_buffer,
             0,
             &buffers.readback_buffer,
             0,
-            output_size,
+            output_bytes,
         );
         self.queue.submit(Some(encoder.finish()));
 
-        let slice = buffers.readback_buffer.slice(0..output_size);
+        let slice = buffers.readback_buffer.slice(0..output_bytes);
         let (sender, receiver) = mpsc::channel();
         slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = sender.send(result);
@@ -324,170 +364,193 @@ impl WgpuBackend {
             .recv()
             .map_err(|err| WgpuAccelError::BufferMapFailed(err.to_string()))?
             .map_err(|err| WgpuAccelError::BufferMapFailed(err.to_string()))?;
-
-        let mapped = slice.get_mapped_range();
-        let words = bytemuck::cast_slice::<u8, u32>(&mapped).to_vec();
-        drop(mapped);
+        let bytes = slice.get_mapped_range().to_vec();
         buffers.readback_buffer.unmap();
-
-        let mut outputs = Vec::with_capacity(inputs.len());
-        for chunk in words.chunks_exact(KECCAK_WORDS) {
-            let mut output = [0u8; 32];
-            for (index, word) in chunk.iter().enumerate() {
-                output[index * 4..index * 4 + 4].copy_from_slice(&word.to_le_bytes());
-            }
-            outputs.push(output);
-        }
-
-        Ok(outputs)
-    }
-
-    fn sha256_buffers(
-        &self,
-        required_block_words: usize,
-        required_messages: usize,
-        required_output_words: usize,
-    ) -> Result<MutexGuard<'_, Option<Sha256Buffers>>, WgpuAccelError> {
-        let mut guard = self
-            .sha256_buffers
-            .lock()
-            .map_err(|_| WgpuAccelError::BufferMapFailed("sha256 buffer lock poisoned".into()))?;
-
-        let needs_create = guard
-            .as_ref()
-            .map(|buffers| {
-                buffers.block_word_capacity < required_block_words
-                    || buffers.message_capacity < required_messages
-                    || buffers.output_word_capacity < required_output_words
-            })
-            .unwrap_or(true);
-
-        if needs_create {
-            let block_word_capacity = required_block_words.max(16).next_power_of_two();
-            let message_capacity = required_messages.max(1).next_power_of_two();
-            let output_word_capacity = required_output_words.max(8).next_power_of_two();
-
-            *guard = Some(create_sha256_buffers(
-                &self.device,
-                &self.sha256_bind_group_layout,
-                block_word_capacity,
-                message_capacity,
-                output_word_capacity,
-            ));
-        }
-
-        Ok(guard)
-    }
-
-    fn keccak_buffers(
-        &self,
-        required_block_words: usize,
-        required_messages: usize,
-        required_output_words: usize,
-    ) -> Result<MutexGuard<'_, Option<KeccakBuffers>>, WgpuAccelError> {
-        let mut guard = self
-            .keccak_buffers
-            .lock()
-            .map_err(|_| WgpuAccelError::BufferMapFailed("keccak buffer lock poisoned".into()))?;
-
-        let needs_create = guard
-            .as_ref()
-            .map(|buffers| {
-                buffers.block_word_capacity < required_block_words
-                    || buffers.message_capacity < required_messages
-                    || buffers.output_word_capacity < required_output_words
-            })
-            .unwrap_or(true);
-
-        if needs_create {
-            let block_word_capacity = required_block_words.max(34).next_power_of_two();
-            let message_capacity = required_messages.max(1).next_power_of_two();
-            let output_word_capacity = required_output_words.max(8).next_power_of_two();
-
-            *guard = Some(create_keccak_buffers(
-                &self.device,
-                &self.keccak_bind_group_layout,
-                block_word_capacity,
-                message_capacity,
-                output_word_capacity,
-            ));
-        }
-
-        Ok(guard)
+        Ok(bytes)
     }
 }
 
-/// Return true when a wgpu adapter/device can be initialized.
+fn non_zero_bytes(words: usize) -> Result<NonZeroU64, WgpuAccelError> {
+    NonZeroU64::new((words * 4) as u64).ok_or(WgpuAccelError::InvalidInput(
+        "a staging write must cover at least one word",
+    ))
+}
+
+impl ComputeKernel {
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        label: &'static str,
+        source: &str,
+        entry_point: &str,
+        output_words: usize,
+    ) -> Self {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(label),
+            source: wgpu::ShaderSource::Wgsl(source.into()),
+        });
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some(label),
+            entries: &[
+                storage_entry(0, true),
+                storage_entry(1, true),
+                storage_entry(2, false),
+            ],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some(label),
+            bind_group_layouts: &[&layout],
+            push_constant_ranges: &[],
+        });
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some(label),
+            layout: Some(&pipeline_layout),
+            module: &shader,
+            entry_point,
+            compilation_options: Default::default(),
+        });
+        Self {
+            label,
+            output_words,
+            layout,
+            pipeline,
+            buffers: Mutex::new(None),
+        }
+    }
+
+    /// The most items one dispatch of this kernel can carry on `limits`.
+    ///
+    /// Both the metadata (2 words per item plus a header) and the output
+    /// (`output_words` per item) are storage bindings, and the output is also
+    /// copied into a mappable readback buffer of the same size, so every one of
+    /// them has to fit the binding limit and the buffer limit.
+    pub(crate) fn max_items(&self, limits: &wgpu::Limits) -> usize {
+        let limit_words = (u64::from(limits.max_storage_buffer_binding_size)
+            .min(limits.max_buffer_size)
+            / 4) as usize;
+        let by_meta = limit_words.saturating_sub(META_HEADER_WORDS) / 2;
+        let by_output = limit_words / self.output_words.max(1);
+        by_meta.min(by_output)
+    }
+
+    /// Buffers grow to the next power of two and are then reused, so a steady
+    /// stream of similar batches allocates nothing after warm-up.
+    fn create_buffers(
+        &self,
+        device: &wgpu::Device,
+        data_words: usize,
+        messages: usize,
+    ) -> HashBuffers {
+        // `hash_batch` already bounds each dispatch by the device limit; growth
+        // is capped there too so a power-of-two round-up never exceeds it.
+        let limit_words = (device.limits().max_storage_buffer_binding_size / 4) as usize;
+        let data_word_capacity = data_words
+            .next_power_of_two()
+            .min(limit_words)
+            .max(data_words);
+        let message_limit = self.max_items(&device.limits());
+        let message_capacity = messages
+            .next_power_of_two()
+            .min(message_limit)
+            .max(messages);
+        let meta_words = META_HEADER_WORDS + 2 * message_capacity;
+        let buffer = |name: &str, words: usize, usage: wgpu::BufferUsages| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(&format!("{}-{name}", self.label)),
+                size: (words * 4) as wgpu::BufferAddress,
+                usage,
+                mapped_at_creation: false,
+            })
+        };
+        let storage_in = wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST;
+        let data_buffer = buffer("data", data_word_capacity, storage_in);
+        let meta_buffer = buffer("meta", meta_words, storage_in);
+        let output_buffer = buffer(
+            "output",
+            message_capacity * self.output_words,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+        );
+        let readback_buffer = buffer(
+            "readback",
+            message_capacity * self.output_words,
+            wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        );
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(self.label),
+            layout: &self.layout,
+            entries: &[
+                bind_entry(0, &data_buffer),
+                bind_entry(1, &meta_buffer),
+                bind_entry(2, &output_buffer),
+            ],
+        });
+        HashBuffers {
+            data_word_capacity,
+            message_capacity,
+            data_buffer,
+            meta_buffer,
+            output_buffer,
+            readback_buffer,
+            bind_group,
+        }
+    }
+}
+
+fn instance() -> wgpu::Instance {
+    wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::VULKAN
+            | wgpu::Backends::METAL
+            | wgpu::Backends::DX12
+            | wgpu::Backends::GL,
+        ..Default::default()
+    })
+}
+
+fn hardware_adapters_raw() -> Vec<wgpu::Adapter> {
+    let mut adapters: Vec<wgpu::Adapter> = instance()
+        .enumerate_adapters(wgpu::Backends::VULKAN | wgpu::Backends::METAL | wgpu::Backends::DX12)
+        .into_iter()
+        .filter(|adapter| {
+            matches!(
+                adapter.get_info().device_type,
+                wgpu::DeviceType::DiscreteGpu | wgpu::DeviceType::IntegratedGpu
+            )
+        })
+        .collect();
+    // A GPU that several backends can drive (Vulkan and DX12 on Windows) is
+    // listed once per backend. Collapsing those by vendor/device/name would also
+    // collapse two identical physical cards, which share all three, so instead
+    // keep a single backend: the one that exposes the most adapters, with ties
+    // going to Vulkan, then Metal, then DX12. Within one backend every entry is a
+    // distinct physical device.
+    let preference = [
+        wgpu::Backend::Vulkan,
+        wgpu::Backend::Metal,
+        wgpu::Backend::Dx12,
+    ];
+    let count = |backend: wgpu::Backend| {
+        adapters
+            .iter()
+            .filter(|adapter| adapter.get_info().backend == backend)
+            .count()
+    };
+    let mut chosen = preference[0];
+    for backend in preference {
+        if count(backend) > count(chosen) {
+            chosen = backend;
+        }
+    }
+    adapters.retain(|adapter| adapter.get_info().backend == chosen);
+    // Stable: identical cards keep the backend's enumeration order.
+    adapters.sort_by_key(|adapter| {
+        let info = adapter.get_info();
+        (info.vendor, info.device, info.name)
+    });
+    adapters
+}
+
+/// Return true when a hardware wgpu adapter/device can be initialized.
 pub fn is_available() -> bool {
     WgpuBackend::initialize().is_ok()
-}
-
-fn append_padded_sha256_blocks(
-    input: &[u8],
-    output_words: &mut Vec<u32>,
-) -> Result<(), WgpuAccelError> {
-    let bit_len = u64::try_from(input.len())
-        .map_err(|_| WgpuAccelError::InvalidInput("input length exceeds u64"))?
-        .checked_mul(8)
-        .ok_or(WgpuAccelError::InvalidInput("input bit length overflow"))?;
-
-    let mut padded = Vec::with_capacity(input.len() + 1 + 8 + 64);
-    padded.extend_from_slice(input);
-    padded.push(0x80);
-    while padded.len() % 64 != 56 {
-        padded.push(0);
-    }
-    padded.extend_from_slice(&bit_len.to_be_bytes());
-
-    if padded.len() / 64 > u32::MAX as usize {
-        return Err(WgpuAccelError::InvalidInput(
-            "padded input block count exceeds u32",
-        ));
-    }
-
-    for block in padded.chunks_exact(64) {
-        for word in block.chunks_exact(4) {
-            output_words.push(u32::from_be_bytes([word[0], word[1], word[2], word[3]]));
-        }
-    }
-
-    Ok(())
-}
-
-/// Pad with Keccak's `pad10*1` rule and emit the absorb rate as little-endian
-/// words.
-///
-/// Keccak-256 differs from SHA3-256 only in the domain byte: Ethereum's variant
-/// appends `0x01` where SHA3-256 appends `0x06`. Getting that byte wrong yields
-/// a hash that looks plausible and is wrong for every Ethereum reader, which is
-/// why the parity test below pins it against `keccak-hash`.
-fn append_padded_keccak_blocks(
-    input: &[u8],
-    output_words: &mut Vec<u32>,
-) -> Result<(), WgpuAccelError> {
-    let mut padded = Vec::with_capacity(input.len() + KECCAK_RATE_BYTES + 1);
-    padded.extend_from_slice(input);
-    padded.push(0x01);
-    while padded.len() % KECCAK_RATE_BYTES != 0 {
-        padded.push(0);
-    }
-    // The final byte of the final block carries the trailing bit of pad10*1.
-    let last = padded.len() - 1;
-    padded[last] |= 0x80;
-
-    if padded.len() / KECCAK_RATE_BYTES > u32::MAX as usize {
-        return Err(WgpuAccelError::InvalidInput(
-            "padded input block count exceeds u32",
-        ));
-    }
-
-    for block in padded.chunks_exact(KECCAK_RATE_BYTES) {
-        for word in block.chunks_exact(4) {
-            output_words.push(u32::from_le_bytes([word[0], word[1], word[2], word[3]]));
-        }
-    }
-
-    Ok(())
 }
 
 fn storage_entry(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntry {
@@ -503,192 +566,6 @@ fn storage_entry(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-fn create_sha256_pipeline(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::ComputePipeline) {
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("x3-sha256-wgsl"),
-        source: wgpu::ShaderSource::Wgsl(SHA256_WGSL.into()),
-    });
-    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("x3-sha256-bind-group-layout"),
-        entries: &[
-            storage_entry(0, true),
-            storage_entry(1, true),
-            storage_entry(2, true),
-            storage_entry(3, false),
-        ],
-    });
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("x3-sha256-pipeline-layout"),
-        bind_group_layouts: &[&bind_group_layout],
-        push_constant_ranges: &[],
-    });
-    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-        label: Some("x3-sha256-pipeline"),
-        layout: Some(&pipeline_layout),
-        module: &shader,
-        entry_point: "main",
-        compilation_options: Default::default(),
-    });
-
-    (bind_group_layout, pipeline)
-}
-
-fn create_keccak_pipeline(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::ComputePipeline) {
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("x3-keccak-wgsl"),
-        source: wgpu::ShaderSource::Wgsl(KECCAK_WGSL.into()),
-    });
-    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("x3-keccak-bind-group-layout"),
-        entries: &[
-            storage_entry(0, true),
-            storage_entry(1, true),
-            storage_entry(2, true),
-            storage_entry(3, false),
-        ],
-    });
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("x3-keccak-pipeline-layout"),
-        bind_group_layouts: &[&bind_group_layout],
-        push_constant_ranges: &[],
-    });
-    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-        label: Some("x3-keccak-pipeline"),
-        layout: Some(&pipeline_layout),
-        module: &shader,
-        entry_point: "main",
-        compilation_options: Default::default(),
-    });
-
-    (bind_group_layout, pipeline)
-}
-
-fn create_sha256_buffers(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    block_word_capacity: usize,
-    message_capacity: usize,
-    output_word_capacity: usize,
-) -> Sha256Buffers {
-    let blocks_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-sha256-blocks"),
-        size: bytes_for_words(block_word_capacity),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let block_offsets_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-sha256-block-offsets"),
-        size: bytes_for_words(message_capacity),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let block_counts_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-sha256-block-counts"),
-        size: bytes_for_words(message_capacity),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-sha256-output"),
-        size: bytes_for_words(output_word_capacity),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-        mapped_at_creation: false,
-    });
-    let readback_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-sha256-readback"),
-        size: bytes_for_words(output_word_capacity),
-        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("x3-sha256-bind-group"),
-        layout,
-        entries: &[
-            bind_entry(0, &blocks_buffer),
-            bind_entry(1, &block_offsets_buffer),
-            bind_entry(2, &block_counts_buffer),
-            bind_entry(3, &output_buffer),
-        ],
-    });
-
-    Sha256Buffers {
-        block_word_capacity,
-        message_capacity,
-        output_word_capacity,
-        blocks_buffer,
-        block_offsets_buffer,
-        block_counts_buffer,
-        output_buffer,
-        readback_buffer,
-        bind_group,
-    }
-}
-
-fn create_keccak_buffers(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    block_word_capacity: usize,
-    message_capacity: usize,
-    output_word_capacity: usize,
-) -> KeccakBuffers {
-    let blocks_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-keccak-blocks"),
-        size: bytes_for_words(block_word_capacity),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let block_offsets_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-keccak-block-offsets"),
-        size: bytes_for_words(message_capacity),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let block_counts_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-keccak-block-counts"),
-        size: bytes_for_words(message_capacity),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-keccak-output"),
-        size: bytes_for_words(output_word_capacity),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-        mapped_at_creation: false,
-    });
-    let readback_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("x3-keccak-readback"),
-        size: bytes_for_words(output_word_capacity),
-        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("x3-keccak-bind-group"),
-        layout,
-        entries: &[
-            bind_entry(0, &blocks_buffer),
-            bind_entry(1, &block_offsets_buffer),
-            bind_entry(2, &block_counts_buffer),
-            bind_entry(3, &output_buffer),
-        ],
-    });
-
-    KeccakBuffers {
-        block_word_capacity,
-        message_capacity,
-        output_word_capacity,
-        blocks_buffer,
-        block_offsets_buffer,
-        block_counts_buffer,
-        output_buffer,
-        readback_buffer,
-        bind_group,
-    }
-}
-
-fn bytes_for_words(words: usize) -> wgpu::BufferAddress {
-    (words * std::mem::size_of::<u32>()) as wgpu::BufferAddress
-}
-
 fn bind_entry(binding: u32, buffer: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
     wgpu::BindGroupEntry {
         binding,
@@ -697,10 +574,34 @@ fn bind_entry(binding: u32, buffer: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
 }
 
 const SHA256_WGSL: &str = r#"
-@group(0) @binding(0) var<storage, read> block_words: array<u32>;
-@group(0) @binding(1) var<storage, read> block_offsets: array<u32>;
-@group(0) @binding(2) var<storage, read> block_counts: array<u32>;
-@group(0) @binding(3) var<storage, read_write> output_words: array<u32>;
+@group(0) @binding(0) var<storage, read> data: array<u32>;
+@group(0) @binding(1) var<storage, read> entries: array<u32>;
+@group(0) @binding(2) var<storage, read_write> output_words: array<u32>;
+
+fn bswap(x: u32) -> u32 {
+    return (x << 24u) | ((x << 8u) & 0x00ff0000u) | ((x >> 8u) & 0x0000ff00u) | (x >> 24u);
+}
+
+// Big-endian word at byte `p` of the padded message: data, then 0x80, then
+// zeros, then the 64-bit big-endian bit length in the last 8 bytes. The host
+// zero-fills each message to a word boundary, so a partial data word needs no
+// masking.
+fn padded_word(base: u32, len: u32, p: u32, total: u32) -> u32 {
+    if (p == total - 8u) {
+        return len >> 29u;
+    }
+    if (p == total - 4u) {
+        return len << 3u;
+    }
+    var w = 0u;
+    if (p < len) {
+        w = bswap(data[base + (p >> 2u)]);
+    }
+    if (len >= p && len < p + 4u) {
+        w = w | (0x80u << ((3u - (len - p)) * 8u));
+    }
+    return w;
+}
 
 fn k(t: u32) -> u32 {
     switch (t) {
@@ -776,14 +677,17 @@ fn rotr(x: u32, n: u32) -> u32 {
 }
 
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let idx = global_id.x;
-    if (idx >= arrayLength(&block_counts)) {
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
+    let idx = global_id.x + global_id.y * groups.x * 64u;
+    if (idx >= entries[0]) {
         return;
     }
 
-    let first_block = block_offsets[idx];
-    let count = block_counts[idx];
+    let base = entries[2u + 2u * idx];
+    let len = entries[3u + 2u * idx];
+    // 1 byte of 0x80 and 8 bytes of length must fit after the data.
+    let count = (len + 8u) / 64u + 1u;
+    let total = count * 64u;
 
     var h0 = 0x6a09e667u;
     var h1 = 0xbb67ae85u;
@@ -796,10 +700,10 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     for (var block = 0u; block < count; block = block + 1u) {
         var w: array<u32, 64>;
-        let word_base = (first_block + block) * 16u;
+        let block_base = block * 64u;
 
         for (var t = 0u; t < 16u; t = t + 1u) {
-            w[t] = block_words[word_base + t];
+            w[t] = padded_word(base, len, block_base + 4u * t, total);
         }
 
         for (var t = 16u; t < 64u; t = t + 1u) {
@@ -844,15 +748,16 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         h7 = h7 + h;
     }
 
+    // Byte-swapped so the buffer holds the digest bytes in order.
     let out = idx * 8u;
-    output_words[out] = h0;
-    output_words[out + 1u] = h1;
-    output_words[out + 2u] = h2;
-    output_words[out + 3u] = h3;
-    output_words[out + 4u] = h4;
-    output_words[out + 5u] = h5;
-    output_words[out + 6u] = h6;
-    output_words[out + 7u] = h7;
+    output_words[out] = bswap(h0);
+    output_words[out + 1u] = bswap(h1);
+    output_words[out + 2u] = bswap(h2);
+    output_words[out + 3u] = bswap(h3);
+    output_words[out + 4u] = bswap(h4);
+    output_words[out + 5u] = bswap(h5);
+    output_words[out + 6u] = bswap(h6);
+    output_words[out + 7u] = bswap(h7);
 }
 "#;
 
@@ -866,10 +771,27 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 /// only operation that needs care is the 64-bit rotate, which is assembled from
 /// two 32-bit shifts in `rotl_lane`.
 const KECCAK_WGSL: &str = r#"
-@group(0) @binding(0) var<storage, read> block_words: array<u32>;
-@group(0) @binding(1) var<storage, read> block_offsets: array<u32>;
-@group(0) @binding(2) var<storage, read> block_counts: array<u32>;
-@group(0) @binding(3) var<storage, read_write> output_words: array<u32>;
+@group(0) @binding(0) var<storage, read> data: array<u32>;
+@group(0) @binding(1) var<storage, read> entries: array<u32>;
+@group(0) @binding(2) var<storage, read_write> output_words: array<u32>;
+
+// Little-endian word at byte `p` of the pad10*1-padded message: data, then the
+// 0x01 domain byte, zeros, and 0x80 OR-ed into the last byte of the last block
+// (both land on one byte, 0x81, when len % 136 == 135). The host zero-fills
+// each message to a word boundary, so a partial data word needs no masking.
+fn padded_word(base: u32, len: u32, p: u32, last_byte: u32) -> u32 {
+    var w = 0u;
+    if (p < len) {
+        w = data[base + (p >> 2u)];
+    }
+    if (len >= p && len < p + 4u) {
+        w = w | (0x01u << ((len - p) * 8u));
+    }
+    if (last_byte >= p && last_byte < p + 4u) {
+        w = w | (0x80u << ((last_byte - p) * 8u));
+    }
+    return w;
+}
 
 fn rc_lo(index: u32) -> u32 {
     switch index {
@@ -1010,14 +932,17 @@ fn rotl_lane(lo: u32, hi: u32, amount: u32) -> vec2<u32> {
 }
 
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let idx = global_id.x;
-    if (idx >= arrayLength(&block_counts)) {
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
+    let idx = global_id.x + global_id.y * groups.x * 64u;
+    if (idx >= entries[0]) {
         return;
     }
 
-    let first_block = block_offsets[idx];
-    let count = block_counts[idx];
+    let base = entries[2u + 2u * idx];
+    let len = entries[3u + 2u * idx];
+    // The 0x01 domain byte always fits, so there is one block past the data.
+    let count = len / 136u + 1u;
+    let last_byte = count * 136u - 1u;
 
     var lo: array<u32, 25>;
     var hi: array<u32, 25>;
@@ -1027,10 +952,11 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     for (var block = 0u; block < count; block = block + 1u) {
-        let word_base = (first_block + block) * 34u;
+        let block_base = block * 136u;
         for (var lane = 0u; lane < 17u; lane = lane + 1u) {
-            lo[lane] = lo[lane] ^ block_words[word_base + 2u * lane];
-            hi[lane] = hi[lane] ^ block_words[word_base + 2u * lane + 1u];
+            let p = block_base + 8u * lane;
+            lo[lane] = lo[lane] ^ padded_word(base, len, p, last_byte);
+            hi[lane] = hi[lane] ^ padded_word(base, len, p + 4u, last_byte);
         }
 
         for (var round = 0u; round < 24u; round = round + 1u) {
@@ -1098,25 +1024,29 @@ mod tests {
     use super::*;
     use sha2::{Digest, Sha256};
 
-    #[test]
-    fn sha256_padding_handles_single_block_messages() {
-        let mut words = Vec::new();
-        append_padded_sha256_blocks(&[1u8; 55], &mut words).unwrap();
-
-        assert_eq!(words.len(), 16);
-    }
-
-    #[test]
-    fn sha256_padding_handles_multi_block_messages() {
-        let mut words = Vec::new();
-        append_padded_sha256_blocks(&[1u8; 120], &mut words).unwrap();
-
-        assert_eq!(words.len(), 48);
+    /// The GPU backend, or `None` with a visible skip. `X3_REQUIRE_GPU=1`
+    /// turns a missing GPU into a failure so a hardware gate cannot pass
+    /// without having touched a GPU.
+    fn gpu_or_skip(test: &str) -> Option<WgpuBackend> {
+        match WgpuBackend::initialize() {
+            Ok(backend) => {
+                eprintln!("{test}: running on {}", backend.adapter_name());
+                Some(backend)
+            }
+            Err(err) => {
+                assert!(
+                    std::env::var("X3_REQUIRE_GPU").as_deref() != Ok("1"),
+                    "{test}: X3_REQUIRE_GPU=1 but no GPU adapter: {err}"
+                );
+                eprintln!("{test}: SKIPPED, no GPU adapter ({err})");
+                None
+            }
+        }
     }
 
     #[test]
     fn sha256_kernel_matches_cpu_when_wgpu_is_available() {
-        let Ok(backend) = WgpuBackend::initialize() else {
+        let Some(backend) = gpu_or_skip("sha256_kernel_matches_cpu") else {
             return;
         };
 
@@ -1130,36 +1060,80 @@ mod tests {
         assert_eq!(gpu_outputs, cpu_outputs);
     }
 
-    #[test]
-    fn keccak_padding_places_domain_and_final_bits_little_endian() {
-        // Keccak's `pad10*1` for an empty message is a single block whose first
-        // byte is the domain byte `0x01` and whose last byte carries the
-        // trailing bit. Words are little-endian, so those land in word 0 and
-        // the top byte of the final word.
-        let mut words = Vec::new();
-        append_padded_keccak_blocks(&[], &mut words).unwrap();
-
-        assert_eq!(words.len(), KECCAK_BLOCK_WORDS);
-        assert_eq!(words[0], 0x0000_0001);
-        assert_eq!(words[KECCAK_BLOCK_WORDS - 1], 0x8000_0000);
+    /// Every length 0..=600 plus the multi-block edges: the kernels pad on the
+    /// GPU, so each block-boundary case for both algorithms is a parity case.
+    fn boundary_inputs() -> Vec<Vec<u8>> {
+        let mut inputs: Vec<Vec<u8>> = (0..=600usize)
+            .map(|len| (0..len).map(|i| (i * 31 + len) as u8).collect())
+            .collect();
+        for len in [1023, 1024, 1025, 4095, 4096, 4097, 65_536] {
+            inputs.push(vec![0xa5; len]);
+        }
+        // A byte that would leak into the padding if the host stopped
+        // zero-filling the word tail.
+        inputs.push(vec![0xff; 3]);
+        inputs
     }
 
     #[test]
-    fn keccak_padding_keeps_a_full_rate_block_intact() {
-        // 135 bytes leaves exactly one byte for the domain byte in a single
-        // block; 136 bytes must spill the trailing bit into a second block.
-        let mut exact = Vec::new();
-        append_padded_keccak_blocks(&[0x11u8; 135], &mut exact).unwrap();
-        assert_eq!(exact.len(), KECCAK_BLOCK_WORDS);
+    fn every_padding_boundary_matches_cpu() {
+        let Some(backend) = gpu_or_skip("every_padding_boundary_matches_cpu") else {
+            return;
+        };
+        let inputs = boundary_inputs();
+        let keccak = backend.keccak256_batch(&inputs).unwrap();
+        let sha = backend.sha256_batch(&inputs).unwrap();
+        for (i, input) in inputs.iter().enumerate() {
+            assert_eq!(
+                keccak[i],
+                keccak_hash::keccak(input).0,
+                "keccak len {}",
+                input.len()
+            );
+            let expected: [u8; 32] = Sha256::digest(input).into();
+            assert_eq!(sha[i], expected, "sha256 len {}", input.len());
+        }
+    }
 
-        let mut spill = Vec::new();
-        append_padded_keccak_blocks(&[0x11u8; 136], &mut spill).unwrap();
-        assert_eq!(spill.len(), KECCAK_BLOCK_WORDS * 2);
+    #[test]
+    fn reused_buffers_do_not_leak_previous_batches() {
+        let Some(backend) = gpu_or_skip("reused_buffers_do_not_leak_previous_batches") else {
+            return;
+        };
+        // A large batch first fills the reusable buffers with nonzero bytes;
+        // a smaller one afterwards must not see any of them.
+        backend
+            .keccak256_batch(&vec![vec![0xff; 999]; 2048])
+            .unwrap();
+        backend.sha256_batch(&vec![vec![0xff; 999]; 2048]).unwrap();
+        let small = vec![Vec::new(), vec![1u8], vec![2u8; 5], vec![3u8; 137]];
+        let keccak = backend.keccak256_batch(&small).unwrap();
+        let sha = backend.sha256_batch(&small).unwrap();
+        for (i, input) in small.iter().enumerate() {
+            assert_eq!(keccak[i], keccak_hash::keccak(input).0);
+            let expected: [u8; 32] = Sha256::digest(input).into();
+            assert_eq!(sha[i], expected);
+        }
+    }
+
+    #[test]
+    fn all_empty_batch_and_empty_list() {
+        let Some(backend) = gpu_or_skip("all_empty_batch_and_empty_list") else {
+            return;
+        };
+        assert!(backend.keccak256_batch(&[]).unwrap().is_empty());
+        let empties = vec![Vec::new(); 70];
+        assert_eq!(
+            backend.keccak256_batch(&empties).unwrap(),
+            vec![keccak_hash::keccak([]).0; 70]
+        );
+        let expected: [u8; 32] = Sha256::digest([]).into();
+        assert_eq!(backend.sha256_batch(&empties).unwrap(), vec![expected; 70]);
     }
 
     #[test]
     fn keccak256_kernel_matches_cpu_when_wgpu_is_available() {
-        let Ok(backend) = WgpuBackend::initialize() else {
+        let Some(backend) = gpu_or_skip("keccak256_kernel_matches_cpu") else {
             return;
         };
 

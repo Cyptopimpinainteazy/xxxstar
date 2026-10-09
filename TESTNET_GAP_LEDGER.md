@@ -1455,6 +1455,19 @@ Validation for the fix: a `cargo test -p pallet-x3-da` / `-p pallet-x3-sequencer
 submission's `reserved_balance` returns to zero (or that the fee lands where the chosen policy says),
 and the halt gate's entry for each call changes from `permanent_charge` to `recoverable`/`exempt`.
 
+**TICKET-154 — CLOSED 2026-10-07 (operator chose: forward to the treasury).** Both pallets now
+charge the fee with `Currency::transfer(.., T::ProtocolTreasury::get(), .., KeepAlive)` and emit
+`DaFeeCollected` / `SequencingFeeCollected`; neither reserves anything, so both entries were removed
+from `security/halt-fund-holding.toml` (the call no longer holds funds, and the checker passes).
+Unlike the router (GAP-ROUTER-FEE-DEPOSIT) the fee is **not waived** when the treasury refuses a
+deposit below the existential deposit — a waived anti-spam fee makes spam free — so the call fails
+with the new `FeeDestinationRefused`, distinct from the payer's `InsufficientFee`. That makes a
+funded treasury a launch requirement for any chain running these pallets (genesis must endow
+`TreasuryAccountId` with at least the existential deposit). The benchmarks fund the treasury in
+setup; the weights were measured with a reserve and should be re-run. Tests:
+`cargo test -p pallet-x3-da -p pallet-x3-sequencer --features runtime-benchmarks` (20 + 19), each
+pallet with a fee-reaches-treasury, a dead-treasury refusal, and an insufficient-funds case.
+
 ## GAP-TOOLCHAIN-WIPE — `~/.cargo/bin` loses everything that was installed after the base image — 2026-09-26
 
 Not a repository defect, but it stopped work twice in one day, so it is recorded where the next
@@ -2001,6 +2014,18 @@ graph, a release attestation was being taken while this was found, and editing a
 underneath a running `make mainnet-check` invalidates it. The alternative fix — keep the treasury
 funded so the fee can always be credited — is a policy decision for the operator, and it is the same
 one recorded on row X3-XVM-014.
+
+**CLOSED 2026-10-07 (operator chose both halves).** (1) Both sites now emit a named event when the
+transfer fails — `ProtocolFeeWaived { who, fee }` and `SettlementFeeWaived { intent_id, fee }`,
+appended at the end of each `Event` enum so no existing variant index moves. The operation still
+completes, as before; only the silence is gone. Both mocks wired the fee rate to `0`, so neither
+branch had ever run in a test — the rates are now settable statics, and each pallet has a
+collected-fee and a waived-fee test (`cargo test -p pallet-atomic-trade-engine -p
+pallet-x3-settlement-engine fee`). (2) Every genesis built by `x3_chain_genesis` (dev, local,
+local3, staging, testnet, production) now creates `TreasuryAccountId` with the existential deposit,
+unless the spec already endows it — so a fresh chain's treasury can take a dust fee from block 0,
+which the DA and sequencer fees (TICKET-154) now require. Specs generated before this change still
+lack the account and must be regenerated.
 
 ## NIGHT SHIFT — the state at 05:00 local on 2026-09-27, for whoever starts next
 

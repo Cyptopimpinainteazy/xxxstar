@@ -7,6 +7,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// X3 Kernel metadata
 #[derive(Clone, Debug)]
@@ -305,12 +306,27 @@ impl X3KernelRegistry {
     }
 }
 
+/// The device that runs a verified kernel binary.
+///
+/// The runtime has no GPU of its own; without an executor, `execute_kernel` is an error rather
+/// than a made-up result.
+pub trait KernelExecutor: Send + Sync {
+    fn execute(
+        &self,
+        manifest: &X3KernelManifest,
+        binary: &[u8],
+        args: &[u8],
+    ) -> Result<Vec<u8>, String>;
+}
+
 /// Kernel runtime: loads and executes active kernels
 #[derive(Clone)]
 pub struct X3KernelRuntime {
     registry: X3KernelRegistry,
-    /// Cached loaded kernels (name → binary)
-    kernel_cache: HashMap<String, Vec<u8>>,
+    /// Installed binaries, keyed by (name, version). Each one matched its manifest's size and
+    /// SHA-256 when it was installed.
+    binaries: HashMap<(String, String), Vec<u8>>,
+    executor: Option<Arc<dyn KernelExecutor>>,
     /// Kernel execution stats
     pub total_executions: u64,
     pub total_errors: u64,
@@ -320,52 +336,73 @@ impl X3KernelRuntime {
     pub fn new(registry: X3KernelRegistry) -> Self {
         Self {
             registry,
-            kernel_cache: HashMap::new(),
+            binaries: HashMap::new(),
+            executor: None,
             total_executions: 0,
             total_errors: 0,
         }
     }
 
-    /// Load a kernel for execution
-    pub fn load_kernel(&mut self, kernel_name: &str) -> Result<Vec<u8>, String> {
-        // Check cache first
-        if let Some(binary) = self.kernel_cache.get(kernel_name) {
-            return Ok(binary.clone());
-        }
+    /// Attach the executor that runs kernel binaries.
+    pub fn set_executor(&mut self, executor: Arc<dyn KernelExecutor>) {
+        self.executor = Some(executor);
+    }
 
-        // Get active kernel
+    /// Install a kernel binary. It is refused unless its size and SHA-256 match the registered
+    /// manifest for `(kernel_name, version)`.
+    pub fn install_binary(
+        &mut self,
+        kernel_name: &str,
+        version: &str,
+        binary: Vec<u8>,
+    ) -> Result<(), String> {
+        let hash: [u8; 32] = Sha256::digest(&binary).into();
+        if !self
+            .registry
+            .verify_kernel(kernel_name, version, &binary, &hash)
+        {
+            return Err(format!(
+                "binary for {kernel_name} {version} does not match its manifest"
+            ));
+        }
+        self.binaries
+            .insert((kernel_name.to_string(), version.to_string()), binary);
+        Ok(())
+    }
+
+    /// Load the active version's verified binary.
+    pub fn load_kernel(&mut self, kernel_name: &str) -> Result<Vec<u8>, String> {
         let kernel = self
             .registry
             .get_active_kernel(kernel_name)
             .ok_or_else(|| "Kernel not found".to_string())?;
-
-        // In production: load from disk or remote registry
-        // For now: return empty binary
-        let binary = vec![0u8; kernel.binary_size as usize];
-
-        // Cache it
-        self.kernel_cache
-            .insert(kernel_name.to_string(), binary.clone());
-
-        Ok(binary)
+        self.binaries
+            .get(&(kernel_name.to_string(), kernel.version.clone()))
+            .cloned()
+            .ok_or_else(|| format!("binary for {kernel_name} {} not installed", kernel.version))
     }
 
-    /// Execute a kernel
-    pub fn execute_kernel(&mut self, kernel_name: &str, _args: &[u8]) -> Result<Vec<u8>, String> {
-        let _binary = self.load_kernel(kernel_name)?;
-
+    /// Execute the active version of a kernel on the attached executor.
+    pub fn execute_kernel(&mut self, kernel_name: &str, args: &[u8]) -> Result<Vec<u8>, String> {
+        let result = self.try_execute(kernel_name, args);
         self.total_executions += 1;
-
-        // In production: call native code / GPU
-        // For now: return mock result
-        match kernel_name {
-            "matmul" => Ok(vec![1u8; 32]),
-            "conv2d" => Ok(vec![2u8; 32]),
-            _ => {
-                self.total_errors += 1;
-                Err("Unknown kernel".to_string())
-            }
+        if result.is_err() {
+            self.total_errors += 1;
         }
+        result
+    }
+
+    fn try_execute(&mut self, kernel_name: &str, args: &[u8]) -> Result<Vec<u8>, String> {
+        let binary = self.load_kernel(kernel_name)?;
+        let manifest = self
+            .registry
+            .get_active_kernel(kernel_name)
+            .ok_or_else(|| "Kernel not found".to_string())?;
+        let executor = self
+            .executor
+            .as_ref()
+            .ok_or_else(|| "no kernel executor attached".to_string())?;
+        executor.execute(&manifest, &binary, args)
     }
 
     /// Hot-reload: switch kernel version mid-execution
@@ -374,9 +411,6 @@ impl X3KernelRuntime {
         kernel_name: String,
         new_version: String,
     ) -> Result<(), String> {
-        // Invalidate cache
-        self.kernel_cache.remove(&kernel_name);
-
         // Activate new version (in production: governance votes first)
         self.registry.activate_kernel(kernel_name, new_version, 0)?;
 
@@ -507,8 +541,23 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_kernel_runtime_execution() {
+    /// Test-only executor: echoes the binary length and the args.
+    struct EchoExecutor;
+
+    impl KernelExecutor for EchoExecutor {
+        fn execute(
+            &self,
+            _manifest: &X3KernelManifest,
+            binary: &[u8],
+            args: &[u8],
+        ) -> Result<Vec<u8>, String> {
+            let mut out = (binary.len() as u32).to_le_bytes().to_vec();
+            out.extend_from_slice(args);
+            Ok(out)
+        }
+    }
+
+    fn matmul_runtime(binary: &[u8]) -> X3KernelRuntime {
         let mut registry = X3KernelRegistry::new();
         registry
             .register_kernel(
@@ -516,20 +565,54 @@ mod tests {
                     name: "matmul".to_string(),
                     version: "1.0.0".to_string(),
                     kernel_type: KernelType::MatMul,
-                    binary_hash: [1u8; 32],
+                    binary_hash: Sha256::digest(binary).into(),
                     min_gpu_capability: "8.0".to_string(),
-                    binary_size: 1024,
+                    binary_size: binary.len() as u32,
                     registered_height: 100,
                     approved: true,
                 },
                 100,
             )
             .unwrap();
-        let mut runtime = X3KernelRuntime::new(registry);
+        X3KernelRuntime::new(registry)
+    }
 
-        let result = runtime.execute_kernel("matmul", &[]);
-        assert!(result.is_ok());
-        assert_eq!(runtime.total_executions, 1);
+    #[test]
+    fn test_kernel_runtime_execution() {
+        let binary = vec![7u8; 1024];
+        let mut runtime = matmul_runtime(&binary);
+        runtime
+            .install_binary("matmul", "1.0.0", binary.clone())
+            .unwrap();
+        runtime.set_executor(Arc::new(EchoExecutor));
+
+        let result = runtime.execute_kernel("matmul", &[9, 9]).unwrap();
+        assert_eq!(result, vec![0, 4, 0, 0, 9, 9]);
+        assert_eq!(runtime.get_stats(), (1, 0));
+    }
+
+    #[test]
+    fn runtime_refuses_binary_that_does_not_match_manifest() {
+        let binary = vec![7u8; 1024];
+        let mut runtime = matmul_runtime(&binary);
+        let mut tampered = binary.clone();
+        tampered[0] ^= 1;
+        assert!(runtime.install_binary("matmul", "1.0.0", tampered).is_err());
+        assert!(runtime
+            .install_binary("matmul", "1.0.0", vec![7u8; 1023])
+            .is_err());
+        assert!(runtime.load_kernel("matmul").is_err());
+    }
+
+    #[test]
+    fn runtime_without_binary_or_executor_does_not_fabricate_output() {
+        let binary = vec![7u8; 1024];
+        let mut runtime = matmul_runtime(&binary);
+        assert!(runtime.execute_kernel("matmul", &[]).is_err());
+
+        runtime.install_binary("matmul", "1.0.0", binary).unwrap();
+        assert!(runtime.execute_kernel("matmul", &[]).is_err());
+        assert_eq!(runtime.get_stats(), (2, 2));
     }
 
     #[test]

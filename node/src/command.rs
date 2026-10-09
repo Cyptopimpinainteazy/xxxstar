@@ -341,7 +341,7 @@ pub fn run() -> CliResult<()> {
                                     .into(),
                             );
                         }
-                        cmd.run_with_spec::<sp_runtime::traits::HashingFor<Block>, sp_io::SubstrateHostFunctions>(Some(config.chain_spec))
+                        cmd.run_with_spec::<sp_runtime::traits::HashingFor<Block>, crate::service::HostFunctions>(Some(config.chain_spec))
                     }
                     BenchmarkCmd::Block(cmd) => {
                         let partial = service::new_partial(&config).map_err(|e| {

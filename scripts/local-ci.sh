@@ -985,6 +985,10 @@ GATES_LIVE=(
   # chain_getFinalizedHead/chain_getHeader, system_name/version/chain and system_nodeRoles through the
   # same client the commands use. A node that does not answer is an error there, not a skipped test.
   "tauri-os live operator console:bash apps/tauri-os/src-tauri/run-live-test.sh"
+  # Signed Ethereum transactions against a `--features frontier` dev node: ethers signs, the runtime
+  # recovers the sender; tampered / wrong-chain / garbage / caller-named / replayed transactions are
+  # refused without moving a nonce or a balance, and the tx/receipt lookups serve the included one.
+  "frontier signed Ethereum txs:bash scripts/frontier-eth-e2e.sh"
 )
 
 GATES_VARIANTS=(

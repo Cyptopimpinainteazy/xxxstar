@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
-use x3_accel::{select_backend, AccelBackend};
+use x3_accel::{select_backend, AccelBackend, AccelError, CpuBackend, Secp256k1VerifyJob};
 use x3_vm::gpu::X3KernelGpuBackend;
 
 /// Helper function to convert a 32-byte slice to HashOutput
@@ -388,6 +388,18 @@ impl DeterministicEngine {
 
         self.stats.total_tasks.fetch_add(1, Ordering::SeqCst);
 
+        // Every path below hashes `task.inputs`. A signature task answered that way reports
+        // digests as if they were verdicts, so it is refused; signatures go through
+        // `verify_secp256k1_batch`, which takes typed jobs.
+        if task.task_type == TaskType::VerifySignature {
+            return ExecutionResult::error(
+                task.task_id,
+                "VerifySignature tasks are not executed as hashes; use \
+                 DeterministicEngine::verify_secp256k1_batch"
+                    .to_string(),
+            );
+        }
+
         // Execute based on mode
         let result = match mode {
             ExecutionMode::GpuOnly => self.execute_gpu(&task, algorithm),
@@ -516,7 +528,7 @@ impl DeterministicEngine {
             algorithm,
             batch_data,
             task.inputs.len() as i64,
-        );
+        )?;
 
         match gpu_backend.execute_module(module, 1_000_000) {
             Ok(execution_result) => match execution_result.value {
@@ -832,6 +844,37 @@ impl DeterministicEngine {
         })
     }
 
+    /// Verify secp256k1 signatures on the selected accelerator, with every verdict checked
+    /// against the CPU (`CpuBackend` is the authority).
+    ///
+    /// An accelerator error answers the batch from the CPU and counts a CPU fallback. A verdict
+    /// that differs from the CPU is a `Divergence` error, never an answer: the caller decides
+    /// whether to quarantine, and nothing the accelerator said is returned.
+    pub fn verify_secp256k1_batch(&self, batch: &[Secp256k1VerifyJob]) -> SwarmResult<Vec<bool>> {
+        let backend = self.accel_backend.read();
+        match x3_accel::secp256k1_with_parity(&**backend, batch) {
+            Ok(verdicts) => Ok(verdicts),
+            Err(AccelError::ParityMismatch) => {
+                self.stats.divergent_tasks.fetch_add(1, Ordering::SeqCst);
+                Err(SwarmError::Divergence(format!(
+                    "accelerator backend {} diverged from CPU secp256k1 verification",
+                    backend.name()
+                )))
+            }
+            Err(err) => {
+                warn!(
+                    "[Deterministic Engine] accelerator backend {} failed secp256k1 batch: {}; using CPU",
+                    backend.name(),
+                    err
+                );
+                self.stats.cpu_fallbacks.fetch_add(1, Ordering::SeqCst);
+                CpuBackend::new()
+                    .verify_secp256k1_batch(batch)
+                    .map_err(|e| SwarmError::CryptoError(e.to_string()))
+            }
+        }
+    }
+
     fn compute_cpu_hashes(task: &DeterministicTask, algorithm: HashAlgorithm) -> Vec<HashOutput> {
         task.inputs
             .iter()
@@ -973,6 +1016,126 @@ mod tests {
         assert_eq!(result.accelerator_backend, "wgpu");
         assert!(!result.accelerator_fallback_used);
         assert!(!result.accelerator_parity_mismatch);
+    }
+
+    fn secp256k1_jobs() -> Vec<Secp256k1VerifyJob> {
+        use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+        let secp = Secp256k1::new();
+        let sk = SecretKey::from_slice(&[0x42; 32]).unwrap();
+        let public_key = PublicKey::from_secret_key(&secp, &sk).serialize().to_vec();
+        (0u8..8)
+            .map(|i| {
+                let message_hash = [i; 32];
+                let msg = Message::from_digest_slice(&message_hash).unwrap();
+                let mut signature = secp.sign_ecdsa(&msg, &sk).serialize_compact();
+                if i % 3 == 0 {
+                    signature[10] ^= 1; // corrupt every third
+                }
+                Secp256k1VerifyJob {
+                    message_hash,
+                    signature,
+                    public_key: public_key.clone(),
+                }
+            })
+            .collect()
+    }
+
+    /// Test-only accelerator that flips every verdict.
+    struct LyingBackend;
+
+    impl AccelBackend for LyingBackend {
+        fn name(&self) -> &'static str {
+            "lying-test"
+        }
+        fn verify_secp256k1_batch(
+            &self,
+            batch: &[Secp256k1VerifyJob],
+        ) -> Result<Vec<bool>, AccelError> {
+            Ok(CpuBackend::new()
+                .verify_secp256k1_batch(batch)?
+                .into_iter()
+                .map(|v| !v)
+                .collect())
+        }
+        fn verify_ed25519_batch(
+            &self,
+            _: &[x3_accel::Ed25519VerifyJob],
+        ) -> Result<Vec<bool>, AccelError> {
+            Err(AccelError::InvalidInput("test backend"))
+        }
+        fn keccak256_batch(&self, _: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
+            Err(AccelError::InvalidInput("test backend"))
+        }
+        fn sha256_batch(&self, _: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
+            Err(AccelError::InvalidInput("test backend"))
+        }
+        fn blake2b256_batch(&self, _: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
+            Err(AccelError::InvalidInput("test backend"))
+        }
+        fn build_merkle_root(&self, _: &[[u8; 32]]) -> Result<[u8; 32], AccelError> {
+            Err(AccelError::InvalidInput("test backend"))
+        }
+    }
+
+    #[test]
+    fn verify_signature_tasks_are_refused_not_hashed() {
+        let engine = DeterministicEngine::new_with_accel_backend(Box::new(CpuBackend::new()));
+        let task = DeterministicTask::new(
+            TaskType::VerifySignature,
+            vec![b"not a signature".to_vec()],
+            HashAlgorithm::Keccak256,
+        );
+        let result = engine.execute(task);
+        assert!(result.outputs.is_empty());
+        assert!(result.error.is_some());
+        assert_ne!(result.verification, VerificationResult::Valid);
+    }
+
+    #[test]
+    fn secp256k1_batch_matches_cpu_verdicts() {
+        let engine = DeterministicEngine::new_with_accel_backend(Box::new(CpuBackend::new()));
+        let jobs = secp256k1_jobs();
+        let verdicts = engine.verify_secp256k1_batch(&jobs).unwrap();
+        let expected: Vec<bool> = (0u8..8).map(|i| i % 3 != 0).collect();
+        assert_eq!(verdicts, expected);
+    }
+
+    #[test]
+    fn secp256k1_batch_divergence_is_an_error_not_an_answer() {
+        let engine = DeterministicEngine::new_with_accel_backend(Box::new(LyingBackend));
+        let err = engine
+            .verify_secp256k1_batch(&secp256k1_jobs())
+            .expect_err("a lying accelerator must not produce verdicts");
+        assert!(matches!(err, SwarmError::Divergence(_)));
+        assert_eq!(engine.stats.divergent_tasks.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn secp256k1_batch_accelerator_error_answers_from_cpu() {
+        let engine = DeterministicEngine::new_with_accel_backend(Box::new(
+            x3_accel::UnavailableBackend::new(x3_accel::BackendKind::Wgpu),
+        ));
+        let verdicts = engine.verify_secp256k1_batch(&secp256k1_jobs()).unwrap();
+        let expected: Vec<bool> = (0u8..8).map(|i| i % 3 != 0).collect();
+        assert_eq!(verdicts, expected);
+        assert_eq!(engine.stats.cpu_fallbacks.load(Ordering::SeqCst), 1);
+    }
+
+    #[cfg(feature = "wgpu")]
+    #[test]
+    fn secp256k1_batch_on_wgpu_matches_cpu() {
+        let Ok(backend) = x3_accel::WgpuBackend::try_new() else {
+            assert!(
+                std::env::var("X3_REQUIRE_GPU").is_err(),
+                "X3_REQUIRE_GPU set but no wgpu adapter"
+            );
+            return;
+        };
+        let engine = DeterministicEngine::new_with_accel_backend(Box::new(backend));
+        let verdicts = engine.verify_secp256k1_batch(&secp256k1_jobs()).unwrap();
+        let expected: Vec<bool> = (0u8..8).map(|i| i % 3 != 0).collect();
+        assert_eq!(verdicts, expected);
+        assert_eq!(engine.stats.cpu_fallbacks.load(Ordering::SeqCst), 0);
     }
 
     #[test]

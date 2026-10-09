@@ -46,7 +46,7 @@ path = "src/bin/x3_cpu_validator.rs"
 # dependent's build graph. Its name now says what it actually enables.
 default = ["vm-gpu-hostcalls"]
 vm-gpu-hostcalls = []
-wgpu = ["x3-accel/wgpu"]
+wgpu = ["x3-accel/wgpu", "dep:x3-accel-wgpu"]
 
 [dependencies]
 # Async runtime
@@ -100,6 +100,8 @@ keccak-hash = "0.11"
 
 # GPU and VM
 x3-accel = { path = "../x3-accel" }
+# Adapter enumeration for `wallet_sync::detect_gpu`; only with the `wgpu` feature.
+x3-accel-wgpu = { path = "../x3-accel-wgpu", optional = true }
 x3-vm = { path = "../x3-vm" }
 x3-backend = { path = "../x3-backend" }
 x3-orchestra-control-plane = { path = "../x3-orchestra-control-plane" }

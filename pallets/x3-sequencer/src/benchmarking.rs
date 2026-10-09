@@ -8,7 +8,7 @@
 
 use super::*;
 use frame_benchmarking::v2::*;
-use frame_support::traits::Currency;
+use frame_support::traits::{Currency, Get};
 use frame_system::RawOrigin;
 use sp_core::H256;
 
@@ -17,13 +17,19 @@ mod benchmarks {
     use super::*;
 
     /// A payload the chain's own cap accepts; the fee is charged per byte, so the measured call
-    /// includes the reserve.
+    /// includes the fee transfer.
     const PAYLOAD_SIZE: u32 = 1_024;
 
     #[benchmark]
     fn submit_transaction() -> Result<(), BenchmarkError> {
         let caller: T::AccountId = whitelisted_caller();
         let _ = T::Currency::make_free_balance_be(&caller, 10_000_000u32.into());
+        // The fee is paid to the treasury; on a fresh chain it has no account yet, and a dead
+        // account refuses any deposit below the existential deposit.
+        let _ = T::Currency::make_free_balance_be(
+            &T::ProtocolTreasury::get(),
+            T::Currency::minimum_balance(),
+        );
 
         #[extrinsic_call]
         submit_transaction(

@@ -7,6 +7,7 @@ import html
 import json
 import os
 import re
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -995,6 +996,11 @@ def may_serve_critical(provider):
     request to anyone and stays eligible — that is how a critical request keeps
     working when a paid provider is unavailable or over budget.
     """
+    if provider.get("origin") == "registration":
+        # A drop-in from another node: having no credentials says nothing about
+        # where the model runs, so only the explicit flag counts, and a drop-in
+        # cannot set it (apply_registrations pins it to False).
+        return bool(provider.get("critical_allowed", False))
     return bool(provider.get("critical_allowed", False)) or not provider.get("api_key_env")
 
 
@@ -1218,6 +1224,10 @@ class Router:
     def __init__(self, config, db_path):
         self.config = config
         self.lock = threading.Lock()
+        # Requests currently running against each provider. In memory only:
+        # it describes this process's load, which a restart resets anyway.
+        self.in_flight = {}
+        self.in_flight_lock = threading.Lock()
         self.context = threading.local()
         self.db = None
         self.reconciled_orphans = 0
@@ -1229,12 +1239,13 @@ class Router:
             if db_path and db_path != ":memory:":
                 parent = os.path.dirname(os.path.abspath(db_path))
                 os.makedirs(parent, exist_ok=True)
-            self.db = sqlite3.connect(db_path, check_same_thread=False)
-            # WAL keeps a reader (dashboard, evidence query) from blocking the
-            # writer; busy_timeout turns lock contention into a bounded wait
-            # instead of an immediate "database is locked" failure.
-            self.db.execute("PRAGMA journal_mode=WAL")
-            self.db.execute("PRAGMA busy_timeout=5000")
+            self.db = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
+            # WAL lets the dashboard and a second router process read while a
+            # request thread writes; the busy timeout absorbs short lock waits
+            # instead of failing the request with "database is locked".
+            self.db.execute("PRAGMA busy_timeout=30000")
+            if db_path != ":memory:":
+                self.db.execute("PRAGMA journal_mode=WAL")
             self.initialize_database()
             self.reconcile_reservations()
         except Exception as exc:
@@ -1320,7 +1331,79 @@ class Router:
         for name in self.config.get("budget_fallback", []):
             if name in self.config["providers"] and name not in order:
                 order.append(name)
-        return order
+        return self.spill_saturated(order)
+
+    def spill_saturated(self, order):
+        """Move providers whose worker is at `max_in_flight` to the back.
+
+        Two local GPU workers each serve a bounded number of requests well;
+        past that, a request queues behind the others on the same card while
+        the second card sits idle. A saturated provider is not removed — it is
+        still the last resort — it just stops being first. Providers without
+        `max_in_flight` are never moved, so cloud ordering is unchanged.
+        """
+        with self.in_flight_lock:
+            busy = {name for name in order if self.saturated(name)}
+        if not busy:
+            return order
+        return [name for name in order if name not in busy] + [name for name in order if name in busy]
+
+    def claimed_attempts(self, chain):
+        """Yield `attempt_order(chain)`, holding an in-flight slot on each.
+
+        The slot is claimed in the same critical section that checks the
+        limit, so two concurrent requests cannot both see an idle worker and
+        pile onto it. It is held while the caller's loop body runs and
+        released when the loop advances or exits (return, break, exception).
+        """
+        pending = self.attempt_order(chain)
+        deferred = set()
+        while pending:
+            name = pending.pop(0)
+            worker = self.worker_of(name)
+            with self.in_flight_lock:
+                if (name not in deferred and self.saturated(name)
+                        and any(not self.saturated(other) for other in pending)):
+                    deferred.add(name)
+                    pending.append(name)
+                    continue
+                self.in_flight[worker] = self.in_flight.get(worker, 0) + 1
+            try:
+                yield name
+            finally:
+                with self.in_flight_lock:
+                    self.in_flight[worker] = max(0, self.in_flight.get(worker, 0) - 1)
+
+    def worker_of(self, name):
+        """The load key: providers sharing a `worker` share one GPU's slots."""
+        return self.config["providers"].get(name, {}).get("worker", name)
+
+    def saturated(self, name):
+        """True when `name`'s worker is at its `max_in_flight`. Caller holds the lock."""
+        limit = self.config["providers"].get(name, {}).get("max_in_flight")
+        # None is unlimited; 0 is zero slots, not "unlimited".
+        return limit is not None and self.in_flight.get(self.worker_of(name), 0) >= limit
+
+    def track(self, name):
+        """Context manager counting one running request against `name`."""
+        router = self
+
+        class _Tracker:
+            def __enter__(self):
+                with router.in_flight_lock:
+                    worker = router.worker_of(name)
+                    router.in_flight[worker] = router.in_flight.get(worker, 0) + 1
+
+            def __exit__(self, *exc):
+                with router.in_flight_lock:
+                    worker = router.worker_of(name)
+                    router.in_flight[worker] = max(0, router.in_flight.get(worker, 0) - 1)
+                return False
+        return _Tracker()
+
+    def load(self):
+        with self.in_flight_lock:
+            return {name: count for name, count in self.in_flight.items() if count}
 
     def reserve(self, agent, estimate):
         day = dt.datetime.now(dt.timezone.utc).date().isoformat()
@@ -1969,7 +2052,7 @@ class Router:
                                 "task_class": classification["task_class"]}
         failures = []
         budget_refused = False
-        for name in self.attempt_order(chain):
+        for name in self.claimed_attempts(chain):
             provider = self.config["providers"][name]
             model = provider["model"]
             price_in = provider.get("input_usd_per_million", 0)
@@ -2174,7 +2257,7 @@ class Router:
                                 "task_class": classification["task_class"]}
         failures = []
         budget_refused = False
-        for name in self.attempt_order(chain):
+        for name in self.claimed_attempts(chain):
             provider = self.config["providers"][name]
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
@@ -2381,7 +2464,7 @@ def handler_for(router):
                 self.end_headers()
                 return
             if self.path == "/health":
-                return self.reply(200, {"status": "ok"})
+                return self.reply(200, {"status": "ok", "in_flight": router.load()})
             if self.path == "/v1/usage":
                 return self.reply(200, {"usage": router.stats()})
             if self.path == "/v1/tasks":
@@ -2729,20 +2812,149 @@ def handler_for(router):
     return Handler
 
 
+REGISTRATION_KEYS = {"base_url", "protocol", "model", "supports_tools", "tool_probe", "tool_probe_max_tokens",
+                     "probe_timeout_seconds", "probe_samples", "critical_allowed", "max_in_flight", "worker",
+                     "timeout_seconds"}
+
+
+def registration_type_error(name, spec):
+    """Raise ValueError when a drop-in value has the wrong type.
+
+    Keys are checked against REGISTRATION_KEYS; this checks values, so a bad
+    file is rejected here instead of failing requests later (a string
+    `max_in_flight` compared with an int, an unhashable `worker` used as a key).
+    """
+    def is_int(value):
+        return isinstance(value, int) and not isinstance(value, bool)
+
+    def is_positive_number(value):
+        return (is_int(value) or isinstance(value, float)) and value > 0
+
+    checks = {
+        "base_url": lambda v: isinstance(v, str),
+        "model": lambda v: isinstance(v, str),
+        "protocol": lambda v: isinstance(v, str),
+        "worker": lambda v: isinstance(v, str) and bool(v),
+        "supports_tools": lambda v: isinstance(v, bool),
+        "tool_probe": lambda v: isinstance(v, bool),
+        "critical_allowed": lambda v: v is False,
+        "max_in_flight": lambda v: is_int(v) and v >= 1,
+        "probe_samples": lambda v: is_int(v) and v >= 1,
+        "tool_probe_max_tokens": lambda v: is_int(v) and v >= 1,
+        "probe_timeout_seconds": is_positive_number,
+        "timeout_seconds": is_positive_number,
+    }
+    for key, value in spec.items():
+        if key in checks and not checks[key](value):
+            raise ValueError(f"provider {name!r} has an invalid {key}: {value!r}")
+
+
+def apply_registrations(config, directory):
+    """Merge GPU worker drop-ins from `directory` into `config`.
+
+    A node joins the fabric by writing `<node>.json` here instead of editing
+    `config.json`:
+
+        {"node": "x3gpu2",
+         "providers": {"x3gpu2_gpu0_qwen3": {"base_url": "http://x3gpu2:11434/v1",
+                                             "model": "qwen3:8b", "worker": "x3gpu2-gpu0", ...}},
+         "policies": {"x3-local": ["x3gpu2_gpu0_qwen3"], "x3-code": ["x3gpu2_gpu0_qwen3"]}}
+
+    Registered providers are appended to the named policies (after what the
+    operator configured, so a new node never jumps the queue) and to
+    `budget_fallback`. They are credential-free and price-free by
+    construction: only keys in REGISTRATION_KEYS are accepted, so a drop-in
+    cannot smuggle in an API key, a price, or `free_model`. A bad file is
+    skipped with a message rather than stopping the router.
+    """
+    accepted, rejected = [], []
+    if not directory or not os.path.isdir(directory):
+        return accepted, rejected
+    for filename in sorted(os.listdir(directory)):
+        if not filename.endswith(".json"):
+            continue
+        path = os.path.join(directory, filename)
+        try:
+            with open(path, encoding="utf-8") as source:
+                data = json.load(source)
+            providers = data.get("providers")
+            if not isinstance(providers, dict) or not providers:
+                raise ValueError("no providers")
+            for name, spec in providers.items():
+                if name in config["providers"]:
+                    raise ValueError(f"provider {name!r} already exists")
+                if not isinstance(spec, dict) or set(spec) - REGISTRATION_KEYS:
+                    raise ValueError(f"provider {name!r} has unsupported keys {sorted(set(spec) - REGISTRATION_KEYS)}")
+                if not str(spec.get("base_url", "")).startswith(("http://", "https://")) or not spec.get("model"):
+                    raise ValueError(f"provider {name!r} needs an http(s) base_url and a model")
+                registration_type_error(name, spec)
+            policies = data.get("policies") or {}
+            for policy, names in policies.items():
+                if policy not in config.get("policies", {}):
+                    raise ValueError(f"unknown policy {policy!r}")
+                if not set(names) <= set(providers):
+                    raise ValueError(f"policy {policy!r} names providers outside this file")
+        except (OSError, ValueError, TypeError, AttributeError) as exc:
+            rejected.append({"file": filename, "error": str(exc)})
+            continue
+        for name, spec in providers.items():
+            # critical_allowed is the router operator's decision, never a drop-in's.
+            config["providers"][name] = dict({"protocol": "chat_completions"}, **spec,
+                                             critical_allowed=False, origin="registration")
+        for policy, names in policies.items():
+            config["policies"][policy]["order"] = config["policies"][policy].get("order", []) + list(names)
+        fallback = config.setdefault("budget_fallback", [])
+        fallback.extend(name for name in providers if name not in fallback)
+        accepted.append({"file": filename, "node": data.get("node"), "providers": sorted(providers)})
+    return accepted, rejected
+
+
+class ThreadingHTTPServerV6(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
+def server_class_for(host):
+    """ThreadingHTTPServer is AF_INET; an IPv6 address such as ::1 needs AF_INET6."""
+    return ThreadingHTTPServerV6 if ":" in host else ThreadingHTTPServer
+
+
+def default_db_path():
+    """`$X3_ROUTER_DB`, else `$XDG_DATA_HOME/x3-router/usage.sqlite3`.
+
+    The old default was relative to the working directory, so the same
+    service started from two places kept two separate budgets.
+    """
+    if os.environ.get("X3_ROUTER_DB"):
+        return os.environ["X3_ROUTER_DB"]
+    base = os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
+    return os.path.join(base, "x3-router", "usage.sqlite3")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=os.path.join(os.path.dirname(__file__), "config.json"))
-    parser.add_argument("--db", default="x3-router.sqlite3")
+    parser.add_argument("--db", default=default_db_path())
     parser.add_argument("--port", type=int, default=11435)
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--providers-dir", default=os.environ.get(
+        "X3_ROUTER_PROVIDERS_DIR", os.path.join(os.path.expanduser("~"), ".config", "x3-router", "providers.d")))
+    # Loopback by default. Set a LAN address only together with
+    # X3_ROUTER_TOKEN; the router fronts paid providers.
+    parser.add_argument("--host", default=os.environ.get("X3_ROUTER_HOST", "127.0.0.1"))
     args = parser.parse_args()
     with open(args.config, encoding="utf-8") as source:
         config = json.load(source)
+    accepted, rejected = apply_registrations(config, args.providers_dir)
+    for entry in accepted:
+        print("registered worker", json.dumps(entry), flush=True)
+    for entry in rejected:
+        print("rejected worker registration", json.dumps(entry), flush=True)
     router = Router(config, args.db)
     # Probe in the background: a slow or unreachable provider must not hold up
     # the listener, and the verdict is what makes an agent route provable.
     threading.Thread(target=router.warm_capabilities, daemon=True).start()
-    server = ThreadingHTTPServer((args.host, args.port), handler_for(router))
+    if args.host not in ("127.0.0.1", "localhost", "::1") and not os.environ.get("X3_ROUTER_TOKEN"):
+        parser.error("--host other than loopback requires X3_ROUTER_TOKEN")
+    server = server_class_for(args.host)((args.host, args.port), handler_for(router))
     server.serve_forever()
 
 

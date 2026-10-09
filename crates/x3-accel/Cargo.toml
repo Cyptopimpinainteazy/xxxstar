@@ -17,3 +17,10 @@ secp256k1 = "0.28"
 sha2 = "0.10"
 thiserror = "1.0"
 x3-accel-wgpu = { path = "../x3-accel-wgpu", optional = true }
+
+[dev-dependencies]
+num-bigint = "0.4"
+
+[[example]]
+name = "secp256k1_gpu_bench"
+required-features = ["wgpu"]
