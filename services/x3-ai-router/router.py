@@ -1239,12 +1239,13 @@ class Router:
             if db_path and db_path != ":memory:":
                 parent = os.path.dirname(os.path.abspath(db_path))
                 os.makedirs(parent, exist_ok=True)
-            self.db = sqlite3.connect(db_path, check_same_thread=False)
-            # WAL keeps a reader (dashboard, evidence query) from blocking the
-            # writer; busy_timeout turns lock contention into a bounded wait
-            # instead of an immediate "database is locked" failure.
-            self.db.execute("PRAGMA journal_mode=WAL")
-            self.db.execute("PRAGMA busy_timeout=5000")
+            self.db = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
+            # WAL lets the dashboard and a second router process read while a
+            # request thread writes; the busy timeout absorbs short lock waits
+            # instead of failing the request with "database is locked".
+            self.db.execute("PRAGMA busy_timeout=30000")
+            if db_path != ":memory:":
+                self.db.execute("PRAGMA journal_mode=WAL")
             self.initialize_database()
             self.reconcile_reservations()
         except Exception as exc:
