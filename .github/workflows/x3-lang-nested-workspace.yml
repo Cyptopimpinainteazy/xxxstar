@@ -21,7 +21,7 @@ concurrency:
 jobs:
   language:
     name: Nested Rust compiler and VM checks
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, x3]
     defaults:
       run:
         working-directory: x3-lang
@@ -46,7 +46,7 @@ jobs:
 
   python-intent:
     name: Python intent DSL regression tests
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
