@@ -64,5 +64,45 @@ class CheatScannerTests(unittest.TestCase):
                     self.assertTrue(all(f['path'] == 'src/feature.js' for f in actual))
 
 
+class ProdMockTests(unittest.TestCase):
+    """A mock used inside `#[cfg(test)]` is test code; one outside it is not."""
+
+    SOURCE = """pub struct Engine;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn counts() {
+        use crate::mock::Test as MockRuntime;
+        let braces = "{ not code }";
+        assert_eq!(engine::<MockRuntime>(), 0);
+    }
+}
+
+pub struct Mock;
+"""
+
+    def kinds(self, fallback=False):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "pallets" / "engine" / "src" / "lib.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text(self.SOURCE)
+            with patch.object(scanner, "REPO_ROOT", root):
+                if fallback:
+                    with patch.object(scanner.shutil, "which", return_value=None):
+                        found = scanner.scan_cheats()
+                else:
+                    found = scanner.scan_cheats()
+        return [(f["kind"], f["line"]) for f in found if f["kind"] == "prod-mock"]
+
+    def test_only_the_mock_outside_the_test_module_is_flagged(self):
+        line = self.SOURCE.splitlines().index("pub struct Mock;") + 1
+        self.assertEqual(self.kinds(), [("prod-mock", line)])
+        self.assertEqual(self.kinds(fallback=True), [("prod-mock", line)])
+
+
 if __name__ == "__main__":
     unittest.main()
