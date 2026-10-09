@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   compile-and-test-storage:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 90
     env:
       CARGO_TERM_COLOR: always
