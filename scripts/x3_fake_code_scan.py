@@ -204,6 +204,10 @@ CHEAT_CANDIDATE_PATTERNS = [
     r"#\s*\[\s*ignore",
     r"\.skip\s*\(",
     r"\bxit\s*\(",
+    # Whole-word on purpose for now, and a known blind spot: it drops
+    # `MockOracle`-style identifiers that `PROD_MOCK_RE` would flag, so the rg path
+    # sees fewer prod-mock findings than the Python fallback. Widening it surfaces
+    # 148 findings that need triage first (TESTNET_GAP_LEDGER.md, GAP-PROD-MOCK-PREFILTER).
     r"(?i)\b(mock|mockall|fake|stub|dummy)\b",
     r"#\s*\[\s*(?:tokio::)?test\s*\]",
 ]
@@ -460,6 +464,51 @@ def _has_cfg_test_attribute_above(lines: list[str], lineno: int) -> bool:
     return False
 
 
+_RUST_LITERAL_RE = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'')
+
+
+def _cfg_test_lines(lines: list[str]) -> set[int]:
+    """1-based numbers of the lines inside a `#[cfg(test)]`-gated Rust item.
+
+    `_has_cfg_test_attribute_above` only sees attributes stacked directly on the
+    matching line, so a `use crate::mock::Test as MockRuntime;` written inside a
+    `#[test]` fn in `#[cfg(test)] mod tests { ... }` was reported as a mock on a
+    production path. This follows braces from each gate to the end of its item.
+    String/char literals and `//` comments are stripped first so braces inside
+    them do not move the depth.
+    """
+    gated: set[int] = set()
+    depth = 0
+    pending = False          # a cfg(test) attribute is waiting for its item
+    region_depth = None      # depth outside the gated item while inside it
+    for number, raw in enumerate(lines, start=1):
+        code = _RUST_LITERAL_RE.sub('""', raw).split("//", 1)[0]
+        stripped = code.strip()
+        if region_depth is not None:
+            gated.add(number)
+        if region_depth is None and _is_cfg_test(stripped):
+            pending = True
+            continue
+        if pending and region_depth is None:
+            if stripped.startswith("#[") or not stripped:
+                continue
+            gated.add(number)
+            if "{" not in code and stripped.endswith(";"):
+                pending = False  # `mod mock;` / a gated `use`: a one-line item
+                continue
+            if "{" in code:
+                region_depth = depth
+                pending = False
+        for char in code:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if region_depth is not None and depth == region_depth:
+                    region_depth = None
+    return gated
+
+
 NOOP_TEST_RUST_RE = re.compile(
     r"#\s*\[\s*(?:tokio::)?test\s*\]\s*(?:#\[[^\]]*\]\s*)*"
     r"(?:async\s+)?fn\s+(?P<name>\w+)\s*\([^)]*\)\s*(?:->[^{]*)?\{\s*\}",
@@ -483,6 +532,7 @@ def scan_cheats() -> list[dict[str, object]]:
     # line above the definition: `#[cfg(test)] mod mock;` is Substrate's normal
     # way to declare a test mock, and it is not a mock on a production path.
     prod_mock_lines: dict[str, list[str]] = {}
+    gated_lines: dict[str, set[int]] = {}
 
     for rel, lineno, line in candidates:
         if line.lstrip().startswith(("//", "/*", "*")):
@@ -511,7 +561,9 @@ def scan_cheats() -> list[dict[str, object]]:
         ):
             if rel not in prod_mock_lines:
                 prod_mock_lines[rel] = read_lines(REPO_ROOT / rel)
-            if not _has_cfg_test_attribute_above(prod_mock_lines[rel], lineno):
+                gated_lines[rel] = _cfg_test_lines(prod_mock_lines[rel])
+            if (not _has_cfg_test_attribute_above(prod_mock_lines[rel], lineno)
+                    and lineno not in gated_lines[rel]):
                 kind = "prod-mock"
         if kind is None:
             continue
