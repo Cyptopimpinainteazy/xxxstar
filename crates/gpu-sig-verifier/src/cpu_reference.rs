@@ -65,5 +65,23 @@ mod tests {
             &digest,
             &signature.to_bytes()
         ));
+
+        // A correctly formed signature from a different key must not pass.
+        let other_key = SigningKey::from_bytes((&[8u8; 32]).into()).unwrap();
+        let other_public_key = other_key.verifying_key().to_encoded_point(true);
+        assert!(!verify_secp256k1_digest(
+            other_public_key.as_bytes(),
+            &digest,
+            &signature.to_bytes()
+        ));
+
+        // Corrupting r or s must never silently verify.
+        let mut corrupted_signature = signature.to_bytes();
+        corrupted_signature[0] ^= 1;
+        assert!(!verify_secp256k1_digest(
+            public_key.as_bytes(),
+            &digest,
+            &corrupted_signature
+        ));
     }
 }
