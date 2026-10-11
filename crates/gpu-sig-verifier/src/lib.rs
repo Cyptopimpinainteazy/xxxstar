@@ -11,6 +11,8 @@
 //! (GPU or otherwise) is wired in. Do not treat this crate as a security
 //! boundary.
 
+pub mod cpu_reference;
+
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
