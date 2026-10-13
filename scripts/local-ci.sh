@@ -1034,6 +1034,7 @@ GATES_VARIANTS=(
 
 GATES_RELEASE=(
   "release gate (mainnet-check):make mainnet-check"
+  "RC1 three-validator boot:bash scripts/mainnet/rc1_boot_gate.sh"
 )
 
 # The loom model checks live outside the workspace (`tests/loom-concurrency` is
@@ -1534,6 +1535,8 @@ run_gate() {
 # smallest correct fix: the alternative is a per-gate port allocation, which means
 # threading a port block through nine scripts and every test constant they drive.
 SERIAL_GATES=(
+  "release gate (mainnet-check)"
+  "RC1 three-validator boot"
   "local node smoke"
   "local network smoke"
   "monitoring across validators"
