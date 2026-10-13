@@ -56,7 +56,10 @@ scripts/ci/run-remote-checks.sh lojak@192.168.0.55 FULL_40_CHARACTER_SHA workspa
 Use comma-separated gate slugs accepted by `scripts/local-ci.sh --all --only`.
 All gate families are available for selection, including explicit live and
 restart tests. Only the named gates execute; their external tool requirements
-still apply.
+still apply. Batch related gates in one invocation, for example
+`test-node,x3-native-lifecycles`, to share a source worktree and build cache.
+Separate jobs create fresh source paths; the CI freshness guard deliberately
+rechecks builds when the path changes.
 The process returns the CI command's exit code and prints its evidence directory.
 Each job fetches and verifies the full commit, creates a detached worktree and
 retains `output.log`, the local CI gate logs under `source/.ai/runlogs`, and
