@@ -6810,6 +6810,7 @@ name = "gpu-sig-verifier"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "k256",
  "serde",
  "tokio",
  "uuid 1.21.0",
