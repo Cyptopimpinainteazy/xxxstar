@@ -1588,8 +1588,9 @@ impl Database {
             .fetch_one(&self.pool)
             .await?;
 
-        let latest: Option<(i64,)> = sqlx::query_as("SELECT MAX(number) FROM blocks")
-            .fetch_optional(&self.pool)
+        // Aggregate queries always return a row; MAX is NULL on an empty chain.
+        let latest: Option<i64> = sqlx::query_scalar("SELECT MAX(number) FROM blocks")
+            .fetch_one(&self.pool)
             .await?;
 
         let total_extrinsics: (i64,) = sqlx::query_as("SELECT COUNT(*)::bigint FROM extrinsics")
@@ -1616,7 +1617,7 @@ impl Database {
 
         Ok(ChainStats {
             total_blocks: total_blocks.0,
-            latest_block: latest.map(|l| l.0),
+            latest_block: latest,
             total_extrinsics: total_extrinsics.0,
             total_events: total_events.0,
             total_comits: total_comits.0,
