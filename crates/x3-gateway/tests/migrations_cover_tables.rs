@@ -51,32 +51,34 @@ fn extract_table_names(text: &str) -> BTreeSet<String> {
 
 fn scan_literal(literal: &str, tables: &mut BTreeSet<String>) {
     let mut rest = literal;
-    while let Some(pos) = rest.find(|c: char| matches!(c, 'A'..='Z')) {
+    while let Some(pos) = rest.find(|c: char| c.is_ascii_uppercase()) {
         let upper = &rest[pos..];
-        let (verb, tail) = if upper.starts_with("FROM ") {
-            ("FROM", &upper[5..])
-        } else if upper.starts_with("FROM\n") {
-            ("FROM", &upper[5..])
-        } else if upper.starts_with("INTO ") {
-            ("INTO", &upper[5..])
-        } else if upper.starts_with("UPDATE ") {
-            ("UPDATE", &upper[7..])
-        } else if upper.starts_with("JOIN ") {
-            ("JOIN", &upper[5..])
+        let (verb, tail) = if let Some(tail) = upper
+            .strip_prefix("FROM ")
+            .or_else(|| upper.strip_prefix("FROM\n"))
+        {
+            ("FROM", tail)
+        } else if let Some(tail) = upper.strip_prefix("INTO ") {
+            ("INTO", tail)
+        } else if let Some(tail) = upper.strip_prefix("UPDATE ") {
+            ("UPDATE", tail)
+        } else if let Some(tail) = upper.strip_prefix("JOIN ") {
+            ("JOIN", tail)
         } else {
             rest = &upper[1..];
             continue;
         };
         let tail = tail.trim_start();
-        if let Some(end) = tail.find(|c: char| !(c.is_ascii_lowercase() || c == '_')) {
-            let ident = &tail[..end];
-            if !ident.is_empty() && ident.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
-                tables.insert(ident.to_string());
-            }
-            rest = &tail[end..];
-        } else {
-            rest = "";
+        // A table name can end the literal ("... FROM benchmark_reports"); without the
+        // fallback to the literal's end those were skipped and the guard missed them.
+        let end = tail
+            .find(|c: char| !(c.is_ascii_lowercase() || c == '_'))
+            .unwrap_or(tail.len());
+        let ident = &tail[..end];
+        if !ident.is_empty() {
+            tables.insert(ident.to_string());
         }
+        rest = &tail[end..];
         let _ = verb;
     }
 }
