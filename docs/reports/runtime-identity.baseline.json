@@ -1,7 +1,7 @@
 {
   "accepted_reasons": {
     "construct_runtime_variants": "Regenerated after the Northern Swarm / Reactor merge (PR #519) added `NorthernSwarm: pallet_northern_swarm` to every variant, and again on 2026-09-30 after the X3 guardian wiring commit f4c13ea25 appended `X3AppRegistry`, `X3SecurityGate` and `X3TrustGate` to every variant. Both are index-renumbering changes for every pallet declared after them, which is exactly what this baseline is for; they are accepted here because those commits are the changes that introduced them and no chain runs this runtime yet (`transaction_version` stays 1: no existing call's encoding moved). Appending at the end of each variant leaves every pre-existing pallet index where it was.",
-    "runtime_version.spec_version": "The baseline was seeded at spec_version 10 and never regenerated, because the gate could not run: `sp_version::RuntimeVersion` dropped `state_version` in the pinned polkadot-sdk revision and the script required it, so every invocation exited before comparing anything. Regenerated 2026-09-27 at 20, which is the value `docs/reports/runtime-wasm-reproducibility.md` records across v10-v20 (v20 removed the unsigned `submit_finalization_result`).",
+    "runtime_version.spec_version": "The baseline was seeded at spec_version 10 and never regenerated, because the gate could not run: `sp_version::RuntimeVersion` dropped `state_version` in the pinned polkadot-sdk revision and the script required it, so every invocation exited before comparing anything. Regenerated 2026-09-27 at 20, which is the value `docs/reports/runtime-wasm-reproducibility.md` records across v10-v20 (v20 removed the unsigned `submit_finalization_result`). Moved to 21 on 2026-10-13 for the X3 Guardian pallets (X3AppRegistry, X3SecurityGate, X3TrustGate), which had joined construct_runtime without a version bump, and to 22 in the same release for the persistent WASM EVM state and authenticated EVM callers, together with self-contained Ethereum extrinsics (#578). transaction_version stays 1: no existing call's encoding moved.",
     "runtime_version.state_version": "Absent from the source in the pinned revision; the field no longer exists in `sp_version::RuntimeVersion`. `system_version` replaces it here.",
     "runtime_version.system_version": "Present from the v20 source (1).",
     "signed_extra": "Unchanged in content and order; recorded here because the seeded baseline predates the two X3 checks (`InvariantCheck`, `AgentLawCheck`) that the source now carries."
@@ -1418,7 +1418,7 @@
     "impl_name": "x3-chain",
     "impl_version": 1,
     "spec_name": "x3-chain",
-    "spec_version": 20,
+    "spec_version": 22,
     "system_version": 1,
     "transaction_version": 1
   },
