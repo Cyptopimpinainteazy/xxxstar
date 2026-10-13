@@ -13,7 +13,7 @@ FAIL=0
 
 ok()   { echo "[PASS] $1"; ((PASS+=1)); }
 fail() { echo "[FAIL] $1"; ((FAIL+=1)); }
-rpc()  { curl -s -X POST -H "Content-Type: application/json" --data "$1" "$RPC"; }
+rpc()  { curl --fail --silent --show-error --max-time 10 -X POST -H "Content-Type: application/json" --data "$1" "$RPC"; }
 
 echo "=== X3 RC1 Smoke Test ==="
 echo "RPC: $RPC"
@@ -43,20 +43,15 @@ fi
 
 # --- 3. Runtime metadata pallets ---
 echo "-- Runtime metadata --"
-META_HEX=$(rpc '{"id":5,"jsonrpc":"2.0","method":"state_getMetadata","params":[]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['result'])")
-META_BYTES=$(python3 -c "import sys; h=sys.argv[1].lstrip('0x'); print(bytes.fromhex(h).decode('latin-1'))" "$META_HEX" 2>/dev/null || echo "$META_HEX")
-
-if echo "$META_BYTES" | grep -q "X3SupplyLedger"; then
-  ok "Pallet X3SupplyLedger present in metadata"
-else
-  fail "Pallet X3SupplyLedger NOT found in metadata"
-fi
-
-if echo "$META_BYTES" | grep -q "X3CrossVmRouter"; then
-  ok "Pallet X3CrossVmRouter present in metadata"
-else
-  fail "Pallet X3CrossVmRouter NOT found in metadata"
-fi
+# Decode from stdin: metadata exceeds a command-line argument on the full runtime.
+# Never put binary metadata in a shell variable (it contains NUL bytes).
+for PALLET in X3SupplyLedger X3CrossVmRouter; do
+  if rpc '{"id":5,"jsonrpc":"2.0","method":"state_getMetadata","params":[]}' | python3 -c 'import sys,json; raw=json.load(sys.stdin)["result"]; sys.exit(0 if sys.argv[1].encode() in bytes.fromhex(raw.removeprefix("0x")) else 1)' "$PALLET"; then
+    ok "Pallet $PALLET present in metadata"
+  else
+    fail "Pallet $PALLET NOT found in metadata"
+  fi
+done
 
 # --- 4. External bridges disabled ---
 echo "-- External bridges disabled --"
@@ -136,7 +131,7 @@ def twox128(value):
 
 print(twox128('X3BridgeAdapters') + twox128('ExternalBridgesEnabled'))
 ")"
-VAL=$(rpc "{\"id\":6,\"jsonrpc\":\"2.0\",\"method\":\"state_getStorage\",\"params\":[\"$STORAGE_KEY\"]}" | python3 -c "import sys,json; value=json.load(sys.stdin).get('result'); print('null' if value is None else value)")
+VAL=$(rpc "{\"id\":6,\"jsonrpc\":\"2.0\",\"method\":\"state_getStorage\",\"params\":[\"$STORAGE_KEY\"]}" | python3 -c "import sys,json; payload=json.load(sys.stdin); assert 'error' not in payload, payload.get('error'); value=payload['result']; print('null' if value is None else value)")
 if [ "$VAL" = "null" ] || [ "$VAL" = "0x00" ]; then
   ok "ExternalBridgesEnabled = false (value: $VAL)"
 else
