@@ -1,0 +1,35 @@
+{
+  "name": "quantum-kernel-voyager",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Quantum Kernel Voyager Desktop Edition — 3D blockchain control interface for the Atlas Sphere ecosystem",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --no-watch",
+    "tauri:build": "tauri build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "three": "0.168.0",
+    "simplex-noise": "4.0.3"
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "2.2.0",
+    "@tauri-apps/cli": "2.2.0",
+    "@tauri-apps/plugin-dialog": "2.2.0",
+    "@tauri-apps/plugin-fs": "2.2.0",
+    "@tauri-apps/plugin-notification": "2.2.0",
+    "@tauri-apps/plugin-os": "2.2.0",
+    "@tauri-apps/plugin-shell": "2.2.0",
+    "@types/three": "0.168.0",
+    "typescript": "5.6.3",
+    "vite": "5.4.11",
+    "vitest": "2.1.8"
+  }
+}

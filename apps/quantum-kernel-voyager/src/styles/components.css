@@ -1,0 +1,245 @@
+/* =========================================================
+ * components.css — Modals, context menu, buttons, tooltips
+ * ========================================================= */
+
+/* ---- Modal Backdrop ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal-backdrop);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.modal-backdrop.open {
+  opacity: 1;
+}
+
+/* ---- Modal Dialog ---- */
+.modal-dialog {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  width: 420px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 24px var(--color-border-glow);
+  transform: scale(0.95);
+  transition: transform 0.2s ease;
+}
+
+.modal-backdrop.open .modal-dialog {
+  transform: scale(1);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 var(--space-xs);
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.modal-close:hover {
+  color: var(--color-danger);
+}
+
+.modal-body {
+  padding: var(--space-lg);
+  overflow-y: auto;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+}
+
+.modal-body p {
+  margin-bottom: var(--space-md);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---- Buttons ---- */
+.modal-btn {
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.2s;
+}
+
+.modal-btn-primary {
+  background: var(--color-primary);
+  color: var(--color-bg);
+  border-color: var(--color-primary);
+}
+
+.modal-btn-primary:hover {
+  background: transparent;
+  color: var(--color-primary);
+  box-shadow: 0 0 12px var(--color-primary);
+}
+
+.modal-btn-secondary {
+  background: transparent;
+  color: var(--color-text-dim);
+  border-color: var(--color-border);
+}
+
+.modal-btn-secondary:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.modal-btn-danger {
+  background: var(--color-danger);
+  color: var(--color-text-bright);
+  border-color: var(--color-danger);
+}
+
+.modal-btn-danger:hover {
+  background: transparent;
+  color: var(--color-danger);
+  box-shadow: 0 0 12px var(--color-danger);
+}
+
+/* ---- Context Menu ---- */
+.context-menu {
+  position: fixed;
+  z-index: var(--z-context-menu);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) 0;
+  min-width: 180px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  animation: fade-in 0.1s ease;
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  transition: background 0.15s, color 0.15s;
+}
+
+.ctx-item:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-primary);
+}
+
+.ctx-item.disabled {
+  color: var(--color-text-dim);
+  cursor: default;
+  pointer-events: none;
+}
+
+.ctx-icon {
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.ctx-label {
+  flex: 1;
+}
+
+.ctx-arrow {
+  color: var(--color-text-dim);
+  font-size: 10px;
+}
+
+.ctx-separator {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-xs) 0;
+}
+
+/* ---- Dev Tools Panel ---- */
+#dev-tools {
+  position: fixed;
+  bottom: 32px;
+  left: 0;
+  width: 300px;
+  max-height: 300px;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 0 var(--radius-md) 0 0;
+  padding: var(--space-md);
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  z-index: var(--z-panel);
+  display: none;
+}
+
+#dev-tools.visible {
+  display: block;
+}
+
+/* ---- Tooltips ---- */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  background: var(--color-bg-panel);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: var(--z-tooltip);
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+}
