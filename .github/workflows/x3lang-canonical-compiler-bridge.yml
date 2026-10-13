@@ -19,6 +19,9 @@ permissions:
 jobs:
   compiler-identity-red-green:
     name: Canonical compiler identity contract
+    # The repository is public and this job runs on our own machines: never run
+    # code from a fork's pull request here.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 20
     steps:
