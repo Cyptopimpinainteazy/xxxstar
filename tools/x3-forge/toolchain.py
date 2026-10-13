@@ -260,7 +260,16 @@ EVIDENCE_EXCLUDE = ("reports/toolchain/",)
 # they are "evidence" that every tool is wired and gated — the inventory
 # measured itself, reporting all 66 tools as GATED and nothing else. A file
 # that lists a tool is not a file that uses it.
-SELF_FILES = {"tools/x3-forge/toolchain.py", "tools/x3-forge/test_toolchain.py"}
+SELF_FILES = {
+    "tools/x3-forge/toolchain.py",
+    "tools/x3-forge/test_toolchain.py",
+    # This inventory's own committed output, and the install record that lists every
+    # tool it tried: both name every tool, so as evidence they made nothing MISSING.
+    # (external-toolchain-commands.sh stays: it actually runs the tools it names.)
+    "external-tool-inventory.json",
+    "external-tool-gap-analysis.md",
+    "external-toolchain-install-evidence.md",
+}
 
 
 def _skip(part):
