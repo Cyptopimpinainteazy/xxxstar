@@ -545,6 +545,9 @@ fn hardware_adapters_raw() -> Vec<wgpu::Adapter> {
         let info = adapter.get_info();
         (info.vendor, info.device, info.name)
     });
+    // Do not deduplicate by vendor/device/name: two separate physical cards are
+    // commonly identical. The selected backend set is platform-native enough
+    // that preserving real devices is safer than collapsing identical GPUs.
     adapters
 }
 

@@ -22,6 +22,7 @@ commit="$(git rev-parse HEAD)"
 # a clean tree dirty.
 dirty="$(test -n "$(git status --porcelain --untracked-files=all -- . ':(exclude,glob)audit-artifacts/gpu-production/**')" && echo true || echo false)"
 out="audit-artifacts/gpu-production/$commit"
+dirty="$(test -n "$(git status --porcelain -- . ':(exclude)audit-artifacts/gpu-production/**')" && echo true || echo false)"
 mkdir -p "$out"
 results=()
 step() {  # step NAME CMD...
