@@ -1558,7 +1558,7 @@ human interventions
 Our goal is not to say:
 
 ```text
-"Forge is 10x faster."
+"Unverified claim: Forge is 10x faster."
 ```
 
 Our goal is to produce evidence showing exactly how much faster it actually becomes.

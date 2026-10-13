@@ -437,19 +437,19 @@ Monte Carlo should deliberately search for sharp transitions.
 Example:
 
 ```text
-4,000 TPS
+Simulated example: 4,000 TPS
 healthy
 
-4,300 TPS
+Simulated example: 4,300 TPS
 healthy
 
-4,550 TPS
+Simulated example: 4,550 TPS
 queue instability
 
-4,620 TPS
+Simulated example: 4,620 TPS
 mass rejection
 
-4,680 TPS
+Simulated example: 4,680 TPS
 collapse
 ```
 
