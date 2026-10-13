@@ -267,8 +267,10 @@ def _is_pruned_dir(name: str) -> bool:
     )
 
 
-def iter_source_files(root: Path = REPO_ROOT) -> list[tuple[str, Path]]:
+def iter_source_files(root: Path | None = None) -> list[tuple[str, Path]]:
     """Every scannable file, as `(root-relative path, absolute path)`, sorted."""
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
     found: list[tuple[str, Path]] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(name for name in dirnames if not _is_pruned_dir(name))
@@ -310,9 +312,11 @@ def _rg_args() -> list[str]:
 
 
 def rg_lines(
-    patterns: list[str], root: Path = REPO_ROOT
+    patterns: list[str], root: Path | None = None
 ) -> list[tuple[str, int, str]] | None:
     """Candidate `(path, line, text)` matches, or `None` when rg is absent."""
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
     if shutil.which("rg") is None:
         return None
     args = _rg_args() + ["--json"]
@@ -337,8 +341,10 @@ def rg_lines(
     return found
 
 
-def rg_files(patterns: list[str], root: Path = REPO_ROOT) -> list[Path] | None:
+def rg_files(patterns: list[str], root: Path | None = None) -> list[Path] | None:
     """Candidate files, or `None` when rg is absent."""
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
     if shutil.which("rg") is None:
         return None
     args = _rg_args() + ["--files-with-matches"]
@@ -355,12 +361,14 @@ def rg_files(patterns: list[str], root: Path = REPO_ROOT) -> list[Path] | None:
     return sorted(files)
 
 
-def rg_file_list(root: Path = REPO_ROOT) -> list[str] | None:
+def rg_file_list(root: Path | None = None) -> list[str] | None:
     """Every file rg would scan under `root`, as paths relative to it.
 
     This is `iter_source_files` in rg's glob language; `self_test` asserts the
     two agree shape by shape. `None` when rg is not installed.
     """
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
     if shutil.which("rg") is None:
         return None
     args = _rg_args() + ["--files", "."]
