@@ -3,7 +3,7 @@
 use crate as pallet_x3_settlement_engine;
 use frame_support::{
     derive_impl, parameter_types,
-    traits::{ConstBool, ConstU32, ConstU64},
+    traits::{ConstBool, ConstU32, ConstU64, Get},
 };
 use sp_core::{H160, H256};
 use sp_runtime::{
@@ -53,7 +53,10 @@ impl frame_system::Config for Test {
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
-    type DbWeight = ();
+    // Nonzero so weight-returning hooks (on_initialize/on_idle) can be pinned:
+    // with `()` every weight sum stays zero and a hook that returns
+    // `Weight::default()` is indistinguishable from one that charges honestly.
+    type DbWeight = frame_support::weights::constants::RocksDbWeight;
     type RuntimeOrigin = RuntimeOrigin;
     type RuntimeCall = RuntimeCall;
     type Nonce = u64;
@@ -103,11 +106,51 @@ parameter_types! {
     pub const SomeDeposit: u128 = 1000;
     pub const MockBridgeEvmEscrow: H160 = H160([0x00; 20]);
     pub const MockBridgeSvmEscrow: [u8; 32] = [0x00; 32];
-    pub const SettlementFeeBps: u32 = 0;
     pub const ProtocolTreasury: u64 = 99;
     pub const AtomicMinBond: u128 = 1_000;
     pub const AtomicMaxLegsPerBundle: u32 = 16;
     pub const AtomicBundleDeadlineBlocks: u64 = 100;
+}
+
+/// Settlement fee in basis points, settable per test thread.
+///
+/// Every historical fixture ran with a zero fee, so the fee branch in
+/// `finalize_settlement` was never observed and the mutation campaign could
+/// replace both `> 0` guards under it without a failure. This keeps every
+/// existing test on the old default (0) while one pin turns the fee on.
+pub struct SettlementFeeBps;
+
+impl Get<u32> for SettlementFeeBps {
+    fn get() -> u32 {
+        SETTLEMENT_FEE_BPS.with(|value| value.get())
+    }
+}
+
+/// Set this thread's settlement fee in basis points. Reset it when done.
+pub fn set_settlement_fee_bps(bps: u32) {
+    SETTLEMENT_FEE_BPS.with(|value| value.set(bps));
+}
+
+/// Whether this runtime stands in for a validator that binds an SVM receipt to
+/// its slot (TICKET-063); true by default so the lifecycle fixtures keep
+/// exercising the bookkeeping path, false in the pin that observes the
+/// fail-closed posture.
+pub struct AllowUnboundSvmProofs;
+
+impl Get<bool> for AllowUnboundSvmProofs {
+    fn get() -> bool {
+        ALLOW_UNBOUND_SVM_PROOFS.with(|value| value.get())
+    }
+}
+
+/// Set this thread's unbound-SVM-proof posture. Reset it when done.
+pub fn set_allow_unbound_svm_proofs(allowed: bool) {
+    ALLOW_UNBOUND_SVM_PROOFS.with(|value| value.set(allowed));
+}
+
+thread_local! {
+    static SETTLEMENT_FEE_BPS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    static ALLOW_UNBOUND_SVM_PROOFS: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
 }
 
 impl pallet_x3_kernel::Config for Test {
@@ -180,7 +223,7 @@ impl pallet_x3_settlement_engine::Config for Test {
     // (TICKET-063). `RecordingCrossChainValidator` is a no-op that accepts
     // everything, so this test runtime states that it stands in for a validator
     // that would do the binding.
-    type AllowUnboundSvmProofs = frame_support::traits::ConstBool<true>;
+    type AllowUnboundSvmProofs = AllowUnboundSvmProofs;
 }
 
 thread_local! {

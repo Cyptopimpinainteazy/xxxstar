@@ -250,11 +250,18 @@ pub async fn get_evidence_bundle(
 ) -> Result<Option<EvidenceBundle>> {
     if let Some(cp) = deref(client) {
         match cp.get_evidence_bundle(bundle_id).await {
-            Ok(remote) => {
+            Ok(remote) if remote.bundle_id == bundle_id => {
                 let mirrored = db
                     .upsert_evidence_bundle_from_control_plane(&remote)
                     .await?;
                 return Ok(Some(mirrored));
+            }
+            Ok(mismatched) => {
+                tracing::warn!(
+                    requested = bundle_id,
+                    returned = %mismatched.bundle_id,
+                    "control-plane returned a different evidence bundle than requested; refusing to mirror mismatched evidence and falling back to the local index"
+                );
             }
             Err(err) => {
                 tracing::info!(

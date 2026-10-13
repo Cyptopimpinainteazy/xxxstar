@@ -118,12 +118,17 @@ expect_restore_refused() {
 # makes the honest version free: an up-to-date build is a fraction of a second.
 VERIFIER="${X3_SNAPSHOT_VERIFIER:-}"
 if [[ -z "$VERIFIER" ]]; then
-  say "building target/debug/x3-state-snapshot ..."
+  # `cargo build` writes to CARGO_TARGET_DIR when the caller redirects it (the
+  # local-ci gate runner does; see docs/local-ci.md), so the lookup has to read
+  # the same variable or it looks in an empty $REPO_ROOT/target after a
+  # successful build and reports "no such file or directory".
+  TARGET_DIR="${CARGO_TARGET_DIR:-$REPO_ROOT/target}"
+  say "building $TARGET_DIR/debug/x3-state-snapshot ..."
   if ! (cd "$REPO_ROOT" && SKIP_WASM_BUILD=1 cargo build -q -p x3-state-snapshot); then
     say "FAIL  could not build the verifier"
     exit 1
   fi
-  VERIFIER="$REPO_ROOT/target/debug/x3-state-snapshot"
+  VERIFIER="$TARGET_DIR/debug/x3-state-snapshot"
 fi
 
 if [[ ! -f "$SPEC" ]]; then

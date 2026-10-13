@@ -3,6 +3,10 @@ name = "x3-wallet-cli"
 version = "0.1.0"
 edition = "2021"
 description = "X3 Wallet CLI - Command-line interface for wallet operations, multisig, and DEX swaps"
+# The crate had no license field at all, which made `cargo deny check licenses`
+# fail with `error[unlicensed]`. Every other X3 crate inherits the workspace
+# license (Apache-2.0).
+license.workspace = true
 
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }

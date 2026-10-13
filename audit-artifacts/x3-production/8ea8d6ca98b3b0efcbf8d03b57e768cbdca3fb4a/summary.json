@@ -1,0 +1,29 @@
+{
+  "tested_code_commit": "8ea8d6ca98b3b0efcbf8d03b57e768cbdca3fb4a",
+  "tested_code_tree": "6c669159336b0cfe2b14cc80dab254e8593dc946",
+  "checks": {
+    "archive_tests": 6,
+    "rpc_export_tests": 22,
+    "restore_smoke": "passed",
+    "bash_syntax": "passed",
+    "python_compile": "passed",
+    "diff_check": "passed",
+    "cheats": {
+      "constant_assert": 16,
+      "noop_test": 2,
+      "skip": 133
+    },
+    "stubs": {
+      "critical_marker": 442,
+      "explicit_stub": 74,
+      "marker": 1057
+    }
+  },
+  "reproduction": "Original restore returned success while requested target lacked the restored file; a multi-root archive was also accepted.",
+  "limitations": [
+    "Real filesystem/archive tests only; running process test uses a test-only Python process with node argv.",
+    "No built validator, Rust toolchain, or live chain available; RocksDB restore/finality not proven.",
+    "Restore supports one root directory with regular files/directories; archive links are refused.",
+    "Stopped-node inspection requires Linux /proc; cannot prevent a node starting after inspection."
+  ]
+}

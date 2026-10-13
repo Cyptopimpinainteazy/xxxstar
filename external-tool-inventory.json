@@ -1,0 +1,2130 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "external-tool-inventory",
+  "generated_at": "2026-10-01",
+  "generated_by": "codex (phase-0 inventory, refreshed after network-enabled host probe)",
+  "repo": {
+    "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git",
+    "branch": "master",
+    "commit": "ff57d15dd6e93ba4bcc19081d18bcd5632954941",
+    "worktree_dirty": true,
+    "dirty_entries": 10,
+    "dirty_notes": "untracked pre-existing: .agents/skills/* (8), .goal-logs/, skills-lock.json"
+  },
+  "host": {
+    "os": "Ubuntu 24.04 (Linux x86_64)",
+    "rustc": "1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "1.90.0 (840b83a10 2025-07-30)",
+    "node": "v24.21.0",
+    "pnpm": "10.15.1",
+    "python3": "3.12.3",
+    "network": "enabled (crates.io and github reachable; verified by resolving libfuzzer-sys 0.4.13)",
+    "binaries_present": {
+      "cargo-fuzz": "0.13.2",
+      "cargo-mutants": "27.1.0",
+      "cargo-audit": "0.22.2",
+      "cargo-deny": "0.20.2",
+      "kani": "0.68.0 (standalone)",
+      "codeql": "2.27.1",
+      "osv-scanner": "2.6.0",
+      "trivy": "0.75.0",
+      "syft": "1.54.0",
+      "grype": "0.119.0",
+      "gitleaks": "8.30.1",
+      "forge": "1.8.3",
+      "cast": "1.8.3",
+      "anvil": "1.8.3",
+      "echidna": "2.3.3",
+      "medusa": "1.5.1",
+      "solana": "4.3.0 (Agave)",
+      "solana-test-validator": "4.3.0 (Agave)",
+      "toxiproxy-server": "2.12.0",
+      "k6": "v2.3.0",
+      "prometheus": "3.15.0",
+      "grafana": "13.2.3",
+      "loki": "3.7.8",
+      "zombienet": "1.3.10",
+      "srtool": "0.13.2",
+      "subwasm": "present",
+      "docker": "29.1.3",
+      "tc": "/usr/sbin/tc",
+      "perf": "/usr/bin/perf",
+      "node": "v24.21.0",
+      "jq": "1.7",
+      "clang": "present"
+    },
+    "binaries_absent": [
+      "afl-fuzz",
+      "honggfuzz",
+      "slither",
+      "halmos",
+      "myth",
+      "mythril",
+      "aderyn",
+      "revm (crate)",
+      "reth",
+      "trufflehog",
+      "semgrep",
+      "pumba",
+      "wrk",
+      "wrk2",
+      "valgrind",
+      "massif-visualizer",
+      "ansible",
+      "ansible-playbook",
+      "kubectl",
+      "podman",
+      "chopsticks",
+      "otelcol",
+      "tempo",
+      "try-runtime (standalone CLI)",
+      "litesvm (crate)",
+      "mollusk (crate)",
+      "trident (crate)",
+      "cargo-nextest",
+      "cargo-geiger",
+      "cargo-llvm-cov",
+      "go",
+      "cmake",
+      "miri (component unavailable for 1.90.0)"
+    ],
+    "cargo_miri_note": "~/.cargo/bin/cargo-miri is a symlink to rustup, but `cargo miri` reports the miri component is not available for toolchain 1.90.0; Miri requires a nightly toolchain."
+  },
+  "vocabularies": {
+    "classification": [
+      "DEPENDENCY",
+      "ADAPTER",
+      "TEST_ORACLE",
+      "TEST_ENGINE",
+      "INFRASTRUCTURE",
+      "OBSERVABILITY",
+      "REFERENCE",
+      "REJECT"
+    ],
+    "status": [
+      "IMPLEMENTED",
+      "WIRED",
+      "PARTIAL",
+      "INSTALLED_ONLY",
+      "REFERENCE_ONLY",
+      "MISSING",
+      "BLOCKED",
+      "OBSOLETE",
+      "REJECTED"
+    ],
+    "status_meaning": {
+      "IMPLEMENTED": "installed + configured + connected to X3 + exercised + produced results + evidence captured + repeatable",
+      "WIRED": "config/CI/code exists and references the tool, but no captured run on this host verifies it end to end",
+      "PARTIAL": "some of installed/configured/wired/tested/evidenced present; at least one required link missing",
+      "INSTALLED_ONLY": "binary or package present, no X3 connection exercised",
+      "REFERENCE_ONLY": "studied as architecture/reference; deliberately not integrated",
+      "MISSING": "no integration and no install",
+      "BLOCKED": "integration exists but cannot run for a documented environmental or upstream reason"
+    }
+  },
+  "repo_wide_evidence": {
+    "ci_workflows_total": 39,
+    "ci_workflows_automatic_on_push_or_pr": [
+      "queue-drain.yml",
+      "swarm-reactor-pr519-verify.yml"
+    ],
+    "ci_workflows_manual_dispatch_only": 37,
+    "ci_note": "37 of 39 workflows are `on: workflow_dispatch` only. Several carry the comment 'GitHub-hosted CI is disabled for this repo; local pre-push CI is the gate of record'.",
+    "local_gate_of_record": "scripts/local-ci.sh (1583 lines)",
+    "pre_push_hook_installed": false,
+    "pre_push_hook_detail": "git config core.hooksPath is unset; .githooks/{commit-msg,pre-commit,pre-push} exist but are not wired",
+    "fuzz_targets_found": 98,
+    "fuzz_crates_found": 75,
+    "fuzz_corpus_dirs_found": 1,
+    "formal_proofs": [
+      "formal-proofs/coq/SupplyInvariant.v",
+      "formal-proofs/k/x3vm-claims.k",
+      "formal-proofs/k/x3vm-spec.k",
+      "formal-proofs/tla"
+    ],
+    "k_js_tools_present": [
+      "tools/coqc",
+      "tools/kompile",
+      "tools/kprove",
+      "tools/tla2tools.jar"
+    ],
+    "criterion_benches": [
+      "signature_verify_bench",
+      "vm_dispatch_bench",
+      "dex_route_bench",
+      "rpc_encoding_bench",
+      "atomic_swap_bench",
+      "bridge_proof_bench"
+    ],
+    "mutation_evidence": {
+      "path": "mutants.out/",
+      "tool": "cargo-mutants 27.1.0",
+      "run_date": "2026-06-20",
+      "totals": {
+        "caught": 94,
+        "missed": 59,
+        "timeout": 0,
+        "unviable": 6
+      },
+      "kill_rate_over_viable": 0.6144,
+      "note": "59 surviving mutants, concentrated in crates/x3-fees (Eip1559FeeMarket::adjust_base_fee, ResourceVector::exceeds)"
+    }
+  },
+  "tools": [
+    {
+      "id": "cargo-fuzz",
+      "section": 1,
+      "name": "cargo-fuzz / libFuzzer",
+      "classification": "TEST_ENGINE",
+      "purpose": "Coverage-guided fuzzing of parsers, packet decoding, proof parsing, X3VM input, compiler inputs",
+      "installed_on_host": true,
+      "version_detected": "cargo-fuzz 0.13.2",
+      "version_expected": "0.13.1 (per reports/TOOL_RUN_SUMMARY.md)",
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "75 fuzz crates (Cargo.toml with [package.metadata] cargo-fuzz = true) under pallets/*/fuzz and crates/*/fuzz",
+        "98 fuzz targets",
+        "crates/x3-integration/fuzz/fuzz_targets/{compile_and_run.rs,x3bc_engines.rs}",
+        "pallets/x3-kernel/fuzz/fuzz_targets/fuzz_codec_parsing.rs",
+        "scripts/external-toolchain/fuzz-x3-language.sh",
+        "scripts/external-toolchain/validate-fuzz-detection.sh",
+        "scripts/generate-fuzz-harnesses.sh",
+        "tools/run-x3-tools.sh",
+        "tools/setup-x3-test-tools.sh",
+        "tools/test-tool-stack/config.toml:gate 5 => cargo fuzz run bridge_message_decode",
+        "tools/test-tool-stack/fuzz-targets/bridge_message_decode.rs",
+        "tools/tool-validation/ (intentionally-defective fixture used to prove detection)"
+      ],
+      "ci_evidence": [
+        "scripts/local-ci.sh GATES_FUZZ (--fuzz, slug fuzz-x3-language-and-detection)",
+        "scripts/external-toolchain/fuzz-gate.sh"
+      ],
+      "evidence_artifacts": [
+        "audit-artifacts/external-toolchain/cargo-fuzz/ci-gate-evidence.json",
+        "audit-artifacts/external-toolchain/cargo-fuzz/evidence.json",
+        "audit-artifacts/external-toolchain/cargo-fuzz/run-seed20261001-2026-10-01.log",
+        "audit-artifacts/external-toolchain/cargo-fuzz/validation-known-bad-*.log",
+        "audit-artifacts/external-toolchain/cargo-fuzz/validation-known-good-*.log",
+        "crates/x3-integration/fuzz/corpus/compile_and_run (212+ files)"
+      ],
+      "gaps": [
+        "only 2 of 98 targets exercised; the pallet fuzz crates have not been built",
+        "gate is opt-in (--fuzz); it does not run on a normal commit and is not release-gated",
+        "a cold ASAN build can be killed by memory pressure on a loaded box (reported BLOCKED, not FAIL)",
+        "requires nightly + --target x86_64-unknown-linux-gnu (musl+ASAN incompatible)"
+      ],
+      "next_action": "Promote --fuzz into the release/nightly set and extend coverage to the pallet fuzz crates",
+      "host_refresh_note": "Binary 0.13.2 installed; libfuzzer-sys 0.4.13 resolves. Two X3-language targets (compile_and_run, x3bc_engines) built and run on nightly 2026-10-01. Defect-detection proven with a known-good/known-bad validation fixture. Not gated in CI.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "libfuzzer-sys",
+      "section": 1,
+      "name": "libfuzzer-sys",
+      "classification": "DEPENDENCY",
+      "purpose": "libFuzzer runtime backing cargo-fuzz targets",
+      "installed_on_host": true,
+      "version_detected": "0.4.13 (resolvable)",
+      "version_expected": "0.4",
+      "status": "WIRED",
+      "repo_evidence": [
+        "crates/x3-integration/fuzz/Cargo.toml: libfuzzer-sys = \"0.4\"",
+        "pallets/*/fuzz/Cargo.toml"
+      ],
+      "ci_evidence": [],
+      "evidence_artifacts": [],
+      "gaps": [
+        "download from index.crates.io fails; no vendor/offline mirror committed"
+      ],
+      "next_action": "Vendor libfuzzer-sys (and the rest of the fuzz-only graph) or document an offline registry so fuzz builds work without network.",
+      "host_refresh_note": "Resolves from crates.io now that the network is enabled (verified 2026-10-01 via cargo metadata on crates/x3-integration/fuzz).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "aflplusplus",
+      "section": 1,
+      "name": "AFL++",
+      "classification": "REJECT",
+      "purpose": "Second coverage-guided fuzz engine",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "no AFL++ harness, dictionary, or corpus anywhere in the repo"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no evidence of incremental value over libFuzzer; 98 libFuzzer targets already exist and are unrun"
+      ],
+      "next_action": "Do not install until libFuzzer campaigns are running and a coverage gap justifies a second engine.",
+      "host_refresh_note": "Still absent on host.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "honggfuzz",
+      "section": 1,
+      "name": "honggfuzz",
+      "classification": "REJECT",
+      "purpose": "Third fuzz engine",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "2 incidental textual mentions only; no harness"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "same as AFL++: no demonstrated incremental coverage"
+      ],
+      "next_action": "Defer; revisit only with a measured coverage argument.",
+      "host_refresh_note": "Still absent on host.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "proptest",
+      "section": 1,
+      "name": "proptest",
+      "classification": "TEST_ENGINE",
+      "purpose": "Property-based testing for state transitions, accounting, serialization, conservation",
+      "installed_on_host": "workspace dependency",
+      "version_detected": "1.4 (Cargo.toml line 333)",
+      "status": "IMPLEMENTED",
+      "repo_evidence": [
+        "Cargo.toml workspace dependency proptest = \"1.4\"",
+        "116 files reference proptest (pallets/x3-*, crates/x3-atomic-*, x3-swap-router dev-dependency)",
+        "crates/x3-asset-kernel, crates/x3-atomic-trade targeted by tools/test-tool-stack/config.toml gates 4"
+      ],
+      "ci_evidence": [
+        "runs inside cargo test --workspace via scripts/local-ci.sh gate 1"
+      ],
+      "gaps": [
+        "no dedicated property-test gate; properties ride on the unit-test gate so a slow property test can be lost in the noise"
+      ],
+      "next_action": "Extract the property suites into a named gate with a fixed seed set so failures are reproducible and attributable.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "proptest-state-machine",
+      "section": 1,
+      "name": "proptest-state-machine",
+      "classification": "TEST_ENGINE",
+      "purpose": "Stateful protocol testing: settlement lifecycle, atomic intents, validator/account/asset state",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "no reference in any manifest or test"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "settlement lifecycle and claim/refund exclusivity are exactly the stateful properties called out in the required-properties list"
+      ],
+      "next_action": "Add proptest-state-machine models for x3-settlement-engine and x3-atomic-kernel; seed corpus feeds Monte Carlo.",
+      "host_refresh_note": "Still not a workspace dependency.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "miri",
+      "section": 2,
+      "name": "Miri",
+      "classification": "TEST_ORACLE",
+      "purpose": "Undefined-behaviour detection in unsafe code and FFI boundaries",
+      "installed_on_host": false,
+      "version_detected": "cargo-miri present at /home/lojak/.cargo/bin/cargo-miri; not listed in rustup component list",
+      "status": "BLOCKED",
+      "repo_evidence": [
+        "237 textual mentions; none are a Miri invocation or a Miri CI job"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no miri run script, no gate, no captured UB report",
+        "component not confirmed installed via rustup"
+      ],
+      "next_action": "Add a nightly toolchain with the miri component before Miri can run.",
+      "host_refresh_note": "cargo-miri symlink exists but the miri component is not available for stable 1.90.0; Miri needs a nightly toolchain.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "loom",
+      "section": 2,
+      "name": "Loom",
+      "classification": "TEST_ENGINE",
+      "purpose": "Exhaustive concurrency interleaving tests for shared state, locks, atomics, queues",
+      "installed_on_host": false,
+      "version_detected": null,
+      "status": "BLOCKED",
+      "repo_evidence": [
+        "tests/loom-concurrency (excluded workspace member, `#![cfg(loom)]` throughout)",
+        "scripts/run-loom-tests.sh",
+        "scripts/local-ci.sh: GATES_LOOM => bash scripts/run-loom-tests.sh (opt-in via --loom)"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "loom needs a nightly toolchain; only stable + 1.90.0 are installed, so the gate reports BLOCKED",
+        "no captured loom run output"
+      ],
+      "next_action": "Install the pinned nightly, run `bash scripts/local-ci.sh --loom`, capture the result as evidence, then decide whether loom stays opt-in or becomes a merge gate.",
+      "host_refresh_note": "Still not a workspace dependency; tests/loom-concurrency exists but is excluded from the workspace and needs nightly.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "shuttle",
+      "section": 2,
+      "name": "Shuttle",
+      "classification": "TEST_ENGINE",
+      "purpose": "Randomized deterministic concurrency testing",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "listed as a planned dev-dependency in tools/test-tool-stack/config.toml; never added"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no dev-dependency, no test"
+      ],
+      "next_action": "Evaluate only after a real Loom run exists; Shuttle's value is a design decision, not a default.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "kani",
+      "section": 3,
+      "name": "Kani Rust Verifier",
+      "classification": "TEST_ORACLE",
+      "purpose": "Bounded model checking of settlement, replay, nonce, supply, authorization, claim/refund exclusivity",
+      "installed_on_host": true,
+      "version_detected": "Kani Rust Verifier 0.68.0 (standalone)",
+      "status": "INSTALLED_ONLY",
+      "repo_evidence": [
+        "tools/test-tool-stack/config.toml: kani-verifier listed as a rust tool",
+        "tools/setup-x3-test-tools.sh attempts install",
+        "docs/X3_PROOF_LEDGER.md, reports/TOOL_RUN_SUMMARY.md mark it PENDING",
+        "no #[kani::proof] harness anywhere; 0 proof artifacts"
+      ],
+      "ci_evidence": [
+        ".github/workflows/formal-verification.yml exists but is workflow_dispatch-only and does not invoke Kani"
+      ],
+      "gaps": [
+        "no harnesses",
+        "no counterexample capture path",
+        "no link into Failure Genome or Completion Intelligence",
+        "formal-verification.yml does not mention Kani"
+      ],
+      "next_action": "Write harnesses for claim-XOR-refund, no-replay, supply conservation and authorization; prove one end to end and store the counterexample corpus.",
+      "host_refresh_note": "Installed 2026-10-01. No harnesses exist in the repo and formal-verification.yml does not invoke kani.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "cargo-mutants",
+      "section": 4,
+      "name": "cargo-mutants",
+      "classification": "TEST_ORACLE",
+      "purpose": "Mutation testing to measure whether tests actually detect defects in security-critical code",
+      "installed_on_host": true,
+      "version_detected": "27.1.0",
+      "version_expected": "27.1.0 (evidenced by mutants.out/lock.json)",
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "mutants.out/{caught,missed,timeout,unviable}.txt + mutants.json + lock.json + diff/",
+        "tools/test-tool-stack/config.toml: gate 4 => cargo mutants -p x3-asset-kernel -p x3-atomic-trade",
+        "mutants.out.old/ (a second, older run)"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "binary not installed now, so the evidenced run is not repeatable on this host",
+        "evidenced run was scoped to x3-fees, not the security-critical pallets named in the config",
+        "59 surviving mutants are not yet mapped to features/requirements",
+        "no CI/nightly job"
+      ],
+      "next_action": "Re-run against x3-atomic-kernel and x3-asset-kernel, map the 59 survivors to missing verification, feed Completion Intelligence.",
+      "host_refresh_note": "Binary reinstalled 2026-10-01. Existing mutants.out/ evidence is from an earlier 27.1.0 run against x3-fees only, not the security crates.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "cargo-nextest",
+      "section": 2,
+      "name": "cargo-nextest",
+      "classification": "TEST_ENGINE",
+      "purpose": "Faster, isolated test runner",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "tools/test-tool-stack/config.toml",
+        "tools/run-x3-tools.sh tool 4"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "referenced by tooling scripts that cannot run because the binary is absent"
+      ],
+      "next_action": "Install and wire behind the same gate as `cargo test` so the two can be compared rather than silently swapped.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "cargo-geiger",
+      "section": 2,
+      "name": "cargo-geiger",
+      "classification": "TEST_ORACLE",
+      "purpose": "Inventory of unsafe Rust",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "tools/test-tool-stack/config.toml",
+        "tools/run-x3-tools.sh tool 3"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no unsafe inventory, so Miri targeting is guesswork"
+      ],
+      "next_action": "Install, run workspace-wide, and use the output to pick the Miri target list.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "cargo-llvm-cov",
+      "section": 2,
+      "name": "cargo-llvm-cov",
+      "classification": "TEST_ORACLE",
+      "purpose": "Coverage measurement",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "tools/test-tool-stack/config.toml gate 2 => cargo llvm-cov nextest --lcov"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no coverage artifact anywhere; mutation kill rate is currently the only coverage signal"
+      ],
+      "next_action": "Install and produce lcov for the security-critical crates first.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "polkadot-sdk",
+      "section": 5,
+      "name": "Polkadot SDK / FRAME / Substrate",
+      "classification": "DEPENDENCY",
+      "purpose": "Runtime, pallets, networking, RPC, consensus components",
+      "installed_on_host": "vendored via Cargo git dependency",
+      "version_detected": "tag polkadot-stable2603 (per fuzz manifests); workspace pins its own",
+      "status": "IMPLEMENTED",
+      "repo_evidence": [
+        "runtime/, node/, pallets/ (FRAME pallets), primitives/",
+        "node/src/command.rs",
+        "chain-specs/, zombienet/x3-local-network.toml"
+      ],
+      "ci_evidence": [
+        "scripts/local-ci.sh build/test gates"
+      ],
+      "gaps": [
+        "node/ has no dogfooded upstream tooling (try-runtime removed from the pinned SDK)"
+      ],
+      "next_action": "Keep upstream mature functionality; do not fork. Track the pinned tag in tools.lock.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "frame-benchmarking",
+      "section": 9,
+      "name": "FRAME benchmarking",
+      "classification": "TEST_ENGINE",
+      "purpose": "Generate and validate weights; detect missing/stale/unrealistic weights",
+      "installed_on_host": "workspace dependency",
+      "status": "WIRED",
+      "repo_evidence": [
+        "pallets/*/src/weights.rs (weight files committed, e.g. pallets/x3-cross-vm-router/src/weights.rs)",
+        "pallets/*/src/benchmarking.rs (e.g. pallets/x3-cross-vm-router/src/benchmarking.rs)",
+        "PALLET_BENCHMARKS references in Makefile/scripts"
+      ],
+      "ci_evidence": [
+        ".github/workflows/frame-benchmarking.yml (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "the workflow is manual-only, so weight drift is not actually gated",
+        "no captured benchmark run or weight-diff artifact in audit-artifacts/"
+      ],
+      "next_action": "Run the benchmark gate once on the current commit, capture the weight diff, and record which pallets have no benchmark at all.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "try-runtime",
+      "section": 8,
+      "name": "try-runtime",
+      "classification": "TEST_ENGINE",
+      "purpose": "Pre/post-upgrade storage-migration checks",
+      "installed_on_host": false,
+      "status": "BLOCKED",
+      "repo_evidence": [
+        "scripts/run-try-runtime.sh (233 lines)",
+        "scripts/run-substrate-tests.sh, scripts/run-substrate-tools.sh, scripts/check-runtime-variants.sh",
+        "scripts/mainnet_release_gate.py",
+        "runtime/ migrations"
+      ],
+      "ci_evidence": [
+        ".github/workflows/try-runtime-upgrade.yml \u2014 header states the standalone CLI was removed from the pinned SDK and the workflow 'intentionally fails until a compatible state-replay runner is implemented'"
+      ],
+      "gaps": [
+        "no working state-replay runner against the pinned polkadot-stable2603",
+        "runtime upgrades therefore have no pre/post migration verification"
+      ],
+      "next_action": "Highest-value substrate gap. Replace the removed CLI path with a frame-try-runtime-based runner (the reports note the workspace dep already exists) and prove it on a real migration.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "zombienet",
+      "section": 6,
+      "name": "Zombienet",
+      "classification": "TEST_ENGINE",
+      "purpose": "Automated multi-validator network testing: topology, failure, partitions, latency, upgrades",
+      "installed_on_host": true,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "scripts/run-zombienet.sh (238 lines, resolves ZOMBIENET_BIN via PATH)",
+        "zombienet/x3-local-network.toml",
+        "tools/test-tool-stack/zombienet/x3-local-7.toml (seven-validator topology)",
+        "tools/test-tool-stack/zombienet/x3-finality-smoke.zndsl",
+        "tests/zombienet/finality-smoke.zndsl",
+        "benchmarks/zombienet/x3-benchmark-network.toml"
+      ],
+      "ci_evidence": [
+        ".github/workflows/zombienet-integration.yml (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "zombienet binary missing on this host",
+        "no captured zombienet run, so the 7-validator topology is unproven",
+        "no failure/partition/latency scenario files beyond the finality smoke spec"
+      ],
+      "next_action": "Execute the 7-validator topology once and capture finality/convergence evidence.",
+      "version_detected": "1.3.10",
+      "host_refresh_note": "Binary present 2026-10-01. Topology + run scripts exist; no captured multi-node run.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "chopsticks",
+      "section": 7,
+      "name": "Chopsticks",
+      "classification": "TEST_ENGINE",
+      "purpose": "Runtime testing, state manipulation, upgrade testing, state replay",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "scripts/run-chopsticks.sh",
+        "scripts/run-substrate-tests.sh, scripts/test-tools.sh, scripts/run-all-tests.sh",
+        "node/src/command.rs",
+        "docs/current/MASTER_CHECKLIST_STATUS.md"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "binary absent",
+        "no captured state-replay or upgrade run"
+      ],
+      "next_action": "Use it as the state-replay half of the try-runtime gap once the runner exists.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "srtool",
+      "section": 10,
+      "name": "srtool",
+      "classification": "INFRASTRUCTURE",
+      "purpose": "Reproducible runtime WASM builds",
+      "installed_on_host": true,
+      "version_detected": "srtool-cli 0.13.2",
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "70 references; release packaging scripts",
+        "release_hashes.txt at repo root",
+        "tools/test-tool-stack/config.toml gate 9 => srtool build && subwasm diff"
+      ],
+      "ci_evidence": [
+        ".github/workflows/release-provenance.yml (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "no evidence a reproducible srtool build was compared against a node-built WASM on this commit",
+        "release_hashes.txt is not tied to a machine-readable tool manifest"
+      ],
+      "next_action": "Run srtool build twice from a clean tree, diff the hashes, and bind them into release evidence.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "subwasm",
+      "section": 11,
+      "name": "subwasm",
+      "classification": "TEST_ORACLE",
+      "purpose": "Runtime inspection, metadata, runtime-version verification",
+      "installed_on_host": true,
+      "status": "INSTALLED_ONLY",
+      "repo_evidence": [
+        "16 references; tools/test-tool-stack/config.toml gate 9",
+        "scripts release verification"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no runtime metadata/hash verification artifact"
+      ],
+      "next_action": "Wire subwasm into release evidence: inspect runtime WASM + version for the built runtime.",
+      "version_detected": "present (~/.local/bin/subwasm)",
+      "host_refresh_note": "Binary present 2026-10-01 (its --version flag needs a true/false argument, so version was not captured cleanly).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "foundry",
+      "section": 12,
+      "name": "Foundry (forge, cast, anvil)",
+      "classification": "TEST_ENGINE",
+      "purpose": "EVM development, contract testing, deterministic local EVM (anvil)",
+      "installed_on_host": true,
+      "version_detected": "1.8.3 (forge, cast, anvil)",
+      "status": "WIRED",
+      "repo_evidence": [
+        "X3-contracts/evm/foundry.toml, foundry.lock",
+        "X3-contracts/evm/contracts/AtlasHTLC.sol, X3KernelBridge.sol, WrappedX3.sol, X3ExternalGateway.sol, EvmReceiptVerifier.sol",
+        "X3-contracts/evm/test/, X3-contracts/evm/test-live-lifecycle.sh",
+        "forge-std/ vendored",
+        "crates/x3-atomic-swap/tests/evm_tx_minimal_integers.rs"
+      ],
+      "ci_evidence": [
+        ".github/workflows/x3vm-evm-live-lifecycle.yml (workflow_dispatch + workflow_call), installs Foundry and runs the anvil HTLC lifecycle"
+      ],
+      "gaps": [
+        "no captured anvil lifecycle run artifact on this commit",
+        "duplicate forge-std copies under tests/phase_core/security/lib/forge-std",
+        "no claim that X3 EVM execution and anvil agree \u2014 anvil is used to host the contract, not to differentially test the X3 EVM"
+      ],
+      "next_action": "Run the live lifecycle once and capture it; then treat anvil as the reference half of the REVM differential pair.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "slither",
+      "section": 13,
+      "name": "Slither",
+      "classification": "TEST_ORACLE",
+      "purpose": "Solidity static analysis",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "X3-contracts/evm/slither.config.json (12 detectors excluded, e.g. reentrancy-no-eth, arbitrary-send-eth, missing-zero-check)",
+        "tests_core/security/slither.config.json",
+        "X3-contracts/evm/crytic-export/combined_solc.json",
+        "reports/integration-source-audit/*.txt"
+      ],
+      "ci_evidence": [
+        "references in audit-artifacts/mainnet-readiness workflows inventory; no dedicated slither workflow"
+      ],
+      "gaps": [
+        "binary absent; the last recorded result is 'v0.11.5 freshly installed' in reports/TOOL_RUN_SUMMARY.md with no scan output",
+        "the exclusion list is broad enough that reentrancy and arbitrary-send-eth are off \u2014 that needs a written justification per exclusion",
+        "findings are not in the normalized Audit King schema"
+      ],
+      "next_action": "Install, scan X3-contracts/evm, and justify or remove each excluded detector.",
+      "host_refresh_note": "Still absent on host (pipx/pip install needed).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "echidna",
+      "section": 14,
+      "name": "Echidna",
+      "classification": "TEST_ENGINE",
+      "purpose": "Solidity property fuzzing of HTLC / settlement contracts",
+      "installed_on_host": true,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "tests_core/security/echidna.config.yaml (testMode property, 500k tests, seqLen 100, 8 workers)",
+        "tests_core/security/contracts/InvariantProperties.sol",
+        "5 named invariants prepared for the config, including echidna_atomic_commit_or_revert and echidna_no_partial_cross_vm_state"
+      ],
+      "ci_evidence": [
+        ".github/workflows/economic-attack-tests.yml references the property gate indirectly"
+      ],
+      "gaps": [
+        "binary absent",
+        "config points at tests/solidity_contracts/ and tests/security/echidna-corpus/ while the properties live in tests_core/security/ \u2014 the paths do not agree",
+        "no failing sequence ever captured"
+      ],
+      "next_action": "Fix config paths and prove echidna detects a deliberately-broken invariant fixture.",
+      "version_detected": "Echidna 2.3.3",
+      "host_refresh_note": "Binary present 2026-10-01. X3-contracts/evm/test/echidna/EchidnaX3.sol and config exist; config paths must be reconciled; no scan captured.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "medusa",
+      "section": 15,
+      "name": "Medusa",
+      "classification": "TEST_ENGINE",
+      "purpose": "Independent Solidity fuzzing",
+      "installed_on_host": true,
+      "status": "INSTALLED_ONLY",
+      "repo_evidence": [
+        "16 textual references; no config, no harness"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "must first be compared against Echidna on the same invariants before earning compute"
+      ],
+      "next_action": "Run against AtlasHTLC and compare coverage/findings with Echidna and Foundry.",
+      "version_detected": "1.5.1",
+      "host_refresh_note": "Binary present 2026-10-01. config at tests/security/medusa.config.json; never run.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "halmos",
+      "section": 16,
+      "name": "Halmos",
+      "classification": "TEST_ORACLE",
+      "purpose": "Symbolic Solidity testing",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "1 incidental mention"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no symbolic harness"
+      ],
+      "next_action": "Defer to second priority; symbolic work on HTLC invariants only after Echidna/Echidna-shaped properties are stable.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "mythril",
+      "section": 17,
+      "name": "Mythril",
+      "classification": "REFERENCE",
+      "purpose": "Independent symbolic/security analyzer as an additional oracle",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "3 references including docs/security.md"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no run, no dedup path"
+      ],
+      "next_action": "Evaluate last among the Solidity analyzers; it overlaps Slither heavily on this codebase size.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "aderyn",
+      "section": 13,
+      "name": "Aderyn",
+      "classification": "TEST_ORACLE",
+      "purpose": "Rust-based Solidity static analysis",
+      "installed_on_host": false,
+      "status": "BLOCKED",
+      "repo_evidence": [
+        "tools/test-tool-stack/config.toml",
+        "reports/TOOL_RUN_SUMMARY.md records 'Build fails on rustc 1.90'"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "upstream does not build on the pinned toolchain"
+      ],
+      "next_action": "Retest against a newer Aderyn release before writing it off.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "revm",
+      "section": 19,
+      "name": "REVM",
+      "classification": "TEST_ORACLE",
+      "purpose": "Independent Rust EVM execution oracle for differential execution against the X3 EVM",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "0 word-boundary references anywhere in the repo"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no differential harness exists",
+        "no divergence localizer for success/failure, gas, logs, state, balances, storage, return values"
+      ],
+      "next_action": "HIGH VALUE, currently zero. Build a differential harness: run the same calldata through the X3 EVM and REVM, compare the seven dimensions, and report the first divergence.",
+      "host_refresh_note": "Still zero references in the workspace Cargo.toml.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "reth",
+      "section": 20,
+      "name": "Reth",
+      "classification": "REFERENCE",
+      "purpose": "Reference / source of mature Rust Ethereum components",
+      "installed_on_host": false,
+      "status": "REFERENCE_ONLY",
+      "repo_evidence": [
+        "appears in RPC provider lists (infra/rpc/providers.yaml.example, infra/rpc/dshackle/dshackle.yaml) as an upstream endpoint, not as a dependency"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no license/architecture review recorded for component reuse"
+      ],
+      "next_action": "Keep as reference. If any component is reused, record license + provenance in the license registry first.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "litesvm",
+      "section": 21,
+      "name": "LiteSVM",
+      "classification": "TEST_ENGINE",
+      "purpose": "Fast in-process SVM program execution",
+      "installed_on_host": false,
+      "status": "REFERENCE_ONLY",
+      "repo_evidence": [
+        "listed as a planned dev-dependency in tools/test-tool-stack/config.toml; 5 textual mentions; no dependency in any manifest"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no SVM program test uses it"
+      ],
+      "next_action": "Add as a dev-dependency for the X3 SVM HTLC program once the solver path is exercised.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "mollusk",
+      "section": 22,
+      "name": "Mollusk",
+      "classification": "TEST_ENGINE",
+      "purpose": "Independent SVM program test environment",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "0 references"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no harness"
+      ],
+      "next_action": "Evaluate against LiteSVM; keep one, not both, unless a coverage argument appears.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "trident",
+      "section": 23,
+      "name": "Trident",
+      "classification": "TEST_ENGINE",
+      "purpose": "Solana program fuzzing/security testing",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "6 textual references, no harness"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "compatibility with the X3 SVM test architecture unproven"
+      ],
+      "next_action": "Defer to second priority.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "solana-test-validator",
+      "section": 24,
+      "name": "solana-test-validator (Agave)",
+      "classification": "TEST_ENGINE",
+      "purpose": "Realistic live SVM lifecycle tests",
+      "installed_on_host": true,
+      "status": "WIRED",
+      "repo_evidence": [
+        "programs/svm/ (excluded standalone BPF workspace)",
+        "crates/svm-integration, crates/svm-counter",
+        "X3-contracts/svm (Anchor workspace)"
+      ],
+      "ci_evidence": [
+        ".github/workflows/x3vm-svm-live-lifecycle.yml \u2014 installs Solana CLI (agave) + cargo-build-sbf, verifies toolchain, runs the live validator HTLC lifecycle (workflow_dispatch + workflow_call)"
+      ],
+      "gaps": [
+        "no captured run artifact",
+        "no restart/recovery scenario in the workflow"
+      ],
+      "next_action": "Run the SVM live lifecycle and add a restart/recovery scenario.",
+      "version_detected": "solana-test-validator 4.3.0 (Agave)",
+      "host_refresh_note": "Binary present 2026-10-01. programs/svm + Anchor workspace exist; no lifecycle run captured on this commit.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "toxiproxy",
+      "section": 25,
+      "name": "Toxiproxy",
+      "classification": "TEST_ENGINE",
+      "purpose": "Controlled network faults: latency, bandwidth, interruption, timeouts",
+      "installed_on_host": true,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "tools/test-tool-stack/config.toml (toxiproxy_version 2.9.0)",
+        "benchmarks/zombienet/x3-benchmark-network.toml",
+        "docs/X3_PROOF_LEDGER.md",
+        "reports/TOOL_RUN_SUMMARY.md (PENDING)"
+      ],
+      "ci_evidence": [
+        ".github/workflows/distributed-atomic-chaos.yml (manual)"
+      ],
+      "gaps": [
+        "binary absent",
+        "no toxiproxy scenario executed or captured"
+      ],
+      "next_action": "Run one latency and one cutoff scenario against the RPC/adapter path.",
+      "version_detected": "2.12.0",
+      "host_refresh_note": "Binary present 2026-10-01. tool-stack config references 2.9.0; no scenario captured.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "netem-tc",
+      "section": 26,
+      "name": "tc / netem",
+      "classification": "INFRASTRUCTURE",
+      "purpose": "Linux-level latency, jitter, loss, duplication, reordering, corruption, bandwidth limits",
+      "installed_on_host": true,
+      "version_detected": "tc present at /usr/sbin/tc",
+      "status": "WIRED",
+      "repo_evidence": [
+        "scripts/mainnet/rc5_chaos_harness.sh",
+        "infra-structure/validator/tests/adversarial/test_network_chaos.py",
+        "tools/cross-chain-gpu-validator/tests/inferstructor/failover_triggers.py",
+        "benchmarks/zombienet/x3-benchmark-network.toml"
+      ],
+      "ci_evidence": [
+        ".github/workflows/distributed-atomic-chaos.yml (manual)"
+      ],
+      "gaps": [
+        "requires root/CAP_NET_ADMIN, so it cannot run inside the default sandbox",
+        "no Monte Carlo netem scenario generator"
+      ],
+      "next_action": "Keep strictly in the lab. Add a netem scenario generator that emits deterministic seeds for Monte Carlo.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "pumba",
+      "section": 27,
+      "name": "Pumba",
+      "classification": "REJECT",
+      "purpose": "Docker chaos testing",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "0 references"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "X3's chaos path is process-level (validator-failure-drill.sh) and netem-based, not container-based"
+      ],
+      "next_action": "Reject until the lab is containerized; netem + the failure drill already cover the same ground.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "chaos-mesh",
+      "section": 28,
+      "name": "Chaos Mesh",
+      "classification": "REJECT",
+      "purpose": "Kubernetes chaos",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "0 references",
+        "k8s/ directory exists but no Chaos Mesh CRDs"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "requires Kubernetes; X3 lab is bare metal/VM today"
+      ],
+      "next_action": "Defer. Revisit only if a k8s-based farm is actually built.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "k6",
+      "section": 29,
+      "name": "k6",
+      "classification": "TEST_ENGINE",
+      "purpose": "RPC/API/WebSocket load testing and sustained traffic measurement",
+      "installed_on_host": true,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "benchmarks/k6/x3_rpc_load.js",
+        "tests/perf/k6/1k_tps_test.js",
+        "tests_core/perf/k6/1k_tps_test.js",
+        "tests_phase4/perf/k6/1k_tps_test.js",
+        "scripts/run_all_benchmarks.sh, scripts/benchmark_report.py"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "binary absent",
+        "no captured throughput/latency/failure/saturation report",
+        "three duplicate copies of the 1k_tps script"
+      ],
+      "next_action": "Run x3_rpc_load.js against a local node and capture throughput/latency.",
+      "version_detected": "v2.3.0",
+      "host_refresh_note": "Binary present 2026-10-01. benchmarks/k6/x3_rpc_load.js (+ duplicates) exist; no run captured.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "wrk2",
+      "section": 30,
+      "name": "wrk / wrk2",
+      "classification": "TEST_ORACLE",
+      "purpose": "Lightweight HTTP/RPC throughput measurement",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "34 textual mentions, no harness"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "k6 already covers the same ground with a committed script"
+      ],
+      "next_action": "Low priority. Use only if k6's overhead is shown to matter.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "criterion",
+      "section": 31,
+      "name": "Criterion.rs",
+      "classification": "TEST_ENGINE",
+      "purpose": "Rust microbenchmarks for hot paths",
+      "installed_on_host": "workspace dependency",
+      "status": "WIRED",
+      "repo_evidence": [
+        "benches/Cargo.toml",
+        "benches/: signature_verify_bench.rs, vm_dispatch_bench.rs, dex_route_bench.rs, rpc_encoding_bench.rs, atomic_swap_bench.rs, bridge_proof_bench.rs",
+        "Cargo.toml declares criterion for benches and x3-lang"
+      ],
+      "ci_evidence": [
+        ".github/workflows/benchmark-regression.yml \u2014 Criterion Microbenchmarks job with a downloaded baseline (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "the regression gate is manual-only, so no baseline is actually enforced",
+        "no benchmark-history artifact is committed"
+      ],
+      "next_action": "Run the six benches, commit a baseline, and compare \u2014 then decide whether the gate can move to push.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "perf",
+      "section": 32,
+      "name": "Linux perf",
+      "classification": "OBSERVABILITY",
+      "purpose": "CPU hotspots, instructions, cache behaviour, context switching",
+      "installed_on_host": true,
+      "version_detected": "/usr/bin/perf",
+      "status": "INSTALLED_ONLY",
+      "repo_evidence": [
+        "no committed perf script or captured perf.data"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "perf_event_paranoid likely blocks sampling in this environment; no evidence of any capture"
+      ],
+      "next_action": "Capture one profile of a transaction-processing hot path and record the paranoid setting alongside it.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "valgrind-massif",
+      "section": 33,
+      "name": "Valgrind / Massif",
+      "classification": "TEST_ORACLE",
+      "purpose": "Memory investigation and memory-growth analysis",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "0 references"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "Rust workloads under Valgrind are slow and noisy; low value next to Miri + perf"
+      ],
+      "next_action": "Defer; prefer Miri for correctness and perf/Massif-style sampling only if a memory-growth bug is suspected.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "semgrep",
+      "section": 34,
+      "name": "Semgrep",
+      "classification": "TEST_ORACLE",
+      "purpose": "Static analysis with X3-specific rules",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "tests/security/semgrep/x3-security-rules.yml (9 custom rules)",
+        "tests_phase4/security/semgrep/x3-security-rules.yml (duplicate)",
+        "tests/invariants/registry.toml, feature-matrix/security-proofgate.toml"
+      ],
+      "ci_evidence": [
+        ".github/workflows/semgrep.yml \u2014 runs the returntocorp/semgrep container (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "binary absent locally; no captured scan result",
+        "rules directory is duplicated between tests/ and tests_phase4/",
+        "no rules for dangerous unwrap/panic, missing domain checks, unsafe filesystem handling, or secret leakage yet"
+      ],
+      "next_action": "Run the 9 existing rules, capture output, then add the four missing rule families the prompt names.",
+      "host_refresh_note": "Still absent on host.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "codeql",
+      "section": 35,
+      "name": "CodeQL",
+      "classification": "TEST_ORACLE",
+      "purpose": "Semantic security analysis",
+      "installed_on_host": true,
+      "status": "WIRED",
+      "repo_evidence": [
+        "codeql config in repo root/workflows",
+        "release-hardening.yml runs github/codeql-action init + autobuild"
+      ],
+      "ci_evidence": [
+        ".github/workflows/codeql.yml and release-hardening.yml (both workflow_dispatch only)"
+      ],
+      "gaps": [
+        "no captured SARIF/alert artifact in audit-artifacts/",
+        "language coverage must be stated honestly \u2014 CodeQL's Rust support is limited"
+      ],
+      "next_action": "Run a query pack and record exactly which languages/queries executed.",
+      "version_detected": "2.27.1",
+      "host_refresh_note": "Binary present 2026-10-01. codeql.yml exists (manual). No SARIF captured.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "osv-scanner",
+      "section": 36,
+      "name": "OSV-Scanner",
+      "classification": "TEST_ORACLE",
+      "purpose": "Dependency vulnerability detection with machine-readable output",
+      "installed_on_host": true,
+      "status": "WIRED",
+      "repo_evidence": [
+        "workflow installs it via pip and scans"
+      ],
+      "ci_evidence": [
+        ".github/workflows/osv-scan.yml (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "no captured machine-readable evidence artifact"
+      ],
+      "next_action": "Scan the workspace lockfiles and store machine-readable output.",
+      "version_detected": "2.6.0",
+      "host_refresh_note": "Binary present 2026-10-01. osv-scan.yml exists (manual).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "trivy",
+      "section": 37,
+      "name": "Trivy",
+      "classification": "TEST_ORACLE",
+      "purpose": "Container, filesystem dependency, and configuration scanning",
+      "installed_on_host": true,
+      "status": "WIRED",
+      "repo_evidence": [
+        "Dockerfile.indexer, Dockerfile.mainnet-check, Dockerfile.validator for image targets"
+      ],
+      "ci_evidence": [
+        ".github/workflows/trivy.yml \u2014 aquasecurity/trivy-action v0.33.1 pinned by SHA (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "no captured scan output",
+        "overlaps OSV-Scanner on the dependency half"
+      ],
+      "next_action": "Scan the built images and filesystem; capture SARIF/JSON.",
+      "version_detected": "0.75.0",
+      "host_refresh_note": "Binary present 2026-10-01. trivy.yml exists (manual, SHA-pinned).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "syft",
+      "section": 38,
+      "name": "Syft",
+      "classification": "OBSERVABILITY",
+      "purpose": "SBOM generation for release artifacts",
+      "installed_on_host": true,
+      "status": "INSTALLED_ONLY",
+      "repo_evidence": [
+        "0 references"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no SBOM exists, so release gating cannot reference one"
+      ],
+      "next_action": "Generate an SBOM for a release artifact and feed it to Grype.",
+      "version_detected": "1.54.0",
+      "host_refresh_note": "Binary present 2026-10-01. Release gate has an SBOM row with no producer.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "grype",
+      "section": 39,
+      "name": "Grype",
+      "classification": "TEST_ORACLE",
+      "purpose": "Scan SBOMs/images/filesystems for known vulnerabilities",
+      "installed_on_host": true,
+      "status": "INSTALLED_ONLY",
+      "repo_evidence": [
+        "1 incidental mention"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "depends on Syft output existing first"
+      ],
+      "next_action": "Scan the Syft SBOM and connect to release gating.",
+      "version_detected": "0.119.0",
+      "host_refresh_note": "Binary present 2026-10-01. No SBOM producer yet.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "cargo-audit",
+      "section": 40,
+      "name": "cargo-audit",
+      "classification": "TEST_ORACLE",
+      "purpose": "Rust dependency advisory scanning",
+      "installed_on_host": true,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "scripts/check-dependency-audit.sh (explicitly fails when cargo-audit is absent)",
+        "scripts/check-advisory-scope.py, scripts/check-cargo-home-safety.py",
+        "scripts/local-ci.sh, scripts/ci/verify_launchops_test_results_baseline.sh",
+        "tools/run-x3-tools.sh tool 1"
+      ],
+      "ci_evidence": [
+        ".github/workflows/mainnet-readiness.yml job 'Cargo audit (dependency vulns)' (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "binary absent, and the gate script hard-fails rather than skipping \u2014 honest but currently broken locally",
+        "advisory policy (exploitable / unreachable / accepted / patched) is documented only in script comments"
+      ],
+      "next_action": "Run and capture; apply the documented advisory policy rather than failing on every advisory.",
+      "version_detected": "0.22.2",
+      "host_refresh_note": "Binary present 2026-10-01. deny.toml + check-dependency-audit.sh exist; no committed advisory report on this commit.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "cargo-deny",
+      "section": 41,
+      "name": "cargo-deny",
+      "classification": "TEST_ORACLE",
+      "purpose": "Advisories, license policy, bans, duplicate deps, source restrictions",
+      "installed_on_host": true,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "deny.toml at repo root",
+        "scripts/check-dependency-audit.sh",
+        "reports/security/cargo-deny-licenses.txt (a captured license report)"
+      ],
+      "ci_evidence": [
+        "scripts/local-ci.sh gate 3"
+      ],
+      "gaps": [
+        "binary absent; the committed license report has no timestamp or commit binding in a manifest"
+      ],
+      "next_action": "Run the four checks and store the report.",
+      "version_detected": "0.20.2",
+      "host_refresh_note": "Binary present 2026-10-01. deny.toml exists (licenses, bans, advisories).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "gitleaks",
+      "section": 42,
+      "name": "Gitleaks",
+      "classification": "TEST_ORACLE",
+      "purpose": "Committed-secret scanning",
+      "installed_on_host": true,
+      "status": "INSTALLED_ONLY",
+      "repo_evidence": [
+        "1 reference in reports/integration-source-audit/atlas-sphere-clean.missing.txt \u2014 i.e. it is listed as *missing*"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "TruffleHog covers the CI secret scan; Gitleaks would be the local/PR-side duplicate"
+      ],
+      "next_action": "Add .gitleaks.toml, run on the repo, prove known-good/known-bad discrimination, redact any hits.",
+      "version_detected": "8.30.1",
+      "host_refresh_note": "Binary present 2026-10-01. No .gitleaks.toml config; mainnet-readiness.yml references secret scanning.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "trufflehog",
+      "section": 43,
+      "name": "TruffleHog",
+      "classification": "TEST_ORACLE",
+      "purpose": "Secret scanning",
+      "installed_on_host": false,
+      "status": "WIRED",
+      "repo_evidence": [
+        "docs/SECRET_MANAGEMENT_POLICY.md, docs/X3_NEXT_TASKS.md",
+        "mainnet-readiness findings reference it"
+      ],
+      "ci_evidence": [
+        ".github/workflows/mainnet-readiness.yml \u2014 installs TruffleHog and scans for secrets (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "no captured scan artifact",
+        "no redaction guarantee proven in logs"
+      ],
+      "next_action": "Run once, capture with redaction, and prove recovered secrets never reach ordinary logs.",
+      "host_refresh_note": "Still absent on host.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "prometheus",
+      "section": 44,
+      "name": "Prometheus",
+      "classification": "OBSERVABILITY",
+      "purpose": "Metrics for block production, finality, peers, txpool, RPC, resources, settlement, cross-VM",
+      "installed_on_host": true,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "monitoring/config/prometheus.yml, monitoring/prometheus-rules.yml, monitoring/alertmanager.yml",
+        "monitoring/local3/prometheus-local3.yml",
+        "infra/rpc/prometheus/prometheus.yml",
+        "infra-structure/validator/prometheus.yml",
+        "tools/cross-chain-gpu-validator/prometheus.yml",
+        "infra/rpc/router/src/metrics.rs (router exposes Prometheus metrics)"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no prometheus binary on host; no scrape ever captured",
+        "no alert-rule-to-evidence binding"
+      ],
+      "next_action": "Bring up one scrape against the router/node and capture metrics.",
+      "version_detected": "3.15.0",
+      "host_refresh_note": "Binary present 2026-10-01. 5 prometheus configs + router metrics.rs exist; nothing captured.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "grafana",
+      "section": 45,
+      "name": "Grafana",
+      "classification": "OBSERVABILITY",
+      "purpose": "Dashboards for validators, consensus, RPC, performance, Audit King, Monte Carlo",
+      "installed_on_host": true,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "monitoring/grafana/dashboards/x3-benchmark-dashboard.json",
+        "infra/rpc/grafana/rpc-dashboard.json",
+        "docs/testnet-config/grafana-dashboards.json"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "only 2 committed dashboards; no validator/consensus/finality/settlement/cross-VM/Audit King/Monte Carlo dashboard",
+        "no datasource provisioning file, so the dashboards cannot be applied by automation"
+      ],
+      "next_action": "Load the committed dashboards and capture a rendered panel.",
+      "version_detected": "13.2.3",
+      "host_refresh_note": "Binary present 2026-10-01. 2 dashboards committed; ~12 needed.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "loki",
+      "section": 46,
+      "name": "Loki",
+      "classification": "OBSERVABILITY",
+      "purpose": "Centralized logs with correlation identifiers",
+      "installed_on_host": true,
+      "status": "INSTALLED_ONLY",
+      "repo_evidence": [
+        "docs only (docs/reports/TESTNET_LAUNCH_RUNBOOK.md)"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no log shipping config",
+        "no correlation-key convention"
+      ],
+      "next_action": "Stand up one log source and correlate by request_id.",
+      "version_detected": "3.7.8",
+      "host_refresh_note": "Binary present 2026-10-01. Config referenced; no log pipeline captured.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "opentelemetry",
+      "section": 47,
+      "name": "OpenTelemetry",
+      "classification": "OBSERVABILITY",
+      "purpose": "Distributed tracing across router/agent/build/test/Audit King/Monte Carlo",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "crates/gpu-swarm/src/monitoring/tracing.rs",
+        "crates/gpu-swarm/src/observability.py",
+        "OTel references in JS workspaces (apps/x3-studio pnpm-lock)"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no collector config",
+        "no trace artifact ever produced by an X3 pipeline"
+      ],
+      "next_action": "Instrument only the Forge/Audit King pipeline first; do not roll out ecosystem-wide.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "tempo",
+      "section": 48,
+      "name": "Tempo",
+      "classification": "REJECT",
+      "purpose": "Distributed trace storage",
+      "installed_on_host": false,
+      "status": "REFERENCE_ONLY",
+      "repo_evidence": [
+        "all 'tempo' matches are the Tempo chain name in chain JSON files; no Grafana Tempo"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no tracing adoption to store"
+      ],
+      "next_action": "Reject until OpenTelemetry tracing demonstrably exists and has a retention need.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "docker",
+      "section": 49,
+      "name": "Docker",
+      "classification": "INFRASTRUCTURE",
+      "purpose": "Reproducible external-tool environments with pinned versions",
+      "installed_on_host": true,
+      "version_detected": "29.1.3",
+      "status": "IMPLEMENTED",
+      "repo_evidence": [
+        "Dockerfile.indexer, Dockerfile.mainnet-check, Dockerfile.validator",
+        "docker-compose.yml (x3-swarm-orchestra)",
+        "docker-config/"
+      ],
+      "ci_evidence": [
+        "workflow steps use container images with SHA-pinned tags (semgrep, trivy)"
+      ],
+      "gaps": [
+        "some workflows still use floating tags (returntocorp/semgrep:latest)",
+        "no tools.lock tying image digests to a release"
+      ],
+      "next_action": "Replace floating tags with digests and record them in tools.lock.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "podman",
+      "section": 50,
+      "name": "Podman",
+      "classification": "REJECT",
+      "purpose": "Alternative container engine",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "no references"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "Docker is the established default; maintaining both doubles infra surface"
+      ],
+      "next_action": "Reject. Revisit only if a rootless requirement appears.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "kubernetes",
+      "section": 51,
+      "name": "Kubernetes",
+      "classification": "REFERENCE",
+      "purpose": "Distributed worker infrastructure for Audit King / fuzz / Monte Carlo farms",
+      "installed_on_host": false,
+      "status": "REFERENCE_ONLY",
+      "repo_evidence": [
+        "k8s/ directory with manifests",
+        "helm/kubectl not installed"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no cluster exists"
+      ],
+      "next_action": "Stay reference until worker scale actually justifies it.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "ansible",
+      "section": 52,
+      "name": "Ansible",
+      "classification": "INFRASTRUCTURE",
+      "purpose": "Reproducible seven-validator physical lab: provisioning, users, SSH, binaries, systemd, configs, monitoring",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "0 references",
+        "infra/ and infra-structure/ contain ad-hoc shell instead"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "the seven-validator lab is currently not reproducible from version control"
+      ],
+      "next_action": "HIGH VALUE for the 7-validator campaign. Write the first playbook for host prep + node binary + systemd unit and run it against one spare host.",
+      "host_refresh_note": "Still absent on host; 7-validator lab is still ad-hoc shell.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "rust-libp2p",
+      "section": 53,
+      "name": "rust-libp2p",
+      "classification": "DEPENDENCY",
+      "purpose": "Networking substrate under Substrate",
+      "installed_on_host": "transitive dependency",
+      "status": "IMPLEMENTED",
+      "repo_evidence": [
+        "115 references; patches/quinn-proto exists for a networking dependency fix",
+        "node/ networking"
+      ],
+      "ci_evidence": [
+        "unit/integration gates"
+      ],
+      "gaps": [
+        "no libp2p conformance/interop evidence of X3's own peer behaviour"
+      ],
+      "next_action": "Build peer-behaviour tests (discovery, limits, connection handling) rather than adding a second stack.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "malachite",
+      "section": 55,
+      "name": "Malachite",
+      "classification": "REFERENCE",
+      "purpose": "BFT consensus state-machine reference and test oracle",
+      "installed_on_host": false,
+      "status": "REFERENCE_ONLY",
+      "repo_evidence": [
+        "0 references"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no written comparison against X3 Flash Finality"
+      ],
+      "next_action": "Write the comparison document before any code is considered; consensus replacement needs explicit approval.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "cometbft",
+      "section": 56,
+      "name": "CometBFT",
+      "classification": "REFERENCE",
+      "purpose": "Mature BFT consensus reference: proposer, timeouts, validator changes, evidence, recovery",
+      "installed_on_host": false,
+      "status": "REFERENCE_ONLY",
+      "repo_evidence": [
+        "3 textual references"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no structured comparison captured"
+      ],
+      "next_action": "Fold into the same consensus-reference document as Malachite.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "ethereum-hive",
+      "section": 57,
+      "name": "Ethereum Hive / X3 Hive",
+      "classification": "REFERENCE",
+      "purpose": "Architecture template: client + test simulator + scenario + result",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "no Hive-derived harness; the closest existing pieces are tests/zombienet/ and scripts/testnet/*-drill.sh"
+      ],
+      "ci_evidence": [
+        "four-validator-mesh.yml, zombienet-integration.yml (both manual)"
+      ],
+      "gaps": [
+        "no scenario format, no result-normalization contract, no Audit King control surface"
+      ],
+      "next_action": "Define the X3 Hive scenario/result schema and implement it over the existing zombienet runner rather than starting a new harness.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "paritydb",
+      "section": 58,
+      "name": "ParityDB",
+      "classification": "REFERENCE",
+      "purpose": "Database comparison against the current X3 storage",
+      "installed_on_host": false,
+      "status": "REFERENCE_ONLY",
+      "repo_evidence": [
+        "5 textual references; no benchmark harness"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no X3-workload benchmark exists yet, so any comparison would be synthetic"
+      ],
+      "next_action": "Build the workload benchmark first; migration requires a plan, crash-recovery, rollback and disk-growth testing.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "rocksdb",
+      "section": 59,
+      "name": "RocksDB",
+      "classification": "DEPENDENCY",
+      "purpose": "Current baseline database behaviour",
+      "installed_on_host": "transitive dependency",
+      "status": "IMPLEMENTED",
+      "repo_evidence": [
+        "83 references; node database backend"
+      ],
+      "ci_evidence": [
+        "unit/integration gates"
+      ],
+      "gaps": [
+        "no disk-growth, compaction or recovery characterization artifact"
+      ],
+      "next_action": "Capture a baseline under sustained write load; that baseline is what ParityDB would have to beat.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "jsonrpsee",
+      "section": 60,
+      "name": "jsonrpsee",
+      "classification": "DEPENDENCY",
+      "purpose": "RPC server/client with method exposure, subscriptions, limits",
+      "installed_on_host": "transitive dependency",
+      "status": "IMPLEMENTED",
+      "repo_evidence": [
+        "65 references; node RPC, crates/x3-rpc, infra/rpc/router/src/{auth,rate_limit,scoring,quorum}.rs"
+      ],
+      "ci_evidence": [
+        "RPC-related workflow suites (manual)"
+      ],
+      "gaps": [
+        "no audit of exposed method surface, unsafe methods, per-method rate limits or subscription resource limits"
+      ],
+      "next_action": "Produce an explicit exposed-method inventory with a safety classification for each.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "hermes",
+      "section": 61,
+      "name": "Hermes (IBC relayer)",
+      "classification": "REFERENCE",
+      "purpose": "Cross-chain relayer architecture: packet lifecycle, retry, timeout, evidence",
+      "installed_on_host": false,
+      "status": "REFERENCE_ONLY",
+      "repo_evidence": [
+        "9 textual references",
+        "X3 has its own crates/x3-relayer and crates/x3-ixl"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "must not be described as X3 using IBC \u2014 it does not"
+      ],
+      "next_action": "Extract retry/timeout/evidence patterns into the X3 relayer design notes only.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "tla-apalache",
+      "section": 62,
+      "name": "TLA+ / Apalache",
+      "classification": "TEST_ORACLE",
+      "purpose": "Formal protocol models: atomic settlement, claim/refund, finality state, upgrade state",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "formal-proofs/tla/",
+        "tools/tla2tools.jar (TLC available)",
+        "formal-proofs/coq/SupplyInvariant.v, formal-proofs/k/x3vm-spec.k, x3vm-claims.k",
+        "tools/{coqc,kompile,kprove}"
+      ],
+      "ci_evidence": [
+        ".github/workflows/formal-verification.yml (workflow_dispatch only)"
+      ],
+      "gaps": [
+        "apalache not installed",
+        "no captured model-check run or counterexample artifact",
+        "no path from a TLA+ counterexample into a concrete X3 regression test"
+      ],
+      "next_action": "Run TLC on the existing tla/ specs, capture a counterexample intentionally, and prove the counterexample-to-regression path.",
+      "host_refresh_note": "apalache still absent; tla2tools.jar present in formal-proofs/tla.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "failure-genome-sources",
+      "section": 63,
+      "name": "Failure Genome external sources (DeFiHackLabs, incident data, CVE datasets, contract corpora, client test vectors, Agave fixtures, postmortems)",
+      "classification": "TEST_ORACLE",
+      "purpose": "Public vulnerability knowledge normalized into the Failure Genome schema",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "intelligence/ directory exists",
+        "audit-artifacts/mainnet-readiness/*/findings.json exist but are per-audit, not a normalized genome",
+        "no provenance/citation schema for external incidents"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no ingestion, no schema, no licensing record per source"
+      ],
+      "next_action": "Define the Failure Genome record schema (root cause, violated invariant, prerequisites, exploit sequence, provenance) before ingesting anything.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "x3-monte-carlo-lab",
+      "section": 64,
+      "name": "X3 Monte Carlo Lab",
+      "classification": "ADAPTER",
+      "purpose": "Orchestrates zombienet, netem, toxiproxy, anvil, solana-test-validator, LiteSVM, k6, storage fault harness, validator workers with deterministic seeds",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "scripts/testnet/validator-failure-drill.sh (boot 4-7 validators, kill minority then supermajority)",
+        "scripts/mainnet/rc5_chaos_harness.sh",
+        "crates/x3-sim (deterministic simulator, recent PRs #560-564)",
+        "crates/northern-swarm, swarm_infrastructure/"
+      ],
+      "ci_evidence": [
+        "distributed-atomic-chaos.yml, swarm-tps-gpu-soak.yml (manual)"
+      ],
+      "gaps": [
+        "no seed \u2192 replay \u2192 minimize \u2192 root-cause pipeline implemented end to end",
+        "no orchestrator that drives the named external tools"
+      ],
+      "next_action": "Build the seed/replay contract first (x3-sim already has a failure-packet format from PR #564 \u2014 reuse it).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "completion-intelligence",
+      "section": 65,
+      "name": "Completion Intelligence Engine",
+      "classification": "ADAPTER",
+      "purpose": "Maps external findings back to feature/requirement/crate/module/symbol/test/invariant/release gate",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "feature-matrix/, FEATURE_MATRIX.toml, FEATURE_REGISTRY.toml",
+        "audit-artifacts/current/feature-status.json",
+        "mutants.out/missed.txt (59 unmapped surviving mutants)"
+      ],
+      "ci_evidence": [
+        ".github/workflows/feature-matrix.yml (manual)"
+      ],
+      "gaps": [
+        "no automated ingestion of tool findings into the feature map; mapping is manual today"
+      ],
+      "next_action": "Wire the first producer: surviving cargo-mutants entries into feature-status.json by crate/module.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "audit-king-normalization",
+      "section": 66,
+      "name": "Audit King normalization layer",
+      "classification": "ADAPTER",
+      "purpose": "Single normalized finding schema across all scanners",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "audit-artifacts/ contains multiple per-tool formats (findings.json, csv, txt, jsonl)",
+        "no schema file defining the 16-field normalized record"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "30 incompatible formats is exactly the current state"
+      ],
+      "next_action": "Commit the normalized finding schema and one adapter first (Slither), then converge the rest.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "finding-dedup",
+      "section": 67,
+      "name": "Finding deduplication",
+      "classification": "ADAPTER",
+      "purpose": "Cluster manifestations of one root cause across scanners",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "no dedup logic anywhere"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "depends on the normalization layer existing first"
+      ],
+      "next_action": "Implement after the schema; cluster on file+symbol+class+invariant.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "tool-trust-model",
+      "section": 68,
+      "name": "External tool trust model",
+      "classification": "ADAPTER",
+      "purpose": "Track tool version, hash, config, ruleset, limitations, FP/FN history",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "no tools.lock, no tool hash manifest"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "a release result can currently become irreproducible because a scanner silently upgraded"
+      ],
+      "next_action": "Create tools.lock with version + hash for every scanner, and gate release evidence on it.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "tool-benchmarking",
+      "section": 69,
+      "name": "Tool benchmarking fixtures",
+      "classification": "TEST_ORACLE",
+      "purpose": "Deliberately vulnerable fixtures to measure TP/FP/FN per tool",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "no intentionally-vulnerable fixture set apart from the Echidna InvariantProperties.sol"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "cannot currently say whether a scanner earns its compute"
+      ],
+      "next_action": "Create one known-vulnerable and one known-clean fixture per family (Solidity, Rust concurrency, secrets).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "tool-router",
+      "section": 70,
+      "name": "Forge/Audit King tool router",
+      "classification": "ADAPTER",
+      "purpose": "Select tools based on the change class rather than running everything",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "scripts/local-ci.sh has gate groups but no change-class routing among external tools"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no mapping from changed paths to tool set"
+      ],
+      "next_action": "Start with the four mappings in the prompt (Solidity / Rust concurrency / runtime migration / atomic settlement).",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "compute-aware-scheduling",
+      "section": 71,
+      "name": "Compute-aware tool scheduling",
+      "classification": "ADAPTER",
+      "purpose": "FAST / MEDIUM / EXPENSIVE / CONTINUOUS classification of every tool",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "scripts/local-ci.sh gate groups (opt-in flags) are the closest existing mechanism"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no cost labels on any tool"
+      ],
+      "next_action": "Add a cost field to each inventory entry once measurements exist.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "evidence-capture",
+      "section": 72,
+      "name": "Evidence capture contract",
+      "classification": "ADAPTER",
+      "purpose": "commit, dirty state, hashes, tool version, command, environment, timing, result, artifacts",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "launch-gates/evidence/ (multi-layered evidence dirs with .sha256 files)",
+        "audit-artifacts/mainnet-readiness/*/evidence/ (workflows-inventory.txt, source-hashes.json, configuration-inventory.txt, tests-inventory.txt)",
+        "scripts/x3-sim failure packets (PR #564 added a schema-validated packet)"
+      ],
+      "ci_evidence": [
+        "launch-gates gates"
+      ],
+      "gaps": [
+        "evidence schema varies per producer; the 9 required fields are not uniformly present"
+      ],
+      "next_action": "Adopt the x3-sim failure-packet schema as the single evidence envelope.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "tools-lock",
+      "section": 73,
+      "name": "tools.lock version pinning",
+      "classification": "ADAPTER",
+      "purpose": "Machine-readable manifest of pinned security/release tool versions",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "no tools.lock anywhere",
+        "tools/test-tool-stack/config.toml records versions for some tools only"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "release results are not reproducible against a fixed scanner set"
+      ],
+      "next_action": "Create tools.lock from the existing config.toml + workflow image digests.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "license-review",
+      "section": 74,
+      "name": "External license review registry",
+      "classification": "ADAPTER",
+      "purpose": "Record project, version, license, usage type, redistribution, modifications, attribution",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "deny.toml license policy",
+        "reports/security/cargo-deny-licenses.txt",
+        "DEPENDENCY_UPGRADE_PLAN_PHASE3_THIRD_PARTY.md"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "covers Cargo dependencies only; no registry for vendored tooling, forge-std copies, or reference projects"
+      ],
+      "next_action": "Extend the registry beyond crates and cover the vendored patches/ directory.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "mainnet-safety-policy",
+      "section": 75,
+      "name": "Mainnet safety policy for external tooling",
+      "classification": "ADAPTER",
+      "purpose": "Restrict destructive tooling to simulation/twin/lab",
+      "installed_on_host": "n/a",
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "scripts/mainnet/*.sh are read-only monitors (rc1_smoke_test.sh, public_testnet_gate.sh, NETTEST_HUB_FEE_MONITOR.sh)",
+        "CURRENT_MAINNET_STATUS.md, MAINNET_READINESS.md"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "policy is described in docs but not enforced by code; nothing prevents a chaos script from being pointed at a public endpoint"
+      ],
+      "next_action": "Add a guard to destructive scripts that refuses non-lab endpoints by default.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "digital-twin",
+      "section": 76,
+      "name": "Digital twin / shadow environment",
+      "classification": "INFRASTRUCTURE",
+      "purpose": "Production-like shadow network for external tools to attack",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "zombienet/x3-local-network.toml and benchmarks/zombienet/x3-benchmark-network.toml are lab topologies but not a sanitized twin"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no sanitized workload/state import path"
+      ],
+      "next_action": "Start from the zombienet 7-validator topology; add a state-sanitization step.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "guardian-release-gate",
+      "section": 83,
+      "name": "Guardian release gate",
+      "classification": "ADAPTER",
+      "purpose": "Consume evidence from external tools and distinguish required/optional/warning/N-A",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "RELEASE_GATES.md, launch-gates/, feature-matrix/security-proofgate.toml",
+        "scripts/mainnet_release_gate.py",
+        "production-gate.yml, release-provenance.yml"
+      ],
+      "ci_evidence": [
+        "production-gate.yml, release-hardening.yml (manual)"
+      ],
+      "gaps": [
+        "the matrix names checks that currently have no producer (Kani, fuzz, mutation, Monte Carlo)"
+      ],
+      "next_action": "Make every row in the gate map to a real evidence artifact or mark it NOT_APPLICABLE explicitly \u2014 no fabricated PASS.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "tool-health-dashboard",
+      "section": 84,
+      "name": "Audit King tool health dashboard",
+      "classification": "OBSERVABILITY",
+      "purpose": "Per-tool version/installed/configured/last-run/findings/health from actual state",
+      "installed_on_host": false,
+      "status": "MISSING",
+      "repo_evidence": [
+        "security-dashboard.yml exists but serves security findings, not tool health"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no source of truth for tool state"
+      ],
+      "next_action": "Generate it from tools.lock + evidence dirs once both exist.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "external-tool-completion-score",
+      "section": 85,
+      "name": "External tool completion score",
+      "classification": "ADAPTER",
+      "purpose": "Separate AVAILABLE/INSTALLED/CONFIGURED/WIRED/TESTED/EVIDENCED/GATED per tool",
+      "installed_on_host": "n/a",
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "this artifact (external-tool-inventory.json) implements the first pass of the split"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "per-tool evidence links are not yet machine-checked"
+      ],
+      "next_action": "Add a validator that fails when a tool claims TESTED/EVIDENCED without an evidence path.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "agent-churn-control",
+      "section": 87,
+      "name": "Evidence reuse / churn control",
+      "classification": "ADAPTER",
+      "purpose": "Reuse valid evidence for same commit/input/config/tool version; invalidate only on relevant change",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "x3-sim failure packets record checkout state and worktree dirtiness (PR #564), which is the beginning of this"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "no cache keyed on (commit, tool, config)"
+      ],
+      "next_action": "Extend the failure-packet schema into an evidence cache key.",
+      "reprobed_on": "2026-10-01"
+    },
+    {
+      "id": "scanner-isolation",
+      "section": 88,
+      "name": "Scanner sandboxing",
+      "classification": "INFRASTRUCTURE",
+      "purpose": "Run external scanners with minimum filesystem/network/credential access",
+      "installed_on_host": false,
+      "status": "PARTIAL",
+      "repo_evidence": [
+        "workflows run scanners in containers (semgrep) or on a self-hosted runner with no explicit credential scoping"
+      ],
+      "ci_evidence": [],
+      "gaps": [
+        "self-hosted runner jobs have repo-wide access; no per-job permission minimization shown"
+      ],
+      "next_action": "Scope workflow permissions explicitly and run scanners with read-only mounts.",
+      "reprobed_on": "2026-10-01"
+    }
+  ],
+  "notes": [
+    "Every status in this file is derived from repository contents plus a live host probe (command -v / --version) performed on 2026-10-01.",
+    "SUPERSEDED (2026-10-01, later the same day): after this Phase 0 snapshot, ~37 of these tools were installed and exercised. See external-toolchain-install-evidence.md for the authoritative post-install status, versions and proof runs. The status/installed_on_host fields below reflect the pre-install state.",
+    "No tool has been installed or modified by producing this artifact.",
+    "status=IMPLEMENTED is claimed only where an execution path exists in code AND the tool is present on the host. Where a run was never captured, the highest honest status is WIRED or PARTIAL.",
+    "The single largest structural finding is that 37 of 39 CI workflows are workflow_dispatch-only, so almost nothing in this inventory is actually gated automatically."
+  ],
+  "revision": {
+    "supersedes": "phase-0 inventory generated 2026-10-01 in a network-disabled sandbox",
+    "why": "The first pass ran with network disabled and no toolchain installed, so ~20 tools were recorded absent/blocked. Re-probed on 2026-10-01 with network enabled.",
+    "probe_date": "2026-10-01",
+    "commit_unchanged": true
+  },
+  "refresh_summary": {
+    "tools_reprobed": 90,
+    "status_changes": [
+      "cargo-fuzz: False->True, BLOCKED->WIRED",
+      "libfuzzer-sys: False->True, BLOCKED->WIRED",
+      "miri: True->False, INSTALLED_ONLY->BLOCKED",
+      "kani: False->True, MISSING->INSTALLED_ONLY",
+      "cargo-mutants: False->True, PARTIAL->PARTIAL",
+      "zombienet: False->True, PARTIAL->PARTIAL",
+      "subwasm: False->True, MISSING->INSTALLED_ONLY",
+      "echidna: False->True, PARTIAL->PARTIAL",
+      "medusa: False->True, MISSING->INSTALLED_ONLY",
+      "solana-test-validator: False->True, WIRED->WIRED",
+      "toxiproxy: False->True, PARTIAL->PARTIAL",
+      "k6: False->True, PARTIAL->PARTIAL",
+      "codeql: False->True, WIRED->WIRED",
+      "osv-scanner: False->True, WIRED->WIRED",
+      "trivy: False->True, WIRED->WIRED",
+      "syft: False->True, MISSING->INSTALLED_ONLY",
+      "grype: False->True, MISSING->INSTALLED_ONLY",
+      "cargo-audit: False->True, PARTIAL->PARTIAL",
+      "cargo-deny: False->True, PARTIAL->PARTIAL",
+      "gitleaks: False->True, MISSING->INSTALLED_ONLY",
+      "prometheus: False->True, PARTIAL->PARTIAL",
+      "grafana: False->True, PARTIAL->PARTIAL",
+      "loki: False->True, MISSING->INSTALLED_ONLY"
+    ]
+  }
+}

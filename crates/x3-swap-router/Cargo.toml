@@ -2,6 +2,7 @@
 name = "x3-swap-router"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 authors = ["X3 Chain Team"]
 description = "DEX swap router with AI-powered route optimization for X3 Chain"
 

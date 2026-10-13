@@ -1,0 +1,19 @@
+# Parent manifest for the external-toolchain validation fixtures.
+#
+# Why this file exists: cargo-fuzz resolves its "project" as the nearest
+# ancestor containing a Cargo.toml and then expects a `fuzz/` directory beside
+# it. Without a manifest here the search walks to the repository root and fails.
+#
+# Standalone workspace so the root workspace does not pick up the fixture.
+[package]
+name = "x3-tool-validation"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+description = "Intentionally-defective fixtures that prove external testing tools actually detect defects"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]

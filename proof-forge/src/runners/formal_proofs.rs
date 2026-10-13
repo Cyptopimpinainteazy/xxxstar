@@ -78,12 +78,12 @@ async fn run_tla_specs(
         4,
         &mut tla_specs,
     );
-    tla_specs.retain(|spec| {
-        let rel_path = rel(workspace, spec);
-        rel_path.contains("formal-proofs/tla/consensus/")
-            || rel_path.contains("formal-proofs/tla/asset_kernel/")
-            || rel_path.contains("formal-proofs/tla/contracts/")
-    });
+    // No directory allowlist. A previous allowlist covered only
+    // consensus/, asset_kernel/ and contracts/, which silently excluded
+    // evolution/, funding/, gpu/ and onboarding/ — four specs that then sat
+    // un-runnable (unparsable cfgs) while S0 still reported 100% VERIFIED.
+    // Every .tla file under formal-proofs/tla must run; a spec that cannot
+    // run has to fail the gate, not disappear from it.
     tla_specs.sort();
 
     if tla_specs.is_empty() {

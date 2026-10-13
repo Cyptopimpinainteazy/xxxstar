@@ -187,4 +187,39 @@ mod tests {
         assert_eq!(NoOpCrossChainValidator::get_latest_evm_header_hash(), None);
         assert_eq!(NoOpCrossChainValidator::get_latest_svm_header_hash(), None);
     }
+
+    /// The neutral bridge is the fail-closed default: if it were ever wired as the
+    /// runtime's provider by mistake, every proof must be refused (no settlement can
+    /// release against it) and no header may report a hash. The mutation campaign
+    /// flipped both `false` bodies to `true` and the suite stayed green, because
+    /// nothing asserted the refusal — only that the accept-all NoOp accepts.
+    #[test]
+    fn the_neutral_bridge_refuses_every_proof_and_reports_no_header() {
+        assert!(
+            !CrossChainValidatorBridge::verify_evm_proof(
+                1,
+                H256::repeat_byte(0x11),
+                H256::repeat_byte(0x22),
+                H256::repeat_byte(0x33),
+            ),
+            "the unwired bridge must refuse EVM proofs"
+        );
+        assert!(
+            !CrossChainValidatorBridge::verify_svm_proof(
+                1,
+                H256::repeat_byte(0x11),
+                H256::repeat_byte(0x22),
+                H256::repeat_byte(0x33),
+            ),
+            "the unwired bridge must refuse SVM proofs"
+        );
+        assert_eq!(
+            CrossChainValidatorBridge::get_latest_evm_header_hash(),
+            None
+        );
+        assert_eq!(
+            CrossChainValidatorBridge::get_latest_svm_header_hash(),
+            None
+        );
+    }
 }

@@ -1,3 +1,9 @@
 target
 artifacts
 coverage
+# libFuzzer writes hash-named units (40 hex chars) into the corpus on every run.
+# The hand-written `.x3` seeds above are committed; the generated units are not,
+# because they are regenerable from the seeds and would be hundreds of binary
+# blobs per run.
+corpus/*/*
+!corpus/*/*.x3

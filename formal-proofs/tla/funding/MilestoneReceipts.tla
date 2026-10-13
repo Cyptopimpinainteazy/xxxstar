@@ -28,6 +28,18 @@ CONSTANTS
     ReceiptOf,       \* function Milestones -> Receipts
     ReceiptStatus    \* function Receipts -> {"verified", "partial", "unverified", "missing"}
 
+\* TLC config-file values. The config parser accepts only literals and
+\* `X <- Impl` operator references, so the mapping functions are defined
+\* here and wired in via MilestoneReceipts.cfg.
+DeliverableImpl ==
+    ("m_good" :> "ship-it" @@ "m_no_budget" :> "no-budget" @@ "m_bad_receipt" :> "weak-receipt")
+BudgetImpl ==
+    ("m_good" :> 100 @@ "m_no_budget" :> 0 @@ "m_bad_receipt" :> 50)
+ReceiptOfImpl ==
+    ("m_good" :> "r_ok" @@ "m_no_budget" :> "r_ok" @@ "m_bad_receipt" :> "r_partial")
+ReceiptStatusImpl ==
+    ("r_ok" :> "verified" @@ "r_partial" :> "partial")
+
 ASSUME
     /\ Milestones # {}
     /\ DOMAIN Deliverable  = Milestones

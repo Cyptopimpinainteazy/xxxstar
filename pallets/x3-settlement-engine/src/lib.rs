@@ -104,6 +104,10 @@ mod mock;
 pub mod proof_fixtures;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_gate_pins;
+#[cfg(test)]
+mod tests_weights;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
@@ -1022,9 +1026,7 @@ pub mod pallet {
                         anchored: true,
                     },
                 );
-                if header.height > BtcBestHeight::<T>::get() {
-                    BtcBestHeight::<T>::put(header.height);
-                }
+                BtcBestHeight::<T>::mutate(|best| *best = (*best).max(header.height));
             }
         }
     }
@@ -2779,47 +2781,38 @@ pub mod pallet {
             // Receipts are RLP-encoded lists with: [status/root, gas_used, logs, contractAddress?]
             // or legacy format: [root, gas_used, logs, contractAddress]
 
+            // The tag byte selects the list shape: 0xc0..=0xf7 is a short list
+            // whose payload length is `tag - 0xc0`; 0xf8 and 0xf9 carry the
+            // payload length in one or two following bytes. Anything else is
+            // not a receipt: below 0xc0 is not a list, and 0xfa..=0xff would
+            // encode an unbounded length, refused rather than verified.
             let first_byte = body[0];
-
-            // Check if it's a valid RLP list (0xc0-0xf7 = short list, 0xf8-0xff = long list)
-            if first_byte < 0xc0 {
-                // Not a list - receipts must be lists
-                return false;
-            }
-
-            // For short lists (0xc0-0xf7), first byte is 0xc0 + payload_length
-            if first_byte <= 0xf7 {
-                let payload_length = (first_byte as usize) - 0xc0;
-                // Receipt should have at least 3 elements, so payload must be reasonable
-                return payload_length >= 3 && body.len() >= (1 + payload_length);
-            }
-
-            // For long lists (0xf8-0xff), next bytes encode the length
-            if first_byte == 0xf8 {
-                // Length is 1 byte after the first byte
-                if body.len() < 3 {
-                    return false;
+            match first_byte {
+                0xc0..=0xf7 => {
+                    let payload_length = (first_byte as usize) - 0xc0;
+                    // A receipt has at least three elements (status/root,
+                    // gas used, logs), so the payload must be at least that
+                    // large and must actually be present.
+                    payload_length >= 3 && body.len() >= (1 + payload_length)
                 }
-                let length_byte = body[1] as usize;
-                return body.len() >= (2 + length_byte);
-            }
-
-            if first_byte == 0xf9 {
-                // Length is 2 bytes after the first byte
-                if body.len() < 4 {
-                    return false;
+                0xf8 => {
+                    // Length is 1 byte after the first byte.
+                    if body.len() < 3 {
+                        return false;
+                    }
+                    let length_byte = body[1] as usize;
+                    body.len() >= (2 + length_byte)
                 }
-                let length = ((body[1] as usize) << 8) | (body[2] as usize);
-                return body.len() >= (3 + length);
+                0xf9 => {
+                    // Length is 2 bytes after the first byte.
+                    if body.len() < 4 {
+                        return false;
+                    }
+                    let length = (body[1] as usize) * 256 + (body[2] as usize);
+                    body.len() >= (3 + length)
+                }
+                _ => false,
             }
-
-            // For f9+, we're dealing with very large receipts - unlikely but possible
-            if first_byte >= 0xfa {
-                // Too long to verify efficiently, fail closed
-                return false;
-            }
-
-            true
         }
 
         /// Verify Solana transaction proof
@@ -2844,12 +2837,10 @@ pub mod pallet {
                 return Ok(false);
             }
 
-            // Need at least: 1-byte sig-count + 64-byte sig + 4 bytes minimal message
-            if tx_bytes.len() < 69 {
-                return Ok(false);
-            }
-
-            // 2. Extract signature count (compact-u16; ≤ 127 fits in one byte)
+            // 2. Extract signature count (compact-u16; ≤ 127 fits in one byte).
+            //    Any input too short to hold the signatures plus a minimal
+            //    message is refused by the `sigs_end` check below, which is
+            //    computed from the count just read.
             let sig_count = tx_bytes[0] as usize;
             if sig_count == 0 {
                 return Ok(false);
@@ -2871,11 +2862,11 @@ pub mod pallet {
 
             // Solana message: [3 header bytes] [compact num_accounts (1B if < 128)]
             //                 [num_accounts × 32B account keys] [32B recent_blockhash] …
-            if message.len() < 4 {
-                return Ok(false);
-            }
             // message[3] = compact-encoded number of account keys (1 byte for values ≤ 127)
-            let num_accounts = message[3] as usize;
+            let Some(&num_accounts) = message.get(3) else {
+                return Ok(false);
+            };
+            let num_accounts = num_accounts as usize;
             let accounts_start: usize = 4;
             let accounts_end: usize =
                 accounts_start.saturating_add(num_accounts.saturating_mul(32));
@@ -2947,50 +2938,30 @@ pub mod pallet {
                 return false;
             }
 
-            // First byte encodes signature count (compact encoding)
-            // Signatures can be variable-length encoded
-            let mut offset = 0;
-            let (sig_count, bytes_read) = match Self::decode_compact_u32(&tx_data[offset..]) {
-                Some(result) => result,
-                None => return false,
+            // First byte(s) encode the signature count (compact encoding).
+            let Some((sig_count, bytes_read)) = Self::decode_compact_u32(tx_data) else {
+                return false;
             };
-            offset += bytes_read;
 
-            // Each signature is 64 bytes
+            // Each signature is 64 bytes; the message starts after them.
             let sig_data_len = (sig_count as usize).saturating_mul(64);
-            if offset.saturating_add(sig_data_len) > tx_data.len() {
+            let Some(rest) = tx_data.get(bytes_read.saturating_add(sig_data_len)..) else {
                 return false;
-            }
-            offset += sig_data_len;
+            };
 
-            // After signatures comes the message
-            // Message starts with header byte
-            if offset >= tx_data.len() {
+            // Message: [header byte][number of static accounts][32-byte recent
+            // blockhash][instructions]. Slicing rather than indexing keeps every
+            // short input a refusal instead of a panic, and the one comparison
+            // left is the observable rule: a message that ends at the blockhash
+            // carries no instructions.
+            let Some((_header, rest)) = rest.split_first() else {
                 return false;
-            }
-
-            let _header = tx_data[offset];
-            offset += 1;
-
-            // Next is number of static accounts (max 255)
-            if offset >= tx_data.len() {
+            };
+            let Some((_num_accounts, rest)) = rest.split_first() else {
                 return false;
-            }
+            };
 
-            let _num_accounts = tx_data[offset];
-            offset += 1;
-
-            // Next 32 bytes should be the recent blockhash
-            if offset.saturating_add(32) > tx_data.len() {
-                return false;
-            }
-
-            // Blockhash is 32 bytes, followed by instruction count
-            offset += 32;
-
-            // If we got here, the basic structure is valid
-            // A real implementation would validate instruction encoding
-            offset < tx_data.len()
+            rest.len() > 32
         }
 
         /// Decode a compact u32 from Solana's encoding
@@ -3013,7 +2984,7 @@ pub mod pallet {
                 if data.len() < 2 {
                     return None;
                 }
-                let value = ((first_byte & 0x3f) as u32) | (((data[1] & 0x7f) as u32) << 6);
+                let value = ((first_byte & 0x3f) as u32) + (((data[1] & 0x7f) as u32) << 6);
                 return Some((value, 2));
             }
 
@@ -3023,8 +2994,8 @@ pub mod pallet {
                     return None;
                 }
                 let value = ((first_byte & 0x1f) as u32)
-                    | (((data[1] & 0x7f) as u32) << 5)
-                    | (((data[2] & 0x7f) as u32) << 12);
+                    + (((data[1] & 0x7f) as u32) << 5)
+                    + (((data[2] & 0x7f) as u32) << 12);
                 return Some((value, 3));
             }
 
@@ -3034,9 +3005,9 @@ pub mod pallet {
                     return None;
                 }
                 let value = ((first_byte & 0x0f) as u32)
-                    | (((data[1] & 0x7f) as u32) << 4)
-                    | (((data[2] & 0x7f) as u32) << 11)
-                    | (((data[3] & 0x7f) as u32) << 18);
+                    + (((data[1] & 0x7f) as u32) << 4)
+                    + (((data[2] & 0x7f) as u32) << 11)
+                    + (((data[3] & 0x7f) as u32) << 18);
                 return Some((value, 4));
             }
 
@@ -3044,10 +3015,9 @@ pub mod pallet {
             if data.len() < 5 {
                 return None;
             }
-            let value = (data[1] as u32)
-                | ((data[2] as u32) << 8)
-                | ((data[3] as u32) << 16)
-                | ((data[4] as u32) << 24);
+            // The high byte is unconstrained; the value is base-256
+            // little-endian over the four tail bytes.
+            let value = u32::from_le_bytes([data[1], data[2], data[3], data[4]]);
             Some((value, 5))
         }
 
@@ -3076,7 +3046,9 @@ pub mod pallet {
             }
         }
 
-        fn proof_domain_key(
+        // Visible to the crate's tests: the domain key is a KAT-pinned
+        // invariant of the settlement path, not a public API.
+        pub(crate) fn proof_domain_key(
             chain_id: &str,
             vm_type: ProofVmType,
             operation: CrossDomainOperation,
@@ -3202,16 +3174,6 @@ pub mod pallet {
                 let (chain_id, vm_type) = Self::proof_domain_descriptor(escrow.chain);
                 let key = Self::proof_domain_key(&chain_id, vm_type, operation);
                 if !VerifiedCrossDomainProofs::<T>::contains_key(intent_id, key) {
-                    #[cfg(test)]
-                    {
-                        // Legacy unit fixtures predate canonical proof sets. Let
-                        // their already-attached SettlementProof stand in only
-                        // during tests so the historical suite remains useful.
-                        // Runtime/production builds never compile this fallback.
-                        if operation == CrossDomainOperation::Claim && escrow.proof.is_some() {
-                            continue;
-                        }
-                    }
                     return false;
                 }
             }
@@ -3245,15 +3207,9 @@ pub mod pallet {
             let now = T::UnixTime::now().as_secs();
             ensure!(now < intent.timeout, Error::<T>::TimeoutExpired);
 
-            // INVARIANT 4: For BTC legs, verify confirmation depth
-            for leg_idx in 0..intent.legs_total {
-                if let Some(escrow) = EscrowStates::<T>::get(intent_id, leg_idx) {
-                    if escrow.chain == ExternalChainId::Bitcoin {
-                        // Check BTC has sufficient confirmations
-                        // (handled by separate BTC proof submission)
-                    }
-                }
-            }
+            // INVARIANT 4: for BTC legs the confirmation depth is enforced
+            // when the BTC proof itself is submitted and verified; by the time
+            // this checker runs there is nothing left here to re-check.
 
             Ok(())
         }
@@ -3315,20 +3271,18 @@ pub mod pallet {
 
             // ── Protocol settlement fee (best-effort, does not block finalization) ──
             let fee_bps = T::SettlementFeeBps::get() as u128;
-            if fee_bps > 0 {
-                let fee_raw = volume.saturating_mul(fee_bps).saturating_div(10_000);
-                if fee_raw > 0 {
-                    let fee: BalanceOf<T> = fee_raw.saturated_into();
-                    if <T as Config>::Currency::transfer(
-                        &intent.maker,
-                        &T::ProtocolTreasury::get(),
-                        fee,
-                        frame_support::traits::ExistenceRequirement::KeepAlive,
-                    )
-                    .is_ok()
-                    {
-                        Self::deposit_event(Event::SettlementFeeCollected { intent_id, fee });
-                    }
+            let fee_raw = volume.saturating_mul(fee_bps).saturating_div(10_000);
+            if fee_raw > 0 {
+                let fee: BalanceOf<T> = fee_raw.saturated_into();
+                if <T as Config>::Currency::transfer(
+                    &intent.maker,
+                    &T::ProtocolTreasury::get(),
+                    fee,
+                    frame_support::traits::ExistenceRequirement::KeepAlive,
+                )
+                .is_ok()
+                {
+                    Self::deposit_event(Event::SettlementFeeCollected { intent_id, fee });
                 }
             }
 
@@ -3497,13 +3451,16 @@ pub mod pallet {
         fn verify_btc_settlement_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
             use crate::btc_gateway::BtcSpvProof;
 
-            // Need at least 4 bytes for the tx_index prefix.
-            if proof.receipt_data.len() < 4 {
+            // Need at least 4 bytes for the tx_index prefix. A `get` slice
+            // makes a short buffer a refusal instead of an indexing panic.
+            let Some(tx_index_bytes) = proof.receipt_data.get(0..4) else {
                 return Ok(false);
-            }
-
-            let tx_index =
-                u32::from_le_bytes(proof.receipt_data[0..4].try_into().unwrap_or([0u8; 4]));
+            };
+            let tx_index = u32::from_le_bytes(
+                tx_index_bytes
+                    .try_into()
+                    .expect("get(0..4) yields exactly four bytes"),
+            );
             let tail = &proof.receipt_data[4..];
 
             // SCALE-decode the BtcBlockHeader from the head of `tail`.
@@ -3531,10 +3488,10 @@ pub mod pallet {
             // BtcBlockHeader::encoded_size gives us the SCALE length so we can
             // split cleanly. Fall back to scanning only if encoding is unavailable.
             let header_encoded_len = codec::Encode::encoded_size(&header);
-            if tail.len() < header_encoded_len {
+            let Some(raw_tx) = tail.get(header_encoded_len..) else {
                 return Ok(false);
-            }
-            let tx_bytes = tail[header_encoded_len..].to_vec();
+            };
+            let tx_bytes = raw_tx.to_vec();
 
             // Sanity: tx_hash must match the double-SHA256 of the tx bytes.
             let computed_txid = {
@@ -3648,10 +3605,15 @@ pub mod pallet {
                 target[0..4].copy_from_slice(&shifted.to_le_bytes());
             } else {
                 let shift = size - 3;
-                for (i, byte) in word.to_le_bytes().iter().enumerate() {
-                    if shift + i < 32 {
-                        target[shift + i] = *byte;
-                    }
+                // `size <= 34` above bounds `shift` at 31, so the copy is
+                // `32 - shift` bytes long and never writes past `target`.
+                for (i, byte) in word
+                    .to_le_bytes()
+                    .iter()
+                    .enumerate()
+                    .take(32usize.saturating_sub(shift))
+                {
+                    target[shift + i] = *byte;
                 }
             }
             Some(target)
@@ -3842,9 +3804,7 @@ pub mod pallet {
 
             BtcHeaders::<T>::insert(block_hash, header.clone());
             BtcHeaderMetaStore::<T>::insert(block_hash, BtcHeaderMeta { height, anchored });
-            if height > BtcBestHeight::<T>::get() {
-                BtcBestHeight::<T>::put(height);
-            }
+            BtcBestHeight::<T>::mutate(|best| *best = (*best).max(height));
             Self::deposit_event(Event::BtcHeaderAdmitted {
                 block_hash,
                 height,
@@ -4064,6 +4024,1091 @@ pub mod pallet {
                 Pallet::<Test>::is_valid_receipt_rlp(&typed),
                 "and the structure after the type byte is what gets checked"
             );
+        }
+
+        /// The mutation campaign left every comparison in the short-list arithmetic
+        /// alive because the existing cases only ever sat far from a boundary. Each
+        /// assertion below is one boundary: the payload-length floor, the declared
+        /// length vs. the carried bytes, and the exact off-by-one on both sides.
+        #[test]
+        fn the_short_list_arithmetic_is_pinned_at_its_boundaries() {
+            // `payload_length >= 3`: two declared bytes is below the receipt floor...
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xc2, 0x01, 0x02]));
+            // ...and stays refused even when the bytes are all there.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xc2, 0x01, 0x02, 0x03
+            ]));
+            // Exactly three payload bytes, all carried, is the smallest valid receipt.
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xc3, 0x01, 0x02, 0x03
+            ]));
+            // Three declared but only two carried is truncated.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xc3, 0x01, 0x02]));
+            // Four declared but only three carried: `1 + payload_length` is exact, not
+            // `1 * payload_length`.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xc4, 0x01, 0x02, 0x03
+            ]));
+            // `first_byte - 0xc0` is the payload length: the prefix arithmetic is a
+            // subtraction, not an addition or division.
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xc3, 0xff, 0xfe, 0xfd
+            ]));
+        }
+
+        /// Same for the long-list forms: the `0xf8` one-byte length and the `0xf9`
+        /// big-endian two-byte length, each with equality accepted and one byte less
+        /// refused.
+        #[test]
+        fn the_long_list_length_prefixes_are_pinned_at_their_boundaries() {
+            // 0xf8 with no length byte at all.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xf8, 0x01]));
+            // A two-byte body only satisfies `body.len() >= 2 + length_byte` when the
+            // length byte is zero: this case is what distinguishes the `< 3` guard
+            // from `> 3` (the misreading would fall through and accept it).
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xf8, 0x00]));
+            // Exactly `2 + length_byte` bytes: equality is accepted.
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[0xf8, 0x01, 0x00]));
+            // One byte short of `2 + length_byte`: refused.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf8, 0x05, 0x01, 0x02
+            ]));
+            // `2 + length_byte` at eight: ten bytes exactly is accepted, which the
+            // `2 * length_byte` misreading would refuse.
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf8, 0x08, 0, 0, 0, 0, 0, 0, 0, 0
+            ]));
+            // 0xf9 with fewer than four bytes cannot hold its two length bytes.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xf9, 0x00, 0x01]));
+            // Exactly `3 + length` bytes: equality is accepted...
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf9, 0x00, 0x01, 0x02
+            ]));
+            // ...one byte short is refused...
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf9, 0x00, 0x02, 0x01
+            ]));
+            // ...and the length is big-endian: `0x0102` is 258, not 2 and not 0.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf9, 0x01, 0x02, 0x00, 0x00
+            ]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf9, 0x02, 0x00, 0x00, 0x00
+            ]));
+            // `0xf9, 0x01, 0x02` must not read as `0x01 & 0x02` (0) or `0x01 ^ 0x02` (3):
+            // both would accept this five-byte body, the real length (258) refuses it.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf9, 0x01, 0x02, 0x00, 0x00
+            ]));
+        }
+    }
+
+    /// `decode_compact_u32` and `is_valid_solana_transaction` are private to this
+    /// module (and currently unused outside it), so their tests live here rather
+    /// than in `crate::tests`. The mutation campaign left every comparison and
+    /// bit operation in both alive: nothing drove a single encoding width or the
+    /// exact-length instruction boundary.
+    #[cfg(test)]
+    mod solana_structure {
+        use super::Pallet;
+        use crate::mock::Test;
+
+        #[test]
+        fn compact_u32_decodes_every_encoding_width_at_its_boundary() {
+            // Single byte: 0x7f is the largest, 0x80 starts the two-byte form.
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[0x7f]), Some((0x7f, 1)));
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0x80, 0x01]),
+                Some((0x40, 2))
+            );
+            // Two-byte: 0x80..=0xbf; six bits from the prefix, seven from the tail.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xbf, 0x7f]),
+                Some(((0x3f | (0x7f << 6)) as u32, 2))
+            );
+            // Three-byte: 0xc0..=0xdf.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xc0, 0x02, 0x03]),
+                Some((((0x02 << 5) | (0x03 << 12)) as u32, 3))
+            );
+            // Four-byte: 0xe0..=0xef.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xe0, 0x02, 0x03, 0x04]),
+                Some((((0x02 << 4) | (0x03 << 11) | (0x04 << 18)) as u32, 4))
+            );
+            // Five-byte little-endian tail.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xf0, 0x01, 0x00, 0x00, 0x00]),
+                Some((1, 5))
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xf0, 0x00, 0x01, 0x00, 0x00]),
+                Some((1 << 8, 5))
+            );
+            // Every tail byte must reach its own shift, not a neighbour's.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xf0, 0x00, 0x00, 0x01, 0x00]),
+                Some((1 << 16, 5))
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xf0, 0x00, 0x00, 0x00, 0x01]),
+                Some((1 << 24, 5))
+            );
+            // Truncated encodings are None, never a partially-read value.
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[]), None);
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[0x80]), None);
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[0xc0, 0x01]), None);
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xe0, 0x01, 0x02]),
+                None
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xf0, 0x01, 0x02, 0x03]),
+                None
+            );
+        }
+
+        #[test]
+        fn solana_transaction_shape_is_exact_at_the_instruction_boundary() {
+            // Zero signatures, a header byte, an account byte and a 32-byte
+            // blockhash is exactly 35 bytes: no instruction byte follows, so the
+            // shape is not executable...
+            let no_instruction = [0x00; 35];
+            assert!(!Pallet::<Test>::is_valid_solana_transaction(
+                &no_instruction
+            ));
+            // ...one instruction byte makes it the smallest valid transaction.
+            let mut one_instruction = no_instruction.to_vec();
+            one_instruction.push(0x01);
+            assert!(Pallet::<Test>::is_valid_solana_transaction(
+                &one_instruction
+            ));
+            // A declared signature that is not carried is refused.
+            let mut short_signatures = vec![0x01];
+            short_signatures.extend_from_slice(&[0u8; 40]);
+            assert!(!Pallet::<Test>::is_valid_solana_transaction(
+                &short_signatures
+            ));
+            assert!(!Pallet::<Test>::is_valid_solana_transaction(&[]));
+        }
+    }
+
+    /// Pins for the settlement-engine mutation campaign, money path (2026-10-03).
+    ///
+    /// These drive the guards that `claim_settlement`, `submit_cross_domain_proof_set`
+    /// and `finalize_settlement` consult, and the fee finalization collects, at the
+    /// exact boundaries the campaign's mutants answer differently. They live inside
+    /// `mod pallet` because the guards are private by design: this is the smallest
+    /// surface that can observe them.
+    #[cfg(test)]
+    mod gate_pins_money_path {
+        use super::*;
+        use crate::mock::{
+            new_test_ext, set_allow_unbound_svm_proofs, set_settlement_fee_bps, RuntimeOrigin,
+            Test, ALICE, BOB,
+        };
+        use crate::tests::{fabricated_bundle, intent_with_two_external_legs};
+        use crate::types::{EscrowLegState, IntentState};
+        use frame_support::assert_ok;
+        use x3_atomic_swap::{CrossDomainOperation, VmType};
+
+        #[test]
+        fn settlement_invariants_report_each_violation() {
+            new_test_ext().execute_with(|| {
+                let id = intent_with_two_external_legs();
+                assert!(Pallet::<Test>::check_settlement_invariants(id).is_ok());
+
+                // INVARIANT 1: locked legs must cover the total.
+                let mut intent = SettlementIntents::<Test>::get(id).expect("intent");
+                intent.legs_locked = 1;
+                SettlementIntents::<Test>::insert(id, intent.clone());
+                assert!(Pallet::<Test>::check_settlement_invariants(id).is_err());
+                intent.legs_locked = 2;
+
+                // INVARIANT 2: every leg record exists and is still Locked.
+                let mut escrow = EscrowStates::<Test>::get(id, 0).expect("leg 0");
+                escrow.state = EscrowLegState::Released;
+                EscrowStates::<Test>::insert(id, 0, escrow.clone());
+                assert!(Pallet::<Test>::check_settlement_invariants(id).is_err());
+                escrow.state = EscrowLegState::Locked;
+                EscrowStates::<Test>::insert(id, 0, escrow);
+
+                // INVARIANT 3: the Unix timeout must not have passed.
+                intent.timeout = 0;
+                SettlementIntents::<Test>::insert(id, intent.clone());
+                assert!(Pallet::<Test>::check_settlement_invariants(id).is_err());
+                intent.timeout = u64::MAX;
+                SettlementIntents::<Test>::insert(id, intent);
+                assert!(Pallet::<Test>::check_settlement_invariants(id).is_ok());
+            });
+        }
+
+        #[test]
+        fn unverified_external_bundles_are_refused_even_when_no_leg_matches() {
+            new_test_ext().execute_with(|| {
+                AllowUnattestedCrossDomainProofs::<Test>::put(false);
+                let id = intent_with_two_external_legs();
+                let runtime_id = id.to_fixed_bytes();
+
+                // The bundle names the Ethereum leg, but no verifier ever saw that
+                // transaction: self-attested, must be refused.
+                let fabricated = fabricated_bundle(
+                    runtime_id,
+                    "ethereum-mainnet",
+                    VmType::Evm,
+                    CrossDomainOperation::Claim,
+                    "0xfabricated".into(),
+                );
+                assert!(Pallet::<Test>::require_verified_external_bundle(id, &fabricated).is_err());
+
+                // A bundle whose domain matches no leg at all must not slip past
+                // either (that is the case that distinguishes the flag
+                // combination the guard builds).
+                let stranger = fabricated_bundle(
+                    runtime_id,
+                    "bitcoin-mainnet",
+                    VmType::BitcoinScript,
+                    CrossDomainOperation::Claim,
+                    "0xfabricated".into(),
+                );
+                assert!(Pallet::<Test>::require_verified_external_bundle(id, &stranger).is_err());
+
+                // The dev posture still allows the bookkeeping path.
+                AllowUnattestedCrossDomainProofs::<Test>::put(true);
+                assert!(Pallet::<Test>::require_verified_external_bundle(id, &fabricated).is_ok());
+            });
+        }
+
+        #[test]
+        fn the_finalization_fee_follows_the_traded_volume() {
+            new_test_ext().execute_with(|| {
+                set_settlement_fee_bps(25);
+                let id = intent_with_two_external_legs();
+                let intent = SettlementIntents::<Test>::get(id).expect("intent");
+                let volume = intent.asset_a.amount.saturating_add(intent.asset_b.amount);
+                let expected_fee = volume * 25 / 10_000;
+                assert!(expected_fee > 0, "fixture must actually owe a fee");
+
+                let before = <Test as Config>::Currency::free_balance(99);
+                assert_ok!(Pallet::<Test>::finalize_settlement(id, &intent, &ALICE));
+                let after = <Test as Config>::Currency::free_balance(99);
+
+                assert_eq!(
+                    after.saturating_sub(before),
+                    expected_fee,
+                    "treasury must receive volume * bps / 10_000"
+                );
+                assert!(frame_system::Pallet::<Test>::events()
+                    .iter()
+                    .any(|record| matches!(
+                        &record.event,
+                        crate::mock::RuntimeEvent::X3SettlementEngine(
+                            crate::Event::SettlementFeeCollected { intent_id, fee }
+                        ) if *intent_id == id && *fee == expected_fee
+                    )));
+                assert_eq!(IntentStates::<Test>::get(id), IntentState::Finalized);
+                set_settlement_fee_bps(0);
+            });
+        }
+
+        #[test]
+        fn a_zero_fee_setting_collects_no_fee_at_all() {
+            new_test_ext().execute_with(|| {
+                set_settlement_fee_bps(0);
+                let id = intent_with_two_external_legs();
+                let intent = SettlementIntents::<Test>::get(id).expect("intent");
+                assert_ok!(Pallet::<Test>::finalize_settlement(id, &intent, &ALICE));
+                assert!(!frame_system::Pallet::<Test>::events()
+                    .iter()
+                    .any(|record| matches!(
+                        &record.event,
+                        crate::mock::RuntimeEvent::X3SettlementEngine(
+                            crate::Event::SettlementFeeCollected { .. }
+                        )
+                    )));
+            });
+        }
+
+        #[test]
+        fn the_unbound_svm_proof_gate_follows_the_runtime_switch() {
+            set_allow_unbound_svm_proofs(false);
+            assert!(
+                ensure_unbound_svm_proofs_allowed::<Test>().is_err(),
+                "with nothing binding an SVM receipt to its slot, the gate must refuse"
+            );
+            set_allow_unbound_svm_proofs(true);
+            assert!(ensure_unbound_svm_proofs_allowed::<Test>().is_ok());
+        }
+
+        // ── batch 3 (2026-10-03): proof decoders and the native-custody path ──
+
+        /// An intent whose maker side is X3-native and whose taker side is an
+        /// Ethereum leg, so the native custody path can be driven end to end.
+        fn native_plus_ethereum_intent(seed: u8) -> H256 {
+            use crate::types::{AssetSpec, TokenId};
+            assert_ok!(Pallet::<Test>::create_intent(
+                RuntimeOrigin::signed(ALICE),
+                BOB,
+                AssetSpec {
+                    chain: ExternalChainId::X3Native,
+                    token: TokenId::Native,
+                    amount: 100,
+                },
+                AssetSpec {
+                    chain: ExternalChainId::Ethereum,
+                    token: TokenId::Native,
+                    amount: 250,
+                },
+                H256::repeat_byte(seed),
+                Some(3_600),
+            ));
+            SettlementIntents::<Test>::iter()
+                .find(|(_, intent)| intent.secret_hash == H256::repeat_byte(seed))
+                .map(|(id, _)| id)
+                .expect("intent exists")
+        }
+
+        fn evm_receipt_proof(receipt: Vec<u8>) -> crate::types::SettlementProof {
+            use crate::types::{ProofType, SettlementProof};
+            SettlementProof {
+                proof_type: ProofType::MerkleTrie,
+                tx_hash: H256::from(sp_io::hashing::keccak_256(&receipt)),
+                block_hash: H256::repeat_byte(0x21),
+                chain_height: Some(11),
+                confirmations: 12,
+                merkle_proof: vec![H256::repeat_byte(0x31), H256::zero()]
+                    .try_into()
+                    .expect("two roots fit"),
+                receipt_data: receipt.try_into().expect("receipt fits the bound"),
+                receipt_index: Some(0),
+                trie_proof: Some(vec![0u8].try_into().expect("proof fits")),
+            }
+        }
+
+        #[test]
+        fn receipt_rlp_accepts_every_list_shape_at_its_boundary() {
+            // Short list: the payload must carry at least three elements and
+            // must actually be present.
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xc3, 0x01, 0x02, 0x03
+            ]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xc3, 0x01, 0x02]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xc2, 0x01, 0x02, 0x03
+            ]));
+            // The top of the short range, exactly 55 payload bytes.
+            let mut at_limit = vec![0xf7u8];
+            at_limit.extend(std::iter::repeat_n(0u8, 55));
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&at_limit));
+            at_limit.pop();
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&at_limit));
+
+            // 0xf8: one length byte, and the length byte itself must be present.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xf8, 0x00]));
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[0xf8, 0x00, 0x00]));
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[0xf8, 0x01, 0x00]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xf8, 0x02, 0x00]));
+
+            // 0xf9: two length bytes, combined as length_hi * 256 + length_lo.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0xf9, 0x00, 0x00]));
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf9, 0x00, 0x00, 0x00
+            ]));
+            // Exactly three payload bytes after the header is the accept edge.
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf9, 0x00, 0x03, 0x00, 0x00, 0x00
+            ]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xf9, 0x00, 0x04, 0x00, 0x00, 0x00
+            ]));
+            let mut ten_after_header = vec![0xf9, 0x01, 0x03];
+            ten_after_header.extend(std::iter::repeat_n(0u8, 10));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&ten_after_header));
+            let mut two_byte_length = vec![0xf9, 0x01, 0x00];
+            two_byte_length.extend(std::iter::repeat_n(0u8, 256));
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&two_byte_length));
+            two_byte_length.pop();
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&two_byte_length));
+
+            // Below 0xc0 is not a list; 0xfa and above are refused outright.
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xbf, 0x01, 0x02, 0x03
+            ]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0xff, 0x01, 0x02, 0x03
+            ]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[]));
+
+            // Typed receipts: the type byte is skipped, then the body must still
+            // be a valid receipt list.
+            assert!(Pallet::<Test>::is_valid_receipt_rlp(&[
+                0x02, 0xc3, 0x01, 0x02, 0x03
+            ]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[0x02]));
+            assert!(!Pallet::<Test>::is_valid_receipt_rlp(&[
+                0x02, 0xc2, 0x01, 0x02
+            ]));
+        }
+
+        #[test]
+        fn compact_u32_decodes_each_width_and_rejects_truncation() {
+            // One byte.
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[0x00]), Some((0, 1)));
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[0x7f]), Some((127, 1)));
+            // Two bytes: 6 low bits + 7 high bits.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0x80, 0x01]),
+                Some((64, 2))
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xbf, 0x7f]),
+                Some((8191, 2))
+            );
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[0x80]), None);
+            // Three bytes: 5 + 7 + 7 bits.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xc0, 0x01, 0x02]),
+                Some((8224, 3))
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xdf, 0x7f, 0x7f]),
+                Some((524_287, 3))
+            );
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[0xc0, 0x01]), None);
+            // Four bytes: 4 + 7 + 7 + 7 bits.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xe0, 0x01, 0x02, 0x03]),
+                Some((790_544, 4))
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xef, 0x7f, 0x7f, 0x7f]),
+                Some((33_554_431, 4))
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xe0, 0x01, 0x02]),
+                None
+            );
+            // Five bytes: the four tail bytes are base-256 little-endian.
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xf0, 0x01, 0x02, 0x03, 0x04]),
+                Some((0x0403_0201, 5))
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xff, 0xff, 0xff, 0xff, 0xff]),
+                Some((u32::MAX, 5))
+            );
+            assert_eq!(
+                Pallet::<Test>::decode_compact_u32(&[0xf0, 0x01, 0x02, 0x03]),
+                None
+            );
+            assert_eq!(Pallet::<Test>::decode_compact_u32(&[]), None);
+        }
+
+        #[test]
+        fn evm_receipt_proof_pins_each_structural_rejection() {
+            use crate::proof_fixtures::receipt_trie;
+            use crate::types::ProofType;
+
+            new_test_ext().execute_with(|| {
+                let receipt = vec![0xc3u8, 0x01, 0x02, 0x03];
+                let (trie_root, trie_proof) = receipt_trie(&receipt, 0);
+
+                // The full happy path: structurally valid receipt, matching
+                // receipt hash, both roots, an index and a real inclusion proof.
+                let mut good = evm_receipt_proof(receipt.clone());
+                good.merkle_proof = vec![H256::repeat_byte(0x41), trie_root]
+                    .try_into()
+                    .expect("two roots fit");
+                good.trie_proof = Some(trie_proof.clone().try_into().expect("proof fits"));
+                assert!(
+                    Pallet::<Test>::verify_evm_receipt_proof(&good).expect("no dispatch error"),
+                    "a receipt with a valid trie path must verify"
+                );
+
+                // The depth floor is inclusive: one confirmation clears it, and
+                // a `< 1` turned into `<= 1` refuses every real proof.
+                let mut one_confirmation = good.clone();
+                one_confirmation.confirmations = 1;
+                assert!(
+                    Pallet::<Test>::verify_evm_receipt_proof(&one_confirmation)
+                        .expect("no dispatch error"),
+                    "one confirmation must clear the depth floor"
+                );
+
+                // Wrong proof-category.
+                let mut wrong_type = good.clone();
+                wrong_type.proof_type = ProofType::SolanaProof;
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&wrong_type).expect("no error"));
+
+                // Empty receipt data.
+                let mut empty = evm_receipt_proof(Vec::new());
+                empty.tx_hash = H256::from(sp_io::hashing::keccak_256(&[]));
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&empty).expect("no error"));
+
+                // Zero confirmations.
+                let mut no_confirmations = good.clone();
+                no_confirmations.confirmations = 0;
+                assert!(
+                    !Pallet::<Test>::verify_evm_receipt_proof(&no_confirmations).expect("no error")
+                );
+
+                // Structurally invalid RLP, with its own hash so the RLP check
+                // is the one that refuses it.
+                let malformed = evm_receipt_proof(vec![0xbf, 0x01, 0x02, 0x03]);
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&malformed).expect("no error"));
+
+                // A receipt whose hash is not the one the proof carries.
+                let mut wrong_hash = good.clone();
+                wrong_hash.tx_hash = H256::repeat_byte(0x99);
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&wrong_hash).expect("no error"));
+
+                // No stated height; no settlement.
+                let mut no_height = good.clone();
+                no_height.chain_height = None;
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&no_height).expect("no error"));
+
+                // Fewer than two roots; no settlement.
+                let mut no_roots = good.clone();
+                no_roots.merkle_proof = Default::default();
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&no_roots).expect("no error"));
+
+                // No receipt index; the trie cannot be walked.
+                let mut no_index = good.clone();
+                no_index.receipt_index = None;
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&no_index).expect("no error"));
+
+                // No path; the walk cannot run.
+                let mut no_path = good.clone();
+                no_path.trie_proof = None;
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&no_path).expect("no error"));
+
+                // A path that does not include the receipt at the stated index.
+                let mut wrong_index = good.clone();
+                wrong_index.receipt_index = Some(7);
+                assert!(!Pallet::<Test>::verify_evm_receipt_proof(&wrong_index).expect("no error"));
+
+                // A path for a different receipt.
+                let (other_root, other_proof) = receipt_trie(&[0xc3u8, 0x09, 0x09, 0x09], 0);
+                let mut other_receipt = good.clone();
+                other_receipt.merkle_proof = vec![H256::repeat_byte(0x41), other_root]
+                    .try_into()
+                    .expect("two roots fit");
+                other_receipt.trie_proof = Some(other_proof.try_into().expect("proof fits"));
+                assert!(
+                    !Pallet::<Test>::verify_evm_receipt_proof(&other_receipt).expect("no error")
+                );
+            });
+        }
+
+        fn svm_proof(tx: Vec<u8>, block_hash: H256) -> crate::types::SettlementProof {
+            use crate::types::{ProofType, SettlementProof};
+            SettlementProof {
+                proof_type: ProofType::SolanaProof,
+                tx_hash: H256::zero(),
+                block_hash,
+                chain_height: Some(4_242),
+                confirmations: 32,
+                merkle_proof: vec![H256::repeat_byte(0x51), H256::repeat_byte(0x52)]
+                    .try_into()
+                    .expect("two roots fit"),
+                receipt_data: tx.try_into().expect("tx fits the bound"),
+                receipt_index: None,
+                trie_proof: None,
+            }
+        }
+
+        #[test]
+        fn svm_proof_verifies_a_signed_transaction_at_the_account_boundary() {
+            use sp_core::{ed25519::Pair as Ed25519Pair, Pair as _};
+
+            set_allow_unbound_svm_proofs(true);
+            let pair = Ed25519Pair::from_seed(&[0x42u8; 32]);
+            let signer = pair.public().0;
+            let block_hash = H256::repeat_byte(0x5b);
+
+            // message: [3 header bytes][num_accounts = 1][signer][blockhash][tail]
+            let mut message = vec![0x01u8, 0x00, 0x00, 0x01];
+            message.extend_from_slice(&signer);
+            message.extend_from_slice(block_hash.as_bytes());
+            message.push(0x00);
+            let signature = pair.sign(&message);
+
+            let mut tx = vec![1u8];
+            tx.extend_from_slice(&signature.0);
+            tx.extend_from_slice(&message);
+
+            let good = svm_proof(tx.clone(), block_hash);
+            assert!(
+                Pallet::<Test>::verify_svm_proof(&good).expect("no dispatch error"),
+                "a signed transaction naming the attested blockhash must verify"
+            );
+
+            // The account boundary is inclusive: a message that ends exactly at
+            // the attested blockhash (no instruction tail) is at the boundary,
+            // not past it, and must verify. A `<` length check turned into `<=`
+            // refuses this otherwise-valid proof.
+            let mut boundary_message = vec![0x01u8, 0x00, 0x00, 0x01];
+            boundary_message.extend_from_slice(&signer);
+            boundary_message.extend_from_slice(block_hash.as_bytes());
+            let boundary_signature = pair.sign(&boundary_message);
+            let mut boundary_tx = vec![1u8];
+            boundary_tx.extend_from_slice(&boundary_signature.0);
+            boundary_tx.extend_from_slice(&boundary_message);
+            assert!(
+                Pallet::<Test>::verify_svm_proof(&svm_proof(boundary_tx, block_hash))
+                    .expect("no dispatch error"),
+                "a message ending exactly at the blockhash is at the account boundary"
+            );
+
+            // The transaction must name the attested blockhash, not another.
+            assert!(!Pallet::<Test>::verify_svm_proof(&svm_proof(
+                tx.clone(),
+                H256::repeat_byte(0x5c)
+            ))
+            .expect("no error"));
+
+            // A tampered signature does not cover the message.
+            let mut forged = tx.clone();
+            forged[10] ^= 0x01;
+            assert!(
+                !Pallet::<Test>::verify_svm_proof(&svm_proof(forged, block_hash))
+                    .expect("no error")
+            );
+
+            // The account count the message states must fit before the blockhash.
+            let mut short_message = vec![0x01u8, 0x00, 0x00, 0x02];
+            short_message.extend_from_slice(&signer);
+            short_message.extend_from_slice(block_hash.as_bytes());
+            short_message.push(0x00);
+            let short_signature = pair.sign(&short_message);
+            let mut short_tx = vec![1u8];
+            short_tx.extend_from_slice(&short_signature.0);
+            short_tx.extend_from_slice(&short_message);
+            assert!(
+                !Pallet::<Test>::verify_svm_proof(&svm_proof(short_tx, block_hash))
+                    .expect("no error")
+            );
+
+            // No stated slot; no settlement.
+            let mut no_height = svm_proof(tx.clone(), block_hash);
+            no_height.chain_height = None;
+            assert!(!Pallet::<Test>::verify_svm_proof(&no_height).expect("no error"));
+
+            // No roots; no settlement.
+            let mut no_roots = svm_proof(tx, block_hash);
+            no_roots.merkle_proof = Default::default();
+            assert!(!Pallet::<Test>::verify_svm_proof(&no_roots).expect("no error"));
+        }
+
+        #[test]
+        fn intent_deadline_index_uses_six_second_blocks_plus_padding() {
+            use crate::types::{AssetSpec, TokenId};
+
+            new_test_ext().execute_with(|| {
+                frame_system::Pallet::<Test>::set_block_number(1);
+                let make = |timeout: u64, seed: u8| {
+                    assert_ok!(Pallet::<Test>::create_intent(
+                        RuntimeOrigin::signed(ALICE),
+                        BOB,
+                        AssetSpec {
+                            chain: ExternalChainId::X3Native,
+                            token: TokenId::Native,
+                            amount: 10,
+                        },
+                        AssetSpec {
+                            chain: ExternalChainId::Ethereum,
+                            token: TokenId::Native,
+                            amount: 10,
+                        },
+                        H256::repeat_byte(seed),
+                        Some(timeout),
+                    ));
+                };
+                make(60, 0x01); // 60 / 6 = 10 blocks, + 1 padding -> block 12
+                make(66, 0x02); // 66 / 6 = 11 blocks, + 1 padding -> block 13
+                make(5, 0x03); // sub-block timeout still gets its padding -> block 2
+
+                let id_of = |seed: u8| {
+                    SettlementIntents::<Test>::iter()
+                        .find(|(_, intent)| intent.secret_hash == H256::repeat_byte(seed))
+                        .map(|(id, _)| id)
+                        .expect("intent exists")
+                };
+                let at_60 = id_of(0x01);
+                let at_66 = id_of(0x02);
+                let sub_block = id_of(0x03);
+
+                assert!(IntentDeadlineIndex::<Test>::get(12u64).contains(&at_60));
+                assert!(
+                    !IntentDeadlineIndex::<Test>::get(11u64).contains(&at_60),
+                    "the +1 padding block must not be dropped"
+                );
+                assert!(IntentDeadlineIndex::<Test>::get(13u64).contains(&at_66));
+                assert!(!IntentDeadlineIndex::<Test>::get(12u64).contains(&at_66));
+                assert!(IntentDeadlineIndex::<Test>::get(2u64).contains(&sub_block));
+                assert!(!IntentDeadlineIndex::<Test>::get(1u64).contains(&sub_block));
+            });
+        }
+
+        #[test]
+        fn native_lock_indexes_its_expiry_and_moves_it_to_finalize() {
+            new_test_ext().execute_with(|| {
+                frame_system::Pallet::<Test>::set_block_number(1);
+                let id = native_plus_ethereum_intent(0x71);
+                assert_ok!(Pallet::<Test>::lock_escrow(
+                    RuntimeOrigin::signed(ALICE),
+                    id,
+                    0,
+                    ExternalChainId::X3Native,
+                    100,
+                    vec![],
+                ));
+
+                // Registered at deadline + 1: the first block where
+                // `is_expired` is true, never the deadline itself.
+                assert!(AtomicLockExpiryIndex::<Test>::get(602u32).contains(&id));
+                assert!(!AtomicLockExpiryIndex::<Test>::get(601u32).contains(&id));
+
+                // The second leg lands five blocks later and completes the
+                // funding: the lock moves to its finalize deadline, and the
+                // index entry must move with it.
+                frame_system::Pallet::<Test>::set_block_number(5);
+                assert_ok!(Pallet::<Test>::lock_escrow(
+                    RuntimeOrigin::signed(BOB),
+                    id,
+                    1,
+                    ExternalChainId::Ethereum,
+                    250,
+                    vec![],
+                ));
+                assert_eq!(IntentStates::<Test>::get(id), IntentState::FullyFunded);
+                assert!(
+                    !AtomicLockExpiryIndex::<Test>::get(602u32).contains(&id),
+                    "the prepare slot must be vacated"
+                );
+                assert!(AtomicLockExpiryIndex::<Test>::get(606u32).contains(&id));
+
+                let lock = AtomicLocks::<Test>::get(id).expect("lock exists");
+                assert_eq!(lock.deadline_block(), Some(605));
+                assert!(
+                    !lock.is_expired(605),
+                    "the finalize block itself is not late"
+                );
+                assert!(lock.is_expired(606));
+            });
+        }
+
+        #[test]
+        fn a_second_native_lock_by_the_same_depositor_is_refused() {
+            new_test_ext().execute_with(|| {
+                let id = native_plus_ethereum_intent(0x72);
+                assert_ok!(Pallet::<Test>::lock_escrow(
+                    RuntimeOrigin::signed(ALICE),
+                    id,
+                    0,
+                    ExternalChainId::X3Native,
+                    100,
+                    vec![],
+                ));
+                let reserved_after_first = <Test as Config>::Currency::reserved_balance(ALICE);
+
+                // The same depositor's native side may be locked only once on an
+                // intent; a second escrow would reserve it twice.
+                frame_support::assert_noop!(
+                    Pallet::<Test>::lock_escrow(
+                        RuntimeOrigin::signed(ALICE),
+                        id,
+                        1,
+                        ExternalChainId::X3Native,
+                        100,
+                        vec![],
+                    ),
+                    crate::Error::<Test>::EscrowAlreadyExists
+                );
+                assert_eq!(
+                    <Test as Config>::Currency::reserved_balance(ALICE),
+                    reserved_after_first,
+                    "a refused lock must not move funds"
+                );
+                assert!(EscrowStates::<Test>::get(id, 1).is_none());
+            });
+        }
+
+        #[test]
+        fn held_native_legs_sees_only_locked_native_custody() {
+            new_test_ext().execute_with(|| {
+                let id = native_plus_ethereum_intent(0x73);
+                assert_ok!(Pallet::<Test>::lock_escrow(
+                    RuntimeOrigin::signed(ALICE),
+                    id,
+                    0,
+                    ExternalChainId::X3Native,
+                    100,
+                    vec![],
+                ));
+                let intent = SettlementIntents::<Test>::get(id).expect("intent");
+
+                let held = Pallet::<Test>::held_native_legs(id, &intent).expect("covered");
+                assert_eq!(held.len(), 1);
+                assert_eq!(held[0].0, ALICE);
+                assert_eq!(held[0].1, 100);
+
+                // A released leg is no longer custody held here.
+                let mut escrow = EscrowStates::<Test>::get(id, 0).expect("leg 0");
+                escrow.state = EscrowLegState::Released;
+                EscrowStates::<Test>::insert(id, 0, escrow.clone());
+                assert!(Pallet::<Test>::held_native_legs(id, &intent)
+                    .expect("nothing to cover")
+                    .is_empty());
+
+                // If the reserve no longer covers the recorded amount, the whole
+                // set fails instead of paying out a shortfall.
+                escrow.state = EscrowLegState::Locked;
+                escrow.amount = 101;
+                EscrowStates::<Test>::insert(id, 0, escrow);
+                assert!(Pallet::<Test>::held_native_legs(id, &intent).is_err());
+            });
+        }
+
+        #[test]
+        fn domain_matching_requires_both_the_chain_and_the_vm() {
+            new_test_ext().execute_with(|| {
+                let id = intent_with_two_external_legs();
+                let runtime_id = id.to_fixed_bytes();
+                let tx_id = "0x1111111111111111111111111111111111111111111111111111111111111111"
+                    .to_string();
+
+                let eth = fabricated_bundle(
+                    runtime_id,
+                    "ethereum-mainnet",
+                    VmType::Evm,
+                    CrossDomainOperation::Claim,
+                    tx_id.clone(),
+                );
+                let sol = fabricated_bundle(
+                    runtime_id,
+                    "solana-mainnet",
+                    VmType::Svm,
+                    CrossDomainOperation::Claim,
+                    tx_id.clone(),
+                );
+                assert!(Pallet::<Test>::bundle_matches_intent_domain(id, &eth));
+                assert!(Pallet::<Test>::bundle_matches_intent_domain(id, &sol));
+
+                // A matching chain with a foreign VM is not a match, and neither
+                // is a matching VM with a foreign chain.
+                let crossed_vm = fabricated_bundle(
+                    runtime_id,
+                    "ethereum-mainnet",
+                    VmType::Svm,
+                    CrossDomainOperation::Claim,
+                    tx_id.clone(),
+                );
+                let crossed_chain = fabricated_bundle(
+                    runtime_id,
+                    "solana-mainnet",
+                    VmType::Evm,
+                    CrossDomainOperation::Claim,
+                    tx_id.clone(),
+                );
+                assert!(!Pallet::<Test>::bundle_matches_intent_domain(
+                    id,
+                    &crossed_vm
+                ));
+                assert!(!Pallet::<Test>::bundle_matches_intent_domain(
+                    id,
+                    &crossed_chain
+                ));
+
+                // No leg on that chain at all.
+                let btc = fabricated_bundle(
+                    runtime_id,
+                    "bitcoin-mainnet",
+                    VmType::BitcoinScript,
+                    CrossDomainOperation::Claim,
+                    tx_id,
+                );
+                assert!(!Pallet::<Test>::bundle_matches_intent_domain(id, &btc));
+
+                // No such intent.
+                assert!(!Pallet::<Test>::bundle_matches_intent_domain(
+                    H256::repeat_byte(0xaa),
+                    &eth
+                ));
+            });
+        }
+
+        #[test]
+        fn an_x3_native_leg_needs_its_chain_and_vm_exactly() {
+            new_test_ext().execute_with(|| {
+                AllowUnattestedCrossDomainProofs::<Test>::put(false);
+                let id = native_plus_ethereum_intent(0x74);
+                assert_ok!(Pallet::<Test>::lock_escrow(
+                    RuntimeOrigin::signed(ALICE),
+                    id,
+                    0,
+                    ExternalChainId::X3Native,
+                    100,
+                    vec![],
+                ));
+                let runtime_id = id.to_fixed_bytes();
+                let tx_id = "0x2222222222222222222222222222222222222222222222222222222222222222"
+                    .to_string();
+
+                // The exact X3-native domain: this chain verifies its own escrow,
+                // so no external proof is required.
+                let native = fabricated_bundle(
+                    runtime_id,
+                    "x3-native",
+                    VmType::X3Vm,
+                    CrossDomainOperation::Claim,
+                    tx_id.clone(),
+                );
+                assert!(Pallet::<Test>::require_verified_external_bundle(id, &native).is_ok());
+
+                // Chain matches the native leg but the VM does not: this is not
+                // that leg, and nothing else matches either, so it is refused.
+                let crossed = fabricated_bundle(
+                    runtime_id,
+                    "x3-native",
+                    VmType::Svm,
+                    CrossDomainOperation::Claim,
+                    tx_id.clone(),
+                );
+                assert!(Pallet::<Test>::require_verified_external_bundle(id, &crossed).is_err());
+
+                // VM matches but the chain does not.
+                let crossed_chain = fabricated_bundle(
+                    runtime_id,
+                    "ethereum-mainnet",
+                    VmType::X3Vm,
+                    CrossDomainOperation::Claim,
+                    tx_id,
+                );
+                assert!(
+                    Pallet::<Test>::require_verified_external_bundle(id, &crossed_chain).is_err()
+                );
+            });
+        }
+
+        #[test]
+        fn the_default_bond_counter_starts_at_zero() {
+            new_test_ext().execute_with(|| {
+                // Bond ids are handed out from this counter; a default of one
+                // would skip the first id and make bond #0 unreachable.
+                assert_eq!(crate::BondCounter::<Test>::get(), 0);
+            });
+        }
+
+        #[test]
+        fn solana_structure_walks_every_offset_to_the_end() {
+            let mut tx = vec![1u8];
+            tx.extend_from_slice(&[0u8; 64]); // signature
+            tx.extend_from_slice(&[0x01, 0x00, 0x00, 0x01]); // 3 header bytes, accounts
+            tx.extend_from_slice(&[0u8; 32]); // first account
+            tx.extend_from_slice(&[0u8; 32]); // recent blockhash
+            tx.push(0x00); // one trailing instruction byte
+            assert!(Pallet::<Test>::is_valid_solana_transaction(&tx));
+
+            // Every truncation point before the blockhash ends is refused.
+            for take in [0usize, 1, 64, 65, 66, 67, 98, 99] {
+                assert!(
+                    !Pallet::<Test>::is_valid_solana_transaction(&tx[..take]),
+                    "truncated at {take} must not pass"
+                );
+            }
+            // The first byte after the blockhash is where the walk can end.
+            assert!(Pallet::<Test>::is_valid_solana_transaction(&tx[..100]));
+        }
+
+        #[test]
+        fn violation_verification_checks_claimed_legs_and_timeout() {
+            use crate::types::InvariantViolationType;
+
+            new_test_ext().execute_with(|| {
+                let id = intent_with_two_external_legs();
+
+                // An unknown intent is an error, not a verdict.
+                assert!(Pallet::<Test>::verify_violation(
+                    H256::repeat_byte(0xbb),
+                    &InvariantViolationType::PartialExecution,
+                    &[],
+                )
+                .is_err());
+
+                // A funded but not-finalized intent has not partially executed.
+                assert!(!Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::PartialExecution,
+                    &[],
+                )
+                .expect("no error"));
+
+                // Finalized with one of two legs claimed is the violation; a
+                // single complete claim is not.
+                let mut intent = SettlementIntents::<Test>::get(id).expect("intent");
+                intent.legs_claimed = 1;
+                SettlementIntents::<Test>::insert(id, intent.clone());
+                IntentStates::<Test>::insert(id, IntentState::Finalized);
+                assert!(Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::PartialExecution,
+                    &[],
+                )
+                .expect("no error"));
+
+                // Zero claimed legs is not a partial execution: the violation
+                // requires at least one claimed (`> 0` mutated to `>= 0`).
+                intent.legs_claimed = 0;
+                SettlementIntents::<Test>::insert(id, intent.clone());
+                assert!(!Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::PartialExecution,
+                    &[],
+                )
+                .expect("no error"));
+
+                intent.legs_claimed = 2;
+                SettlementIntents::<Test>::insert(id, intent.clone());
+                assert!(!Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::PartialExecution,
+                    &[],
+                )
+                .expect("no error"));
+
+                // A finalized intent past its own timeout is a timeout bypass.
+                intent.timeout = 1;
+                SettlementIntents::<Test>::insert(id, intent);
+                pallet_timestamp::Pallet::<Test>::set_timestamp(2_000);
+                assert!(Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::TimeoutBypass,
+                    &[],
+                )
+                .expect("no error"));
+                pallet_timestamp::Pallet::<Test>::set_timestamp(1_000);
+                assert!(!Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::TimeoutBypass,
+                    &[],
+                )
+                .expect("no error"));
+
+                // The unproven categories stay false.
+                assert!(!Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::CrossVmReentrancy,
+                    &[],
+                )
+                .expect("no error"));
+                assert!(!Pallet::<Test>::verify_violation(
+                    id,
+                    &InvariantViolationType::BtcReleaseWithoutConfirmation,
+                    &[],
+                )
+                .expect("no error"));
+            });
         }
     }
 }

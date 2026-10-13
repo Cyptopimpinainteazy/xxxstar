@@ -2,6 +2,7 @@
 name = "x3-runtime-params"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "X3 Chain Runtime Parameters - Block weights, gas limits, and network tuning"
 
 [dependencies]

@@ -382,4 +382,83 @@ mod tests {
             }
         ));
     }
+
+    #[test]
+    fn manager_release_timeout_cleanup_and_counts_are_pinned() {
+        use crate::mock::Test as MockRuntime;
+
+        let mut manager = AtomicLockManager::<MockRuntime>::new();
+        assert!(manager.get_lock(&[1u8; 32]).is_none());
+        assert!(manager.get_lock_mut(&[1u8; 32]).is_none());
+        assert_eq!(manager.active_count(), 0);
+        assert_eq!(manager.process_timeouts(50), Vec::<[u8; 32]>::new());
+        assert!(
+            manager
+                .release_lock(&[9u8; 32], ReleaseReason::CommitSucceeded, 10)
+                .is_err(),
+            "releasing an unknown lock is an error"
+        );
+
+        manager.locks.insert(
+            [1u8; 32],
+            AtomicLock::new_prepare([1u8; 32], 0u64, 1_000u128, 1u64, [9u8; 32], 10, 100),
+        );
+        assert_eq!(manager.active_count(), 1);
+        assert!(manager.get_lock(&[1u8; 32]).is_some());
+
+        // The deadline block itself is not late; the next block slashes.
+        assert_eq!(manager.process_timeouts(110), Vec::<[u8; 32]>::new());
+        assert_eq!(manager.process_timeouts(111), vec![[9u8; 32]]);
+        assert!(matches!(
+            manager.get_lock(&[1u8; 32]).expect("lock").phase,
+            LockPhase::Slashed { .. }
+        ));
+        assert_eq!(manager.active_count(), 0);
+
+        // Released locks are evicted once the grace period has passed.
+        let mut old_release =
+            AtomicLock::new_prepare([2u8; 32], 0u64, 1_000u128, 1u64, [8u8; 32], 10, 100);
+        old_release.release_on_abort(150).expect("release");
+        manager.locks.insert([2u8; 32], old_release);
+        let mut young_release =
+            AtomicLock::new_prepare([3u8; 32], 0u64, 1_000u128, 1u64, [8u8; 32], 10, 100);
+        young_release.release_on_abort(158).expect("release");
+        manager.locks.insert([3u8; 32], young_release);
+        manager.locks.insert(
+            [4u8; 32],
+            AtomicLock::new_prepare([4u8; 32], 0u64, 1_000u128, 1u64, [8u8; 32], 10, 1_000),
+        );
+
+        manager.cleanup_old_locks(160, 5);
+        assert!(
+            manager.get_lock(&[2u8; 32]).is_none(),
+            "past the grace period: evicted"
+        );
+        assert!(
+            manager.get_lock(&[3u8; 32]).is_some(),
+            "inside the grace period: kept"
+        );
+        assert!(
+            manager.get_lock(&[4u8; 32]).is_some(),
+            "active locks are never evicted"
+        );
+
+        // release_lock drives the phase transition through the mutable accessor.
+        let mut committing =
+            AtomicLock::new_prepare([5u8; 32], 0u64, 1_000u128, 1u64, [8u8; 32], 10, 5);
+        committing.lock_for_commit(20, 30).expect("commit phase");
+        manager.locks.insert([5u8; 32], committing);
+        assert_eq!(manager.active_count(), 2);
+        assert!(manager
+            .release_lock(&[5u8; 32], ReleaseReason::CommitSucceeded, 60)
+            .is_ok());
+        assert!(matches!(
+            manager.get_lock(&[5u8; 32]).expect("lock").phase,
+            LockPhase::Released {
+                reason: ReleaseReason::CommitSucceeded,
+                ..
+            }
+        ));
+        assert_eq!(manager.active_count(), 1);
+    }
 }

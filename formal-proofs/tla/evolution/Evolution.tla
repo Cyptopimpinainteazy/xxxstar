@@ -71,17 +71,40 @@ Spec == Init /\ [][Next]_vars
 ----------------------------------------------------------------------------
 (* Invariants                                                               *)
 ----------------------------------------------------------------------------
-\* I1: no regression events ever occur.
-NoRegression == regressed = {}
+\* I1: a recorded regression never lowers the pinned floor. A downward
+\* observation is *rejected*: it is recorded in `regressed` and `floor` is
+\* left untouched, so the pin can never fall back below a previously
+\* recorded regression floor.
+RegressionsDoNotLowerFloors ==
+    \A e \in regressed : floor[e[1]] >= e[3]
 
-\* I2: floors stay within bounds.
+\* I2: every recorded regression event is well-formed and genuinely
+\* downward (observed < previous pin). A malformed or upward event in
+\* `regressed` would mean the gate mislabelled an accepted score.
+RegressionEventsSound ==
+    \A e \in regressed :
+        /\ e[1] \in Claims
+        /\ e[2] \in 1..MaxGenerations
+        /\ e[3] \in 0..ScoreCeiling
+        /\ e[4] \in 0..ScoreCeiling
+        /\ e[4] < e[3]
+
+\* I3: floors stay within bounds.
 TypeOK ==
     /\ generation \in 0..MaxGenerations
     /\ \A c \in Claims : floor[c] \in 0..ScoreCeiling
 
-\* I3: the floor function is monotone non-decreasing across generations.
+\* I4: the floor function is monotone non-decreasing across generations.
 \* Encoded as an action property: floor[c]' >= floor[c] for every step.
 MonotoneFloors == [][\A c \in Claims : floor'[c] >= floor[c]]_vars
 
-Invariant == TypeOK /\ NoRegression
+\* `regressed = {}` is NOT a protocol invariant: it asserts the environment
+\* never presents a downward score, which is exactly the event the gate
+\* exists to handle, and TLC correctly finds a behavior containing one
+\* (previously failing as "Invariant is violated"). The runner's guarantee
+\* is conditional acceptance: `verify_evolution` emits success only when no
+\* regression was recorded, and a recorded regression never moves the pin.
+\* Those are the properties checked here: RegressionsDoNotLowerFloors,
+\* RegressionEventsSound, and the temporal MonotoneFloors.
+Invariant == TypeOK /\ RegressionEventsSound /\ RegressionsDoNotLowerFloors
 ================================================================================

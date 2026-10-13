@@ -138,7 +138,9 @@ impl VirtualNetwork {
             seq: self.seq,
             from,
             to,
-            due_ms: now_ms.saturating_add(self.base_latency_ms).saturating_add(jitter),
+            due_ms: now_ms
+                .saturating_add(self.base_latency_ms)
+                .saturating_add(jitter),
             op_index,
         });
         self.stats.sent += 1;

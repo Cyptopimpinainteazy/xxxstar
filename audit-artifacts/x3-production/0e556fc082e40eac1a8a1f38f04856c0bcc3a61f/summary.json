@@ -1,0 +1,47 @@
+{
+  "tested_code_commit": "0e556fc082e40eac1a8a1f38f04856c0bcc3a61f",
+  "tested_code_tree": "77259c1077c8a0ea4b62461b5c2d65aaa220ca4a",
+  "checks": [
+    {
+      "command": "python3 tests/test_snapshot_archive_restore.py",
+      "tests": 13,
+      "result": "PASS",
+      "exit_code": 0
+    },
+    {
+      "command": "bash scripts/snapshot-restore.sh test-restore",
+      "result": "PASS",
+      "exit_code": 0
+    },
+    {
+      "command": "bash -n scripts/snapshot-restore.sh",
+      "result": "PASS",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m py_compile scripts/snapshot-archive-restore.py tests/test_snapshot_archive_restore.py",
+      "result": "PASS",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS",
+      "exit_code": 0
+    }
+  ],
+  "fixed": [
+    "Existing empty target ownership and root permissions preserved; otherwise explicit archive root owner selected; all extracted entries assigned selected owner",
+    "Short -d and renamed/wrapped command argv claiming the exact base path refused",
+    "Dot backups normalized to a concrete root directory",
+    "Extraction collisions are archive errors, not occupied-target errors",
+    "Failed installs chmod staging directories before cleanup",
+    "Proc mounts with hidden PIDs refused"
+  ],
+  "limitations": [
+    "Ownership test verifies real chown calls and same-user filesystem ownership, not a running x3 service account",
+    "No live validator/RocksDB/finality proof",
+    "Process scanning deliberately fails closed on unreadable process information",
+    "Concurrent node startup after inspection is not prevented",
+    "Scanner gates verified on combined integration tree, not this historical stacked tree"
+  ]
+}

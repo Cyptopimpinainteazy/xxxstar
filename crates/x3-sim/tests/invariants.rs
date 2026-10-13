@@ -166,4 +166,21 @@ fn two_sessions_settling_one_hash_lock_is_detected() {
         "one hash lock completed two swaps; got {:?}",
         codes(&found)
     );
+    // The violation must blame a session that actually exists: the simulator
+    // keys its before/after state by session id, so a synthetic lock id would
+    // make that lookup miss and leave the packet unattributed.
+    let double = found
+        .iter()
+        .find(|violation| violation.code == "DOUBLE_SETTLE")
+        .expect("DOUBLE_SETTLE is reported");
+    assert!(
+        ["double-settle-a", "double-settle-b"].contains(&double.session_id.as_str()),
+        "DOUBLE_SETTLE must blame a real session, got `{}`",
+        double.session_id
+    );
+    assert!(
+        double.detail.contains("2 sessions completed"),
+        "the detail must keep the group size: {}",
+        double.detail
+    );
 }

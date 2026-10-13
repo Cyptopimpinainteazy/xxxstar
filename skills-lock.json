@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skills": {
+    "audit-prep-assistant": {
+      "source": "trailofbits/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/building-secure-contracts/skills/audit-prep-assistant/SKILL.md",
+      "computedHash": "7ccc0cf0a7a7f1193bde47da289be6aa2dbfffab63a245323405a1a550719b7c"
+    },
+    "code-exemplars-blueprint-generator": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/code-exemplars-blueprint-generator/SKILL.md",
+      "computedHash": "1a4e9008100148a106bac0be4338b84a43a9d6b3bc70d14f75359977d4770f2e"
+    },
+    "code-review": {
+      "source": "coderabbitai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review/SKILL.md",
+      "computedHash": "1cc49f29b6762f2cb3a20e3e111fb87aeaa418669d9cc00b81c2cb504baf9dbe"
+    },
+    "web3-audit": {
+      "source": "uphiago/recon-skills",
+      "sourceType": "github",
+      "skillPath": "redteam/web3-audit/SKILL.md",
+      "computedHash": "c9e40bdcc13fb49908bcfb222ddd23f7eab618507828ff7dfdeb59c486f6b916"
+    },
+    "web3-dev": {
+      "source": "blockscout/agent-skills",
+      "sourceType": "github",
+      "skillPath": "web3-dev/SKILL.md",
+      "computedHash": "38b6e209f3242fabde1ecfa24f413ceb4f5ced2c7c08e307fcf004b1e4e812ca"
+    },
+    "web3-solidity-audit-mcp": {
+      "source": "awarexone/web3-bug-bounty-hunting-ai-skills",
+      "sourceType": "github",
+      "skillPath": "web3-solidity-audit-mcp/SKILL.md",
+      "computedHash": "150887e98c55ce54df464286be39f5ca75419ddafc48affedd8e463b336325b5"
+    },
+    "web3-tools": {
+      "source": "noditlabs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/web3-tools/SKILL.md",
+      "computedHash": "11a1c1d696c6d4c398073a1090dc1a90b6666cc508d8a96c641dd57504924ea7"
+    },
+    "web3d-integration-patterns": {
+      "source": "freshtechbro/claudedesignskills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/web3d-integration-patterns/SKILL.md",
+      "computedHash": "e411bbc6e7f7f928b6fd2f209530446cf74dfa1ff9cfd6adb17ba37317d89e9a"
+    }
+  }
+}

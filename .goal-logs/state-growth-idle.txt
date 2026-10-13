@@ -1,0 +1,31 @@
+database: /tmp/x3-cpu-author-ElscQH/chains/x3_chain_dev/paritydb
+  seconds       allocated         delta        apparent
+-------------------------------------------------------
+      0.0       196345856            +0       411377238
+     15.0       198901760      +2555904       413931200
+     30.0       201482240      +2580480       416514315
+     45.1       204042240      +2560000       419071584
+     60.1       206618624      +2576384       421649548
+     75.1       209203200      +2584576       424230188
+     90.1       211795968      +2592768       426822952
+    105.2       214380544      +2584576       429407823
+    120.2       216932352      +2551808       431960024
+    135.2       219545600      +2613248       434571459
+    150.2       222126080      +2580480       437153293
+    165.2       224686080      +2560000       439712567
+    180.3       227262464      +2576384       442287329
+    195.3       229875712      +2613248       444902143
+    210.3       232452096      +2576384       447479408
+    225.3       235008000      +2555904       450034989
+    240.0       237555712      +2547712       452580965
+-------------------------------------------------------
+window              240.0 s
+written (allocated) 41209856 bytes = 171691 B/s
+written (apparent)  41203727 bytes = 171666 B/s
+per block           34338 bytes written (at 5 blocks/s)
+written per day     13.82 GiB at this rate
+net growth          +41209856 bytes over the window (+13.82 GiB/day)
+live floor          196345856 bytes (smallest size seen: post-compaction)
+compactions seen    0
+
+'written' is every byte the database wrote (the I/O a disk must sustain); 'net growth' is what it kept, and is only meaningful over a window that contains a compaction cycle; 'live floor' is the size just after compaction. This is the whole database — state trie, block bodies and metadata together — and a dev chain is a floor, not a workload

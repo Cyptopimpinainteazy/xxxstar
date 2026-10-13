@@ -85,4 +85,35 @@ allow = [
     "BlueOak-1.0.0",
     "GPL-3.0-or-later WITH Classpath-exception-2.0",
     "CDLA-Permissive-2.0",
+    # BSL-1.0 (Boost Software License 1.0) is OSI-approved and FSF-libre, is
+    # permissive with no copyleft, and is the only license xxhash-rust offers
+    # (0.8.18, via redis -> x3-gateway). Reject it and the gateway cannot build.
+    "BSL-1.0",
+    # Unlicense is a public-domain dedication (OSI-approved 2020, FSF-libre), no
+    # copyleft. Reached via ws_stream_wasm/async_io_stream -> ethers-providers
+    # 2.0.14 -> ethers 2.x -> x3-bot.
+    "Unlicense",
+    # NCSA (University of Illinois/NCSA Open Source License) is permissive and
+    # OSI-approved. Reached through a dependency of x3-integration-fuzz.
+    "NCSA",
+    # OpenSSL/SSLeay. Permissive (attribution + advertising clause for
+    # derivatives), not copyleft. Needed only so the `ring` clarification below
+    # can be stated truthfully: ring is ISC-style for new code plus
+    # BoringSSL/OpenSSL terms for the derived parts. ring is already an accepted
+    # dependency here (its 0.16.20 build is named in the advisory ignore list
+    # above as RUSTSEC-2025-0009) and reaches the node through libp2p-tls and
+    # hickory-proto, so this makes an existing acceptance machine-checkable
+    # rather than introducing a new one. Revert this entry to reject ring.
+    "OpenSSL",
 ]
+
+# `ring` ships no SPDX field in its manifest; its LICENSE file is ISC-style for
+# new code and BoringSSL/OpenSSL for the derived parts, which cargo-deny cannot
+# resolve above its confidence threshold, so it reports the crate as unlicensed.
+# This states the licence explicitly, pinned to the file hash cargo-deny
+# reported, instead of lowering the global confidence threshold (which would
+# weaken detection for every other crate).
+[[licenses.clarify]]
+name = "ring"
+expression = "ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
