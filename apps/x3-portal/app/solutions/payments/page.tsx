@@ -14,7 +14,7 @@ import {
   CheckCircle2,
   Code,
 } from 'lucide-react';
-import { HexagonCluster } from '../../../components/frontend/ui/Logo';
+import { HexagonCluster } from '@/components/ui/Logo';
 
 const paymentFeatures = [
   {
@@ -186,7 +186,7 @@ export default function PaymentsPage() {
                   'Accept any supported cryptocurrency',
                   'Auto-convert to stablecoins',
                   'Webhook notifications',
-                  'Detailed analytics apps/dash-legacy-2-legacy-2board',
+                  'Detailed analytics dashboard',
                 ].map((item, i) => (
                   <li key={i} className="flex items-center text-gray-400">
                     <CheckCircle2 className="w-5 h-5 text-emerald-500 mr-3" />

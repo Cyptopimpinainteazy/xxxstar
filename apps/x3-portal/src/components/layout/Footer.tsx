@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Logo from '../frontend/ui/Logo';
+import Logo from '@/components/ui/Logo';
 import {
   Twitter,
   Github,

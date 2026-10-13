@@ -15,3 +15,19 @@ Live data: `src/lib/substrate/{client,queries}.ts` use `@polkadot/api` against
 new-head subscriptions, `system.events`, `aura` and `atlasKernel` storage.
 
 Imports `../shared` (`apps/shared`, `@x3-chain/shared`), which xxxstar already carries.
+
+## Repairs (separate commits) and verification, 2026-10-13
+- 27 pages imported `components/frontend/ui/Logo`, a path that never existed in any commit;
+  `HexagonCluster` lives in `src/components/ui/Logo.tsx`, now imported as `@/components/ui/Logo`
+  (also `src/components/layout/{Footer,Navigation}.tsx`).
+- A repo-wide find-and-replace had turned every "dash" into `apps/dash-legacy-2-legacy-2`
+  (`dashArray`, `border-dashed`, "dashboard"); reversed in 10 places.
+- `src/app/x3/swarm/api/**` (12 consent/claim/KYC/admin routes) and `src/lib/db.ts` are excluded
+  from the build: Next serves the root `app/`, so these never routed, and their `@/lib/auth` never
+  existed. They are kept, not wired: admin endpoints without real authentication would be a hole.
+- `react` types pinned to the portal's copy (apps/shared installs a second version);
+  `framer-motion` declared, since the shared components the portal renders need it.
+- Result: `next build` succeeds (99 routes). Against a live `x3-chain-node --dev` (Oct 1 build)
+  the explorer showed live block height, Aura block time, the validator count and the newest
+  blocks updating; block detail and network status rendered with no page errors.
+  Screenshots: `reports/recovery/portal-screenshots/`.

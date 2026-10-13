@@ -17,7 +17,7 @@ import {
   AlertCircle,
   ExternalLink,
 } from 'lucide-react';
-import { HexagonCluster } from '../../../components/frontend/ui/Logo';
+import { HexagonCluster } from '@/components/ui/Logo';
 import { useAuthorities } from '@/hooks/useSubstrate';
 
 const requirements = [

@@ -17,7 +17,7 @@ import {
   Globe,
   RefreshCw,
 } from 'lucide-react';
-import { HexagonCluster } from '../../../components/frontend/ui/Logo';
+import { HexagonCluster } from '@/components/ui/Logo';
 import { useNetworkStats, useAuthorities } from '@/hooks/useSubstrate';
 
 const vmStats = [

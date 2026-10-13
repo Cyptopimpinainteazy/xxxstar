@@ -12,7 +12,7 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react';
-import { HexagonCluster } from '../../components/frontend/ui/Logo';
+import { HexagonCluster } from '@/components/ui/Logo';
 import { useNetworkStats, useAuthorities } from '@/hooks/useSubstrate';
 
 const sections = [

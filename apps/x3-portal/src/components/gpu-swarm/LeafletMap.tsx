@@ -298,7 +298,7 @@ export default function LeafletMap({ nodes, selectedNode, onNodeSelect }: Leafle
         const line = L.polyline([from, to], {
           color: 'rgba(0, 255, 255, 0.15)',
           weight: 1,
-          apps/dash-legacy-2-legacy-2Array: '5, 10',
+          dashArray: '5, 10',
           className: 'connection-line',
         }).addTo(map);
       });

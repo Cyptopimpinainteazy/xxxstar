@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import Logo from '../frontend/ui/Logo';
+import Logo from '@/components/ui/Logo';
 
 // Dynamic import with SSR disabled to prevent hydration mismatch
 const WalletButton = dynamic(

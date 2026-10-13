@@ -14,7 +14,7 @@ import {
   Download,
   Copy,
 } from 'lucide-react';
-import { HexagonCluster } from '../../../components/frontend/ui/Logo';
+import { HexagonCluster } from '@/components/ui/Logo';
 
 const sdks = [
   {

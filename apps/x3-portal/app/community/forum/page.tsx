@@ -16,7 +16,7 @@ import {
   Plus,
   ArrowUp,
 } from 'lucide-react';
-import { HexagonCluster } from '../../../components/frontend/ui/Logo';
+import { HexagonCluster } from '@/components/ui/Logo';
 
 const categories = [
   { name: 'All', count: 1247, color: 'bg-gray-500' },

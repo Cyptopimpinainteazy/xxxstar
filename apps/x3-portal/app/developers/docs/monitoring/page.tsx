@@ -164,17 +164,17 @@ scrape_configs:
 
       <h2>Grafana Dashboard</h2>
       <p>
-        Import our pre-built apps/dash-legacy-2-legacy-2board for X3 Atlas Sphere:
+        Import our pre-built dashboard for X3 Atlas Sphere:
       </p>
       <CodeBlock language="bash">
-{`# Download apps/dash-legacy-2-legacy-2board JSON
-curl -O https://raw.githubusercontent.com/Cyptopimpinainteazy/atlas-sphere/main/monitoring/grafana-apps/dash-legacy-2-legacy-2board.json
+{`# Download dashboard JSON
+curl -O https://raw.githubusercontent.com/Cyptopimpinainteazy/atlas-sphere/main/monitoring/grafana-dashboard.json
 
 # Import via Grafana UI or API
 curl -X POST \\
   -H "Content-Type: application/json" \\
-  -d @grafana-apps/dash-legacy-2-legacy-2board.json \\
-  http://admin:password@localhost:3000/api/apps/dash-legacy-2-legacy-2boards/db`}
+  -d @grafana-dashboard.json \\
+  http://admin:password@localhost:3000/api/dashboards/db`}
       </CodeBlock>
 
       <h2>Logging</h2>
@@ -220,7 +220,7 @@ index = "atlas-logs-%Y-%m-%d"`}
 {`./atlas-sphere-node \\
   --telemetry-url "wss://telemetry.atlas-sphere.io/submit 0"
 
-# View telemetry apps/dash-legacy-2-legacy-2board
+# View telemetry dashboard
 # https://telemetry.atlas-sphere.io`}
       </CodeBlock>
 

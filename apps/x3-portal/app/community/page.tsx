@@ -16,7 +16,7 @@ import {
   Star,
   Zap,
 } from 'lucide-react';
-import { HexagonCluster } from '../../components/frontend/ui/Logo';
+import { HexagonCluster } from '@/components/ui/Logo';
 
 const communityStats = [
   { label: 'Discord Members', value: '45K+', icon: <MessageSquare className="w-5 h-5" /> },

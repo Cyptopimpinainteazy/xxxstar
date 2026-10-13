@@ -11,7 +11,7 @@ import {
   Star,
   ChevronDown,
 } from 'lucide-react';
-import { HexagonCluster } from '../../../components/frontend/ui/Logo';
+import { HexagonCluster } from '@/components/ui/Logo';
 
 const categories = [
   'All',
@@ -99,7 +99,7 @@ const projects = [
   {
     name: 'X3 Analytics',
     category: 'Analytics',
-    description: 'Comprehensive analytics apps/dash-legacy-2-legacy-2board for X3 STAR',
+    description: 'Comprehensive analytics dashboard for X3 STAR',
     logo: '📊',
     tvl: null,
     users: '20K+',

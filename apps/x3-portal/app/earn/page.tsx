@@ -346,7 +346,7 @@ export default function EarnPage() {
                 </>
               ) : (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-[#0a0a0a] border border-apps/dash-legacy-2-legacy-2ed border-[#333333] text-center">
+                  <div className="p-4 rounded-xl bg-[#0a0a0a] border border-dashed border-[#333333] text-center">
                     <p className="text-gray-500 text-sm">Connect your wallet to view your points balance and start earning</p>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
@@ -560,7 +560,7 @@ export default function EarnPage() {
                     <span className="text-sm text-gray-400">7-Day Streak</span>
                     <span className="badge badge-success">+10%</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#0a0a0a] border border-apps/dash-legacy-2-legacy-2ed border-[#333333]">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#0a0a0a] border border-dashed border-[#333333]">
                     <span className="text-sm text-gray-600">Weekend Bonus</span>
                     <span className="text-xs text-gray-600">Sat-Sun</span>
                   </div>
