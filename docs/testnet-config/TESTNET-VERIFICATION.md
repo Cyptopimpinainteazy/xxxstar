@@ -18,7 +18,7 @@ The wrapper runs these checks in order:
 3. Optional Prometheus and Grafana health checks
 4. Optional single-process or multiprocess load baseline
 
-The script exits non-zero on the first failed invariant.
+The script exits non-zero on the first failed invariant. Finality verification parses complete JSON-RPC responses, requires every node to advance beyond genesis, bounds lag, checks a stable shared genesis, preserves each previously finalized block, and compares the canonical hash at the minimum sampled finalized height across nodes. Differing sampled heights are allowed when their common finalized block agrees. This trusts the configured local RPC endpoints; it does not independently verify GRANDPA signatures or prove seven distinct authorities participated.
 
 ## Config Schema
 

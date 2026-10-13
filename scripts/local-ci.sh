@@ -693,6 +693,8 @@ GATES_FAST=(
   # redden them, a missing one must fail rather than skip, and no check may
   # discard its status. Cheap: 18 checks, no build.
   "rc gate scripts:python3 tests/test_rc_gates.py"
+  # Finality monitoring must reject divergent finalized chains and malformed RPC evidence.
+  "testnet finality monitor:python3 tests/test_testnet_finality_status.py"
   # The promotion record: what ties a passing RC run to the genesis it promotes.
   # `build` refuses a wrong validator count, a non-Live spec, an RC log without the
   # gate's own PASSED marker, a missing operator, a missing artifact and a dirty tree;
