@@ -358,6 +358,7 @@ GATES_FAST=(
   # brace-expansion, ip-address) -- with every gate green. Seven of the eight are now clean
   # and the eighth's remaining findings are all `low`, documented and ratcheted in
   # security/npm-audit-baseline.json. critical/high can never be baselined.
+  "npm audit scope:python3 -m unittest discover -s tests -p test_npm_audit_scope.py"
   "npm audit:python3 scripts/check-npm-audit.py"
   "feature matrix check:python3 scripts/feature_matrix.py check"
   # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
