@@ -40,6 +40,9 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          # Shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create.
+          cache-bin: false
       - name: Validate compiler and storage code formatting
         run: cargo fmt --all -- --check
       - name: Check chain-facing language compiler
