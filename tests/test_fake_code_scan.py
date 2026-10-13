@@ -104,5 +104,41 @@ pub struct Mock;
         self.assertEqual(self.kinds(fallback=True), [("prod-mock", line)])
 
 
+class ScopeTests(unittest.TestCase):
+    """Recovered from x3gpu1: links are not sources, and the vocabulary exemption is exact."""
+
+    def test_links_and_pruned_paths_are_not_sources_on_either_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("src/real.rs", "src/.hidden.rs", "apps/demo/node_modules/dependency.rs", "dist/generated.rs"):
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("todo!();\n")
+            # A file link would scan real.rs twice; a directory link back to the root loops.
+            (root / "src/link.rs").symlink_to(root / "src/real.rs")
+            (root / "loop").symlink_to(root, target_is_directory=True)
+            walked = [rel for rel, _ in scanner.iter_source_files(root)]
+            self.assertEqual(walked, ["src/real.rs"])
+            listed = scanner.rg_file_list(root)
+            if listed is not None:
+                self.assertEqual(listed, ["src/real.rs"])
+
+    def test_vocabulary_exemption_preserves_implementation_findings(self):
+        path = "services/x3-ai-router/router.py"
+        vocabulary = '    "BOILERPLATE": ("scaffold", "stub out"),'
+        lines = [
+            (path, 1, vocabulary),
+            (path, 2, vocabulary + " # TODO: implement this"),
+            (path, 3, '    "OTHER": ("stub out",),'),
+            ("services/other.py", 4, vocabulary),
+            (path, 5, 'todo!();'),
+            (path, 6, '    "BOILERPLATE": ("scaffold",), # ' + vocabulary),
+        ]
+        with patch.object(scanner, "rg_lines", return_value=lines):
+            findings = scanner.scan_stubs()
+        self.assertEqual(sorted(f["line"] for f in findings), [2, 3, 4, 5, 6])
+        self.assertEqual(next(f for f in findings if f["line"] == 5)["kind"], "explicit-stub")
+
+
 if __name__ == "__main__":
     unittest.main()

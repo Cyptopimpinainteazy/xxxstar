@@ -267,6 +267,30 @@ def _is_pruned_dir(name: str) -> bool:
     )
 
 
+def eligible_source(rel: str, root: Path | None = None) -> bool:
+    """Scan visible regular source files, excluding file and directory links.
+
+    Real source targets remain scanned under their own paths; following links
+    would duplicate findings and could escape the repository or loop back to it.
+    Both discovery implementations apply this same policy. (Recovered from
+    x3gpu1's uncommitted scanner work.)
+    """
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
+    parts = Path(rel).parts
+    path = root / rel
+    return (
+        bool(parts)
+        and not any(_is_pruned_dir(part) for part in parts[:-1])
+        and not parts[-1].startswith(".")
+        and not parts[-1].endswith(PRUNE_FILE_SUFFIXES)
+        and path.suffix in SOURCE_SUFFIXES
+        and rel not in SELF_EXCLUDES
+        and not any(root.joinpath(*parts[:i]).is_symlink() for i in range(1, len(parts) + 1))
+        and path.is_file()
+    )
+
+
 def iter_source_files(root: Path | None = None) -> list[tuple[str, Path]]:
     """Every scannable file, as `(root-relative path, absolute path)`, sorted."""
     # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
@@ -281,7 +305,7 @@ def iter_source_files(root: Path | None = None) -> list[tuple[str, Path]]:
             if path.suffix not in SOURCE_SUFFIXES:
                 continue
             rel = path.relative_to(root).as_posix()
-            if rel in SELF_EXCLUDES:
+            if not eligible_source(rel, root):
                 continue
             found.append((rel, path))
     return sorted(found)
@@ -337,6 +361,8 @@ def rg_lines(
         data = obj["data"]
         path = data["path"]["text"]
         rel = path[2:] if path.startswith("./") else path
+        if not eligible_source(rel, root):
+            continue
         found.append((rel, int(data["line_number"]), data["lines"]["text"].rstrip("\n")))
     return found
 
@@ -357,6 +383,8 @@ def rg_files(patterns: list[str], root: Path | None = None) -> list[Path] | None
     files = []
     for raw in proc.stdout.splitlines():
         rel = raw[2:] if raw.startswith("./") else raw
+        if not eligible_source(rel, root):
+            continue
         files.append(root / rel)
     return sorted(files)
 
@@ -378,6 +406,8 @@ def rg_file_list(root: Path | None = None) -> list[str] | None:
     files: list[str] = []
     for raw in proc.stdout.splitlines():
         rel = raw[2:] if raw.startswith("./") else raw
+        if not eligible_source(rel, root):
+            continue
         files.append(rel)
     return sorted(files)
 
@@ -403,7 +433,7 @@ def scan_stubs() -> list[dict[str, object]]:
         kind = None
         if any(rx.search(text) for rx in STUB_EXPLICIT_RES):
             kind = "explicit-stub"
-        elif STUB_MARKER_RE.search(text):
+        elif STUB_MARKER_RE.search(marker_text(rel, text)):
             kind = "critical-marker" if critical_path else "marker"
         if kind is None:
             continue
@@ -417,6 +447,20 @@ def scan_stubs() -> list[dict[str, object]]:
             }
         )
     return sorted(findings, key=lambda f: (str(f["kind"]), str(f["path"]), int(f["line"])))
+
+
+def marker_text(rel: str, text: str) -> str:
+    """Exclude one prompt phrase from the router's classification vocabulary.
+
+    Only the quoted phrase in the BOILERPLATE tuple is vocabulary. Comments,
+    other entries and explicit implementation macros remain subject to scanning.
+    """
+    if rel == "services/x3-ai-router/router.py" and re.match(
+        r'^\s*"BOILERPLATE"\s*:\s*\(', text
+    ):
+        code, separator, comment = text.partition("#")
+        return code.replace('"stub out"', '"scaffold request"', 1) + separator + comment
+    return text
 
 
 def _looks_like_test_file(name: str) -> bool:
@@ -819,7 +863,18 @@ def self_test() -> int:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
 
+        # Links: one to a real source file, one to a source directory. Following
+        # them would scan the same file twice (or leave the tree), so both
+        # enumerations must skip them.
+        (tmp_path / "src" / "linked.rs").symlink_to("keep.rs")
+        (tmp_path / "linked_dir").symlink_to("src", target_is_directory=True)
+
         expected = sorted(rel for rel, _ in iter_source_files(tmp_path))
+        linked = [rel for rel in expected if rel == "src/linked.rs" or rel.startswith("linked_dir/")]
+        if linked:
+            print(f"fake-code scanner self-test FAILED: links were enumerated as sources: {linked}",
+                  file=sys.stderr)
+            return 1
         actual = rg_file_list(tmp_path)
         if actual is None:
             print(
