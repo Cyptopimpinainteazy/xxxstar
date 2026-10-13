@@ -1,0 +1,3214 @@
+{
+  "collected": "2026-10-13T14:45:03+00:00",
+  "host": "x3star1",
+  "roots": [
+    "/home/lojak",
+    "/home/lojak/Desktop",
+    "/home/lojak/Documents",
+    "/home/lojak/.openclaw/workspace",
+    "/home/lojak/x3-infrastructure"
+  ],
+  "max_depth": 4,
+  "repositories": [
+    {
+      "path": "/home/lojak/.openclaw/workspace",
+      "name": "workspace",
+      "kind": "repository",
+      "common_dir": "/home/lojak/.openclaw/workspace/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 8
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/.openclaw/workspace/x3-research",
+      "name": "x3-research",
+      "kind": "repository",
+      "common_dir": "/home/lojak/.openclaw/workspace/x3-research/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 6
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/.openclaw/workspace/x3triplethreat",
+      "name": "x3triplethreat",
+      "kind": "repository",
+      "common_dir": "/home/lojak/.openclaw/workspace/x3triplethreat/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": "a802a53743337ddf4b032adcf9d33caa04a37790",
+      "last_commit": "2026-09-06T12:55:56-06:00 memory: mark REDLINE MVP committed, config paths verified",
+      "status": {
+        "modified": 1,
+        "untracked": 94
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 1,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 66,
+      "languages": {
+        "Markdown": 19,
+        "Rust": 19,
+        "YAML": 14,
+        "TOML": 9
+      },
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/.openclaw/workspace/x3triplethreat/repos/xxxstar",
+      "name": "xxxstar",
+      "kind": "repository",
+      "common_dir": "/home/lojak/.openclaw/workspace/x3triplethreat/repos/xxxstar/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "master",
+      "head": "861161e51642185a717ea6f045ebb39d49e9d3b8",
+      "last_commit": "2026-09-05T22:01:46-06:00 ci: deploy transparency portal to GitHub Pages",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/master",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 2,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 22416,
+      "languages": {
+        "Rust": 9405,
+        "Markdown": 2407,
+        "TOML": 857,
+        "TypeScript": 585,
+        "Python": 507,
+        "Shell": 312
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/Desktop/xxxstar-main",
+      "name": "xxxstar-main",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "origin": "git@github.com:Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": null,
+      "current_branch": "main",
+      "head": "84a19d5bc9ea2c33ead3f6b5524ec767af88e640",
+      "last_commit": "2026-06-20T22:58:14-06:00 chore: stage remaining simulator + risk-engine changes",
+      "status": {
+        "modified": 1041,
+        "untracked": 2
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 9,
+      "remote_branches": 65,
+      "tags": 1,
+      "stashes": 0,
+      "worktrees": 7,
+      "tracked_files": 88441,
+      "languages": {
+        "Rust": 51001,
+        "Markdown": 5502,
+        "TOML": 3163,
+        "TypeScript": 573,
+        "Shell": 536,
+        "YAML": 533
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/New Folder/xxxstar-main",
+      "name": "xxxstar-main",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/New Folder/xxxstar-main/.git",
+      "remotes": {
+        "origin": "git@github.com:Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": null,
+      "current_branch": "main",
+      "head": "84a19d5bc9ea2c33ead3f6b5524ec767af88e640",
+      "last_commit": "2026-06-20T22:58:14-06:00 chore: stage remaining simulator + risk-engine changes",
+      "status": {
+        "modified": 1041,
+        "untracked": 2
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 8,
+      "remote_branches": 65,
+      "tags": 1,
+      "stashes": 0,
+      "worktrees": 7,
+      "tracked_files": 88441,
+      "languages": {
+        "Rust": 51001,
+        "Markdown": 5502,
+        "TOML": 3163,
+        "TypeScript": 573,
+        "Shell": 536,
+        "YAML": 533
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/OllamaHound",
+      "name": "OllamaHound",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/OllamaHound/.git",
+      "remotes": {
+        "origin": "https://github.com/7h30th3r0n3/OllamaHound.git"
+      },
+      "default_branch": "main",
+      "current_branch": "main",
+      "head": "e06f195bc8c1b59dbabadbc525fbb6beeb3a8e84",
+      "last_commit": "2026-02-02T13:57:07+01:00 Merge pull request #1 from 0xlildoudou/main",
+      "status": {
+        "modified": 0,
+        "untracked": 1
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 2,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 9,
+      "languages": {
+        "Python": 5,
+        "Markdown": 1
+      },
+      "build_systems": [
+        "docker"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/Open-Ollama-Scanner",
+      "name": "Open-Ollama-Scanner",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Open-Ollama-Scanner/.git",
+      "remotes": {
+        "origin": "https://github.com/maxmoodycyber/Open-Ollama-Scanner.git"
+      },
+      "default_branch": "main",
+      "current_branch": "main",
+      "head": "2a9f82f4cc3e8689ccba267b187d917cf2b16531",
+      "last_commit": "2025-02-03T13:52:47+00:00 Update README.md",
+      "status": {
+        "modified": 0,
+        "untracked": 1
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 2,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 4,
+      "languages": {
+        "Markdown": 1,
+        "Python": 1
+      },
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/Quantum AI HOTEL OS",
+      "name": "Quantum AI HOTEL OS",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Quantum AI HOTEL OS/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/quantum-hotel-os.git"
+      },
+      "default_branch": "main",
+      "current_branch": "main",
+      "head": "e4dc90cbf81fb571916451a516e824a3e5107b5b",
+      "last_commit": "2026-09-24T19:41:01-06:00 Build the Proof app: prove it, from the receipt to the confirmed transaction (#25)",
+      "status": {
+        "modified": 0,
+        "untracked": 1
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 26,
+      "remote_branches": 27,
+      "tags": 2,
+      "stashes": 0,
+      "worktrees": 2,
+      "tracked_files": 283,
+      "languages": {
+        "TypeScript": 246,
+        "Markdown": 19,
+        "JavaScript": 9,
+        "YAML": 1
+      },
+      "build_systems": [
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main",
+      "name": "xxxstar-main",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "origin": "git@github.com:Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": null,
+      "current_branch": "main",
+      "head": "84a19d5bc9ea2c33ead3f6b5524ec767af88e640",
+      "last_commit": "2026-06-20T22:58:14-06:00 chore: stage remaining simulator + risk-engine changes",
+      "status": {
+        "modified": 243,
+        "untracked": 2
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 9,
+      "remote_branches": 65,
+      "tags": 1,
+      "stashes": 0,
+      "worktrees": 7,
+      "tracked_files": 88441,
+      "languages": {
+        "Rust": 51001,
+        "Markdown": 5502,
+        "TOML": 3163,
+        "TypeScript": 573,
+        "Shell": 536,
+        "YAML": 533
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_codegen",
+      "name": "x3_codegen",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_codegen/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_core",
+      "name": "x3_core",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_core/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_lsp",
+      "name": "x3_lsp",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_lsp/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_parser",
+      "name": "x3_parser",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_parser/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_semantics",
+      "name": "x3_semantics",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_semantics/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_test",
+      "name": "x3_test",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_test/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3c",
+      "name": "x3c",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3c/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar",
+      "name": "xxxstar",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar"
+      },
+      "default_branch": null,
+      "current_branch": "ci/gpu-soak-062409646",
+      "head": "0624096466f73b9569aaf80add35206ff619114b",
+      "last_commit": "2026-06-06T00:10:26-06:00 Print GPU soak report in CI",
+      "status": {
+        "modified": 841,
+        "untracked": 23
+      },
+      "upstream": "origin/ci/gpu-soak-062409646",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 1,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 90943,
+      "languages": {
+        "Rust": 50792,
+        "Markdown": 5394,
+        "TOML": 3124,
+        "JavaScript": 808,
+        "YAML": 512,
+        "Shell": 494
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar",
+      "name": "xxxstar",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar"
+      },
+      "default_branch": null,
+      "current_branch": "main",
+      "head": "0624096466f73b9569aaf80add35206ff619114b",
+      "last_commit": "2026-06-06T00:10:26-06:00 Print GPU soak report in CI",
+      "status": {
+        "modified": 768,
+        "untracked": 0
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 1,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 90943,
+      "languages": {
+        "Rust": 50792,
+        "Markdown": 5394,
+        "TOML": 3124,
+        "JavaScript": 808,
+        "YAML": 512,
+        "Shell": 494
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/audit-king",
+      "name": "audit-king",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/audit-king/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": "81951a40a6fed9f1864c230a51631ad48dc54b98",
+      "last_commit": "2026-09-29T23:32:24-06:00 Add the offline EVM analyzer image",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 1,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 27,
+      "languages": {
+        "Python": 7,
+        "Rust": 3,
+        "TOML": 2,
+        "TypeScript": 2,
+        "Markdown": 1,
+        "YAML": 1
+      },
+      "build_systems": [
+        "cargo"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/iphone 14/build/idevicerestore",
+      "name": "idevicerestore",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/iphone 14/build/idevicerestore/.git",
+      "remotes": {
+        "origin": "https://github.com/libimobiledevice/idevicerestore.git"
+      },
+      "default_branch": "master",
+      "current_branch": "master",
+      "head": "60192e97f87d1bbab5c493684e0a245b0966363f",
+      "last_commit": "2026-09-07T03:03:22+02:00 [github-actions] Update workflow with newer action versions",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/master",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 2,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 61,
+      "languages": {
+        "Shell": 4,
+        "YAML": 3,
+        "Markdown": 1
+      },
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/jacktheripper",
+      "name": "jacktheripper",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/jacktheripper/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/x3jacktheripper.git"
+      },
+      "default_branch": null,
+      "current_branch": "master",
+      "head": "32062ebd7384f374a3b7f4a2e6ad85d8df805b9a",
+      "last_commit": "2026-09-13T15:59:35-06:00 Phase 2: BNB state engine foundation",
+      "status": {
+        "modified": 23148,
+        "untracked": 0
+      },
+      "upstream": "origin/master",
+      "ahead": 1,
+      "behind": 40,
+      "local_branches": 1,
+      "remote_branches": 1,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 190,
+      "languages": {
+        "Rust": 43,
+        "Markdown": 32,
+        "TypeScript": 30,
+        "Solidity": 28,
+        "TOML": 20,
+        "YAML": 2
+      },
+      "build_systems": [
+        "cargo"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-chain-master",
+      "name": "x3-chain-master",
+      "kind": "repository",
+      "common_dir": "",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "(detached)",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 0,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-chain-master/apps/atlas-sphere-clean",
+      "name": "atlas-sphere-clean",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-chain-master/apps/atlas-sphere-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/atlas-sphere.git"
+      },
+      "default_branch": null,
+      "current_branch": "feature/rebuild-push",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 12366,
+        "untracked": 0
+      },
+      "upstream": "origin/main",
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 7,
+      "tags": 1,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 12366,
+      "languages": {
+        "Python": 2383,
+        "Rust": 1180,
+        "Markdown": 816,
+        "TypeScript": 647,
+        "Solidity": 366,
+        "Shell": 194
+      },
+      "build_systems": [
+        "cargo",
+        "docker",
+        "go",
+        "make",
+        "npm",
+        "python"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-chain-master/context-engineering-intro",
+      "name": "context-engineering-intro",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-chain-master/context-engineering-intro/.git",
+      "remotes": {
+        "origin": "https://github.com/coleam00/context-engineering-intro.git"
+      },
+      "default_branch": "main",
+      "current_branch": "main",
+      "head": "a2d84b021cee1e2f4e77ba854bba0be8cb319035",
+      "last_commit": "2026-03-16T07:13:58-05:00 Add README for WISC framework use case",
+      "status": {
+        "modified": 3,
+        "untracked": 6
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 4,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 247,
+      "languages": {
+        "Markdown": 139,
+        "Python": 51,
+        "TypeScript": 24,
+        "Shell": 2,
+        "JavaScript": 1
+      },
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-chain-master/forge-std",
+      "name": "forge-std",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-chain-master/forge-std/.git",
+      "remotes": {
+        "origin": "https://github.com/foundry-rs/forge-std.git"
+      },
+      "default_branch": "master",
+      "current_branch": "master",
+      "head": "04ee608913e6c334973649b2b1a2976260647c1b",
+      "last_commit": "2026-03-02T15:31:24+01:00 chore(deps): bump crate-ci/typos from 1.43.5 to 1.44.0 (#829)",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/master",
+      "ahead": 0,
+      "behind": 6,
+      "local_branches": 1,
+      "remote_branches": 18,
+      "tags": 40,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 68,
+      "languages": {
+        "Solidity": 50,
+        "YAML": 3,
+        "Markdown": 3,
+        "TOML": 3,
+        "Python": 1
+      },
+      "build_systems": [
+        "foundry",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-chain-master/ralph",
+      "name": "ralph",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-chain-master/ralph/.git",
+      "remotes": {
+        "origin": "https://github.com/snarktank/ralph.git"
+      },
+      "default_branch": "main",
+      "current_branch": "main",
+      "head": "6c53cb0b831ebe8739c6a003e22af14902d8b0b5",
+      "last_commit": "2026-02-01T20:46:21-05:00 fix(skill): enfore options indentation in prd SKILL.md (#64)",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 2,
+      "tags": 0,
+      "stashes": 1,
+      "worktrees": 1,
+      "tracked_files": 31,
+      "languages": {
+        "Markdown": 7,
+        "TypeScript": 3,
+        "YAML": 1,
+        "JavaScript": 1,
+        "Shell": 1
+      },
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-chain-master/ralph-o-matic",
+      "name": "ralph-o-matic",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-chain-master/ralph-o-matic/.git",
+      "remotes": {
+        "origin": "https://github.com/dbinky/ralph-o-matic.git"
+      },
+      "default_branch": "main",
+      "current_branch": "main",
+      "head": "4e1e8d9b7489bec161e1517b264a05377a37077b",
+      "last_commit": "2026-04-06T02:19:14-06:00 feat: add plan-to-ralph skill",
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": "origin/main",
+      "ahead": 2,
+      "behind": 1,
+      "local_branches": 1,
+      "remote_branches": 9,
+      "tags": 16,
+      "stashes": 1,
+      "worktrees": 1,
+      "tracked_files": 246,
+      "languages": {
+        "Go": 121,
+        "Markdown": 69,
+        "YAML": 8,
+        "Shell": 1
+      },
+      "build_systems": [
+        "go",
+        "make"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-chain-master/tools/get-shit-done",
+      "name": "get-shit-done",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-chain-master/tools/get-shit-done/.git",
+      "remotes": {
+        "origin": "https://github.com/gsd-build/get-shit-done"
+      },
+      "default_branch": "main",
+      "current_branch": "main",
+      "head": "33dcb775db9d51c4fbb9ec3adc874264f384b481",
+      "last_commit": "2026-03-15T11:52:51-06:00 1.24.0",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/main",
+      "ahead": 0,
+      "behind": 386,
+      "local_branches": 1,
+      "remote_branches": 102,
+      "tags": 180,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 201,
+      "languages": {
+        "Markdown": 146,
+        "YAML": 5,
+        "JavaScript": 5
+      },
+      "build_systems": [
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-lang/x3_codegen",
+      "name": "x3_codegen",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-lang/x3_codegen/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-lang/x3_core",
+      "name": "x3_core",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-lang/x3_core/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-lang/x3_lsp",
+      "name": "x3_lsp",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-lang/x3_lsp/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-lang/x3_parser",
+      "name": "x3_parser",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-lang/x3_parser/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-lang/x3_semantics",
+      "name": "x3_semantics",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-lang/x3_semantics/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-lang/x3_test",
+      "name": "x3_test",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-lang/x3_test/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/x3-lang/x3c",
+      "name": "x3c",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/x3-lang/x3c/.git",
+      "remotes": {},
+      "default_branch": null,
+      "current_branch": "master",
+      "head": null,
+      "last_commit": null,
+      "status": {
+        "modified": 0,
+        "untracked": 3
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 0,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 0,
+      "languages": {},
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-chatgpt",
+      "name": "xxxstar-chatgpt",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "wip/chatgpt-mainnet-attestation-20260918",
+      "head": "e83d3918ee43b10ccd6b819044f817c9dd3c29f3",
+      "last_commit": "2026-09-18T11:30:06-06:00 wip(chatgpt-mainnet): preserve uncommitted confidential-gpu / validator-attestation / atomic-kernel work",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/wip/chatgpt-mainnet-attestation-20260918",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22497,
+      "languages": {
+        "Rust": 9431,
+        "Markdown": 2420,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 507,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-clean",
+      "name": "xxxstar-clean",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "master",
+      "head": "e6f9267cc2af4bee86fea5e9d89b021a865ebcba",
+      "last_commit": "2026-09-17T16:31:51-06:00 fix(coordinator): partial-move in settlement outbox CAS transitions",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/master",
+      "ahead": 0,
+      "behind": 2205,
+      "local_branches": 79,
+      "remote_branches": 180,
+      "tags": 4,
+      "stashes": 0,
+      "worktrees": 8,
+      "tracked_files": 22502,
+      "languages": {
+        "Rust": 9446,
+        "Markdown": 2419,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 508,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-clean.worktrees/codex-x3-economic-safety-kernel",
+      "name": "codex-x3-economic-safety-kernel",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "codex/x3-economic-safety-kernel",
+      "head": "6e80c26d1a2d1912e825684a17a018ca9a080528",
+      "last_commit": "2026-09-17T17:38:42-06:00 Merge remote-tracking branch 'origin/master' into codex/x3-economic-safety-kernel",
+      "status": {
+        "modified": 1,
+        "untracked": 0
+      },
+      "upstream": "origin/codex/x3-economic-safety-kernel",
+      "ahead": 46,
+      "behind": 113,
+      "local_branches": 79,
+      "remote_branches": 180,
+      "tags": 4,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22519,
+      "languages": {
+        "Rust": 9457,
+        "Markdown": 2423,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 508,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-clean.worktrees/codex-x3-trading-core-v1-hardening",
+      "name": "codex-x3-trading-core-v1-hardening",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "codex/x3-trading-core-v1-hardening",
+      "head": "094865eba8c1a9b4e8865ef868fd9e95499efeb9",
+      "last_commit": "2026-09-17T01:06:07-06:00 docs(x3lang): plan economic safety kernel implementation",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/codex/x3-trading-core-v1-hardening",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 79,
+      "remote_branches": 180,
+      "tags": 4,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22490,
+      "languages": {
+        "Rust": 9433,
+        "Markdown": 2422,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 508,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-clean.worktrees/feat-settlement-proofset-gate-20260911",
+      "name": "feat-settlement-proofset-gate-20260911",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/settlement-proofset-gate-20260911",
+      "head": "14fdab3a97e0c531440449d951f9f3e0c57c24cf",
+      "last_commit": "2026-09-17T17:38:42-06:00 Merge remote-tracking branch 'origin/master' into feat/settlement-proofset-gate-20260911",
+      "status": {
+        "modified": 2,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/settlement-proofset-gate-20260911",
+      "ahead": 202,
+      "behind": 0,
+      "local_branches": 79,
+      "remote_branches": 180,
+      "tags": 4,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22512,
+      "languages": {
+        "Rust": 9454,
+        "Markdown": 2420,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 508,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-clean.worktrees/feat-x3vm-durable-recovery-20260911",
+      "name": "feat-x3vm-durable-recovery-20260911",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/x3vm-durable-recovery-20260911",
+      "head": "824f8d96bc208030fa7bed12008431b9f9419509",
+      "last_commit": "2026-09-11T00:21:52-06:00 feat(x3vm): add durable atomic recovery storage",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/x3vm-durable-recovery-20260911",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 79,
+      "remote_branches": 180,
+      "tags": 4,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22488,
+      "languages": {
+        "Rust": 9431,
+        "Markdown": 2418,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 507,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-clean.worktrees/finish-x3vm-live-transport",
+      "name": "finish-x3vm-live-transport",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "finish/x3vm-live-transport",
+      "head": "b0bd6233716e5ee1ef8086014359d9e03c260749",
+      "last_commit": "2026-09-17T17:27:00-06:00 Merge remote-tracking branch 'origin/master' into finish/x3vm-live-transport",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/finish/x3vm-live-transport",
+      "ahead": 125,
+      "behind": 0,
+      "local_branches": 79,
+      "remote_branches": 180,
+      "tags": 4,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22512,
+      "languages": {
+        "Rust": 9454,
+        "Markdown": 2420,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 508,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-clean.worktrees/finish-x3vm-live-transport-fix",
+      "name": "finish-x3vm-live-transport-fix",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "finish/x3vm-live-transport-fix",
+      "head": "440b963323066f2e1f59d0048922c8caeebd01d5",
+      "last_commit": "2026-09-09T21:32:16-06:00 Fix native X3 finality/transport: correct intent-id resolution and finalized-block range scanning",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/finish/x3vm-live-transport-fix",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 79,
+      "remote_branches": 180,
+      "tags": 4,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22478,
+      "languages": {
+        "Rust": 9422,
+        "Markdown": 2416,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 507,
+        "Shell": 313
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-clean.worktrees/test-cross-domain-refund-recovery-20260911",
+      "name": "test-cross-domain-refund-recovery-20260911",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "test/cross-domain-refund-recovery-20260911",
+      "head": "29a3dcaff7201f65376b4d4f112a297e6fdd38f3",
+      "last_commit": "2026-09-11T00:25:38-06:00 ci: exercise SVM lifecycle on stacked recovery PR",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/test/cross-domain-refund-recovery-20260911",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 79,
+      "remote_branches": 180,
+      "tags": 4,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22505,
+      "languages": {
+        "Rust": 9439,
+        "Markdown": 2419,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 507,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-main",
+      "name": "xxxstar-main",
+      "kind": "repository",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/x3-guardian",
+      "head": "1beb644603a0f1b6de8bb5882e699fdc99bb2e58",
+      "last_commit": "2026-10-03T10:00:00-06:00 fix(x3-ai-router): end interrupted SSE streams with an explicit terminal event",
+      "status": {
+        "modified": 8,
+        "untracked": 41
+      },
+      "upstream": "origin/feat/x3-guardian",
+      "ahead": 1,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": 6,
+      "worktrees": 49,
+      "tracked_files": 22676,
+      "languages": {
+        "Rust": 9748,
+        "Markdown": 2096,
+        "TOML": 898,
+        "Python": 667,
+        "TypeScript": 602,
+        "Shell": 402
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-main.worktrees/clean-stub-check",
+      "name": "clean-stub-check",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "(detached)",
+      "head": "e1dab1fce7e0206097eb1989226ff624a5a53502",
+      "last_commit": "2026-10-01T01:55:34-06:00 chore(runtime): re-attest the WASM hashes at 7332aa279",
+      "status": {
+        "modified": 4,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22676,
+      "languages": {
+        "Rust": 9748,
+        "Markdown": 2096,
+        "TOML": 898,
+        "Python": 667,
+        "TypeScript": 602,
+        "Shell": 402
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-main.worktrees/fix-the-x3-ai-router-so-codex-can",
+      "name": "fix-the-x3-ai-router-so-codex-can",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "agents/fix-the-x3-ai-router-so-codex-can",
+      "head": "a4d16d2b994c0e097c2488847e2d7fddccc26481",
+      "last_commit": "2026-09-29T22:06:52-06:00 Merge pull request #558 from Cyptopimpinainteazy/feat/x3-sim-deterministic-simulator",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22474,
+      "languages": {
+        "Rust": 9725,
+        "Markdown": 2007,
+        "TOML": 893,
+        "Python": 653,
+        "TypeScript": 602,
+        "Shell": 401
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-main.worktrees/pasted-text-processing",
+      "name": "pasted-text-processing",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "wip/prompts-to-skills-20260918",
+      "head": "4a6ffa6f1a86804548a1bba34320c0a1ec1aeb0b",
+      "last_commit": "2026-09-18T11:30:20-06:00 wip(skills): preserve the prompts -> .agents/skills conversion",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/wip/prompts-to-skills-20260918",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22476,
+      "languages": {
+        "Rust": 9416,
+        "Markdown": 2416,
+        "TOML": 859,
+        "TypeScript": 587,
+        "Python": 509,
+        "Shell": 315
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-main.worktrees/x3-reaper-20261013",
+      "name": "x3-reaper-20261013",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "fix/swarm-core-import-cycle-20261013",
+      "head": "e7a47c33f5b3d3bd5b5735bc2018fcd3ec391615",
+      "last_commit": "2026-10-13T03:51:24-06:00 fix(swarm): break schema and agent import cycles",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/fix/swarm-core-import-cycle-20261013",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 665,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/Desktop/xxxstar-main.worktrees/x3-resurrection-20261013",
+      "name": "x3-resurrection-20261013",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/remote-ci-worker-20261013",
+      "head": "acadaa00f6ae8bea89e0d1a1ebdb414bc98feb7f",
+      "last_commit": "2026-10-03T08:53:05-06:00 fix(router,gateway): surface mid-stream failures, refuse mismatched evidence, track the missing Postgres migrations (#584)",
+      "status": {
+        "modified": 1,
+        "untracked": 4
+      },
+      "upstream": "origin/master",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22950,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/actions-runner/_work/xxxstar/xxxstar",
+      "name": "xxxstar",
+      "kind": "repository",
+      "common_dir": "/home/lojak/actions-runner/_work/xxxstar/xxxstar/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar"
+      },
+      "default_branch": null,
+      "current_branch": "(detached)",
+      "head": "909c65d3020d23428df84e45e05f2a4dea8124ad",
+      "last_commit": "2026-10-13T08:07:13-06:00 Merge 340902d8c3b1a564856673fc1456e9f8513dbfd8 into acadaa00f6ae8bea89e0d1a1ebdb414bc98feb7f",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 139,
+      "tags": 4,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 22576,
+      "languages": {
+        "Rust": 9778,
+        "Markdown": 2102,
+        "TOML": 901,
+        "Python": 684,
+        "TypeScript": 603,
+        "Shell": 417
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/actions-runner-2/_work/xxxstar/xxxstar",
+      "name": "xxxstar",
+      "kind": "repository",
+      "common_dir": "/home/lojak/actions-runner-2/_work/xxxstar/xxxstar/.git",
+      "remotes": {
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar"
+      },
+      "default_branch": null,
+      "current_branch": "(detached)",
+      "head": "340902d8c3b1a564856673fc1456e9f8513dbfd8",
+      "last_commit": "2026-10-13T07:13:56-06:00 Merge origin/test/gateway-migrations-cover-tables into the merge train (train's attested/regenerated files kept)",
+      "status": {
+        "modified": 2,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 117,
+      "tags": 4,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 22576,
+      "languages": {
+        "Rust": 9778,
+        "Markdown": 2102,
+        "TOML": 901,
+        "Python": 684,
+        "TypeScript": 603,
+        "Shell": 417
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/apps/open-notebook",
+      "name": "open-notebook",
+      "kind": "repository",
+      "common_dir": "/home/lojak/apps/open-notebook/.git",
+      "remotes": {
+        "origin": "https://github.com/lfnovo/open-notebook.git"
+      },
+      "default_branch": null,
+      "current_branch": "(detached)",
+      "head": "30c7e2a63e43b7f270fc2c638f0b6246934a53f4",
+      "last_commit": "2026-07-20T22:10:50-03:00 fix(podcasts): clarify episode max_tokens field and fix empty-state error (#1197)",
+      "status": {
+        "modified": 2,
+        "untracked": 4
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 0,
+      "remote_branches": 0,
+      "tags": 1,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 592,
+      "languages": {
+        "TypeScript": 240,
+        "Python": 130,
+        "Markdown": 104,
+        "YAML": 18,
+        "Shell": 5,
+        "TOML": 4
+      },
+      "build_systems": [
+        "docker",
+        "make",
+        "python"
+      ]
+    },
+    {
+      "path": "/home/lojak/quickemu",
+      "name": "quickemu",
+      "kind": "repository",
+      "common_dir": "/home/lojak/quickemu/.git",
+      "remotes": {
+        "origin": "https://github.com/quickemu-project/quickemu"
+      },
+      "default_branch": "master",
+      "current_branch": "master",
+      "head": "82df57dadfd415e7ee3e54aff2b21cde1df7e93e",
+      "last_commit": "2026-06-19T14:53:01+01:00 build(deps): bump DeterminateSystems/magic-nix-cache-action from 9 to 14",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/master",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 1,
+      "remote_branches": 8,
+      "tags": 45,
+      "stashes": 0,
+      "worktrees": 1,
+      "tracked_files": 49,
+      "languages": {
+        "Markdown": 11,
+        "YAML": 9
+      },
+      "build_systems": []
+    },
+    {
+      "path": "/home/lojak/x3-base-41f",
+      "name": "x3-base-41f",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "(detached)",
+      "head": "41f386c3d5b84c28fe924d81b1ca9303e2e2cce1",
+      "last_commit": "2026-09-27T21:43:47-06:00 docs(memory): PR #520 landed mid-turn, and its panic-ratchet and proof-fixture defects",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22409,
+      "languages": {
+        "Rust": 9683,
+        "Markdown": 2003,
+        "TOML": 891,
+        "Python": 649,
+        "TypeScript": 602,
+        "Shell": 401
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-ci-autorun",
+      "name": "x3-ci-autorun",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "ci/local-ci-on-push-and-pr",
+      "head": "4e4d4045600db44d0efa0e2a818783c8000e6a08",
+      "last_commit": "2026-10-13T02:18:23-06:00 ci: run local CI automatically on pushes to master and on PRs",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/ci/local-ci-on-push-and-pr",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-cluster-control",
+      "name": "x3-cluster-control",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/x3-cluster-control",
+      "head": "2e1cfaab30e64f8f16ac6ecb44df31c6ddf557d2",
+      "last_commit": "2026-10-03T11:11:24-06:00 test(x3-cluster): dry-run join must not create authorized_keys",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/x3-cluster-control",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23087,
+      "languages": {
+        "Rust": 9742,
+        "Markdown": 2773,
+        "TOML": 896,
+        "Python": 668,
+        "TypeScript": 602,
+        "Shell": 414
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-forge-bisect",
+      "name": "x3-forge-bisect",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "fix/tla-specs-run",
+      "head": "82587c05c973c913429919562270daaeac9cd9be",
+      "last_commit": "2026-10-02T02:25:59-06:00 fix(formal): run and repair all seven TLA+ specs",
+      "status": {
+        "modified": 2,
+        "untracked": 0
+      },
+      "upstream": "origin/fix/tla-specs-run",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23459,
+      "languages": {
+        "Rust": 9733,
+        "Markdown": 2772,
+        "TOML": 895,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 408
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-fraud-proofs",
+      "name": "x3-fraud-proofs",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "runtime/evm-persistence-and-fraud-proof-pins",
+      "head": "d749e0d564490e89f3e8a104256d407e9d169458",
+      "last_commit": "2026-10-13T07:13:52-06:00 Merge branch 'integrate/x3-guardian' into runtime/evm-persistence-and-fraud-proof-pins",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/runtime/evm-persistence-and-fraud-proof-pins",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23151,
+      "languages": {
+        "Rust": 9765,
+        "Markdown": 2861,
+        "TOML": 901,
+        "Python": 676,
+        "TypeScript": 602,
+        "Shell": 411
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-gate-fixture",
+      "name": "x3-gate-fixture",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "(detached)",
+      "head": "27b72462f39cb725bebb47d1bf6d5518a8147221",
+      "last_commit": "2026-10-02T02:58:23-06:00 Merge pull request #575 from Cyptopimpinainteazy/fix/gate-tool-validation-fixture",
+      "status": {
+        "modified": 2,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23462,
+      "languages": {
+        "Rust": 9733,
+        "Markdown": 2772,
+        "TOML": 895,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 408
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-gate-verify",
+      "name": "x3-gate-verify",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "(detached)",
+      "head": "ca452c69c92388a813acaaa573c0f0198964118f",
+      "last_commit": "2026-10-02T01:55:52-06:00 Merge pull request #565 from Cyptopimpinainteazy/fix/master-gate-reds",
+      "status": {
+        "modified": 4,
+        "untracked": 9
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23457,
+      "languages": {
+        "Rust": 9733,
+        "Markdown": 2772,
+        "TOML": 895,
+        "Python": 662,
+        "TypeScript": 602,
+        "Shell": 408
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-guardian-int",
+      "name": "x3-guardian-int",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "integrate/x3-guardian",
+      "head": "aef549353d2f485d7f5ded1b496602afbefeb498",
+      "last_commit": "2026-10-13T07:13:40-06:00 fix(x3-forge): the toolchain inventory must not count its own reports as evidence",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/integrate/x3-guardian",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23150,
+      "languages": {
+        "Rust": 9764,
+        "Markdown": 2861,
+        "TOML": 901,
+        "Python": 676,
+        "TypeScript": 602,
+        "Shell": 411
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-gw-pg",
+      "name": "x3-gw-pg",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "test/gateway-postgres-control-plane",
+      "head": "43be3bbb7238d090c45b5e0b893d85defe4d22b1",
+      "last_commit": "2026-10-13T04:10:14-06:00 test(x3-gateway): one shared migration set for gateway and indexer, proven on real Postgres",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/test/gateway-postgres-control-plane",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22961,
+      "languages": {
+        "Rust": 9743,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-gw-test",
+      "name": "x3-gw-test",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "test/gateway-migrations-cover-tables",
+      "head": "1d07a8bd66f66bad0430a3be6d33be1e3639feb9",
+      "last_commit": "2026-10-13T06:14:31-06:00 fix(x3-gateway): the migration coverage test misses no table and passes clippy",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/test/gateway-migrations-cover-tables",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9742,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-hashes",
+      "name": "x3-hashes",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "fix/runtime-hashes-supply-ledger",
+      "head": "08af8fb4283a74b98f92ee0a20cb337ce94b242f",
+      "last_commit": "2026-10-03T01:26:39-06:00 [runtime] re-record wasm hashes after x3-supply-ledger proof pruning; tests: ./scripts/update-runtime-hashes.sh --check",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/fix/runtime-hashes-supply-ledger",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22940,
+      "languages": {
+        "Rust": 9736,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-lang-hardening",
+      "name": "x3-lang-hardening",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/x3lang-hardening-x3gpu1",
+      "head": "66a7ffd150715b7fadcfb0521f2f6bbdfd3ca222",
+      "last_commit": "2026-10-13T04:00:06-06:00 feat(x3-lang): numeric typing, constant bindings and unknown-token hardening",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/x3lang-hardening-x3gpu1",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9742,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-mission",
+      "name": "x3-mission",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "mission/resurrection-phase-a",
+      "head": "340902d8c3b1a564856673fc1456e9f8513dbfd8",
+      "last_commit": "2026-10-13T07:13:56-06:00 Merge origin/test/gateway-migrations-cover-tables into the merge train (train's attested/regenerated files kept)",
+      "status": {
+        "modified": 0,
+        "untracked": 1
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22576,
+      "languages": {
+        "Rust": 9778,
+        "Markdown": 2102,
+        "TOML": 901,
+        "Python": 684,
+        "TypeScript": 603,
+        "Shell": 417
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-mut-settlement",
+      "name": "x3-mut-settlement",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/mutants-gate-runtime",
+      "head": "acadaa00f6ae8bea89e0d1a1ebdb414bc98feb7f",
+      "last_commit": "2026-10-03T08:53:05-06:00 fix(router,gateway): surface mid-stream failures, refuse mismatched evidence, track the missing Postgres migrations (#584)",
+      "status": {
+        "modified": 4,
+        "untracked": 0
+      },
+      "upstream": "origin/master",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22950,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-mutants",
+      "name": "x3-mutants",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "(detached)",
+      "head": "27b72462f39cb725bebb47d1bf6d5518a8147221",
+      "last_commit": "2026-10-02T02:58:23-06:00 Merge pull request #575 from Cyptopimpinainteazy/fix/gate-tool-validation-fixture",
+      "status": {
+        "modified": 368,
+        "untracked": 125
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23462,
+      "languages": {
+        "Rust": 9733,
+        "Markdown": 2772,
+        "TOML": 895,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 408
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-mutants-ext",
+      "name": "x3-mutants-ext",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/mutants-gate-atomic-kernel",
+      "head": "aa060f1320d07e98985d59e29e2fc7e00b5dafc0",
+      "last_commit": "2026-10-03T05:05:47-06:00 ci(mutants): run the mutation gate on pallet-x3-atomic-kernel",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/mutants-gate-atomic-kernel",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22943,
+      "languages": {
+        "Rust": 9739,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-mutfix",
+      "name": "x3-mutfix",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/mutants-gate",
+      "head": "6823afa771ff9e8bd71e2894f02de0b06691b664",
+      "last_commit": "2026-10-02T16:02:45-06:00 fix(supply-ledger): prune proofs with checked_sub so the retention bound holds",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/mutants-gate",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22940,
+      "languages": {
+        "Rust": 9736,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-pr-6916e8",
+      "name": "x3-pr-6916e8",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "codex/x3lang-canonical-compiler-phase2",
+      "head": "4da42f7c8e0c0ea4ac9609e4d0e13349389426d8",
+      "last_commit": "2026-10-13T04:38:55-06:00 feat(x3lang): export compiler identity; accept the version-2 artifacts the compiler writes",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/codex/x3lang-canonical-compiler-phase2",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-pr-6eb511",
+      "name": "x3-pr-6eb511",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "codex/x3lang-compiled-storage-regression-20261008",
+      "head": "fadd0dba72ebeedb054fc884b768272318b4f581",
+      "last_commit": "2026-10-13T04:43:52-06:00 ci: rust-cache must not delete the shared toolchain (cache-bin: false)",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/codex/x3lang-compiled-storage-regression-20261008",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-pr-980aea",
+      "name": "x3-pr-980aea",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "codex/x3-lang-nested-workspace-gate-20261008",
+      "head": "5f0179c84479cf4a03ed04d241ad4fec12b8d541",
+      "last_commit": "2026-10-13T04:43:52-06:00 ci: rust-cache must not delete the shared toolchain (cache-bin: false)",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/codex/x3-lang-nested-workspace-gate-20261008",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-pr-dde4b2",
+      "name": "x3-pr-dde4b2",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "codex/x3lang-control-flow-parity-20261008",
+      "head": "838e753a20204a0108f52eef7f3810e7ae468997",
+      "last_commit": "2026-10-13T04:20:05-06:00 ci: never run fork pull requests on the self-hosted runners",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/codex/x3lang-control-flow-parity-20261008",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-pr578",
+      "name": "x3-pr578",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/x3gpu1-dual-gpu-accel",
+      "head": "51d9f11e7150c8d8fa0ae9aa24e383fd5f1389bb",
+      "last_commit": "2026-10-13T06:59:07-06:00 fix(x3-sidecar): record fp-self-contained in the nested lockfile",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/x3gpu1-dual-gpu-accel",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22228,
+      "languages": {
+        "Rust": 9749,
+        "Markdown": 2013,
+        "TOML": 896,
+        "Python": 667,
+        "TypeScript": 603,
+        "Shell": 414
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-pr581",
+      "name": "x3-pr581",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "integrate/x3-cluster-control",
+      "head": "2e1cfaab30e64f8f16ac6ecb44df31c6ddf557d2",
+      "last_commit": "2026-10-03T11:11:24-06:00 test(x3-cluster): dry-run join must not create authorized_keys",
+      "status": {
+        "modified": 881,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/x3-cluster-control",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22372,
+      "languages": {
+        "Rust": 9755,
+        "Markdown": 2015,
+        "TOML": 896,
+        "Python": 673,
+        "TypeScript": 603,
+        "Shell": 419
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-pr590",
+      "name": "x3-pr590",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/gpu-cpu-reference-20261011",
+      "head": "285ed11b6d2fcf52aca35c355d91d041759a0193",
+      "last_commit": "2026-10-13T05:22:57-06:00 fix(gpu-sig-verifier): build standalone; record the k256 dependency in Cargo.lock",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/gpu-cpu-reference-20261011",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22951,
+      "languages": {
+        "Rust": 9742,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-provenance",
+      "name": "x3-provenance",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "fix/release-provenance-rc6-rebased",
+      "head": "69ce03eab103df3ef894baf561745a01b803edad",
+      "last_commit": "2026-10-13T03:49:10-06:00 fix(release): bind artifacts to clean committed source and genesis",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/fix/release-provenance-rc6-rebased",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22952,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 666,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-rc1-boot",
+      "name": "x3-rc1-boot",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "test/rc1-three-validator-boot-gate",
+      "head": "38e6dfbb02bd0ced37aa197914ac0332e06d01e5",
+      "last_commit": "2026-10-13T04:02:04-06:00 test(mainnet): RC1 three-validator boot gate; harden the RC1 smoke test",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/test/rc1-three-validator-boot-gate",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22952,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 665,
+        "TypeScript": 602,
+        "Shell": 411
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-red-gates",
+      "name": "x3-red-gates",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "fix/master-red-gates",
+      "head": "eea28b858a22cd52d426ca98fba05aaee2f546c1",
+      "last_commit": "2026-10-13T03:32:19-06:00 [audit] panic scan: out-of-line #[cfg(test)] modules declared from any file are test code; tests: python3 scripts/audit/panic_unwrap_s",
+      "status": {
+        "modified": 4,
+        "untracked": 1
+      },
+      "upstream": "origin/fix/master-red-gates",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22950,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-router-fixes",
+      "name": "x3-router-fixes",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/router-stream-and-evidence-hardening",
+      "head": "53447714bdccd898e11e495d6e9957974080ca54",
+      "last_commit": "2026-10-03T08:51:53-06:00 fix(router,gateway): surface mid-stream failures and refuse mismatched evidence",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22950,
+      "languages": {
+        "Rust": 9741,
+        "Markdown": 2772,
+        "TOML": 896,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 410
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-table-test",
+      "name": "x3-table-test",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "(detached)",
+      "head": "2cfa3f063ae96edc3f63d1cbfc87b0dcd05d242b",
+      "last_commit": "2026-10-02T03:04:36-06:00 Merge pull request #574 from Cyptopimpinainteazy/test/coordinator-transition-table",
+      "status": {
+        "modified": 4,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23462,
+      "languages": {
+        "Rust": 9733,
+        "Markdown": 2772,
+        "TOML": 895,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 408
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-tla-atomic",
+      "name": "x3-tla-atomic",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "feat/tla-atomic-settlement",
+      "head": "3b61c427edb9bb6beb9cd1d6bda954e53667d50d",
+      "last_commit": "2026-10-02T02:38:56-06:00 feat(formal): model the atomic settlement claim/refund lattice in TLA+",
+      "status": {
+        "modified": 2,
+        "untracked": 0
+      },
+      "upstream": "origin/feat/tla-atomic-settlement",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 23462,
+      "languages": {
+        "Rust": 9733,
+        "Markdown": 2772,
+        "TOML": 895,
+        "Python": 664,
+        "TypeScript": 602,
+        "Shell": 408
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-train",
+      "name": "x3-train",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "integrate/merge-train-20261013",
+      "head": "340902d8c3b1a564856673fc1456e9f8513dbfd8",
+      "last_commit": "2026-10-13T07:13:56-06:00 Merge origin/test/gateway-migrations-cover-tables into the merge train (train's attested/regenerated files kept)",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": "origin/integrate/merge-train-20261013",
+      "ahead": 0,
+      "behind": 0,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22576,
+      "languages": {
+        "Rust": 9778,
+        "Markdown": 2102,
+        "TOML": 901,
+        "Python": 684,
+        "TypeScript": 603,
+        "Shell": 417
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    },
+    {
+      "path": "/home/lojak/x3-train-fix",
+      "name": "x3-train-fix",
+      "kind": "linked-worktree",
+      "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+      "remotes": {
+        "atomicstar": "https://github.com/Cyptopimpinainteazy/x3-atomic-star.git",
+        "origin": "https://github.com/Cyptopimpinainteazy/xxxstar.git"
+      },
+      "default_branch": "master",
+      "current_branch": "fix/train-audit-matrix",
+      "head": "340902d8c3b1a564856673fc1456e9f8513dbfd8",
+      "last_commit": "2026-10-13T07:13:56-06:00 Merge origin/test/gateway-migrations-cover-tables into the merge train (train's attested/regenerated files kept)",
+      "status": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "local_branches": 463,
+      "remote_branches": 155,
+      "tags": 11,
+      "stashes": null,
+      "worktrees": null,
+      "tracked_files": 22576,
+      "languages": {
+        "Rust": 9778,
+        "Markdown": 2102,
+        "TOML": 901,
+        "Python": 684,
+        "TypeScript": 603,
+        "Shell": 417
+      },
+      "build_systems": [
+        "cargo",
+        "hardhat",
+        "make",
+        "npm"
+      ]
+    }
+  ]
+}
