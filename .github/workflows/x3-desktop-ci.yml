@@ -45,7 +45,7 @@ jobs:
         run: npm run build
 
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: x3-desktop-frontend
           path: apps/x3-desktop/dist/
@@ -130,7 +130,7 @@ jobs:
         run: npm run tauri:build
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: x3-desktop-installer-${{ runner.os }}
           path: apps/x3-desktop/src-tauri/target/release/bundle/

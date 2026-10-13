@@ -164,7 +164,7 @@ jobs:
           cp docs/release-notes/CANDIDATE_SIGNOFF_TEMPLATE.md candidate-evidence/signoff/candidate-signoff.md
 
       - name: Upload rehearsal evidence pack
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: candidate-evidence-pack
           path: candidate-evidence

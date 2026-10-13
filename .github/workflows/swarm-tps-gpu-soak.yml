@@ -63,7 +63,7 @@ jobs:
           find "$X3_SWARM_SOAK_OUT_DIR" -name '*.json' -print -exec cat {} \;
 
       - name: Upload TPS soak artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         continue-on-error: true
         with:
