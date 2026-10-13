@@ -286,8 +286,10 @@ mod tests {
         // is intentionally randomized per signature scheme, so only the call
         // bytes are compared here.
         assert_eq!(
-            a.function.encode(),
-            b.function.encode(),
+            x3_chain_runtime::generic_extrinsic(a.clone())
+                .function
+                .encode(),
+            x3_chain_runtime::generic_extrinsic(b).function.encode(),
             "set_keys call must be deterministic"
         );
         assert!(!a.encode().is_empty());
@@ -300,6 +302,7 @@ mod tests {
             .expect("loads")
             .set_keys(keys, H256::zero(), 0)
             .expect("builds");
+        let xt = x3_chain_runtime::generic_extrinsic(xt);
         assert!(
             matches!(xt.preamble, sp_runtime::generic::Preamble::Signed(..)),
             "a set_keys transaction must be signed"

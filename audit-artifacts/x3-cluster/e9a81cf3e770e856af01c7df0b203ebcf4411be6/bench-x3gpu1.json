@@ -1,0 +1,60 @@
+{
+  "node": "x3gpu1",
+  "label": "PHYSICAL",
+  "collected": "2026-10-02T23:36:57+00:00",
+  "repo": {
+    "commit": "e9a81cf3e770e856af01c7df0b203ebcf4411be6",
+    "branch": "master",
+    "dirty": true
+  },
+  "cpu": {
+    "sha256_mib_s_1thread": 480.7,
+    "sha256_mib_s_all": 1789.2,
+    "threads": 8
+  },
+  "disk": {
+    "seq_write_mb_s": 39.6,
+    "seq_read_mb_s": 529.0,
+    "method": "dd 1GiB O_DIRECT"
+  },
+  "network": {
+    "nics": [
+      {
+        "name": "enp0s31f6",
+        "mac": "1c:1b:0d:69:19:ac",
+        "state": "up",
+        "speed_mbps": 1000,
+        "ipv4": "192.168.0.30/24"
+      },
+      {
+        "name": "enp13s0",
+        "mac": "1c:1b:0d:69:19:ae",
+        "state": "down",
+        "speed_mbps": null,
+        "ipv4": null
+      },
+      {
+        "name": "wlp5s0",
+        "mac": "74:19:f8:10:90:97",
+        "state": "down",
+        "speed_mbps": null,
+        "ipv4": null
+      }
+    ],
+    "latency": {
+      "x3star1": {
+        "avg_ms": 1.242,
+        "max_ms": 4.535
+      }
+    },
+    "iperf3": "not measured: iperf3 missing or no peer server"
+  },
+  "rust_build": {
+    "crate": "gpu-sig-verifier",
+    "profile": "dev",
+    "clean": true,
+    "seconds": 9.0,
+    "ok": true,
+    "tail": ""
+  }
+}

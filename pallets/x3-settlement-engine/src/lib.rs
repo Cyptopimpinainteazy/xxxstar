@@ -816,6 +816,10 @@ pub mod pallet {
             secret: H256,
             final_tx_hash: H256,
         },
+        /// The settlement fee could not be paid to the treasury, so it was not collected. The
+        /// settlement still finalizes; this records the uncollected revenue that a failed
+        /// transfer used to drop without a trace.
+        SettlementFeeWaived { intent_id: H256, fee: BalanceOf<T> },
     }
 
     // ============================================================================
@@ -3283,6 +3287,8 @@ pub mod pallet {
                 .is_ok()
                 {
                     Self::deposit_event(Event::SettlementFeeCollected { intent_id, fee });
+                } else {
+                    Self::deposit_event(Event::SettlementFeeWaived { intent_id, fee });
                 }
             }
 

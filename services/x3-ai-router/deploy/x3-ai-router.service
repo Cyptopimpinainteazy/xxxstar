@@ -1,0 +1,16 @@
+[Unit]
+Description=X3 AI router (OpenAI-compatible, dual local GPU + cloud fallback)
+After=network-online.target ollama-worker-b.service
+Wants=ollama-worker-b.service
+
+[Service]
+Type=simple
+# Secrets (DEEPSEEK_API_KEY, X3_ROUTER_TOKEN, ...) live here, mode 600.
+EnvironmentFile=-%h/.config/x3-router/env
+# Template: deploy/install.sh replaces @ROUTER_DIR@ with the checkout it runs from.
+ExecStart=/usr/bin/python3 "@ROUTER_DIR@/router.py" --db %h/.local/share/x3-router/usage.sqlite3
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

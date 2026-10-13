@@ -29,6 +29,10 @@ pub mod command;
 pub mod rpc;
 pub mod rpc_frontier;
 
+/// Ethereum transaction index behind the tx/receipt lookup RPCs (frontier builds).
+#[cfg(feature = "frontier")]
+pub mod eth_index;
+
 /// RPC rate limiting and security middleware.
 pub mod rpc_middleware;
 
