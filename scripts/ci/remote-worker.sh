@@ -22,7 +22,7 @@ export CARGO_HOME="$prefix/cargo" CARGO_TARGET_DIR="$prefix/targets/$sha"
 export WASM_BUILD_WORKSPACE_HINT="$job/source"
 export CARGO_BUILD_JOBS=4
 set +e
-nice -n 10 bash scripts/local-ci.sh --only "$gates" --jobs 1 --cargo-jobs 4 > "$job/output.log" 2>&1
+nice -n 10 bash scripts/local-ci.sh --all --only "$gates" --jobs 1 --cargo-jobs 4 > "$job/output.log" 2>&1
 result=$?
 set -e
 python3 - "$job" "$sha" "$gates" "$result" <<'PY'

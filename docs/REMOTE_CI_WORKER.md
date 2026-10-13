@@ -53,7 +53,10 @@ From a clean controller checkout:
 scripts/ci/run-remote-checks.sh lojak@192.168.0.55 FULL_40_CHARACTER_SHA workspace-check
 ```
 
-Use comma-separated gate slugs accepted by `scripts/local-ci.sh --only`.
+Use comma-separated gate slugs accepted by `scripts/local-ci.sh --all --only`.
+All gate families are available for selection, including explicit live and
+restart tests. Only the named gates execute; their external tool requirements
+still apply.
 The process returns the CI command's exit code and prints its evidence directory.
 Each job fetches and verifies the full commit, creates a detached worktree and
 retains `output.log`, the local CI gate logs under `source/.ai/runlogs`, and
