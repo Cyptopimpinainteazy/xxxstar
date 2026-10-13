@@ -1158,3 +1158,34 @@ fn the_guardian_gates_are_wired_and_refuse_an_unprivileged_caller() {
         );
     });
 }
+
+/// Every named genesis preset must build. The presets are JSON compiled into the runtime and
+/// read by chain-spec tooling (`get_preset`); nothing exercised them, and on 2026-10-13 the
+/// `dev` preset carried two dev accounts with broken SS58 checksums (Charlie, Eve) and the
+/// `testnet` preset seven, so building either failed. The whole-runtime fuzzer
+/// (`crates/x3-runtime-fuzz`) found it on its first run.
+#[test]
+fn every_genesis_preset_builds() {
+    use sp_genesis_builder::PresetId;
+    let names =
+        <Runtime as sp_genesis_builder::runtime_decl_for_genesis_builder::GenesisBuilderV1<
+            Block,
+        >>::preset_names();
+    assert!(
+        !names.is_empty(),
+        "the runtime advertises no genesis preset"
+    );
+    for name in names {
+        let json =
+            <Runtime as sp_genesis_builder::runtime_decl_for_genesis_builder::GenesisBuilderV1<
+                Block,
+            >>::get_preset(&Some(PresetId::from(name.clone())))
+            .unwrap_or_else(|| panic!("advertised preset {name:?} is missing"));
+        sp_io::TestExternalities::new(sp_runtime::Storage::default()).execute_with(|| {
+            <Runtime as sp_genesis_builder::runtime_decl_for_genesis_builder::GenesisBuilderV1<
+                Block,
+            >>::build_state(json.clone())
+            .unwrap_or_else(|e| panic!("preset {name:?} does not build: {e}"));
+        });
+    }
+}

@@ -27310,6 +27310,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-runtime-fuzz"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "serde_json",
+ "sp-consensus-aura",
+ "sp-core",
+ "sp-runtime",
+ "sp-state-machine",
+ "x3-chain-runtime",
+]
+
+[[package]]
 name = "x3-runtime-params"
 version = "0.1.0"
 dependencies = [

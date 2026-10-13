@@ -49,6 +49,7 @@ exclude = [
     "tools/tool-validation",
 ]
 members = [
+    "crates/x3-runtime-fuzz",
     "pallets/x3-kernel",
     "pallets/x3-app-registry",
     "pallets/x3-security-gate",
