@@ -1438,7 +1438,7 @@ pub mod pallet {
                 };
 
                 // Execute the leg
-                let result = Self::execute_single_leg(leg, input_amount);
+                let result = Self::execute_single_leg(leg, input_amount, &batch.origin);
 
                 match result {
                     Ok((amount_out, gas_used)) => {
@@ -1503,6 +1503,7 @@ pub mod pallet {
         fn execute_single_leg(
             leg: &TradeLeg,
             amount_in: u128,
+            owner: &T::AccountId,
         ) -> Result<(u128, u64), TradeLegFailureReason> {
             // Build payload for the appropriate VM
             let payload = Self::build_trade_payload(leg, amount_in)?;
@@ -1510,8 +1511,12 @@ pub mod pallet {
             match leg.vm_type {
                 VmType::Evm => {
                     let gas_limit = T::DefaultTradeEvmGasLimit::get();
-                    let receipt = <T as pallet::Config>::EvmAdapter::execute(&payload, gas_limit)
-                        .map_err(|_| TradeLegFailureReason::EvmExecutionFailed)?;
+                    let receipt = <T as pallet::Config>::EvmAdapter::execute_from(
+                        &payload,
+                        gas_limit,
+                        pallet_x3_kernel::adapters::authenticated_evm_address(owner),
+                    )
+                    .map_err(|_| TradeLegFailureReason::EvmExecutionFailed)?;
 
                     if !receipt.success {
                         return Err(TradeLegFailureReason::EvmExecutionFailed);
@@ -1553,7 +1558,7 @@ pub mod pallet {
                 }
                 VmType::CrossVm => {
                     // Cross-VM execution requires coordination between both VMs
-                    Self::execute_cross_vm_leg(leg, amount_in)
+                    Self::execute_cross_vm_leg(leg, amount_in, owner)
                 }
             }
         }
@@ -1562,14 +1567,16 @@ pub mod pallet {
         fn execute_cross_vm_leg(
             leg: &TradeLeg,
             amount_in: u128,
+            owner: &T::AccountId,
         ) -> Result<(u128, u64), TradeLegFailureReason> {
             // Build EVM portion payload
             let evm_payload = Self::build_cross_vm_evm_payload(leg, amount_in)?;
 
             // Execute EVM portion
-            let evm_receipt = <T as pallet::Config>::EvmAdapter::execute(
+            let evm_receipt = <T as pallet::Config>::EvmAdapter::execute_from(
                 &evm_payload,
                 T::DefaultTradeEvmGasLimit::get(),
+                pallet_x3_kernel::adapters::authenticated_evm_address(owner),
             )
             .map_err(|_| TradeLegFailureReason::CrossVmBridgeFailed)?;
 

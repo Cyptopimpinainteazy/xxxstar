@@ -26034,6 +26034,7 @@ dependencies = [
  "pallet-cross-chain-validator",
  "pallet-evm",
  "pallet-evolution-core",
+ "pallet-governance",
  "pallet-session",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",

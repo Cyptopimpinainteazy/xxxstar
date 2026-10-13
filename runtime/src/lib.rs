@@ -396,7 +396,10 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // construct_runtime in every variant. New pallets only, with empty genesis
     // storage; no existing pallet's storage changes shape, so no migration.
     // `transaction_version` is unchanged: no existing call's encoding moved.
-    spec_version: 21,
+    // 22: the default WASM EVM now persists content-addressed contract state in
+    // the chain trie. Failed execution and enclosing atomic transaction failure
+    // roll back these writes. Existing state had no EVM keys, so no migration.
+    spec_version: 22,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -1804,7 +1807,7 @@ impl pallet_x3_kernel::Config for Runtime {
     #[cfg(all(feature = "std", feature = "frontier"))]
     type X3Adapter = pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
-    type EvmAdapter = pallet_x3_kernel::wasm_adapters::WasmEvmAdapter;
+    type EvmAdapter = pallet_x3_kernel::wasm_adapters::ContextualWasmEvmAdapter<Runtime>;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
     type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
@@ -1899,7 +1902,7 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     #[cfg(all(feature = "std", feature = "frontier"))]
     type X3Adapter = pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
-    type EvmAdapter = pallet_x3_kernel::wasm_adapters::WasmEvmAdapter;
+    type EvmAdapter = pallet_x3_kernel::wasm_adapters::ContextualWasmEvmAdapter<Runtime>;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
     type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
@@ -1945,7 +1948,16 @@ mod native_vm_adapters {
     const CANONICAL_NATIVE_ASSET_ID: AssetId = 0;
 
     impl EvmExecutorAdapter for NativeEvmAdapter {
-        fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+        fn execute(_payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+            Err(DispatchError::Other(
+                "EVM execution requires an authenticated caller",
+            ))
+        }
+        fn execute_from(
+            payload: &[u8],
+            gas_limit: u64,
+            source: H160,
+        ) -> Result<ExecutionReceipt, DispatchError> {
             // The kernel's non-empty EVM payload is a SCALE-encoded `Packet`, and Frontier would
             // treat those bytes as init code: the packet's discriminant `0x00` is `STOP`, so `create`
             // reports success for an empty contract and the chain stores a receipt for work that
@@ -1957,8 +1969,6 @@ mod native_vm_adapters {
             }
 
             // Use Frontier's Runner directly for real EVM execution
-            let source = H160::zero(); // System caller
-            let target = H160::zero(); // Default target (for create, this is ignored)
             let value = U256::zero();
             let evm_config = fp_evm::Config::shanghai();
 
@@ -1966,12 +1976,8 @@ mod native_vm_adapters {
             // collect_evm_balance_changes can compute deltas instead of snapshots.
             let pre_balances = evm_balance_snapshot(&[source]);
 
-            // Determine whether to perform a contract call or creation.
-            // If the payload represents raw bytecode (typical for contract deployment),
-            // perform a `create` so the bytecode is executed as contract initialization.
-            // Full implementation would parse tx type from payload.
-            // Try contract creation first (treat payload as init code). If that fails,
-            // fall back to a call to the zero address (some payloads are call data).
+            // This interface accepts init code. Refuse failed creation rather than
+            // executing the same bytes as calldata against an unrelated account.
             let create_res = <super::Runtime as pallet_evm::Config>::Runner::create(
                 source,
                 payload.to_vec(),
@@ -2020,34 +2026,7 @@ mod native_vm_adapters {
                 });
             }
 
-            // Fall back to a regular call to `target` (zero address by default).
-            let call_res = <super::Runtime as pallet_evm::Config>::Runner::call(
-                source,
-                target,
-                payload.to_vec(),
-                value,
-                gas_limit,
-                Some(U256::from(super::NATIVE_GAS_PRICE)),
-                None,
-                None,
-                Vec::new(),
-                Vec::new(), // authorization_list
-                false,
-                false,
-                None,
-                None,
-                &evm_config,
-            );
-
-            match call_res {
-                Ok(info) => Ok(map_call_info_to_receipt(
-                    info,
-                    source,
-                    Some(target),
-                    &pre_balances,
-                )),
-                Err(_e) => Err(DispatchError::Other("EVM execution failed")),
-            }
+            Err(DispatchError::Other("EVM contract creation failed"))
         }
 
         fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
@@ -5569,8 +5548,11 @@ mod vm_adapter_tests {
         // Test that NativeEvmAdapter uses real Frontier
         let simple_evm_bytecode = vec![0x60, 0x00, 0x60, 0x00, 0xf3]; // PUSH1 0 PUSH1 0 RETURN
         sp_io::TestExternalities::default().execute_with(|| {
-            let result =
-                super::native_vm_adapters::NativeEvmAdapter::execute(&simple_evm_bytecode, 100_000);
+            let result = super::native_vm_adapters::NativeEvmAdapter::execute_from(
+                &simple_evm_bytecode,
+                100_000,
+                pallet_x3_kernel::adapters::authenticated_evm_address(&AccountId::new([1; 32])),
+            );
             // Debug: print result to stderr to capture runner error details during test
             eprintln!("NativeEvmAdapter.execute result = {:?}", result);
             assert!(result.is_ok());
@@ -5700,7 +5682,11 @@ mod a_packet_is_refused_by_the_native_adapters {
         );
 
         sp_io::TestExternalities::default().execute_with(|| {
-            match super::native_vm_adapters::NativeEvmAdapter::execute(&payload, EVM_GAS_LIMIT) {
+            match super::native_vm_adapters::NativeEvmAdapter::execute_from(
+                &payload,
+                EVM_GAS_LIMIT,
+                pallet_x3_kernel::adapters::authenticated_evm_address(&AccountId::new([1; 32])),
+            ) {
                 Err(DispatchError::Other(message)) => assert!(
                     message.contains("Packet, not bytecode"),
                     "the refusal has to name the reason, got: {message}"

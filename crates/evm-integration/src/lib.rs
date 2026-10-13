@@ -22,6 +22,7 @@ pub mod precompiles;
 
 /// Minimal no-std EVM executor (SputnikVM) — available in both std and no-std builds
 pub mod mini_evm;
+mod persistent;
 
 /// Frontier EVM execution backend (gated behind `frontier` feature; OFF in default RC-1 build).
 #[cfg(all(feature = "std", feature = "frontier"))]
@@ -125,8 +126,8 @@ impl Default for EvmConfig {
             gas_price: U256::from(1_000_000_000), // 1 gwei
             block_number: 0,
             block_timestamp: 0,
-            chain_id: 650_000, // X3 Chain ID (matches runtime ChainId parameter)
-            base_fee: U256::from(1_000_000_000), // 1 gwei base
+            chain_id: mini_evm::X3_DEFAULT_CHAIN_ID, // Matches runtime ChainId
+            base_fee: U256::from(1_000_000_000),     // 1 gwei base
             coinbase: H160::zero(),
         }
     }

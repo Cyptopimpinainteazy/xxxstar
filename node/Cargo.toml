@@ -177,3 +177,6 @@ tempfile = { workspace = true }
 # The producer: this test boots an anvil, has the relayer build the receipt
 # proof for a transaction in a real block, and submits it to the engine.
 x3-relayer = { path = "../crates/x3-relayer" }
+
+# Live historical-state rehearsal enacts an upgrade through the real governance calls.
+pallet-governance = { path = "../pallets/governance", default-features = false, features = ["std"] }
