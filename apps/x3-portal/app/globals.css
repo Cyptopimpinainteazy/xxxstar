@@ -1,0 +1,417 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Quantum Theme Styles */
+@import '../src/styles/quantum.css';
+
+:root {
+  /* X3 Dark Color Palette - Blackscale with Orange/Red Accents */
+  --x3-black: #000000;
+  --x3-darker: #050505;
+  --x3-dark: #0a0a0a;
+  --x3-dark-gray: #111111;
+  --x3-gray: #1a1a1a;
+  --x3-light-gray: #252525;
+  --x3-border: #2a2a2a;
+  --x3-border-light: #333333;
+  
+  /* Accent Colors - Orange/Red Fire Palette */
+  --x3-orange: #f97316;
+  --x3-orange-bright: #fb923c;
+  --x3-orange-dark: #ea580c;
+  --x3-red: #dc2626;
+  --x3-red-bright: #ef4444;
+  --x3-red-dark: #b91c1c;
+  --x3-amber: #f59e0b;
+  --x3-yellow: #fbbf24;
+  
+  /* Secondary accent */
+  --x3-cyan: #06b6d4;
+  --x3-cyan-dark: #0891b2;
+  
+  /* Status Colors */
+  --x3-success: #22c55e;
+  --x3-warning: #f59e0b;
+  --x3-error: #ef4444;
+  --x3-info: #3b82f6;
+}
+
+@layer base {
+  body {
+    @apply bg-black text-white antialiased;
+  }
+}
+
+@layer components {
+  /* Full-width container with responsive padding */
+  .container-full {
+    @apply w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16;
+  }
+
+  /* Wide container for main content - stretches more on large screens */
+  .container-wide {
+    @apply w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16;
+  }
+
+  /* Gradient text - Orange/Red fire gradient */
+  .gradient-text {
+    @apply bg-gradient-to-r from-orange-500 via-red-500 to-orange-400 bg-clip-text text-transparent;
+  }
+  
+  .gradient-text-fire {
+    @apply bg-gradient-to-r from-yellow-500 via-orange-500 to-red-600 bg-clip-text text-transparent;
+  }
+  
+  .gradient-text-ember {
+    @apply bg-gradient-to-r from-orange-400 via-amber-500 to-orange-600 bg-clip-text text-transparent;
+  }
+
+  .gradient-bg {
+    @apply bg-gradient-to-br from-orange-600 via-red-600 to-orange-700;
+  }
+
+  .gradient-border {
+    @apply border border-transparent bg-gradient-to-r from-orange-500 via-red-500 to-orange-500 bg-clip-border;
+  }
+
+  /* Glass cards - Darker with subtle borders */
+  .glass-card {
+    @apply backdrop-blur-xl border border-[#1a1a1a] rounded-2xl;
+    background-color: rgba(10, 10, 10, 0.9);
+  }
+
+  .glass-card-hover {
+    @apply backdrop-blur-xl border border-[#1a1a1a] rounded-2xl hover:bg-[#111111] hover:border-orange-500/30 transition-all duration-300;
+    background-color: rgba(10, 10, 10, 0.9);
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply text-gray-500 hover:text-white transition-colors duration-200;
+  }
+
+  .nav-link-active {
+    @apply text-orange-400 font-semibold;
+  }
+
+  /* Buttons - Primary with orange/red gradient */
+  .btn-primary {
+    @apply px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 transition-all duration-300 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 rounded-xl font-semibold text-white border border-[#333333] bg-[#111111] hover:bg-[#1a1a1a] hover:border-orange-500/50 transition-all duration-300;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-all duration-200;
+  }
+
+  .btn-outline-fire {
+    @apply px-6 py-3 rounded-xl font-semibold text-orange-400 border border-orange-500/50 hover:bg-orange-500/10 hover:border-orange-400 transition-all duration-300;
+  }
+
+  /* Feature cards */
+  .card-feature {
+    @apply p-6 rounded-2xl bg-gradient-to-br from-[#111111] to-[#0a0a0a] border border-[#1a1a1a] hover:border-orange-500/30 hover:from-[#151515] hover:to-[#0f0f0f] transition-all duration-300;
+  }
+
+  .stat-card {
+    @apply p-6 rounded-xl bg-gradient-to-br from-[#111111] to-[#0a0a0a] border border-[#1a1a1a];
+  }
+
+  /* Dropdown menu */
+  .menu-dropdown {
+    @apply absolute top-full left-0 mt-2 w-64 rounded-xl backdrop-blur-xl border border-[#1a1a1a] shadow-2xl shadow-black/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200;
+    background-color: rgba(10, 10, 10, 0.98);
+  }
+
+  .menu-item {
+    @apply block px-4 py-3 text-sm text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors duration-200;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+  }
+
+  .badge-warning {
+    @apply bg-amber-500/20 text-amber-400 border border-amber-500/30;
+  }
+
+  .badge-info {
+    @apply bg-cyan-500/20 text-cyan-400 border border-cyan-500/30;
+  }
+
+  .badge-purple {
+    @apply bg-purple-500/20 text-purple-400 border border-purple-500/30;
+  }
+
+  .badge-fire {
+    @apply bg-orange-500/20 text-orange-400 border border-orange-500/30;
+  }
+
+  .badge-red {
+    @apply bg-red-500/20 text-red-400 border border-red-500/30;
+  }
+
+  /* Form inputs */
+  .input-search {
+    @apply w-full px-4 py-3 rounded-xl bg-[#111111] border border-[#1a1a1a] text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all duration-200;
+  }
+
+  /* Section typography */
+  .section-title {
+    @apply text-3xl md:text-4xl font-bold mb-4;
+  }
+
+  .section-subtitle {
+    @apply text-lg text-gray-500 max-w-2xl;
+  }
+
+  /* Code blocks */
+  .code-block {
+    @apply bg-[#0a0a0a] rounded-xl p-4 font-mono text-sm overflow-x-auto border border-[#1a1a1a];
+  }
+
+  /* Tables */
+  .table-header {
+    @apply px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+
+  .table-cell {
+    @apply px-6 py-4 whitespace-nowrap text-sm;
+  }
+
+  /* Page Headers - Different styles for different sections */
+  .page-header-base {
+    @apply py-12 relative overflow-hidden border-b border-[#1a1a1a];
+  }
+
+  .page-header-explorer {
+    @apply page-header-base;
+    background: linear-gradient(135deg, #0a0a0a 0%, #111111 50%, #0a0505 100%);
+  }
+
+  .page-header-learn {
+    @apply page-header-base;
+    background: linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 50%, #0a0808 100%);
+  }
+
+  .page-header-developers {
+    @apply page-header-base;
+    background: linear-gradient(135deg, #0a0a0a 0%, #0a0a12 50%, #080810 100%);
+  }
+
+  .page-header-solutions {
+    @apply page-header-base;
+    background: linear-gradient(135deg, #0a0a0a 0%, #100808 50%, #0a0505 100%);
+  }
+
+  .page-header-network {
+    @apply page-header-base;
+    background: linear-gradient(135deg, #0a0a0a 0%, #080a0c 50%, #050808 100%);
+  }
+
+  .page-header-community {
+    @apply page-header-base;
+    background: linear-gradient(135deg, #0a0a0a 0%, #0c0a10 50%, #08050a 100%);
+  }
+}
+
+@layer utilities {
+  .animate-glow {
+    animation: glow-fire 2s ease-in-out infinite alternate;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-gradient {
+    animation: gradient 8s ease infinite;
+    background-size: 400% 400%;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes glow-fire {
+  from {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.3), 0 0 40px rgba(220, 38, 38, 0.2);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(249, 115, 22, 0.5), 0 0 60px rgba(220, 38, 38, 0.3);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Custom scrollbar - Darker */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(17, 17, 17, 0.5);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(42, 42, 42, 0.8);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(51, 51, 51, 1);
+}
+
+/* Mesh gradient background - Dark with orange/red hints */
+.mesh-gradient {
+  background: 
+    radial-gradient(at 40% 20%, rgba(249, 115, 22, 0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(220, 38, 38, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(249, 115, 22, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, rgba(220, 38, 38, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(245, 158, 11, 0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 100%, rgba(6, 182, 212, 0.05) 0px, transparent 50%);
+}
+
+/* Hero pattern - Dark */
+.hero-pattern {
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(220, 38, 38, 0.08) 0%, transparent 50%);
+}
+
+/* Grid pattern - Darker */
+.grid-pattern {
+  background-size: 60px 60px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* Fire gradient border */
+.fire-border {
+  position: relative;
+}
+
+.fire-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(45deg, #f97316, #dc2626, #f59e0b, #dc2626, #f97316);
+  background-size: 400% 400%;
+  animation: gradient 4s ease infinite;
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0.5;
+}
+
+/* Noise texture overlay */
+.noise-texture {
+  position: relative;
+}
+
+.noise-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  pointer-events: none;
+}
+
+/* Blockchain animation - Orange */
+.blockchain-node {
+  @apply w-3 h-3 rounded-full bg-orange-500;
+  animation: pulse-node 2s ease-in-out infinite;
+}
+
+@keyframes pulse-node {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+/* Card hover effects */
+.card-lift {
+  @apply transition-all duration-300;
+}
+
+.card-lift:hover {
+  transform: translateY(-4px);
+}
+
+/* Text selection - Orange */
+::selection {
+  background: rgba(249, 115, 22, 0.4);
+  color: white;
+}
+
+/* Focus visible - Orange */
+:focus-visible {
+  outline: 2px solid rgba(249, 115, 22, 0.5);
+  outline-offset: 2px;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Glow effects */
+.glow-orange {
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.3), 0 0 40px rgba(249, 115, 22, 0.1);
+}
+
+.glow-red {
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.3), 0 0 40px rgba(220, 38, 38, 0.1);
+}
+
+/* Ember particle effect */
+.ember-bg {
+  background: radial-gradient(ellipse at bottom, #1a0a05 0%, #000000 100%);
+}
