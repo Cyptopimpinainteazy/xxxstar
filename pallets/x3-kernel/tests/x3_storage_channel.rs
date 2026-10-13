@@ -404,13 +404,10 @@ fn a_store_reaches_chain_storage_through_the_receipt() {
 /// bytecode path continues to pass.
 #[test]
 fn compiled_x3_source_persists_a_slot_and_a_later_comit_reads_it() {
-    let writer = compile_source(
-        "fn main() -> i64 { evm_sstore(7, 41); return evm_sload(7); }",
-    )
-    .expect("storage writer source must compile");
-    let reader =
-        compile_source("fn main() -> i64 { return evm_sload(7); }")
-            .expect("storage reader source must compile");
+    let writer = compile_source("fn main() -> i64 { evm_sstore(7, 41); return evm_sload(7); }")
+        .expect("storage writer source must compile");
+    let reader = compile_source("fn main() -> i64 { return evm_sload(7); }")
+        .expect("storage reader source must compile");
 
     new_test_ext().execute_with(|| {
         assert_eq!(Kernel::x3_contract_slot(evm_slot_key(7)), None);
@@ -430,8 +427,8 @@ fn compiled_x3_source_persists_a_slot_and_a_later_comit_reads_it() {
             reader.clone(),
         )
         .expect("compiled reader accepted");
-        let receipt = Kernel::x3_execution_receipt(H256::from_low_u64_be(0x5722))
-            .expect("reader receipt");
+        let receipt =
+            Kernel::x3_execution_receipt(H256::from_low_u64_be(0x5722)).expect("reader receipt");
         assert!(receipt.success);
         assert_eq!(receipt.return_data, 41i64.to_le_bytes().to_vec());
         assert!(receipt.storage_writes.is_empty());
