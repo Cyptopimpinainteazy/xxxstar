@@ -21,6 +21,9 @@ concurrency:
 jobs:
   language:
     name: Nested Rust compiler and VM checks
+    # The repository is public and this job runs on our own machines: never run
+    # code from a fork's pull request here.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, x3]
     defaults:
       run:
@@ -46,6 +49,9 @@ jobs:
 
   python-intent:
     name: Python intent DSL regression tests
+    # The repository is public and this job runs on our own machines: never run
+    # code from a fork's pull request here.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - uses: actions/checkout@v4
