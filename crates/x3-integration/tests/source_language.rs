@@ -230,3 +230,48 @@ fn a_cross_vm_call_is_refused_with_the_reason_it_cannot_run() {
         42
     );
 }
+
+// ─── Control-flow parity across all three execution paths ──────────────────────────────────────
+
+/// These programs are compiled from source, not hand-assembled. A compiler which misplaces
+/// a branch target, leaks a loop-local register, or drops a call will disagree with the
+/// mathematical result in at least one of the std, mini and on-chain execution paths.
+#[test]
+fn branches_execute_only_the_selected_arm() {
+    assert_eq!(
+        agreed_value(
+            "fn main() -> i64 { let mut x = 3; if x > 2 { x = 41; } else { x = 7; } return x + 1; }"
+        ),
+        42
+    );
+    assert_eq!(
+        agreed_value(
+            "fn main() -> i64 { let mut x = 3; if x < 2 { x = 41; } else { x = 7; } return x + 1; }"
+        ),
+        8
+    );
+}
+
+#[test]
+fn loop_iterations_update_state_and_respect_branching() {
+    assert_eq!(
+        agreed_value(
+            "fn main() -> i64 { let mut i = 0; let mut sum = 0; while i < 7 {              if i < 4 { sum = sum + i; } else { sum = sum + 2; }              i = i + 1; } return sum; }"
+        ),
+        12
+    );
+    assert_eq!(
+        agreed_value("fn main() -> i64 { let mut i = 0; while i < 0 { i = i + 1; } return i; }"),
+        0
+    );
+}
+
+#[test]
+fn nested_function_calls_and_arithmetic_agree() {
+    assert_eq!(
+        agreed_value(
+            "fn twice(x: i64) -> i64 { return x * 2; }              fn plus(x: i64, y: i64) -> i64 { return x + y; }              fn main() -> i64 { return plus(twice(19), 4); }"
+        ),
+        42
+    );
+}
