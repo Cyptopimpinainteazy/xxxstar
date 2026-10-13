@@ -5,26 +5,26 @@
   "srtool": "0.18.4",
   "rustc": "1.93.0",
   "recorded_at": "2026-10-13",
-  "recorded_revision": "9b00a53c8",
-  "runtime_version": "x3-chain-21 (x3-chain-1.tx1.au1)",
+  "recorded_revision": "06e4ac5fd",
+  "runtime_version": "x3-chain-22 (x3-chain-1.tx1.au1)",
   "metadata": "V14",
   "runtimes": {
     "compact": {
-      "size": "9092851",
-      "set_code": "0xcf26f9d28a40ad11b14906bb54a75f9d041feaf93871d163aa9637b4f62cdf20",
-      "authorize_upgrade": "0x0c9834c3aa09d31ffbb4ac03ba2f43896def2d79bfc8fe1b44f64443ea2f2ebb",
-      "ipfs": "QmSxkKPnUFaRfDJpKL4wSjWC5ChHSHjLFLTrF1qcgfQwsh",
-      "blake2_256": "0xc535c4d96140992f5219804f765ee5b64731df32701c0bf877fd39b6c5f2e680",
-      "version": "x3-chain-21 (x3-chain-1.tx1.au1)",
+      "size": "9140647",
+      "set_code": "0x741141f17ec2f5d625f38ac2f634af433314d6ceb20348c6a52c850d32bd433f",
+      "authorize_upgrade": "0xa1700ddcf00b632b60806028c0284fdfddf69e4abec2b78e45e656b22f6066fe",
+      "ipfs": "Qmc5Raj2ixnH1af4W7Y8tGoyFeQz9G4ZQyYrx5kJtw9MKH",
+      "blake2_256": "0xfa4e00791d6b9e6067489ee8f401147f0b48a5bedb10fab830624b0381e23ee0",
+      "version": "x3-chain-22 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     },
     "compressed": {
-      "size": "1554069",
-      "set_code": "0x6776d4926d914385c05b267925b28cc4a00b286db231d2da51dba90a056566b3",
-      "authorize_upgrade": "0x558188b29e0b9dbfde161d038255491ccb667d9047170ef0526376cf407a4d64",
-      "ipfs": "QmZYU1Fn8Qd6m6HyKzgvzB5iJNjSzv9kYkjmGyX1z24458",
-      "blake2_256": "0x45f7250158e99116082a4fdffad339fb27761bdf45949dd2afab3e4758591578",
-      "version": "x3-chain-21 (x3-chain-1.tx1.au1)",
+      "size": "1567025",
+      "set_code": "0x74fb3aa1e7831c0b9cccca79f6134c19b0cecd31947e580d9f0c0df03a3156c7",
+      "authorize_upgrade": "0x06a44d7d3eca70778d39756f3b68b20b92d18dde57f31de3f87540cd57c54456",
+      "ipfs": "QmcvkSXBCAcqUer5WFR6FtCSu1bRadTbjRDqvLiAZgPtvr",
+      "blake2_256": "0x677588306b3902f232cb6ccb7fcc52b34fbbcdcf0c97e0e53541d339d1562945",
+      "version": "x3-chain-22 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     }
   }
