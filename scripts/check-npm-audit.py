@@ -8,6 +8,16 @@ projects, including a critical (`websocket-driver` in the app-store frontend) an
 highs (`axios`, `form-data`, `picomatch`, `brace-expansion`, `ip-address`). None of it
 was visible to any gate.
 
+What is gated is what ships: each project is audited with `--omit=dev` (pnpm: `--prod`), and
+a project under a test directory (`tests/`, `tests_core/`) ships nothing, so it is reported
+but never gates. Measured 2026-10-09: after a lockfile-only `npm audit fix` across every
+project, all remaining highs were one advisory, `braces` <= 3.0.3 (GHSA-vfj7-8cjw-p6xm, glob
+stack-exhaustion DoS), which has no patched release and entered only through build and test
+tooling (jest, tailwindcss, chokidar). Gating on dev tooling made every JS project red with no
+fix available; build tools that were misfiled as runtime dependencies were moved to
+devDependencies in the same change. The full audit, dev tooling included, is still printed on
+every run as a non-blocking report, so nothing is hidden.
+
 Policy, in order of what it protects:
 
   * `critical` and `high` findings always fail, and can never be added to the baseline --
@@ -41,6 +51,14 @@ PER_PROJECT_TIMEOUT = 300
 # Findings at these severities are never acceptable, baseline or not.
 FATAL = ("critical", "high")
 
+# Projects under these directories are test harnesses: reported, never gating.
+TEST_DIRS = {"tests", "tests_core"}
+
+
+def is_test_harness(project):
+    parts = pathlib.Path(project).parts
+    return bool(parts) and parts[0] in TEST_DIRS
+
 
 def projects():
     """Every directory holding a tracked package-lock.json, plus pnpm projects."""
@@ -61,11 +79,12 @@ def projects():
     return sorted(found.items())
 
 
-def audit(project, manager):
+def audit(project, manager, shipped_only=True):
+    """Findings for `project`; `shipped_only` leaves out devDependencies."""
     if manager == "npm":
-        command = ["npm", "audit", "--json"]
+        command = ["npm", "audit", "--json"] + (["--omit=dev"] if shipped_only else [])
     else:
-        command = ["corepack", "pnpm", "audit", "--json"]
+        command = ["corepack", "pnpm", "audit", "--json"] + (["--prod"] if shipped_only else [])
     try:
         completed = subprocess.run(
             command, cwd=ROOT / project, capture_output=True, text=True,
@@ -105,12 +124,31 @@ def main():
 
     results = {}
     failures = []
+    reported = {}  # non-blocking: dev tooling, and test harnesses entirely
     for project, manager in projects():
-        findings, error = audit(project, manager)
+        everything, error = audit(project, manager, shipped_only=False)
+        if error:
+            failures.append("%s: %s" % (project, error))
+            continue
+        if is_test_harness(project):
+            reported[project] = everything
+            continue
+        findings, error = audit(project, manager, shipped_only=True)
         if error:
             failures.append("%s: %s" % (project, error))
             continue
         results[project] = findings
+        extra = {name: sev for name, sev in everything.items() if name not in findings}
+        if extra:
+            reported[project] = extra
+
+    for project in sorted(reported):
+        counts = {}
+        for severity in reported[project].values():
+            counts[severity] = counts.get(severity, 0) + 1
+        why = "test harness" if is_test_harness(project) else "dev tooling"
+        print("check-npm-audit: report (not gating, %s): %s: %s" % (
+            why, project, ", ".join("%d %s" % (n, s) for s, n in sorted(counts.items()))))
 
     if args.list:
         for project in sorted(results):

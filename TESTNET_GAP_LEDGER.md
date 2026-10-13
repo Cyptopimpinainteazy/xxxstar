@@ -2053,3 +2053,29 @@ minutes to under a minute, but it breaks the nested WASM build for a node check,
 `SKIP_WASM_BUILD=1`. Two `make mainnet-check` runs at once fight over ports 9944/9945; two
 `supply_invariant_distributed` runs cannot coexist at all (the test asserts its ports free).
 `~/.cargo/bin` is still the one directory CI deletes, and the fix for that is `ab18567f5`.
+
+## GAP-PROD-MOCK-PREFILTER — the cheat scan's rg path cannot see `MockFoo` on a production path — 2026-10-09
+
+Found while fixing master's red `test-cheat scan`. `scripts/x3_fake_code_scan.py cheats` prefilters
+candidate lines with ripgrep using `(?i)\b(mock|mockall|fake|stub|dummy)\b`, a whole-word match, and
+only then applies `PROD_MOCK_RE`, which is written to catch identifiers such as `MockOracle` or
+`struct FakeLedger`. A whole-word prefilter drops those lines before the real check runs, so the rg
+path (the one CI uses) reports none of them, while the pure-Python fallback (which reads every line)
+does. That is the "~239 false prod-mock findings" the fallback was blamed for: most were not false.
+
+Widening the prefilter to a substring match, with the `#[cfg(test)]` region fix from the same change
+applied, reports **148 prod-mock findings in 60 files**. They are mixed and need triage, not a baseline:
+
+* **real production fakes** — e.g. `crates/x3-bot/src/api.rs` serves hard-coded "Mocked live TPS"
+  numbers; `crates/custody-service/src/client.rs` exports a public `MockCustodyClient`;
+  `crates/x3-evolution` re-exports `MockFitness`.
+* **false positives** — about twenty pallets' `src/mock.rs` files are test-only (declared with
+  `#[cfg(test)] mod mock;` in `lib.rs`) but the scanner does not treat the `mock.rs` filename as test
+  context.
+* **to read** — `pallets/x3-kernel/src/adapters.rs` (18), `node/benches/rpc_dex_latency.rs` (8),
+  fuzz targets.
+
+**Ticket:** teach `_path_is_test` (or the `mod` declaration lookup) that a file declared under
+`#[cfg(test)]` is test context, remove or gate the real production fakes, then widen the prefilter
+and re-baseline with the remainder named. Until then the prefilter stays whole-word, with this gap
+documented at the pattern itself.
