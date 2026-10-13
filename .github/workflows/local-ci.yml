@@ -56,6 +56,7 @@ jobs:
             [ -d "$dir" ] && echo "$dir" >> "$GITHUB_PATH"
           done
           iso="$HOME/.x3ci-runner-${RUNNER_NAME}"
+          mkdir -p "$iso"
           [ -d "$iso/cargo" ] || cp -al "$HOME/.cargo" "$iso/cargo"
           [ -d "$iso/rustup" ] || cp -al "$HOME/.rustup" "$iso/rustup"
           # rustup reinstalls replace the binary; keep the copy's launcher current.
