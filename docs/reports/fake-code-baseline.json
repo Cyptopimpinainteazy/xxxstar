@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-13T09:28:30Z",
-  "scanner_sha256": "5c3f763e466d98c3af1dbd151f917acbf8f4e9d987ddb1b153717f67faaa6dc9",
+  "generated_at": "2026-10-13T11:37:56Z",
+  "scanner_sha256": "f16ad00d270c2d8e2252a2e32264ae7e1363adb47b2b10ea838f963797b2420e",
   "counts": {
     "critical-marker": 449,
     "explicit-stub": 72,
