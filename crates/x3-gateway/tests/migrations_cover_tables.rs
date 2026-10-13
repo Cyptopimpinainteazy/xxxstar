@@ -83,11 +83,8 @@ fn scan_literal(literal: &str, tables: &mut BTreeSet<String>) {
 
 #[test]
 fn every_table_the_gateway_queries_is_created_by_a_migration() {
-    let migrations_dir = fs::read_dir(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/migrations"
-    ))
-    .expect("migrations directory must exist");
+    let migrations_dir = fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations"))
+        .expect("migrations directory must exist");
     let mut created: BTreeSet<String> = BTreeSet::new();
     for entry in migrations_dir {
         let path = entry.expect("read migration entry").path();
