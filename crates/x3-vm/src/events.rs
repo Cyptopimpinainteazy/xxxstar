@@ -4,6 +4,8 @@
 //! commit. On rollback the buffer is discarded. This provides atomicity: events
 //! are only observable if the execution succeeded.
 
+use crate::prelude::*;
+
 /// An event topic: 32-byte hash.
 pub type Topic = [u8; 32];
 

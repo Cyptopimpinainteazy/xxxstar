@@ -4,6 +4,8 @@
 //! each other's memory directly — all cross-contract communication goes through
 //! the hostcall interface.
 
+use crate::prelude::*;
+
 /// Contract execution context — isolated per call frame.
 pub struct IsolationContext {
     /// Contract address owning this context.

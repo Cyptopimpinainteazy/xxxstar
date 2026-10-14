@@ -704,6 +704,11 @@ GATES_FAST=(
   # redden them, a missing one must fail rather than skip, and no check may
   # discard its status. Cheap: 18 checks, no build.
   "rc gate scripts:python3 tests/test_rc_gates.py"
+  # The one X3VM engine the runtime is meant to embed (x3-lang unification, PR 1): the
+  # interpreter, verifier and bytecode decoder must build for the runtime's wasm target with
+  # std off. `check-no-default-features.sh` covers the host target only, and std leaks
+  # (println!, HashMap, a std-only dependency) show up only on wasm.
+  "x3-vm no_std wasm:cargo check -p x3-vm --no-default-features --target wasm32v1-none"
   # Gate 7 of the public testnet gate is the one criterion that decides a launch
   # from a forced-restart proof the operator supplies, and until 2026-09-30 the
   # rule that reads that proof was inline in a script that cannot run without a

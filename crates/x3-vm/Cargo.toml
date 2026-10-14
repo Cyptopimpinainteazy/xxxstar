@@ -8,8 +8,8 @@ repository = "https://github.com/x3-chain/x3"
 
 [dependencies]
 # Core dependencies
-x3-backend = { path = "../x3-backend" }
-x3-common = { path = "../x3-common" }
+x3-backend = { path = "../x3-backend", default-features = false }
+x3-common = { path = "../x3-common", default-features = false, features = ["alloc"] }
 
 # Substrate primitives — H160/U256 used in EVM bridge hostcalls
 sp-core = { workspace = true, default-features = false }
@@ -18,28 +18,35 @@ sp-core = { workspace = true, default-features = false }
 x3-evm-integration = { path = "../evm-integration", optional = true }
 x3-svm-integration = { path = "../svm-integration", optional = true }
 
-# Dynamic library loading for GPU FFI
-libloading = "0.9"
+# Dynamic library loading for GPU FFI (std only)
+libloading = { version = "0.9", optional = true }
 
 # Error handling
-thiserror = "1.0"
+thiserror = { version = "2", default-features = false }
 
 # Logging
-log = "0.4"
-tracing = "0.1"
+log = { version = "0.4", default-features = false }
+tracing = { version = "0.1", optional = true }
 
-# Synchronization primitives
-parking_lot = "0.12"
+# Synchronization primitives (JIT cache, std only)
+parking_lot = { version = "0.12", optional = true }
 
 # Serialization (for VM state snapshots)
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 
 [dev-dependencies]
 env_logger = "0.10"
 
 [features]
 default = ["std"]
+# Without `std` this is the deterministic core the runtime can embed: verifier, interpreter,
+# gas, storage journal, events and hostcall registry. GPU FFI, the cross-VM bridge, the JIT,
+# the debugger, escrow and upgrade helpers are off-chain only.
 std = [
+    "dep:libloading",
+    "dep:parking_lot",
+    "dep:tracing",
+    "thiserror/std",
     "serde/std",
     "sp-core/std",
     "x3-backend/std",

@@ -4,6 +4,8 @@
 //! made within that scope must be fully undone. This module ties together
 //! the storage rollback, event buffer discard, and gas accounting reset.
 
+use crate::prelude::*;
+
 /// Revert reason codes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RevertReason {

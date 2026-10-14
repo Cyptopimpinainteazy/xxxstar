@@ -14,7 +14,8 @@
 //! 6. **Gas**: Conservative gas estimate doesn't exceed limits
 //! 7. **On-Chain**: Debug/JIT opcodes forbidden in production
 
-use std::collections::{BTreeMap, BTreeSet};
+use crate::prelude::*;
+use alloc::collections::{BTreeMap, BTreeSet};
 
 use x3_backend::bc_format::{BytecodeModule, VERSION};
 use x3_backend::opcode::Opcode;
