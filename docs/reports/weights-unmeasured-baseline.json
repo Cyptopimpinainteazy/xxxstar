@@ -1,5 +1,5 @@
 {
-  "note": "Pallets whose src/weights.rs carries no benchmark CLI record line, i.e. was not produced by `x3-chain-node benchmark pallet`. The set is shrink-only: scripts/check-weights-freshness.py fails on a file that is not listed here, and prints the ones that are measured now so this list can drop. Recorded 2026-09-28, when 29 of the 51 weights.rs files in the tree already carried the CLI's own header and 22 did not.",
+  "note": "Pallets whose src/weights.rs carries no benchmark CLI record line, i.e. was not produced by `x3-chain-node benchmark pallet`. The set is shrink-only: scripts/check-weights-freshness.py fails on a file that is not listed here, and prints the ones that are measured now so this list can drop. Recorded 2026-09-28, when 29 of the 51 weights.rs files in the tree already carried the CLI's own header and 22 did not. The three x3 guardian pallets (x3-app-registry, x3-security-gate, x3-trust-gate) were added 2026-09-30: each weighs its dispatchables with the documented DB-access fallback (RocksDbWeight reads/writes) and says so in its own header, but none has been through `scripts/run-frame-benchmarks.sh` yet.",
   "unmeasured": [
     "agent-accounts",
     "agent-memory",
@@ -14,14 +14,17 @@
     "swarm",
     "treasury",
     "x3-agent-law",
+    "x3-app-registry",
     "x3-auction",
     "x3-coin",
     "x3-compute-market",
     "x3-consensus",
     "x3-inventory",
     "x3-launchpad",
+    "x3-security-gate",
     "x3-settlement-engine",
     "x3-slash",
+    "x3-trust-gate",
     "x3-verifier"
   ]
 }

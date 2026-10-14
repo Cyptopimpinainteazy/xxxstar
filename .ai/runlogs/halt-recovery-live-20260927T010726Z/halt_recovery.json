@@ -1,0 +1,63 @@
+{
+  "status": "passed",
+  "steps": [
+    {
+      "label": "council membership",
+      "detail": "3 members: 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty, 5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y, 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+    },
+    {
+      "label": "control transfer landed",
+      "detail": "block 30, +1000000000"
+    },
+    {
+      "label": "trip the emergency halt: council motion executed",
+      "detail": "index=0 hash=0x55677e94c80ead970f2e5a28a0077458e4aef9876494df853d7eaa4b78dde6e1 block=40",
+      "proposalIndex": 0,
+      "proposalHash": "0x55677e94c80ead970f2e5a28a0077458e4aef9876494df853d7eaa4b78dde6e1",
+      "blockNumber": 40
+    },
+    {
+      "label": "both halt flags are set",
+      "detail": "x3Invariants.halted, x3SupplyLedger.transferHalted"
+    },
+    {
+      "label": "a transfer while halted (node A): refused by the pool",
+      "detail": "1010: Invalid Transaction: Custom error: 1"
+    },
+    {
+      "label": "a transfer while halted (node B): refused by the pool",
+      "detail": "1010: Invalid Transaction: Custom error: 1"
+    },
+    {
+      "label": "a second validator refuses it for the same reason",
+      "detail": "the halt is consensus state, not a node-local switch"
+    },
+    {
+      "label": "the refused transfer moved nothing",
+      "detail": "balance still 1000000001000000000"
+    },
+    {
+      "label": "clear the halt: council motion executed",
+      "detail": "index=1 hash=0x9461cab5b1cd58dbbf85a6d501b7beaaae0b48dc0fc3548ef13658eed6ef271e block=52",
+      "proposalIndex": 1,
+      "proposalHash": "0x9461cab5b1cd58dbbf85a6d501b7beaaae0b48dc0fc3548ef13658eed6ef271e",
+      "blockNumber": 52
+    },
+    {
+      "label": "resume transfers: council motion executed",
+      "detail": "index=2 hash=0xaa00e1a89c4e9fbc848a78bbd64afe9a68eaf60bd65c69bafefee1574fc9f87a block=62",
+      "proposalIndex": 2,
+      "proposalHash": "0xaa00e1a89c4e9fbc848a78bbd64afe9a68eaf60bd65c69bafefee1574fc9f87a",
+      "blockNumber": 62
+    },
+    {
+      "label": "both halt flags are cleared",
+      "detail": "cleared by council motion, not by a restart"
+    },
+    {
+      "label": "traffic resumed",
+      "detail": "block 65, +1000000000"
+    }
+  ],
+  "chain": "X3 Chain Local 3-Validator Testnet"
+}

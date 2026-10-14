@@ -45,6 +45,39 @@ fn evm_leg(amount: u128, min_out: u128) -> TradeLegInput {
     create_test_leg(VmType::Evm, AmmProtocol::UniswapV2, amount, min_out)
 }
 
+#[test]
+fn evm_trade_uses_authenticated_batch_owner() {
+    new_test_ext().execute_with(|| {
+        let owner = account(1);
+        LAST_EVM_CALLER.with(|last| last.set(None));
+        assert_ok!(AtomicTradeEngine::create_trade_batch(
+            RuntimeOrigin::signed(owner),
+            vec![evm_leg(1_000_000_000_000_000_000, 900_000_000_000_000_000)],
+            100,
+            100,
+            0,
+        ));
+        let id = AtomicTradeEngine::pending_batches(owner)[0];
+        assert_noop!(
+            AtomicTradeEngine::execute_trade_batch(RuntimeOrigin::signed(account(2)), id,),
+            Error::<Test>::Unauthorized
+        );
+        LAST_EVM_CALLER.with(|last| assert_eq!(last.get(), None));
+        assert_ok!(AtomicTradeEngine::execute_trade_batch(
+            RuntimeOrigin::signed(owner),
+            id
+        ));
+        LAST_EVM_CALLER.with(|last| {
+            assert_eq!(
+                last.get(),
+                Some(pallet_x3_kernel::adapters::authenticated_evm_address(
+                    &owner
+                ))
+            )
+        });
+    });
+}
+
 /// Create an SVM trade leg
 fn svm_leg(amount: u128, min_out: u128) -> TradeLegInput {
     create_test_leg(VmType::Svm, AmmProtocol::Raydium, amount, min_out)
@@ -911,5 +944,59 @@ fn concurrent_batches_per_account() {
 
         let pending = AtomicTradeEngine::pending_batches(account(1));
         assert_eq!(pending.len(), 5);
+    });
+}
+
+// ── GAP-SILENT-FEE-WAIVER: a protocol fee the treasury did not receive is recorded ──
+
+fn execute_one_evm_batch(who: u64) -> u128 {
+    let amount = 1_000_000_000_000_000_000u128;
+    assert_ok!(AtomicTradeEngine::create_trade_batch(
+        RuntimeOrigin::signed(account(who)),
+        vec![evm_leg(amount, amount * 97 / 100)],
+        100,
+        100,
+        0,
+    ));
+    let batch_id = AtomicTradeEngine::pending_batches(account(who))[0];
+    assert_ok!(AtomicTradeEngine::execute_trade_batch(
+        RuntimeOrigin::signed(account(who)),
+        batch_id,
+    ));
+    assert_eq!(
+        AtomicTradeEngine::trade_batches(batch_id).unwrap().status,
+        BatchStatus::Completed
+    );
+    amount
+}
+
+#[test]
+fn a_collected_protocol_fee_reaches_the_treasury() {
+    new_test_ext().execute_with(|| {
+        ProtocolFeeBps::set(20);
+        let fee = execute_one_evm_batch(1) * 20 / 10_000;
+        assert_eq!(Balances::free_balance(ProtocolTreasury::get()), fee);
+        System::assert_has_event(RuntimeEvent::AtomicTradeEngine(
+            Event::ProtocolFeeCollected {
+                who: account(1),
+                fee,
+            },
+        ));
+    });
+}
+
+#[test]
+fn an_uncollected_protocol_fee_is_recorded_as_waived() {
+    new_test_ext().execute_with(|| {
+        ProtocolFeeBps::set(20);
+        // The submitter cannot pay the fee: the batch still completes, and the lost fee is on
+        // record instead of vanishing.
+        Balances::make_free_balance_be(&account(1), 1);
+        let fee = execute_one_evm_batch(1) * 20 / 10_000;
+        System::assert_has_event(RuntimeEvent::AtomicTradeEngine(Event::ProtocolFeeWaived {
+            who: account(1),
+            fee,
+        }));
+        assert_eq!(Balances::free_balance(ProtocolTreasury::get()), 0);
     });
 }

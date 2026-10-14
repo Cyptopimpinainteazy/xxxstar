@@ -1,0 +1,12 @@
+{
+  "status": "failed",
+  "steps": [
+    {
+      "label": "the token was created",
+      "detail": "asset 0x9bada2470ed719195842d4832b95b8c4893c92fbbb002710cf72c931f48866e8"
+    }
+  ],
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "specVersion": "20",
+  "error": "Alice tries to freeze a mint authority: refused for the wrong reason — BadOrigin"
+}

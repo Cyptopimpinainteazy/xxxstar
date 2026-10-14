@@ -52,19 +52,9 @@ fn detect_gpu() {
         println!();
         println!("GPU Information:");
         println!("  Model: {}", report.gpu_model);
-        println!("  Memory: {} MB", report.memory_mb);
-        println!(
-            "  Compute Capability: {}.{}",
-            report.compute_capability.0, report.compute_capability.1
-        );
-        println!("  CUDA Cores: {}", report.cuda_cores);
+        println!("  Backend: {}", report.backend);
+        println!("  Keccak-256: {} hashes/sec", report.benchmark_score);
         println!("  Supported Operations: {:?}", report.supported_ops);
-
-        // Run benchmark
-        println!();
-        println!("Running benchmark...");
-        let score = wallet_sync::run_benchmark();
-        println!("  Benchmark Score: {} ops/sec", score);
     } else {
         println!("✗ No GPU detected");
         println!("Running in CPU-only mode");
@@ -72,7 +62,7 @@ fn detect_gpu() {
 }
 
 fn run_benchmark() {
-    println!("Running GPU Benchmark...");
+    println!("Running CPU Keccak-256 benchmark...");
     println!();
 
     let score = wallet_sync::run_benchmark();
@@ -90,9 +80,10 @@ fn run_benchmark() {
 fn register_provider() {
     println!("Registering as Provider...");
 
-    // Get wallet from args
-    let wallet = std::env::var("WALLET_ADDRESS")
-        .unwrap_or_else(|_| "0x0000000000000000000000000000000000000000".to_string());
+    let Ok(wallet) = std::env::var("WALLET_ADDRESS") else {
+        println!("✗ Set WALLET_ADDRESS to the provider's wallet");
+        return;
+    };
 
     let stake = std::env::var("STAKE_AMOUNT")
         .unwrap_or_else(|_| "1000000".to_string())
@@ -178,25 +169,49 @@ fn wallet_sync_flow() {
     let score = wallet_sync::run_benchmark();
     println!("  ✓ Benchmark score: {} ops/sec", score);
 
-    // Step 3: Get wallet address
+    // Step 3: Get wallet address and its signature over the registration message
     println!();
     println!("Step 3: Wallet Connection");
-    let wallet = std::env::var("WALLET_ADDRESS").unwrap_or_else(|_| {
-        println!("  Enter wallet address (or set WALLET_ADDRESS env var):");
-        println!("  > ");
-        "0x0000000000000000000000000000000000000000".to_string()
-    });
-    println!("  ✓ Connected: {}", wallet);
+    let Ok(wallet) = std::env::var("WALLET_ADDRESS") else {
+        println!("  ✗ Set WALLET_ADDRESS to the provider's wallet");
+        return;
+    };
+    let mut report = report;
+    if let Some(timestamp) = std::env::var("WALLET_TIMESTAMP")
+        .ok()
+        .and_then(|t| t.parse().ok())
+    {
+        report.timestamp = timestamp;
+    }
+    if let Ok(provider_id) = std::env::var("PROVIDER_ID") {
+        report.provider_id = provider_id;
+    }
+    let message = wallet_sync::registration_message(&wallet, &report.provider_id, report.timestamp);
+    let signature = match std::env::var("WALLET_SIGNATURE")
+        .ok()
+        .and_then(|sig| hex::decode(sig.trim_start_matches("0x")).ok())
+    {
+        Some(signature) => signature,
+        None => {
+            println!("  Sign this message with personal_sign, then rerun with");
+            println!(
+                "  WALLET_SIGNATURE=<0x hex>, PROVIDER_ID={}",
+                report.provider_id
+            );
+            println!("  and WALLET_TIMESTAMP={}:", report.timestamp);
+            println!();
+            println!("{message}");
+            return;
+        }
+    };
+    println!("  ✓ Wallet: {}", wallet);
 
     // Step 4: Register
     println!();
     println!("Step 4: Registering provider...");
-    let config = SwarmConfig::default();
-    let _payment = Arc::new(PaymentSystem::new(config));
-
     let request = wallet_sync::WalletSyncRequest {
         wallet_address: wallet.clone(),
-        signature: vec![1, 2, 3], // Would be real signature
+        signature,
         gpu_report: report,
     };
 

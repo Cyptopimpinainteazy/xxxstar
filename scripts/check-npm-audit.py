@@ -40,6 +40,7 @@ PER_PROJECT_TIMEOUT = 300
 
 # Findings at these severities are never acceptable, baseline or not.
 FATAL = ("critical", "high")
+SEVERITIES = ("info", "low", "moderate", "high", "critical")
 
 
 def projects():
@@ -75,6 +76,8 @@ def audit(project, manager):
         return None, "timed out after %ds" % PER_PROJECT_TIMEOUT
     except OSError as error:
         return None, "could not run %s: %s" % (command[0], error)
+    if completed.returncode not in (0, 1):
+        return None, "audit tool failed (exit %s)" % completed.returncode
     text = completed.stdout.strip()
     if not text:
         tail = (completed.stderr or "").strip().splitlines()[-2:]
@@ -83,10 +86,25 @@ def audit(project, manager):
         data = json.loads(text)
     except json.JSONDecodeError as error:
         return None, "unreadable JSON (%s)" % error
+    if not isinstance(data, dict) or "error" in data:
+        return None, "audit tool returned an error or invalid report"
+    modern = "vulnerabilities" in data
+    legacy = "advisories" in data
+    if modern == legacy:
+        return None, "audit report must contain exactly one supported findings object"
+    entries = data["vulnerabilities" if modern else "advisories"]
+    if not isinstance(entries, dict):
+        return None, "audit findings must be an object"
     findings = {}
-    for name, entry in (data.get("vulnerabilities") or {}).items():
+    for identifier, entry in entries.items():
+        if not isinstance(entry, dict):
+            return None, "audit finding must be an object"
+        name = identifier if modern else entry.get("module_name")
         severity = entry.get("severity")
-        if severity and severity != "info":
+        if not isinstance(name, str) or not name or severity not in SEVERITIES:
+            return None, "audit finding has invalid package identity or severity"
+        previous = findings.get(name, "info")
+        if SEVERITIES.index(severity) > SEVERITIES.index(previous):
             findings[name] = severity
     return findings, None
 

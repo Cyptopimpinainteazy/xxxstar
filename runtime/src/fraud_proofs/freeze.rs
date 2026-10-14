@@ -174,4 +174,31 @@ mod tests {
     fn empty_bytes_not_frozen() {
         assert!(!is_frozen_from_bytes(&[]));
     }
+
+    /// FREEZE-006: either flag alone freezes the consensus path — the
+    /// disjunction is the contract, not an optimization.
+    #[test]
+    fn either_flag_freezes_consensus() {
+        let only_ai = FreezeState {
+            ai_syscalls_frozen: true,
+            ..FreezeState::default()
+        };
+        let only_scheduler = FreezeState {
+            scheduler_frozen: true,
+            ..FreezeState::default()
+        };
+        assert!(only_ai.is_consensus_frozen());
+        assert!(only_scheduler.is_consensus_frozen());
+        assert!(!FreezeState::default().is_consensus_frozen());
+    }
+
+    /// FREEZE-007: the summary an operator reads must name the state.
+    #[test]
+    fn summary_names_frozen_and_live_states() {
+        assert_eq!(freeze_summary(&FreezeState::default()), b"live".to_vec());
+        assert_eq!(
+            freeze_summary(&engaged_state(FreezeReason::DivergenceDetected, 7)),
+            b"frozen".to_vec()
+        );
+    }
 }

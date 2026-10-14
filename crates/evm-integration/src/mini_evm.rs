@@ -46,7 +46,7 @@ use sp_std::prelude::Vec;
 use sp_std::vec;
 
 /// Default chain ID for X3 Chain (used by both mini_evm and lib.rs default config)
-pub const X3_DEFAULT_CHAIN_ID: u64 = 42;
+pub const X3_DEFAULT_CHAIN_ID: u64 = 650_000;
 
 /// Execute EVM bytecode using the SputnikVM interpreter (no-std compatible).
 ///
@@ -60,6 +60,43 @@ pub fn execute_evm(
     caller: SpH160,
     value: SpU256,
     evm_config: &crate::EvmConfig,
+) -> EvmResult<EvmExecutionResult> {
+    execute_evm_inner(payload, caller, value, evm_config, false)
+}
+
+/// Execute the existing content-addressed bytecode convention against chain storage.
+/// Writes participate in the enclosing Substrate storage transaction. The caller must
+/// provide that transaction when combining this execution with another VM.
+pub fn execute_evm_persistent(
+    payload: &[u8],
+    caller: SpH160,
+    value: SpU256,
+    evm_config: &crate::EvmConfig,
+) -> EvmResult<EvmExecutionResult> {
+    execute_evm_inner(payload, caller, value, evm_config, true)
+}
+
+/// Simulate against current chain state, discarding every write before returning.
+/// The standalone calldata lower-bound estimator remains available separately.
+pub fn estimate_gas_evm_persistent(
+    payload: &[u8],
+    caller: SpH160,
+    value: SpU256,
+    evm_config: &crate::EvmConfig,
+) -> EvmResult<u64> {
+    sp_io::storage::start_transaction();
+    let result =
+        execute_evm_persistent(payload, caller, value, evm_config).map(|receipt| receipt.gas_used);
+    sp_io::storage::rollback_transaction();
+    result
+}
+
+fn execute_evm_inner(
+    payload: &[u8],
+    caller: SpH160,
+    value: SpU256,
+    evm_config: &crate::EvmConfig,
+    persistent: bool,
 ) -> EvmResult<EvmExecutionResult> {
     if payload.is_empty() {
         return Err(EvmError::InvalidPayload);
@@ -105,7 +142,11 @@ pub fn execute_evm(
         to_evm_h160(caller),
         MemoryAccount {
             nonce: EvmU256::zero(),
-            balance: EvmU256::from(u128::MAX),
+            balance: if persistent {
+                EvmU256::zero()
+            } else {
+                EvmU256::from(u128::MAX)
+            },
             storage: BTreeMap::new(),
             code: vec![],
         },
@@ -121,7 +162,8 @@ pub fn execute_evm(
         },
     );
 
-    let mut backend = MemoryBackend::new(&vicinity, state_map);
+    let mut backend =
+        super::persistent::ChainBackend::new(MemoryBackend::new(&vicinity, state_map), persistent);
     let metadata = StackSubstateMetadata::new(gas_limit, &config);
     let stack_state = MemoryStackState::new(metadata, &mut backend);
     let precompiles = standard_precompiles();
@@ -150,6 +192,10 @@ pub fn execute_evm(
         return Err(err);
     }
 
+    let (changes, logs) = executor.into_state().deconstruct();
+    let logs: Vec<_> = logs.into_iter().collect();
+    backend.apply_changes(changes);
+
     // Compute a deterministic state root from the execution inputs and result.
     // This commits the caller address, target, gas consumption, and output
     // into a single hash so validators can agree on execution outcome.
@@ -160,6 +206,9 @@ pub fn execute_evm(
         preimage.extend_from_slice(target_addr.as_bytes());
         preimage.extend_from_slice(&gas_used.to_le_bytes());
         preimage.extend_from_slice(&return_data);
+        if persistent {
+            preimage.extend_from_slice(&sp_io::storage::root(sp_runtime::StateVersion::V1));
+        }
         blake2_256(&preimage)
     };
 
@@ -167,7 +216,18 @@ pub fn execute_evm(
         success: true,
         output: return_data,
         gas_used,
-        logs: Vec::new(), // canonical ledger owns the event log
+        logs: logs
+            .into_iter()
+            .map(|log| crate::EvmLog {
+                address: SpH160::from_slice(log.address.as_bytes()),
+                topics: log
+                    .topics
+                    .into_iter()
+                    .map(|topic| sp_core::H256::from_slice(topic.as_bytes()))
+                    .collect(),
+                data: log.data,
+            })
+            .collect(),
         state_changes: Vec::new(),
         state_root,
     })
@@ -211,7 +271,8 @@ pub fn validate_evm(payload: &[u8]) -> EvmResult<()> {
 // ---------------------------------------------------------------------------
 
 /// Derive a stable H160 target address from payload bytes via keccak-256
-/// (consistent with Ethereum's CREATE address derivation).
+/// This is X3's bytecode-payload convention; CREATE inside execution uses Sputnik's
+/// Ethereum caller/nonce derivation separately.
 fn derive_target(payload: &[u8]) -> EvmH160 {
     let hash = sp_io::hashing::keccak_256(payload);
     EvmH160::from_slice(&hash[12..32])

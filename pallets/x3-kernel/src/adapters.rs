@@ -18,11 +18,54 @@ pub trait EvmExecutorAdapter {
     /// Execute EVM payload and return execution receipt
     fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError>;
 
+    /// Execute with an authenticated caller supplied by the dispatch boundary.
+    /// Adapters must explicitly support this; ignoring identity is unsafe for persistent state.
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        let _ = (payload, gas_limit, caller);
+        Err(DispatchError::Other(
+            "Authenticated EVM execution is unsupported",
+        ))
+    }
+
+    /// Call a deployed target. Calldata must never be treated as fresh bytecode.
+    fn execute_call(
+        caller: sp_core::H160,
+        target: sp_core::H160,
+        input: &[u8],
+        value: u128,
+        gas_limit: u64,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        let _ = (caller, target, input, value, gas_limit);
+        Err(DispatchError::Other(
+            "Authenticated deployed-target EVM calls are unsupported",
+        ))
+    }
+
+    /// Simulate with the same authenticated identity as execution.
+    fn estimate_gas_from(payload: &[u8], caller: sp_core::H160) -> Result<u64, DispatchError> {
+        let _ = (payload, caller);
+        Err(DispatchError::Other(
+            "Authenticated EVM gas estimation is unsupported",
+        ))
+    }
+
     /// Estimate gas for a payload without state changes
     fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError>;
 
     /// Validate EVM bytecode without execution
     fn validate(payload: &[u8]) -> Result<(), DispatchError>;
+}
+
+/// Bind a signed native account to a domain-separated EVM caller identity.
+pub fn authenticated_evm_address(account: &impl parity_scale_codec::Encode) -> sp_core::H160 {
+    let mut preimage = b"x3:evm:origin:v1:".to_vec();
+    preimage.extend_from_slice(&account.encode());
+    let hash = sp_io::hashing::keccak_256(&preimage);
+    sp_core::H160::from_slice(&hash[12..])
 }
 
 /// Trait for SVM execution adapters
@@ -87,6 +130,14 @@ pub trait X3ExecutorAdapter {
 pub struct MockEvmAdapter;
 
 impl EvmExecutorAdapter for MockEvmAdapter {
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        _caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        Self::execute(payload, gas_limit)
+    }
+
     fn execute(payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
         // Mock execution: hash payload to generate deterministic state changes
         let state_root = if payload.is_empty() {
@@ -133,6 +184,14 @@ impl EvmExecutorAdapter for MockEvmAdapter {
 // RbpfSvmAdapter, X3VmAdapter).
 #[cfg(any(test, feature = "runtime-benchmarks"))]
 impl EvmExecutorAdapter for () {
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        _caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        <Self as EvmExecutorAdapter>::execute(payload, gas_limit)
+    }
+
     fn execute(_payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
         Ok(ExecutionReceipt {
             version: crate::EXECUTION_RECEIPT_VERSION,
@@ -206,6 +265,14 @@ impl SvmExecutorAdapter for MockSvmAdapter {
 pub struct FailingMockEvmAdapter;
 
 impl EvmExecutorAdapter for FailingMockEvmAdapter {
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        _caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        Self::execute(payload, gas_limit)
+    }
+
     fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
         // Simulate failure when payload starts with 0xFF
         if payload.first() == Some(&0xFF) {

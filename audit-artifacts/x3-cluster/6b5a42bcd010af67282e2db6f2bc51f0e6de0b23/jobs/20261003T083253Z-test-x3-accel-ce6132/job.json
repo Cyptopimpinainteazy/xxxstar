@@ -1,0 +1,41 @@
+{
+  "id": "20261003T083253Z-test-x3-accel-ce6132",
+  "name": "test-x3-accel",
+  "class": "TEST",
+  "cmd": "cargo test --locked -p x3-accel -p x3-accel-wgpu",
+  "commit": "6b5a42bcd010af67282e2db6f2bc51f0e6de0b23",
+  "ref": "6b5a42bcd010af67282e2db6f2bc51f0e6de0b23",
+  "priority": "HIGH",
+  "timeout": 3600,
+  "node": null,
+  "min_free_gb": 30,
+  "submitted": "2026-10-03T08:32:53+00:00",
+  "controller": "x3star1",
+  "worker": "x3star1",
+  "label": "LOCAL-FALLBACK",
+  "rejected_workers": [
+    {
+      "node": "x3build1",
+      "reason": "unreachable or SSH key auth failed"
+    }
+  ],
+  "exit_code": 0,
+  "result": "PASS",
+  "seconds": 18.8,
+  "machine": "x3star1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "cc": "cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0"
+  },
+  "start": "2026-10-03T08:33:01Z",
+  "end": "2026-10-03T08:33:11Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-main",
+  "target_dir": "/home/lojak/.cache/x3-cluster/target",
+  "worker_free_gb": "275",
+  "log_sha256": "a6992672301f4f83567164994a258ed683f0dec202972c557ca35661e0cbf147",
+  "log_tail": "ce_is_covered_by_the_others ... ok\ntest shadow::tests::honest_accelerator_is_used_and_rejections_rechecked ... ok\ntest shadow::tests::false_acceptance_unsampled_is_the_documented_risk ... ok\ntest shadow::tests::false_acceptance_is_caught_when_sampled ... ok\ntest shadow::tests::false_rejection_is_always_caught_and_disables ... ok\ntest multi_device::tests::split_results_are_identical_and_in_order ... ok\ntest shadow::tests::sampling_rate_is_roughly_honoured ... ok\n\ntest result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.80s\n\n     Running tests/secp256k1_gpu_parity.rs (/home/lojak/.cache/x3-cluster/target/debug/deps/secp256k1_gpu_parity-0cc4308cc3466b55)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/lib.rs (/home/lojak/.cache/x3-cluster/target/debug/deps/x3_accel_wgpu-655ef668ab7c2928)\n\nrunning 6 tests\nlibEGL warning: DRI2: failed to authenticate\nlibEGL warning: DRI2: failed to authenticate\nlibEGL warning: DRI2: failed to authenticate\nlibEGL warning: DRI2: failed to authenticate\nlibEGL warning: DRI2: failed to authenticate\nlibEGL warning: DRI2: failed to authenticate\ntest tests::all_empty_batch_and_empty_list ... ok\ntest secp256k1::tests::gpu_field_and_scalar_primitives_match_reference ... ok\ntest tests::reused_buffers_do_not_leak_previous_batches ... ok\ntest tests::keccak256_kernel_matches_cpu_when_wgpu_is_available ... ok\ntest tests::sha256_kernel_matches_cpu_when_wgpu_is_available ... ok\ntest tests::every_padding_boundary_matches_cpu ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s\n\n   Doc-tests x3_accel\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests x3_accel_wgpu\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\nX3JOB-META end=2026-10-03T08:33:11Z\n",
+  "artifacts": [],
+  "finished": "2026-10-03T08:33:12+00:00"
+}

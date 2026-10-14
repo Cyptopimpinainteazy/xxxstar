@@ -1,0 +1,36 @@
+{
+  "status": "failed",
+  "steps": [
+    {
+      "label": "read the window switch",
+      "detail": "enabled=false"
+    },
+    {
+      "label": "enable ordering windows: motion executed",
+      "detail": "block=33"
+    },
+    {
+      "label": "the ordering lane is enabled"
+    },
+    {
+      "label": "window opened",
+      "detail": "id=0 range=35..=42"
+    },
+    {
+      "label": "committed from alice",
+      "detail": "block=38"
+    },
+    {
+      "label": "committed from bob",
+      "detail": "block=40"
+    },
+    {
+      "label": "a mismatched reveal was refused",
+      "detail": "privateExecution.OrderingWindowNotOpen"
+    }
+  ],
+  "settled_order": null,
+  "recomputed": null,
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "error": "reveal from alice: dispatch failed — privateExecution.OrderingWindowNotOpen"
+}

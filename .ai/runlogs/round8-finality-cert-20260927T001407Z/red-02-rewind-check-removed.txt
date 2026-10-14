@@ -1,0 +1,6 @@
+test finality::tests::test_a_rewound_anchor_is_refused ... FAILED
+thread 'finality::tests::test_a_rewound_anchor_is_refused' panicked at crates/x3-atomic-swap/src/finality.rs:666:9:
+assertion `left == right` failed
+  left: Ok(true)
+ right: Err(CertificateRewindsAcceptedAnchor { chain: Ethereum, accepted_tip: 1012, certificate_tip: 1011 })
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 667 filtered out; finished in 0.00s

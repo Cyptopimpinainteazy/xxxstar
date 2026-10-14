@@ -34,7 +34,6 @@ export interface X3StudioAPI {
   };
   scanner: { scanFiles: (dir: string, patterns: string[]) => Promise<ScanResult[]> };
   app: { getEnv: () => Promise<any> };
-  chain: { rpcCall: (rpcUrl: string, method: string, params: any[]) => Promise<any> };
   debugger: {
     start: (target: string, cwd: string) => Promise<CmdResult>;
     step: (id: string) => Promise<{ line: number; file: string; variables: DebugVar[]; callStack: DebugFrame[] }>;
@@ -109,7 +108,7 @@ export type PanelId =
   | 'deployment-config' | 'dao-proposal' | 'account-abstraction' | 'tps-benchmark'
   | 'cross-chain-sim' | 'chain-config'
   | 'solidity-compiler' | 'wasm-debugger' | 'registry-marketplace' | 'collab'
-  | 'chain-sync' | 'tps-meter';
+  | 'chain-sync' | 'tps-meter' | 'multi-window';
 
 export interface Tab {
   id: string;

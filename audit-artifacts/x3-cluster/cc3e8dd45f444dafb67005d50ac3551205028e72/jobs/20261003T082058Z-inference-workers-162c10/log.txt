@@ -1,0 +1,14 @@
+X3JOB-META free_gb=11
+X3JOB-META host=x3gpu1
+X3JOB-META repo=/home/lojak/Desktop/xxxstar-master
+X3JOB-META kernel=6.8.0-146-generic
+X3JOB-META rustc=none
+X3JOB-META cargo=none
+X3JOB-META cc=cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+X3JOB-META target_dir=/home/lojak/Desktop/xxxstar-master/target
+X3JOB-META start=2026-10-03T08:21:34Z
+worker :11434 ok
+worker :11436 ok
+/home/lojak/.cache/x3-cluster/out/20261003T082058Z-inference-workers-162c10/worker-11434.json
+/home/lojak/.cache/x3-cluster/out/20261003T082058Z-inference-workers-162c10/worker-11436.json
+X3JOB-META end=2026-10-03T08:25:22Z

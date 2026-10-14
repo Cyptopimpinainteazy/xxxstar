@@ -1,0 +1,13 @@
+{
+  "stamp": "20260927T141217Z",
+  "branch": "feat/x3-prelaunch-economics-x3lang-cutover",
+  "head": "1e17ac5ed",
+  "working_tree": "dirty",
+  "jobs": 3,
+  "cargo_jobs": 10,
+  "result": "PASS",
+  "touched_files": 0,
+  "gates": [
+    {"name": "tauri-os live operator console", "result": "PASS", "seconds": 13, "reason": "", "log": "local-ci-20260927T141217Z-tauri-os-live-operator-console.log"}
+  ]
+}

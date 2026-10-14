@@ -4,13 +4,13 @@
 //! CPU execution with transparent state changes. Avoids validator crash.
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 /// Execution target
 #[derive(Clone, Debug)]
 pub enum ExecutionTarget {
-    GPU,  // Primary: X3 kernel on GPU
-    CPU,  // Fallback: CPU-only
-    Mock, // Test/development
+    GPU, // Primary: X3 kernel on GPU
+    CPU, // Fallback: CPU-only
 }
 
 /// Degradation strategy
@@ -44,6 +44,15 @@ pub struct X3KernelInstance {
     pub last_error: Option<String>,
 }
 
+/// The device that runs an attached kernel's operations.
+///
+/// The chain has no GPU of its own: a kernel only executes when the caller attaches the executor
+/// that really runs it. An operation the executor cannot run is an `Err`, which the `Cascading`
+/// strategy turns into a CPU fallback.
+pub trait GpuKernelExecutor: Send + Sync {
+    fn execute(&self, op: &str, args: &[u64]) -> Result<Vec<u64>, String>;
+}
+
 /// CPU Fallback Engine
 #[derive(Clone)]
 pub struct CPUFallbackEngine {
@@ -74,8 +83,6 @@ impl CPUFallbackEngine {
                 }
                 Ok(vec![args[0].wrapping_mul(args[1])])
             }
-            "hash" => Ok(vec![0xDEADBEEFu64]), // Mock hash
-            "verify" => Ok(vec![1u64]),        // Mock verify success
             _ => Err(format!("Unknown operation: {}", op)),
         }
     }
@@ -85,6 +92,7 @@ impl CPUFallbackEngine {
 pub struct FallbackChain {
     pub strategy: DegradationStrategy,
     pub primary: Option<X3KernelInstance>,
+    executor: Option<Arc<dyn GpuKernelExecutor>>,
     pub cpu_engine: CPUFallbackEngine,
     pub current_target: ExecutionTarget,
     pub fallback_history: VecDeque<FallbackEvent>,
@@ -96,6 +104,7 @@ impl FallbackChain {
         Self {
             strategy,
             primary: None,
+            executor: None,
             cpu_engine: CPUFallbackEngine::new(),
             current_target: ExecutionTarget::GPU,
             fallback_history: VecDeque::new(),
@@ -103,9 +112,14 @@ impl FallbackChain {
         }
     }
 
-    /// Attach X3 GPU kernel
-    pub fn attach_gpu_kernel(&mut self, kernel: X3KernelInstance) {
+    /// Attach an X3 GPU kernel and the executor that runs it.
+    pub fn attach_gpu_kernel(
+        &mut self,
+        kernel: X3KernelInstance,
+        executor: Arc<dyn GpuKernelExecutor>,
+    ) {
         self.primary = Some(kernel);
+        self.executor = Some(executor);
     }
 
     /// Execute with automatic fallback
@@ -173,7 +187,7 @@ impl FallbackChain {
     fn execute_on_gpu(
         &mut self,
         op: &str,
-        _args: &[u64],
+        args: &[u64],
         _block_height: u32,
     ) -> Result<Vec<u64>, String> {
         let kernel = self
@@ -186,13 +200,11 @@ impl FallbackChain {
             return Err(format!("GPU kernel '{}' not operational", kernel.name));
         }
 
-        // Mock GPU execution
-        match op {
-            "matmul" => Ok(vec![42u64]), // Mock result
-            "conv2d" => Ok(vec![100u64]),
-            "hash" => Ok(vec![0xCAFEBABEu64]),
-            _ => Err(format!("GPU kernel doesn't support operation: {}", op)),
-        }
+        let executor = self
+            .executor
+            .as_ref()
+            .ok_or("GPU kernel has no executor attached")?;
+        executor.execute(op, args)
     }
 
     /// Execute on CPU
@@ -300,6 +312,48 @@ pub enum HealthStatus {
 mod tests {
     use super::*;
 
+    /// Test-only executor: runs `add` on "the GPU" so the GPU path is observable.
+    struct AddExecutor;
+
+    impl GpuKernelExecutor for AddExecutor {
+        fn execute(&self, op: &str, args: &[u64]) -> Result<Vec<u64>, String> {
+            match (op, args) {
+                ("add", [a, b]) => Ok(vec![a.wrapping_add(*b)]),
+                _ => Err(format!("unsupported: {op}")),
+            }
+        }
+    }
+
+    fn executor() -> Arc<dyn GpuKernelExecutor> {
+        Arc::new(AddExecutor)
+    }
+
+    #[test]
+    fn cpu_engine_has_no_fake_hash_or_verify() {
+        let engine = CPUFallbackEngine::new();
+        assert!(engine.execute_scalar("hash", &[1]).is_err());
+        assert!(engine.execute_scalar("verify", &[1]).is_err());
+    }
+
+    #[test]
+    fn unsupported_gpu_op_cascades_to_cpu_and_strict_fails() {
+        let kernel = || X3KernelInstance {
+            kernel_id: 1,
+            name: "k".to_string(),
+            version: "1.0.0".to_string(),
+            is_operational: true,
+            last_error: None,
+        };
+        let mut strict = FallbackChain::new(DegradationStrategy::Strict);
+        strict.attach_gpu_kernel(kernel(), executor());
+        assert!(strict.execute("mul", &[3, 4], 0).is_err());
+
+        let mut cascading = FallbackChain::new(DegradationStrategy::Cascading);
+        cascading.attach_gpu_kernel(kernel(), executor());
+        assert_eq!(cascading.execute("mul", &[3, 4], 0).unwrap(), vec![12]);
+        assert!(matches!(cascading.current_target, ExecutionTarget::CPU));
+    }
+
     #[test]
     fn test_fallback_chain_creation() {
         let chain = FallbackChain::new(DegradationStrategy::Cascading);
@@ -355,10 +409,12 @@ mod tests {
             last_error: None,
         };
 
-        chain.attach_gpu_kernel(kernel);
+        chain.attach_gpu_kernel(kernel, executor());
 
-        let result = chain.execute("matmul", &[], 0);
-        assert!(result.is_ok());
+        let result = chain.execute("add", &[2, 3], 0);
+        assert_eq!(result.unwrap(), vec![5]);
+        assert!(matches!(chain.current_target, ExecutionTarget::GPU));
+        assert_eq!(chain.get_stats().total_fallbacks, 0);
     }
 
     #[test]
@@ -373,7 +429,7 @@ mod tests {
             last_error: Some("CUDA timeout".to_string()),
         };
 
-        chain.attach_gpu_kernel(kernel);
+        chain.attach_gpu_kernel(kernel, executor());
 
         // GPU is down, should cascade to CPU
         let result = chain.execute("add", &[3, 7], 0);
@@ -395,7 +451,7 @@ mod tests {
             last_error: Some("CUDA error".to_string()),
         };
 
-        chain.attach_gpu_kernel(kernel);
+        chain.attach_gpu_kernel(kernel, executor());
 
         // Trigger fallback
         let _ = chain.execute("add", &[1, 2], 100);
@@ -416,7 +472,7 @@ mod tests {
             last_error: None,
         };
 
-        chain.attach_gpu_kernel(kernel);
+        chain.attach_gpu_kernel(kernel, executor());
 
         match chain.health_check() {
             HealthStatus::Healthy => {}
@@ -436,7 +492,7 @@ mod tests {
             last_error: Some("CUDA OOM".to_string()),
         };
 
-        chain.attach_gpu_kernel(kernel);
+        chain.attach_gpu_kernel(kernel, executor());
 
         match chain.health_check() {
             HealthStatus::Degraded(_) => {}
@@ -456,7 +512,7 @@ mod tests {
             last_error: None,
         };
 
-        chain.attach_gpu_kernel(kernel);
+        chain.attach_gpu_kernel(kernel, executor());
         chain.set_gpu_operational(false, Some("Manual disable".to_string()));
 
         assert!(!chain.primary.as_ref().unwrap().is_operational);

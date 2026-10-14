@@ -697,3 +697,12 @@ alters the runtime, so the record and the code land together.
   compressed 1530390
   (`0x5efad00fe7ab70f779eeb0f16318ec43b7857e809c22397180b81bea256519ee`) — was 1,530,061, from two
   builds that agreed.
+
+* `7332aa279` — **the guardian pallets are attested.** `x3-app-registry`, `x3-security-gate` and
+  `x3-trust-gate` (with their weights) are wired into the runtime; the record's exemption for
+  test-only files kept this from being demanded for the test edits on the way here. Two
+  independent from-scratch srtool builds agreed. The bytes move: compact 9084047
+  (`0xd6ba85e1c4ecd1b86eb5708aee4158cc1ced81b7003de3ba0a1e1564202459f9`) — was 8,906,533 — and
+  compressed 1553413
+  (`0x4f6e6b08ef8b27a9433c59a481adbabb53e2be52dd3109806a37ca13ee63a2ff`) — was 1,530,390, from
+  two builds that agreed.

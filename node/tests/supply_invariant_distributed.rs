@@ -30,6 +30,11 @@
 //! validator that never received the extrinsic — because a "conserved" chain that never moved
 //! anything has proven nothing.
 //!
+//! The live matrix executes all six internal routes and adversarial lifecycle calls.
+//! With `X3_SUPPLY_GENESIS_SPEC` (older raw local3 spec) and
+//! `X3_SUPPLY_UPGRADE_WASM` (fresh current artifact), it runs before and after
+//! a council/governance code swap and requires historical state to survive.
+//!
 //! ## Why there is a second, corrupted chain
 //!
 //! A conservation check that always passes is not evidence. The last phase takes the same `local3`
@@ -83,6 +88,8 @@ const SCRATCH_P2P: u16 = 30397;
 /// slower than a dev node's; every wait below is sized for a debug build of a 1.4 GB binary.
 const NODE_BOOT_TIMEOUT: Duration = Duration::from_secs(300);
 const CONSENSUS_TIMEOUT: Duration = Duration::from_secs(300);
+// Cold compilation of a new debug WASM can outlast ordinary dispatch; bound upgrade recovery.
+const UPGRADE_TIMEOUT: Duration = Duration::from_secs(600);
 const RECEIPT_TIMEOUT: Duration = Duration::from_secs(300);
 /// How long one comit may take to be included and dispatched before a stream gives up. Blocks on
 /// this chain are sub-second, so this is generous; a timeout here means the comit was rejected.
@@ -625,7 +632,10 @@ fn extrinsics_in_block(port: u16, hash: &str) -> Vec<String> {
         };
         match x3_chain_runtime::UncheckedExtrinsic::decode(&mut &bytes[..]) {
             Ok(decoded) => {
-                let text = format!("{:?}", decoded.function);
+                let text = format!(
+                    "{:?}",
+                    x3_chain_runtime::generic_extrinsic(decoded).function
+                );
                 out.push(text.chars().take(140).collect::<String>());
             }
             Err(error) => out.push(format!("<undecodable: {error}>")),
@@ -854,7 +864,11 @@ fn assert_ports_free() {
 /// and spawning everything from the copy makes the artifact under test a constant for the run, and
 /// prints the digest so the evidence names which build was proven.
 fn freeze_node_binary(base_path: &Path) -> (PathBuf, Option<String>) {
-    let source = PathBuf::from(env!("CARGO_BIN_EXE_x3-chain-node"));
+    // Historical rehearsals may run an explicitly pinned older release host;
+    // on-chain code/version checks still bind the old genesis and current upgrade.
+    let source = std::env::var_os("X3_SUPPLY_NODE_BINARY")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_BIN_EXE_x3-chain-node")));
     let frozen = base_path.join("x3-chain-node");
     std::fs::copy(&source, &frozen).unwrap_or_else(|e| {
         panic!(
@@ -953,9 +967,13 @@ fn wait_for_rpc(name: &str, port: u16, timeout: Duration) {
 /// canonical hash at a common height.
 fn boot_local3(node_bin: &Path, base_path: &Path) -> ValidatorSet {
     std::fs::create_dir_all(base_path).expect("create the validator set's base path");
-    let mut children = Vec::new();
+    let mut network = ValidatorSet {
+        base_path: base_path.to_path_buf(),
+        children: Vec::new(),
+    };
+    let chain = std::env::var("X3_SUPPLY_GENESIS_SPEC").unwrap_or_else(|_| "local3".into());
 
-    children.push(spawn_with_args(
+    network.children.push(spawn_with_args(
         &validator_argv(
             node_bin,
             "alice",
@@ -964,7 +982,7 @@ fn boot_local3(node_bin: &Path, base_path: &Path) -> ValidatorSet {
             ALICE_RPC,
             ALICE_P2P,
             &base_path.join("alice"),
-            "local3",
+            &chain,
             &[],
         ),
         &base_path.join("alice.log"),
@@ -973,7 +991,7 @@ fn boot_local3(node_bin: &Path, base_path: &Path) -> ValidatorSet {
     let alice_peer_id = rpc_string(ALICE_RPC, "system_localPeerId", Vec::new());
     let alice_bootnode = format!("/ip4/127.0.0.1/tcp/{ALICE_P2P}/p2p/{alice_peer_id}");
 
-    children.push(spawn_with_args(
+    network.children.push(spawn_with_args(
         &validator_argv(
             node_bin,
             "bob",
@@ -982,7 +1000,7 @@ fn boot_local3(node_bin: &Path, base_path: &Path) -> ValidatorSet {
             BOB_RPC,
             BOB_P2P,
             &base_path.join("bob"),
-            "local3",
+            &chain,
             std::slice::from_ref(&alice_bootnode),
         ),
         &base_path.join("bob.log"),
@@ -991,7 +1009,7 @@ fn boot_local3(node_bin: &Path, base_path: &Path) -> ValidatorSet {
     let bob_peer_id = rpc_string(BOB_RPC, "system_localPeerId", Vec::new());
     let bob_bootnode = format!("/ip4/127.0.0.1/tcp/{BOB_P2P}/p2p/{bob_peer_id}");
 
-    children.push(spawn_with_args(
+    network.children.push(spawn_with_args(
         &validator_argv(
             node_bin,
             "charlie",
@@ -1000,17 +1018,12 @@ fn boot_local3(node_bin: &Path, base_path: &Path) -> ValidatorSet {
             CHARLIE_RPC,
             CHARLIE_P2P,
             &base_path.join("charlie"),
-            "local3",
+            &chain,
             &[alice_bootnode, bob_bootnode],
         ),
         &base_path.join("charlie.log"),
     ));
     wait_for_rpc("charlie", CHARLIE_RPC, NODE_BOOT_TIMEOUT);
-
-    let network = ValidatorSet {
-        base_path: base_path.to_path_buf(),
-        children,
-    };
 
     // they have to find each other
     let started = Instant::now();
@@ -1451,6 +1464,679 @@ fn require_pending_supply_returns_to_zero(
     }
 }
 
+/// Require the finalized dispatch outcome of this exact signed extrinsic. Pool acceptance
+/// alone cannot distinguish an invalid call from a successful state transition.
+fn finalized_dispatch(
+    ports: &[u16; 3],
+    signer: &X3RuntimeSigner,
+    call: RuntimeCall,
+    success: bool,
+) {
+    finalized_dispatch_with_timeout(ports, signer, call, success, PENDING_TIMEOUT);
+}
+
+fn finalized_dispatch_with_timeout(
+    ports: &[u16; 3],
+    signer: &X3RuntimeSigner,
+    call: RuntimeCall,
+    success: bool,
+    timeout: Duration,
+) {
+    let signed = signer.sign_call(call).expect("sign live route call");
+    let start = finalized_number(ports[0]);
+    submit_extrinsic(ports[1], &signed, "live route call");
+    let mut checked = start;
+    wait_until(
+        timeout,
+        "the exact extrinsic's finalized dispatch result",
+        || {
+            let (end, _) = common_finalized(ports);
+            for number in checked + 1..=end {
+                let hash = block_hash_at(ports[0], number).expect("finalized block exists");
+                let block = rpc_expect(
+                    ports[0],
+                    "chain_getBlock",
+                    vec![Value::String(hash.clone())],
+                );
+                let extrinsics = block["block"]["extrinsics"]
+                    .as_array()
+                    .expect("block extrinsics");
+                if let Some(index) = extrinsics
+                    .iter()
+                    .position(|encoded| encoded.as_str() == Some(signed.as_str()))
+                {
+                    let key = frame_support::storage::storage_prefix(b"System", b"Events");
+                    let raw = rpc_string(
+                        ports[0],
+                        "state_getStorage",
+                        vec![
+                            Value::String(format!("0x{}", hex::encode(key))),
+                            Value::String(hash),
+                        ],
+                    );
+                    let bytes = hex::decode(raw.trim_start_matches("0x")).expect("events hex");
+                    let records = Vec::<
+                        frame_system::EventRecord<x3_chain_runtime::RuntimeEvent, H256>,
+                    >::decode(&mut &bytes[..])
+                    .expect("typed events");
+                    let outcome = records
+                        .iter()
+                        .find_map(|record| {
+                            if record.phase != frame_system::Phase::ApplyExtrinsic(index as u32) {
+                                return None;
+                            }
+                            match &record.event {
+                                x3_chain_runtime::RuntimeEvent::System(
+                                    frame_system::Event::ExtrinsicSuccess { .. },
+                                ) => Some(true),
+                                x3_chain_runtime::RuntimeEvent::System(
+                                    frame_system::Event::ExtrinsicFailed { dispatch_error, .. },
+                                ) => {
+                                    println!("[x3-routes] expected rejection: {dispatch_error:?}");
+                                    Some(false)
+                                }
+                                _ => None,
+                            }
+                        })
+                        .expect("exact extrinsic has dispatch event");
+                    if success {
+                        for record in &records {
+                            if record.phase == frame_system::Phase::ApplyExtrinsic(index as u32) {
+                                if let x3_chain_runtime::RuntimeEvent::Council(
+                                    pallet_collective::Event::Executed { result, .. }
+                                    | pallet_collective::Event::MemberExecuted { result, .. },
+                                ) = &record.event
+                                {
+                                    assert!(
+                                        result.is_ok(),
+                                        "nested council dispatch failed: {result:?}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    assert_eq!(outcome, success, "unexpected live dispatch outcome");
+                    return true;
+                }
+            }
+            checked = end;
+            false
+        },
+    );
+}
+
+fn require_six_live_routes(ports: &[u16; 3], asset: x3_asset_kernel_types::AssetId) {
+    use x3_asset_kernel_types::{AccountBytes, DomainId};
+    let gateway =
+        X3RuntimeSigner::from_uri(CHAIN_ID.into(), rpc_url(ports[0]), "//x3-atomic-gateway")
+            .expect("gateway signer");
+    let unauthorized = X3RuntimeSigner::from_uri(CHAIN_ID.into(), rpc_url(ports[0]), "//Alice")
+        .expect("unauthorized signer");
+    let account = |domain| match domain {
+        DomainId::X3Native => AccountBytes::X3Native([7; 32]),
+        DomainId::X3Evm => AccountBytes::Evm([7; 20]),
+        DomainId::X3Svm => AccountBytes::Svm([7; 32]),
+        _ => panic!("only internal domains under test"),
+    };
+    let supply = |ledger: &x3_asset_kernel_types::SupplyLedger, domain| match domain {
+        DomainId::X3Native => ledger.native_supply,
+        DomainId::X3Evm => ledger.evm_supply,
+        DomainId::X3Svm => ledger.svm_supply,
+        _ => panic!("only internal domains under test"),
+    };
+    // Keep one SVM transfer's worth in reserve so the last SVM route can still
+    // exercise a separate refund after its successful outgoing transfer.
+    let (_, seed_hash) = common_finalized(ports);
+    let seed_ledger = read_asset_ledger(ports[0], &seed_hash, asset)
+        .expect("seed ledger read")
+        .expect("seed ledger exists");
+    if seed_ledger.svm_supply < PENDING_AMOUNT {
+        let old_ids = transfers_message_ids(ports[0], &seed_hash);
+        let amount = PENDING_AMOUNT - seed_ledger.svm_supply;
+        let expires_at = u32::try_from(header_number(ports[0], &best_head(ports[0])) + 900)
+            .expect("expiry fits");
+        finalized_dispatch(
+            ports,
+            &gateway,
+            RuntimeCall::X3CrossVmRouter(
+                pallet_x3_cross_vm_router::Call::<Runtime>::xvm_transfer {
+                    asset_id: asset,
+                    destination: DomainId::X3Svm,
+                    recipient: account(DomainId::X3Svm),
+                    amount,
+                    expires_at,
+                },
+            ),
+            true,
+        );
+        let (_, opened) = common_finalized(ports);
+        let new_ids: Vec<_> = transfers_message_ids(ports[0], &opened)
+            .into_iter()
+            .filter(|id| !old_ids.contains(id))
+            .collect();
+        assert_eq!(new_ids.len(), 1, "one signed SVM reserve transfer");
+        finalized_dispatch(
+            ports,
+            &gateway,
+            RuntimeCall::X3CrossVmRouter(
+                pallet_x3_cross_vm_router::Call::<Runtime>::complete_xvm_transfer {
+                    message_id: new_ids[0],
+                },
+            ),
+            true,
+        );
+        let (_, seeded) = common_finalized(ports);
+        for port in ports {
+            let ledger = read_asset_ledger(*port, &seeded, asset)
+                .expect("seeded ledger read")
+                .expect("seeded ledger exists");
+            assert_eq!(ledger.svm_supply, seed_ledger.svm_supply + amount);
+            assert_eq!(ledger.native_supply, seed_ledger.native_supply - amount);
+            assert_eq!(ledger.pending_supply, seed_ledger.pending_supply);
+            assert_eq!(ledger.canonical_supply, seed_ledger.canonical_supply);
+        }
+    }
+    // Ordered to fund SVM before either outgoing SVM route.
+    let routes = [
+        (DomainId::X3Native, DomainId::X3Svm),
+        (DomainId::X3Native, DomainId::X3Evm),
+        (DomainId::X3Evm, DomainId::X3Svm),
+        (DomainId::X3Svm, DomainId::X3Evm),
+        (DomainId::X3Evm, DomainId::X3Native),
+        (DomainId::X3Svm, DomainId::X3Native),
+    ];
+    for (source, destination) in routes {
+        let (_, before_hash) = common_finalized(ports);
+        let before = read_asset_ledger(ports[0], &before_hash, asset)
+            .expect("ledger read")
+            .expect("ledger exists");
+        let old_ids = transfers_message_ids(ports[0], &before_hash);
+        let expires_at = u32::try_from(finalized_number(ports[0]) + 900).expect("expiry fits");
+        let call = if source == DomainId::X3Native {
+            RuntimeCall::X3CrossVmRouter(pallet_x3_cross_vm_router::Call::<Runtime>::xvm_transfer {
+                asset_id: asset,
+                destination,
+                recipient: account(destination),
+                amount: PENDING_AMOUNT,
+                expires_at,
+            })
+        } else {
+            RuntimeCall::X3CrossVmRouter(
+                pallet_x3_cross_vm_router::Call::<Runtime>::xvm_transfer_from_vm {
+                    asset_id: asset,
+                    source,
+                    sender: account(source),
+                    destination,
+                    recipient: account(destination),
+                    amount: PENDING_AMOUNT,
+                    expires_at,
+                },
+            )
+        };
+        let mut wrong_recipient = call.clone();
+        match &mut wrong_recipient {
+            RuntimeCall::X3CrossVmRouter(pallet_x3_cross_vm_router::Call::xvm_transfer {
+                recipient,
+                ..
+            })
+            | RuntimeCall::X3CrossVmRouter(
+                pallet_x3_cross_vm_router::Call::xvm_transfer_from_vm { recipient, .. },
+            ) => *recipient = account(source),
+            _ => unreachable!("the matrix only creates router initiation calls"),
+        }
+        finalized_dispatch(ports, &gateway, wrong_recipient, false);
+        finalized_dispatch(ports, &unauthorized, call.clone(), false);
+        finalized_dispatch(ports, &gateway, call, true);
+        let (_, opened_hash) = common_finalized(ports);
+        let new_ids: Vec<_> = transfers_message_ids(ports[0], &opened_hash)
+            .into_iter()
+            .filter(|id| !old_ids.contains(id))
+            .collect();
+        assert_eq!(new_ids.len(), 1, "exactly one route transfer opened");
+        let message_id = new_ids[0];
+        let cancel = RuntimeCall::X3CrossVmRouter(
+            pallet_x3_cross_vm_router::Call::<Runtime>::cancel_expired_xvm_transfer { message_id },
+        );
+        finalized_dispatch(ports, &gateway, cancel, false);
+        let complete = RuntimeCall::X3CrossVmRouter(
+            pallet_x3_cross_vm_router::Call::<Runtime>::complete_xvm_transfer { message_id },
+        );
+        finalized_dispatch(ports, &gateway, complete.clone(), true);
+        finalized_dispatch(ports, &gateway, complete, false);
+        let (_, after_hash) = common_finalized(ports);
+        for port in ports {
+            let after = read_asset_ledger(*port, &after_hash, asset)
+                .expect("ledger read")
+                .expect("ledger exists");
+            assert_eq!(
+                supply(&after, source),
+                supply(&before, source) - PENDING_AMOUNT
+            );
+            assert_eq!(
+                supply(&after, destination),
+                supply(&before, destination) + PENDING_AMOUNT
+            );
+            assert_eq!(after.pending_supply, before.pending_supply);
+            assert_eq!(after.canonical_supply, before.canonical_supply);
+            assert_eq!(
+                after.native_supply
+                    + after.evm_supply
+                    + after.svm_supply
+                    + after.external_locked_supply
+                    + after.pending_supply,
+                after.canonical_supply
+            );
+        }
+        // A second transfer expires on-chain and must restore the exact ledger snapshot.
+        let expires_at =
+            u32::try_from(header_number(ports[0], &best_head(ports[0])) + 12).expect("expiry fits");
+        let refund_call = if source == DomainId::X3Native {
+            RuntimeCall::X3CrossVmRouter(pallet_x3_cross_vm_router::Call::<Runtime>::xvm_transfer {
+                asset_id: asset,
+                destination,
+                recipient: account(destination),
+                amount: PENDING_AMOUNT,
+                expires_at,
+            })
+        } else {
+            RuntimeCall::X3CrossVmRouter(
+                pallet_x3_cross_vm_router::Call::<Runtime>::xvm_transfer_from_vm {
+                    asset_id: asset,
+                    source,
+                    sender: account(source),
+                    destination,
+                    recipient: account(destination),
+                    amount: PENDING_AMOUNT,
+                    expires_at,
+                },
+            )
+        };
+        let old_ids = transfers_message_ids(ports[0], &after_hash);
+        finalized_dispatch(ports, &gateway, refund_call, true);
+        let (_, refund_hash) = common_finalized(ports);
+        let new_ids: Vec<_> = transfers_message_ids(ports[0], &refund_hash)
+            .into_iter()
+            .filter(|id| !old_ids.contains(id))
+            .collect();
+        assert_eq!(new_ids.len(), 1, "exactly one expiring transfer opened");
+        let message_id = new_ids[0];
+        wait_until(PENDING_TIMEOUT, "transfer expiry to finalize", || {
+            common_finalized(ports).0 > u64::from(expires_at)
+        });
+        let cancel = RuntimeCall::X3CrossVmRouter(
+            pallet_x3_cross_vm_router::Call::<Runtime>::cancel_expired_xvm_transfer { message_id },
+        );
+        finalized_dispatch(ports, &gateway, cancel.clone(), true);
+        finalized_dispatch(ports, &gateway, cancel, false);
+        finalized_dispatch(
+            ports,
+            &gateway,
+            RuntimeCall::X3CrossVmRouter(
+                pallet_x3_cross_vm_router::Call::<Runtime>::complete_xvm_transfer { message_id },
+            ),
+            false,
+        );
+        let (_, refunded_hash) = common_finalized(ports);
+        for port in ports {
+            assert_eq!(
+                read_asset_ledger(*port, &refunded_hash, asset).expect("refunded ledger"),
+                read_asset_ledger(*port, &after_hash, asset).expect("pre-refund ledger"),
+                "refund restores every ledger field on every validator"
+            );
+        }
+        println!("[x3-routes] {source:?} -> {destination:?}: finalized movement on all validators; wrong recipient, unauthorized, early refund, repeated completion, refund replay, completion after refund rejected");
+    }
+}
+
+/// Prove the default WASM EVM retains storage and uses the signed caller on every validator.
+fn require_live_persistent_evm(ports: &[u16; 3]) {
+    let code = vec![
+        0x60, 0, 0x54, 0x60, 1, 0x01, 0x60, 0, 0x55, 0x33, 0x60, 1, 0x55, 0x00,
+    ];
+    let digest = sp_core::keccak_256(&code);
+    let slot_key = |slot: u8| {
+        let mut key = b"x3:evm:v1:".to_vec();
+        key.extend_from_slice(&digest[12..]);
+        key.push(b's');
+        key.extend_from_slice(&[0; 31]);
+        key.push(slot);
+        Value::String(format!("0x{}", hex::encode(key)))
+    };
+    for (step, uri) in ["//Alice", "//Bob"].into_iter().enumerate() {
+        let signer = X3RuntimeSigner::from_uri(CHAIN_ID.into(), rpc_url(ports[0]), uri)
+            .expect("persistent EVM signer");
+        let nonce = signer.kernel_comit_nonce().expect("live kernel nonce");
+        let id = H256::from(sp_core::blake2_256(
+            format!("persistent-evm-{uri}-{nonce}").as_bytes(),
+        ));
+        let fee = 1_000_000;
+        let root =
+            pallet_x3_kernel::Pallet::<Runtime>::compute_prepare_root(id, &code, &[], nonce, fee);
+        finalized_dispatch(
+            ports,
+            &signer,
+            RuntimeCall::AtlasKernel(pallet_x3_kernel::Call::submit_comit {
+                comit_id: id,
+                evm_payload: code.clone(),
+                svm_payload: vec![],
+                nonce,
+                fee,
+                prepare_root: root,
+            }),
+            true,
+        );
+        let (_, at) = common_finalized(ports);
+        let mut counter = [0u8; 32];
+        counter[31] = (step + 1) as u8;
+        let mut caller = [0u8; 32];
+        caller[12..].copy_from_slice(
+            pallet_x3_kernel::adapters::authenticated_evm_address(&signer.account()).as_bytes(),
+        );
+        for port in ports {
+            for (slot, expected) in [(0, counter), (1, caller)] {
+                assert_eq!(
+                    rpc_expect(
+                        *port,
+                        "state_getStorage",
+                        vec![slot_key(slot), Value::String(at.clone())]
+                    ),
+                    Value::String(format!("0x{}", hex::encode(expected))),
+                    "finalized EVM storage/caller mismatch on validator {port}"
+                );
+            }
+        }
+    }
+    println!("[x3-evm] signed Alice/Bob executions persisted counter 1 -> 2 and authenticated CALLER on all validators");
+}
+
+/// Execute through two independent council votes and check the nested dispatch result.
+fn require_council_dispatch(ports: &[u16; 3], alice: &X3RuntimeSigner, call: RuntimeCall) {
+    use frame_support::dispatch::GetDispatchInfo;
+    type CouncilCall = pallet_collective::Call<Runtime, x3_chain_runtime::CouncilCollective>;
+    let key = frame_support::storage::storage_prefix(b"Council", b"ProposalCount");
+    let count = rpc_expect(
+        ports[0],
+        "state_getStorage",
+        vec![Value::String(format!("0x{}", hex::encode(key)))],
+    );
+    let index = count
+        .as_str()
+        .map(|raw| {
+            u32::decode(
+                &mut &hex::decode(raw.trim_start_matches("0x")).expect("council count hex")[..],
+            )
+            .expect("council count")
+        })
+        .unwrap_or(0);
+    let proposal = H256::from(sp_core::blake2_256(&call.encode()));
+    let length_bound = call.encoded_size() as u32;
+    let proposal_weight_bound = call.get_dispatch_info().call_weight;
+    finalized_dispatch(
+        ports,
+        alice,
+        RuntimeCall::Council(CouncilCall::propose {
+            threshold: 2,
+            proposal: Box::new(call),
+            length_bound,
+        }),
+        true,
+    );
+    for uri in ["//Alice", "//Bob"] {
+        let signer = X3RuntimeSigner::from_uri(CHAIN_ID.into(), rpc_url(ports[0]), uri)
+            .expect("council signer");
+        finalized_dispatch(
+            ports,
+            &signer,
+            RuntimeCall::Council(CouncilCall::vote {
+                proposal,
+                index,
+                approve: true,
+            }),
+            true,
+        );
+    }
+    finalized_dispatch(
+        ports,
+        alice,
+        RuntimeCall::Council(CouncilCall::close {
+            proposal_hash: proposal,
+            index,
+            proposal_weight_bound,
+            length_bound,
+        }),
+        true,
+    );
+}
+
+/// Upgrade a chain with already-finalized transfers, refunds and token ledger state.
+/// The input genesis spec must carry an older runtime; setting code to the current
+/// runtime cannot satisfy the version/hash checks. The same live route matrix runs
+/// again afterward against the surviving state.
+fn require_historical_live_upgrade(ports: &[u16; 3], asset: H256, artifact: &Path) {
+    use pallet_governance::{Conviction, VoteDirection};
+    let alice = X3RuntimeSigner::from_uri(CHAIN_ID.into(), rpc_url(ports[0]), "//Alice")
+        .expect("governance signer");
+    let code = std::fs::read(artifact).expect("read upgrade runtime artifact");
+    let expected_code_hash =
+        Value::String(format!("0x{}", hex::encode(sp_core::blake2_256(&code))));
+    let version_before = rpc_expect(ports[0], "state_getRuntimeVersion", Vec::new())["specVersion"]
+        .as_u64()
+        .expect("old spec version");
+    assert!(
+        version_before < u64::from(x3_chain_runtime::VERSION.spec_version),
+        "historical rehearsal must start on an older runtime"
+    );
+    let code_hash_before = rpc_expect(
+        ports[0],
+        "state_getStorageHash",
+        vec![Value::String("0x3a636f6465".into())],
+    );
+    let (_, before_hash) = common_finalized(ports);
+    let ledger_before =
+        read_asset_ledger(ports[0], &before_hash, asset).expect("historical ledger");
+    let transfers_before = transfers_message_ids(ports[0], &before_hash);
+    let transfer_records = |port: u16, block: &str| {
+        transfers_message_ids(port, block)
+            .into_iter()
+            .map(|id| {
+                let mut key =
+                    frame_support::storage::storage_prefix(b"X3CrossVmRouter", b"Transfers")
+                        .to_vec();
+                let encoded = id.encode();
+                key.extend_from_slice(&sp_core::blake2_128(&encoded));
+                key.extend_from_slice(&encoded);
+                (
+                    id,
+                    rpc_expect(
+                        port,
+                        "state_getStorage",
+                        vec![
+                            Value::String(format!("0x{}", hex::encode(key))),
+                            Value::String(block.into()),
+                        ],
+                    ),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let records_before = transfer_records(ports[0], &before_hash);
+    let router_state = |port: u16, block: &str| {
+        let prefix = format!("0x{}", hex::encode(sp_core::twox_128(b"X3CrossVmRouter")));
+        let keys = rpc_expect(
+            port,
+            "state_getKeys",
+            vec![Value::String(prefix), Value::String(block.into())],
+        );
+        keys.as_array()
+            .expect("router key list")
+            .iter()
+            .map(|key| {
+                let value = rpc_expect(
+                    port,
+                    "state_getStorage",
+                    vec![key.clone(), Value::String(block.into())],
+                );
+                assert!(
+                    value.is_string(),
+                    "an enumerated historical router key must have a value"
+                );
+                (key.clone(), value)
+            })
+            .collect::<Vec<_>>()
+    };
+    let router_before = router_state(ports[0], &before_hash);
+    assert!(
+        transfers_before.len() >= 18,
+        "historical state must include completed and refunded route records"
+    );
+    require_council_dispatch(
+        ports,
+        &alice,
+        RuntimeCall::Governance(
+            pallet_governance::Call::<Runtime>::authorize_governance_account {
+                account: alice.account(),
+            },
+        ),
+    );
+    require_council_dispatch(
+        ports,
+        &alice,
+        RuntimeCall::Governance(pallet_governance::Call::<Runtime>::update_config {
+            new_quorum: Some(sp_runtime::Percent::from_percent(0)),
+            new_threshold: None,
+            new_voting_period: None,
+            new_enactment_period: Some(1),
+        }),
+    );
+    let count_key = frame_support::storage::storage_prefix(b"Governance", b"ProposalCount");
+    let count = rpc_expect(
+        ports[0],
+        "state_getStorage",
+        vec![Value::String(format!("0x{}", hex::encode(count_key)))],
+    );
+    let proposal_id = count
+        .as_str()
+        .map(|raw| {
+            u32::decode(
+                &mut &hex::decode(raw.trim_start_matches("0x")).expect("proposal count hex")[..],
+            )
+            .expect("proposal count")
+        })
+        .unwrap_or(0);
+    finalized_dispatch(
+        ports,
+        &alice,
+        RuntimeCall::Governance(pallet_governance::Call::<Runtime>::submit_proposal {
+            call: Box::new(RuntimeCall::System(
+                frame_system::Call::<Runtime>::set_code { code },
+            )),
+            title: b"Historical-state runtime rehearsal"
+                .to_vec()
+                .try_into()
+                .expect("title fits"),
+            description: b"Upgrade finalized live six-route state and re-execute the same matrix"
+                .to_vec()
+                .try_into()
+                .expect("description fits"),
+            touches_invariants: false,
+            proof_commitment: None,
+            constitution_hash: None,
+        }),
+        true,
+    );
+    finalized_dispatch(
+        ports,
+        &alice,
+        RuntimeCall::Governance(pallet_governance::Call::<Runtime>::vote {
+            proposal_id,
+            direction: VoteDirection::Aye,
+            balance: 1_000_000,
+            conviction: Conviction::Locked1x,
+        }),
+        true,
+    );
+    require_council_dispatch(
+        ports,
+        &alice,
+        RuntimeCall::Governance(pallet_governance::Call::<Runtime>::fast_track {
+            proposal_id,
+            voting_period: 0,
+        }),
+    );
+    finalized_dispatch_with_timeout(
+        ports,
+        &alice,
+        RuntimeCall::Governance(pallet_governance::Call::<Runtime>::finalize_proposal {
+            proposal_id,
+        }),
+        true,
+        UPGRADE_TIMEOUT,
+    );
+    wait_until(
+        UPGRADE_TIMEOUT,
+        "the upgraded runtime finalized on all three validators",
+        || {
+            let (_, hash) = common_finalized(ports);
+            ports.iter().all(|port| {
+                rpc_try(
+                    *port,
+                    "state_getRuntimeVersion",
+                    vec![Value::String(hash.clone())],
+                )
+                .ok()
+                .and_then(|version| version["specVersion"].as_u64())
+                    == Some(u64::from(x3_chain_runtime::VERSION.spec_version))
+            })
+        },
+    );
+    let (height, hash) = common_finalized(ports);
+    for port in ports {
+        assert_ne!(
+            rpc_expect(
+                *port,
+                "state_getStorageHash",
+                vec![Value::String("0x3a636f6465".into())]
+            ),
+            code_hash_before,
+            "actual runtime code must change"
+        );
+        assert_eq!(
+            rpc_expect(
+                *port,
+                "state_getStorageHash",
+                vec![
+                    Value::String("0x3a636f6465".into()),
+                    Value::String(hash.clone())
+                ]
+            ),
+            expected_code_hash,
+            "finalized code must equal the supplied artifact"
+        );
+        assert_eq!(
+            read_asset_ledger(*port, &hash, asset).expect("upgraded ledger"),
+            ledger_before,
+            "historical ledger fields survive upgrade"
+        );
+        assert_eq!(
+            transfers_message_ids(*port, &hash),
+            transfers_before,
+            "historical transfer records survive upgrade"
+        );
+        assert_eq!(
+            transfer_records(*port, &hash),
+            records_before,
+            "all historical transfer values survive byte-for-byte"
+        );
+        assert_eq!(
+            router_state(*port, &hash),
+            router_before,
+            "historical router counters, replay protection and records survive byte-for-byte"
+        );
+        check_conserved(*port, &hash).expect("native supply conserved across live upgrade");
+    }
+    println!("[x3-upgrade] finalized historical-state upgrade {version_before} -> {} at {height}:{hash}; ledger and transfer records unchanged on all validators", x3_chain_runtime::VERSION.spec_version);
+}
+
 fn assert_corrupted_ledger_is_caught(node_bin: &Path, base_path: &Path) {
     let spec_path = base_path.join("corrupted-local3.json");
     let (key, real, corrupted) = write_corrupted_spec(node_bin, &spec_path);
@@ -1538,6 +2224,17 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
     let network = boot_local3(&node_bin, &base_path.join("local3"));
     let ports = [ALICE_RPC, BOB_RPC, CHARLIE_RPC];
 
+    for port in ports {
+        if std::env::var_os("X3_SUPPLY_UPGRADE_WASM").is_some() {
+            continue;
+        }
+        let version = rpc_expect(port, "state_getRuntimeVersion", Vec::new());
+        assert_eq!(
+            version["specVersion"].as_u64(),
+            Some(u64::from(x3_chain_runtime::VERSION.spec_version)),
+            "the live embedded WASM must match the runtime compiled into this test"
+        );
+    }
     let (height0, hash0) = common_finalized(&ports);
     let baseline: Vec<SupplyView> = ports
         .iter()
@@ -1752,6 +2449,7 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
         enabled_domains: vec![
             x3_asset_kernel_types::DomainId::X3Native,
             x3_asset_kernel_types::DomainId::X3Evm,
+            x3_asset_kernel_types::DomainId::X3Svm,
         ]
         .try_into()
         .expect("enabled domains fit"),
@@ -1861,6 +2559,12 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
     let (probe_asset, probe_before) =
         probe.expect("the per-asset loop ran at least one record, so the probe is set");
     require_pending_supply_returns_to_zero(&ports, probe_asset, &probe_before);
+    require_six_live_routes(&ports, probe_asset);
+    if let Some(artifact) = std::env::var_os("X3_SUPPLY_UPGRADE_WASM") {
+        require_historical_live_upgrade(&ports, probe_asset, Path::new(&artifact));
+        require_six_live_routes(&ports, probe_asset);
+    }
+    require_live_persistent_evm(&ports);
 
     // -------- negative control, on a scratch copy of the ledger ----------
     drop(network);

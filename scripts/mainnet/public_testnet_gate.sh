@@ -22,6 +22,10 @@
 #   X3_EXPLORER_URL    — where the X3 explorer actually is. Tried before the default ports, and
 #                        the report names the URL criterion 14 passed against, so a launch
 #                        decision never rests on "something was listening on 3000".
+#   X3_RESTART_PROOF_MAX_AGE_SECONDS — how old the forced-restart proof (Gate 7) may be before
+#                        it stops counting as proof (default: 86400). See
+#                        scripts/mainnet/restart_proof_verdict.sh for why chain identity alone
+#                        cannot distinguish this boot from the previous one.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -29,6 +33,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REPORT_DIR="$ROOT_DIR/reports"
 REPORT="$REPORT_DIR/public_testnet_gate.md"
 mkdir -p "$REPORT_DIR"
+
+# The Gate 7 evidence rule, kept in its own file so it can be tested without a
+# seven-validator network (tests/test_restart_proof_verdict.py).
+# shellcheck source=restart_proof_verdict.sh
+source "$ROOT_DIR/scripts/mainnet/restart_proof_verdict.sh"
 
 RPC_URL="${X3_RPC_URL:-http://localhost:9933}"
 CHAIN_SPEC="${X3_CHAIN_SPEC:-$ROOT_DIR/chain-specs/x3-testnet-raw.json}"
@@ -287,31 +296,24 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 echo "→ [Gate 7] Forced node restart drill..."
 RESTART_REPORT="$REPORT_DIR/drill_node_restart.md"
+# The evidence rule — a report that exists, says PASS, names *this* chain, and is
+# dated within X3_RESTART_PROOF_MAX_AGE_SECONDS — lives in one function that
+# tests/test_restart_proof_verdict.py drives directly. It used to be inline here,
+# which meant the one rule this gate has about the proof it accepts had no test:
+# the gate cannot run without a seven-validator network, and that is exactly how
+# the fail-open it closes (any file containing `restart_drill: PASS`) survived.
+GATE_GENESIS=""
 if [[ -f "$RESTART_REPORT" ]]; then
-    if grep -q "restart_drill: PASS" "$RESTART_REPORT"; then
-        # A PASS from *some* run is not a proof about *this* network. Until 2026-09-28 this
-        # criterion accepted any file at this path containing `restart_drill: PASS`, so a report
-        # from a different chain — or from a previous boot of this one — satisfied a launch
-        # criterion. The drill now records the chain it restarted, and the gate requires that
-        # genesis hash to be its own. A report predating the field is refused rather than trusted,
-        # because there is no way to tell which network it described.
-        GATE_GENESIS="$(rpc_value chain_getBlockHash '[0]')"
-        REPORT_CHAIN="$(sed -n 's/^- restart_drill_chain: //p' "$RESTART_REPORT" | head -1)"
-        if [[ -z "$REPORT_CHAIN" || "$REPORT_CHAIN" == "unknown" ]]; then
-            fail "forced_node_restart_drill" "the report at $RESTART_REPORT does not name the chain it restarted (reports written before 2026-09-28 do not) — re-run scripts/drills/node_restart_drill.sh against this network"
-        elif [[ -z "$GATE_GENESIS" ]]; then
-            fail "forced_node_restart_drill" "could not read this chain's genesis hash from $RPC_URL, so the restart report cannot be tied to it"
-        elif [[ "$REPORT_CHAIN" != "$GATE_GENESIS" ]]; then
-            fail "forced_node_restart_drill" "the report proves a restart on chain $REPORT_CHAIN but this gate reads $GATE_GENESIS — the drill was run against a different network (or a previous boot)"
-        else
-            info "the restart report names this chain ($GATE_GENESIS)"
-            pass "forced_node_restart_drill"
-        fi
-    else
-        fail "forced_node_restart_drill" "drill report present but not PASS — see $RESTART_REPORT"
-    fi
+    GATE_GENESIS="$(rpc_value chain_getBlockHash '[0]')"
+fi
+NOW_EPOCH="$(date +%s)"
+RESTART_VERDICT="$(restart_proof_verdict "$RESTART_REPORT" "$GATE_GENESIS" "$NOW_EPOCH" "$X3_RESTART_PROOF_MAX_AGE_SECONDS" "$RPC_URL")"
+if [[ "$RESTART_VERDICT" == "pass" ]]; then
+    REPORT_EPOCH="$(sed -n 's/^- restart_drill_epoch: //p' "$RESTART_REPORT" | head -1)"
+    info "the restart report names this chain ($GATE_GENESIS) and is $(( (NOW_EPOCH - REPORT_EPOCH) / 60 ))m old"
+    pass "forced_node_restart_drill"
 else
-    fail "forced_node_restart_drill" "no drill report at $RESTART_REPORT — run scripts/drills/node_restart_drill.sh"
+    fail "forced_node_restart_drill" "${RESTART_VERDICT#fail:}"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

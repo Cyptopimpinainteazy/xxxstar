@@ -42,7 +42,7 @@ use x3_atomic_swap::{
 };
 use x3_chain_runtime::{
     AccountId, Address, CouncilCollective, Runtime, RuntimeCall, RuntimeEvent, Signature,
-    SignedExtra, SignedPayload, UncheckedExtrinsic, VERSION,
+    SignedExtra, SignedPayload, UncheckedExtrinsic,
 };
 
 /// A signed create-intent transaction. The runtime intent id CANNOT be known
@@ -213,6 +213,18 @@ impl X3RuntimeSigner {
     }
 
     fn signed_extrinsic(&self, call: RuntimeCall) -> Result<String, SwapError> {
+        let version = self.rpc_call("state_getRuntimeVersion", vec![])?;
+        let read_version = |field: &str| -> Result<u32, SwapError> {
+            version
+                .get(field)
+                .and_then(Value::as_u64)
+                .and_then(|v| u32::try_from(v).ok())
+                .ok_or_else(|| {
+                    SwapError::RpcError(format!("runtime version missing valid {field}"))
+                })
+        };
+        let spec_version = read_version("specVersion")?;
+        let transaction_version = read_version("transactionVersion")?;
         let genesis_hash = self.genesis_hash()?;
         let nonce = self.account_nonce()?;
         let account = self.account();
@@ -239,8 +251,8 @@ impl X3RuntimeSigner {
             extra.clone(),
             (
                 (),
-                VERSION.spec_version,
-                VERSION.transaction_version,
+                spec_version,
+                transaction_version,
                 genesis_hash,
                 genesis_hash,
                 (),

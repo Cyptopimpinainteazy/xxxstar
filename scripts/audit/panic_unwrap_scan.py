@@ -213,8 +213,34 @@ def is_cfg_test_item(code: str) -> bool:
 
 
 CFG_TEST_MODULE = re.compile(
-    r"#\[cfg\([^\n]*\btest\b[^\n]*\)\]\s*(?:#\[[^\n]*\]\s*)*mod\s+([A-Za-z0-9_]+)\s*;"
+    r"(#\[cfg\([^\n]*\btest\b[^\n]*\)\])\s*((?:#\[[^\n]*\]\s*)*)mod\s+([A-Za-z0-9_]+)\s*;"
 )
+PATH_ATTRIBUTE = re.compile(r'#\[path\s*=\s*"([^"]+)"\s*\]')
+
+
+def out_of_line_test_modules(declaring_file: str, text: str) -> list[str]:
+    """Paths of the `#[cfg(test)] mod x;` files that `declaring_file` declares.
+
+    Rust's own rules, because Cargo decides where the module lives: a `#[path]`
+    is relative to the declaring file's directory; otherwise a module declared in
+    `lib.rs`, `main.rs` or `mod.rs` lives next to it, and one declared in `foo.rs`
+    lives under `foo/`. Both the `name.rs` and the `name/` form are returned.
+    """
+    directory = os.path.dirname(declaring_file)
+    stem = os.path.splitext(os.path.basename(declaring_file))[0]
+    out: list[str] = []
+    for match in CFG_TEST_MODULE.finditer(text):
+        cfg, attributes, name = match.group(1), match.group(2), match.group(3)
+        if not is_cfg_test_item(cfg):
+            continue
+        explicit = PATH_ATTRIBUTE.search(attributes)
+        if explicit:
+            out.append(os.path.normpath(os.path.join(directory, explicit.group(1))))
+            continue
+        base = directory if stem in ("lib", "main", "mod") else os.path.join(directory, stem)
+        out.append(os.path.normpath(os.path.join(base, f"{name}.rs")))
+        out.append(os.path.normpath(os.path.join(base, name)))
+    return out
 
 
 def test_only_files(roots: list[str]) -> set[str]:
@@ -222,8 +248,9 @@ def test_only_files(roots: list[str]) -> set[str]:
 
     Two shapes, both decided by Cargo rather than by anything inside the file:
 
-    * `#[cfg(test)] mod tests;` / `mod mock;` in a crate root — a pallet's
-      out-of-line test support, absent from every production build;
+    * `#[cfg(test)] mod tests;` / `mod mock;` in any source file of the crate,
+      including `#[path = ...]` forms — out-of-line test support, absent from
+      every production build;
     * the package's `tests/`, `benches/` and `examples/` directories — Cargo
       compiles each file there as its own test/bench/example target and never
       links it into the library or the binary.
@@ -244,16 +271,18 @@ def test_only_files(roots: list[str]) -> set[str]:
                 candidate = os.path.join(dirpath, target_dir)
                 if os.path.isdir(candidate):
                     out.add(os.path.normpath(candidate))
-            for crate_root in ("lib.rs", "main.rs"):
-                path = os.path.join(dirpath, "src", crate_root)
-                if not os.path.exists(path):
-                    continue
-                with open(path, encoding="utf-8", errors="replace") as handle:
-                    text = handle.read()
-                for match in CFG_TEST_MODULE.finditer(text):
-                    name = match.group(1)
-                    out.add(os.path.normpath(os.path.join(dirpath, "src", f"{name}.rs")))
-                    out.add(os.path.normpath(os.path.join(dirpath, "src", name)))
+            # Every source file, not only the crate root: a module file can declare
+            # its own out-of-line tests (`vm_revert.rs` declares
+            # `#[cfg(test)] #[path = "tests_vm_revert_hardening.rs"] mod ...;`),
+            # and reading only lib.rs/main.rs counted those as production.
+            for src_dir, _subdirs, src_files in os.walk(os.path.join(dirpath, "src")):
+                for source in src_files:
+                    if not source.endswith(".rs"):
+                        continue
+                    path = os.path.join(src_dir, source)
+                    with open(path, encoding="utf-8", errors="replace") as handle:
+                        text = handle.read()
+                    out.update(out_of_line_test_modules(path, text))
     return out
 
 

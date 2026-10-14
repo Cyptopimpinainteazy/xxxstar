@@ -1,0 +1,31 @@
+runlog: /home/lojak/Desktop/xxxstar-main/.ai/runlogs/x3-htlc-live-20260927T120755Z
+workdir: /tmp/x3-htlc-live.ZY9VLY
+rpc:     http://127.0.0.1:18511 (port 18511)
+=== build the SBF program ===
+
+warning: `x3_htlc` (lib) generated 13 warnings (5 duplicates)
+    Finished `release` profile [optimized] target(s) in 0.39s
+program so: /home/lojak/Desktop/xxxstar-main/X3-contracts/svm/target/deploy/x3_htlc.so (284560 bytes)
+=== build the broadcaster ===
+    Finished `release` profile [optimized] target(s) in 0.33s
+=== generating keypairs ===
+initiator=CUoCAbTpQwMU6WNFXnjVjc3fTte6eiq9Ur9akj5WckTT recipient=6qc1jtKKwVptq7kh4vhBoW3eyoKGq4PrMmXnfkQkagCu stranger=6hRJBBGs7MdXka3LSNCamZ2njcsA5qFWvu6KFuBcy3Sk
+=== starting solana-test-validator ===
+validator ready: 4.2.2
+PASS: x3_htlc is deployed and executable on-chain at X3HTLC1111111111111111111111111111111111111
+=== creating SPL mint and token accounts ===
+mint=BRvKTkHMnCUuF4witPq1xQAYaiJfzRNf7gyfRKr6t58q
+PASS: SPL mint is owned by the on-chain token program
+initiator_ata=3gN9cDkYWHGNbGcGenGus4xW48JM41eNVQi6mdvdbTdg recipient_ata=3FeyYs7T2ZnDUQNtt7CdKuJhfMZ4xyRP7CxDTRp3ykik
+FAIL: initiator token account holds the minted supply before locking (expected '1000000', got '1000000000000000')
+escrow=HFeEskEg7subhYeWzcgU7nNQiVQYSSnhN87jq1FJXyyH vault=86SSwsAfM1DdicY96xsfAKoiqyTYJKsgapcLheRszzpG
+PASS: escrow account does not exist before the lock
+FAIL: lock (happy path, real SPL transfer into the escrow vault)
+create failed: x3-htlc-client: send_and_confirm failed: RPC response error -32002: Transaction simulation failed: Error processing Instruction 0: custom program error: 0xbc4; 5 log messages:
+  Program X3HTLC1111111111111111111111111111111111111 invoke [1]
+  Program log: Instruction: CreateHtlc
+  Program log: AnchorError caused by account: token_mint. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.
+  Program X3HTLC1111111111111111111111111111111111111 consumed 3611 of 200000 compute units
+  Program X3HTLC1111111111111111111111111111111111111 failed: custom program error: 0xbc4
+
+Error: escrow account (HFeEskEg7subhYeWzcgU7nNQiVQYSSnhN87jq1FJXyyH) never became visible on-chain

@@ -9,8 +9,8 @@
     "dev": "concurrently -k \"corepack pnpm dev:renderer\" \"corepack pnpm dev:electron\"",
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build": "corepack pnpm build:electron && corepack pnpm build:renderer",
-    "test": "vitest run",
+    "build": "corepack pnpm lint && corepack pnpm build:electron && corepack pnpm build:renderer",
+    "test": "corepack pnpm lint && vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit -p tsconfig.json"
   },

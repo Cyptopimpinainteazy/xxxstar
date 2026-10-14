@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { useNetworkProfilerStore } from '../../store';
 
+export function getRequestUrl(input: RequestInfo | URL): string {
+  return typeof input === 'string' ? input : 'url' in input ? input.url : input.href;
+}
+
 export default function NetworkProfilerPanel() {
   const requests = useNetworkProfilerStore(s => s.requests);
   const isRecording = useNetworkProfilerStore(s => s.isRecording);
@@ -24,7 +28,7 @@ export default function NetworkProfilerPanel() {
         const body = await cloned.text();
         addRequest({
           id: `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          url: typeof input === 'string' ? input : input.url,
+          url: getRequestUrl(input),
           method: init?.method || 'GET',
           status: response.status,
           duration,
@@ -37,7 +41,7 @@ export default function NetworkProfilerPanel() {
         const duration = Date.now() - start;
         addRequest({
           id: `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          url: typeof input === 'string' ? input : input.url,
+          url: getRequestUrl(input),
           method: init?.method || 'GET',
           status: 0,
           duration,

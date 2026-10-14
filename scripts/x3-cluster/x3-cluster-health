@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Cluster health table (or --json). See scripts/x3-cluster/x3cluster.py.
+exec python3 "$(dirname "$(readlink -f "$0")")/x3cluster.py" health "$@"

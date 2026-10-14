@@ -190,6 +190,8 @@ CHAIN_GENESIS="$(curl -sf -m 5 "$RPC_URL" -H 'Content-Type: application/json' \
     echo ""
     echo "- restart_drill_chain: ${CHAIN_GENESIS:-unknown}"
     echo "- restart_drill_rpc: $RPC_URL"
+    echo "- restart_drill_epoch: $(date +%s)"
+    echo "- restart_drill_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "- RPC checked: $RPC_URL (port $RPC_PORT)"
     echo "- Node killed: pid $NODE_PID, restarted from its own argv as pid ${NEW_PID:-none}"
     echo "- Pre-kill best block: $PRE_BLOCK"

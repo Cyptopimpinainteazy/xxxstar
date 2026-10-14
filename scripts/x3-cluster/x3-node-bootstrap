@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# x3-node-bootstrap --role gpu|build|sim|data|net|ops|control [--apply] [--lan]
+exec python3 "$(dirname "$(readlink -f "$0")")/x3cluster.py" bootstrap "$@"

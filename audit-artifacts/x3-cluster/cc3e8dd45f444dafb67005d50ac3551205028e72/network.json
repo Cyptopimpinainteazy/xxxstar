@@ -1,0 +1,16 @@
+{
+  "label": "PHYSICAL",
+  "collected": "2026-10-03T08:24Z",
+  "from": "x3star1",
+  "links": {
+    "x3star1": {"nic": "eno2", "negotiated_mbps": 1000, "ip": "192.168.0.70"},
+    "x3gpu1": {"nic": "enp0s31f6", "negotiated_mbps": 1000, "ip": "192.168.0.30"}
+  },
+  "x3star1_to_x3gpu1": {
+    "method": "python TCP stream, 1 MiB writes, 10 s, sink bound to 192.168.0.30:52011 for the test only (iperf3 not installed: needs sudo)",
+    "sender_mbit_s": 941, "receiver_mbit_s": 939, "bytes": 1177000000,
+    "ping": {"count": 20, "loss_pct": 0, "rtt_ms": {"min": 0.748, "avg": 1.102, "max": 2.989, "mdev": 0.447}}
+  },
+  "ten_gbe": "x3star1 has a dual-port 10GbE Emulex OneConnect (Skyhawk) at 06:00.0, ens1f0/ens1f1 UP but NO-CARRIER (no cable/switch); every link in use is 1000 Mb/s",
+  "sweep": "192.168.0.0/24 ICMP + :22 sweep found only x3star1 and x3gpu1 as X3 nodes"
+}
