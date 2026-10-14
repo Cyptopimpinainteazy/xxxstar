@@ -47,16 +47,32 @@ const DEFAULT_ICON_ORDER: { id: PanelId; label: string; icon: string }[] = [
   { id: 'problems', label: 'Problems', icon: '!' },
 ];
 
+export function restoreIconOrder(saved: string | null): typeof DEFAULT_ICON_ORDER {
+  if (!saved) return [...DEFAULT_ICON_ORDER];
+  try {
+    const parsed: unknown = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [...DEFAULT_ICON_ORDER];
+    const lookup = new Map<string, typeof DEFAULT_ICON_ORDER[number]>(DEFAULT_ICON_ORDER.map(e => [e.id, e]));
+    const order: typeof DEFAULT_ICON_ORDER = [];
+    for (const id of parsed) {
+      const entry = typeof id === 'string' ? lookup.get(id) : undefined;
+      if (entry) {
+        order.push(entry);
+        lookup.delete(id);
+      }
+    }
+    return [...order, ...lookup.values()];
+  } catch {
+    return [...DEFAULT_ICON_ORDER];
+  }
+}
+
 function loadIconOrder(): typeof DEFAULT_ICON_ORDER {
   try {
-    const saved = localStorage.getItem('x3studio-icon-order');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      const lookup = new Map(DEFAULT_ICON_ORDER.map(e => [e.id, e]));
-      return parsed.map((id: string) => lookup.get(id) || { id, label: id, icon: '?' }).filter(Boolean);
-    }
-  } catch {}
-  return [...DEFAULT_ICON_ORDER];
+    return restoreIconOrder(localStorage.getItem('x3studio-icon-order'));
+  } catch {
+    return [...DEFAULT_ICON_ORDER];
+  }
 }
 
 function saveIconOrder(order: typeof DEFAULT_ICON_ORDER) {
