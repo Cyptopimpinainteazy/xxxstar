@@ -48,11 +48,13 @@
 //!
 //! Bytecode declares a `min_version` - the loader must be at least that version.
 
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
-use crate::error::{BackendError, BackendErrorKind, BackendResult};
-use crate::opcode::{ConstIdx, FuncIdx, Register};
+use crate::error::{BytecodeError, BytecodeResult};
+use crate::opcode::{ConstIdx, FuncIdx};
 
 /// Magic bytes identifying X3 bytecode files.
 ///
@@ -143,8 +145,8 @@ impl VersionInfo {
     }
 }
 
-impl std::fmt::Display for VersionInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for VersionInfo {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
     }
 }
@@ -404,14 +406,14 @@ impl BytecodeModule {
     }
 
     /// Deserialize module from bytes.
-    pub fn from_bytes(bytes: &[u8]) -> BackendResult<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> BytecodeResult<Self> {
         if bytes.len() < 24 {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
 
         // Verify magic
         if &bytes[0..4] != MAGIC {
-            return Err(BackendError::without_span(BackendErrorKind::InvalidMagic));
+            return Err(BytecodeError::InvalidMagic);
         }
 
         let version_packed = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
@@ -422,9 +424,7 @@ impl BytecodeModule {
         // the runtime's reader (which applies this same gate) refused it — found by the
         // `x3bc_engines` fuzz target.
         if !x3_common::bytecode::version_is_readable(version_packed) {
-            return Err(BackendError::without_span(
-                BackendErrorKind::UnsupportedVersion(version_packed),
-            ));
+            return Err(BytecodeError::UnsupportedVersion(version_packed));
         }
 
         let flags = ModuleFlags(u32::from_le_bytes([
@@ -435,12 +435,10 @@ impl BytecodeModule {
         let checksum = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
         let expected = x3_common::bytecode::checksum(&bytes[x3_common::bytecode::HEADER_LEN..]);
         if checksum != expected {
-            return Err(BackendError::without_span(
-                BackendErrorKind::ChecksumMismatch {
-                    expected,
-                    found: checksum,
-                },
-            ));
+            return Err(BytecodeError::ChecksumMismatch {
+                expected,
+                found: checksum,
+            });
         }
         let min_version_packed = u32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
         let min_version = VersionInfo::from_packed(min_version_packed);
@@ -451,9 +449,7 @@ impl BytecodeModule {
         // Check minimum version requirement
         // Also on the full `u32`, for the same reason as the version gate above.
         if !x3_common::bytecode::loader_satisfies(min_version_packed) {
-            return Err(BackendError::without_span(
-                BackendErrorKind::UnsupportedVersion(min_version_packed),
-            ));
+            return Err(BytecodeError::UnsupportedVersion(min_version_packed));
         }
 
         let mut offset = 24;
@@ -472,7 +468,7 @@ impl BytecodeModule {
 
         // Read code section
         if offset + 4 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let code_len = u32::from_le_bytes([
             bytes[offset],
@@ -483,7 +479,7 @@ impl BytecodeModule {
         offset += 4;
 
         if offset + code_len > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let code = bytes[offset..offset + code_len].to_vec();
         offset += code_len;
@@ -554,9 +550,9 @@ impl BytecodeModule {
         }
     }
 
-    fn read_const_pool(bytes: &[u8], mut offset: usize) -> BackendResult<(ConstPool, usize)> {
+    fn read_const_pool(bytes: &[u8], mut offset: usize) -> BytecodeResult<(ConstPool, usize)> {
         if offset + 4 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let count = u32::from_le_bytes([
             bytes[offset],
@@ -569,7 +565,7 @@ impl BytecodeModule {
         let mut pool = ConstPool::new();
         for _ in 0..count {
             if offset >= bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let tag = bytes[offset];
             offset += 1;
@@ -578,7 +574,7 @@ impl BytecodeModule {
                 0 => {
                     // Integer
                     if offset + 8 > bytes.len() {
-                        return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                        return Err(BytecodeError::UnexpectedEof);
                     }
                     let v = i64::from_le_bytes([
                         bytes[offset],
@@ -596,7 +592,7 @@ impl BytecodeModule {
                 1 => {
                     // Float
                     if offset + 8 > bytes.len() {
-                        return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                        return Err(BytecodeError::UnexpectedEof);
                     }
                     let v = f64::from_le_bytes([
                         bytes[offset],
@@ -614,7 +610,7 @@ impl BytecodeModule {
                 2 => {
                     // String
                     if offset + 4 > bytes.len() {
-                        return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                        return Err(BytecodeError::UnexpectedEof);
                     }
                     let len = u32::from_le_bytes([
                         bytes[offset],
@@ -624,7 +620,7 @@ impl BytecodeModule {
                     ]) as usize;
                     offset += 4;
                     if offset + len > bytes.len() {
-                        return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                        return Err(BytecodeError::UnexpectedEof);
                     }
                     let s = String::from_utf8_lossy(&bytes[offset..offset + len]).to_string();
                     offset += len;
@@ -633,7 +629,7 @@ impl BytecodeModule {
                 3 => {
                     // Bool
                     if offset >= bytes.len() {
-                        return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                        return Err(BytecodeError::UnexpectedEof);
                     }
                     let b = bytes[offset] != 0;
                     offset += 1;
@@ -642,7 +638,7 @@ impl BytecodeModule {
                 4 => {
                     // Bytes
                     if offset + 4 > bytes.len() {
-                        return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                        return Err(BytecodeError::UnexpectedEof);
                     }
                     let len = u32::from_le_bytes([
                         bytes[offset],
@@ -652,16 +648,14 @@ impl BytecodeModule {
                     ]) as usize;
                     offset += 4;
                     if offset + len > bytes.len() {
-                        return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                        return Err(BytecodeError::UnexpectedEof);
                     }
                     let b = bytes[offset..offset + len].to_vec();
                     offset += len;
                     ConstValue::Bytes(b)
                 }
                 _ => {
-                    return Err(BackendError::without_span(
-                        BackendErrorKind::CorruptedBytecode { offset: offset - 1 },
-                    ));
+                    return Err(BytecodeError::CorruptedBytecode { offset: offset - 1 });
                 }
             };
             pool.entries.push(value);
@@ -692,9 +686,9 @@ impl BytecodeModule {
     fn read_functions(
         bytes: &[u8],
         mut offset: usize,
-    ) -> BackendResult<(Vec<FunctionEntry>, usize)> {
+    ) -> BytecodeResult<(Vec<FunctionEntry>, usize)> {
         if offset + 4 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let count = u32::from_le_bytes([
             bytes[offset],
@@ -712,19 +706,19 @@ impl BytecodeModule {
         for _ in 0..count {
             // Name
             if offset + 2 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let name_len = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
             offset += 2;
             if offset + name_len > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let name = String::from_utf8_lossy(&bytes[offset..offset + name_len]).to_string();
             offset += name_len;
 
             // Entry point
             if offset + 4 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let entry_point = u32::from_le_bytes([
                 bytes[offset],
@@ -736,28 +730,28 @@ impl BytecodeModule {
 
             // Param count
             if offset >= bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let param_count = bytes[offset];
             offset += 1;
 
             // Local count
             if offset + 2 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let local_count = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]);
             offset += 2;
 
             // Max stack
             if offset + 2 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let max_stack = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]);
             offset += 2;
 
             // Return type tag
             if offset >= bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let return_type_tag = bytes[offset];
             offset += 1;
@@ -786,9 +780,9 @@ impl BytecodeModule {
         }
     }
 
-    fn read_globals(bytes: &[u8], mut offset: usize) -> BackendResult<(Vec<GlobalEntry>, usize)> {
+    fn read_globals(bytes: &[u8], mut offset: usize) -> BytecodeResult<(Vec<GlobalEntry>, usize)> {
         if offset + 4 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let count = u32::from_le_bytes([
             bytes[offset],
@@ -806,18 +800,18 @@ impl BytecodeModule {
         for _ in 0..count {
             // Name
             if offset + 2 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let name_len = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
             offset += 2;
             if offset + name_len > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let name = String::from_utf8_lossy(&bytes[offset..offset + name_len]).to_string();
             offset += name_len;
 
             if offset + 6 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let type_tag = bytes[offset];
             let mutable = bytes[offset + 1] != 0;
@@ -858,10 +852,10 @@ impl BytecodeModule {
         }
     }
 
-    fn read_debug_info(bytes: &[u8], mut offset: usize) -> BackendResult<(DebugInfo, usize)> {
+    fn read_debug_info(bytes: &[u8], mut offset: usize) -> BytecodeResult<(DebugInfo, usize)> {
         // Source map
         if offset + 4 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let map_count = u32::from_le_bytes([
             bytes[offset],
@@ -878,7 +872,7 @@ impl BytecodeModule {
         let mut source_map = Vec::with_capacity(map_count.min(bytes.len().saturating_sub(offset)));
         for _ in 0..map_count {
             if offset + 8 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let code_offset = u32::from_le_bytes([
                 bytes[offset],
@@ -898,7 +892,7 @@ impl BytecodeModule {
 
         // Symbol names
         if offset + 4 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let name_count = u32::from_le_bytes([
             bytes[offset],
@@ -911,7 +905,7 @@ impl BytecodeModule {
         let mut symbol_names = BTreeMap::new();
         for _ in 0..name_count {
             if offset + 6 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let idx = u32::from_le_bytes([
                 bytes[offset],
@@ -923,7 +917,7 @@ impl BytecodeModule {
             offset += 6;
 
             if offset + name_len > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let name = String::from_utf8_lossy(&bytes[offset..offset + name_len]).to_string();
             offset += name_len;
@@ -982,27 +976,27 @@ impl BytecodeModule {
         }
     }
 
-    fn read_metadata(bytes: &[u8], mut offset: usize) -> BackendResult<(ModuleMetadata, usize)> {
+    fn read_metadata(bytes: &[u8], mut offset: usize) -> BytecodeResult<(ModuleMetadata, usize)> {
         // Compiler name
         if offset + 2 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let compiler_len = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
         offset += 2;
         if offset + compiler_len > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let compiler = String::from_utf8_lossy(&bytes[offset..offset + compiler_len]).to_string();
         offset += compiler_len;
 
         // Compiler version
         if offset + 2 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let version_len = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
         offset += 2;
         if offset + version_len > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let compiler_version =
             String::from_utf8_lossy(&bytes[offset..offset + version_len]).to_string();
@@ -1010,7 +1004,7 @@ impl BytecodeModule {
 
         // Timestamp
         if offset + 8 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let compiled_at = u64::from_le_bytes([
             bytes[offset],
@@ -1026,17 +1020,17 @@ impl BytecodeModule {
 
         // Source file
         if offset >= bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let source_file = if bytes[offset] == 1 {
             offset += 1;
             if offset + 2 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let len = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
             offset += 2;
             if offset + len > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let s = String::from_utf8_lossy(&bytes[offset..offset + len]).to_string();
             offset += len;
@@ -1048,17 +1042,17 @@ impl BytecodeModule {
 
         // Source hash
         if offset >= bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let source_hash = if bytes[offset] == 1 {
             offset += 1;
             if offset + 2 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let len = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
             offset += 2;
             if offset + len > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let s = String::from_utf8_lossy(&bytes[offset..offset + len]).to_string();
             offset += len;
@@ -1070,14 +1064,14 @@ impl BytecodeModule {
 
         // Opt level
         if offset >= bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let opt_level = bytes[offset];
         offset += 1;
 
         // Annotations
         if offset + 4 > bytes.len() {
-            return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+            return Err(BytecodeError::UnexpectedEof);
         }
         let anno_count = u32::from_le_bytes([
             bytes[offset],
@@ -1090,23 +1084,23 @@ impl BytecodeModule {
         let mut annotations = BTreeMap::new();
         for _ in 0..anno_count {
             if offset + 2 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let key_len = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
             offset += 2;
             if offset + key_len > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let key = String::from_utf8_lossy(&bytes[offset..offset + key_len]).to_string();
             offset += key_len;
 
             if offset + 2 > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let val_len = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
             offset += 2;
             if offset + val_len > bytes.len() {
-                return Err(BackendError::without_span(BackendErrorKind::UnexpectedEof));
+                return Err(BytecodeError::UnexpectedEof);
             }
             let value = String::from_utf8_lossy(&bytes[offset..offset + val_len]).to_string();
             offset += val_len;
@@ -1217,7 +1211,7 @@ impl ConstPool {
     }
 
     /// Add an integer constant, deduplicating.
-    pub fn add_integer(&mut self, value: i64) -> BackendResult<ConstIdx> {
+    pub fn add_integer(&mut self, value: i64) -> BytecodeResult<ConstIdx> {
         if let Some(&idx) = self.int_map.get(&value) {
             return Ok(idx);
         }
@@ -1227,7 +1221,7 @@ impl ConstPool {
     }
 
     /// Add a float constant, deduplicating.
-    pub fn add_float(&mut self, value: f64) -> BackendResult<ConstIdx> {
+    pub fn add_float(&mut self, value: f64) -> BytecodeResult<ConstIdx> {
         let bits = value.to_bits();
         if let Some(&idx) = self.float_map.get(&bits) {
             return Ok(idx);
@@ -1238,14 +1232,12 @@ impl ConstPool {
     }
 
     /// Add a string constant, deduplicating.
-    pub fn add_string(&mut self, value: String) -> BackendResult<ConstIdx> {
+    pub fn add_string(&mut self, value: String) -> BytecodeResult<ConstIdx> {
         if value.len() > MAX_STRING_LEN {
-            return Err(BackendError::without_span(
-                BackendErrorKind::StringTooLong {
-                    len: value.len(),
-                    max: MAX_STRING_LEN,
-                },
-            ));
+            return Err(BytecodeError::StringTooLong {
+                len: value.len(),
+                max: MAX_STRING_LEN,
+            });
         }
         if let Some(&idx) = self.string_map.get(&value) {
             return Ok(idx);
@@ -1256,23 +1248,21 @@ impl ConstPool {
     }
 
     /// Add a bool constant.
-    pub fn add_bool(&mut self, value: bool) -> BackendResult<ConstIdx> {
+    pub fn add_bool(&mut self, value: bool) -> BytecodeResult<ConstIdx> {
         // Bools are not deduplicated (they're tiny)
         self.add_entry(ConstValue::Bool(value))
     }
 
     /// Add raw bytes.
-    pub fn add_bytes(&mut self, value: Vec<u8>) -> BackendResult<ConstIdx> {
+    pub fn add_bytes(&mut self, value: Vec<u8>) -> BytecodeResult<ConstIdx> {
         self.add_entry(ConstValue::Bytes(value))
     }
 
-    fn add_entry(&mut self, value: ConstValue) -> BackendResult<ConstIdx> {
+    fn add_entry(&mut self, value: ConstValue) -> BytecodeResult<ConstIdx> {
         if self.entries.len() >= MAX_CONST_POOL as usize {
-            return Err(BackendError::without_span(
-                BackendErrorKind::ConstPoolOverflow {
-                    max: MAX_CONST_POOL,
-                },
-            ));
+            return Err(BytecodeError::ConstPoolOverflow {
+                max: MAX_CONST_POOL,
+            });
         }
         let idx = ConstIdx(self.entries.len() as u32);
         self.entries.push(value);
@@ -1648,9 +1638,9 @@ mod tests {
         corrupted[last] ^= 0xFF;
         match BytecodeModule::from_bytes(&corrupted) {
             Err(error) => assert!(
-                matches!(error.kind, BackendErrorKind::ChecksumMismatch { .. }),
+                matches!(error, BytecodeError::ChecksumMismatch { .. }),
                 "expected a checksum mismatch, got {:?}",
-                error.kind
+                error
             ),
             Ok(_) => panic!("a body corrupted after compilation must not load"),
         }

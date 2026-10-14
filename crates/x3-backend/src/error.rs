@@ -182,6 +182,28 @@ pub enum BackendErrorKind {
 /// Result type for backend operations.
 pub type BackendResult<T> = Result<T, BackendError>;
 
+/// A failure from the X3BC format itself, reported as the backend's own error.
+///
+/// The compiler builds constant pools and reads modules through `x3-bytecode`; this keeps `?` working
+/// across that boundary and keeps the kinds callers already match on.
+impl From<x3_bytecode::BytecodeError> for BackendError {
+    fn from(error: x3_bytecode::BytecodeError) -> Self {
+        use x3_bytecode::BytecodeError as B;
+        let kind = match error {
+            B::InvalidMagic => BackendErrorKind::InvalidMagic,
+            B::UnsupportedVersion(v) => BackendErrorKind::UnsupportedVersion(v),
+            B::ChecksumMismatch { expected, found } => {
+                BackendErrorKind::ChecksumMismatch { expected, found }
+            }
+            B::CorruptedBytecode { offset } => BackendErrorKind::CorruptedBytecode { offset },
+            B::UnexpectedEof => BackendErrorKind::UnexpectedEof,
+            B::ConstPoolOverflow { max } => BackendErrorKind::ConstPoolOverflow { max },
+            B::StringTooLong { len, max } => BackendErrorKind::StringTooLong { len, max },
+        };
+        BackendError::without_span(kind)
+    }
+}
+
 /// Accumulator for multiple backend errors.
 #[derive(Debug, Default)]
 pub struct BackendErrors {

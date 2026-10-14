@@ -21,6 +21,10 @@
 //! [METADATA: marker(u8) + optional data]
 //! ```
 
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::bc_format::{ConstValue, FunctionEntry, MAGIC, VERSION};
 use crate::opcode::Opcode;
 

@@ -3,6 +3,8 @@
 //! Tracks the lifecycle of a contract execution: Idle → Executing → Committing →
 //! Committed / Reverted. Enforces valid transitions and prevents illegal state changes.
 
+#[allow(unused_imports)]
+use crate::prelude::*;
 /// States in the X3VM execution lifecycle.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum VmState {

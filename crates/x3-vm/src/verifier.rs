@@ -14,10 +14,10 @@
 //! 6. **Gas**: Conservative gas estimate doesn't exceed limits
 //! 7. **On-Chain**: Debug/JIT opcodes forbidden in production
 
-use std::collections::{BTreeMap, BTreeSet};
-
-use x3_backend::bc_format::{BytecodeModule, VERSION};
-use x3_backend::opcode::Opcode;
+#[allow(unused_imports)]
+use crate::prelude::*;
+use x3_bytecode::bc_format::{BytecodeModule, VERSION};
+use x3_bytecode::opcode::Opcode;
 
 use crate::error::{VerifierError, VerifierErrorKind, VerifierResult};
 
@@ -1104,8 +1104,8 @@ pub fn opcode_gas_cost(opcode: u8) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use x3_backend::bc_format::{BytecodeModule, ConstPool, FeatureFlags, VersionInfo};
-    use x3_backend::opcode::Opcode;
+    use x3_bytecode::bc_format::{BytecodeModule, ConstPool, FeatureFlags, VersionInfo};
+    use x3_bytecode::opcode::Opcode;
 
     fn make_simple_module(code: Vec<u8>) -> BytecodeModule {
         BytecodeModule {

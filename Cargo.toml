@@ -211,6 +211,7 @@ members = [
     "crates/x3-orchestra-control-plane", # <- x3-gateway, x3-gpu-validator-swarm (required)
     "crates/x3-vm",                      # <- x3-gpu-validator-swarm (required), x3-integration (optional)
     "crates/x3-backend",                 # <- x3-gpu-validator-swarm (required), x3-integration (optional), x3-vm
+    "crates/x3-bytecode",                # <- x3-backend, x3-vm (X3BC format; builds no_std for the runtime)
     "crates/x3-compiler",                # <- x3-integration (optional)
     "crates/x3-verifier",                # <- x3-integration (optional), x3-compiler (note: separate from pallets/x3-verifier)
     # Transitive path deps (level-2+, compiler/language toolchain):

@@ -3,6 +3,8 @@
 //! Defines the canonical bytecode structure and provides a validator that checks
 //! structural integrity before the interpreter is allowed to execute the program.
 
+#[allow(unused_imports)]
+use crate::prelude::*;
 /// Magic bytes identifying X3 bytecode files.
 pub const X3BC_MAGIC: &[u8; 4] = b"X3BC";
 

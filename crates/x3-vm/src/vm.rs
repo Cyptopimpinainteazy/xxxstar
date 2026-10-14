@@ -26,13 +26,16 @@
 //! └─────────────────────────────────────────────────┘
 //! ```
 
-use x3_backend::bc_format::{BytecodeModule, ConstValue};
-use x3_backend::opcode::Opcode;
+#[allow(unused_imports)]
+use crate::prelude::*;
+use x3_bytecode::bc_format::{BytecodeModule, ConstValue};
+use x3_bytecode::opcode::Opcode;
 
 use crate::error::{VMError, VMErrorKind, VMResult};
 use crate::events::{EventBuffer, VmEvent};
 use crate::hostcall::HostcallRegistry;
 use crate::isolation::IsolationContext;
+#[cfg(feature = "std")]
 use crate::jit_compiler::{JitCompiler, JitConfig, JitStats};
 use crate::state::{StateMachine, VmState};
 use crate::storage::{StorageValue, VmStorage, WriteRecord};
@@ -205,7 +208,8 @@ pub struct VM {
     event_buffer: EventBuffer,
     /// Journaled VM storage.
     storage: VmStorage,
-    /// Hot-path tracker and compiled-function cache.
+    /// Hot-path tracker and compiled-function cache (off-chain only; it never changes a result).
+    #[cfg(feature = "std")]
     jit: JitCompiler,
 }
 
@@ -273,6 +277,7 @@ impl VM {
             isolation: IsolationContext::new([0u8; 32]).with_max_call_depth(isolation_depth),
             event_buffer: EventBuffer::new(),
             storage,
+            #[cfg(feature = "std")]
             jit: JitCompiler::new(JitConfig::default()),
         })
     }
@@ -318,6 +323,7 @@ impl VM {
     }
 
     /// Snapshot JIT counters and compilation cache statistics.
+    #[cfg(feature = "std")]
     pub fn jit_stats(&self) -> JitStats {
         self.jit.stats()
     }
@@ -612,15 +618,18 @@ impl VM {
                     ));
                 }
 
-                let func_id = func_idx as u32;
-                self.jit.record_execution(func_id);
-                if self.jit.should_compile(func_id)
-                    && self.jit.get_compiled(func_id).is_none()
-                    && self.jit.backend_available()
+                #[cfg(feature = "std")]
                 {
-                    self.jit
-                        .compile(func_id, &self.module.code)
-                        .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                    let func_id = func_idx as u32;
+                    self.jit.record_execution(func_id);
+                    if self.jit.should_compile(func_id)
+                        && self.jit.get_compiled(func_id).is_none()
+                        && self.jit.backend_available()
+                    {
+                        self.jit
+                            .compile(func_id, &self.module.code)
+                            .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                    }
                 }
 
                 self.isolation.enter_call().map_err(|err| {
@@ -1786,7 +1795,7 @@ fn value_to_storage_value(value: &Value) -> Option<[u8; 32]> {
 mod tests {
     #![allow(clippy::vec_init_then_push)]
     use super::*;
-    use x3_backend::bc_format_helpers;
+    use x3_bytecode::bc_format_helpers;
 
     /// Stamp the envelope's checksum, as the writer does, before loading hand-assembled bytes.
     ///
@@ -1882,8 +1891,8 @@ mod tests {
 
     #[test]
     fn vm_call_frame_base_and_register_isolation() {
-        use x3_backend::bc_format::FunctionEntry;
-        use x3_backend::opcode::Opcode;
+        use x3_bytecode::bc_format::FunctionEntry;
+        use x3_bytecode::opcode::Opcode;
 
         // Build a module with two functions: caller (0) and callee (1).
         // Caller: LoadImm r1,100; Call func 1; Ret r1
@@ -1911,7 +1920,7 @@ mod tests {
 
         // Build module bytes
         let mut out: Vec<u8> = Vec::new();
-        use x3_backend::bc_format::{MAGIC, VERSION};
+        use x3_bytecode::bc_format::{MAGIC, VERSION};
         out.extend_from_slice(MAGIC);
         out.extend_from_slice(&VERSION.to_le_bytes());
         out.extend_from_slice(&0u32.to_le_bytes()); // flags
@@ -1977,8 +1986,8 @@ mod tests {
 
     #[test]
     fn vm_globals_load_store_and_atomic_rollback() {
-        use x3_backend::bc_format::FunctionEntry;
-        use x3_backend::opcode::Opcode;
+        use x3_bytecode::bc_format::FunctionEntry;
+        use x3_bytecode::opcode::Opcode;
 
         // Module that: initializes global0 = 7; then in main does:
         // StoreGlobal and LoadGlobal and demonstrates rollback
@@ -2002,7 +2011,7 @@ mod tests {
 
         // Build module bytes
         let mut out: Vec<u8> = Vec::new();
-        use x3_backend::bc_format::{MAGIC, VERSION};
+        use x3_bytecode::bc_format::{MAGIC, VERSION};
         out.extend_from_slice(MAGIC);
         out.extend_from_slice(&VERSION.to_le_bytes());
         out.extend_from_slice(&0u32.to_le_bytes());
@@ -2178,8 +2187,8 @@ mod tests {
     /// 5. Register isolation holds: callee's local registers don't affect caller's.
     #[test]
     fn vm_nested_call_with_global_state() {
-        use x3_backend::bc_format::{FunctionEntry, MAGIC, VERSION};
-        use x3_backend::opcode::Opcode;
+        use x3_bytecode::bc_format::{FunctionEntry, MAGIC, VERSION};
+        use x3_bytecode::opcode::Opcode;
 
         // Global index 0: starts at 0 (const pool index 0 = integer 0)
         // func 0 (caller):
@@ -2360,7 +2369,7 @@ mod tests {
     /// fixtures are as valid as compiled bytecode — the reader rejects a wrong
     /// checksum (TICKET-108).
     fn storage_module(code: Vec<u8>, param_count: u8, local_count: u16) -> Vec<u8> {
-        use x3_backend::bc_format::{BytecodeModule, FunctionEntry};
+        use x3_bytecode::bc_format::{BytecodeModule, FunctionEntry};
 
         let mut module = BytecodeModule::new();
         module.functions.push(FunctionEntry {

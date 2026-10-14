@@ -84,14 +84,16 @@
 //! let module = Module::from_bytes(&bytes)?;
 //! ```
 
-pub mod bc_format;
-pub mod bc_format_helpers;
+// The instruction set and module format live in `x3-bytecode`, which builds without `std` so the
+// runtime can read X3BC with the same code the compiler writes it with. They are re-exported here
+// under their old paths, so `x3_backend::bc_format` and `x3_backend::opcode` keep working.
+pub use x3_bytecode::{bc_format, bc_format_helpers, opcode};
+
 pub mod emit;
 pub mod error;
 pub mod layout;
 pub mod lower;
 pub mod mir_lower;
-pub mod opcode;
 
 pub use bc_format::{
     BytecodeModule, ConstPool, DebugInfo, FeatureFlags, FunctionEntry, GlobalEntry, ModuleFlags,

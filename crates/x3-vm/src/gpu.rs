@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use x3_backend::bc_format::BytecodeModule;
+use x3_bytecode::bc_format::BytecodeModule;
 
 use crate::{GpuHostcalls, VMConfig, VMResult, Value, VM};
 
@@ -275,7 +275,7 @@ mod tests {
     fn case(name: &'static str, inputs: Vec<u64>) -> DeterminismTestCase {
         DeterminismTestCase {
             name,
-            bytecode: x3_backend::bc_format_helpers::assemble_simple_module(),
+            bytecode: x3_bytecode::bc_format_helpers::assemble_simple_module(),
             inputs,
             gas_limit: 10_000,
         }

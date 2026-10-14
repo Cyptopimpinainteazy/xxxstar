@@ -4,6 +4,8 @@
 //! execution halts with `GasExhausted`. All arithmetic is saturating to prevent
 //! integer overflow in gas accounting.
 
+#[allow(unused_imports)]
+use crate::prelude::*;
 /// Gas cost per instruction category.
 pub mod cost {
     /// Simple arithmetic or nop.

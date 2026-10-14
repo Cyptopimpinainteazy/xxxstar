@@ -8,8 +8,8 @@ repository = "https://github.com/x3-chain/x3"
 
 [dependencies]
 # Core dependencies
-x3-backend = { path = "../x3-backend" }
-x3-common = { path = "../x3-common" }
+x3-bytecode = { path = "../x3-bytecode", default-features = false }
+x3-common = { path = "../x3-common", default-features = false }
 
 # Substrate primitives — H160/U256 used in EVM bridge hostcalls
 sp-core = { workspace = true, default-features = false }
@@ -18,21 +18,22 @@ sp-core = { workspace = true, default-features = false }
 x3-evm-integration = { path = "../evm-integration", optional = true }
 x3-svm-integration = { path = "../svm-integration", optional = true }
 
-# Dynamic library loading for GPU FFI
-libloading = "0.9"
+# Error handling (thiserror 2 derives `core::error::Error`, so it works without std)
+thiserror = { version = "2", default-features = false }
 
-# Error handling
-thiserror = "1.0"
-
-# Logging
-log = "0.4"
-tracing = "0.1"
-
-# Synchronization primitives
-parking_lot = "0.12"
+# Logging (no_std-safe facade; a no-op unless a logger is installed)
+log = { version = "0.4", default-features = false }
 
 # Serialization (for VM state snapshots)
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "alloc"], default-features = false }
+
+# --- std-only services (GPU FFI, JIT tracking) ---
+# Dynamic library loading for GPU FFI
+libloading = { version = "0.9", optional = true }
+# Logging used by the JIT tracker
+tracing = { version = "0.1", optional = true }
+# Synchronization primitives for the JIT cache
+parking_lot = { version = "0.12", optional = true }
 
 [dev-dependencies]
 env_logger = "0.10"
@@ -42,11 +43,19 @@ default = ["std"]
 std = [
     "serde/std",
     "sp-core/std",
-    "x3-backend/std",
+    "thiserror/std",
+    "log/std",
+    "x3-bytecode/std",
     "x3-common/std",
     "x3-evm-integration",
     "x3-svm-integration",
+    "dep:libloading",
+    "dep:tracing",
+    "dep:parking_lot",
 ]
+# The real cross-VM bridge client (`bridge.rs` gates its EVM and SVM calls on these names).
+x3-evm-integration = ["dep:x3-evm-integration"]
+x3-svm-integration = ["dep:x3-svm-integration"]
 # Enable debug opcodes (DebugPrint, DebugDump) - NEVER for on-chain
 debug-ops = []
 # Enable JIT hints (for future JIT compiler)

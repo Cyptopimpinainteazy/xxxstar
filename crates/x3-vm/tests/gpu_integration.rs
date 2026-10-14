@@ -8,8 +8,8 @@
 //!
 //! Invariant: INV-GPU-001 (GPU hostcall dispatch correctness)
 
-use x3_backend::bc_format::*;
-use x3_backend::opcode::Opcode;
+use x3_bytecode::bc_format::*;
+use x3_bytecode::opcode::Opcode;
 use x3_vm::{GpuHostcalls, Value, VM};
 
 /// Build a minimal BytecodeModule with given code and one function at offset 0.

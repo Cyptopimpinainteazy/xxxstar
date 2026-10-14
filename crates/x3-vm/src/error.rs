@@ -1,7 +1,10 @@
 //! Error types for the X3 VM.
 
-use std::fmt;
+use core::fmt;
 use thiserror::Error;
+
+#[allow(unused_imports)]
+use crate::prelude::*;
 
 // =============================================================================
 // Verifier Errors
@@ -27,7 +30,7 @@ impl VerifierError {
     }
 }
 
-impl std::error::Error for VerifierError {}
+impl core::error::Error for VerifierError {}
 
 /// Specific verifier error kinds.
 #[derive(Debug, Error)]
@@ -136,7 +139,7 @@ impl VMError {
     }
 }
 
-impl std::error::Error for VMError {}
+impl core::error::Error for VMError {}
 
 /// Specific VM error kinds.
 #[derive(Debug, Error)]

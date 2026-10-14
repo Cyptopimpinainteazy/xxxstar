@@ -398,7 +398,15 @@ GATES_FAST=(
   # wrote the code section alone (an artifact no reader of the format could load) with
   # nothing to notice. `tests/artifact.rs` loads what it writes and checks its signatures.
   "test x3-cli:env SKIP_WASM_BUILD=1 cargo test -p x3-cli"
-  "test x3 chain compiler:cargo test -p x3-common -p x3-semantics -p x3-typeck -p x3-hir -p x3-mir -p x3-opt -p x3-backend -p x3-compiler"
+  "test x3 chain compiler:cargo test -p x3-common -p x3-semantics -p x3-typeck -p x3-hir -p x3-mir -p x3-opt -p x3-bytecode -p x3-backend -p x3-compiler"
+  # `x3-vm` is the engine the unification plan makes the only one: the runtime and every off-chain
+  # tool are to execute X3BC through it. Its suite (the interpreter, verifier, journaled storage and
+  # nested atomic rollback) was not run by any gate here, so it is gated now. The second gate builds
+  # the engine and the X3BC format with `std` off, which is how the wasm runtime will build them: a
+  # `std::` path, a hash map or a clock slipped into the engine fails here instead of in the
+  # runtime build.
+  "test x3-vm:cargo test -p x3-vm"
+  "check x3 engine no_std:cargo check -p x3-bytecode -p x3-vm --no-default-features"
   # The Python half of `make test` (parser, typechecker, mocked e2e). Nothing else
   # in this gate set runs pytest, so without this line the x3-lang Python suites
   # were invisible to the CI of record.

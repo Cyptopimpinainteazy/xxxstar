@@ -30,7 +30,7 @@ use crate::gpu_hostcalls::GpuHostcalls;
 use crate::{ExecutionResult, VMError, VMErrorKind, Value, VM};
 
 // Re-export x3-backend types for bytecode helpers (used by tests and callers)
-pub use x3_backend::bc_format_helpers;
+pub use x3_bytecode::bc_format_helpers;
 
 #[cfg(feature = "x3-evm-integration")]
 use x3_evm_integration::{EvmConfig, EvmExecutor};

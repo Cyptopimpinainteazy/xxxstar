@@ -18,8 +18,9 @@
 //! 4. **X3-specific**: Atomic blocks, context access, VM intrinsics are first-class
 //! 5. **GPU-friendly**: Avoid divergent branches where possible
 
+use alloc::vec::Vec;
+use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 /// Virtual register index (0-65535).
 /// Register 0 is typically reserved for the return value.

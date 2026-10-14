@@ -815,13 +815,13 @@ impl BytecodeCompiler {
     /// Evaluate a constant expression to a constant pool index.
     fn eval_const_expr(&mut self, expr: &HirExpr) -> BackendResult<ConstIdx> {
         match &expr.kind {
-            HirExprKind::Literal(lit) => match lit {
-                Literal::Integer(v) => self.emitter.const_pool.add_integer(*v),
-                Literal::Float(v) => self.emitter.const_pool.add_float(*v),
-                Literal::String(s) => self.emitter.const_pool.add_string(s.clone()),
-                Literal::Bool(b) => self.emitter.const_pool.add_bool(*b),
-                Literal::Unit => self.emitter.const_pool.add_integer(0),
-            },
+            HirExprKind::Literal(lit) => Ok(match lit {
+                Literal::Integer(v) => self.emitter.const_pool.add_integer(*v)?,
+                Literal::Float(v) => self.emitter.const_pool.add_float(*v)?,
+                Literal::String(s) => self.emitter.const_pool.add_string(s.clone())?,
+                Literal::Bool(b) => self.emitter.const_pool.add_bool(*b)?,
+                Literal::Unit => self.emitter.const_pool.add_integer(0)?,
+            }),
             _ => Err(BackendError::new(
                 BackendErrorKind::NotImplemented(
                     "non-constant global initializer: only literals are supported".to_string(),

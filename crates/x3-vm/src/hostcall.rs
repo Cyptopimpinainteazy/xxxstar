@@ -4,11 +4,10 @@
 //! They provide an interface between the VM and the host environment
 //! (blockchain runtime, sidecar, or local development server).
 
-use std::collections::BTreeMap;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
+#[allow(unused_imports)]
+use crate::prelude::*;
+use alloc::sync::Arc;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::{VMError, VMErrorKind, VMResult};
 use crate::vm::Value;
@@ -198,26 +197,29 @@ impl HostcallRegistry {
             )))
         });
 
-        // ID 20: print_i64 - print i64 value
+        // IDs 20-22: print_* - write a value to the host's log.
+        //
+        // These went to stdout, which a wasm runtime does not have, so the chain could not offer
+        // them and a program using one would have run off chain and failed on chain. Routing them
+        // through the `log` facade gives both builds the same hostcall table and the same result:
+        // the value is reported if a logger is installed and execution continues either way.
         self.register(20, "print_i64", 1, |args| {
             if let Some(Value::I64(v)) = args.first() {
-                println!("{}", v);
+                log::info!("[X3] {}", v);
             }
             Ok(None)
         });
 
-        // ID 21: print_f64 - print f64 value
         self.register(21, "print_f64", 1, |args| {
             if let Some(Value::F64(v)) = args.first() {
-                println!("{}", v);
+                log::info!("[X3] {}", v);
             }
             Ok(None)
         });
 
-        // ID 22: print_string - print string value
         self.register(22, "print_string", 1, |args| {
             if let Some(Value::String(s)) = args.first() {
-                println!("{}", s);
+                log::info!("[X3] {}", s);
             }
             Ok(None)
         });

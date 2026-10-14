@@ -25872,6 +25872,7 @@ dependencies = [
  "serde",
  "thiserror 1.0.69",
  "x3-ast",
+ "x3-bytecode",
  "x3-common",
  "x3-hir",
  "x3-lexer",
@@ -25990,6 +25991,14 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "x3-bytecode"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "x3-common",
 ]
 
 [[package]]
@@ -27610,9 +27619,9 @@ dependencies = [
  "parking_lot 0.12.5",
  "serde",
  "sp-core",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tracing",
- "x3-backend",
+ "x3-bytecode",
  "x3-common",
  "x3-evm-integration",
  "x3-svm-integration",

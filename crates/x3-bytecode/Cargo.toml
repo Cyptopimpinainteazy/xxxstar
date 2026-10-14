@@ -1,0 +1,23 @@
+[package]
+name = "x3-bytecode"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "X3BC instruction set and binary module format, shared by the compiler, the off-chain tools and the on-chain runtime"
+publish = false
+
+# This crate is the single definition of X3BC: the opcode table, the module
+# layout, and the reader/writer for it. It must build without `std` because the
+# runtime executes X3BC inside wasm; everything that needs a compiler front end
+# stays in `x3-backend`, which re-exports these modules unchanged.
+
+[dependencies]
+x3-common = { path = "../x3-common", default-features = false }
+serde = { version = "1.0", features = ["derive", "alloc"], default-features = false }
+
+[features]
+default = ["std"]
+std = [
+    "serde/std",
+    "x3-common/std",
+]
