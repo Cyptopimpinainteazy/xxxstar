@@ -1,0 +1,32 @@
+---
+# Stop and disable validators. Limit to one host with -l, or one validator with
+# -e x3_only=<index>. -e x3_purge=true also deletes chain data (keys stay staged on
+# the controller); never purge a live network's only copy of a validator's database
+# without meaning to.
+- name: Stop validators
+  hosts: validators
+  gather_facts: true
+  vars:
+    x3_purge: false
+    targets: "{{ x3_validators | selectattr('index', 'equalto', x3_only | int) | list if x3_only is defined else x3_validators }}"
+  tasks:
+    - name: Stop and disable
+      ansible.builtin.systemd_service:
+        name: "x3-validator-{{ item.index }}.service"
+        scope: user
+        state: stopped
+        enabled: false
+      loop: "{{ targets }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
+      register: stopped
+      failed_when: stopped.failed and 'not found' not in (stopped.msg | default(''))
+
+    - name: Delete chain data
+      when: x3_purge | bool
+      ansible.builtin.file:
+        path: "{{ x3_home }}/data/validator-{{ item.index }}"
+        state: absent
+      loop: "{{ targets }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
