@@ -27,4 +27,6 @@ x3_rpc_methods: Safe
 
 # Health expectations for 30-verify.yml.
 x3_verify_timeout_sec: 180
-x3_min_peers: 1
+# 4 of 6 possible: GRANDPA needs 5 of 7 voters, so a validator with fewer peers is
+# one partition away from stalling finality.
+x3_min_peers: 4

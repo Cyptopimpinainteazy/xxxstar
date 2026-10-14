@@ -4,7 +4,34 @@
 - name: Verify
   hosts: validators
   gather_facts: false
+  # Report every host's reachability before failing, not just the first.
+  any_errors_fatal: false
   tasks:
+    # A host that accepts no inbound p2p still shows a few peers (its own outbound dials),
+    # so a peer count alone hides a firewall that splits the network. Dial every other
+    # host's p2p ports from here.
+    - name: Reach every other host's p2p ports
+      vars:
+        targets: >-
+          {%- set t = [] -%}
+          {%- for h in groups['validators'] if h != inventory_hostname -%}
+          {%- for v in hostvars[h].x3_validators -%}
+          {%- set _ = t.append(hostvars[h].ansible_host ~ ':' ~ (x3_p2p_base + v.index)) -%}
+          {%- endfor -%}
+          {%- endfor -%}
+          {{ t }}
+      ansible.builtin.shell: |
+        blocked=""
+        for t in {{ targets | join(' ') }}; do
+          timeout 4 bash -c "</dev/tcp/${t%:*}/${t#*:}" 2>/dev/null || blocked="$blocked $t"
+        done
+        echo "${blocked# }"
+      args:
+        executable: /bin/bash
+      register: reach
+      changed_when: false
+      failed_when: reach.stdout | length > 0
+
     - name: Genesis hash
       ansible.builtin.uri:
         url: "http://127.0.0.1:{{ x3_rpc_base + item.index }}"
