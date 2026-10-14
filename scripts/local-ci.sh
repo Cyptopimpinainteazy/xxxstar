@@ -358,6 +358,7 @@ GATES_FAST=(
   # brace-expansion, ip-address) -- with every gate green. Seven of the eight are now clean
   # and the eighth's remaining findings are all `low`, documented and ratcheted in
   # security/npm-audit-baseline.json. critical/high can never be baselined.
+  "npm audit scope:python3 -m unittest discover -s tests -p test_npm_audit_scope.py"
   "npm audit:python3 scripts/check-npm-audit.py"
   "feature matrix check:python3 scripts/feature_matrix.py check"
   # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
@@ -586,6 +587,7 @@ GATES_FAST=(
   # `launch_gate` citations that name tests nobody wrote.
   "repo scanner:python3 scripts/swarm/x3_repo_scan.py --check"
   "repo scanner test:pytest -q scripts/swarm/test_x3_repo_scan.py"
+  "remote CI gateway arguments:python3 tests/test_remote_ci_gateway.py"
   # The other half of the weights story. `runtime-weights-wired` (below) proves a wired pallet
   # charges *something*; nothing proved the something still describes the pallet. Re-running the
   # FRAME CLI for all 51 files needs a `--features runtime-benchmarks` node build per pallet, so

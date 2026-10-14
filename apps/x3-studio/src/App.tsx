@@ -137,7 +137,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <PanelGroup direction="horizontal" className="app-body">
+      <PanelGroup orientation="horizontal" className="app-body">
         {/* Activity Bar - fixed width */}
         <div className="sidebar-icons-wrapper">
           <Sidebar />
@@ -145,7 +145,7 @@ function App() {
         {/* Sidebar Panel - resizable */}
         {sidebarVisible && (
           <>
-            <Panel defaultSize={22} minSize={12} maxSize={50}>
+            <Panel defaultSize="22%" minSize="12%" maxSize="50%">
               <div className="sidebar-content">
                 {renderSidebarContent()}
               </div>
@@ -154,15 +154,15 @@ function App() {
           </>
         )}
         {/* Editor + Bottom Panel */}
-        <Panel minSize={30}>
-          <PanelGroup direction="vertical" style={{ height: '100%' }}>
-            <Panel minSize={20}>
+        <Panel minSize="30%">
+          <PanelGroup orientation="vertical" style={{ height: '100%' }}>
+            <Panel minSize="20%">
               <EditorPanel />
             </Panel>
             {bottomVisible && (
               <>
                 <PanelResizeHandle className="resize-handle resize-handle-horizontal" />
-                <Panel defaultSize={25} minSize={8} maxSize={60}>
+                <Panel defaultSize="25%" minSize="8%" maxSize="60%">
                   <BottomPanel />
                 </Panel>
               </>
