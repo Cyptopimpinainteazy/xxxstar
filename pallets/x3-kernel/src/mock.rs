@@ -1,4 +1,5 @@
 use crate as pallet_x3_kernel;
+use crate::ExecutionReceipt;
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use frame_support::{
     construct_runtime, parameter_types,
@@ -179,9 +180,44 @@ impl pallet_balances::Config for Test {
 
 // A minimal adapter used by tests to emit a deterministic state change so
 // canonical ledger updates can be verified via submit_comit.
+thread_local! { static REAL_EVM_ADAPTER: core::cell::Cell<bool> = const { core::cell::Cell::new(false) }; }
+/// Run the actual production EVM adapter through this test chain's signed dispatch.
+pub fn with_real_evm_adapter<R>(run: impl FnOnce() -> R) -> R {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REAL_EVM_ADAPTER.with(|flag| flag.set(self.0));
+        }
+    }
+    let previous = REAL_EVM_ADAPTER.with(|flag| flag.replace(true));
+    let _restore = Restore(previous);
+    run()
+}
+
 pub struct TestEvmAdapter;
 
 impl pallet_x3_kernel::EvmExecutorAdapter for TestEvmAdapter {
+    fn execute_call(
+        caller: H160,
+        _target: H160,
+        input: &[u8],
+        _value: u128,
+        gas_limit: u64,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        Self::execute_from(input, gas_limit, caller)
+    }
+
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        _caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        if REAL_EVM_ADAPTER.with(|flag| flag.get()) {
+            return <crate::wasm_adapters::ContextualWasmEvmAdapter<Test> as pallet_x3_kernel::EvmExecutorAdapter>::execute_from(payload, gas_limit, _caller);
+        }
+        Self::execute(payload, gas_limit)
+    }
+
     fn execute(_payload: &[u8], _gas_limit: u64) -> Result<crate::ExecutionReceipt, DispatchError> {
         // Use a fixed asset/balance so tests can assert on canonical ledger.
         let account: AccountId = ALICE;

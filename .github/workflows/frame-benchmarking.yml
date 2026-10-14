@@ -130,7 +130,7 @@ jobs:
           echo "✅ Benchmarks complete. Review /tmp/weights-*.rs for changes."
 
       - name: Upload generated weights
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: generated-weights
           path: /tmp/weights-*.rs

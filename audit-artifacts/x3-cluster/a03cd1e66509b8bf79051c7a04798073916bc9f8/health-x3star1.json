@@ -1,0 +1,335 @@
+{
+  "collected": "2026-10-03T10:01:05+00:00",
+  "from": "x3star1",
+  "repo": {
+    "commit": "a03cd1e66509b8bf79051c7a04798073916bc9f8",
+    "branch": "feat/x3-cluster-control",
+    "dirty": true
+  },
+  "nodes": [
+    {
+      "node": "x3star1",
+      "role": "control",
+      "ip": "192.168.0.70",
+      "required": true,
+      "reachable": true,
+      "ssh": true,
+      "label": "LOCAL",
+      "cpu": "32t load 6.6",
+      "ram": "81.7G",
+      "gpu": "-",
+      "services": {
+        "ssh": "active",
+        "x3-ai-router": "active"
+      },
+      "ollama_workers": {
+        "11434": {
+          "ok": true,
+          "loaded": []
+        }
+      },
+      "router": {
+        "status": "ok"
+      },
+      "disk_free_gb": 260.1,
+      "clock_synced": true,
+      "failed_units": [],
+      "repo": {
+        "commit": "a03cd1e66509b8bf79051c7a04798073916bc9f8",
+        "branch": "feat/x3-cluster-control",
+        "dirty": true
+      }
+    },
+    {
+      "node": "x3gpu1",
+      "role": "gpu",
+      "ip": "192.168.0.30",
+      "required": true,
+      "reachable": true,
+      "ssh": true,
+      "ssh_port": true,
+      "label": "PHYSICAL",
+      "remote": {
+        "hostname": "x3gpu1",
+        "threads": 8,
+        "load": 7.55322265625,
+        "ram_gb": 32.8,
+        "free_gb": 9.9,
+        "gpus": [
+          "NVIDIA GeForce GTX 1070",
+          "NVIDIA GeForce RTX 2060 SUPER"
+        ],
+        "ollama_workers": {
+          "11436": {
+            "ok": true,
+            "bind": "*",
+            "loaded": [
+              "qwen2.5-coder:7b"
+            ]
+          },
+          "11434": {
+            "ok": true,
+            "bind": "*",
+            "loaded": [
+              "qwen2.5-coder:7b"
+            ]
+          }
+        },
+        "router": {
+          "status": "ok",
+          "in_flight": {}
+        },
+        "clock_synced": true,
+        "failed_units": [],
+        "role": "gpu",
+        "repo_head": "f464c06c23416f51ba9605c0a44381b9affead1e"
+      },
+      "cpu": "8t load 7.6",
+      "ram": "32.8G",
+      "gpu": "GTX 1070,RTX 2060 SUPER",
+      "ollama_workers": {
+        "11436": {
+          "ok": true,
+          "bind": "*",
+          "loaded": [
+            "qwen2.5-coder:7b"
+          ]
+        },
+        "11434": {
+          "ok": true,
+          "bind": "*",
+          "loaded": [
+            "qwen2.5-coder:7b"
+          ]
+        }
+      },
+      "router": {
+        "status": "ok",
+        "in_flight": {}
+      },
+      "disk_free_gb": 9.9,
+      "clock_synced": true,
+      "failed_units": [],
+      "node_role": "gpu",
+      "repo_head": "f464c06c23416f51ba9605c0a44381b9affead1e"
+    },
+    {
+      "node": "x3gpu2",
+      "role": "gpu",
+      "ip": "192.168.0.23",
+      "required": true,
+      "reachable": true,
+      "ssh": false,
+      "ssh_port": true,
+      "label": "PHYSICAL-METRICS",
+      "remote": null,
+      "detail": "sshd answers but refuses this node's key: run x3-join.sh on it",
+      "metrics": {
+        "threads": 2,
+        "ram_gb": 25.1,
+        "free_gb": 8.9,
+        "gpus": [
+          {
+            "uuid": "GPU-1783d228-a6f5-9776-6296-194bc6f7613b",
+            "memory_total_mib": 8192.0,
+            "memory_used_mib": 5135.0,
+            "power_watts": 5.87,
+            "temperature_celsius": 39.0,
+            "utilization_percent": 0.0
+          }
+        ],
+        "units": {
+          "ModemManager.service": "active",
+          "NetworkManager-wait-online.service": "active",
+          "NetworkManager.service": "active",
+          "accounts-daemon.service": "active",
+          "acpid.path": "active",
+          "acpid.service": "active",
+          "acpid.socket": "active",
+          "alsa-restore.service": "active",
+          "anacron.timer": "active",
+          "apparmor.service": "active",
+          "apport.service": "active",
+          "apt-daily-upgrade.timer": "active",
+          "apt-daily.timer": "active",
+          "avahi-daemon.service": "active",
+          "avahi-daemon.socket": "active",
+          "colord.service": "active",
+          "console-setup.service": "active",
+          "cron.service": "active",
+          "cups-browsed.service": "active",
+          "cups.path": "active",
+          "cups.service": "active",
+          "cups.socket": "active",
+          "dbus.service": "active",
+          "dbus.socket": "active",
+          "dpkg-db-backup.timer": "active",
+          "e2scrub_all.timer": "active",
+          "fstrim.timer": "active",
+          "fwupd-refresh.timer": "active",
+          "fwupd.service": "active",
+          "gdm.service": "active",
+          "irqbalance.service": "active",
+          "kerneloops.service": "active",
+          "keyboard-setup.service": "active",
+          "kmod-static-nodes.service": "active",
+          "logrotate.timer": "active",
+          "man-db.timer": "active",
+          "motd-news.timer": "active",
+          "networkd-dispatcher.service": "active",
+          "nvidia-persistenced.service": "active",
+          "ollama.service": "active",
+          "openvpn.service": "active",
+          "packagekit.service": "active",
+          "plymouth-quit-wait.service": "active",
+          "plymouth-read-write.service": "active",
+          "plymouth-start.service": "active",
+          "polkit.service": "active",
+          "power-profiles-daemon.service": "active",
+          "prometheus-node-exporter-apt.timer": "active",
+          "prometheus-node-exporter-smartmon.timer": "active",
+          "prometheus-node-exporter.service": "active",
+          "rsyslog.service": "active",
+          "rtkit-daemon.service": "active",
+          "setvtrgb.service": "active",
+          "smartmontools.service": "active",
+          "snapd.apparmor.service": "active",
+          "snapd.seeded.service": "active",
+          "snapd.service": "active",
+          "snapd.socket": "active",
+          "ssh.service": "active",
+          "swapfile.swap": "active",
+          "switcheroo-control.service": "active",
+          "syslog.socket": "active",
+          "systemd-ask-password-plymouth.path": "active",
+          "systemd-ask-password-wall.path": "active",
+          "systemd-binfmt.service": "active",
+          "systemd-fsck@dev-disk-by\\\\x2duuid-E6CA\\\\x2d811D.service": "active",
+          "systemd-fsckd.socket": "active",
+          "systemd-initctl.socket": "active",
+          "systemd-journal-flush.service": "active",
+          "systemd-journald-audit.socket": "active",
+          "systemd-journald-dev-log.socket": "active",
+          "systemd-journald.service": "active",
+          "systemd-journald.socket": "active",
+          "systemd-logind.service": "active",
+          "systemd-modules-load.service": "active",
+          "systemd-oomd.service": "active",
+          "systemd-random-seed.service": "active",
+          "systemd-remount-fs.service": "active",
+          "systemd-resolved.service": "active",
+          "systemd-rfkill.socket": "active",
+          "systemd-sysctl.service": "active",
+          "systemd-sysusers.service": "active",
+          "systemd-timesyncd.service": "active",
+          "systemd-tmpfiles-clean.timer": "active",
+          "systemd-tmpfiles-setup-dev.service": "active",
+          "systemd-tmpfiles-setup.service": "active",
+          "systemd-udev-trigger.service": "active",
+          "systemd-udevd-control.socket": "active",
+          "systemd-udevd-kernel.socket": "active",
+          "systemd-udevd.service": "active",
+          "systemd-update-utmp.service": "active",
+          "systemd-user-sessions.service": "active",
+          "thermald.service": "active",
+          "udisks2.service": "active",
+          "ufw.service": "active",
+          "unattended-upgrades.service": "active",
+          "update-notifier-download.timer": "active",
+          "update-notifier-motd.timer": "active",
+          "upower.service": "active",
+          "user-runtime-dir@1000.service": "active",
+          "user@1000.service": "active",
+          "uuidd.socket": "active",
+          "whoopsie.path": "active",
+          "wpa_supplicant.service": "active",
+          "x3-ai-router.service": "active",
+          "x3-compute-coordinator.service": "active",
+          "x3-nvidia-metrics.timer": "active",
+          "x3-worker.service": "active"
+        },
+        "clock_synced": true,
+        "os": "Ubuntu 22.04.5 LTS",
+        "hostname": "x3gpu2",
+        "kernel": "6.8.0-138-generic",
+        "failed_units": [],
+        "ollama_workers": {
+          "11434": {
+            "ok": true,
+            "bind": "LAN",
+            "models": [
+              "qwen2.5-coder:7b",
+              "qwen3:8b"
+            ]
+          }
+        }
+      },
+      "cpu": "2t",
+      "ram": "25.1G",
+      "gpu": "1x8GB",
+      "ollama_workers": {
+        "11434": {
+          "ok": true,
+          "bind": "LAN",
+          "models": [
+            "qwen2.5-coder:7b",
+            "qwen3:8b"
+          ]
+        }
+      },
+      "clock_synced": true,
+      "disk_free_gb": 8.9,
+      "failed_units": []
+    },
+    {
+      "node": "x3build1",
+      "role": "build",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3sim1",
+      "role": "sim",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3data1",
+      "role": "data",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3net1",
+      "role": "net",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "node": "x3ops1",
+      "role": "ops",
+      "ip": null,
+      "required": true,
+      "reachable": false,
+      "ssh": false,
+      "label": "UNKNOWN",
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    }
+  ]
+}

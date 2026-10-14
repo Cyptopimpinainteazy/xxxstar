@@ -4,7 +4,7 @@
 //! This module bridges the gap between DeterministicEngine tasks and X3 VM GPU execution.
 
 use crate::crypto::HashAlgorithm;
-use tracing::debug;
+use crate::error::{SwarmError, SwarmResult};
 use x3_backend::bc_format::{
     BytecodeModule, ConstPool, FeatureFlags, FunctionEntry, ModuleFlags, VersionInfo,
 };
@@ -19,16 +19,9 @@ use x3_backend::opcode::Opcode;
 /// GpuSha256Batch r0, r1, r2          ; r0 = gpu_sha256_batch(inputs, count)
 /// Ret r0                             ; return r0
 /// ```
-pub fn generate_sha256_batch_bytecode(inputs: Vec<u8>, count: i64) -> BytecodeModule {
+pub fn generate_sha256_batch_bytecode(inputs: Vec<u8>, count: i64) -> SwarmResult<BytecodeModule> {
     let mut const_pool = ConstPool::new();
-    let inputs_idx = const_pool
-        .add_bytes(inputs)
-        .map(|idx| idx.0) // Extract u32 from ConstIdx
-        .unwrap_or(0);
-    let count_idx = const_pool
-        .add_integer(count)
-        .map(|idx| idx.0) // Extract u32 from ConstIdx
-        .unwrap_or(1);
+    let (inputs_idx, count_idx) = add_batch_consts(&mut const_pool, inputs, count)?;
 
     let mut code = Vec::new();
 
@@ -52,7 +45,7 @@ pub fn generate_sha256_batch_bytecode(inputs: Vec<u8>, count: i64) -> BytecodeMo
     code.push(Opcode::Ret.to_byte());
     code.push(0u8);
 
-    BytecodeModule {
+    Ok(BytecodeModule {
         version: VersionInfo::new(1, 0, 0),
         min_version: VersionInfo::new(1, 0, 0),
         flags: ModuleFlags::default(),
@@ -70,20 +63,16 @@ pub fn generate_sha256_batch_bytecode(inputs: Vec<u8>, count: i64) -> BytecodeMo
         code,
         debug_info: None,
         metadata: None,
-    }
+    })
 }
 
 /// Generate X3 bytecode for a Keccak-256 batch hash operation
-pub fn generate_keccak256_batch_bytecode(inputs: Vec<u8>, count: i64) -> BytecodeModule {
+pub fn generate_keccak256_batch_bytecode(
+    inputs: Vec<u8>,
+    count: i64,
+) -> SwarmResult<BytecodeModule> {
     let mut const_pool = ConstPool::new();
-    let inputs_idx = const_pool
-        .add_bytes(inputs)
-        .map(|idx| idx.0) // Extract u32 from ConstIdx
-        .unwrap_or(0);
-    let count_idx = const_pool
-        .add_integer(count)
-        .map(|idx| idx.0) // Extract u32 from ConstIdx
-        .unwrap_or(1);
+    let (inputs_idx, count_idx) = add_batch_consts(&mut const_pool, inputs, count)?;
 
     let mut code = Vec::new();
 
@@ -107,7 +96,7 @@ pub fn generate_keccak256_batch_bytecode(inputs: Vec<u8>, count: i64) -> Bytecod
     code.push(Opcode::Ret.to_byte());
     code.push(0u8);
 
-    BytecodeModule {
+    Ok(BytecodeModule {
         version: VersionInfo::new(1, 0, 0),
         min_version: VersionInfo::new(1, 0, 0),
         flags: ModuleFlags::default(),
@@ -125,22 +114,65 @@ pub fn generate_keccak256_batch_bytecode(inputs: Vec<u8>, count: i64) -> Bytecod
         code,
         debug_info: None,
         metadata: None,
-    }
+    })
 }
 
-/// Generate X3 GPU bytecode based on the algorithm
+/// Generate X3 GPU bytecode based on the algorithm.
+///
+/// Blake2b has no GPU opcode. It is an error rather than a substitution: running Keccak-256 and
+/// reporting it as Blake2b hands the caller a wrong digest.
 pub fn generate_gpu_bytecode_for_algorithm(
     algorithm: HashAlgorithm,
     inputs: Vec<u8>,
     count: i64,
-) -> BytecodeModule {
+) -> SwarmResult<BytecodeModule> {
     match algorithm {
         HashAlgorithm::Sha256 => generate_sha256_batch_bytecode(inputs, count),
         HashAlgorithm::Keccak256 => generate_keccak256_batch_bytecode(inputs, count),
-        HashAlgorithm::Blake2b => {
-            // Blake2b not available as GPU opcode, fallback to Keccak256
-            debug!("[GPU Bytecode] Blake2b not available as GPU opcode, using Keccak256");
-            generate_keccak256_batch_bytecode(inputs, count)
-        }
+        HashAlgorithm::Blake2b => Err(SwarmError::GpuError(
+            "no X3 VM GPU opcode for Blake2b".to_string(),
+        )),
+    }
+}
+
+/// Add the batch inputs and count to the constant pool. A failed insert is an error: falling
+/// back to a guessed index would load whatever constant sits there.
+fn add_batch_consts(
+    const_pool: &mut ConstPool,
+    inputs: Vec<u8>,
+    count: i64,
+) -> SwarmResult<(u32, u32)> {
+    let inputs_idx = const_pool
+        .add_bytes(inputs)
+        .map_err(|e| SwarmError::GpuError(format!("const pool: inputs: {e}")))?;
+    let count_idx = const_pool
+        .add_integer(count)
+        .map_err(|e| SwarmError::GpuError(format!("const pool: count: {e}")))?;
+    Ok((inputs_idx.0, count_idx.0))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blake2b_has_no_gpu_bytecode() {
+        let err = generate_gpu_bytecode_for_algorithm(HashAlgorithm::Blake2b, vec![1, 2, 3], 1)
+            .expect_err("Blake2b must not be lowered to another hash");
+        assert!(matches!(err, SwarmError::GpuError(_)));
+    }
+
+    #[test]
+    fn keccak_and_sha256_lower_to_their_own_opcodes() {
+        let keccak =
+            generate_gpu_bytecode_for_algorithm(HashAlgorithm::Keccak256, vec![1, 2, 3], 1)
+                .unwrap();
+        assert!(keccak.code.contains(&Opcode::GpuKeccak256Batch.to_byte()));
+        assert!(!keccak.code.contains(&Opcode::GpuSha256Batch.to_byte()));
+
+        let sha =
+            generate_gpu_bytecode_for_algorithm(HashAlgorithm::Sha256, vec![1, 2, 3], 1).unwrap();
+        assert!(sha.code.contains(&Opcode::GpuSha256Batch.to_byte()));
+        assert!(!sha.code.contains(&Opcode::GpuKeccak256Batch.to_byte()));
     }
 }

@@ -8,7 +8,7 @@
 
 use super::*;
 use frame_benchmarking::v2::*;
-use frame_support::traits::Currency;
+use frame_support::traits::{Currency, Get};
 use frame_system::RawOrigin;
 use sp_core::H256;
 
@@ -23,6 +23,12 @@ mod benchmarks {
     fn submit_blob_commitment() -> Result<(), BenchmarkError> {
         let caller: T::AccountId = whitelisted_caller();
         let _ = T::Currency::make_free_balance_be(&caller, 10_000_000u32.into());
+        // The fee is paid to the treasury; on a fresh chain it has no account yet, and a dead
+        // account refuses any deposit below the existential deposit.
+        let _ = T::Currency::make_free_balance_be(
+            &T::ProtocolTreasury::get(),
+            T::Currency::minimum_balance(),
+        );
 
         #[extrinsic_call]
         submit_blob_commitment(RawOrigin::Signed(caller), BLOB_HASH, BLOB_SIZE, None, None);
@@ -36,6 +42,12 @@ mod benchmarks {
     fn submit_shard_proof() -> Result<(), BenchmarkError> {
         let caller: T::AccountId = whitelisted_caller();
         let _ = T::Currency::make_free_balance_be(&caller, 10_000_000u32.into());
+        // The fee is paid to the treasury; on a fresh chain it has no account yet, and a dead
+        // account refuses any deposit below the existential deposit.
+        let _ = T::Currency::make_free_balance_be(
+            &T::ProtocolTreasury::get(),
+            T::Currency::minimum_balance(),
+        );
         // A shard proof attests to a blob that has to exist; the commitment is the setup, made the
         // way the extrinsic makes it.
         Pallet::<T>::submit_blob_commitment(

@@ -197,6 +197,8 @@ GATES_FAST=(
   "format check:cargo fmt --all -- --check"
   "agent guards:make guard"
   "make gate exit codes:make check-make-gates"
+  "RC6 release sequence:python3 tests/test_rc6_release_sequence.py"
+  "release artifact provenance:python3 tests/test_release_artifact_provenance.py"
   "script syntax:bash scripts/check-script-syntax.sh"
   # A script or unit on the bring-up path that hardcodes /home/<user>/Desktop/ only works on the
   # machine it was written on — one such script mkdir'd the missing root and then reported a
@@ -267,6 +269,13 @@ GATES_FAST=(
   # on a *new* finding rather than on the years-old annotations that are already counted.
   "fake-code scan:python3 scripts/x3_fake_code_scan.py stubs"
   "test-cheat scan:python3 scripts/x3_fake_code_scan.py cheats"
+  # Both scans above walk with rg when it is installed and os.walk when it is not. The two
+  # enumerations drifted once: the globs listed exclusions first and rg gives the *last*
+  # matching glob precedence, so `node_modules/decimal.js` (a directory named like source),
+  # the scanner itself and every excluded name ending in a source suffix came back, and a
+  # dirty checkout read 152 findings above a clean extraction. The self-test builds one tree
+  # with every pruning shape and fails if the two enumerations disagree.
+  "fake-code scanner self-test:python3 scripts/x3_fake_code_scan.py --self-test"
   # The runtime-hash check exempts files that cannot reach the wasm target
   # (`#[cfg(test)] mod tests;`, `<package>/tests/*.rs`) so a test-only edit does
   # not demand a ten-minute double srtool rebuild. An exemption that is too wide
@@ -349,6 +358,7 @@ GATES_FAST=(
   # brace-expansion, ip-address) -- with every gate green. Seven of the eight are now clean
   # and the eighth's remaining findings are all `low`, documented and ratcheted in
   # security/npm-audit-baseline.json. critical/high can never be baselined.
+  "npm audit scope:python3 -m unittest discover -s tests -p test_npm_audit_scope.py"
   "npm audit:python3 scripts/check-npm-audit.py"
   "feature matrix check:python3 scripts/feature_matrix.py check"
   # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
@@ -693,6 +703,15 @@ GATES_FAST=(
   # redden them, a missing one must fail rather than skip, and no check may
   # discard its status. Cheap: 18 checks, no build.
   "rc gate scripts:python3 tests/test_rc_gates.py"
+  # Gate 7 of the public testnet gate is the one criterion that decides a launch
+  # from a forced-restart proof the operator supplies, and until 2026-09-30 the
+  # rule that reads that proof was inline in a script that cannot run without a
+  # seven-validator network — so it had no test, and the fail-open it closes (any
+  # file containing `restart_drill: PASS`) survived unmeasured. The rule is now a
+  # function; this drives it with synthetic reports and a fixed clock, and asserts
+  # the gate calls it and the drill still writes the fields it reads.
+  # Cheap: 20 checks, no build, no network.
+  "public testnet gate 7 verdict:python3 tests/test_restart_proof_verdict.py"
   # The promotion record: what ties a passing RC run to the genesis it promotes.
   # `build` refuses a wrong validator count, a non-Live spec, an RC log without the
   # gate's own PASSED marker, a missing operator, a missing artifact and a dirty tree;
@@ -746,6 +765,16 @@ GATES_FAST=(
   # stays fixed. `--locked` against the committed lock, and its own target dir
   # because it resolves the coordinator's dependency graph.
   "test x3-sim:export CARGO_TARGET_DIR=/tmp/x3-nested-x3-sim; cargo fetch --locked --manifest-path crates/x3-sim/Cargo.toml || echo 'local-ci: x3-sim dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-sim/Cargo.toml"
+  # `x3-mc` is the Monte Carlo search layer over `x3-sim`: it samples scenario
+  # parameters, drives `x3_sim::run_with`, and judges the result with the
+  # coordinator's invariants. It is a third standalone workspace root on the
+  # same dependency chain, so `cargo test --workspace` never sees it either.
+  # Its suite is the evidence that the search engine can actually detect a
+  # defect (the control scenario is deliberately broken), that a failure
+  # replays from its recorded seed, and that minimization shrinks a reproducer
+  # without drifting onto a different violation. Without a gate it would rot
+  # exactly the way the nested workspaces above did.
+  "test x3-mc:export CARGO_TARGET_DIR=/tmp/x3-nested-x3-mc; cargo fetch --locked --manifest-path crates/x3-mc/Cargo.toml || echo 'local-ci: x3-mc dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-mc/Cargo.toml"
   # A failing simulation now produces a failure packet and hands it to a root-cause
   # agent. The dispatcher's own contract (fail closed when the router is down,
   # never store a non-conforming answer as a cause) is not covered by the Rust
@@ -985,6 +1014,10 @@ GATES_LIVE=(
   # chain_getFinalizedHead/chain_getHeader, system_name/version/chain and system_nodeRoles through the
   # same client the commands use. A node that does not answer is an error there, not a skipped test.
   "tauri-os live operator console:bash apps/tauri-os/src-tauri/run-live-test.sh"
+  # Signed Ethereum transactions against a `--features frontier` dev node: ethers signs, the runtime
+  # recovers the sender; tampered / wrong-chain / garbage / caller-named / replayed transactions are
+  # refused without moving a nonce or a balance, and the tx/receipt lookups serve the included one.
+  "frontier signed Ethereum txs:bash scripts/frontier-eth-e2e.sh"
 )
 
 GATES_VARIANTS=(
@@ -1002,6 +1035,7 @@ GATES_VARIANTS=(
 
 GATES_RELEASE=(
   "release gate (mainnet-check):make mainnet-check"
+  "RC1 three-validator boot:bash scripts/mainnet/rc1_boot_gate.sh"
 )
 
 # The loom model checks live outside the workspace (`tests/loom-concurrency` is
@@ -1502,6 +1536,8 @@ run_gate() {
 # smallest correct fix: the alternative is a per-gate port allocation, which means
 # threading a port block through nine scripts and every test constant they drive.
 SERIAL_GATES=(
+  "release gate (mainnet-check)"
+  "RC1 three-validator boot"
   "local node smoke"
   "local network smoke"
   "monitoring across validators"

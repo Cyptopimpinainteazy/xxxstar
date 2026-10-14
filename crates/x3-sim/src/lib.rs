@@ -29,6 +29,7 @@ pub mod invariants;
 pub mod minimize;
 pub mod network;
 pub mod packet;
+pub mod params;
 pub mod rng;
 pub mod sim;
 
@@ -38,6 +39,10 @@ pub use hunt::{hunt, HuntFailure, HuntReport};
 pub use invariants::{check_session, check_sessions, Violation};
 pub use minimize::{minimize, Minimized, DEFAULT_MAX_RUNS};
 pub use network::{NetworkStats, VirtualNetwork};
-pub use packet::{FailurePacket, MinimizedReproducer, PacketConfig, PacketViolation, SuspectedSymbol, PACKET_SCHEMA};
+pub use packet::{
+    FailurePacket, MinimizedReproducer, PacketConfig, PacketViolation, SuspectedSymbol,
+    PACKET_SCHEMA,
+};
+pub use params::SimParams;
 pub use rng::SimRng;
-pub use sim::{run, Scenario, SimConfig, SimOp, SimOutcome, START_UNIX_MS};
+pub use sim::{run, run_with, Scenario, SimConfig, SimOp, SimOutcome, START_UNIX_MS};

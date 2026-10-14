@@ -1,0 +1,47 @@
+{
+  "id": "20261003T082058Z-sim-partition-storm-hunt-bed119",
+  "name": "sim-partition-storm-hunt",
+  "class": "SIMULATION",
+  "cmd": "cargo run --release --manifest-path crates/x3-sim/Cargo.toml -- --scenario partition-storm --seed 1000 --hunt 200 --out \"$X3_JOB_OUT/partition-storm\" --packet \"$X3_JOB_OUT/packets\"",
+  "commit": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "ref": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "priority": "BACKGROUND",
+  "timeout": 2400,
+  "node": null,
+  "min_free_gb": 20,
+  "submitted": "2026-10-03T08:20:58+00:00",
+  "controller": "x3star1",
+  "worker": "x3star1",
+  "label": "LOCAL-FALLBACK",
+  "rejected_workers": [
+    {
+      "node": "x3sim1",
+      "reason": "unreachable or SSH key auth failed"
+    }
+  ],
+  "exit_code": 0,
+  "result": "PASS",
+  "seconds": 301.3,
+  "machine": "x3star1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "cc": "cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0"
+  },
+  "start": "2026-10-03T08:21:08Z",
+  "end": "2026-10-03T08:25:58Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-main",
+  "target_dir": "/home/lojak/.cache/x3-cluster/target",
+  "worker_free_gb": "282",
+  "log_sha256": "47f232ebf7dac4813119b02375b2abdcf4bc47c527dfdb28dbddd589a0a5f36d",
+  "log_tail": "X3JOB-META free_gb=282\nX3JOB-META host=x3star1\nX3JOB-META repo=/home/lojak/Desktop/xxxstar-main\nX3JOB-META kernel=6.8.0-146-generic\nX3JOB-META rustc=rustc 1.90.0 (1159e78c4 2025-09-14)\nX3JOB-META cargo=cargo 1.90.0 (840b83a10 2025-07-30)\nX3JOB-META cc=cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nX3JOB-META target_dir=/home/lojak/.cache/x3-cluster/target\nX3JOB-META start=2026-10-03T08:21:08Z\n    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on build directory\n   Compiling x3-cross-vm-bridge v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T082058Z-sim-partition-storm-hunt-bed119/crates/cross-vm-bridge)\n   Compiling x3-cross-vm-coordinator v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T082058Z-sim-partition-storm-hunt-bed119/crates/cross-vm-coordinator)\n   Compiling x3-sim v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T082058Z-sim-partition-storm-hunt-bed119/crates/x3-sim)\n    Finished `release` profile [optimized] target(s) in 4m 47s\n     Running `/home/lojak/.cache/x3-cluster/target/release/x3-sim --scenario partition-storm --seed 1000 --hunt 200 --out /home/lojak/.cache/x3-cluster/out/20261003T082058Z-sim-partition-storm-hunt-bed119/partition-storm --packet /home/lojak/.cache/x3-cluster/out/20261003T082058Z-sim-partition-storm-hunt-bed119/packets`\nhunt: seeds 1000..1200  run = 200  passes = 200  failures = 0 duplicates = 0\nno invariant violations in 200 runs\nX3JOB-META end=2026-10-03T08:25:58Z\n",
+  "artifacts": [
+    {
+      "path": "partition-storm/hunt-summary-partition-storm-1000.json",
+      "sha256": "89d5505af694c54a9028e025d28fa283881f2b76617a43152b700e0f558b5737",
+      "bytes": 267
+    }
+  ],
+  "finished": "2026-10-03T08:26:00+00:00"
+}

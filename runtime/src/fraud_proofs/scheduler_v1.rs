@@ -69,8 +69,11 @@ pub fn build_conflict_edges(witness: &SchedulerWitnessV1) -> Vec<Vec<u32>> {
     for txs in key_to_txs.values() {
         for a in 0..txs.len() {
             for b in (a + 1)..txs.len() {
-                let (lo, hi) = (txs[a] as usize, txs[b] as usize);
-                let (lo, hi) = if lo < hi { (lo, hi) } else { (hi, lo) };
+                // `txs` is appended in ascending index order, so `a < b` implies
+                // `txs[a] < txs[b]`; min/max makes the canonical (lo, hi) ordering
+                // explicit without a branch split that no witness can observe.
+                let lo = txs[a].min(txs[b]) as usize;
+                let hi = txs[a].max(txs[b]) as usize;
                 if !edges[lo].contains(&(hi as u32)) {
                     edges[lo].push(hi as u32);
                 }
@@ -93,7 +96,9 @@ pub fn canonical_order(witness: &SchedulerWitnessV1) -> Result<Vec<u32>, Witness
     let mut in_degree = vec![0u32; n];
     for edge in edges.iter().take(n) {
         for &j in edge {
-            in_degree[j as usize] += 1;
+            // saturating_add: a malformed duplicate edge must not panic the
+            // verifier path; canonical witnesses never saturate.
+            in_degree[j as usize] = in_degree[j as usize].saturating_add(1);
         }
     }
 
@@ -109,7 +114,7 @@ pub fn canonical_order(witness: &SchedulerWitnessV1) -> Result<Vec<u32>, Witness
         order.push(cur);
         let mut newly: Vec<u32> = Vec::new();
         for &succ in &edges[cur as usize] {
-            in_degree[succ as usize] -= 1;
+            in_degree[succ as usize] = in_degree[succ as usize].saturating_sub(1);
             if in_degree[succ as usize] == 0 {
                 newly.push(succ);
             }
@@ -133,4 +138,157 @@ pub fn canonical_order(witness: &SchedulerWitnessV1) -> Result<Vec<u32>, Witness
         return Err(WitnessError::CycleDetected);
     }
     Ok(order)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fraud_proofs::witness_v1::{
+        AccessKeyV1, AccessListV1, SchedulerWitnessV1, WITNESS_VERSION,
+    };
+    use codec::Compact;
+
+    fn access(domain: u8, key_byte: u8) -> AccessKeyV1 {
+        AccessKeyV1 {
+            domain,
+            key: H256([key_byte; 32]),
+        }
+    }
+
+    fn list(keys: Vec<AccessKeyV1>) -> AccessListV1 {
+        AccessListV1 {
+            access_count: Compact(keys.len() as u32),
+            accesses: keys,
+        }
+    }
+
+    fn witness(tx_ids: Vec<H256>, access_lists: Vec<AccessListV1>) -> SchedulerWitnessV1 {
+        SchedulerWitnessV1 {
+            version: WITNESS_VERSION,
+            rules_version: 1,
+            tx_count: Compact(tx_ids.len() as u32),
+            tx_ids,
+            access_lists,
+            seed: None,
+            reserved: Vec::new(),
+        }
+    }
+
+    fn ids(n: u8) -> Vec<H256> {
+        (0..n).map(|i| H256([i; 32])).collect()
+    }
+
+    /// WITNESS-GRAPH-001: no txs, no edges.
+    #[test]
+    fn conflict_edges_empty_witness_is_empty() {
+        let w = witness(Vec::new(), Vec::new());
+        assert_eq!(build_conflict_edges(&w), Vec::<Vec<u32>>::new());
+    }
+
+    /// WITNESS-GRAPH-001: every conflicting pair is linked once, j > i, sorted.
+    #[test]
+    fn conflict_edges_links_each_key_once_and_sorts() {
+        // tx0 touches keys 9 and 1; tx1 touches key 9; tx2 touches key 1.
+        // The key-1 walk pushes edge (0, 2) before the key-9 walk pushes
+        // (0, 1), so the per-node list must be re-sorted to be canonical.
+        let w = witness(
+            ids(3),
+            vec![
+                list(vec![access(1, 9), access(1, 1)]),
+                list(vec![access(1, 9)]),
+                list(vec![access(1, 1)]),
+            ],
+        );
+        assert_eq!(build_conflict_edges(&w), vec![vec![1, 2], vec![], vec![]]);
+    }
+
+    /// Two shared keys between the same pair must still produce exactly one edge.
+    #[test]
+    fn conflict_edges_dedups_shared_pairs() {
+        let w = witness(
+            ids(2),
+            vec![
+                list(vec![access(1, 1), access(1, 2)]),
+                list(vec![access(1, 1), access(1, 2)]),
+            ],
+        );
+        assert_eq!(build_conflict_edges(&w), vec![vec![1], vec![]]);
+    }
+
+    /// Same key bytes under different domains are independent resources.
+    #[test]
+    fn conflict_edges_distinct_domains_do_not_conflict() {
+        let w = witness(
+            ids(2),
+            vec![list(vec![access(1, 7)]), list(vec![access(2, 7)])],
+        );
+        assert_eq!(
+            build_conflict_edges(&w),
+            vec![Vec::<u32>::new(), Vec::new()]
+        );
+    }
+
+    /// WITNESS-ORDER-001: empty witness has the empty canonical order.
+    #[test]
+    fn canonical_order_empty_is_ok_empty() {
+        assert_eq!(
+            canonical_order(&witness(Vec::new(), Vec::new())),
+            Ok(Vec::new())
+        );
+    }
+
+    /// WITNESS-ORDER-001: independent txs keep ascending index (= tx_id) order.
+    #[test]
+    fn canonical_order_independent_txs_keep_index_order() {
+        let w = witness(ids(3), vec![list(vec![]), list(vec![]), list(vec![])]);
+        assert_eq!(canonical_order(&w), Ok(vec![0, 1, 2]));
+    }
+
+    /// A conflict forces the successor after its predecessor; free txs still run.
+    #[test]
+    fn canonical_order_conflicting_tx_waits_for_predecessor() {
+        let w = witness(
+            ids(3),
+            vec![
+                list(vec![access(1, 5)]),
+                list(vec![access(1, 5)]),
+                list(vec![]),
+            ],
+        );
+        assert_eq!(canonical_order(&w), Ok(vec![0, 1, 2]));
+    }
+
+    /// Two predecessors of the same successor: the successor is emitted only
+    /// after the second one releases it, and never re-emitted.
+    #[test]
+    fn canonical_order_emits_shared_successor_once() {
+        let w = witness(
+            ids(3),
+            vec![
+                list(vec![access(1, 5)]),
+                list(vec![access(2, 6)]),
+                list(vec![access(1, 5), access(2, 6)]),
+            ],
+        );
+        assert_eq!(canonical_order(&w), Ok(vec![0, 1, 2]));
+    }
+
+    /// build_conflict_edges output must never depend on map iteration order:
+    /// the sorted edge list is the canonical graph.
+    #[test]
+    fn canonical_order_is_repeatable() {
+        let w = witness(
+            ids(4),
+            vec![
+                list(vec![access(1, 1), access(1, 2)]),
+                list(vec![access(1, 1)]),
+                list(vec![access(1, 2)]),
+                list(vec![access(3, 1)]),
+            ],
+        );
+        assert_eq!(canonical_order(&w), canonical_order(&w));
+        assert_eq!(build_conflict_edges(&w), build_conflict_edges(&w));
+    }
 }

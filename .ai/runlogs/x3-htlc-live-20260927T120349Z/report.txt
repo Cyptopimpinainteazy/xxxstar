@@ -1,0 +1,23 @@
+runlog: /home/lojak/Desktop/xxxstar-main/.ai/runlogs/x3-htlc-live-20260927T120349Z
+workdir: /tmp/x3-htlc-live.XkEZg5
+rpc:     http://127.0.0.1:18511 (port 18511)
+=== build the SBF program ===
+
+warning: `x3_htlc` (lib) generated 13 warnings (5 duplicates)
+    Finished `release` profile [optimized] target(s) in 0.36s
+program so: /home/lojak/Desktop/xxxstar-main/X3-contracts/svm/target/deploy/x3_htlc.so (284560 bytes)
+=== build the broadcaster ===
+    Finished `release` profile [optimized] target(s) in 0.37s
+=== generating keypairs ===
+initiator=36Nmqph3dsdUFVUjK4rkJxSTyYR9hDHfPmTxNp6yVzT3 recipient=ATRmY7hTMkgd6im8X8U7irNC36qcAdg2JvsAEpgEX31D stranger=4TzMoqnFhgpY4LfRzN18cYzSWZeDgA56KBxyFwzzUQoo
+=== starting solana-test-validator ===
+validator ready: 4.2.2
+PASS: x3_htlc is deployed and executable on-chain at X3HTLC1111111111111111111111111111111111111
+=== creating SPL mint and token accounts ===
+mint=CyhMxXxFvC9qkykEJNEBWE6NEwnU2ySrZqpHEJzuMaUS
+FAIL: SPL mint is owned by the on-chain token program (expected 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', got 'MISSING')
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json,sys; print(json.load(sys.stdin)['result']['value'][0]['pubkey'])
+                           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 'result'

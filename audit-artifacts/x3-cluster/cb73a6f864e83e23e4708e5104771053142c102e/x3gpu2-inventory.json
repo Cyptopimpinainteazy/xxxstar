@@ -1,0 +1,64 @@
+{
+  "node": "x3gpu2",
+  "ip": "192.168.0.23",
+  "mac": "60:45:cb:81:d5:5c",
+  "label": "PHYSICAL-METRICS",
+  "collected": "2026-10-03T09:59:44+00:00",
+  "how": "read-only: node_exporter :9100 and Ollama :11434 over the LAN; SSH refuses x3star1's key",
+  "identified_by": [
+    "reverse DNS 192.168.0.23 -> x3gpu2",
+    "avahi -a 192.168.0.23 -> x3gpu2",
+    "node_uname_info nodename=x3gpu2"
+  ],
+  "facts": {
+    "threads": 2,
+    "ram_gb": 25.1,
+    "free_gb": 8.9,
+    "gpus": [
+      {
+        "uuid": "GPU-1783d228-a6f5-9776-6296-194bc6f7613b",
+        "memory_total_mib": 8192.0,
+        "memory_used_mib": 6201.0,
+        "power_watts": 31.05,
+        "temperature_celsius": 38.0,
+        "utilization_percent": 0.0
+      }
+    ],
+    "clock_synced": true,
+    "os": "Ubuntu 22.04.5 LTS",
+    "hostname": "x3gpu2",
+    "kernel": "6.8.0-138-generic",
+    "failed_units": [],
+    "ollama_workers": {
+      "11434": {
+        "ok": true,
+        "bind": "LAN",
+        "models": [
+          "qwen2.5-coder:7b",
+          "qwen3:8b"
+        ]
+      }
+    }
+  },
+  "x3_units_active": [
+    "nvidia-persistenced.service",
+    "ollama.service",
+    "ssh.service",
+    "x3-ai-router.service",
+    "x3-compute-coordinator.service",
+    "x3-nvidia-metrics.timer",
+    "x3-worker.service"
+  ],
+  "inference": {
+    "model": "qwen2.5-coder:7b",
+    "eval_tokens_per_s": 44.9,
+    "size_vram_gb": 5.18,
+    "load_s": 3.0,
+    "comparison_same_prompt": {
+      "x3gpu1 RTX 2060 SUPER :11434": 96.1,
+      "x3gpu1 GTX 1070 :11436": 45.8
+    }
+  },
+  "router_proof": "PR #578 router (this commit's services/x3-ai-router) with providers={} and only providers.d/x3gpu2.json: registered 2 providers, POST /v1/chat/completions model=x3-local -> 200, qwen2.5-coder:7b answered 'ok'. Live tool probe: qwen3:8b 0/2 genuine tool calls (router demoted it).",
+  "security": "Ollama :11434 and node_exporter :9100 are reachable from the whole LAN (no auth); x3-join.sh restricts both to x3star1"
+}

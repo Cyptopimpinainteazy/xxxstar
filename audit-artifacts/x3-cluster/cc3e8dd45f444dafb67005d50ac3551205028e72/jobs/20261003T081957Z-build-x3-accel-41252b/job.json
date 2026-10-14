@@ -1,0 +1,41 @@
+{
+  "id": "20261003T081957Z-build-x3-accel-41252b",
+  "name": "build-x3-accel",
+  "class": "BUILD",
+  "cmd": "cargo build --locked -p x3-accel -p x3-accel-wgpu",
+  "commit": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "ref": "cc3e8dd45f444dafb67005d50ac3551205028e72",
+  "priority": "HIGH",
+  "timeout": 3600,
+  "node": null,
+  "min_free_gb": 30,
+  "submitted": "2026-10-03T08:19:57+00:00",
+  "controller": "x3star1",
+  "worker": "x3star1",
+  "label": "LOCAL-FALLBACK",
+  "rejected_workers": [
+    {
+      "node": "x3build1",
+      "reason": "unreachable or SSH key auth failed"
+    }
+  ],
+  "exit_code": 0,
+  "result": "PASS",
+  "seconds": 61.6,
+  "machine": "x3star1",
+  "kernel": "6.8.0-146-generic",
+  "toolchain": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "cc": "cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0"
+  },
+  "start": "2026-10-03T08:20:04Z",
+  "end": "2026-10-03T08:20:57Z",
+  "worker_repo": "/home/lojak/Desktop/xxxstar-main",
+  "target_dir": "/home/lojak/.cache/x3-cluster/target",
+  "worker_free_gb": "283",
+  "log_sha256": "c10df67c3f60d1ad96e54718a0ffb683cb36dc4b85e502c3b86e3e756d47b85b",
+  "log_tail": "-sys v1.1.0\n   Compiling glow v0.13.1\n   Compiling tiny-keccak v2.0.2\n   Compiling byteorder v1.5.0\n   Compiling raw-window-handle v0.6.2\n   Compiling litrs v1.0.0\n   Compiling once_cell v1.21.4\n   Compiling wgpu v0.20.1\n   Compiling hashbrown v0.15.5\n   Compiling fixed-hash v0.8.0\n   Compiling zeroize v1.9.0\n   Compiling signature v2.2.0\n   Compiling bytemuck v1.25.2\n   Compiling gpu-alloc-types v0.3.1\n   Compiling cc v1.4.5\n   Compiling generic-array v0.14.7\n   Compiling bit-set v0.5.3\n   Compiling gpu-descriptor-types v0.2.0\n   Compiling spirv v0.3.0+sdk-1.3.268.0\n   Compiling rustc_version v0.4.1\n   Compiling wgpu-types v0.20.0\n   Compiling num-traits v0.2.19\n   Compiling pollster v1.0.1\n   Compiling codespan-reporting v0.11.1\n   Compiling ed25519 v2.2.3\n   Compiling uint v0.10.1\n   Compiling primitive-types v0.13.1\n   Compiling gpu-alloc v0.6.2\n   Compiling curve25519-dalek v4.1.3\n   Compiling indexmap v2.14.2\n   Compiling document-features v0.2.12\n   Compiling gpu-descriptor v0.3.2\n   Compiling syn v2.0.119\n   Compiling secp256k1-sys v0.9.2\n   Compiling crypto-common v0.1.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/patches/crypto-common)\n   Compiling block-buffer v0.10.4\n   Compiling digest v0.10.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/patches/digest)\n   Compiling sha2 v0.10.9\n   Compiling blake2 v0.10.6\n   Compiling parking_lot v0.12.5\n   Compiling keccak-hash v0.11.0\n   Compiling thiserror-impl v1.0.69\n   Compiling curve25519-dalek-derive v0.1.1\n   Compiling naga v0.20.0\n   Compiling ed25519-dalek v2.2.0\n   Compiling secp256k1 v0.28.2\n   Compiling x3-accel v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/crates/x3-accel)\n   Compiling x3-accel-wgpu v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/crates/x3-accel-wgpu)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 52.68s\nX3JOB-META end=2026-10-03T08:20:57Z\n",
+  "artifacts": [],
+  "finished": "2026-10-03T08:20:58+00:00"
+}

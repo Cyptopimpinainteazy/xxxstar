@@ -1,0 +1,111 @@
+X3JOB-META free_gb=283
+X3JOB-META host=x3star1
+X3JOB-META repo=/home/lojak/Desktop/xxxstar-main
+X3JOB-META kernel=6.8.0-146-generic
+X3JOB-META rustc=rustc 1.90.0 (1159e78c4 2025-09-14)
+X3JOB-META cargo=cargo 1.90.0 (840b83a10 2025-07-30)
+X3JOB-META cc=cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+X3JOB-META target_dir=/home/lojak/.cache/x3-cluster/target
+X3JOB-META start=2026-10-03T08:20:04Z
+warning: /home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling cfg-if v1.0.4
+   Compiling bitflags v2.13.1
+   Compiling version_check v0.9.5
+   Compiling cfg_aliases v0.1.1
+   Compiling libc v0.2.189
+   Compiling typenum v1.20.1
+   Compiling thiserror v1.0.69
+   Compiling autocfg v1.5.1
+   Compiling static_assertions v1.1.0
+   Compiling parking_lot_core v0.9.12
+   Compiling crunchy v0.2.4
+   Compiling semver v1.0.28
+   Compiling unicode-width v0.1.14
+   Compiling smallvec v1.16.1
+   Compiling ash v0.37.3+1.3.251
+   Compiling shlex v2.0.1
+   Compiling hashbrown v0.17.1
+   Compiling subtle v2.6.1
+   Compiling khronos-egl v6.0.0
+   Compiling equivalent v1.0.2
+   Compiling bit-vec v0.6.3
+   Compiling scopeguard v1.2.0
+   Compiling find-msvc-tools v0.1.12
+   Compiling termcolor v1.4.1
+   Compiling foldhash v0.1.5
+   Compiling arrayvec v0.7.8
+   Compiling unicode-xid v0.2.6
+   Compiling log v0.4.34
+   Compiling rustc-hash v1.1.0
+   Compiling hexf-parse v0.2.1
+   Compiling cpufeatures v0.2.17
+   Compiling hex v0.4.3
+   Compiling profiling v1.0.18
+   Compiling libloading v0.7.4
+   Compiling wgpu-hal v0.21.1
+   Compiling libloading v0.8.9
+   Compiling lock_api v0.4.14
+   Compiling wgpu-core v0.21.1
+   Compiling renderdoc-sys v1.1.0
+   Compiling glow v0.13.1
+   Compiling tiny-keccak v2.0.2
+   Compiling byteorder v1.5.0
+   Compiling raw-window-handle v0.6.2
+   Compiling litrs v1.0.0
+   Compiling once_cell v1.21.4
+   Compiling wgpu v0.20.1
+   Compiling hashbrown v0.15.5
+   Compiling fixed-hash v0.8.0
+   Compiling zeroize v1.9.0
+   Compiling signature v2.2.0
+   Compiling bytemuck v1.25.2
+   Compiling gpu-alloc-types v0.3.1
+   Compiling cc v1.4.5
+   Compiling generic-array v0.14.7
+   Compiling bit-set v0.5.3
+   Compiling gpu-descriptor-types v0.2.0
+   Compiling spirv v0.3.0+sdk-1.3.268.0
+   Compiling rustc_version v0.4.1
+   Compiling wgpu-types v0.20.0
+   Compiling num-traits v0.2.19
+   Compiling pollster v1.0.1
+   Compiling codespan-reporting v0.11.1
+   Compiling ed25519 v2.2.3
+   Compiling uint v0.10.1
+   Compiling primitive-types v0.13.1
+   Compiling gpu-alloc v0.6.2
+   Compiling curve25519-dalek v4.1.3
+   Compiling indexmap v2.14.2
+   Compiling document-features v0.2.12
+   Compiling gpu-descriptor v0.3.2
+   Compiling syn v2.0.119
+   Compiling secp256k1-sys v0.9.2
+   Compiling crypto-common v0.1.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/patches/crypto-common)
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/patches/digest)
+   Compiling sha2 v0.10.9
+   Compiling blake2 v0.10.6
+   Compiling parking_lot v0.12.5
+   Compiling keccak-hash v0.11.0
+   Compiling thiserror-impl v1.0.69
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling naga v0.20.0
+   Compiling ed25519-dalek v2.2.0
+   Compiling secp256k1 v0.28.2
+   Compiling x3-accel v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/crates/x3-accel)
+   Compiling x3-accel-wgpu v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T081957Z-build-x3-accel-41252b/crates/x3-accel-wgpu)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 52.68s
+X3JOB-META end=2026-10-03T08:20:57Z

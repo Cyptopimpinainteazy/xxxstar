@@ -102,6 +102,9 @@ sp-core = { workspace = true }
 sp-inherents = { workspace = true }
 sp-runtime = { workspace = true }
 sp-io = { workspace = true }
+# `storage_proof_size` host function: pallet-evm's proof-size gas accounting imports it, so a
+# runtime with `frontier` cannot even be instantiated by an executor that lacks it.
+cumulus-primitives-proof-size-hostfunction = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-timestamp = { workspace = true }
 sp-keystore = { workspace = true }
 
@@ -177,3 +180,6 @@ tempfile = { workspace = true }
 # The producer: this test boots an anvil, has the relayer build the receipt
 # proof for a transaction in a real block, and submits it to the engine.
 x3-relayer = { path = "../crates/x3-relayer" }
+
+# Live historical-state rehearsal enacts an upgrade through the real governance calls.
+pallet-governance = { path = "../pallets/governance", default-features = false, features = ["std"] }

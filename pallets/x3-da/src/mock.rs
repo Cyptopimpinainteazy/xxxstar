@@ -53,7 +53,7 @@ impl system::Config for Test {
 }
 
 parameter_types! {
-    pub const ExistentialDeposit: u128 = 1;
+    pub static ExistentialDeposit: u128 = 1;
 }
 
 impl pallet_balances::Config for Test {
@@ -74,6 +74,11 @@ impl pallet_balances::Config for Test {
 }
 
 parameter_types! {
+    /// Funded in `new_test_ext`, as a live treasury would be.
+    pub const Treasury: u64 = 99;
+}
+
+parameter_types! {
     pub const MaxBlobSize: u32 = 1024;
     pub const DaPerByteFee: u128 = 5;
     pub const MaxShardProofs: u32 = 8;
@@ -82,6 +87,7 @@ parameter_types! {
 
 impl pallet_x3_da::Config for Test {
     type Currency = Balances;
+    type ProtocolTreasury = Treasury;
     type MaxBlobSize = MaxBlobSize;
     type PerByteFee = DaPerByteFee;
     type MaxShardProofs = MaxShardProofs;
@@ -96,7 +102,12 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .unwrap();
 
     pallet_balances::GenesisConfig::<Test> {
-        balances: vec![(1, 10_000_000), (2, 10_000_000), (3, 10_000_000)],
+        balances: vec![
+            (1, 10_000_000),
+            (2, 10_000_000),
+            (3, 10_000_000),
+            (Treasury::get(), 1),
+        ],
         dev_accounts: None,
     }
     .assimilate_storage(&mut t)

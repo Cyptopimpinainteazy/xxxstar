@@ -1326,7 +1326,11 @@ pub mod pallet {
             let svm_compute_limit = T::DefaultSvmComputeLimit::get();
 
             let evm_receipt = if let Some(ref tx) = evm_tx {
-                match T::EvmAdapter::execute(tx, evm_gas_limit) {
+                match T::EvmAdapter::execute_from(
+                    tx,
+                    evm_gas_limit,
+                    crate::adapters::authenticated_evm_address(&who),
+                ) {
                     Ok(receipt) => Some(receipt),
                     Err(_e) => {
                         return Err(Self::fail_with_reason(
@@ -1579,7 +1583,11 @@ pub mod pallet {
 
             let evm_receipt = if let Some(ref tx) = evm_tx {
                 // Execute EVM payload via configured adapter
-                match T::EvmAdapter::execute(tx, evm_gas_limit) {
+                match T::EvmAdapter::execute_from(
+                    tx,
+                    evm_gas_limit,
+                    crate::adapters::authenticated_evm_address(&who),
+                ) {
                     Ok(receipt) => Some(receipt),
                     Err(_e) => {
                         // EVM execution failed - return with detailed error
@@ -1866,7 +1874,11 @@ pub mod pallet {
             let x3_gas_limit = T::DefaultX3GasLimit::get();
 
             let evm_receipt = if let Some(ref tx) = evm_tx {
-                match T::EvmAdapter::execute(tx, evm_gas_limit) {
+                match T::EvmAdapter::execute_from(
+                    tx,
+                    evm_gas_limit,
+                    crate::adapters::authenticated_evm_address(&who),
+                ) {
                     Ok(receipt) => Some(receipt),
                     Err(_e) => {
                         return Err(Self::fail_with_reason(
@@ -3925,12 +3937,18 @@ pub mod pallet {
     impl<T: Config> CrossVmDispatcher for KernelCrossVmDispatcher<T> {
         fn execute_evm_tx(
             &self,
-            _caller: &[u8; 20],
-            _target: &[u8; 20],
+            caller: &[u8; 20],
+            target: &[u8; 20],
             input: &[u8],
-            _value: u128,
+            value: u128,
         ) -> Result<CrossVmResult, DispatchError> {
-            let receipt = T::EvmAdapter::execute(input, T::DefaultEvmGasLimit::get())?;
+            let receipt = T::EvmAdapter::execute_call(
+                sp_core::H160::from_slice(caller),
+                sp_core::H160::from_slice(target),
+                input,
+                value,
+                T::DefaultEvmGasLimit::get(),
+            )?;
             if receipt.success {
                 Ok(CrossVmResult::success(
                     receipt.return_data,

@@ -134,6 +134,8 @@ use sp_std::prelude::*;
 use x3_asset_kernel_types::DomainId;
 
 #[cfg(feature = "frontier")]
+pub mod ethereum_tx;
+#[cfg(feature = "frontier")]
 mod precompiles;
 #[cfg(feature = "frontier")]
 use precompiles::FrontierPrecompiles;
@@ -392,7 +394,17 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // a genesis-named gateway account since 19) or `finalize_with_settlement` (`SettlementOrigin`).
     // One call and one weight entry removed, no storage key changes shape, so no migration.
     // `transaction_version` is unchanged: no existing call's encoding moved.
-    spec_version: 20,
+    // 21: the X3 Guardian pallets (X3AppRegistry, X3SecurityGate, X3TrustGate) join
+    // construct_runtime in every variant. New pallets only, with empty genesis
+    // storage; no existing pallet's storage changes shape, so no migration.
+    // `transaction_version` is unchanged: no existing call's encoding moved.
+    // 22: the default WASM EVM now persists content-addressed contract state in
+    // the chain trie. Failed execution and enclosing atomic transaction failure
+    // roll back these writes. Existing state had no EVM keys, so no migration.
+    // Same release: signed Ethereum transactions become self-contained extrinsics
+    // (fp_self_contained::UncheckedExtrinsic). Existing signed extrinsics encode
+    // exactly as before, so `transaction_version` is unchanged.
+    spec_version: 22,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -605,6 +617,9 @@ construct_runtime!(
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
         NorthernSwarm: pallet_northern_swarm,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -683,6 +698,9 @@ construct_runtime!(
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
         NorthernSwarm: pallet_northern_swarm,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -750,6 +768,9 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         NorthernSwarm: pallet_northern_swarm,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -829,6 +850,9 @@ construct_runtime!(
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
         NorthernSwarm: pallet_northern_swarm,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
@@ -910,12 +934,51 @@ construct_runtime!(
         NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
+        X3AppRegistry: pallet_x3_app_registry,
+        X3SecurityGate: pallet_x3_security_gate,
+        X3TrustGate: pallet_x3_trust_gate,
     }
 );
 
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+#[cfg(not(feature = "frontier"))]
 pub type UncheckedExtrinsic =
     generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+/// With Frontier, a signed Ethereum transaction is a self-contained extrinsic whose sender the
+/// runtime recovers from its ECDSA signature (see `ethereum_tx`).
+#[cfg(feature = "frontier")]
+pub type UncheckedExtrinsic =
+    fp_self_contained::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+
+/// The generic extrinsic inside an [`UncheckedExtrinsic`], whichever extrinsic type this build
+/// uses, so native code can read the preamble and call without its own `frontier` switch.
+pub fn generic_extrinsic(
+    xt: UncheckedExtrinsic,
+) -> generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra> {
+    #[cfg(feature = "frontier")]
+    {
+        xt.0
+    }
+    #[cfg(not(feature = "frontier"))]
+    {
+        xt
+    }
+}
+
+/// For a signed Ethereum transaction: the account its signature-recovered sender maps to, and
+/// its nonce. `None` for every other call, for a signature that does not recover, and on builds
+/// without Frontier.
+pub fn ethereum_sender_and_nonce(call: &RuntimeCall) -> Option<(AccountId, u64)> {
+    #[cfg(feature = "frontier")]
+    {
+        ethereum_tx::sender_and_nonce(call)
+    }
+    #[cfg(not(feature = "frontier"))]
+    {
+        let _ = call;
+        None
+    }
+}
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 // Runtime storage migrations tuple. Add migration structs for pallets that need upgrades.
 pub type Migrations = (
@@ -1785,7 +1848,7 @@ impl pallet_x3_kernel::Config for Runtime {
     #[cfg(all(feature = "std", feature = "frontier"))]
     type X3Adapter = pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
-    type EvmAdapter = pallet_x3_kernel::wasm_adapters::WasmEvmAdapter;
+    type EvmAdapter = pallet_x3_kernel::wasm_adapters::ContextualWasmEvmAdapter<Runtime>;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
     type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
@@ -1880,7 +1943,7 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     #[cfg(all(feature = "std", feature = "frontier"))]
     type X3Adapter = pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
-    type EvmAdapter = pallet_x3_kernel::wasm_adapters::WasmEvmAdapter;
+    type EvmAdapter = pallet_x3_kernel::wasm_adapters::ContextualWasmEvmAdapter<Runtime>;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
     type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
@@ -1926,7 +1989,16 @@ mod native_vm_adapters {
     const CANONICAL_NATIVE_ASSET_ID: AssetId = 0;
 
     impl EvmExecutorAdapter for NativeEvmAdapter {
-        fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+        fn execute(_payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+            Err(DispatchError::Other(
+                "EVM execution requires an authenticated caller",
+            ))
+        }
+        fn execute_from(
+            payload: &[u8],
+            gas_limit: u64,
+            source: H160,
+        ) -> Result<ExecutionReceipt, DispatchError> {
             // The kernel's non-empty EVM payload is a SCALE-encoded `Packet`, and Frontier would
             // treat those bytes as init code: the packet's discriminant `0x00` is `STOP`, so `create`
             // reports success for an empty contract and the chain stores a receipt for work that
@@ -1938,8 +2010,6 @@ mod native_vm_adapters {
             }
 
             // Use Frontier's Runner directly for real EVM execution
-            let source = H160::zero(); // System caller
-            let target = H160::zero(); // Default target (for create, this is ignored)
             let value = U256::zero();
             let evm_config = fp_evm::Config::shanghai();
 
@@ -1947,12 +2017,8 @@ mod native_vm_adapters {
             // collect_evm_balance_changes can compute deltas instead of snapshots.
             let pre_balances = evm_balance_snapshot(&[source]);
 
-            // Determine whether to perform a contract call or creation.
-            // If the payload represents raw bytecode (typical for contract deployment),
-            // perform a `create` so the bytecode is executed as contract initialization.
-            // Full implementation would parse tx type from payload.
-            // Try contract creation first (treat payload as init code). If that fails,
-            // fall back to a call to the zero address (some payloads are call data).
+            // This interface accepts init code. Refuse failed creation rather than
+            // executing the same bytes as calldata against an unrelated account.
             let create_res = <super::Runtime as pallet_evm::Config>::Runner::create(
                 source,
                 payload.to_vec(),
@@ -2001,34 +2067,7 @@ mod native_vm_adapters {
                 });
             }
 
-            // Fall back to a regular call to `target` (zero address by default).
-            let call_res = <super::Runtime as pallet_evm::Config>::Runner::call(
-                source,
-                target,
-                payload.to_vec(),
-                value,
-                gas_limit,
-                Some(U256::from(super::NATIVE_GAS_PRICE)),
-                None,
-                None,
-                Vec::new(),
-                Vec::new(), // authorization_list
-                false,
-                false,
-                None,
-                None,
-                &evm_config,
-            );
-
-            match call_res {
-                Ok(info) => Ok(map_call_info_to_receipt(
-                    info,
-                    source,
-                    Some(target),
-                    &pre_balances,
-                )),
-                Err(_e) => Err(DispatchError::Other("EVM execution failed")),
-            }
+            Err(DispatchError::Other("EVM contract creation failed"))
         }
 
         fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
@@ -2942,6 +2981,7 @@ impl pallet_private_execution::Config for Runtime {
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_sequencer::Config for Runtime {
     type Currency = Balances;
+    type ProtocolTreasury = TreasuryAccountId;
     type MaxTxsPerBatch = SeqMaxTxsPerBatch;
     type MaxPayloadSize = SeqMaxPayloadSize;
     type PerByteFee = SeqPerByteFee;
@@ -2974,6 +3014,7 @@ impl ProposerQuery<AccountId> for Runtime {
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_da::Config for Runtime {
     type Currency = Balances;
+    type ProtocolTreasury = TreasuryAccountId;
     type MaxBlobSize = DaMaxBlobSize;
     type PerByteFee = DaPerByteFee;
     type MaxShardProofs = DaMaxShardProofs;
@@ -3282,6 +3323,127 @@ impl pallet_x3_sentinel::Config for Runtime {
     // this deliberately defaults to the strongest, easiest-to-audit origin.
     type FreezeOrigin = frame_system::EnsureRoot<AccountId>;
     type WeightInfo = pallet_x3_sentinel::weights::SubstrateWeight<Runtime>;
+}
+
+// ===== X3 Guardian Configuration =====
+//
+// Guardian is the on-chain half of the application-trust system: the registry
+// binds a certification to an exact artifact hash, the security gate holds the
+// versioned rules an artifact must satisfy, and the trust gate holds the
+// privileged-capability census judged against the category an application
+// claims (Guardian spec §2, §3, §5, §16).
+//
+// Until these pallets were members of a `construct_runtime!` block, no Guardian
+// rule could refuse anything on chain — the pallets compiled as
+// members-of-nothing (see the checklist item WIRE-1). Wiring them makes their
+// privileged origins, and therefore their refusals, real.
+parameter_types! {
+    /// Hard ceiling on registered applications.
+    pub const GuardianMaxApplications: u32 = 10_000;
+    /// Hard ceiling on addresses bound to a single application.
+    pub const GuardianMaxAddressesPerApp: u32 = 16;
+    /// Hard ceiling on versions retained for a single application.
+    pub const GuardianMaxVersionsPerApp: u32 = 64;
+    /// Maximum length of a recorded severity-exception justification.
+    pub const GuardianMaxJustificationLen: u32 = 1_024;
+}
+
+parameter_types! {
+    /// The derived, non-signer account that Root-enacted Guardian actions are
+    /// attributed to. `Root` carries no `AccountId` in this SDK
+    /// (`EnsureRoot<AccountId>::Success = ()`), but the Guardian gates record the
+    /// acting account on every privileged action; a governance enactment arrives
+    /// as `Root` (see `pallet_governance::enact_proposal`), so it needs a stable
+    /// identity rather than a dropped attribution. Deriving it from a `PalletId`
+    /// keeps it provably distinct from any signer's key material (the same idiom
+    /// the treasury account uses).
+    pub const GuardianRootPalletId: PalletId = PalletId(*b"py/grdn!");
+    pub GuardianRootActor: AccountId = GuardianRootPalletId::get().into_account_truncating();
+}
+
+/// The Guardian authority: certification, restriction, revocation, ruleset
+/// activation and privilege censuses are security powers. They are available to
+/// a majority of the council (yielding the acting member) or to Root — the
+/// origin governance enacts approved proposals as — and never to a bare signed
+/// account, which is exactly what the pallets' `GuardianOrigin` docs require.
+///
+/// Both the security gate and the trust gate need `Success = AccountId`; the
+/// app registry's `GuardianOrigin` is account-less, so it reuses the same
+/// adapter and discards the account. One authority, one place to audit.
+pub struct GuardianAuthority;
+
+impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for GuardianAuthority {
+    type Success = AccountId;
+
+    fn try_origin(o: RuntimeOrigin) -> Result<AccountId, RuntimeOrigin> {
+        // Authorize exactly like the rest of the runtime's security powers:
+        // Root (a governance enactment) or a majority of the council. A bare
+        // signed account is refused here, before any attribution happens.
+        if <EnsureRootOrHalfCouncil as frame_support::traits::EnsureOrigin<RuntimeOrigin>>::try_origin(
+            o.clone(),
+        )
+        .is_err()
+        {
+            return Err(o);
+        }
+
+        // Attribute the action to the acting council member when the origin is a
+        // single member's signed origin. Root and motion-enacted calls carry no
+        // account, so they are attributed to the derived, non-signer actor.
+        if let Ok(member) = <EnsureCouncilMember as frame_support::traits::EnsureOrigin<
+            RuntimeOrigin,
+        >>::try_origin(o.clone())
+        {
+            return Ok(member);
+        }
+
+        Ok(GuardianRootActor::get())
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(frame_system::RawOrigin::Root.into())
+    }
+}
+
+/// `pallet-x3-app-registry`'s privileged origin discards the acting account.
+pub struct GuardianAuthorityAccountless;
+
+impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for GuardianAuthorityAccountless {
+    type Success = ();
+
+    fn try_origin(o: RuntimeOrigin) -> Result<(), RuntimeOrigin> {
+        <GuardianAuthority as frame_support::traits::EnsureOrigin<RuntimeOrigin>>::try_origin(o)
+            .map(|_| ())
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        <GuardianAuthority as frame_support::traits::EnsureOrigin<RuntimeOrigin>>::try_successful_origin()
+    }
+}
+
+impl pallet_x3_app_registry::Config for Runtime {
+    // Registration is permissionless by design (Guardian spec §4): any signed
+    // account may register an EXPERIMENTAL application; it inherits no
+    // privileges until the Guardian certifies its exact artifact hash.
+    type OwnerOrigin = frame_system::EnsureSigned<AccountId>;
+    type GuardianOrigin = GuardianAuthorityAccountless;
+    type MaxApplications = GuardianMaxApplications;
+    type MaxAddressesPerApp = GuardianMaxAddressesPerApp;
+    type MaxVersionsPerApp = GuardianMaxVersionsPerApp;
+    type WeightInfo = pallet_x3_app_registry::weights::SubstrateWeight<Runtime>;
+}
+
+impl pallet_x3_security_gate::Config for Runtime {
+    type GuardianOrigin = GuardianAuthority;
+    type MaxJustificationLen = GuardianMaxJustificationLen;
+    type WeightInfo = pallet_x3_security_gate::weights::SubstrateWeight<Runtime>;
+}
+
+impl pallet_x3_trust_gate::Config for Runtime {
+    type GuardianOrigin = GuardianAuthority;
+    type WeightInfo = pallet_x3_trust_gate::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Launchpad Configuration =====
@@ -3896,239 +4058,12 @@ impl_runtime_apis! {
             balance > 0
         }
 
-        #[allow(unused_variables)]
-        fn submit_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
-            #[cfg(feature = "frontier")]
-            {
-            #[cfg(feature = "frontier")]
-            {
-            // Payload contract:
-            // [caller(20)] [to(20)] [value(16 LE)] [data_len(4 LE)] [data...]
-            use sp_io::hashing::keccak_256;
-            use fp_evm::ExitReason;
-            use pallet_evm::Runner;
-            use sp_core::{H160, H256, U256};
-            use codec::Encode;
-
-            // Compute tx_hash once at the start for replay prevention check
-            let tx_hash = keccak_256(&raw_tx);
-
-            // Check for replay - reject if this transaction was already submitted
-            if pallet_x3_kernel::SubmittedComits::<Runtime>::contains_key(H256::from_slice(tx_hash.as_ref())) {
-                return Err(b"transaction already submitted (replay detected)".to_vec());
-            }
-
-            if raw_tx.len() < (20 + 20 + 16 + 4) {
-                return Err(b"invalid payload: too short".to_vec());
-            }
-
-            let caller = {
-                let mut bytes = [0u8; 20];
-                bytes.copy_from_slice(&raw_tx[0..20]);
-                H160::from(bytes)
-            };
-            let to = {
-                let mut bytes = [0u8; 20];
-                bytes.copy_from_slice(&raw_tx[20..40]);
-                H160::from(bytes)
-            };
-            let value = U256::from_little_endian(&raw_tx[40..56]);
-            let data_len = u32::from_le_bytes(raw_tx[56..60].try_into().unwrap_or([0u8; 4])) as usize;
-            if raw_tx.len() < 60 + data_len {
-                return Err(b"invalid payload: data_len out of bounds".to_vec());
-            }
-            let data = raw_tx[60..60 + data_len].to_vec();
-
-            use sp_runtime::traits::BlakeTwo256;
-            let caller_account: AccountId = <pallet_evm::HashedAddressMapping<BlakeTwo256>
-                as pallet_evm::AddressMapping<AccountId>>::into_account_id(caller);
-            let tx_nonce = frame_system::Pallet::<Runtime>::account_nonce(&caller_account) as u64;
-
-            log::info!(
-                target: "runtime::evm",
-                "submit_evm_transaction caller=0x{:?} to=0x{:?} value={} data_len={}",
-                caller,
-                to,
-                value,
-                data_len,
-            );
-
-            let evm_config = fp_evm::Config::shanghai();
-
-            // Persist full tx metadata for eth_getTransactionByHash compatibility.
-            let tx_data = pallet_x3_kernel::pallet::EvmTransactionData {
-                raw: raw_tx.clone(),
-                from: caller.as_bytes().to_vec(),
-                to: to.as_bytes().to_vec(),
-                value: value.as_u128(),
-                gas: 10_000_000u64,
-                input: data.clone(),
-                nonce: tx_nonce,
-                gas_price: NATIVE_GAS_PRICE as u128,
-            };
-            pallet_x3_kernel::EvmTransactions::<Runtime>::insert(
-                H256::from_slice(tx_hash.as_ref()),
-                tx_data,
-            );
-            let result = <Runtime as pallet_evm::Config>::Runner::call(
-                caller,
-                to,
-                data,
-                value,
-                10_000_000u64,
-                Some(U256::from(NATIVE_GAS_PRICE)),
-                None,
-                None,
-                Vec::new(),
-                Vec::new(), // authorization_list
-                false,
-                false,
-                None,
-                None,
-                &evm_config,
-            );
-
-            match result {
-                Ok(info) => match info.exit_reason {
-                    ExitReason::Succeed(_) => {
-                        // Build execution receipt
-                        let receipt = pallet_x3_kernel::ExecutionReceipt {
-                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
-                            success: true,
-                            gas_used: info.used_gas.standard.low_u64(),
-                            return_data: info.value.to_vec(),
-                            logs: info
-                                .logs
-                                .into_iter()
-                                .map(|log| pallet_x3_kernel::ExecutionLog {
-                                    address: log.address.as_bytes().to_vec(),
-                                    topics: log.topics,
-                                    data: log.data,
-                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
-                                })
-                                .collect(),
-                            state_changes: Vec::new(),
-                            storage_writes: Vec::new(),
-                            protocol_version: 1,
-                            migration_history: Vec::new(),
-                            compatibility_flags: 0,
-                            from: caller.as_bytes().to_vec(),
-                            to: to.as_bytes().to_vec(),
-                            value: value.as_u128(),
-                        };
-                        // Store receipt keyed by transaction hash
-                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
-                            H256::from_slice(tx_hash.as_ref()),
-                            receipt,
-                        );
-                        // Record transaction as submitted for replay prevention
-                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
-                        Ok(tx_hash.to_vec())
-                    }
-                    ExitReason::Revert(_) => {
-                        // Build execution receipt for reverted transaction
-                        let receipt = pallet_x3_kernel::ExecutionReceipt {
-                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
-                            success: false,
-                            gas_used: info.used_gas.standard.low_u64(),
-                            return_data: info.value.to_vec(),
-                            logs: info
-                                .logs
-                                .into_iter()
-                                .map(|log| pallet_x3_kernel::ExecutionLog {
-                                    address: log.address.as_bytes().to_vec(),
-                                    topics: log.topics,
-                                    data: log.data,
-                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
-                                })
-                                .collect(),
-                            state_changes: Vec::new(),
-                            storage_writes: Vec::new(),
-                            protocol_version: 1,
-                            migration_history: Vec::new(),
-                            compatibility_flags: 0,
-                            from: caller.as_bytes().to_vec(),
-                            to: to.as_bytes().to_vec(),
-                            value: value.as_u128(),
-                        };
-                        // Store receipt keyed by transaction hash
-                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
-                            H256::from_slice(tx_hash.as_ref()),
-                            receipt,
-                        );
-                        // Record transaction as submitted for replay prevention
-                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
-                        Err(info.value)
-                    }
-                    ExitReason::Error(_) | ExitReason::Fatal(_) => {
-                        // Build execution receipt for failed transaction
-                        let receipt = pallet_x3_kernel::ExecutionReceipt {
-                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
-                            success: false,
-                            gas_used: info.used_gas.standard.low_u64(),
-                            return_data: info.value.to_vec(),
-                            logs: info
-                                .logs
-                                .into_iter()
-                                .map(|log| pallet_x3_kernel::ExecutionLog {
-                                    address: log.address.as_bytes().to_vec(),
-                                    topics: log.topics,
-                                    data: log.data,
-                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
-                                })
-                                .collect(),
-                            state_changes: Vec::new(),
-                            storage_writes: Vec::new(),
-                            protocol_version: 1,
-                            migration_history: Vec::new(),
-                            compatibility_flags: 0,
-                            from: caller.as_bytes().to_vec(),
-                            to: to.as_bytes().to_vec(),
-                            value: value.as_u128(),
-                        };
-                        // Store receipt keyed by transaction hash
-                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
-                            H256::from_slice(tx_hash.as_ref()),
-                            receipt,
-                        );
-                        // Record transaction as submitted for replay prevention
-                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
-                        Err(info.value)
-                    }
-                },
-                Err(_) => {
-                    // Build execution receipt for runner failure
-                    let receipt = pallet_x3_kernel::ExecutionReceipt {
-                        version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
-                        success: false,
-                        gas_used: 0,
-                        return_data: b"EVM runner call failed".to_vec(),
-                        logs: Vec::new(),
-                        state_changes: Vec::new(),
-                        storage_writes: Vec::new(),
-                        protocol_version: 1,
-                        migration_history: Vec::new(),
-                        compatibility_flags: 0,
-                        from: caller.as_bytes().to_vec(),
-                        to: to.as_bytes().to_vec(),
-                        value: value.as_u128(),
-                    };
-                    // Store receipt keyed by transaction hash
-                    pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
-                        H256::from_slice(tx_hash.as_ref()),
-                        receipt,
-                    );
-                    // Record transaction as submitted for replay prevention
-                    pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
-                    Err(b"EVM runner call failed".to_vec())
-                }
-            }
-            }
-            #[cfg(not(feature = "frontier"))]
-            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
-            }
-            #[cfg(not(feature = "frontier"))]
-            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
+        // Refused on every build. The payload named its own `caller`, and the EVM ran as that
+        // address with no signature checked. A signed Ethereum transaction goes through the
+        // transaction pool as a self-contained extrinsic (`eth_sendRawTransaction`), where the
+        // runtime recovers the sender from the signature (`ethereum_tx`).
+        fn submit_evm_transaction(_raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
+            Err(b"unsigned EVM payloads are refused; submit a signed Ethereum transaction with eth_sendRawTransaction".to_vec())
         }
 
         fn submit_svm_instruction(program_id: [u8; 32], instruction_data: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
@@ -5429,8 +5364,11 @@ mod vm_adapter_tests {
         // Test that NativeEvmAdapter uses real Frontier
         let simple_evm_bytecode = vec![0x60, 0x00, 0x60, 0x00, 0xf3]; // PUSH1 0 PUSH1 0 RETURN
         sp_io::TestExternalities::default().execute_with(|| {
-            let result =
-                super::native_vm_adapters::NativeEvmAdapter::execute(&simple_evm_bytecode, 100_000);
+            let result = super::native_vm_adapters::NativeEvmAdapter::execute_from(
+                &simple_evm_bytecode,
+                100_000,
+                pallet_x3_kernel::adapters::authenticated_evm_address(&AccountId::new([1; 32])),
+            );
             // Debug: print result to stderr to capture runner error details during test
             eprintln!("NativeEvmAdapter.execute result = {:?}", result);
             assert!(result.is_ok());
@@ -5560,7 +5498,11 @@ mod a_packet_is_refused_by_the_native_adapters {
         );
 
         sp_io::TestExternalities::default().execute_with(|| {
-            match super::native_vm_adapters::NativeEvmAdapter::execute(&payload, EVM_GAS_LIMIT) {
+            match super::native_vm_adapters::NativeEvmAdapter::execute_from(
+                &payload,
+                EVM_GAS_LIMIT,
+                pallet_x3_kernel::adapters::authenticated_evm_address(&AccountId::new([1; 32])),
+            ) {
                 Err(DispatchError::Other(message)) => assert!(
                     message.contains("Packet, not bytecode"),
                     "the refusal has to name the reason, got: {message}"

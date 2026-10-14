@@ -53,6 +53,14 @@ SHA-256 is recorded). `--check` (the gate's mode) fails when
 
 It passes when the counts are at or below the baseline, and says so when the
 counts dropped, because that is the moment to refresh the baseline deliberately.
+
+`--self-test` builds one synthetic tree carrying every pruning shape (a
+`node_modules` entry whose directory name looks like source, both forge
+dependencies, build output, a `.wt-*` checkout, a self-exclude, hidden paths,
+plain source) and asserts that the rg glob set and the `os.walk` fallback
+report exactly the same file list. The two enumerations must agree, or a
+machine with rg reads different findings than one without it for the same
+commit.
 """
 
 from __future__ import annotations
@@ -84,6 +92,10 @@ PRUNE_DIR_NAMES = {
     "dist",
     "build",
     "forge-std",
+    # `forge install` checks out both dependencies under X3-contracts/evm/lib;
+    # `forge-std` was pruned from the start, openzeppelin-contracts was missed,
+    # so a working checkout read ~16 findings above a clean extraction.
+    "openzeppelin-contracts",
     "vendor",
     # The desktop app vendors whole crates under a compound name, so the
     # `vendor` entry above never matched it.
@@ -191,8 +203,16 @@ MOCK_REF_RE = r"\b(?:crate|super|self)::(?:mock|tests)\b"
 TEST_ATTR_RE = r"#\s*\[\s*(?:tokio::)?test\s*\]"
 
 # Supersets handed to `rg`, which finds *candidate* lines and files; the Python
-# matchers above stay authoritative for classification, so the two paths cannot
-# drift in what they report.
+# matchers above stay authoritative for classification. For the two paths to
+# report the same findings, candidate patterns must be supersets of what the
+# classifiers can match. `stubs` upholds that. `cheats` does not, for one
+# class: `PROD_MOCK_RE` matches `struct XStub`/`MockThing` shapes that the
+# `\b(mock|fake|stub|dummy)\b` candidate does not (no word boundary inside the
+# identifier), so with rg the `prod-mock` class reads 0 and without rg it reads
+# 239 on the same tree (`PATH=/usr/bin:/bin python3 scripts/x3_fake_code_scan.py
+# cheats`). Deciding which of those 239 are real needs the `#[cfg(test)] mod
+# mock;` question settled first; until then the ratchet records the rg-path
+# count (the CI path) and this divergence stays tracked, not silently fixed.
 STUB_CANDIDATE_PATTERNS = [
     r"\btodo!",
     r"\bunimplemented!",
@@ -204,6 +224,10 @@ CHEAT_CANDIDATE_PATTERNS = [
     r"#\s*\[\s*ignore",
     r"\.skip\s*\(",
     r"\bxit\s*\(",
+    # Whole-word on purpose for now, and a known blind spot: it drops
+    # `MockOracle`-style identifiers that `PROD_MOCK_RE` would flag, so the rg path
+    # sees fewer prod-mock findings than the Python fallback. Widening it surfaces
+    # 148 findings that need triage first (TESTNET_GAP_LEDGER.md, GAP-PROD-MOCK-PREFILTER).
     r"(?i)\b(mock|mockall|fake|stub|dummy)\b",
     r"#\s*\[\s*(?:tokio::)?test\s*\]",
 ]
@@ -243,10 +267,36 @@ def _is_pruned_dir(name: str) -> bool:
     )
 
 
-def iter_source_files() -> list[tuple[str, Path]]:
-    """Every scannable file, as `(repo-relative path, absolute path)`, sorted."""
+def eligible_source(rel: str, root: Path | None = None) -> bool:
+    """Scan visible regular source files, excluding file and directory links.
+
+    Real source targets remain scanned under their own paths; following links
+    would duplicate findings and could escape the repository or loop back to it.
+    Both discovery implementations apply this same policy. (Recovered from
+    x3gpu1's uncommitted scanner work.)
+    """
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
+    parts = Path(rel).parts
+    path = root / rel
+    return (
+        bool(parts)
+        and not any(_is_pruned_dir(part) for part in parts[:-1])
+        and not parts[-1].startswith(".")
+        and not parts[-1].endswith(PRUNE_FILE_SUFFIXES)
+        and path.suffix in SOURCE_SUFFIXES
+        and rel not in SELF_EXCLUDES
+        and not any(root.joinpath(*parts[:i]).is_symlink() for i in range(1, len(parts) + 1))
+        and path.is_file()
+    )
+
+
+def iter_source_files(root: Path | None = None) -> list[tuple[str, Path]]:
+    """Every scannable file, as `(root-relative path, absolute path)`, sorted."""
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
     found: list[tuple[str, Path]] = []
-    for dirpath, dirnames, filenames in os.walk(REPO_ROOT):
+    for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(name for name in dirnames if not _is_pruned_dir(name))
         for name in sorted(filenames):
             if name.startswith(".") or name.endswith(PRUNE_FILE_SUFFIXES):
@@ -254,8 +304,8 @@ def iter_source_files() -> list[tuple[str, Path]]:
             path = Path(dirpath) / name
             if path.suffix not in SOURCE_SUFFIXES:
                 continue
-            rel = path.relative_to(REPO_ROOT).as_posix()
-            if rel in SELF_EXCLUDES:
+            rel = path.relative_to(root).as_posix()
+            if not eligible_source(rel, root):
                 continue
             found.append((rel, path))
     return sorted(found)
@@ -285,15 +335,19 @@ def _rg_args() -> list[str]:
     return args
 
 
-def rg_lines(patterns: list[str]) -> list[tuple[str, int, str]] | None:
+def rg_lines(
+    patterns: list[str], root: Path | None = None
+) -> list[tuple[str, int, str]] | None:
     """Candidate `(path, line, text)` matches, or `None` when rg is absent."""
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
     if shutil.which("rg") is None:
         return None
     args = _rg_args() + ["--json"]
     for pattern in patterns:
         args += ["-e", pattern]
     args.append(".")
-    proc = subprocess.run(args, cwd=REPO_ROOT, capture_output=True, text=True)
+    proc = subprocess.run(args, cwd=root, capture_output=True, text=True)
     if proc.returncode not in (0, 1):
         return None
     found: list[tuple[str, int, str]] = []
@@ -307,25 +361,54 @@ def rg_lines(patterns: list[str]) -> list[tuple[str, int, str]] | None:
         data = obj["data"]
         path = data["path"]["text"]
         rel = path[2:] if path.startswith("./") else path
+        if not eligible_source(rel, root):
+            continue
         found.append((rel, int(data["line_number"]), data["lines"]["text"].rstrip("\n")))
     return found
 
 
-def rg_files(patterns: list[str]) -> list[Path] | None:
+def rg_files(patterns: list[str], root: Path | None = None) -> list[Path] | None:
     """Candidate files, or `None` when rg is absent."""
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
     if shutil.which("rg") is None:
         return None
     args = _rg_args() + ["--files-with-matches"]
     for pattern in patterns:
         args += ["-e", pattern]
     args.append(".")
-    proc = subprocess.run(args, cwd=REPO_ROOT, capture_output=True, text=True)
+    proc = subprocess.run(args, cwd=root, capture_output=True, text=True)
     if proc.returncode not in (0, 1):
         return None
     files = []
     for raw in proc.stdout.splitlines():
         rel = raw[2:] if raw.startswith("./") else raw
-        files.append(REPO_ROOT / rel)
+        if not eligible_source(rel, root):
+            continue
+        files.append(root / rel)
+    return sorted(files)
+
+
+def rg_file_list(root: Path | None = None) -> list[str] | None:
+    """Every file rg would scan under `root`, as paths relative to it.
+
+    This is `iter_source_files` in rg's glob language; `self_test` asserts the
+    two agree shape by shape. `None` when rg is not installed.
+    """
+    # Resolved at call time, not definition time: tests point REPO_ROOT at a tree.
+    root = REPO_ROOT if root is None else root
+    if shutil.which("rg") is None:
+        return None
+    args = _rg_args() + ["--files", "."]
+    proc = subprocess.run(args, cwd=root, capture_output=True, text=True)
+    if proc.returncode not in (0, 1):
+        return None
+    files: list[str] = []
+    for raw in proc.stdout.splitlines():
+        rel = raw[2:] if raw.startswith("./") else raw
+        if not eligible_source(rel, root):
+            continue
+        files.append(rel)
     return sorted(files)
 
 
@@ -350,7 +433,7 @@ def scan_stubs() -> list[dict[str, object]]:
         kind = None
         if any(rx.search(text) for rx in STUB_EXPLICIT_RES):
             kind = "explicit-stub"
-        elif STUB_MARKER_RE.search(text):
+        elif STUB_MARKER_RE.search(marker_text(rel, text)):
             kind = "critical-marker" if critical_path else "marker"
         if kind is None:
             continue
@@ -364,6 +447,20 @@ def scan_stubs() -> list[dict[str, object]]:
             }
         )
     return sorted(findings, key=lambda f: (str(f["kind"]), str(f["path"]), int(f["line"])))
+
+
+def marker_text(rel: str, text: str) -> str:
+    """Exclude one prompt phrase from the router's classification vocabulary.
+
+    Only the quoted phrase in the BOILERPLATE tuple is vocabulary. Comments,
+    other entries and explicit implementation macros remain subject to scanning.
+    """
+    if rel == "services/x3-ai-router/router.py" and re.match(
+        r'^\s*"BOILERPLATE"\s*:\s*\(', text
+    ):
+        code, separator, comment = text.partition("#")
+        return code.replace('"stub out"', '"scaffold request"', 1) + separator + comment
+    return text
 
 
 def _looks_like_test_file(name: str) -> bool:
@@ -460,6 +557,51 @@ def _has_cfg_test_attribute_above(lines: list[str], lineno: int) -> bool:
     return False
 
 
+_RUST_LITERAL_RE = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'')
+
+
+def _cfg_test_lines(lines: list[str]) -> set[int]:
+    """1-based numbers of the lines inside a `#[cfg(test)]`-gated Rust item.
+
+    `_has_cfg_test_attribute_above` only sees attributes stacked directly on the
+    matching line, so a `use crate::mock::Test as MockRuntime;` written inside a
+    `#[test]` fn in `#[cfg(test)] mod tests { ... }` was reported as a mock on a
+    production path. This follows braces from each gate to the end of its item.
+    String/char literals and `//` comments are stripped first so braces inside
+    them do not move the depth.
+    """
+    gated: set[int] = set()
+    depth = 0
+    pending = False          # a cfg(test) attribute is waiting for its item
+    region_depth = None      # depth outside the gated item while inside it
+    for number, raw in enumerate(lines, start=1):
+        code = _RUST_LITERAL_RE.sub('""', raw).split("//", 1)[0]
+        stripped = code.strip()
+        if region_depth is not None:
+            gated.add(number)
+        if region_depth is None and _is_cfg_test(stripped):
+            pending = True
+            continue
+        if pending and region_depth is None:
+            if stripped.startswith("#[") or not stripped:
+                continue
+            gated.add(number)
+            if "{" not in code and stripped.endswith(";"):
+                pending = False  # `mod mock;` / a gated `use`: a one-line item
+                continue
+            if "{" in code:
+                region_depth = depth
+                pending = False
+        for char in code:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if region_depth is not None and depth == region_depth:
+                    region_depth = None
+    return gated
+
+
 NOOP_TEST_RUST_RE = re.compile(
     r"#\s*\[\s*(?:tokio::)?test\s*\]\s*(?:#\[[^\]]*\]\s*)*"
     r"(?:async\s+)?fn\s+(?P<name>\w+)\s*\([^)]*\)\s*(?:->[^{]*)?\{\s*\}",
@@ -483,6 +625,7 @@ def scan_cheats() -> list[dict[str, object]]:
     # line above the definition: `#[cfg(test)] mod mock;` is Substrate's normal
     # way to declare a test mock, and it is not a mock on a production path.
     prod_mock_lines: dict[str, list[str]] = {}
+    gated_lines: dict[str, set[int]] = {}
 
     for rel, lineno, line in candidates:
         if line.lstrip().startswith(("//", "/*", "*")):
@@ -511,7 +654,9 @@ def scan_cheats() -> list[dict[str, object]]:
         ):
             if rel not in prod_mock_lines:
                 prod_mock_lines[rel] = read_lines(REPO_ROOT / rel)
-            if not _has_cfg_test_attribute_above(prod_mock_lines[rel], lineno):
+                gated_lines[rel] = _cfg_test_lines(prod_mock_lines[rel])
+            if (not _has_cfg_test_attribute_above(prod_mock_lines[rel], lineno)
+                    and lineno not in gated_lines[rel]):
                 kind = "prod-mock"
         if kind is None:
             continue
@@ -674,14 +819,119 @@ def check(mode: str, findings: list[dict[str, object]]) -> int:
     return 0
 
 
+def self_test() -> int:
+    """Pin the rg enumeration to the os.walk enumeration on a synthetic tree.
+
+    The tree carries one instance of every shape the pruning exists for, in
+    the exact arrangement that broke when the globs were ordered
+    exclusions-first: a directory literally named `decimal.js` inside
+    `node_modules`, both forge dependencies, a source-looking file under
+    build output, and the scanner itself. Anything the tests add or drop
+    shows up as a set difference instead of a count nobody can trace.
+    """
+    import tempfile
+
+    shapes = {
+        # Plain source: both must include these.
+        "src/keep.rs": "fn main() {}\n",
+        "src/keep.js": "console.log(1);\n",
+        "apps/dashboard/src/panel.tsx": "// TODO\n",
+        "tools/ok.py": "# placeholder\n",
+        # Not source by suffix: both must drop it.
+        "src/notes.txt": "not source\n",
+        # Vendored and build trees: both must drop everything inside.
+        "node_modules/decimal.js/decimal.js": "// TODO\n",
+        "node_modules/decimal.js/decimal.mjs": "// TODO\n",
+        "node_modules/pkg/index.mjs": "// fake\n",
+        "X3-contracts/evm/lib/openzeppelin-contracts/contracts/token.sol": "// TODO\n",
+        "X3-contracts/evm/lib/forge-std/src/Test.sol": "// TODO\n",
+        "target/debug/foo.rs": "// TODO\n",
+        "out/_next/chunk.js": "// TODO\n",
+        # Hidden paths and worktrees: both must drop them.
+        ".hidden_dir/leak.rs": "// TODO\n",
+        ".wt-abc/vendor/lib.rs": "// TODO\n",
+        # The detector itself: both must drop it even though it is `*.py`.
+        "scripts/x3_fake_code_scan.py": "# placeholder\n",
+        "scripts/x3-detect-stubs.sh": "# stub\n",
+        "scripts/x3-detect-test-cheats.sh": "# stub\n",
+    }
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        for rel, text in shapes.items():
+            path = tmp_path / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+
+        # Links: one to a real source file, one to a source directory. Following
+        # them would scan the same file twice (or leave the tree), so both
+        # enumerations must skip them.
+        (tmp_path / "src" / "linked.rs").symlink_to("keep.rs")
+        (tmp_path / "linked_dir").symlink_to("src", target_is_directory=True)
+
+        expected = sorted(rel for rel, _ in iter_source_files(tmp_path))
+        linked = [rel for rel in expected if rel == "src/linked.rs" or rel.startswith("linked_dir/")]
+        if linked:
+            print(f"fake-code scanner self-test FAILED: links were enumerated as sources: {linked}",
+                  file=sys.stderr)
+            return 1
+        actual = rg_file_list(tmp_path)
+        if actual is None:
+            print(
+                "self-test: rg is not installed, so the enumerations cannot "
+                "be compared; install ripgrep",
+                file=sys.stderr,
+            )
+            return 1
+        if actual != expected:
+            print(
+                "fake-code scanner self-test FAILED: the rg glob set and the "
+                "os.walk fallback disagree",
+                file=sys.stderr,
+            )
+            print(f"  only the walker scans: {sorted(set(expected) - set(actual))}", file=sys.stderr)
+            print(f"  only rg scans:         {sorted(set(actual) - set(expected))}", file=sys.stderr)
+            return 1
+
+        included = {
+            "src/keep.rs",
+            "apps/dashboard/src/panel.tsx",
+            "tools/ok.py",
+        }
+        if not included <= set(expected):
+            print(
+                f"self-test: the tree stopped exercising inclusion: {sorted(included - set(expected))}",
+                file=sys.stderr,
+            )
+            return 1
+
+    print(
+        f"fake-code scanner self-test: PASS ({len(expected)} files scanned; "
+        "rg glob set == os.walk fallback)"
+    )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("mode", choices=sorted(MODES))
+    parser.add_argument("mode", nargs="?", choices=sorted(MODES))
     parser.add_argument("--json", action="store_true", help="emit JSON on stdout")
     parser.add_argument(
         "--update-baseline", action="store_true", help="record the current findings"
     )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="pin the rg glob set to the os.walk fallback on a synthetic tree",
+    )
     args = parser.parse_args()
+
+    if args.self_test:
+        if args.mode is not None or args.json or args.update_baseline:
+            parser.error("--self-test does not combine with a mode or other flags")
+        return self_test()
+    if args.mode is None:
+        parser.error("a mode is required unless --self-test is given")
 
     findings = MODES[args.mode]()
 

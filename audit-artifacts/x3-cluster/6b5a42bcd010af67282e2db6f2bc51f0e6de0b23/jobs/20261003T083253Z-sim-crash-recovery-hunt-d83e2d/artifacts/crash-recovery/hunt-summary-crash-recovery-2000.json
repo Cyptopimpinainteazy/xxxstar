@@ -1,0 +1,12 @@
+{
+  "duplicate_evidence_samples": 0,
+  "duplicates": 0,
+  "failures": [],
+  "first_seed": 2000,
+  "passes": 200,
+  "scenario": "crash-recovery",
+  "schema": "x3-sim-hunt-summary-v1",
+  "seeds_requested": 200,
+  "seeds_run": 200,
+  "stopped_at_max_failures": false
+}

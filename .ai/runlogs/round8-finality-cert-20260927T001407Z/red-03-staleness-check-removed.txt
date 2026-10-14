@@ -1,0 +1,6 @@
+test finality::tests::test_a_stale_certificate_is_refused ... FAILED
+thread 'finality::tests::test_a_stale_certificate_is_refused' panicked at crates/x3-atomic-swap/src/finality.rs:691:9:
+assertion `left == right` failed
+  left: Ok(true)
+ right: Err(CertificateStale { chain: Ethereum, seen_tip: 2200, certificate_tip: 1011, window: 512 })
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 667 filtered out; finished in 0.00s

@@ -118,37 +118,45 @@ SKIP_BUILD=1 bash "$ROOT_DIR/scripts/testnet/x3_testnet_up.sh" --skip-build \
   >"$WORK_DIR/launch.log" 2>&1 || { tail -20 "$WORK_DIR/launch.log" >&2; fail "the launcher could not start ${COUNT} validators"; }
 info "launched; waiting for RPC, peers and finality"
 
-deadline=$(( $(date +%s) + 900 ))
-ready=0
 declare -A LAST_PEERS LAST_FINALIZED
-while [[ "$(date +%s)" -lt "$deadline" ]]; do
-  ready=1
-  for i in $(seq 1 "$COUNT"); do
-    port=$(( RPC_BASE + i - 1 ))
-    peers="$(rpc "$port" system_health | sed -n 's/.*"peers":\([0-9]*\).*/\1/p' | head -1)"
-    [[ "${peers:-0}" -ge "$CONNECTED_PEERS" ]] || { ready=0; LAST_PEERS[$i]="${peers:-none}"; }
-    # A *height* past genesis, not "a finalized head exists": a node that just started answers
-    # with the genesis hash at height 0, so the weaker check passes while the node is at block 1.
-    head="$(rpc "$port" chain_getFinalizedHead | sed -n 's/.*"result":"\([^"]*\)".*/\1/p' | head -1)"
-    if [[ -z "$head" ]]; then
-      ready=0
-    else
-      height="$(rpc "$port" chain_getHeader "[\"$head\"]" \
-        | sed -n 's/.*"number":"\(0x[0-9a-f]*\)".*/\1/p' | head -1)"
-      height=$(( ${height:-0x0} ))
-      [[ "$height" -ge "$MIN_FINALIZED" ]] || { ready=0; LAST_FINALIZED[$i]="$height"; }
-    fi
+
+# Waits until every validator has the peer floor and a finalized height past the minimum, and
+# reports which one did not. Called twice: after the launch, and again after the forced-restart
+# step — because that step kills and restarts a validator immediately before the gate runs, and a
+# mesh that is still reconnecting fails the gate's criterion 1 ("7 authorities configured but only
+# 6 reachable (peers: 5)") for a reason that has nothing to do with the launch. Measured
+# 2026-09-28: exactly that, on the first run with the restart step wired in.
+wait_for_mesh() {
+  local deadline=$(( $(date +%s) + 900 )) ready=0
+  while [[ "$(date +%s)" -lt "$deadline" ]]; do
+    ready=1
+    for i in $(seq 1 "$COUNT"); do
+      port=$(( RPC_BASE + i - 1 ))
+      peers="$(rpc "$port" system_health | sed -n 's/.*"peers":\([0-9]*\).*/\1/p' | head -1)"
+      [[ "${peers:-0}" -ge "$CONNECTED_PEERS" ]] || { ready=0; LAST_PEERS[$i]="${peers:-none}"; }
+      # A *height* past genesis, not "a finalized head exists": a node that just started answers
+      # with the genesis hash at height 0, so the weaker check passes while the node is at block 1.
+      head="$(rpc "$port" chain_getFinalizedHead | sed -n 's/.*"result":"\([^"]*\)".*/\1/p' | head -1)"
+      if [[ -z "$head" ]]; then
+        ready=0
+      else
+        height="$(rpc "$port" chain_getHeader "[\"$head\"]" \
+          | sed -n 's/.*"number":"\(0x[0-9a-f]*\)".*/\1/p' | head -1)"
+        height=$(( ${height:-0x0} ))
+        [[ "$height" -ge "$MIN_FINALIZED" ]] || { ready=0; LAST_FINALIZED[$i]="$height"; }
+      fi
+    done
+    [[ "$ready" = 1 ]] && return 0
+    sleep 3
   done
-  [[ "$ready" = 1 ]] && break
-  sleep 3
-done
-if [[ "$ready" != 1 ]]; then
   detail=""
   for i in $(seq 1 "$COUNT"); do
     detail+="node-$i(peers=${LAST_PEERS[$i]:-ok},finalized=${LAST_FINALIZED[$i]:-ok}) "
   done
   fail "not all ${COUNT} validators reached ${CONNECTED_PEERS} peers and finalized height ${MIN_FINALIZED} in 900s (last: $detail)"
-fi
+}
+
+wait_for_mesh
 pass "${COUNT} validators are on one chain (>= ${CONNECTED_PEERS} peers each, finalized past ${MIN_FINALIZED})"
 
 # run_gate <rpc-port> <log-file>; returns the gate's exit status.
@@ -168,6 +176,10 @@ info "running the forced node restart drill against this network (gate 7 reads i
 X3_RPC_URL="http://127.0.0.1:$RPC_BASE" bash "$ROOT_DIR/scripts/drills/node_restart_drill.sh" \
   >"$WORK_DIR/restart-drill.out" 2>&1 || { tail -20 "$WORK_DIR/restart-drill.out" >&2; fail "the forced node restart drill did not pass on this network"; }
 grep -E '^- restart_drill(_chain)?:' "$ROOT_DIR/reports/drill_node_restart.md" | sed 's/^/  /'
+# The restarted validator has to be back in the mesh before the gate reads it: criterion 1 counts
+# reachable authorities, and the node that was killed is legitimately the one still reconnecting.
+info "waiting for the mesh to reconverge after the forced restart"
+wait_for_mesh
 
 # Criterion 14 reads an explorer the operator starts, and the two ends have to agree: the page must
 # read *this* network. Measured 2026-09-28 — the explorer on :3000 pointed at the monitoring gates'

@@ -572,8 +572,8 @@ mod tests {
         };
         let first = FailurePacket::from_outcome(&outcome_for(&config, "CLAIM_REFUND_MIX"))
             .expect("a failing outcome produces a packet");
-        let second = FailurePacket::from_outcome(&outcome_for(&config, "CLAIM_REFUND_MIX"))
-            .expect("packet");
+        let second =
+            FailurePacket::from_outcome(&outcome_for(&config, "CLAIM_REFUND_MIX")).expect("packet");
         assert_eq!(first.failure_id, second.failure_id);
 
         let smaller = SimConfig {
@@ -583,8 +583,8 @@ mod tests {
             nodes: 4,
             ..SimConfig::default()
         };
-        let third =
-            FailurePacket::from_outcome(&outcome_for(&smaller, "CLAIM_REFUND_MIX")).expect("packet");
+        let third = FailurePacket::from_outcome(&outcome_for(&smaller, "CLAIM_REFUND_MIX"))
+            .expect("packet");
         assert_ne!(
             first.failure_id, third.failure_id,
             "a different config is a different failure"
@@ -624,8 +624,8 @@ mod tests {
             seed: 41,
             ..SimConfig::default()
         };
-        let mut packet =
-            FailurePacket::from_outcome(&outcome_for(&config, "REFUND_AFTER_CLAIM")).expect("packet");
+        let mut packet = FailurePacket::from_outcome(&outcome_for(&config, "REFUND_AFTER_CLAIM"))
+            .expect("packet");
         packet.attach_minimized(MinimizedReproducer {
             sessions: 1,
             steps: 11,

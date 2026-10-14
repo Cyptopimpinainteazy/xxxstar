@@ -1,0 +1,38 @@
+{
+  "status": "passed",
+  "steps": [
+    {
+      "label": "the profile names its signer as owner",
+      "detail": "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+    },
+    {
+      "label": "an unsupported biometric type was refused",
+      "detail": "x3WalletPallet.InvalidBiometricType"
+    },
+    {
+      "label": "the request records the delay",
+      "detail": "executable at block 79"
+    },
+    {
+      "label": "the threshold is met",
+      "detail": "approvals=2"
+    },
+    {
+      "label": "a finalize before the delay was refused",
+      "detail": "x3WalletPallet.RecoveryNotReady"
+    },
+    {
+      "label": "a non-owner cancel was refused",
+      "detail": "x3WalletPallet.NotRecoveryOwner"
+    },
+    {
+      "label": "recovery executed",
+      "detail": "block=82"
+    },
+    {
+      "label": "the stored recovery owner changed to the new owner",
+      "detail": "0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48"
+    }
+  ],
+  "chain": "X3 Chain Local 3-Validator Testnet"
+}

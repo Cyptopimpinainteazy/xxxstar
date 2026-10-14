@@ -948,7 +948,8 @@ where
     )?;
 
     // Merge Frontier ETH-compatible JSON-RPC endpoints.
-    let frontier_module = crate::rpc_frontier::create_frontier_rpc(client.clone())?;
+    let frontier_module =
+        crate::rpc_frontier::create_frontier_rpc(client.clone(), tx_pool.clone())?;
     module.merge(frontier_module)?;
 
     // Merge SVM-compatible JSON-RPC endpoints.

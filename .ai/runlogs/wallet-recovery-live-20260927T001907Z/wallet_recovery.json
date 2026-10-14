@@ -1,0 +1,23 @@
+{
+  "status": "failed",
+  "steps": [
+    {
+      "label": "the profile names its signer as owner",
+      "detail": "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+    },
+    {
+      "label": "an unsupported biometric type was refused",
+      "detail": "x3WalletPallet.InvalidBiometricType"
+    },
+    {
+      "label": "the request records the delay",
+      "detail": "executable at block 42"
+    },
+    {
+      "label": "the threshold is met",
+      "detail": "approvals=2"
+    }
+  ],
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "error": "a finalize before the delay: nothing observed within 120000 ms"
+}

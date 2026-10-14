@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Ansible dynamic inventory for the X3 build cluster (inventory.json + discovered IPs).
+#   ansible-inventory -i scripts/x3-cluster/x3-ansible-inventory --graph
+#   ansible -i scripts/x3-cluster/x3-ansible-inventory gpu -m ping
+exec python3 "$(dirname "$(readlink -f "$0")")/x3cluster.py" ansible-inventory "$@"
