@@ -4,26 +4,26 @@
   "image_digest": "sha256:8638a668bd6d29111dc01953fbead6eb08c062e1cc62d3047a245a52b6edb3bf",
   "srtool": "0.18.4",
   "rustc": "1.93.0",
-  "recorded_at": "2026-10-13",
-  "recorded_revision": "06e4ac5fd",
+  "recorded_at": "2026-10-14",
+  "recorded_revision": "2e6facdb0",
   "runtime_version": "x3-chain-22 (x3-chain-1.tx1.au1)",
   "metadata": "V14",
   "runtimes": {
     "compact": {
-      "size": "9140647",
-      "set_code": "0x741141f17ec2f5d625f38ac2f634af433314d6ceb20348c6a52c850d32bd433f",
-      "authorize_upgrade": "0xa1700ddcf00b632b60806028c0284fdfddf69e4abec2b78e45e656b22f6066fe",
-      "ipfs": "Qmc5Raj2ixnH1af4W7Y8tGoyFeQz9G4ZQyYrx5kJtw9MKH",
-      "blake2_256": "0xfa4e00791d6b9e6067489ee8f401147f0b48a5bedb10fab830624b0381e23ee0",
+      "size": "9163361",
+      "set_code": "0x74cfc81f891e7c61fbbb3b405cc8299d9a55dbedeb8adb38575f41778e33d108",
+      "authorize_upgrade": "0x755d45ac7c546526cad84d913032f8d0bd33de886657bb3610b317a3a2b58fd5",
+      "ipfs": "QmeaJnpEGgX4LdeVBJb6HBEkvwwGHcDbYm3uA7qJGZHbRQ",
+      "blake2_256": "0x0ebb0be54ed037f2e81c1fc7a5e30dc1fb64b9c07bc64c94c3c81950489efe8d",
       "version": "x3-chain-22 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     },
     "compressed": {
-      "size": "1567025",
-      "set_code": "0x74fb3aa1e7831c0b9cccca79f6134c19b0cecd31947e580d9f0c0df03a3156c7",
-      "authorize_upgrade": "0x06a44d7d3eca70778d39756f3b68b20b92d18dde57f31de3f87540cd57c54456",
-      "ipfs": "QmcvkSXBCAcqUer5WFR6FtCSu1bRadTbjRDqvLiAZgPtvr",
-      "blake2_256": "0x677588306b3902f232cb6ccb7fcc52b34fbbcdcf0c97e0e53541d339d1562945",
+      "size": "1567442",
+      "set_code": "0x183499924d6b73f8fd2743cd99d1e95ec6e2320817d04475c323e43557e7ac2c",
+      "authorize_upgrade": "0x4a7d4fad3c0a5b9b13bea49552a2a2572b29d24c4d3f627e1aef78444fc4c4b7",
+      "ipfs": "QmZ3BqridhR7WcQAhjAjXpyjKhU86v9uGyb3i99paEX5Zb",
+      "blake2_256": "0x0b8581cc7343f48f97ab69d283e4c5f353b1b948ea7f217849685ec4ac8802ef",
       "version": "x3-chain-22 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     }
