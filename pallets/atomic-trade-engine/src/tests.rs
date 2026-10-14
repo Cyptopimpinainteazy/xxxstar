@@ -45,6 +45,39 @@ fn evm_leg(amount: u128, min_out: u128) -> TradeLegInput {
     create_test_leg(VmType::Evm, AmmProtocol::UniswapV2, amount, min_out)
 }
 
+#[test]
+fn evm_trade_uses_authenticated_batch_owner() {
+    new_test_ext().execute_with(|| {
+        let owner = account(1);
+        LAST_EVM_CALLER.with(|last| last.set(None));
+        assert_ok!(AtomicTradeEngine::create_trade_batch(
+            RuntimeOrigin::signed(owner),
+            vec![evm_leg(1_000_000_000_000_000_000, 900_000_000_000_000_000)],
+            100,
+            100,
+            0,
+        ));
+        let id = AtomicTradeEngine::pending_batches(owner)[0];
+        assert_noop!(
+            AtomicTradeEngine::execute_trade_batch(RuntimeOrigin::signed(account(2)), id,),
+            Error::<Test>::Unauthorized
+        );
+        LAST_EVM_CALLER.with(|last| assert_eq!(last.get(), None));
+        assert_ok!(AtomicTradeEngine::execute_trade_batch(
+            RuntimeOrigin::signed(owner),
+            id
+        ));
+        LAST_EVM_CALLER.with(|last| {
+            assert_eq!(
+                last.get(),
+                Some(pallet_x3_kernel::adapters::authenticated_evm_address(
+                    &owner
+                ))
+            )
+        });
+    });
+}
+
 /// Create an SVM trade leg
 fn svm_leg(amount: u128, min_out: u128) -> TradeLegInput {
     create_test_leg(VmType::Svm, AmmProtocol::Raydium, amount, min_out)
