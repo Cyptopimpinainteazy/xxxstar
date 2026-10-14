@@ -587,6 +587,7 @@ GATES_FAST=(
   # `launch_gate` citations that name tests nobody wrote.
   "repo scanner:python3 scripts/swarm/x3_repo_scan.py --check"
   "repo scanner test:pytest -q scripts/swarm/test_x3_repo_scan.py"
+  "remote CI gateway arguments:python3 tests/test_remote_ci_gateway.py"
   # The other half of the weights story. `runtime-weights-wired` (below) proves a wired pallet
   # charges *something*; nothing proved the something still describes the pallet. Re-running the
   # FRAME CLI for all 51 files needs a `--features runtime-benchmarks` node build per pallet, so
