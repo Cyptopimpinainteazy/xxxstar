@@ -21,6 +21,76 @@ type Test = mock::Test;
 type AtlasEvent = crate::Event<Test>;
 type AtlasError = crate::Error<Test>;
 
+#[test]
+fn signed_dispatch_binds_persistent_evm_caller_to_origin() {
+    use crate::adapters::authenticated_evm_address;
+    new_test_ext().execute_with(|| {
+        mock::with_real_evm_adapter(|| {
+            // Store CALLER in slot zero; arbitrary payload bytes cannot supply identity.
+            let code = vec![0x33, 0x60, 0, 0x55, 0x00];
+            let id = H256::from_low_u64_be(9001);
+            let root = compute_prepare_root(id, &code, &[], 0, 100_000);
+            assert_ok!(AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                id,
+                code.clone(),
+                vec![],
+                0,
+                100_000,
+                root,
+            ));
+            let hash = sp_io::hashing::keccak_256(&code);
+            let mut key = b"x3:evm:v1:".to_vec();
+            key.extend_from_slice(&hash[12..]);
+            key.push(b's');
+            key.extend_from_slice(&[0; 32]);
+            let stored = sp_io::storage::get(&key).expect("production EVM persisted CALLER");
+            assert_eq!(&stored[12..], authenticated_evm_address(&ALICE).as_bytes());
+            assert_ne!(&stored[12..], authenticated_evm_address(&BOB).as_bytes());
+        })
+    });
+}
+
+#[test]
+fn production_evm_writes_rollback_when_later_vm_dispatch_fails() {
+    use crate::adapters::{authenticated_evm_address, EvmExecutorAdapter};
+    new_test_ext().execute_with(|| {
+        mock::with_real_evm_adapter(|| {
+            let code = vec![
+                0x60, 0, 0x54, 0x60, 1, 0x01, 0x80, 0x60, 0, 0x55, 0x60, 0, 0x52, 0x60, 32, 0x60,
+                0, 0xf3,
+            ];
+            let x3 = wrap_x3_payload(&[0xff, 0, 0, 0]);
+            let id = H256::from_low_u64_be(9002);
+            let root = compute_prepare_root_v2(id, &code, &[], &x3, 0, 500);
+            assert_noop!(
+                AtlasKernel::submit_comit_v2(
+                    RuntimeOrigin::signed(ALICE),
+                    id,
+                    code.clone(),
+                    vec![],
+                    x3,
+                    0,
+                    500,
+                    root,
+                ),
+                AtlasError::X3ExecutionFailed
+            );
+            assert_eq!(Nonces::<Test>::get(ALICE), 0);
+            let result = crate::wasm_adapters::ContextualWasmEvmAdapter::<Test>::execute_from(
+                &code,
+                1_000_000,
+                authenticated_evm_address(&ALICE),
+            )
+            .unwrap();
+            assert_eq!(
+                result.return_data[31], 1,
+                "failed dispatch must not retain increment"
+            );
+        })
+    });
+}
+
 /// Helper to get only AtlasKernel events, filtering out Balance/System events
 fn x3_events() -> Vec<AtlasEvent> {
     System::events()

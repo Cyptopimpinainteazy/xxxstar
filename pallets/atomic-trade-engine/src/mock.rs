@@ -10,6 +10,7 @@ use frame_support::{
 use frame_system as system;
 use pallet_x3_kernel::{adapters::*, ExecutionReceipt};
 use sp_core::H256;
+use sp_runtime::DispatchError;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
@@ -99,8 +100,20 @@ impl pallet_timestamp::Config for Test {
 /// Mock EVM adapter that returns 98% output (2% fee simulation)
 /// Uses the EvmExecutorAdapter trait from x3-kernel
 pub struct TradeEngineEvmAdapter;
+thread_local! {
+    pub static LAST_EVM_CALLER: core::cell::Cell<Option<sp_core::H160>> = const { core::cell::Cell::new(None) };
+}
 
 impl EvmExecutorAdapter for TradeEngineEvmAdapter {
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        LAST_EVM_CALLER.with(|last| last.set(Some(caller)));
+        Self::execute(payload, gas_limit)
+    }
+
     fn execute(
         payload: &[u8],
         gas_limit: u64,
@@ -339,7 +352,7 @@ parameter_types! {
     pub const DefaultTradeEvmGasLimit: u64 = 500_000;
     pub const DefaultTradeSvmComputeLimit: u64 = 500_000;
     pub const DefaultTradeX3GasLimit: u64 = 500_000;
-    pub const ProtocolFeeBps: u32 = 0;
+    pub static ProtocolFeeBps: u32 = 0;
     pub const ProtocolTreasury: u64 = 999;
     pub const MaxSlippageBps: u32 = 500; // 5% default max slippage
     pub const MinSlippageBps: u32 = 1;

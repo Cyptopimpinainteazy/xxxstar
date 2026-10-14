@@ -1,0 +1,248 @@
+# The dispatchables that can hold funds, and how those funds leave while `Halted` is set.
+#
+# `pallet_x3_invariants::InvariantCheck` refuses every signed extrinsic while the constitutional halt
+# flag is set, except the calls in `RuntimeHaltExemptCalls`. The reviewed exemption list lives in
+# `security/halt-exemptions.toml`. What it could never prove is *completeness*: a pallet that
+# reserves a bond, escrow or deposit whose only exit is a dispatchable the halt refuses is invisible
+# to it, and so is a reserve that is never released at all (TICKET-153).
+#
+# `scripts/ci/check-halt-fund-holding.py` builds that inventory: it parses every pallet wired by
+# `construct_runtime!`, finds each dispatchable that can reach `reserve` / `reserve_named` / `hold` /
+# `hold_named` / `set_lock` (through same-file helpers), and requires an entry here. This file is the
+# review. The checker fails when a fund-holding call is missing, when an entry outlives its call, or
+# when the disposition's claim is not true of the code:
+#
+#   * `exempt`           — the call itself is in RuntimeHaltExemptCalls;
+#   * `recoverable`      — `recoverable_by` is a sibling dispatchable that reaches a release
+#                          primitive; `while_halted = true` means that sibling is itself exempt, and
+#                          `false` means the funds are recoverable only once governance clears the
+#                          halt (`Council::close` is exempt precisely so the halt is clearable);
+#   * `transient`        — the call frees what it reserves before it returns, so it retains nothing;
+#   * `permanent_charge` — a non-refundable anti-spam fee, so there is no release path by design,
+#                          and the reserved amount must be read from a `*Fee` constant.
+#
+# Everything with `while_halted = false` or `permanent_charge` is an *exception*: a call whose funds
+# the halt keeps locked until it is cleared. The checker prints them. Only the atomic bundle has a
+# halt-reachable release today, which is the honest state recorded by TICKET-153.
+
+[[holding]]
+call = "pallet_agent_accounts/register_agent"
+pallet_variant = "AgentAccounts"
+disposition = "recoverable"
+recoverable_by = "pallet_agent_accounts/terminate_agent"
+recoverable_variant = "AgentAccounts"
+while_halted = false
+why = "Registration reserves the agent's stake; `terminate_agent` unreserves it and is not halt-exempt, so the stake is returned only after governance clears the halt."
+
+[[holding]]
+call = "pallet_agent_memory/append_entry"
+pallet_variant = "AgentMemory"
+disposition = "recoverable"
+recoverable_by = "pallet_agent_memory/withdraw_deposit"
+recoverable_variant = "AgentMemory"
+while_halted = false
+why = "Each appended entry reserves a per-entry storage bond; `withdraw_deposit` returns the accumulated bond, which needs the halt cleared first."
+
+[[holding]]
+call = "pallet_agent_memory/append_batch"
+pallet_variant = "AgentMemory"
+disposition = "recoverable"
+recoverable_by = "pallet_agent_memory/withdraw_deposit"
+recoverable_variant = "AgentMemory"
+while_halted = false
+why = "A batch of entries reserves the same per-entry storage bond as a single append; `withdraw_deposit` is the refund path."
+
+[[holding]]
+call = "pallet_agent_memory/increase_deposit"
+pallet_variant = "AgentMemory"
+disposition = "recoverable"
+recoverable_by = "pallet_agent_memory/withdraw_deposit"
+recoverable_variant = "AgentMemory"
+while_halted = false
+why = "Raises the agent's memory deposit by reserving more; `withdraw_deposit` returns the whole deposit when the agent leaves."
+
+[[holding]]
+call = "pallet_depin_marketplace/register_provider"
+pallet_variant = "DepinMarketplace"
+disposition = "recoverable"
+recoverable_by = "pallet_depin_marketplace/deregister_provider"
+recoverable_variant = "DepinMarketplace"
+while_halted = false
+why = "Provider registration reserves a stake; `deregister_provider` releases it, and that call is not halt-exempt."
+
+[[holding]]
+call = "pallet_governance/submit_proposal"
+pallet_variant = "Governance"
+disposition = "recoverable"
+recoverable_by = "pallet_governance/cancel_proposal"
+recoverable_variant = "Governance"
+while_halted = false
+why = "A proposal reserves `ProposalDeposit`; `cancel_proposal` returns it, so the deposit is trapped for as long as the halt refuses that call."
+
+[[holding]]
+call = "pallet_northern_swarm/register_executor"
+pallet_variant = "NorthernSwarm"
+disposition = "recoverable"
+recoverable_by = "pallet_northern_swarm/release_stake"
+recoverable_variant = "NorthernSwarm"
+while_halted = false
+why = "Registering an executor reserves its stake; `release_stake` returns it when the executor leaves, and only after the halt is cleared."
+
+[[holding]]
+call = "pallet_northern_swarm/submit_task"
+pallet_variant = "NorthernSwarm"
+disposition = "recoverable"
+recoverable_by = "pallet_northern_swarm/release_stake"
+recoverable_variant = "NorthernSwarm"
+while_halted = false
+why = "Submitting a task reserves its reward into escrow; `release_stake` is the pallet's release primitive and is not halt-exempt."
+
+[[holding]]
+call = "pallet_private_execution/commit_ordering"
+pallet_variant = "PrivateExecution"
+disposition = "recoverable"
+recoverable_by = "pallet_private_execution/settle_ordering_window"
+recoverable_variant = "PrivateExecution"
+while_halted = false
+why = "Committing an ordering reserves the committer's bond; `settle_ordering_window` unreserves it at window close, which the halt blocks."
+
+[[holding]]
+call = "pallet_swarm/register_contributor"
+pallet_variant = "Swarm"
+disposition = "recoverable"
+recoverable_by = "pallet_swarm/complete_deregister"
+recoverable_variant = "Swarm"
+while_halted = false
+why = "Contributor registration reserves a stake; `complete_deregister` returns it, and that call is not halt-exempt."
+
+[[holding]]
+call = "pallet_swarm/submit_task"
+pallet_variant = "Swarm"
+disposition = "recoverable"
+recoverable_by = "pallet_swarm/cancel_task"
+recoverable_variant = "Swarm"
+while_halted = false
+why = "Submitting a swarm task reserves its bounty; `cancel_task` refunds it, so the bounty is locked until the halt is cleared."
+
+[[holding]]
+call = "pallet_treasury/submit_proposal"
+pallet_variant = "Treasury"
+disposition = "recoverable"
+recoverable_by = "pallet_treasury/reject_proposal"
+recoverable_variant = "Treasury"
+while_halted = false
+why = "A treasury spend proposal reserves its bond; `reject_proposal` returns it, and that call is not halt-exempt."
+
+[[holding]]
+call = "pallet_x3_agent_registry/register_agent"
+pallet_variant = "X3AgentRegistry"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_agent_registry/terminate_agent"
+recoverable_variant = "X3AgentRegistry"
+while_halted = false
+why = "Agent registration reserves a registration stake; `terminate_agent` unreserves it, which the halt refuses."
+
+[[holding]]
+call = "pallet_x3_agent_registry/post_bond"
+pallet_variant = "X3AgentRegistry"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_agent_registry/release_bond"
+recoverable_variant = "X3AgentRegistry"
+while_halted = false
+why = "Posting a bond reserves the agent's bond; `release_bond` returns it, and only after the halt is cleared."
+
+[[holding]]
+call = "pallet_x3_atomic_kernel/submit_atomic_bundle"
+pallet_variant = "X3AtomicKernel"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_atomic_kernel/rollback_atomic_bundle"
+recoverable_variant = "X3AtomicKernel"
+while_halted = true
+why = "Submitting an atomic bundle reserves the submitter's bond; `rollback_atomic_bundle` is the one release path that is itself halt-exempt, because a halt that traps a pending bundle's bond was `6d7bfc540`."
+
+[[holding]]
+call = "pallet_x3_automation/register_task"
+pallet_variant = "X3Automation"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_automation/cancel_task"
+recoverable_variant = "X3Automation"
+while_halted = false
+why = "Registering a task reserves `BaseRegistrationFee`; `cancel_task` unreserves it, so the fee is trapped while the halt refuses cancels."
+
+[[holding]]
+call = "pallet_x3_da/submit_blob_commitment"
+pallet_variant = "X3Da"
+disposition = "permanent_charge"
+why = "The reserved amount is the per-byte anti-spam fee (`PerByteFee`), a charge rather than a refundable bond; no dispatchable in this pallet releases it. TICKET-155 records that reserve-as-charge is indistinguishable from a fund trap and should use an explicit fee primitive."
+
+[[holding]]
+call = "pallet_x3_kernel/prepare_cross_vm_operation"
+pallet_variant = "AtlasKernel"
+disposition = "transient"
+why = "The operation's balance check holds and frees the same amount inside the call, so it retains no funds once it returns; the checker verifies a release primitive is reached."
+
+[[holding]]
+call = "pallet_x3_kernel/submit_cross_vm_operation"
+pallet_variant = "AtlasKernel"
+disposition = "transient"
+why = "Same balance-check pattern as prepare: the reserve is released before returning, so this call holds nothing and needs no halt exemption."
+
+[[holding]]
+call = "pallet_x3_proof_carrying_agent/challenge_proof"
+pallet_variant = "X3ProofCarryingAgent"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_proof_carrying_agent/resolve_challenge"
+recoverable_variant = "X3ProofCarryingAgent"
+while_halted = false
+why = "Challenging a proof reserves the challenger's bond; `resolve_challenge` returns or slashes it, which the halt blocks."
+
+[[holding]]
+call = "pallet_x3_sequencer/submit_transaction"
+pallet_variant = "X3Sequencer"
+disposition = "permanent_charge"
+why = "The reserved amount is the anti-spam sequencing fee (`BaseFee` + `PerByteFee`), charged rather than bonded; no dispatchable in this pallet releases it. TICKET-155 records the same reserve-as-charge concern as x3-da."
+
+[[holding]]
+call = "pallet_x3_settlement_engine/deposit_bond"
+pallet_variant = "X3SettlementEngine"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_settlement_engine/trigger_refund"
+recoverable_variant = "X3SettlementEngine"
+while_halted = false
+why = "Depositing a settlement bond reserves it; `trigger_refund` returns it to the depositor, and that call is not halt-exempt."
+
+[[holding]]
+call = "pallet_x3_slash/post_bond"
+pallet_variant = "X3Slash"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_slash/release_bond"
+recoverable_variant = "X3Slash"
+while_halted = false
+why = "Posting a bond reserves it against slashing; `release_bond` returns an un-slashed bond, which the halt refuses."
+
+[[holding]]
+call = "pallet_x3_verifier/register_executor"
+pallet_variant = "X3Verifier"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_verifier/deactivate_executor"
+recoverable_variant = "X3Verifier"
+while_halted = false
+why = "Registering an executor reserves its stake; `deactivate_executor` unreserves it, and only once the halt is cleared."
+
+[[holding]]
+call = "pallet_x3_verifier/submit_job"
+pallet_variant = "X3Verifier"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_verifier/submit_receipt"
+recoverable_variant = "X3Verifier"
+while_halted = false
+why = "Submitting a job reserves the reward the executor will claim; `submit_receipt` pays it out, so the reward is locked while the halt blocks receipts."
+
+[[holding]]
+call = "pallet_x3_vrf/request_randomness"
+pallet_variant = "X3Vrf"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_vrf/cancel_randomness"
+recoverable_variant = "X3Vrf"
+while_halted = false
+why = "A randomness request reserves `BaseFee` + `FeePerByte`; `cancel_randomness` unreserves it, so the fee is trapped for the duration of a halt."

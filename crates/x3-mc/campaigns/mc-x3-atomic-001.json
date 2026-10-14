@@ -1,0 +1,80 @@
+{
+  "campaign": {
+    "name": "MC-X3-ATOMIC-001",
+    "description": "Atomic settlement under randomized timing, network and fault conditions. Every run executes the real cross-vm coordinator via x3-sim.",
+    "runs": 2000,
+    "seed": "auto"
+  },
+  "variables": {
+    "sessions": {
+      "distribution": "integer",
+      "min": 2,
+      "max": 24
+    },
+    "steps": {
+      "distribution": "integer",
+      "min": 40,
+      "max": 240
+    },
+    "nodes": {
+      "distribution": "integer",
+      "min": 2,
+      "max": 7
+    },
+    "latency_ms": {
+      "distribution": "log_uniform",
+      "min": 1,
+      "max": 1500
+    },
+    "jitter_ms": {
+      "distribution": "uniform",
+      "min": 0,
+      "max": 600
+    },
+    "drop_percent": {
+      "distribution": "uniform",
+      "min": 0,
+      "max": 30
+    },
+    "duplicate_percent": {
+      "distribution": "uniform",
+      "min": 0,
+      "max": 40
+    },
+    "partition_events": {
+      "distribution": "discrete",
+      "values": [0, 1, 2, 3, 4]
+    },
+    "slow_link_events": {
+      "distribution": "discrete",
+      "values": [0, 1, 2]
+    },
+    "crash_events": {
+      "distribution": "discrete",
+      "values": [0, 1, 2, 3]
+    },
+    "crash_duration_ms": {
+      "distribution": "log_uniform",
+      "min": 500,
+      "max": 8000
+    },
+    "stale_write_events": {
+      "distribution": "discrete",
+      "values": [0, 1, 2]
+    },
+    "clock_step_ms": {
+      "distribution": "uniform",
+      "min": 50,
+      "max": 1000
+    },
+    "clock_jitter_ms": {
+      "distribution": "uniform",
+      "min": 0,
+      "max": 1000
+    },
+    "verify_determinism": {
+      "distribution": "bernoulli",
+      "p": 0.05
+    }
+  }
+}

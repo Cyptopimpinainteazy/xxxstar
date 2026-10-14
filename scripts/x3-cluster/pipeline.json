@@ -1,0 +1,64 @@
+{
+  "description": "First distributed X3 gate. Stage order follows the cluster pipeline: build, then fuzz / simulation / GPU / inference in parallel. Every command is a real repo command; each job runs at the same exact commit in a throwaway worktree on the node that owns its class (or the control node, labelled LOCAL-FALLBACK, when that node does not exist yet).",
+  "stages": [
+    {
+      "name": "build",
+      "jobs": [
+        {
+          "name": "build-x3-accel",
+          "class": "BUILD",
+          "priority": "HIGH",
+          "timeout": 3600,
+          "cmd": "cargo build --locked -p x3-accel -p x3-accel-wgpu"
+        }
+      ]
+    },
+    {
+      "name": "verify",
+      "jobs": [
+        {
+          "name": "test-x3-accel",
+          "class": "TEST",
+          "priority": "HIGH",
+          "timeout": 3600,
+          "cmd": "cargo test --locked -p x3-accel --features wgpu && cargo test --locked -p x3-accel-wgpu"
+        },
+        {
+          "name": "fuzz-atomic-kernel-rollback",
+          "class": "FUZZ",
+          "priority": "NORMAL",
+          "timeout": 2400,
+          "cmd": "mkdir -p \"$X3_JOB_OUT/crashes\" \"$X3_JOB_OUT/corpus\" && cd pallets/x3-atomic-kernel && cargo +nightly-2026-08-21 fuzz run fuzz_rollback \"$X3_JOB_OUT/corpus\" -- -max_total_time=120 -seed=1 -artifact_prefix=\"$X3_JOB_OUT/crashes/\""
+        },
+        {
+          "name": "sim-partition-storm-hunt",
+          "class": "SIMULATION",
+          "priority": "BACKGROUND",
+          "timeout": 2400,
+          "cmd": "cargo run --release --manifest-path crates/x3-sim/Cargo.toml -- --scenario partition-storm --seed 1000 --hunt 200 --out \"$X3_JOB_OUT/partition-storm\" --packet \"$X3_JOB_OUT/packets\""
+        },
+        {
+          "name": "sim-crash-recovery-hunt",
+          "class": "SIMULATION",
+          "priority": "BACKGROUND",
+          "timeout": 2400,
+          "cmd": "cargo run --release --manifest-path crates/x3-sim/Cargo.toml -- --scenario crash-recovery --seed 2000 --hunt 200 --out \"$X3_JOB_OUT/crash-recovery\" --packet \"$X3_JOB_OUT/packets\""
+        },
+        {
+          "name": "gpu-production-gate",
+          "class": "GPU",
+          "priority": "HIGH",
+          "timeout": 3600,
+          "cmd": "set +e; bash scripts/gpu-production-gate.sh; rc=$?; mkdir -p \"$X3_JOB_OUT/gpu-production\"; cp -r audit-artifacts/gpu-production/\"$X3_COMMIT\"/. \"$X3_JOB_OUT/gpu-production\"/ 2>/dev/null || true; exit $rc"
+        },
+        {
+          "name": "inference-workers",
+          "class": "INFERENCE",
+          "priority": "NORMAL",
+          "timeout": 600,
+          "cmd": "ports=$(awk -F= '/^X3_GPU_WORKERS=/{print $2}' ~/.config/x3-cluster/node.env | tr ',' '\\n' | awk -F: '{print $NF}'); [ -n \"$ports\" ] || { echo \"no planned GPU workers\"; exit 1; }; for p in $ports; do case \"$p\" in 1143[4-9]|1144[0-9]) ;; *) echo \"invalid worker port $p\"; exit 1;; esac; curl -fsS -m 300 http://127.0.0.1:$p/api/generate -d '{\"model\":\"qwen2.5-coder:7b\",\"prompt\":\"Reply with the single word: ok\",\"stream\":false,\"options\":{\"num_predict\":8}}' -o \"$X3_JOB_OUT/worker-$p.json\" || { echo \"worker :$p failed\"; exit 1; }; echo \"worker :$p ok\"; done; ls \"$X3_JOB_OUT\"/worker-*.json"
+        }
+      ]
+    }
+  ]
+}

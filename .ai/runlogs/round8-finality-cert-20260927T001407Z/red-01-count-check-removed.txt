@@ -1,0 +1,3 @@
+test finality::tests::test_a_reported_count_the_anchor_does_not_imply_is_refused ... FAILED
+thread 'finality::tests::test_a_reported_count_the_anchor_does_not_imply_is_refused' panicked at crates/x3-atomic-swap/src/finality.rs:598:10:
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 667 filtered out; finished in 0.00s

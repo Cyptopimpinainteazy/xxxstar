@@ -1,0 +1,7 @@
+{
+  "status": "failed",
+  "steps": [],
+  "chain": "X3 Chain Local 3-Validator Testnet",
+  "specVersion": "20",
+  "error": "createType(Call):: Call: failed decoding x3TokenFactory.createToken:: Struct: failed on args: {\"config\":\"{\\\"symbol\\\":\\\"Bytes\\\",\\\"name\\\":\\\"Bytes\\\",\\\"canonicalDecimals\\\":\\\"u8\\\",\\\"initialSupply\\\":\\\"u128\\\",\\\"maxSupply\\\":\\\"Option<u128>\\\",\\\"class\\\":\\\"X3AssetKernelTypesTokenClass\\\",\\\"enabledDomains\\\":\\\"Vec<X3AssetKernelTypesDomainId>\\\"}\"}:: Struct: failed on config: {\"symbol\":\"Bytes\",\"name\":\"Bytes\",\"canonicalDecimals\":\"u8\",\"initialSupply\":\"u128\",\"maxSupply\":\"Option<u128>\",\"class\":\"X3AssetKernelTypesTokenClass\",\"enabledDomains\":\"Vec<X3AssetKernelTypesDomainId>\"}:: Struct: failed on symbol: Bytes:: Compact input is > Number.MAX_SAFE_INTEGER"
+}

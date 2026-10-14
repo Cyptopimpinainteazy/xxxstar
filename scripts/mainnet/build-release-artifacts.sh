@@ -1,162 +1,122 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────────────────
-# build-release-artifacts.sh — produce the files a release is made of
-#
-# The release pipeline has never run a single step. `v0.4.0-rc.1` is 1,027
-# commits behind master, and the workflow file *at that tag* asked for
-# `ubuntu-latest`, which is billing-locked for this account — every job finished
-# in ~4 seconds with zero steps, so the draft release has no assets and
-# `install-validator.sh --from-release` has nothing to download. The workflow on
-# master targets the self-hosted runners (both online), but its dispatch path
-# builds whatever ref it is dispatched on, which is not the tag you want to
-# release.
-#
-# This script produces the same set of files locally, from the tree you point it
-# at, and prints the exact upload command:
-#
-#   x3-chain-node                    the node binary
-#   x3-chain-node.sha256             its digest (the installer requires this file)
-#   x3_chain_runtime.compact.wasm(.gz)   the runtime blob the node embeds
-#   x3-chain-node.cdx.json           SBOM, when `cargo cyclonedx` is available
-#   MANIFEST.txt                     commit, toolchain, sizes, digests
-#   x3-chain-node-<tag>-linux-x86_64.tar.gz  the above, for humans
-#
-# Usage:
-#   scripts/mainnet/build-release-artifacts.sh <tag> [--out DIR] [--chain SPEC]
-#                                                [--binary PATH] [--skip-sbom]
-#
-# `--binary` skips the build and packages a binary you already have (what the
-# release-artifact gate uses, so it does not rebuild the node a second time).
-# ─────────────────────────────────────────────────────────────────────────────
+# Package one committed candidate. Existing binaries are deliberately not accepted.
+# Usage: build-release-artifacts.sh LABEL --chain PLAIN_SPEC --features FEATURES
+#        [--out DIR] [--skip-sbom]
+# FEATURES is the explicit Cargo feature list, including cli (e.g. cli,testnet).
 set -euo pipefail
-
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TAG="${1:?usage: build-release-artifacts.sh <tag> [--out DIR] [--chain SPEC] [--binary PATH] [--skip-sbom]}"
+TAG="${1:?usage: build-release-artifacts.sh LABEL --chain SPEC --features FEATURES [--out DIR] [--skip-sbom]}"
 shift
-
 OUT_DIR=""
 CHAIN_SPEC=""
-NODE_BIN=""
+FEATURES=""
 SKIP_SBOM=0
-while [ "$#" -gt 0 ]; do
+info() { printf '[release-artifacts] %s\n' "$*"; }
+die() { printf '[release-artifacts] FAIL: %s\n' "$*" >&2; exit 1; }
+while (( $# )); do
   case "$1" in
     --out) OUT_DIR="${2:?--out needs a directory}"; shift 2 ;;
     --chain) CHAIN_SPEC="${2:?--chain needs a file}"; shift 2 ;;
-    --binary) NODE_BIN="${2:?--binary needs a path}"; shift 2 ;;
+    --features) FEATURES="${2:?--features needs a feature list}"; shift 2 ;;
     --skip-sbom) SKIP_SBOM=1; shift ;;
-    *) echo "unknown option: $1" >&2; exit 2 ;;
+    --binary) die "prebuilt binaries have no verified source provenance; omit --binary" ;;
+    *) die "unknown option: $1" ;;
   esac
 done
-
-OUT_DIR="${OUT_DIR:-$ROOT/dist/${TAG}}"
-BINARY_NAME="x3-chain-node"
-RUNTIME_WASM="x3_chain_runtime.compact.compressed.wasm"
-TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
-
-info() { printf '[release-artifacts] %s\n' "$*"; }
-die() { printf '[release-artifacts] FAIL: %s\n' "$*" >&2; exit 1; }
-
-[ -n "$TAG" ] || die "a tag is required"
-
+[[ "$TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "invalid release label"
+[[ "$FEATURES" =~ ^[A-Za-z0-9_-]+(,[A-Za-z0-9_-]+)*$ ]] || die "an explicit Cargo feature list is required"
+[[ -f "$CHAIN_SPEC" ]] || die "a plain chain spec is required"
+CHAIN_SPEC="$(realpath "$CHAIN_SPEC")"
 COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
-if [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ]; then
-  info "WARNING: the tree has uncommitted changes; the manifest names $COMMIT but the"
-  info "         artifacts were built from the working tree. Commit first for a release."
-fi
-
-# ── the binary ───────────────────────────────────────────────────────────────
-if [ -z "$NODE_BIN" ]; then
-  info "building $BINARY_NAME (release)"
-  ( cd "$ROOT" && cargo build --release -p x3-chain-node )
-  NODE_BIN="$TARGET_DIR/release/$BINARY_NAME"
-fi
-[ -x "$NODE_BIN" ] || die "node binary not found or not executable: $NODE_BIN"
-
-mkdir -p "$OUT_DIR"
-install -m 0755 "$NODE_BIN" "$OUT_DIR/$BINARY_NAME"
-
-# The runtime blob the binary embeds. Take srtool's if it is there (that is the
-# build stage 6b attests), else the workspace's own wbuild output.
-WASM_PATH=""
-for candidate in \
-  "$ROOT/runtime/target/srtool/..." \
-  "$TARGET_DIR/release/wbuild/x3-chain-runtime/$RUNTIME_WASM" \
-  "$TARGET_DIR/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.wasm"; do
-  case "$candidate" in *"..."*) continue ;; esac
-  if [ -f "$candidate" ]; then WASM_PATH="$candidate"; break; fi
-done
-if [ -n "$WASM_PATH" ]; then
-  base="$(basename "$WASM_PATH")"
-  install -m 0644 "$WASM_PATH" "$OUT_DIR/$base"
-  gzip -c "$OUT_DIR/$base" >"$OUT_DIR/$base.gz"
-  info "runtime blob: $base ($(stat -c%s "$OUT_DIR/$base") bytes)"
-else
-  info "WARNING: no runtime wasm found under $TARGET_DIR; the bundle will not carry one"
-fi
-
-# ── SBOM ─────────────────────────────────────────────────────────────────────
-if [ "$SKIP_SBOM" = 0 ]; then
-  if command -v cargo-cyclonedx >/dev/null 2>&1 || cargo cyclonedx --version >/dev/null 2>&1; then
-    info "generating SBOM (cyclonedx)"
-    ( cd "$ROOT" && cargo cyclonedx -p x3-chain-node --output "$OUT_DIR" --format json ) \
-      || info "WARNING: cyclonedx failed; continuing without an SBOM"
-  else
-    info "WARNING: cargo-cyclonedx is not installed; continuing without an SBOM"
-    info "         install it with: cargo install cargo-cyclonedx"
-  fi
-fi
-
-if [ -n "$CHAIN_SPEC" ]; then
-  [ -f "$CHAIN_SPEC" ] || die "chain spec not found: $CHAIN_SPEC"
-  install -m 0644 "$CHAIN_SPEC" "$OUT_DIR/genesis.json"
-  info "genesis: $(basename "$CHAIN_SPEC")"
-fi
-
-# ── checksums and manifest ───────────────────────────────────────────────────
+[[ -z "$(git -C "$ROOT" status --porcelain --untracked-files=all)" ]] \
+  || die "candidate checkout must be clean, including untracked files"
+OUT_DIR="$(realpath -m "${OUT_DIR:-$ROOT/dist/$TAG}")"
+[[ ! -e "$OUT_DIR" ]] || die "output directory already exists; choose a new release directory"
+TARBALL="${OUT_DIR}.tar.gz"
+[[ ! -e "$TARBALL" ]] || die "archive already exists"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+mkdir "$WORK/source" "$WORK/bundle"
+# Ignored build products and local configuration cannot enter the source snapshot.
+git -C "$ROOT" archive "$COMMIT" | tar -x -C "$WORK/source"
+cp "$CHAIN_SPEC" "$WORK/bundle/genesis.json"
+# Resolve rustup's pinned toolchain in the archived source, not the caller's cwd.
+RUSTC_VERSION="$(cd "$WORK/source" && rustc --version)"
+CARGO_VERSION="$(cd "$WORK/source" && cargo --version)"
+BUILD_HOST="$(cd "$WORK/source" && rustc -vV | sed -n 's/^host: //p')"
+info "building committed source $COMMIT with features $FEATURES"
 (
-  cd "$OUT_DIR"
-  # The installer fetches `<binary>.sha256` and runs `sha256sum -c` against it, so
-  # it must name exactly the binary asset.
-  sha256sum "$BINARY_NAME" >"$BINARY_NAME.sha256"
-  for extra in *.wasm *.wasm.gz; do
-    [ -f "$extra" ] || continue
-    sha256sum "$extra" >>"$BINARY_NAME.sha256"
-  done
+  cd "$WORK/source"
+  env -u SKIP_WASM_BUILD CARGO_TARGET_DIR="$WORK/target" \
+    cargo build --locked --release -p x3-chain-node --no-default-features --features "$FEATURES"
 )
-
-{
-  echo "tag:            $TAG"
-  echo "commit:         $COMMIT"
-  echo "built_at:       $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "rustc:          $(rustc --version 2>/dev/null || echo unknown)"
-  echo "cargo:          $(cargo --version 2>/dev/null || echo unknown)"
-  echo "target:         $(rustc -vV 2>/dev/null | sed -n 's/^host: //p' || echo unknown)"
-  echo "binary_size:    $(stat -c%s "$OUT_DIR/$BINARY_NAME")"
-  echo
-  echo "files:"
-  ( cd "$OUT_DIR" && ls -1 )
-  echo
-  echo "digests:"
-  cat "$OUT_DIR/$BINARY_NAME.sha256"
-} >"$OUT_DIR/MANIFEST.txt"
-
-TARBALL="$ROOT/dist/${TAG}-linux-x86_64.tar.gz"
-mkdir -p "$(dirname "$TARBALL")"
+NODE_BIN="$WORK/target/release/x3-chain-node"
+[[ -x "$NODE_BIN" ]] || die "build did not produce an executable node"
+install -m 0755 "$NODE_BIN" "$WORK/bundle/x3-chain-node"
+# Loading the supplied plain spec uses the node's own genesis validation. Its raw
+# twin is generated here, never taken from an unrelated previous build.
+"$NODE_BIN" build-spec --chain "$WORK/bundle/genesis.json" --raw > "$WORK/bundle/genesis-raw.json"
+"$NODE_BIN" build-spec --chain local3 > "$WORK/embedded.json"
+python3 - "$WORK/bundle" "$WORK/embedded.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+bundle = Path(sys.argv[1])
+plain = json.loads((bundle / 'genesis.json').read_text())
+raw = json.loads((bundle / 'genesis-raw.json').read_text())
+embedded = json.loads(Path(sys.argv[2]).read_text())
+def decode(value):
+    if not isinstance(value, str) or not value.startswith('0x'):
+        raise ValueError('runtime code must be hex prefixed with 0x')
+    code = bytes.fromhex(value[2:])
+    if not code:
+        raise ValueError('runtime code is empty')
+    return code
+code = decode(plain['genesis']['runtimeGenesis']['code'])
+if code != decode(embedded['genesis']['runtimeGenesis']['code']):
+    raise ValueError('plain spec runtime differs from the built binary embedded runtime')
+if code != decode(raw['genesis']['raw']['top']['0x3a636f6465']):
+    raise ValueError('raw spec runtime differs from plain spec')
+for field in ('id', 'name', 'chainType', 'bootNodes', 'properties', 'protocolId'):
+    if plain.get(field) != raw.get(field):
+        raise ValueError(f'plain/raw identity mismatch: {field}')
+# Preserve the exact :code bytes, including compression if present.
+(bundle / 'x3-runtime.wasm').write_bytes(code)
+PY
+gzip -n -c "$WORK/bundle/x3-runtime.wasm" > "$WORK/bundle/x3-runtime.wasm.gz"
+SBOM_STATUS=omitted_by_request
+if (( SKIP_SBOM == 0 )); then
+  ( cd "$WORK/source" && cargo cyclonedx --manifest-path node/Cargo.toml \
+      --format json --no-default-features --features "$FEATURES" )
+  [[ -s "$WORK/source/node/bom.json" ]] || die "SBOM command produced no node/bom.json"
+  cp "$WORK/source/node/bom.json" "$WORK/bundle/x3-chain-node.cdx.json"
+  SBOM_STATUS=generated
+fi
 (
-  cd "$OUT_DIR"
-  tar -czf "$TARBALL" .
+  cd "$WORK/bundle"
+  # Keep the installer-compatible binary digest separate from the complete bundle.
+  sha256sum x3-chain-node > x3-chain-node.sha256
+  printf '%s\n' "$COMMIT" > git-revision.txt
+  {
+    echo "label:          $TAG"
+    echo "commit:         $COMMIT"
+    echo "features:       $FEATURES"
+    echo "default_features: false"
+    echo "build:          cargo build --locked --release -p x3-chain-node --no-default-features --features $FEATURES"
+    echo "rustc:          $RUSTC_VERSION"
+    echo "cargo:          $CARGO_VERSION"
+    echo "build_host:     $BUILD_HOST"
+    echo "sbom:           $SBOM_STATUS"
+    echo "runtime:        exact genesis :code bytes; compression preserved"
+    echo "reproducibility: not established by this single build"
+  } > MANIFEST.txt
+  find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' \
+    | sort -z | xargs -0 sha256sum > SHA256SUMS
+  sha256sum -c SHA256SUMS
 )
-info "bundle: $TARBALL ($(stat -c%s "$TARBALL") bytes)"
-
-echo
-info "artifacts in $OUT_DIR"
-( cd "$OUT_DIR" && sha256sum -c "$BINARY_NAME.sha256" ) || die "checksums do not verify"
-info "checksums verify"
-echo
-info "to attach them to the release (a draft is fine; publish when you are ready):"
-info "  gh release upload $TAG $OUT_DIR/$BINARY_NAME $OUT_DIR/$BINARY_NAME.sha256 \\"
-info "      $OUT_DIR/*.wasm $OUT_DIR/*.wasm.gz $OUT_DIR/*.cdx.json --clobber"
-info
-info "the public download path only serves published releases, so"
-info "  install-validator.sh --from-release $TAG"
-info "works after the release is published, not while it is a draft."
+mkdir -p "$(dirname "$OUT_DIR")"
+# No files reach the release destination until the build and identity checks pass.
+mv -T "$WORK/bundle" "$OUT_DIR"
+tar -czf "$TARBALL" -C "$OUT_DIR" .
+info "bundle: $OUT_DIR"
+info "archive: $TARBALL"

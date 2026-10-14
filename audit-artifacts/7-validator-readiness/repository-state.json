@@ -1,0 +1,44 @@
+{
+  "captured_at": "2026-10-01T04:46:13Z",
+  "git": {
+    "commit": "2685f7d89c348a87a2575ba5f89d7582dd433748",
+    "branch": "feat/x3-guardian",
+    "dirty_entries": 26
+  },
+  "toolchain": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "polkadot_sdk_branch": "stable2512"
+  },
+  "runtime": {
+    "spec_version": 20,
+    "impl_version": 1,
+    "transaction_version": 1,
+    "node_version": "0.1.0"
+  },
+  "artifacts": {
+    "release_binary": {
+      "path": "target/release/x3-chain-node",
+      "sha256": "8d3596f329c0d25c047151017913b3d255ab1746b62db3dfa3c415ec5fc8085f",
+      "built": "2026-09-28 06:05:58",
+      "note": "predates HEAD; not candidate-bound evidence"
+    },
+    "chain_specs": {
+      "deployment/chain-specs/x3-testnet-raw.json": "24b33908db98399bd0f7a526ba2706dd14233eeddd327a72c9753e3fd1209868",
+      "deployment/chain-specs/fresh/x3-testnet-plain.json": "f59a973e8bf25e280f9c5bbc791d599d633802bb8479599d7f68bd3c1b82574d",
+      "chain-specs/x3-local3-plain.json": "ee92c42a4a310629190a4118e6bb0075ba0d94c6a8430ab18da9b02829b730b6"
+    }
+  },
+  "verification": {
+    "audit_matrix_check": "PASS (scripts/x3_audit_matrix.py --check)",
+    "local_ci": "RUNNING at capture time",
+    "router_tests": "PASS (126 tests, 2026-09-30)",
+    "loopback_7_validator_proof": "TESTNET_GAP_LEDGER.md: 7/7 identical finalized heads, 2000/2000 remarks, 110.6 finTPS, 8/8 cold starts, 7/7 single-loss survival (2026-09-22 evidence)"
+  },
+  "known_gaps": {
+    "bare_metal_automation": "absent: no ansible/autoinstall/cloud-init/PXE/hardware profiles in tree",
+    "frozen_7val_artifact_set": "absent: no x3-7val-testnet.json + SHA256 record bound to a commit",
+    "monitoring_log_aggregation": "no Loki/central log pipeline",
+    "completion_scan": "153 features: 2 high + 27 medium + 2 low unfinished; 122 complete by current detector"
+  }
+}

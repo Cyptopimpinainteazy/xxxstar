@@ -1,0 +1,29 @@
+runlog: /home/lojak/Desktop/xxxstar-main/.ai/runlogs/x3-htlc-live-20260927T120705Z
+workdir: /tmp/x3-htlc-live.udOAxK
+rpc:     http://127.0.0.1:18511 (port 18511)
+=== build the SBF program ===
+
+warning: `x3_htlc` (lib) generated 13 warnings (5 duplicates)
+    Finished `release` profile [optimized] target(s) in 0.40s
+program so: /home/lojak/Desktop/xxxstar-main/X3-contracts/svm/target/deploy/x3_htlc.so (284560 bytes)
+=== build the broadcaster ===
+    Finished `release` profile [optimized] target(s) in 0.38s
+=== generating keypairs ===
+initiator=AgixSfyoDJR6NQD25P97iv1DqQbdB89ENzt7G3Fdj4Zb recipient=B7BM8pfCnTVJMScj8s93sJ1gkbHmaycDZ12HNbNY2Nqe stranger=4JuFsnPC8HgYBFVF7oHXfRDDWiXVHXj99cS2CAb32NYC
+=== starting solana-test-validator ===
+validator ready: 4.2.2
+PASS: x3_htlc is deployed and executable on-chain at X3HTLC1111111111111111111111111111111111111
+=== creating SPL mint and token accounts ===
+mint=D6hbNy5nKFTjwLjJFhxzp1jqCJYfoKXaYjYcqkymWXBo
+PASS: SPL mint is owned by the on-chain token program
+initiator_ata=4m5jVYnNxoTDst2J2FyDspxd4rLiXLBzCfgSbmx14E5t recipient_ata=GrHLxWF7rAHAyq6ri55u2CkSB3qrf3KkFXHBnm7wcQRf
+error: Found argument '--recipient' which wasn't expected, or isn't valid in this context
+
+	Did you mean '--recipient-owner'?
+
+	If you tried to supply `--recipient` as a value rather than a flag, use `-- --recipient`
+
+USAGE:
+    spl-token mint --recipient-owner <RECIPIENT_WALLET_ADDRESS> <TOKEN_MINT_ADDRESS> <TOKEN_AMOUNT>
+
+For more information try --help

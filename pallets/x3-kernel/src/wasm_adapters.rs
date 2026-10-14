@@ -22,8 +22,12 @@ use sp_std::vec::Vec;
 /// EVM adapter powered by `mini_evm` — runs the SputnikVM interpreter.
 pub struct WasmEvmAdapter;
 
-impl EvmExecutorAdapter for WasmEvmAdapter {
-    fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+impl WasmEvmAdapter {
+    fn execute_with_config(
+        payload: &[u8],
+        evm_config: &x3_evm_integration::EvmConfig,
+        caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty EVM payload"));
         }
@@ -35,40 +39,76 @@ impl EvmExecutorAdapter for WasmEvmAdapter {
                 "EVM payload is a SCALE-encoded Packet, not bytecode: this adapter cannot execute it",
             ));
         }
-        let evm_config = x3_evm_integration::EvmConfig {
-            gas_limit,
-            ..x3_evm_integration::EvmConfig::default()
-        };
-        x3_evm_integration::mini_evm::execute_evm(
+        x3_evm_integration::mini_evm::execute_evm_persistent(
             payload,
-            sp_core::H160::zero(), // caller — pallet fills in from origin
-            sp_core::U256::zero(), // value — pallet fills in from extrinsic
-            &evm_config,
+            caller,
+            sp_core::U256::zero(), // No implicit native-ledger value transfer
+            evm_config,
         )
         .map(|res| ExecutionReceipt {
             version: crate::EXECUTION_RECEIPT_VERSION,
             success: res.success,
             gas_used: res.gas_used,
             return_data: res.output,
-            logs: Vec::new(),
+            logs: res
+                .logs
+                .into_iter()
+                .map(|log| crate::ExecutionLog {
+                    address: log.address.as_bytes().to_vec(),
+                    topics: log.topics,
+                    data: log.data,
+                    block_number: evm_config.block_number,
+                })
+                .collect(),
             state_changes: Vec::new(),
             storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
-            from: Vec::new(),
+            from: caller.as_bytes().to_vec(),
             to: Vec::new(),
             value: 0,
         })
         .map_err(|_| DispatchError::Other("EVM execution failed"))
     }
+}
 
+impl EvmExecutorAdapter for WasmEvmAdapter {
+    fn execute(payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+        Self::validate(payload)?;
+        Err(DispatchError::Other(
+            "EVM execution requires an authenticated caller",
+        ))
+    }
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        Self::execute_with_config(
+            payload,
+            &x3_evm_integration::EvmConfig {
+                gas_limit,
+                ..Default::default()
+            },
+            caller,
+        )
+    }
     fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
-        if payload.is_empty() {
-            return Err(DispatchError::Other("Empty EVM payload"));
-        }
-        x3_evm_integration::mini_evm::estimate_gas_evm(payload)
-            .map_err(|_| DispatchError::Other("EVM gas estimation failed"))
+        Self::validate(payload)?;
+        Err(DispatchError::Other(
+            "EVM gas estimation requires an authenticated caller",
+        ))
+    }
+    fn estimate_gas_from(payload: &[u8], caller: sp_core::H160) -> Result<u64, DispatchError> {
+        Self::validate(payload)?;
+        x3_evm_integration::mini_evm::estimate_gas_evm_persistent(
+            payload,
+            caller,
+            sp_core::U256::zero(),
+            &Default::default(),
+        )
+        .map_err(|_| DispatchError::Other("EVM gas estimation failed"))
     }
 
     fn validate(payload: &[u8]) -> Result<(), DispatchError> {
@@ -86,6 +126,50 @@ impl EvmExecutorAdapter for WasmEvmAdapter {
         }
         x3_evm_integration::mini_evm::validate_evm(payload)
             .map_err(|_| DispatchError::Other("EVM validation failed"))
+    }
+}
+
+/// Production context for the same content-addressed EVM adapter.
+pub struct ContextualWasmEvmAdapter<T>(core::marker::PhantomData<T>);
+impl<T: crate::Config> ContextualWasmEvmAdapter<T> {
+    fn config(gas_limit: u64) -> x3_evm_integration::EvmConfig {
+        use frame_support::traits::UnixTime;
+        use sp_runtime::traits::SaturatedConversion;
+        x3_evm_integration::EvmConfig {
+            gas_limit,
+            block_number: frame_system::Pallet::<T>::block_number().saturated_into(),
+            block_timestamp: <pallet_timestamp::Pallet<T> as UnixTime>::now().as_secs(),
+            ..Default::default()
+        }
+    }
+}
+impl<T: crate::Config> EvmExecutorAdapter for ContextualWasmEvmAdapter<T> {
+    fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+        WasmEvmAdapter::execute(payload, gas_limit)
+    }
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        WasmEvmAdapter::execute_with_config(payload, &Self::config(gas_limit), caller)
+    }
+    fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
+        WasmEvmAdapter::estimate_gas(payload)
+    }
+    fn estimate_gas_from(payload: &[u8], caller: sp_core::H160) -> Result<u64, DispatchError> {
+        Self::validate(payload)?;
+        use frame_support::traits::Get;
+        x3_evm_integration::mini_evm::estimate_gas_evm_persistent(
+            payload,
+            caller,
+            sp_core::U256::zero(),
+            &Self::config(T::DefaultEvmGasLimit::get()),
+        )
+        .map_err(|_| DispatchError::Other("EVM gas estimation failed"))
+    }
+    fn validate(payload: &[u8]) -> Result<(), DispatchError> {
+        WasmEvmAdapter::validate(payload)
     }
 }
 
@@ -418,7 +502,10 @@ mod an_accepted_evm_payload_is_refused {
             !crate::packet_adapters::payload_is_packet(&code),
             "the fixture has to be bytecode, not a packet"
         );
-        let receipt = WasmEvmAdapter::execute(&code, 6_000_000).expect("bytecode has to execute");
+        let receipt = sp_io::TestExternalities::default().execute_with(|| {
+            WasmEvmAdapter::execute_from(&code, 6_000_000, sp_core::H160::zero())
+                .expect("bytecode has to execute")
+        });
         assert!(
             receipt.success,
             "`PUSH1 0; PUSH1 0; RETURN` halts successfully"
@@ -443,52 +530,79 @@ mod an_accepted_evm_payload_is_refused {
         );
     }
 
-    /// The EVM the production (WASM) runtime runs keeps no state between executions: each call
-    /// starts `mini_evm` from an empty storage map, with no deployed contracts or accounts. A slot
-    /// one execution writes is gone for the next, even though the same execution reads its own
-    /// write back. This is why a cross-VM call from `.x3` (`evm_call`, ...) has nothing to reach
-    /// and is refused at compile time (X3-LANG-001), and why a test built with the runtime's
-    /// `frontier` feature (which swaps in `pallet_evm` for the native build only) is not evidence
-    /// about the chain's EVM.
+    /// The production adapter retains a slot across independent interpreter instances.
     #[test]
-    fn the_chains_evm_keeps_no_state_between_executions() {
-        use crate::adapters::EvmExecutorAdapter;
-
-        // PUSH1 0x42; PUSH1 0; SSTORE; PUSH1 0; SLOAD; PUSH1 0; MSTORE; PUSH1 32; PUSH1 0; RETURN
-        let store_then_load: &[u8] = &[
-            0x60, 0x42, 0x60, 0x00, 0x55, 0x60, 0x00, 0x54, 0x60, 0x00, 0x52, 0x60, 0x20, 0x60,
-            0x00, 0xf3,
-        ];
-        // PUSH1 0x42; PUSH1 0; SSTORE; STOP
-        let store: &[u8] = &[0x60, 0x42, 0x60, 0x00, 0x55, 0x00];
-        // PUSH1 0; SLOAD; PUSH1 0; MSTORE; PUSH1 32; PUSH1 0; RETURN
-        let load: &[u8] = &[
-            0x60, 0x00, 0x54, 0x60, 0x00, 0x52, 0x60, 0x20, 0x60, 0x00, 0xf3,
-        ];
-        let word = |value: u8| {
-            let mut word = [0u8; 32];
-            word[31] = value;
-            word.to_vec()
-        };
-
-        // Within one execution the interpreter's storage works: the control.
-        let same = WasmEvmAdapter::execute(store_then_load, 100_000).expect("runs");
-        assert!(same.success);
-        assert_eq!(same.return_data, word(0x42));
-
-        // Across executions it does not persist.
-        let stored = WasmEvmAdapter::execute(store, 100_000).expect("runs");
-        assert!(stored.success);
-        assert!(
-            stored.state_changes.is_empty() && stored.storage_writes.is_empty(),
-            "the adapter reports no state change for the chain to keep"
-        );
-        let loaded = WasmEvmAdapter::execute(load, 100_000).expect("runs");
-        assert!(loaded.success);
-        assert_eq!(
-            loaded.return_data,
-            word(0),
-            "a later execution reads an empty slot: nothing the first one wrote survived"
-        );
+    fn the_chains_evm_keeps_state_between_executions() {
+        sp_io::TestExternalities::default().execute_with(|| {
+            // Increment slot zero, then return it. Identical code means the same
+            // content-addressed contract on both calls.
+            let code = [
+                0x60, 0, 0x54, 0x60, 1, 0x01, 0x80, 0x60, 0, 0x55, 0x60, 0, 0x52, 0x60, 32, 0x60,
+                0, 0xf3,
+            ];
+            let root_before = sp_io::storage::root(sp_runtime::StateVersion::V1);
+            let refused: Result<(), DispatchError> =
+                frame_support::storage::with_storage_layer(|| {
+                    let receipt =
+                        WasmEvmAdapter::execute_from(&code, 100_000, sp_core::H160::zero())?;
+                    assert_eq!(receipt.return_data[31], 1);
+                    // Model the next VM failing after successful EVM execution.
+                    Err(DispatchError::Other("second VM refused"))
+                });
+            assert!(refused.is_err());
+            assert_eq!(
+                root_before,
+                sp_io::storage::root(sp_runtime::StateVersion::V1)
+            );
+            let estimated_first = WasmEvmAdapter::estimate_gas_from(&code, sp_core::H160::zero())
+                .expect("simulate first call");
+            assert_eq!(
+                root_before,
+                sp_io::storage::root(sp_runtime::StateVersion::V1)
+            );
+            let first = WasmEvmAdapter::execute_from(&code, 100_000, sp_core::H160::zero())
+                .expect("first call");
+            assert_eq!(estimated_first, first.gas_used);
+            let root_after_first = sp_io::storage::root(sp_runtime::StateVersion::V1);
+            let estimated_second = WasmEvmAdapter::estimate_gas_from(&code, sp_core::H160::zero())
+                .expect("simulate second call");
+            assert_eq!(
+                root_after_first,
+                sp_io::storage::root(sp_runtime::StateVersion::V1)
+            );
+            let second = WasmEvmAdapter::execute_from(&code, 100_000, sp_core::H160::zero())
+                .expect("second call");
+            assert_eq!(estimated_second, second.gas_used);
+            assert_eq!(first.return_data[31], 1);
+            assert_eq!(second.return_data[31], 2);
+            assert!(
+                second.gas_used < first.gas_used,
+                "SSTORE uses the persisted original value"
+            );
+        });
+    }
+    #[test]
+    fn runtime_context_uses_chain_block_number_and_timestamp() {
+        crate::mock::new_test_ext().execute_with(|| {
+            crate::mock::System::set_block_number(123);
+            pallet_timestamp::Pallet::<crate::mock::Test>::set_timestamp(456_000);
+            let code = [
+                0x43, 0x60, 0, 0x52, 0x42, 0x60, 32, 0x52, 0x60, 64, 0x60, 0, 0xf3,
+            ];
+            let receipt = ContextualWasmEvmAdapter::<crate::mock::Test>::execute_from(
+                &code,
+                100_000,
+                sp_core::H160::zero(),
+            )
+            .unwrap();
+            assert_eq!(
+                sp_core::U256::from_big_endian(&receipt.return_data[..32]),
+                sp_core::U256::from(123)
+            );
+            assert_eq!(
+                sp_core::U256::from_big_endian(&receipt.return_data[32..]),
+                sp_core::U256::from(456)
+            );
+        });
     }
 }

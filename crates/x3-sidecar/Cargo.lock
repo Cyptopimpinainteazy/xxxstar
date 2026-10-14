@@ -3241,6 +3241,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "fp-self-contained"
+version = "1.0.0-dev"
+source = "git+https://github.com/polkadot-evm/frontier?branch=stable2512#9d49e36ed5bac38241594f8ba055fdb94991483a"
+dependencies = [
+ "frame-support",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-runtime",
+]
+
+[[package]]
 name = "fp-storage"
 version = "2.0.0"
 source = "git+https://github.com/polkadot-evm/frontier?branch=stable2512#9d49e36ed5bac38241594f8ba055fdb94991483a"
@@ -7365,6 +7377,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-app-registry"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-x3-asset-registry"
 version = "0.1.0"
 dependencies = [
@@ -7802,6 +7828,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-security-gate"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-x3-app-registry",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-x3-sentinel"
 version = "0.1.0"
 dependencies = [
@@ -7941,6 +7982,21 @@ dependencies = [
  "parity-scale-codec",
  "scale-info",
  "serde",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-x3-trust-gate"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-x3-app-registry",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
  "sp-runtime",
  "sp-std",
 ]
@@ -12000,9 +12056,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-rustls"
-version = "0.26.5"
+version = "0.26.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0c85f2c3ef0b1cd58b36682f4b17aaa995f0e5db534d85692b4903abce21f67"
+checksum = "c9cc2678c2cdd569ef8215e2afd7954ada2ae20b4fdd2c5fe6139a3b02d105db"
 dependencies = [
  "rustls",
  "tokio",
@@ -13833,8 +13889,10 @@ dependencies = [
 name = "x3-chain-runtime"
 version = "0.1.0"
 dependencies = [
+ "ethereum",
  "fp-ethereum",
  "fp-evm",
+ "fp-self-contained",
  "frame-executive",
  "frame-support",
  "frame-system",
@@ -13873,6 +13931,7 @@ dependencies = [
  "pallet-x3-account-registry",
  "pallet-x3-agent-law",
  "pallet-x3-agent-registry",
+ "pallet-x3-app-registry",
  "pallet-x3-asset-registry",
  "pallet-x3-atomic-kernel",
  "pallet-x3-auction",
@@ -13900,6 +13959,7 @@ dependencies = [
  "pallet-x3-rebalance",
  "pallet-x3-reconciliation",
  "pallet-x3-reservation",
+ "pallet-x3-security-gate",
  "pallet-x3-sentinel",
  "pallet-x3-sequencer",
  "pallet-x3-settlement-engine",
@@ -13908,6 +13968,7 @@ dependencies = [
  "pallet-x3-supply-ledger",
  "pallet-x3-token-factory",
  "pallet-x3-treasury-policy",
+ "pallet-x3-trust-gate",
  "pallet-x3-verifier",
  "pallet-x3-vrf",
  "pallet-x3-wallet",
@@ -14579,9 +14640,9 @@ dependencies = [
 
 [[package]]
 name = "yoke-derive"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33811428bee40dbceb6d545e95754741d17a6aef9a4849f0fd62e2ba4f412a78"
+checksum = "ec8ebde2db3681e8c9980cc27822030e68752690ddfa9473e739aeb4dbde6d71"
 dependencies = [
  "proc-macro2",
  "quote",

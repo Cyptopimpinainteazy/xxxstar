@@ -1,0 +1,1 @@
+../../x3-gateway/migrations/0006_funding_swarm_public_ledger.sql

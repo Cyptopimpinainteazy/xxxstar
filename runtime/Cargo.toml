@@ -62,6 +62,10 @@ pallet-evm-precompile-modexp = { workspace = true, default-features = false, opt
 pallet-evm-precompile-sha3fips = { workspace = true, default-features = false, optional = true }
 fp-evm = { workspace = true, default-features = false, optional = true }
 fp-ethereum = { workspace = true, default-features = false, optional = true }
+# Self-contained Ethereum extrinsics: the runtime recovers the ECDSA sender of a signed
+# Ethereum transaction itself instead of trusting a caller field.
+fp-self-contained = { workspace = true, default-features = false, features = ["serde"], optional = true }
+ethereum = { version = "0.18.2", default-features = false, optional = true }
 
 pallet-x3-kernel = { path = "../pallets/x3-kernel", default-features = false }
 pallet-x3-consensus = { path = "../pallets/x3-consensus", default-features = false }
@@ -109,6 +113,9 @@ quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
 # staged-pallets (now wired)
 pallet-x3-lp-locker = { path = "../pallets/x3-lp-locker", default-features = false }
 pallet-x3-sentinel = { path = "../pallets/x3-sentinel", default-features = false }
+pallet-x3-app-registry = { path = "../pallets/x3-app-registry", default-features = false }
+pallet-x3-security-gate = { path = "../pallets/x3-security-gate", default-features = false }
+pallet-x3-trust-gate = { path = "../pallets/x3-trust-gate", default-features = false }
 pallet-northern-swarm = { path = "../pallets/northern-swarm", default-features = false }
 pallet-x3-slash = { path = "../pallets/x3-slash", default-features = false }
 pallet-x3-agent-registry = { path = "../pallets/pallet-x3-agent-registry", default-features = false }
@@ -224,6 +231,8 @@ std = [
 	"pallet-evm-precompile-sha3fips?/std",
 	"fp-evm?/std",
 	"fp-ethereum?/std",
+	"fp-self-contained?/std",
+	"ethereum?/std",
 	"pallet-x3-kernel/std",
 	"pallet-x3-invariants/std",
 	"x3-cross-vm-bridge/std",
@@ -248,6 +257,9 @@ std = [
 	"pallet-x3-consensus/std",
 	"pallet-x3-lp-locker/std",
 	"pallet-x3-sentinel/std",
+	"pallet-x3-app-registry/std",
+	"pallet-x3-security-gate/std",
+	"pallet-x3-trust-gate/std",
 	"pallet-northern-swarm/std",
 	"pallet-x3-slash/std",
 	"pallet-x3-agent-registry/std",
@@ -405,6 +417,8 @@ frontier = [
 	"pallet-evm-precompile-sha3fips",
 	"fp-evm",
 	"fp-ethereum",
+	"fp-self-contained",
+	"ethereum",
 ]
 
 # Advanced analytics and indexer features
@@ -416,6 +430,9 @@ try-runtime = [
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
 	"pallet-x3-invariants/try-runtime",
+	"pallet-x3-app-registry/try-runtime",
+	"pallet-x3-security-gate/try-runtime",
+	"pallet-x3-trust-gate/try-runtime",
 ]
 
 [lints.rust]

@@ -1,0 +1,1 @@
+../../x3-indexer/migrations/20241205_001_init.sql

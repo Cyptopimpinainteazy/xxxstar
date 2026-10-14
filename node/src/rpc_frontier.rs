@@ -11,6 +11,9 @@ use hex;
 use jsonrpsee::RpcModule;
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sc_client_api::BlockBackend;
+use sc_transaction_pool_api::TransactionPool;
+#[cfg(feature = "frontier")]
+use sc_transaction_pool_api::TransactionSource;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_runtime::DigestItem;
@@ -383,10 +386,13 @@ fn block_timestamp_from_header(header: &x3_chain_runtime::opaque::Header) -> u64
 /// Create a Frontier-compatible JSON-RPC module backed by runtime API calls.
 /// Provides eth_getBalance, eth_getCode, eth_getStorageAt,
 /// eth_getTransactionCount (nonce), eth_call, and eth_estimateGas.
-pub fn create_frontier_rpc<C>(
+pub fn create_frontier_rpc<C, P>(
     client: Arc<C>,
+    pool: Arc<P>,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
+    P: TransactionPool<Block = Block> + Send + Sync + 'static,
+    C: sc_client_api::AuxStore,
     C: Send
         + Sync
         + 'static
@@ -561,47 +567,56 @@ where
         },
     )?;
 
-    // eth_sendRawTransaction — submit a signed RLP-encoded Ethereum transaction
-    // Executes via the X3 kernel EVM adapter and returns the keccak256 tx hash.
-    let c = client.clone();
-    module.register_method(
-        "eth_sendRawTransaction",
-        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let raw_hex: String = params.one()?;
-            let stripped = raw_hex.strip_prefix("0x").unwrap_or(&raw_hex);
-            let raw_bytes = hex::decode(stripped).map_err(|e| {
-                jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Invalid hex: {}", e),
-                    None::<()>,
+    // eth_sendRawTransaction — submit a signed, EIP-2718 enveloped Ethereum transaction to the
+    // transaction pool. The runtime recovers the sender from the transaction's ECDSA signature
+    // when the pool validates it (`x3_chain_runtime::ethereum_tx`); a forged or malformed
+    // transaction is refused there. Returns the Ethereum transaction hash.
+    #[cfg(feature = "frontier")]
+    {
+        let c = client.clone();
+        let pool = pool.clone();
+        module.register_async_method("eth_sendRawTransaction", move |params, _, _| {
+            let c = c.clone();
+            let pool = pool.clone();
+            async move {
+                let rpc_error = |message: String| {
+                    jsonrpsee::types::ErrorObjectOwned::owned(-32603, message, None::<()>)
+                };
+                let raw_hex: String = params.one()?;
+                let stripped = raw_hex.strip_prefix("0x").unwrap_or(&raw_hex);
+                let raw_bytes =
+                    hex::decode(stripped).map_err(|e| rpc_error(format!("Invalid hex: {e}")))?;
+                let (extrinsic, tx_hash) =
+                    x3_chain_runtime::ethereum_tx::signed_ethereum_extrinsic(&raw_bytes)
+                        .map_err(|e| rpc_error(e.to_string()))?;
+                pool.submit_one(
+                    c.info().best_hash,
+                    TransactionSource::External,
+                    extrinsic.into(),
                 )
-            })?;
-            let api = c.runtime_api();
-            let at = c.info().best_hash;
-            let result: Result<Vec<u8>, Vec<u8>> =
-                api.submit_evm_transaction(at, raw_bytes).map_err(|e| {
-                    jsonrpsee::types::ErrorObjectOwned::owned(
-                        -32603,
-                        format!("Runtime error: {:?}", e),
-                        None::<()>,
-                    )
-                })?;
-            match result {
-                Ok(tx_hash) => Ok(serde_json::Value::String(format!(
+                .await
+                .map_err(|e| rpc_error(format!("Transaction rejected: {e}")))?;
+                Ok::<_, jsonrpsee::types::ErrorObjectOwned>(serde_json::Value::String(format!(
                     "0x{}",
-                    hex::encode(tx_hash)
-                ))),
-                Err(err_bytes) => Err(jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!(
-                        "EVM execution failed: {}",
-                        String::from_utf8_lossy(&err_bytes)
-                    ),
-                    None::<()>,
-                )),
+                    hex::encode(tx_hash.as_bytes())
+                )))
             }
-        },
-    )?;
+        })?;
+    }
+    #[cfg(not(feature = "frontier"))]
+    {
+        let _ = &pool;
+        module.register_method(
+            "eth_sendRawTransaction",
+            |_, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                Err(jsonrpsee::types::ErrorObjectOwned::owned(
+                    -32601,
+                    "EVM disabled in RC-1 (frontier feature off)",
+                    None::<()>,
+                ))
+            },
+        )?;
+    }
 
     // eth_getTransactionByHash — returns EVM transaction object by hash
     let c = client.clone();
@@ -623,6 +638,20 @@ where
                     "Transaction hash must be 32 bytes".to_string(),
                     None::<()>,
                 ));
+            }
+            #[cfg(feature = "frontier")]
+            if let Some(entry) =
+                crate::eth_index::lookup(&*c, &sp_core::H256::from_slice(&tx_hash_bytes)).map_err(
+                    |e| {
+                        jsonrpsee::types::ErrorObjectOwned::owned(
+                            -32603,
+                            format!("Index error: {e}"),
+                            None::<()>,
+                        )
+                    },
+                )?
+            {
+                return Ok(crate::eth_index::transaction_json(&entry));
             }
             let api = c.runtime_api();
             let at = c.info().best_hash;
@@ -747,6 +776,12 @@ where
         if tx_hash_bytes.len() != 32 {
             return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
         }
+        #[cfg(feature = "frontier")]
+        if let Some(entry) = crate::eth_index::lookup(&*c, &sp_core::H256::from_slice(&tx_hash_bytes))
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Index error: {e}"), None::<()>))?
+        {
+            return Ok(crate::eth_index::receipt_json(&entry));
+        }
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let receipt_opt: Option<Vec<u8>> = api
@@ -780,6 +815,20 @@ where
     let c = client.clone();
     module.register_method("eth_getLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or(serde_json::Value::Null);
+        // EIP-234: a `blockHash` filter names one block; Ethereum logs come from the node's index.
+        #[cfg(feature = "frontier")]
+        let index_filter = crate::eth_index::LogFilter::from_json(&filter)
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32602, format!("Invalid filter: {e}"), None::<()>))?;
+        #[cfg(feature = "frontier")]
+        if let Some(block_hash) = filter.get("blockHash").and_then(|v| v.as_str()) {
+            let bytes = hex::decode(block_hash.trim_start_matches("0x"))
+                .ok()
+                .filter(|b| b.len() == 32)
+                .ok_or_else(|| jsonrpsee::types::ErrorObjectOwned::owned(-32602, "Invalid blockHash".to_string(), None::<()>))?;
+            let logs = crate::eth_index::logs_in_block(&*c, &sp_core::H256::from_slice(&bytes), &index_filter)
+                .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Index error: {e}"), None::<()>))?;
+            return Ok(serde_json::Value::Array(logs));
+        }
         let latest_block = c.info().best_number as u64;
         let from_block = filter.get("fromBlock")
             .and_then(|v| v.as_str())
@@ -790,7 +839,7 @@ where
                 let stripped = s.strip_prefix("0x").unwrap_or(s);
                 u64::from_str_radix(stripped, 16)
                     .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid fromBlock: {}", e), None::<()>))
-            }).unwrap_or(Ok(0))?;
+            }).unwrap_or(Ok(latest_block))?; // JSON-RPC default: "latest"
         let to_block = filter.get("toBlock")
             .and_then(|v| v.as_str())
             .map(|s| {
@@ -806,6 +855,9 @@ where
             .map(decode_address)
             .transpose()?;
         validate_log_block_range("eth_getLogs", from_block, to_block)?;
+        #[cfg(feature = "frontier")]
+        let index_logs = crate::eth_index::logs_in_range(&*c, from_block as u32, to_block as u32, &index_filter)
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Index error: {e}"), None::<()>))?;
         // Encode filter as SCALE tuple: (from_block: u64, to_block: u64, address: Option<[u8; 20]>)
         // SCALE encoding: u64 (8 bytes LE) + u64 (8 bytes LE) + Option tag (0x00/0x01) + [u8; 20] (if Some)
         let mut filter_bytes = Vec::new();
@@ -842,6 +894,8 @@ where
                 }
             })
             .collect();
+        #[cfg(feature = "frontier")]
+        let logs = index_logs.into_iter().chain(logs).collect::<Vec<_>>();
         Ok(serde_json::Value::Array(logs))
     })?;
 
@@ -1179,7 +1233,7 @@ where
     module.register_method(
         "eth_getBlockByNumber",
         move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let (block_param, _full): (serde_json::Value, bool) = params
+            let (block_param, full): (serde_json::Value, bool) = params
                 .parse()
                 .unwrap_or_else(|_| (serde_json::Value::String("latest".to_string()), false));
 
@@ -1252,13 +1306,14 @@ where
             let number = header.number;
             let timestamp = block_timestamp_from_header(&header);
 
-            Ok(serde_json::json!({
+            #[allow(unused_mut)]
+            let mut block_json = serde_json::json!({
                 "number": format!("0x{:x}", number),
                 "hash": format!("0x{}", hex::encode(hash.as_bytes())),
                 "parentHash": format!("0x{}", hex::encode(parent_hash.as_bytes())),
                 "stateRoot": format!("0x{}", hex::encode(state_root.as_bytes())),
                 "extrinsicsRoot": format!("0x{}", hex::encode(extrinsics_root.as_bytes())),
-                "logsBloom": "0x0",
+                "logsBloom": format!("0x{}", "00".repeat(256)),
                 "transactionsRoot": format!("0x{}", hex::encode(hash.as_bytes())),
                 "miner": "0x0000000000000000000000000000000000000000",
                 "gasLimit": format!("0xc350"),
@@ -1269,7 +1324,23 @@ where
                 "size": format!("0x0"),
                 "extraData": "0x",
                 "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
-            }))
+            });
+            // Ethereum transactions, gas used, logs bloom and gas limit from the node's index.
+            #[cfg(feature = "frontier")]
+            if let Some(fields) = crate::eth_index::block_fields(&*c, &hash, full).map_err(|e| {
+                jsonrpsee::types::ErrorObjectOwned::owned(
+                    -32603,
+                    format!("Index error: {e}"),
+                    None::<()>,
+                )
+            })? {
+                if let Some(object) = block_json.as_object_mut() {
+                    object.extend(fields);
+                }
+            }
+            #[cfg(not(feature = "frontier"))]
+            let _ = full;
+            Ok(block_json)
         },
     )?;
 
@@ -1278,7 +1349,7 @@ where
     module.register_method(
         "eth_getBlockByHash",
         move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let (hash_hex, _full): (String, bool) =
+            let (hash_hex, full): (String, bool) =
                 params.parse().unwrap_or_else(|_| ("0x".to_string(), false));
 
             let stripped = hash_hex.strip_prefix("0x").unwrap_or(&hash_hex);
@@ -1320,13 +1391,14 @@ where
             let number = header.number;
             let timestamp = block_timestamp_from_header(&header);
 
-            Ok(serde_json::json!({
+            #[allow(unused_mut)]
+            let mut block_json = serde_json::json!({
                 "number": format!("0x{:x}", number),
                 "hash": format!("0x{}", hex::encode(hash.as_bytes())),
                 "parentHash": format!("0x{}", hex::encode(parent_hash.as_bytes())),
                 "stateRoot": format!("0x{}", hex::encode(state_root.as_bytes())),
                 "extrinsicsRoot": format!("0x{}", hex::encode(extrinsics_root.as_bytes())),
-                "logsBloom": "0x0",
+                "logsBloom": format!("0x{}", "00".repeat(256)),
                 "transactionsRoot": format!("0x{}", hex::encode(hash.as_bytes())),
                 "miner": "0x0000000000000000000000000000000000000000",
                 "gasLimit": format!("0xc350"),
@@ -1337,7 +1409,23 @@ where
                 "size": format!("0x0"),
                 "extraData": "0x",
                 "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
-            }))
+            });
+            // Ethereum transactions, gas used, logs bloom and gas limit from the node's index.
+            #[cfg(feature = "frontier")]
+            if let Some(fields) = crate::eth_index::block_fields(&*c, &hash, full).map_err(|e| {
+                jsonrpsee::types::ErrorObjectOwned::owned(
+                    -32603,
+                    format!("Index error: {e}"),
+                    None::<()>,
+                )
+            })? {
+                if let Some(object) = block_json.as_object_mut() {
+                    object.extend(fields);
+                }
+            }
+            #[cfg(not(feature = "frontier"))]
+            let _ = full;
+            Ok(block_json)
         },
     )?;
 

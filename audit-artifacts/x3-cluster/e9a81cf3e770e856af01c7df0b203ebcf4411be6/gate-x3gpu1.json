@@ -1,0 +1,126 @@
+{
+  "collected": "2026-10-02T23:50:21+00:00",
+  "from": "x3gpu1",
+  "repo": {
+    "commit": "e9a81cf3e770e856af01c7df0b203ebcf4411be6",
+    "branch": "master",
+    "dirty": true
+  },
+  "checks": [
+    {
+      "check": "x3star1.reachable",
+      "pass": true,
+      "detail": "192.168.0.70"
+    },
+    {
+      "check": "x3star1.ssh",
+      "pass": false,
+      "detail": "key auth"
+    },
+    {
+      "check": "x3gpu1.reachable",
+      "pass": true,
+      "detail": "192.168.0.30"
+    },
+    {
+      "check": "x3gpu1.ssh",
+      "pass": true,
+      "detail": "local sshd"
+    },
+    {
+      "check": "x3gpu1.role_identity",
+      "pass": true,
+      "detail": "gpu"
+    },
+    {
+      "check": "x3gpu1.clock_synced",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "x3gpu1.disk_free_10gb",
+      "pass": true,
+      "detail": 71.4
+    },
+    {
+      "check": "x3gpu1.no_failed_units",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "check": "x3gpu1.gpu_workers",
+      "pass": true,
+      "detail": [
+        11434,
+        11436
+      ]
+    },
+    {
+      "check": "x3gpu2.reachable",
+      "pass": false,
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "check": "x3gpu2.ssh",
+      "pass": false,
+      "detail": "key auth"
+    },
+    {
+      "check": "x3build1.reachable",
+      "pass": false,
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "check": "x3build1.ssh",
+      "pass": false,
+      "detail": "key auth"
+    },
+    {
+      "check": "x3sim1.reachable",
+      "pass": false,
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "check": "x3sim1.ssh",
+      "pass": false,
+      "detail": "key auth"
+    },
+    {
+      "check": "x3data1.reachable",
+      "pass": false,
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "check": "x3data1.ssh",
+      "pass": false,
+      "detail": "key auth"
+    },
+    {
+      "check": "x3net1.reachable",
+      "pass": false,
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "check": "x3net1.ssh",
+      "pass": false,
+      "detail": "key auth"
+    },
+    {
+      "check": "x3ops1.reachable",
+      "pass": false,
+      "detail": "no IP: not in DNS/mDNS/inventory"
+    },
+    {
+      "check": "x3ops1.ssh",
+      "pass": false,
+      "detail": "key auth"
+    },
+    {
+      "check": "storage.mounted",
+      "pass": false,
+      "detail": "/x3-storage"
+    }
+  ],
+  "passed": 8,
+  "failed": 14
+}

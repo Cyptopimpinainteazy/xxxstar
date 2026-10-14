@@ -1,0 +1,6 @@
+test finality::tests::test_a_certificate_for_the_wrong_chain_is_refused ... FAILED
+thread 'finality::tests::test_a_certificate_for_the_wrong_chain_is_refused' panicked at crates/x3-atomic-swap/src/finality.rs:645:9:
+assertion `left == right` failed
+  left: Err(FinalityNotMet { chain: "eth", required: 12, current: 11 })
+ right: Err(CertificateChainMismatch { expected: Ethereum, found: Bitcoin })
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 667 filtered out; finished in 0.00s

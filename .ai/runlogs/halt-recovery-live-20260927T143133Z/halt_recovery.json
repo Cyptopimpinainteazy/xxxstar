@@ -1,0 +1,91 @@
+{
+  "status": "passed",
+  "steps": [
+    {
+      "label": "council membership",
+      "detail": "3 members: 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty, 5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y, 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+    },
+    {
+      "label": "control transfer landed",
+      "detail": "block 41, +1000000000"
+    },
+    {
+      "label": "a bundle is in flight with its bond reserved",
+      "detail": "bundle 0x58adce4bcddeabdd6874b71a29348b05c7f113cb2b6457ddda7e8f6a38fd886b at block 43, bond 1000000000000 reserved"
+    },
+    {
+      "label": "trip the emergency halt: council motion executed",
+      "detail": "index=0 hash=0x55677e94c80ead970f2e5a28a0077458e4aef9876494df853d7eaa4b78dde6e1 block=54",
+      "proposalIndex": 0,
+      "proposalHash": "0x55677e94c80ead970f2e5a28a0077458e4aef9876494df853d7eaa4b78dde6e1",
+      "blockNumber": 54
+    },
+    {
+      "label": "both halt flags are set",
+      "detail": "x3Invariants.halted, x3SupplyLedger.transferHalted"
+    },
+    {
+      "label": "a transfer while halted (node A): refused by the pool",
+      "detail": "1010: Invalid Transaction: Custom error: 1"
+    },
+    {
+      "label": "a transfer while halted (node B): refused by the pool",
+      "detail": "1010: Invalid Transaction: Custom error: 1"
+    },
+    {
+      "label": "a second validator refuses it for the same reason",
+      "detail": "the halt is consensus state, not a node-local switch"
+    },
+    {
+      "label": "the refused transfer moved nothing",
+      "detail": "balance still 1000000001000000000"
+    },
+    {
+      "label": "the bond-releasing rollback while halted: reached the pallet while halted",
+      "detail": "included at block 57 and refused by the pallet (x3AtomicKernel.BundleNotFound), so the halt did not refuse it"
+    },
+    {
+      "label": "a new bundle while halted: refused by the pool",
+      "detail": "1010: Invalid Transaction: Custom error: 1"
+    },
+    {
+      "label": "a new bundle is refused while halted",
+      "detail": "submit_atomic_bundle is not on the exemption list, so the pool refuses it"
+    },
+    {
+      "label": "the in-flight bundle was rolled back and its bond released while halted",
+      "detail": "bundle 0x58adce4bcddeabdd6874b71a29348b05c7f113cb2b6457ddda7e8f6a38fd886b RolledBack at block 60, reserved back to 0"
+    },
+    {
+      "label": "clear the halt: council motion executed",
+      "detail": "index=1 hash=0x9461cab5b1cd58dbbf85a6d501b7beaaae0b48dc0fc3548ef13658eed6ef271e block=70",
+      "proposalIndex": 1,
+      "proposalHash": "0x9461cab5b1cd58dbbf85a6d501b7beaaae0b48dc0fc3548ef13658eed6ef271e",
+      "blockNumber": 70
+    },
+    {
+      "label": "resume transfers: council motion executed",
+      "detail": "index=2 hash=0xaa00e1a89c4e9fbc848a78bbd64afe9a68eaf60bd65c69bafefee1574fc9f87a block=80",
+      "proposalIndex": 2,
+      "proposalHash": "0xaa00e1a89c4e9fbc848a78bbd64afe9a68eaf60bd65c69bafefee1574fc9f87a",
+      "blockNumber": 80
+    },
+    {
+      "label": "both halt flags are cleared",
+      "detail": "cleared by council motion, not by a restart"
+    },
+    {
+      "label": "traffic resumed",
+      "detail": "block 83, +1000000000"
+    },
+    {
+      "label": "a fresh bundle is accepted after the remedy",
+      "detail": "bundle 0xf1263deb1f8a6f1f9a3ceefa68f27fd532aae912fba103a3ce5b1c551b478b08 at block 86"
+    },
+    {
+      "label": "no supply was minted, and both validators agree at one finalized block",
+      "detail": "9999999999890403000 -> 9999999998793783000 (fees burned), identical on node A and node B"
+    }
+  ],
+  "chain": "X3 Chain Local 3-Validator Testnet"
+}
