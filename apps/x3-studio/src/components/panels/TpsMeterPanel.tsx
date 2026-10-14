@@ -15,7 +15,7 @@ export default function TpsMeterPanel() {
 
   const poll = async () => {
     try {
-      const result = await (window as any).x3studio.chain.monitorBlock(rpcUrl);
+      const result = await window.x3studio.chain.monitorBlock(rpcUrl);
       if (result) {
         const tps = result.tps ?? 0;
         const blockNumber = result.blockNumber ?? 0;
@@ -103,7 +103,7 @@ export default function TpsMeterPanel() {
                 const h = Math.max(3, (s.tps / barMax) * 24);
                 return (
                   <div key={i} style={{
-                    flex: 1, height, background: s.tps === currentTps ? 'var(--accent)' : 'var(--blue)',
+                    flex: 1, height: h, background: s.tps === currentTps ? 'var(--accent)' : 'var(--blue)',
                     borderRadius: '1px 1px 0 0', opacity: 0.4 + (i / recent.length) * 0.6,
                   }} title={`Block ${s.blockNumber}: ${s.tps.toFixed(1)} TPS`} />
                 );

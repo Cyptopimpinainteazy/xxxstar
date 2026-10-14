@@ -10,6 +10,22 @@ interface SyncedConfig {
   type: 'evm' | 'svm' | 'substrate' | 'cosmos';
 }
 
+export function syncedConfigs(result: { configs: unknown; error: string | null }): SyncedConfig[] {
+  if (result.error !== null) throw new Error(result.error || 'Chain sync failed');
+  if (!Array.isArray(result.configs)) throw new Error('Invalid chain config response');
+  const configs: unknown[] = result.configs;
+  if (!configs.every((config): config is SyncedConfig => {
+    if (typeof config !== 'object' || config === null) return false;
+    return 'name' in config && typeof config.name === 'string' && config.name.length > 0
+      && 'chainId' in config && typeof config.chainId === 'number' && Number.isSafeInteger(config.chainId) && config.chainId >= 0
+      && 'rpcUrl' in config && typeof config.rpcUrl === 'string'
+      && 'explorerUrl' in config && typeof config.explorerUrl === 'string'
+      && 'currency' in config && typeof config.currency === 'string'
+      && 'type' in config && typeof config.type === 'string' && ['evm', 'svm', 'substrate', 'cosmos'].includes(config.type);
+  })) throw new Error('Invalid chain config entry');
+  return configs;
+}
+
 export default function ChainSyncPanel() {
   const chainRpcUrl = useSettingsStore(s => s.chainRpcUrl);
   const configs = useChainConfigStore(s => s.configs);
@@ -23,9 +39,11 @@ export default function ChainSyncPanel() {
     setStatus('Syncing...');
     try {
       const result = await window.x3studio.chain.syncConfigs(rpcUrl);
-      setSynced(result ?? []);
-      setStatus(`✓ Synced ${result?.length ?? 0} configs`);
+      const received = syncedConfigs(result);
+      setSynced(received);
+      setStatus(`✓ Synced ${received.length} configs`);
     } catch (e: any) {
+      setSynced([]);
       setStatus(`✗ Sync failed: ${e.message ?? e}`);
     }
   };
