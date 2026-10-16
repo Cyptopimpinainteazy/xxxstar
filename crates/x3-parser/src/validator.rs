@@ -15,7 +15,7 @@ use crate::error::{ParseError, ParseResult};
 use x3_ast::{
     Agent, AtomicBlock, Block, Const, EmitStatement, Expression, ForLoopKind, ForStatement,
     Function, GlobalLet, Identifier, IfStatement, Item, LoopStatement, Module, Statement,
-    WhileStatement,
+    StructDef, WhileStatement,
 };
 use x3_common::Span;
 
@@ -55,6 +55,7 @@ impl StructuralValidator {
                 // Arb programs are validated by dedicated arb-specific passes.
                 Item::ArbProgram(_) => {}
                 Item::Agent(agent) => self.validate_agent(agent)?,
+                Item::Struct(def) => self.validate_struct(def)?,
             }
         }
 
@@ -132,6 +133,29 @@ impl StructuralValidator {
         Ok(())
     }
 
+    /// A struct names each field once.
+    fn validate_struct(&mut self, def: &StructDef) -> ParseResult<()> {
+        self.validate_span(&def.span)?;
+        self.validate_identifier(&def.name)?;
+        for (i, field) in def.fields.iter().enumerate() {
+            self.validate_identifier(&field.name)?;
+            self.validate_span(&field.ty.span)?;
+            if def.fields[..i]
+                .iter()
+                .any(|f| f.name.name == field.name.name)
+            {
+                return Err(ParseError::new(
+                    format!(
+                        "struct `{}` declares field `{}` twice",
+                        def.name.name, field.name.name
+                    ),
+                    field.name.span,
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn validate_agent(&mut self, agent: &Agent) -> ParseResult<()> {
         self.validate_span(&agent.span)?;
         self.validate_identifier(&agent.name)?;
@@ -144,6 +168,7 @@ impl StructuralValidator {
                 Item::Const(const_item) => self.validate_const(const_item)?,
                 Item::ArbProgram(_) => {}
                 Item::Agent(nested_agent) => self.validate_agent(nested_agent)?,
+                Item::Struct(def) => self.validate_struct(def)?,
             }
         }
 
@@ -429,6 +454,20 @@ impl StructuralValidator {
                 self.validate_span(&assign.span)?;
                 self.validate_identifier(&assign.target)?;
                 self.validate_expression(&assign.index, ctx)?;
+                self.validate_expression(&assign.value, ctx)?;
+            }
+            Expression::StructLiteral(literal) => {
+                self.validate_span(&literal.span)?;
+                self.validate_identifier(&literal.name)?;
+                for field in &literal.fields {
+                    self.validate_identifier(&field.name)?;
+                    self.validate_expression(&field.value, ctx)?;
+                }
+            }
+            Expression::FieldAssign(assign) => {
+                self.validate_span(&assign.span)?;
+                self.validate_identifier(&assign.target)?;
+                self.validate_identifier(&assign.field)?;
                 self.validate_expression(&assign.value, ctx)?;
             }
         }

@@ -28,6 +28,9 @@ const SEEDS: &[&str] = &[
     "fn main() -> i64 { let x = ctx_chain_id(); let h = ctx_block_height(); return x + h; }",
     "fn main() -> i64 { let mut n = 10; let mut acc = 1; while n > 0 { acc = acc * 2 % 1000; n = n - 1; } return acc; }",
     "fn main() -> bool { let a = 3; let b = 4; return a < b && !(a == b) || false; }",
+    "struct P { x: i64, y: i64 } fn main() -> i64 { let mut p = P { y: 2, x: 1 }; p.x = p.x + p.y; return p.x; }",
+    "struct L { v: i64, a: [i64; 2] } struct R { l: L } fn main() -> i64 { let r = R { l: L { v: 1, a: [2, 3] } }; return r.l.a[1] + r.l.v; }",
+    "fn main() -> i64 { let mut t = (1, 2); t.1 = 5; return t.0 + t.1; }",
 ];
 
 const TOKENS: &[&str] = &[

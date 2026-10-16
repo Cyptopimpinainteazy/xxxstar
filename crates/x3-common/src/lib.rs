@@ -561,6 +561,11 @@ pub mod intrinsics {
     pub const INDEX_SET_SYMBOL: usize = usize::MAX - 10;
     /// `base.len()`: the number of elements.
     pub const LEN_SYMBOL: usize = usize::MAX - 11;
+    /// `s.field = value` (and a tuple's element), as a value: `base` with the element at
+    /// `index` replaced. `index` must be a constant: a tuple's and a struct's elements are named
+    /// at compile time, and the engine writes one with `store_field`, which takes its position as
+    /// an immediate.
+    pub const FIELD_SET_SYMBOL: usize = usize::MAX - 12;
 
     pub fn by_name(name: &str) -> Option<Intrinsic> {
         ALL.iter().copied().find(|intrinsic| intrinsic.name == name)

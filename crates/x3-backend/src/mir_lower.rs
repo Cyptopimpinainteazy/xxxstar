@@ -31,6 +31,8 @@ pub struct MirBytecodeCompiler {
     function_indices: HashMap<SymbolId, FuncIdx>,
     /// MIR value → register mapping (per function).
     value_regs: HashMap<MirValue, Register>,
+    /// MIR values assigned an integer literal, for operands the engine takes as immediates.
+    int_constants: HashMap<MirValue, i64>,
     /// Block → label mapping (per function).
     block_labels: HashMap<MirBlockId, crate::emit::Label>,
     /// Next available register.
@@ -48,6 +50,7 @@ impl MirBytecodeCompiler {
             layout: LayoutComputer::new(),
             function_indices: HashMap::new(),
             value_regs: HashMap::new(),
+            int_constants: HashMap::new(),
             block_labels: HashMap::new(),
             next_reg: 0,
             debug: false,
@@ -183,6 +186,9 @@ impl MirBytecodeCompiler {
                 let dst = self.get_or_alloc_reg(*target)?;
                 match rhs {
                     MirRhs::Literal(lit) => {
+                        if let Literal::Integer(n) = lit {
+                            self.int_constants.insert(*target, *n);
+                        }
                         self.compile_literal(lit, dst)?;
                     }
                     MirRhs::Unary(op, val) => {
@@ -221,7 +227,7 @@ impl MirBytecodeCompiler {
                             // represents as 0 — the same as a host call that returns nothing.
                             self.emitter.emit_int(dst, 0)?;
                         } else if let Some(()) =
-                            self.compile_aggregate_call(target.0, dst, &arg_regs)?
+                            self.compile_aggregate_call(target.0, dst, &arg_regs, args)?
                         {
                             // An array, tuple, index or length operation (see
                             // `x3_common::intrinsics::ARRAY_NEW_SYMBOL` and its neighbours).
@@ -469,6 +475,7 @@ impl MirBytecodeCompiler {
         symbol: usize,
         dst: Register,
         args: &[Register],
+        mir_args: &[MirValue],
     ) -> BackendResult<Option<()>> {
         use x3_common::intrinsics as i;
         let arity = |n: usize, what: &str| -> BackendResult<()> {
@@ -506,6 +513,23 @@ impl MirBytecodeCompiler {
             // original SSA value is unchanged for anything else that reads it.
             self.emitter.emit_mov(dst, args[0]);
             self.emitter.emit_store_index(dst, args[1], args[2]);
+        } else if symbol == i::FIELD_SET_SYMBOL {
+            arity(3, "a field assignment")?;
+            let field = mir_args
+                .get(1)
+                .and_then(|value| self.int_constants.get(value))
+                .and_then(|n| u16::try_from(*n).ok())
+                .ok_or_else(|| {
+                    BackendError::new(
+                        BackendErrorKind::Internal(
+                            "a field assignment's position is not a constant".to_string(),
+                        ),
+                        self.current_span,
+                    )
+                })?;
+            // Value semantics, as for an element: copy, then replace the field in the copy.
+            self.emitter.emit_mov(dst, args[0]);
+            self.emitter.emit_store_field(dst, field, args[2]);
         } else if symbol == i::LEN_SYMBOL {
             arity(1, "`len`")?;
             self.emitter.emit_array_len(dst, args[0]);

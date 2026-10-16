@@ -310,11 +310,26 @@ impl MirFunctionBuilder {
                                 "assignment to an element of something other than a named array",
                             ));
                         };
+                        // A struct's field or a tuple's element is written by position, fixed at
+                        // compile time; an array's element by a run-time index.
+                        let by_position = matches!(
+                            array.ty.kind,
+                            x3_typeck::TypeKind::Struct(_) | x3_typeck::TypeKind::Tuple(_)
+                        );
+                        if by_position && !matches!(index.kind, HirExprKind::Literal(_)) {
+                            return Err(unsupported(
+                                "assignment to a tuple or struct element at a run-time position",
+                            ));
+                        }
                         let base = self.lower_expr(array)?;
                         let at = self.lower_expr(index)?;
                         let item = self.lower_expr(value)?;
                         let updated = self.emit_assignment(MirRhs::Call {
-                            target: SymbolId(x3_common::intrinsics::INDEX_SET_SYMBOL),
+                            target: SymbolId(if by_position {
+                                x3_common::intrinsics::FIELD_SET_SYMBOL
+                            } else {
+                                x3_common::intrinsics::INDEX_SET_SYMBOL
+                            }),
                             args: vec![base, at, item],
                         });
                         if let Some(&cell) = self.slots.get(symbol) {

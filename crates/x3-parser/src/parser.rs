@@ -5,10 +5,11 @@ use crate::tokens::MAX_NESTING_DEPTH;
 use x3_ast::{
     Agent, ArrayExpression, AssignExpression, AtomicBlock, BinaryExpression, Block, BreakStatement,
     CallExpression, Const, ContinueStatement, EmitStatement, Expression, FieldAccessExpression,
-    ForLoopKind, ForStatement, Function, GlobalLet, Identifier, IfStatement, IndexAssignExpression,
-    IndexExpression, Item, LetStatement, LiteralExpression, LoopStatement, Module, Param,
-    RangeExpression, Statement, TupleExpression, TypeAnnotation, TypeShape, UnaryExpression,
-    UnaryOp, WhileStatement,
+    FieldAssignExpression, FieldInit, ForLoopKind, ForStatement, Function, GlobalLet, Identifier,
+    IfStatement, IndexAssignExpression, IndexExpression, Item, LetStatement, LiteralExpression,
+    LoopStatement, Module, Param, RangeExpression, Statement, StructDef, StructField,
+    StructLiteralExpression, TupleExpression, TypeAnnotation, TypeShape, UnaryExpression, UnaryOp,
+    WhileStatement,
 };
 use x3_common::{Keyword, Literal, Span, Symbol, Token, TokenKind};
 use x3_lexer::Lexer;
@@ -17,6 +18,9 @@ use x3_lexer::Lexer;
 pub struct Parser {
     cursor: Cursor,
     nesting_depth: usize,
+    /// False while parsing an `if`/`while` condition, where `name {` opens the body, not a struct
+    /// literal (Rust's rule). Parentheses, brackets and call arguments turn it back on.
+    struct_literals: bool,
 }
 
 impl Parser {
@@ -25,6 +29,7 @@ impl Parser {
         Self {
             cursor: Cursor::new(Lexer::lex_all(source)),
             nesting_depth: 0,
+            struct_literals: true,
         }
     }
 
@@ -44,6 +49,7 @@ impl Parser {
             TokenKind::Keyword(Keyword::Agent) => self.parse_agent_item(),
             TokenKind::Keyword(Keyword::Const) => self.parse_const_item(),
             TokenKind::Keyword(Keyword::Let) => self.parse_global_let(),
+            TokenKind::Keyword(Keyword::Struct) => self.parse_struct_item(),
             TokenKind::Eof => Err(ParseError::new("unexpected end of input", self.peek().span)),
             token => Err(ParseError::new(
                 format!("unexpected token {token:?} at top-level"),
@@ -109,6 +115,92 @@ impl Parser {
             ty,
             value: Box::new(value),
             span: Span::new(0, 0), // Span tracking requires token position propagation
+        }))
+    }
+
+    /// `struct Name { field: Type, ... }` (a trailing comma is allowed).
+    fn parse_struct_item(&mut self) -> ParseResult<Item> {
+        let keyword = self.expect_keyword(Keyword::Struct)?;
+        let name = self.expect_identifier()?;
+        self.expect_symbol(Symbol::LeftBrace)?;
+        let mut fields = Vec::new();
+        while !self.peek_symbol(Symbol::RightBrace) {
+            let field_name = self.expect_identifier()?;
+            self.expect_symbol(Symbol::Colon)?;
+            let ty = self.parse_type_annotation()?;
+            let span = field_name.span.merge(ty.span);
+            fields.push(StructField {
+                name: field_name,
+                ty,
+                span,
+            });
+            if !self.accept_symbol(Symbol::Comma) {
+                break;
+            }
+        }
+        let close = self.expect_symbol(Symbol::RightBrace)?;
+        Ok(Item::Struct(StructDef {
+            name,
+            fields,
+            span: keyword.span.merge(close.span),
+        }))
+    }
+
+    /// Parse with struct literals allowed or not, restoring the previous setting.
+    fn with_struct_literals<R>(
+        &mut self,
+        allowed: bool,
+        parse: impl FnOnce(&mut Self) -> ParseResult<R>,
+    ) -> ParseResult<R> {
+        let previous = std::mem::replace(&mut self.struct_literals, allowed);
+        let result = parse(self);
+        self.struct_literals = previous;
+        result
+    }
+
+    /// A condition: an expression in which `name {` opens the block that follows. Inside
+    /// parentheses a struct literal is allowed again (`if (S { v: 1 }).v == 1 {`).
+    fn parse_condition(&mut self) -> ParseResult<Expression> {
+        self.with_struct_literals(false, |p| p.parse_expression_bp(0))
+    }
+
+    /// After a name, `{ }` or `{ field :` starts a struct literal.
+    fn at_struct_literal(&self) -> bool {
+        if !self.struct_literals || !self.peek_symbol(Symbol::LeftBrace) {
+            return false;
+        }
+        match self.cursor.peek_n(1).map(|t| &t.kind) {
+            Some(TokenKind::Symbol(Symbol::RightBrace)) => true,
+            Some(TokenKind::Identifier(_)) => {
+                self.cursor.peek_n(2).and_then(|t| t.kind.symbol()) == Some(Symbol::Colon)
+            }
+            _ => false,
+        }
+    }
+
+    fn parse_struct_literal(&mut self, name: Identifier) -> ParseResult<Expression> {
+        self.expect_symbol(Symbol::LeftBrace)?;
+        let mut fields = Vec::new();
+        while !self.peek_symbol(Symbol::RightBrace) {
+            let field = self.expect_identifier()?;
+            self.expect_symbol(Symbol::Colon)?;
+            let value = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
+            let span = field.span.merge(value.span());
+            fields.push(FieldInit {
+                name: field,
+                value,
+                span,
+            });
+            if !self.accept_symbol(Symbol::Comma) {
+                break;
+            }
+        }
+        let close = self.expect_symbol(Symbol::RightBrace)?;
+        let span = name.span.merge(close.span);
+        Ok(Expression::StructLiteral(StructLiteralExpression {
+            name,
+            fields,
+            span,
         }))
     }
 
@@ -270,6 +362,13 @@ impl Parser {
 
     /// The elements of a bracketed or parenthesised list, up to and including `close`.
     fn parse_expression_list(&mut self, close: Symbol) -> ParseResult<(Vec<Expression>, Span)> {
+        self.with_struct_literals(true, |p| p.parse_expression_list_inner(close))
+    }
+
+    fn parse_expression_list_inner(
+        &mut self,
+        close: Symbol,
+    ) -> ParseResult<(Vec<Expression>, Span)> {
         let mut elements = Vec::new();
         if !self.peek_symbol(close) {
             loop {
@@ -353,13 +452,7 @@ impl Parser {
 
     fn parse_if_statement(&mut self) -> ParseResult<IfStatement> {
         let if_token = self.expect_keyword(Keyword::If)?;
-        let condition = if self.accept_symbol(Symbol::LeftParen) {
-            let expr = self.parse_expression_bp(0)?;
-            self.expect_symbol(Symbol::RightParen)?;
-            expr
-        } else {
-            self.parse_expression_bp(0)?
-        };
+        let condition = self.parse_condition()?;
         let then_block = self.parse_block()?;
         let else_block = if self.accept_keyword(Keyword::Else) {
             Some(self.parse_block()?)
@@ -377,13 +470,7 @@ impl Parser {
 
     fn parse_while_statement(&mut self) -> ParseResult<WhileStatement> {
         let while_token = self.expect_keyword(Keyword::While)?;
-        let condition = if self.accept_symbol(Symbol::LeftParen) {
-            let expr = self.parse_expression_bp(0)?;
-            self.expect_symbol(Symbol::RightParen)?;
-            expr
-        } else {
-            self.parse_expression_bp(0)?
-        };
+        let condition = self.parse_condition()?;
         let body = self.parse_block()?;
         let span = while_token.span.merge(body.span);
         Ok(WhileStatement {
@@ -647,6 +734,27 @@ impl Parser {
                     equals.span,
                 )),
             },
+            // `name.field = value`, rebinding `name` as `a[i] = v` does.
+            Expression::FieldAccess(FieldAccessExpression {
+                object,
+                field,
+                span,
+            }) => match *object {
+                Expression::Identifier(target) => {
+                    let rhs = self.parse_expression_bp(1)?;
+                    let span = span.merge(rhs.span());
+                    Ok(Expression::FieldAssign(FieldAssignExpression {
+                        target,
+                        field,
+                        value: Box::new(rhs),
+                        span,
+                    }))
+                }
+                _ => Err(ParseError::new(
+                    "a field can only be assigned through a named value (`s.f = v`)",
+                    equals.span,
+                )),
+            },
             Expression::Identifier(ident) => {
                 let rhs = self.parse_expression_bp(1)?;
                 let span = ident.span.merge(rhs.span());
@@ -731,11 +839,15 @@ impl Parser {
             }
             TokenKind::Identifier(_) => {
                 let identifier = self.expect_identifier()?;
+                if self.at_struct_literal() {
+                    let literal = self.parse_struct_literal(identifier)?;
+                    return self.finish_postfix(literal);
+                }
                 Ok(self.finish_postfix(Expression::Identifier(identifier))?)
             }
             TokenKind::Symbol(Symbol::LeftParen) => {
                 let open = self.expect_symbol(Symbol::LeftParen)?;
-                let first = self.parse_expression_bp(0)?;
+                let first = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
                 if self.accept_symbol(Symbol::Comma) {
                     // `(a, b, ...)`: a tuple. `(a)` stays a parenthesised expression.
                     let (mut rest, end) = self.parse_expression_list(Symbol::RightParen)?;
@@ -773,7 +885,7 @@ impl Parser {
                 let mut args = Vec::new();
                 if !self.peek_symbol(Symbol::RightParen) {
                     loop {
-                        args.push(self.parse_expression_bp(0)?);
+                        args.push(self.with_struct_literals(true, |p| p.parse_expression_bp(0))?);
                         if !self.accept_symbol(Symbol::Comma) {
                             break;
                         }
@@ -788,7 +900,7 @@ impl Parser {
                 });
             } else if self.peek_symbol(Symbol::LeftBracket) {
                 self.expect_symbol(Symbol::LeftBracket)?;
-                let index = self.parse_expression_bp(0)?;
+                let index = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
                 let close = self.expect_symbol(Symbol::RightBracket)?;
                 let span = base.span().merge(close.span);
                 base = Expression::Index(IndexExpression {
@@ -810,9 +922,18 @@ impl Parser {
                         span,
                     });
                 } else {
-                    // Field access
+                    // Field access: `s.name`, or `t.0` for a tuple's element.
                     self.expect_symbol(Symbol::Dot)?;
-                    let field = self.expect_identifier()?;
+                    let field = match self.peek().kind.clone() {
+                        TokenKind::Literal(Literal::Integer(n)) if n >= 0 => {
+                            let token = self.bump();
+                            Identifier {
+                                name: n.to_string(),
+                                span: token.span,
+                            }
+                        }
+                        _ => self.expect_identifier()?,
+                    };
                     let span = base.span().merge(field.span);
                     base = Expression::FieldAccess(FieldAccessExpression {
                         object: Box::new(base),
