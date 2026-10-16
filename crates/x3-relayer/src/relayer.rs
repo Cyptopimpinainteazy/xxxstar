@@ -898,6 +898,7 @@ impl RelayerSafetyPipeline {
             expected_amount: 0,
             expected_sender: Vec::new(),
             expected_recipient: Vec::new(),
+            expected_beneficiary: Vec::new(),
         };
 
         let outcome = self
@@ -1552,6 +1553,7 @@ mod tests {
             expected_amount: 0,
             expected_sender: Vec::new(),
             expected_recipient: Vec::new(),
+            expected_beneficiary: Vec::new(),
         };
         let verifier = x3_verification_router::SolanaFinalizedVerifier::new(
             vec![a.verifying_key().to_bytes(), b.verifying_key().to_bytes()],

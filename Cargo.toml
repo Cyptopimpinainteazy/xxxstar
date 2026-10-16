@@ -199,6 +199,7 @@ members = [
     "crates/x3-validator-attestation", # <- node/Cargo.toml
     "crates/x3-runtime-signer",        # <- node/Cargo.toml, crates/x3-relayer
     "crates/x3-verification-router",   # <- node/Cargo.toml
+    "crates/x3-btc-spv",               # <- x3-verification-router, x3-crosschain-intent, x3-bridge
     "crates/x3-circuit-breaker",       # <- crosschain-gateway, pallets
     "crates/x3-external-route-registry", # <- crosschain-gateway, pallets
     "crates/x3-gateway-indexer",       # <- crosschain-gateway

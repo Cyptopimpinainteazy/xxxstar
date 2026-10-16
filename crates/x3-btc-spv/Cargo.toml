@@ -1,0 +1,13 @@
+[package]
+name = "x3-btc-spv"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Bitcoin consensus checks an SPV verifier needs: header proof of work, Bitcoin's exact difficulty retarget, median-time-past, most-work chain selection and position-aware Merkle inclusion. no_std."
+
+[dependencies]
+sha2 = { version = "0.10", default-features = false }
+
+[features]
+default = ["std"]
+std = ["sha2/std"]

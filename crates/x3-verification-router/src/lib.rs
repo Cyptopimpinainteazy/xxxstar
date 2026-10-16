@@ -20,6 +20,7 @@ use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 
+pub mod bitcoin_spv;
 pub mod evm_receipt;
 pub mod gateway_types;
 
@@ -35,8 +36,11 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+pub use bitcoin_spv::{
+    bitcoin_deposit_id, deposit_commitment_script, encode_btc_proof_v1, BitcoinSpvVerifier,
+    BtcHeaderAnchor, NoBtcHeaderAnchor,
+};
 use core::fmt::{Display, Formatter};
-use sha2::{Digest, Sha256};
 
 // ── Compile-time guard: TestOnly verifier cannot be used in production ──────
 #[cfg(all(feature = "production", feature = "test-verifier"))]
@@ -90,6 +94,9 @@ pub struct ProofEnvelope {
     pub expected_amount: u128,
     pub expected_sender: alloc::vec::Vec<u8>,
     pub expected_recipient: alloc::vec::Vec<u8>,
+    /// The X3 account the deposit credits. A Bitcoin proof must show the transaction committed to
+    /// it (see [`bitcoin_spv`]); other strategies do not read it.
+    pub expected_beneficiary: alloc::vec::Vec<u8>,
 }
 
 /// Outcome of a verification attempt
@@ -117,6 +124,12 @@ pub enum VerificationError {
     NoAuthorizedValidators,
     /// Fewer distinct authorized validators signed than the threshold requires.
     InsufficientValidSignatures,
+    /// The proof names a block this chain's header store does not hold on its best chain.
+    UnanchoredBlock,
+    /// The block is not buried deep enough.
+    InsufficientConfirmations,
+    /// The transaction does not make the deposit the envelope describes.
+    DepositMismatch,
 }
 
 impl Display for VerificationError {
@@ -140,6 +153,15 @@ impl Display for VerificationError {
             }
             VerificationError::NoAuthorizedValidators => {
                 write!(f, "no authorized validators configured: failing closed")
+            }
+            VerificationError::UnanchoredBlock => {
+                write!(f, "block is not on this chain's anchored best chain")
+            }
+            VerificationError::InsufficientConfirmations => {
+                write!(f, "block has fewer confirmations than required")
+            }
+            VerificationError::DepositMismatch => {
+                write!(f, "transaction does not make the described deposit")
             }
             VerificationError::InsufficientValidSignatures => {
                 write!(f, "insufficient valid validator attestations")
@@ -257,6 +279,7 @@ impl VerificationRouter {
             expected_amount: request.amount,
             expected_sender: request.sender.as_bytes().to_vec(),
             expected_recipient: request.recipient.as_bytes().to_vec(),
+            expected_beneficiary: request.recipient.as_bytes().to_vec(),
         };
 
         match self.route(&proof) {
@@ -580,244 +603,6 @@ impl Verifier for X3InternalVerifier {
     }
 }
 
-// ── Bitcoin SPV Proof Wire Format ───────────────────────────────────────────
-//
-// The proof payload is structured as:
-//   [8 bytes: current_chain_tip_height (little-endian)]
-//   [4 bytes: num_headers (little-endian)]
-//   [num_headers × 80 bytes: block header chain (newest-first)]
-//   [4 bytes: tx_index (little-endian)]
-//   [4 bytes: num_merkle_proof_nodes (little-endian)]
-//   [num_merkle_proof_nodes × 32 bytes: merkle proof hashes]
-//   [32 bytes: txid being proven]
-
-fn decode_u64_le(buf: &[u8]) -> u64 {
-    let mut out = [0u8; 8];
-    let n = buf.len().min(8);
-    out[..n].copy_from_slice(&buf[..n]);
-    u64::from_le_bytes(out)
-}
-
-fn decode_u32_le(buf: &[u8]) -> u32 {
-    let mut out = [0u8; 4];
-    out.copy_from_slice(&buf[..4]);
-    u32::from_le_bytes(out)
-}
-
-fn sha256d(data: &[u8]) -> [u8; 32] {
-    let h1 = Sha256::digest(data);
-    let h2 = Sha256::digest(h1);
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&h2);
-    out
-}
-
-fn parse_btc_header(raw: &[u8]) -> Result<([u8; 32], [u8; 32]), &'static str> {
-    if raw.len() != 80 {
-        return Err("bitcoin header must be 80 bytes");
-    }
-    let mut prev_block = [0u8; 32];
-    let mut merkle_root = [0u8; 32];
-    prev_block.copy_from_slice(&raw[4..36]);
-    merkle_root.copy_from_slice(&raw[36..68]);
-    let bits = u32::from_le_bytes([raw[72], raw[73], raw[74], raw[75]]);
-    let hash = sha256d(raw);
-    let target = compact_to_target(bits);
-    for i in (0..32).rev() {
-        if hash[i] < target[i] {
-            return Ok((prev_block, merkle_root));
-        }
-        if hash[i] > target[i] {
-            return Err("proof-of-work not satisfied");
-        }
-    }
-    Ok((prev_block, merkle_root))
-}
-
-fn compact_to_target(bits: u32) -> [u8; 32] {
-    let exponent = (bits >> 24) as usize;
-    let mantissa = bits & 0x00FF_FFFF;
-    let mut target = [0u8; 32];
-    if exponent == 0 || exponent > 34 {
-        return target;
-    }
-    let shift = exponent.saturating_sub(3);
-    if shift < 29 {
-        target[shift] = ((mantissa >> 16) & 0xFF) as u8;
-        target[shift + 1] = ((mantissa >> 8) & 0xFF) as u8;
-        target[shift + 2] = (mantissa & 0xFF) as u8;
-    }
-    target
-}
-
-fn verify_btc_merkle_proof(txid: &[u8; 32], merkle_root: &[u8; 32], proof: &[u8]) -> bool {
-    if proof.is_empty() {
-        return txid == merkle_root;
-    }
-    if !proof.len().is_multiple_of(32) {
-        return false;
-    }
-    let mut hash = *txid;
-    for chunk in proof.chunks(32) {
-        let mut sibling = [0u8; 32];
-        sibling.copy_from_slice(chunk);
-        let combined = if hash <= sibling {
-            [hash.as_slice(), sibling.as_slice()].concat()
-        } else {
-            [sibling.as_slice(), hash.as_slice()].concat()
-        };
-        hash = sha256d(&combined);
-    }
-    hash == *merkle_root
-}
-
-// ── Bitcoin SPV Verifier ────────────────────────────────────────────────────
-//
-// Integrates with `x3-bitcoin-vault` so confirmation thresholds and the
-// signer-threshold configuration come from a single canonical source rather
-// than being hard-coded in the verifier. This promotes the previously-orphan
-// `x3-bitcoin-vault` crate to a real compiled consumer of the production
-// Bitcoin SPV path used by `pallet_x3_crosschain_gateway`.
-
-/// Verifies Bitcoin SPV proofs: header-chain linkage (`sha256d`), the merkle
-/// proof against the last header's merkle root, and the confirmation count.
-///
-/// **Vault signer approvals are not consulted here.** An earlier version
-/// carried `vault_threshold` / `vault_total_signers` and documented that
-/// SPV-verified deposits must be backed by that many vault signers — but
-/// `verify` never read those fields, so the policy only looked enforced.
-/// They were **removed** rather than "enforced" by counting approvals,
-/// because at the time `BtcVault::add_signer_approval` stored signer
-/// signature bytes *without verifying them*, so counting them would have
-/// proven nothing.
-///
-/// `add_signer_approval` now does verify each approval (real secp256k1 ECDSA
-/// against a domain-separated, deposit-bound message — issue #272), so that
-/// specific gap is closed. This verifier still doesn't read the vault's
-/// approval state, though: that would mean this crate depending on
-/// `x3-bitcoin-vault`'s deposit bookkeeping, which is a real architectural
-/// decision (do SPV confirmation and signer quorum stay two independently
-/// satisfiable gates, or does one wrap the other?) that #272 didn't make and
-/// this fix isn't the place to make either.
-///
-/// Deposits are therefore credited on the SPV proof plus confirmations,
-/// independent of vault signer approvals.
-pub struct BitcoinSpvVerifier {
-    pub min_confirmations: u64,
-}
-
-impl BitcoinSpvVerifier {
-    /// Default constructor: takes the confirmation policy from
-    /// `x3-bitcoin-vault`. Prefer this over `BitcoinSpvVerifier::new(6)` so the
-    /// confirmation policy stays centralized.
-    pub fn from_vault_defaults() -> Self {
-        Self {
-            min_confirmations: x3_bitcoin_vault::MIN_BITCOIN_CONFIRMATIONS,
-        }
-    }
-
-    pub fn new(min_confirmations: u64) -> Self {
-        Self { min_confirmations }
-    }
-
-    /// Adopt the vault's confirmation policy. The vault's signer set is *not*
-    /// adopted, because this verifier cannot check signer approvals (see the
-    /// type docs and issue #272).
-    pub fn with_vault_config(mut self, config: &x3_bitcoin_vault::BtcVaultConfig) -> Self {
-        self.min_confirmations = config.min_confirmations;
-        self
-    }
-}
-
-impl Verifier for BitcoinSpvVerifier {
-    fn strategy(&self) -> VerificationStrategy {
-        VerificationStrategy::BitcoinSpvProof
-    }
-
-    fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
-        match proof.source_chain {
-            ChainKind::Bitcoin => {}
-            _ => return Err(VerificationError::UnsupportedChain),
-        }
-
-        let payload = &proof.payload;
-        if payload.len() < 16 {
-            return Err(VerificationError::MalformedProof);
-        }
-
-        // Parse current chain tip (block number that the verifier knows about)
-        let chain_tip = decode_u64_le(&payload[0..8]);
-        let num_headers = decode_u32_le(&payload[8..12]) as usize;
-
-        let mut offset = 12usize;
-        if payload.len() < offset + num_headers * 80 + 4 + 4 {
-            return Err(VerificationError::MalformedProof);
-        }
-
-        // Verify header chain (newest first order)
-        let mut prev_hash: Option<[u8; 32]> = None;
-        let mut last_merkle_root = [0u8; 32];
-        for i in 0..num_headers {
-            let h_start = offset + i * 80;
-            if h_start + 80 > payload.len() {
-                return Err(VerificationError::MalformedProof);
-            }
-            let raw = &payload[h_start..h_start + 80];
-            let (prev_block, merkle_root) =
-                parse_btc_header(raw).map_err(|_| VerificationError::MalformedProof)?;
-            if let Some(p) = prev_hash {
-                if prev_block != p {
-                    return Err(VerificationError::MalformedProof);
-                }
-            }
-            prev_hash = Some(sha256d(raw));
-            if i == num_headers - 1 {
-                last_merkle_root = merkle_root;
-            }
-        }
-
-        offset += num_headers * 80;
-
-        // Parse tx_index and merkle proof
-        if payload.len() < offset + 8 {
-            return Err(VerificationError::MalformedProof);
-        }
-        let tx_index = decode_u32_le(&payload[offset..offset + 4]);
-        let num_proof_nodes = decode_u32_le(&payload[offset + 4..offset + 8]) as usize;
-        offset += 8;
-
-        if payload.len() < offset + num_proof_nodes * 32 + 32 {
-            return Err(VerificationError::MalformedProof);
-        }
-
-        let proof_nodes = &payload[offset..offset + num_proof_nodes * 32];
-        offset += num_proof_nodes * 32;
-
-        let mut txid = [0u8; 32];
-        txid.copy_from_slice(&payload[offset..offset + 32]);
-
-        // Verify merkle proof
-        if !verify_btc_merkle_proof(&txid, &last_merkle_root, proof_nodes) {
-            return Err(VerificationError::MalformedProof);
-        }
-
-        // Check confirmations
-        if chain_tip < tx_index as u64 {
-            return Err(VerificationError::MalformedProof);
-        }
-        let confirmations = chain_tip - tx_index as u64 + 1;
-        if confirmations < self.min_confirmations {
-            return Err(VerificationError::MalformedProof);
-        }
-
-        Ok(VerificationOutcome {
-            accepted: true,
-            reason: "bitcoin_spv_proof_verified",
-            verified_at_height: Some(tx_index as u64),
-        })
-    }
-}
-
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -836,6 +621,7 @@ mod tests {
             expected_amount: 1000,
             expected_sender: vec![0x01],
             expected_recipient: vec![0x02; 20],
+            expected_beneficiary: Vec::new(),
         }
     }
 
@@ -938,68 +724,6 @@ mod tests {
             ),
             "an unconfigured Solana verifier must fail closed"
         );
-    }
-
-    #[test]
-    fn bitcoin_spv_works() {
-        let mut router = VerificationRouter::new();
-        router.register_verifier(Arc::new(BitcoinSpvVerifier::new(6)));
-
-        let mut proof = dummy_proof(VerificationStrategy::BitcoinSpvProof);
-        proof.source_chain = ChainKind::Bitcoin;
-
-        // Build a valid SPV proof payload:
-        // [8 bytes: chain_tip = 200]
-        // [4 bytes: num_headers = 1]
-        // [80 bytes: header with easy target (nBits = 0x1D00FFFF)]
-        // [4 bytes: tx_index = 100]
-        // [4 bytes: num_proof_nodes = 0]
-        // [32 bytes: txid = all zeros]
-        let mut payload = Vec::new();
-        payload.extend_from_slice(&200u64.to_le_bytes());
-        payload.extend_from_slice(&1u32.to_le_bytes());
-
-        let mut header = [0u8; 80];
-        // Pre-computed valid header: bits=0x1EFFFFFF, nonce=2561 → hash meets target
-        header[72..76].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0x1E]);
-        header[76..80].copy_from_slice(&2561u32.to_le_bytes());
-        payload.extend_from_slice(&header);
-
-        payload.extend_from_slice(&100u32.to_le_bytes());
-        payload.extend_from_slice(&0u32.to_le_bytes());
-        payload.extend_from_slice(&[0u8; 32]);
-
-        proof.payload = payload;
-        let outcome = router.route(&proof).expect("should verify");
-        assert!(outcome.accepted);
-    }
-
-    #[test]
-    fn bitcoin_spv_below_confirmation_threshold_rejected() {
-        // Same proof as `bitcoin_spv_works` (chain tip 200, tx at index 100 →
-        // 101 confirmations) but a verifier that demands more than the chain has.
-        let mut router = VerificationRouter::new();
-        router.register_verifier(Arc::new(BitcoinSpvVerifier::new(102)));
-
-        let mut proof = dummy_proof(VerificationStrategy::BitcoinSpvProof);
-        proof.source_chain = ChainKind::Bitcoin;
-
-        let mut payload = Vec::new();
-        payload.extend_from_slice(&200u64.to_le_bytes());
-        payload.extend_from_slice(&1u32.to_le_bytes());
-        let mut header = [0u8; 80];
-        header[72..76].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0x1E]);
-        header[76..80].copy_from_slice(&2561u32.to_le_bytes());
-        payload.extend_from_slice(&header);
-        payload.extend_from_slice(&100u32.to_le_bytes());
-        payload.extend_from_slice(&0u32.to_le_bytes());
-        payload.extend_from_slice(&[0u8; 32]);
-        proof.payload = payload;
-
-        assert!(matches!(
-            router.route(&proof),
-            Err(VerificationError::MalformedProof)
-        ));
     }
 
     #[test]

@@ -51,6 +51,7 @@ fn sample_envelope(
         expected_amount: amount,
         expected_sender: alloc::vec::Vec::from(&b"0xSENDER"[..]),
         expected_recipient: alloc::vec::Vec::from(&b"0xRECIPIENT"[..]),
+        expected_beneficiary: alloc::vec::Vec::new(),
     }
 }
 

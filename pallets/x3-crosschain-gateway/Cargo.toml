@@ -50,6 +50,8 @@ x3-verification-router = { path = "../../crates/x3-verification-router", default
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 # Building a real receipts-trie fixture for the EVM-receipt route tests.
 rlp = { version = "0.5", default-features = false }
+# Real Bitcoin headers for the Bitcoin-route tests.
+x3-btc-spv = { path = "../../crates/x3-btc-spv" }
 
 [features]
 default = ["std"]
