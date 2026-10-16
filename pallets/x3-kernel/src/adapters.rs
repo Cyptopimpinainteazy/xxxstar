@@ -622,8 +622,8 @@ pub mod real_adapters {
     }
 
     /// The native runtime's X3 adapter. It delegates to `WasmX3Adapter`, so the native and the
-    /// wasm runtime execute X3 programs with the same engine; it used to run `x3-vm`, which no node
-    /// executing the wasm runtime ever runs (see `X3Executor::execute_on_chain`).
+    /// wasm runtime execute X3 programs with the same engine, `x3-vm`
+    /// (see `X3Executor::execute_on_chain`).
     pub struct X3VmAdapter;
 
     impl super::X3ExecutorAdapter for X3VmAdapter {

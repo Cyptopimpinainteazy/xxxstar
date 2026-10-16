@@ -42,6 +42,148 @@ use crate::storage::{StorageValue, VmStorage, WriteRecord};
 /// Maximum register count.
 pub const MAX_REGISTERS: usize = 256;
 
+/// Whether this interpreter has an implementation for `opcode`.
+///
+/// The match has no wildcard arm on purpose: an opcode added to the instruction set does not
+/// compile until someone decides here whether the engine runs it. The on-chain verifier refuses
+/// every opcode this returns `false` for, and `engine_executes_matches_the_interpreter` (below)
+/// checks each answer against what the interpreter actually does.
+///
+/// `true` means the interpreter has an arm, not that every context may run it: GPU intrinsics,
+/// debug opcodes and floating-point arithmetic are executed off chain and refused on chain by
+/// separate verifier rules.
+pub const fn engine_executes(opcode: Opcode) -> bool {
+    match opcode {
+        Opcode::Nop
+        | Opcode::Jump
+        | Opcode::JumpIf
+        | Opcode::JumpUnless
+        | Opcode::Call
+        | Opcode::Ret
+        | Opcode::RetVoid
+        | Opcode::Halt
+        | Opcode::LoadConst
+        | Opcode::Mov
+        | Opcode::LoadGlobal
+        | Opcode::StoreGlobal
+        | Opcode::LoadImm
+        | Opcode::LoadZero
+        | Opcode::LoadTrue
+        | Opcode::LoadFalse
+        | Opcode::AddI
+        | Opcode::SubI
+        | Opcode::MulI
+        | Opcode::DivI
+        | Opcode::ModI
+        | Opcode::NegI
+        | Opcode::AddF
+        | Opcode::SubF
+        | Opcode::MulF
+        | Opcode::DivF
+        | Opcode::ModF
+        | Opcode::NegF
+        | Opcode::EqI
+        | Opcode::NeI
+        | Opcode::LtI
+        | Opcode::LeI
+        | Opcode::GtI
+        | Opcode::GeI
+        | Opcode::EqF
+        | Opcode::NeF
+        | Opcode::LtF
+        | Opcode::LeF
+        | Opcode::GtF
+        | Opcode::GeF
+        | Opcode::And
+        | Opcode::Or
+        | Opcode::Xor
+        | Opcode::Not
+        | Opcode::Shl
+        | Opcode::Shr
+        | Opcode::UShr
+        | Opcode::LAnd
+        | Opcode::LOr
+        | Opcode::LNot
+        | Opcode::AtomicBegin
+        | Opcode::AtomicCommit
+        | Opcode::AtomicRollback
+        | Opcode::AtomicCheck
+        | Opcode::Emit
+        | Opcode::EvmSload
+        | Opcode::EvmSstore
+        | Opcode::GpuSha256Batch
+        | Opcode::GpuEd25519Verify
+        | Opcode::GpuPohChain
+        | Opcode::GpuSha256Streamed
+        | Opcode::GpuDeviceCount
+        | Opcode::GpuBenchmark
+        | Opcode::GpuKeccak256Batch
+        | Opcode::GpuSecp256k1Verify
+        | Opcode::DebugPrint
+        | Opcode::Breakpoint
+        | Opcode::Assert
+        | Opcode::Panic => true,
+
+        // Aggregates: no value model for arrays, tuples or structs yet.
+        Opcode::LoadIndex
+        | Opcode::StoreIndex
+        | Opcode::LoadField
+        | Opcode::StoreField
+        | Opcode::NewArray
+        | Opcode::ArrayLen
+        | Opcode::ArrayPush
+        | Opcode::ArrayPop
+        | Opcode::NewTuple
+        | Opcode::TupleGet
+        | Opcode::Inc
+        | Opcode::Dec
+        // Conversions: the value model has only i64 and f64 (TICKET-149).
+        | Opcode::I32ToI64
+        | Opcode::I64ToI32
+        | Opcode::I32ToF32
+        | Opcode::I64ToF64
+        | Opcode::F32ToI32
+        | Opcode::F64ToI64
+        | Opcode::F32ToF64
+        | Opcode::F64ToF32
+        | Opcode::ToBool
+        // Context: needs the block context the kernel has not handed the engine yet.
+        | Opcode::CtxSender
+        | Opcode::CtxBlockHeight
+        | Opcode::CtxTimestamp
+        | Opcode::CtxValue
+        | Opcode::CtxGas
+        | Opcode::CtxChainId
+        // Agents: no agent registry.
+        | Opcode::AgentSelf
+        | Opcode::AgentInit
+        // Cross-VM calls: need the kernel's EVM and SVM adapters wired as hosts.
+        | Opcode::EvmCall
+        | Opcode::EvmStaticCall
+        | Opcode::EvmDelegateCall
+        | Opcode::EvmCreate
+        | Opcode::EvmCreate2
+        | Opcode::EvmLog
+        | Opcode::EvmBalance
+        | Opcode::EvmCodeSize
+        | Opcode::SvmInvoke
+        | Opcode::SvmInvokeSigned
+        | Opcode::SvmCreateAccount
+        | Opcode::SvmTransfer
+        | Opcode::SvmGetData
+        | Opcode::SvmSetData
+        | Opcode::SvmGetRent
+        | Opcode::SvmGetClock => false,
+    }
+}
+
+/// Deepest nesting of atomic windows one execution may open.
+///
+/// Each open window holds a copy of the registers and globals, so this bounds the memory a program
+/// can make the engine hold. The figure is the one the runtime interpreter enforced before this
+/// engine replaced it.
+pub const MAX_ATOMIC_DEPTH: usize = 32;
+
 /// Maximum call stack depth.
 pub const MAX_CALL_DEPTH: usize = 64;
 
@@ -933,6 +1075,19 @@ impl VM {
                 Ok(StepResult::Continue(ip + 4))
             }
 
+            Opcode::ModF => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let a = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let b = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
+                let va = self.regs[a].as_f64()?;
+                let vb = self.regs[b].as_f64()?;
+                // IEEE remainder with the sign of the dividend, like `DivF` producing infinity
+                // rather than an error: `x % 0.0` is NaN. Floats are refused on chain by the
+                // verifier (`deny_float_arithmetic`), so this arm only serves off-chain tools.
+                self.regs[dst] = Value::F64(va % vb);
+                Ok(StepResult::Continue(ip + 4))
+            }
+
             Opcode::NegF => {
                 let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
                 let src = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
@@ -1171,6 +1326,14 @@ impl VM {
             // Atomic Operations
             // ================================================================
             Opcode::AtomicBegin => {
+                // Every open window holds a full copy of the registers and globals, so the nesting
+                // depth bounds the memory a program can make the engine hold on the chain's behalf.
+                // An unbounded `AtomicBegin` in a loop is a memory amplification; refuse it.
+                if self.atomic_depth >= MAX_ATOMIC_DEPTH {
+                    return Err(
+                        self.error_at(ip, VMErrorKind::AtomicDepthExceeded(MAX_ATOMIC_DEPTH))
+                    );
+                }
                 // snapshot regs + globals
                 self.atomic_snapshots
                     .push((self.regs.clone(), self.globals.clone()));
@@ -1191,6 +1354,13 @@ impl VM {
                 self.event_buffer.commit();
                 self.atomic_depth -= 1;
                 Ok(StepResult::Continue(ip + 3)) // opcode + id:u16
+            }
+
+            Opcode::AtomicCheck => {
+                // `atomic_check dst`: whether an atomic window is open at this instruction.
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                self.regs[dst] = Value::Bool(self.atomic_depth > 0);
+                Ok(StepResult::Continue(ip + 2))
             }
 
             Opcode::AtomicRollback => {
@@ -1580,7 +1750,7 @@ impl VM {
             Opcode::LoadGlobal | Opcode::StoreGlobal => 3,
             Opcode::AddI | Opcode::SubI | Opcode::MulI => 1,
             Opcode::DivI | Opcode::ModI => 5,
-            Opcode::AddF | Opcode::SubF | Opcode::MulF | Opcode::DivF => 2,
+            Opcode::AddF | Opcode::SubF | Opcode::MulF | Opcode::DivF | Opcode::ModF => 2,
             Opcode::EqI | Opcode::NeI | Opcode::LtI | Opcode::LeI | Opcode::GtI | Opcode::GeI => 1,
             Opcode::And | Opcode::Or | Opcode::Xor | Opcode::Not => 1,
             Opcode::Shl | Opcode::Shr | Opcode::UShr => 1,
@@ -2698,5 +2868,153 @@ mod tests {
         // default-initialised map would hand back.
         assert_ne!(evm_slot_key(0), evm_slot_key(1));
         assert_ne!(evm_slot_key(0), [0u8; 32]);
+    }
+
+    // ------------------------------------------------------------------------
+    // The engine's own table of what it executes, held to the interpreter
+    // ------------------------------------------------------------------------
+
+    /// Run `instruction` as the first instruction of `main`, padded so an engine that steps past it
+    /// reaches a clean `RetVoid`.
+    fn run_single(instruction: &[u8]) -> VMResult<ExecutionResult> {
+        let mut code = instruction.to_vec();
+        code.extend_from_slice(&[Opcode::Nop as u8; 16]);
+        code.push(Opcode::RetVoid as u8);
+        let bytes = storage_module(code, 0, 16);
+        let mut vm = VM::from_bytes(&bytes).expect("the module loads");
+        vm.config.gas_limit = 10_000;
+        vm.call_function(0, &[])
+    }
+
+    #[test]
+    fn engine_executes_matches_the_interpreter() {
+        let mut wrong = Vec::new();
+        for byte in 0u8..=255 {
+            let Some(opcode) = Opcode::from_byte(byte) else {
+                continue;
+            };
+            // Operand bytes are zero: register r0, index 0, count 0, jump target 0.
+            let mut instruction = vec![byte];
+            instruction.extend_from_slice(&[0u8; 9]);
+            let refused_as_unimplemented = matches!(
+                run_single(&instruction),
+                Err(VMError {
+                    kind: VMErrorKind::UnimplementedOpcode(b),
+                    ..
+                }) if b == byte
+            );
+            if engine_executes(opcode) == refused_as_unimplemented {
+                wrong.push(format!(
+                    "{opcode:?} (0x{byte:02X}): table says {}, interpreter {}",
+                    engine_executes(opcode),
+                    if refused_as_unimplemented {
+                        "refuses it"
+                    } else {
+                        "runs it"
+                    }
+                ));
+            }
+        }
+        assert!(
+            wrong.is_empty(),
+            "table and interpreter disagree:\n  {}",
+            wrong.join("\n  ")
+        );
+    }
+
+    #[test]
+    fn atomic_check_reports_whether_a_window_is_open() {
+        // r1 = atomic_check (outside); begin; r2 = atomic_check (inside); commit; r3 = r1 + 2*r2 ...
+        // Booleans are returned through a branch so the result is one integer.
+        let code = vec![
+            Opcode::AtomicCheck as u8,
+            1, // r1 = false
+            Opcode::AtomicBegin as u8,
+            0,
+            0,
+            Opcode::AtomicCheck as u8,
+            2, // r2 = true
+            Opcode::AtomicCommit as u8,
+            0,
+            0,
+            Opcode::AtomicCheck as u8,
+            3, // r3 = false again
+            Opcode::Ret as u8,
+            2,
+        ];
+        let bytes = storage_module(code.clone(), 0, 16);
+        let mut vm = VM::from_bytes(&bytes).expect("loads");
+        assert_eq!(
+            vm.call_function(0, &[]).unwrap().value,
+            Some(Value::Bool(true))
+        );
+
+        let mut outside = code;
+        let last = outside.len() - 1;
+        outside[last] = 1; // return r1, read before the window opened
+        let mut vm = VM::from_bytes(&storage_module(outside.clone(), 0, 16)).expect("loads");
+        assert_eq!(
+            vm.call_function(0, &[]).unwrap().value,
+            Some(Value::Bool(false))
+        );
+        outside[last] = 3; // and r3, read after it closed
+        let mut vm = VM::from_bytes(&storage_module(outside, 0, 16)).expect("loads");
+        assert_eq!(
+            vm.call_function(0, &[]).unwrap().value,
+            Some(Value::Bool(false))
+        );
+    }
+
+    #[test]
+    fn the_atomic_window_past_the_depth_cap_is_refused() {
+        let mut code = Vec::new();
+        for _ in 0..=MAX_ATOMIC_DEPTH {
+            code.extend_from_slice(&[Opcode::AtomicBegin as u8, 0, 0]);
+        }
+        code.push(Opcode::RetVoid as u8);
+        let mut vm = VM::from_bytes(&storage_module(code, 0, 16)).expect("loads");
+        let err = vm.call_function(0, &[]).expect_err("one window too many");
+        assert!(
+            matches!(err.kind, VMErrorKind::AtomicDepthExceeded(MAX_ATOMIC_DEPTH)),
+            "{err:?}"
+        );
+
+        // The control: exactly the cap is allowed.
+        let mut code = Vec::new();
+        for _ in 0..MAX_ATOMIC_DEPTH {
+            code.extend_from_slice(&[Opcode::AtomicBegin as u8, 0, 0]);
+        }
+        for _ in 0..MAX_ATOMIC_DEPTH {
+            code.extend_from_slice(&[Opcode::AtomicCommit as u8, 0, 0]);
+        }
+        code.push(Opcode::RetVoid as u8);
+        let mut vm = VM::from_bytes(&storage_module(code, 0, 16)).expect("loads");
+        vm.call_function(0, &[]).expect("32 nested windows run");
+    }
+
+    #[test]
+    fn mod_f_is_the_ieee_remainder() {
+        let mut module = x3_backend::bc_format::BytecodeModule::new();
+        let seven_half = module.const_pool.add_float(7.5).unwrap();
+        let two = module.const_pool.add_float(2.0).unwrap();
+        let mut code = vec![Opcode::LoadConst as u8, 1];
+        code.extend_from_slice(&seven_half.0.to_le_bytes());
+        code.extend_from_slice(&[Opcode::LoadConst as u8, 2]);
+        code.extend_from_slice(&two.0.to_le_bytes());
+        code.extend_from_slice(&[Opcode::ModF as u8, 3, 1, 2, Opcode::Ret as u8, 3]);
+        module.functions.push(x3_backend::bc_format::FunctionEntry {
+            name: "main".to_string(),
+            entry_point: 0,
+            param_count: 0,
+            local_count: 16,
+            max_stack: 8,
+            return_type_tag: 1,
+        });
+        module.code = code;
+        let mut vm = VM::from_bytes(&module.to_bytes()).expect("loads");
+        assert_eq!(
+            vm.call_function(0, &[]).unwrap().value,
+            Some(Value::F64(1.5))
+        );
     }
 }

@@ -53,6 +53,12 @@ extern crate alloc;
 pub mod error;
 pub mod executor;
 pub mod hostcalls;
+/// The interpreter the runtime ran before `x3-vm` built without `std`.
+///
+/// No chain path reaches it any more: `X3Executor::execute_on_chain` runs `x3-vm` in every build.
+/// It stays for now as the reference the differential and agreement tests hold the new engine to,
+/// so the switch is checked against the behaviour it replaced; it is removed when the old engines
+/// are retired.
 pub mod mini_x3;
 pub mod types;
 

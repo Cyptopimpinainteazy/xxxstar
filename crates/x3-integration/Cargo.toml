@@ -6,10 +6,12 @@ description = "X3 Chain integration for X3 virtual machine and compiler"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-# X3 core (std-only — heavy deps; not used in WASM runtime)
-x3-vm = { path = "../x3-vm", optional = true }
+# The X3 engine. It builds without `std`, so the wasm runtime executes X3BC with the same
+# interpreter and verifier the native runtime, tests and tools use.
+x3-vm = { path = "../x3-vm", default-features = false }
+x3-backend = { path = "../x3-backend", default-features = false }
+# Compiler front end (std-only — heavy deps; not used in WASM runtime)
 x3-compiler = { path = "../x3-compiler", optional = true }
-x3-backend = { path = "../x3-backend", optional = true }
 x3-common = { path = "../x3-common", default-features = false }
 x3-verifier = { path = "../x3-verifier", optional = true }
 
@@ -63,9 +65,9 @@ std = [
     "x3-common/std",
     "x3-evm-integration/std",
     # x3-svm-integration excluded from std: solana-program 3.x dual solana-address conflict
-    "x3-vm",
+    "x3-vm/std",
+    "x3-backend/std",
     "x3-compiler",
-    "x3-backend",
     "x3-verifier",
 ]
 # Enable contract compilation from source

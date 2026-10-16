@@ -147,6 +147,9 @@ impl Verifier {
         // 6. Const pool validation
         Self::verify_const_pool_refs(&instrs, module)?;
 
+        // 6b. Linkage: entries, calls, globals and frames agree with the module's tables.
+        Self::verify_linkage(&instrs, &offsets, module)?;
+
         // 7. Atomic balance validation
         Self::verify_atomic_balance(&instrs)?;
 
@@ -156,10 +159,17 @@ impl Verifier {
         // 9. On-chain restrictions
         if options.on_chain {
             Self::verify_on_chain_restrictions(&instrs)?;
+            Self::verify_engine_executes(&instrs)?;
         }
 
         if options.deny_float_arithmetic {
             Self::verify_float_determinism(&instrs)?;
+        }
+
+        // Last, so a module refused for what its code does is told that rather than that its
+        // function table is incomplete.
+        if options.on_chain {
+            Self::verify_on_chain_entry(module)?;
         }
 
         Ok(())
@@ -805,6 +815,104 @@ impl Verifier {
         Ok(())
     }
 
+    /// Check that every reference into the module's tables matches the table.
+    ///
+    /// These were checked only when the interpreter reached them, so a module that called a
+    /// function with the wrong number of arguments, named a global that does not exist, or entered
+    /// a function in the middle of an instruction was admitted and failed at run time. The runtime
+    /// interpreter this engine replaces refused each of them at intake; so does this.
+    fn verify_linkage(
+        instrs: &[DecodedInstr],
+        offsets: &BTreeSet<usize>,
+        module: &BytecodeModule,
+    ) -> VerifierResult<()> {
+        for (idx, func) in module.functions.iter().enumerate() {
+            if !offsets.contains(&(func.entry_point as usize)) {
+                return Err(VerifierError::without_offset(
+                    VerifierErrorKind::FunctionEntryUnaligned(idx, func.entry_point),
+                ));
+            }
+            let frame = func.param_count as usize + func.local_count as usize;
+            if frame > crate::vm::MAX_REGISTERS {
+                return Err(VerifierError::without_offset(
+                    VerifierErrorKind::FunctionFrameTooLarge(idx, frame, crate::vm::MAX_REGISTERS),
+                ));
+            }
+        }
+
+        let globals = module.globals.len();
+        for instr in instrs {
+            match Opcode::from_byte(instr.opcode) {
+                Some(Opcode::Call) => {
+                    // operands: dst, func, argc, args...
+                    let func_idx = instr.operands[1] as u32;
+                    let argc = instr.operands[2] as usize;
+                    // `verify_cfg` has already refused an index past the table.
+                    if let Some(func) = module.functions.get(func_idx as usize) {
+                        if func.param_count as usize != argc {
+                            return Err(VerifierError::new(
+                                VerifierErrorKind::CallArgumentCountMismatch(
+                                    func_idx,
+                                    func.param_count,
+                                    argc,
+                                ),
+                                instr.offset,
+                            ));
+                        }
+                    }
+                }
+                Some(Opcode::LoadGlobal) | Some(Opcode::StoreGlobal) => {
+                    // LoadGlobal: dst, idx. StoreGlobal: idx, src.
+                    let index = if instr.opcode == Opcode::LoadGlobal as u8 {
+                        instr.operands[1]
+                    } else {
+                        instr.operands[0]
+                    } as u32;
+                    if index as usize >= globals {
+                        return Err(VerifierError::new(
+                            VerifierErrorKind::GlobalIndexOutOfBounds(index, globals),
+                            instr.offset,
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// On chain the runtime calls function 0 with no arguments, so it must exist and take none.
+    fn verify_on_chain_entry(module: &BytecodeModule) -> VerifierResult<()> {
+        let entry = module.functions.first().ok_or_else(|| {
+            VerifierError::without_offset(VerifierErrorKind::MissingEntryFunction)
+        })?;
+        if entry.param_count != 0 {
+            return Err(VerifierError::without_offset(
+                VerifierErrorKind::InvalidParamCount(0, entry.param_count),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Refuse, at intake, any opcode the interpreter has no implementation for.
+    ///
+    /// Without this a module carrying one was admitted, stored, and then failed with
+    /// `UnimplementedOpcode` on the block that reached it. An admitted program is a promise that
+    /// the chain can run it; this keeps the promise checkable before anything is charged.
+    fn verify_engine_executes(instrs: &[DecodedInstr]) -> VerifierResult<()> {
+        for instr in instrs {
+            if let Some(opcode) = Opcode::from_byte(instr.opcode) {
+                if !crate::vm::engine_executes(opcode) {
+                    return Err(VerifierError::new(
+                        VerifierErrorKind::NotExecutable(instr.opcode),
+                        instr.offset,
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn check_jump_target(
         target: u32,
         code_len: usize,
@@ -1267,6 +1375,138 @@ mod tests {
                 "{op:?}: {refusal:?}"
             );
         }
+    }
+
+    fn entry(params: u8, locals: u16, at: u32) -> x3_backend::bc_format::FunctionEntry {
+        x3_backend::bc_format::FunctionEntry {
+            name: "f".to_string(),
+            entry_point: at,
+            param_count: params,
+            local_count: locals,
+            max_stack: 8,
+            return_type_tag: 1,
+        }
+    }
+
+    #[test]
+    fn an_opcode_the_engine_cannot_run_is_refused_on_chain_and_admitted_off_it() {
+        // `ctx_sender dst` — decodes, and the interpreter has no arm for it.
+        let mut module = make_simple_module(vec![
+            Opcode::CtxSender.to_byte(),
+            0x00,
+            Opcode::Halt.to_byte(),
+        ]);
+        module.functions.push(entry(0, 4, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::on_chain())
+            .expect_err("a block could not run it");
+        assert!(
+            matches!(refusal.kind, VerifierErrorKind::NotExecutable(b) if b == Opcode::CtxSender.to_byte()),
+            "{refusal:?}"
+        );
+        // Off chain the verifier stays a structural check: tools may inspect such a module.
+        Verifier::verify_module(&module, &VerifyOptions::default()).expect("admitted off chain");
+    }
+
+    #[test]
+    fn a_call_with_the_wrong_number_of_arguments_is_refused() {
+        // main: call f1 with one argument; f1 declares two parameters.
+        let mut code = vec![Opcode::Call.to_byte(), 0x00];
+        code.extend_from_slice(&1u32.to_le_bytes());
+        code.extend_from_slice(&1u16.to_le_bytes());
+        code.push(0x02); // the one argument register
+        code.push(Opcode::Halt.to_byte());
+        let f1_at = code.len() as u32;
+        code.push(Opcode::RetVoid.to_byte());
+        let mut module = make_simple_module(code);
+        module.functions.push(entry(0, 4, 0));
+        module.functions.push(entry(2, 4, f1_at));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect_err("argument count must match");
+        assert!(
+            matches!(
+                refusal.kind,
+                VerifierErrorKind::CallArgumentCountMismatch(1, 2, 1)
+            ),
+            "{refusal:?}"
+        );
+        // The control: declaring one parameter makes it admissible.
+        module.functions[1].param_count = 1;
+        Verifier::verify_module(&module, &VerifyOptions::default()).expect("now it matches");
+    }
+
+    #[test]
+    fn a_global_index_past_the_table_is_refused() {
+        let mut code = vec![Opcode::LoadGlobal.to_byte(), 0x00];
+        code.extend_from_slice(&0u32.to_le_bytes());
+        code.push(Opcode::Halt.to_byte());
+        let mut module = make_simple_module(code);
+        module.functions.push(entry(0, 4, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect_err("no globals declared");
+        assert!(
+            matches!(
+                refusal.kind,
+                VerifierErrorKind::GlobalIndexOutOfBounds(0, 0)
+            ),
+            "{refusal:?}"
+        );
+    }
+
+    #[test]
+    fn a_function_entering_mid_instruction_or_with_an_oversized_frame_is_refused() {
+        // LoadImm is three bytes; offset 1 is inside it.
+        let code = vec![
+            Opcode::LoadImm.to_byte(),
+            0x00,
+            0x05,
+            Opcode::Halt.to_byte(),
+        ];
+        let mut module = make_simple_module(code.clone());
+        module.functions.push(entry(0, 4, 1));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect_err("entry inside an instruction");
+        assert!(
+            matches!(
+                refusal.kind,
+                VerifierErrorKind::FunctionEntryUnaligned(0, 1)
+            ),
+            "{refusal:?}"
+        );
+
+        let mut module = make_simple_module(code);
+        module.functions.push(entry(10, 250, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect_err("frame larger than the register file");
+        assert!(
+            matches!(
+                refusal.kind,
+                VerifierErrorKind::FunctionFrameTooLarge(0, 260, 256)
+            ),
+            "{refusal:?}"
+        );
+    }
+
+    #[test]
+    fn on_chain_the_entry_function_must_exist_and_take_no_arguments() {
+        let code = vec![Opcode::Halt.to_byte()];
+        let module = make_simple_module(code.clone());
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::on_chain())
+            .expect_err("no entry function");
+        assert!(matches!(
+            refusal.kind,
+            VerifierErrorKind::MissingEntryFunction
+        ));
+
+        let mut module = make_simple_module(code);
+        module.functions.push(entry(1, 4, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::on_chain())
+            .expect_err("the runtime calls the entry with no arguments");
+        assert!(
+            matches!(refusal.kind, VerifierErrorKind::InvalidParamCount(0, 1)),
+            "{refusal:?}"
+        );
+        Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect("off chain a tool may call it with arguments");
     }
 
     #[test]
