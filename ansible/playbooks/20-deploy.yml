@@ -1,0 +1,201 @@
+---
+# Install and start every validator in the inventory as a systemd user unit.
+# Session keys are inserted into a keystore on the controller and copied over, so a
+# seed never appears on a remote command line. Run 00-genesis and 10-preflight first.
+# Deploy to a subset with -e x3_hosts=<host>[,<host>], not --limit: --limit would also
+# skip the controller play that stages keys and checks the whole cluster.
+
+- name: Stage keys on the controller
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    staged: "{{ x3_genesis_outdir }}/staged"
+  tasks:
+    - name: Use -e x3_hosts, not --limit
+      ansible.builtin.assert:
+        that: ansible_limit is not defined
+        fail_msg: "--limit skips this controller play; use -e x3_hosts=<host>[,<host>] instead"
+        quiet: true
+
+    # Two nodes signing with one authority key equivocate, and Aura/GRANDPA equivocation
+    # is the one mistake a testnet cannot undo. Moving a validator is 90-stop first.
+    # Every inventory host is asked, whichever hosts this run deploys to, and in --check too.
+    - name: Validator units active on every inventory host
+      vars:
+        query: "systemctl --user list-units --state=active --plain --no-legend 'x3-validator-*.service'"
+        remote: "{{ hostvars[item].ansible_connection | default('ssh') != 'local' }}"
+      ansible.builtin.command:
+        argv: >-
+          {{ (['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'LogLevel=ERROR',
+               hostvars[item].ansible_user ~ '@' ~ hostvars[item].ansible_host, query])
+             if remote else ['sh', '-c', query] }}
+      register: active_units
+      changed_when: false
+      check_mode: false
+      loop: "{{ groups['validators'] }}"
+
+    - name: No validator is placed on a host other than the one already running it
+      vars:
+        conflicts: >-
+          {%- set e = [] -%}
+          {%- for r in active_units.results -%}
+          {%- for u in r.stdout_lines | map('split') | map('first') | select('match', '^x3-validator-\\d+\\.service$') -%}
+          {%- set i = u | regex_replace('^x3-validator-(\\d+)\\.service$', '\\1') | int -%}
+          {%- for h in groups['validators'] if h != r.item and i in (hostvars[h].x3_validators | map(attribute='index') | map('int') | list) -%}
+          {%- set _ = e.append('validator ' ~ i ~ ' runs on ' ~ r.item ~ ' but is placed on ' ~ h) -%}
+          {%- endfor -%}
+          {%- endfor -%}
+          {%- endfor -%}
+          {{ e }}
+      ansible.builtin.assert:
+        that: conflicts | length == 0
+        fail_msg: "refusing to deploy: {{ conflicts | join('; ') }}. Run 90-stop.yml on the old host first."
+        quiet: true
+
+    - name: Chain id of the spec
+      ansible.builtin.set_fact:
+        x3_chain_id: "{{ (lookup('file', x3_spec_src) | from_json).id }}"
+
+    - name: Keystore directories
+      ansible.builtin.file:
+        path: "{{ staged }}/validator-{{ item }}/keystore"
+        state: directory
+        mode: "0700"
+      loop: "{{ range(1, x3_validator_count + 1) | list }}"
+
+    - name: Insert Aura and GRANDPA keys from each validator seed
+      ansible.builtin.command:
+        argv:
+          - "{{ x3_binary_src }}"
+          - keys
+          - insert
+          - --key-type
+          - "{{ item.1 }}"
+          - --seed
+          - "{{ lookup('file', x3_keys_dir ~ '/validator-' ~ item.0 ~ '.suri').splitlines() | select('match', '^seed=') | first | regex_replace('^seed=', '') }}"
+          - --keystore-path
+          - "{{ staged }}/validator-{{ item.0 }}/keystore"
+      loop: "{{ range(1, x3_validator_count + 1) | product(['aura', 'grandpa']) | list }}"
+      loop_control:
+        label: "validator-{{ item.0 }} {{ item.1 }}"
+      no_log: true
+      changed_when: false
+
+    - name: Each keystore holds exactly one Aura and one GRANDPA key
+      ansible.builtin.find:
+        paths: "{{ staged }}/validator-{{ item }}/keystore"
+      register: ks
+      loop: "{{ range(1, x3_validator_count + 1) | list }}"
+      failed_when: ks.matched != 2
+
+    - name: Node keys as the 64 hex characters --node-key-file reads
+      ansible.builtin.copy:
+        dest: "{{ staged }}/validator-{{ item }}/nodekey"
+        content: "{{ lookup('file', x3_keys_dir ~ '/validator-' ~ item ~ '.nodekey') | trim | regex_replace('^0x', '') }}"
+        mode: "0600"
+      loop: "{{ range(1, x3_validator_count + 1) | list }}"
+      no_log: true
+
+- name: Deploy validators
+  hosts: "{{ x3_hosts | default('validators') }}"
+  gather_facts: true
+  vars:
+    staged: "{{ x3_genesis_outdir }}/staged"
+    x3_chain_id: "{{ hostvars['localhost'].x3_chain_id }}"
+  handlers:
+    - name: Restart validators
+      ansible.builtin.systemd_service:
+        name: "x3-validator-{{ item.index }}.service"
+        scope: user
+        state: restarted
+        daemon_reload: true
+      loop: "{{ x3_validators }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
+  tasks:
+    # --limit skips the controller play (key staging and the cluster-wide double-sign
+    # check) without an error; stop here rather than deploy unchecked.
+    - name: The controller play ran
+      ansible.builtin.assert:
+        that: hostvars['localhost'].x3_chain_id is defined
+        fail_msg: "--limit skips the controller play; use -e x3_hosts=<host>[,<host>] instead"
+        quiet: true
+
+    - name: Directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0700"
+      loop:
+        - "{{ x3_home }}/bin"
+        - "{{ x3_home }}/spec"
+        - "{{ x3_home }}/keys"
+        - "{{ ansible_env.HOME }}/.config/systemd/user"
+
+    - name: Node binary
+      ansible.builtin.copy:
+        src: "{{ x3_binary_src }}"
+        dest: "{{ x3_bin }}"
+        mode: "0755"
+      notify: Restart validators
+
+    - name: Chain spec
+      ansible.builtin.copy:
+        src: "{{ x3_spec_src }}"
+        dest: "{{ x3_spec }}"
+        mode: "0644"
+      notify: Restart validators
+
+    - name: Node keys
+      ansible.builtin.copy:
+        src: "{{ staged }}/validator-{{ item.index }}/nodekey"
+        dest: "{{ x3_home }}/keys/validator-{{ item.index }}.nodekey"
+        mode: "0600"
+      loop: "{{ x3_validators }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
+      no_log: true
+      notify: Restart validators
+
+    - name: Keystore directories
+      ansible.builtin.file:
+        path: "{{ x3_home }}/data/validator-{{ item.index }}/chains/{{ x3_chain_id }}/keystore"
+        state: directory
+        mode: "0700"
+      loop: "{{ x3_validators }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
+
+    - name: Session keys
+      ansible.builtin.copy:
+        src: "{{ staged }}/validator-{{ item.index }}/keystore/"
+        dest: "{{ x3_home }}/data/validator-{{ item.index }}/chains/{{ x3_chain_id }}/keystore/"
+        mode: "0600"
+      loop: "{{ x3_validators }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
+      no_log: true
+      notify: Restart validators
+
+    - name: Units
+      ansible.builtin.template:
+        src: ../templates/x3-validator.service.j2
+        dest: "{{ ansible_env.HOME }}/.config/systemd/user/x3-validator-{{ v.index }}.service"
+        mode: "0644"
+      loop: "{{ x3_validators }}"
+      loop_control:
+        loop_var: v
+        label: "validator-{{ v.index }}"
+      notify: Restart validators
+
+    - name: Enable and start
+      ansible.builtin.systemd_service:
+        name: "x3-validator-{{ item.index }}.service"
+        scope: user
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop: "{{ x3_validators }}"
+      loop_control:
+        label: "validator-{{ item.index }}"

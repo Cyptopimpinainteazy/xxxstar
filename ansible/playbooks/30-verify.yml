@@ -1,0 +1,92 @@
+---
+# Health of the running network, read from each validator's loopback RPC on its own host:
+# one genesis everywhere, enough peers, and a finalized head that keeps moving.
+- name: Verify
+  hosts: validators
+  gather_facts: false
+  # Report every host's reachability before failing, not just the first.
+  any_errors_fatal: false
+  tasks:
+    # A host that accepts no inbound p2p still shows a few peers (its own outbound dials),
+    # so a peer count alone hides a firewall that splits the network. Dial every other
+    # host's p2p ports from here.
+    - name: Reach every other host's p2p ports
+      vars:
+        targets: >-
+          {%- set t = [] -%}
+          {%- for h in groups['validators'] if h != inventory_hostname -%}
+          {%- for v in hostvars[h].x3_validators -%}
+          {%- set _ = t.append(hostvars[h].ansible_host ~ ':' ~ (x3_p2p_base + v.index)) -%}
+          {%- endfor -%}
+          {%- endfor -%}
+          {{ t }}
+      ansible.builtin.shell: |
+        blocked=""
+        for t in {{ targets | join(' ') }}; do
+          timeout 4 bash -c "</dev/tcp/${t%:*}/${t#*:}" 2>/dev/null || blocked="$blocked $t"
+        done
+        echo "${blocked# }"
+      args:
+        executable: /bin/bash
+      register: reach
+      changed_when: false
+      failed_when: reach.stdout | length > 0
+
+    - name: Genesis hash
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ x3_rpc_base + item.index }}"
+        method: POST
+        body_format: json
+        body: {jsonrpc: "2.0", id: 1, method: chain_getBlockHash, params: [0]}
+      register: genesis
+      loop: "{{ x3_validators }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
+
+    - name: Finalized height now
+      ansible.builtin.shell: |
+        h=$(curl -s -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"chain_getFinalizedHead"}' http://127.0.0.1:{{ x3_rpc_base + item.index }} | python3 -c 'import json,sys;print(json.load(sys.stdin)["result"])')
+        curl -s -H 'Content-Type: application/json' -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"chain_getHeader\",\"params\":[\"$h\"]}" http://127.0.0.1:{{ x3_rpc_base + item.index }} | python3 -c 'import json,sys;print(int(json.load(sys.stdin)["result"]["number"],16))'
+      register: fin0
+      changed_when: false
+      loop: "{{ x3_validators }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
+
+    - name: Peers and finality advance
+      ansible.builtin.shell: |
+        rpc() { curl -s -H 'Content-Type: application/json' -d "$1" http://127.0.0.1:{{ x3_rpc_base + item.0.index }}; }
+        peers=$(rpc '{"jsonrpc":"2.0","id":1,"method":"system_health"}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["result"]["peers"])')
+        h=$(rpc '{"jsonrpc":"2.0","id":1,"method":"chain_getFinalizedHead"}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["result"])')
+        fin=$(rpc "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"chain_getHeader\",\"params\":[\"$h\"]}" | python3 -c 'import json,sys;print(int(json.load(sys.stdin)["result"]["number"],16))')
+        best=$(rpc '{"jsonrpc":"2.0","id":1,"method":"chain_getHeader"}' | python3 -c 'import json,sys;print(int(json.load(sys.stdin)["result"]["number"],16))')
+        echo "$peers $fin $best"
+      register: health
+      changed_when: false
+      until: >-
+        health.stdout.split() | length == 3
+        and health.stdout.split()[0] | int >= x3_min_peers
+        and health.stdout.split()[1] | int > item.1.stdout | int
+      retries: "{{ (x3_verify_timeout_sec / 6) | int }}"
+      delay: 6
+      loop: "{{ x3_validators | zip(fin0.results) | list }}"
+      loop_control:
+        label: "validator-{{ item.0.index }}"
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >-
+          {% for r in health.results %}v{{ r.item.0.index }}: peers={{ r.stdout.split()[0] }}
+          finalized={{ r.stdout.split()[1] }} best={{ r.stdout.split()[2] }}{{ '; ' if not loop.last }}{% endfor %}
+
+- name: One network
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Every validator reports the same genesis hash
+      vars:
+        hashes: "{{ groups['validators'] | map('extract', hostvars, ['genesis', 'results']) | flatten | map(attribute='json') | map(attribute='result') | unique | list }}"
+      ansible.builtin.assert:
+        that: hashes | length == 1
+        fail_msg: "validators disagree on genesis: {{ hashes }}"
+        success_msg: "genesis {{ hashes[0] }}"
