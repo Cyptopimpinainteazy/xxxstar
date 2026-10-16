@@ -251,6 +251,12 @@ pub enum VMErrorKind {
     #[error("the host supplied no {0} for this execution")]
     ContextUnavailable(&'static str),
 
+    #[error("pop from an empty array")]
+    EmptyArray,
+
+    #[error("aggregate would hold {0} values (max {1})")]
+    AggregateTooLarge(usize, usize),
+
     #[error("hostcall {0} not found")]
     HostcallNotFound(u8),
 

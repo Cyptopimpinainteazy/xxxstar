@@ -428,6 +428,13 @@ pub mod value_tags {
     pub const ADDR: u8 = 4;
     pub const BYTES: u8 = 5;
     pub const STRING: u8 = 6;
+    /// An array in a returned value (`x3_vm::Value::return_bytes`). Never stored in a slot or an
+    /// event: an aggregate is refused there.
+    pub const ARRAY: u8 = 7;
+    /// A tuple (or a struct, which the engine holds as a tuple of its fields) in a returned value.
+    pub const TUPLE: u8 = 8;
+    /// Unit inside a returned aggregate.
+    pub const UNIT: u8 = 9;
 }
 
 /// Host calls a chain program can make by name: the VM's storage opcodes, reachable from source.

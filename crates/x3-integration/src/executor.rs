@@ -236,16 +236,12 @@ impl X3Executor {
 
         match result {
             Ok(exec_result) => {
-                let return_data = match exec_result.value {
-                    Some(x3_vm::Value::I64(v)) => v.to_le_bytes().to_vec(),
-                    Some(x3_vm::Value::F64(v)) => v.to_bits().to_le_bytes().to_vec(),
-                    Some(x3_vm::Value::Bool(v)) => vec![v as u8],
-                    Some(x3_vm::Value::Bytes(v)) => v,
-                    Some(x3_vm::Value::String(s)) => s.into_bytes(),
-                    Some(x3_vm::Value::Unit) => vec![],
-                    Some(x3_vm::Value::Addr(a)) => a.to_le_bytes().to_vec(),
-                    None => vec![],
-                };
+                // One encoding for a returned value, the engine's own, shared with the chain path.
+                let return_data = exec_result
+                    .value
+                    .as_ref()
+                    .map(x3_vm::Value::return_bytes)
+                    .unwrap_or_default();
 
                 // Drain the slot journal into the receipt's storage channel.
                 //
@@ -439,15 +435,11 @@ impl X3Executor {
 
         match result {
             Ok(exec) => {
-                let return_data = match exec.value {
-                    Some(Value::I64(v)) => v.to_le_bytes().to_vec(),
-                    Some(Value::F64(v)) => v.to_bits().to_le_bytes().to_vec(),
-                    Some(Value::Bool(v)) => vec![v as u8],
-                    Some(Value::Bytes(v)) => v,
-                    Some(Value::String(s)) => s.into_bytes(),
-                    Some(Value::Addr(a)) => a.to_le_bytes().to_vec(),
-                    Some(Value::Unit) | None => vec![],
-                };
+                let return_data = exec
+                    .value
+                    .as_ref()
+                    .map(Value::return_bytes)
+                    .unwrap_or_default();
                 // A write a rolled-back window abandoned is already gone from the journal, so
                 // this is exactly the state change the execution made.
                 let storage_writes = vm
