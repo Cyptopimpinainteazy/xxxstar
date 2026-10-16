@@ -199,3 +199,25 @@ fn context_opcodes_read_what_the_host_supplied_and_refuse_what_it_did_not() {
     assert!(!receipt.success);
     assert!(String::from_utf8_lossy(&receipt.return_data).contains("ContextUnavailable"));
 }
+
+#[test]
+fn arrays_and_tuples_run_on_chain_and_return_self_describing_bytes() {
+    // r1 = []; push 4; push 5; r2 = len(r1); return (r2, r1[1])
+    let program = bytes(vec![
+        0x70, 0x01, 0x02, 0x00, // NewArray r1 cap 2
+        0x18, 0x02, 0x04, 0x72, 0x01, 0x02, // LoadImm r2 4; ArrayPush r1 r2
+        0x18, 0x02, 0x05, 0x72, 0x01, 0x02, // LoadImm r2 5; ArrayPush r1 r2
+        0x71, 0x03, 0x01, // ArrayLen r3 r1
+        0x18, 0x04, 0x01, 0x14, 0x05, 0x01, 0x04, // LoadImm r4 1; LoadIndex r5 r1 r4
+        0x74, 0x06, 0x02, 0x00, 0x03, 0x05, // NewTuple r6 (r3, r5)
+        0x05, 0x06, // Ret r6
+    ]);
+    let receipt = X3Executor::execute_on_chain(&program, GAS, &[], false).expect("admitted");
+    assert!(
+        receipt.success,
+        "{}",
+        String::from_utf8_lossy(&receipt.return_data)
+    );
+    let expected = x3_vm::Value::Tuple(vec![x3_vm::Value::I64(2), x3_vm::Value::I64(5)]);
+    assert_eq!(receipt.return_data, expected.return_bytes());
+}

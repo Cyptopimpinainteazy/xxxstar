@@ -247,9 +247,11 @@ impl Verifier {
     /// | 3B   | `[op][id:u16]` | 3 | AtomicBegin/Commit/Rollback |
     /// | 3B   | `[op][reg:u8][i8]` | 1 | LoadImm |
     /// | 3B   | `[op][dst:u8][src:u8]` | 18 | Mov, NegI, Inc, conversions, ArrayLen |
-    /// | 3B   | `[op][dst:u8][cap:u8]` | 1 | NewArray |
     /// | 3B   | `[op][r:u8][r:u8]` | 6 | EvmSload, EvmSstore, EvmBalance, SvmGetData... |
-    /// | 4B   | `[op][dst:u8][a:u8][b:u8]` | 28 | AddI, EqI, LoadField, TupleGet, SvmTransfer... |
+    /// | 4B   | `[op][dst:u8][a:u8][b:u8]` | 26 | AddI, EqI, LoadIndex, SvmTransfer... |
+    /// | 4B   | `[op][dst:u8][cap:u16]` | 1 | NewArray |
+    /// | 5B   | `[op][dst:u8][obj:u8][idx:u16]` | 2 | LoadField, TupleGet |
+    /// | 5B   | `[op][obj:u8][field:u16][val:u8]` | 1 | StoreField |
     /// | 5B   | `[op][target:u32]` | 1 | Jump |
     /// | 5B   | `[op][idx:u32]` | 1 | Panic |
     /// | 5B   | `[op][dst:u8][4×reg:u8]` | 5 | EvmStaticCall, SvmInvoke, SvmCreateAccount |
@@ -426,19 +428,22 @@ impl Verifier {
             }
 
             // Load field: opcode dst:u8 obj:u8 field:u8 (4 bytes)
+            // Field indices are u16, as `BytecodeEmitter::emit_load_field` writes them. This
+            // decoded a u8 and a 4-byte instruction, so every compiled field access put the
+            // decoder one byte out of step with the code that followed it.
             Opcode::LoadField => {
                 let dst = read_u8(1)? as u64;
                 let obj = read_u8(2)? as u64;
-                let field = read_u8(3)? as u64;
-                Ok((4, vec![dst, obj, field]))
+                let field = read_u16(3)? as u64;
+                Ok((5, vec![dst, obj, field]))
             }
 
             // Store field: opcode obj:u8 field:u8 val:u8 (4 bytes)
             Opcode::StoreField => {
                 let obj = read_u8(1)? as u64;
-                let field = read_u8(2)? as u64;
-                let val = read_u8(3)? as u64;
-                Ok((4, vec![obj, field, val]))
+                let field = read_u16(2)? as u64;
+                let val = read_u8(4)? as u64;
+                Ok((5, vec![obj, field, val]))
             }
 
             // Load immediate: opcode dst:u8 val:i8 (3 bytes)
@@ -455,19 +460,19 @@ impl Verifier {
                 Ok((3, vec![arr, val]))
             }
 
-            // New array: opcode dst:u8 capacity:u8 (3 bytes)
+            // New array: opcode dst:u8 capacity:u16 (4 bytes), as `emit_new_array` writes it.
             Opcode::NewArray => {
                 let dst = read_u8(1)? as u64;
-                let capacity = read_u8(2)? as u64;
-                Ok((3, vec![dst, capacity]))
+                let capacity = read_u16(2)? as u64;
+                Ok((4, vec![dst, capacity]))
             }
 
-            // Tuple get: opcode dst:u8 tuple:u8 idx:u8 (4 bytes)
+            // Tuple get: opcode dst:u8 tuple:u8 idx:u16 (5 bytes), as `emit_tuple_get` writes it.
             Opcode::TupleGet => {
                 let dst = read_u8(1)? as u64;
                 let tuple = read_u8(2)? as u64;
-                let idx = read_u8(3)? as u64;
-                Ok((4, vec![dst, tuple, idx]))
+                let idx = read_u16(3)? as u64;
+                Ok((5, vec![dst, tuple, idx]))
             }
 
             // Atomic operations: opcode id:u16 (3 bytes)
@@ -1507,6 +1512,32 @@ mod tests {
         );
         Verifier::verify_module(&module, &VerifyOptions::default())
             .expect("off chain a tool may call it with arguments");
+    }
+
+    #[test]
+    fn the_verifier_decodes_aggregate_instructions_exactly_as_the_emitter_writes_them() {
+        use x3_backend::opcode::Register as R;
+        let mut emitter = x3_backend::BytecodeEmitter::new();
+        emitter.emit_new_array(R(1), 300);
+        emitter.emit_new_tuple(R(2), &[R(1), R(1)]);
+        emitter.emit_load_field(R(3), R(2), 1);
+        emitter.emit_store_field(R(2), 0, R(3));
+        emitter.emit_tuple_get(R(4), R(2), 1);
+        let code = emitter.code().to_vec();
+        let instrs = Verifier::decode_all_instructions(&code).expect("decodes");
+        let lens: Vec<usize> = instrs.iter().map(|i| i.size).collect();
+        assert_eq!(
+            lens,
+            vec![4, 6, 5, 5, 5],
+            "each instruction's length is the emitter's"
+        );
+        assert_eq!(
+            lens.iter().sum::<usize>(),
+            code.len(),
+            "no byte left over or skipped"
+        );
+        // And the u16 operands are read whole.
+        assert_eq!(instrs[0].operands[1], 300);
     }
 
     #[test]

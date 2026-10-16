@@ -52,17 +52,10 @@ fn module_with(instruction: &[u8]) -> Vec<u8> {
 /// Opcodes the compiler can emit and neither interpreter implements, with one reasoning note each.
 /// Kept as a table so a divergence shows up as a changed refusal rather than as a silent success.
 fn agreed_refusals() -> Vec<(u8, &'static str)> {
+    // The aggregates (`load_index` .. `store_field`, `new_array` .. `tuple_get`) left this table
+    // when `x3-vm`, the chain's engine, implemented them. `mini_x3`, retired from every chain path,
+    // still refuses them; `x3-vm`'s own tests and `tests/chain_engine.rs` hold the implementation.
     let mut table: Vec<(u8, &'static str)> = vec![
-        (0x14, "load_index"),
-        (0x15, "store_index"),
-        (0x16, "load_field"),
-        (0x17, "store_field"),
-        (0x70, "new_array"),
-        (0x71, "array_len"),
-        (0x72, "array_push"),
-        (0x73, "array_pop"),
-        (0x74, "new_tuple"),
-        (0x75, "tuple_get"),
         // The context reads below are implemented by `x3-vm` now, and still refused here because
         // `VM::from_bytes` is given no context: with nothing supplied, neither engine answers.
         (0x80, "ctx_sender"),

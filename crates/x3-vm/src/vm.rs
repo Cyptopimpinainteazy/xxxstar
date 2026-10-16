@@ -109,6 +109,18 @@ pub const fn engine_executes(opcode: Opcode) -> bool {
         | Opcode::AtomicCommit
         | Opcode::AtomicRollback
         | Opcode::AtomicCheck
+        | Opcode::LoadIndex
+        | Opcode::StoreIndex
+        | Opcode::LoadField
+        | Opcode::StoreField
+        | Opcode::NewArray
+        | Opcode::ArrayLen
+        | Opcode::ArrayPush
+        | Opcode::ArrayPop
+        | Opcode::NewTuple
+        | Opcode::TupleGet
+        | Opcode::Inc
+        | Opcode::Dec
         | Opcode::CtxSender
         | Opcode::CtxBlockHeight
         | Opcode::CtxTimestamp
@@ -130,21 +142,8 @@ pub const fn engine_executes(opcode: Opcode) -> bool {
         | Opcode::Assert
         | Opcode::Panic => true,
 
-        // Aggregates: no value model for arrays, tuples or structs yet.
-        Opcode::LoadIndex
-        | Opcode::StoreIndex
-        | Opcode::LoadField
-        | Opcode::StoreField
-        | Opcode::NewArray
-        | Opcode::ArrayLen
-        | Opcode::ArrayPush
-        | Opcode::ArrayPop
-        | Opcode::NewTuple
-        | Opcode::TupleGet
-        | Opcode::Inc
-        | Opcode::Dec
         // Conversions: the value model has only i64 and f64 (TICKET-149).
-        | Opcode::I32ToI64
+        Opcode::I32ToI64
         | Opcode::I64ToI32
         | Opcode::I32ToF32
         | Opcode::I64ToF64
@@ -234,12 +233,85 @@ pub enum Value {
     Bytes(Vec<u8>),
     /// Address/pointer.
     Addr(u64),
+    /// Array: an ordered, growable list (`new_array`, `array_push`, `load_index`, ...).
+    Array(Vec<Value>),
+    /// Tuple: a fixed list (`new_tuple`, `tuple_get`). A struct is held as the tuple of its
+    /// fields, addressed by field index (`load_field`, `store_field`).
+    Tuple(Vec<Value>),
     /// Unit (void/null).
     #[default]
     Unit,
 }
 
+/// Most values one aggregate may hold, counting nested elements and the aggregate itself.
+///
+/// Registers, atomic snapshots and `mov` all copy whole values, so an unbounded aggregate is a
+/// memory amplification: `a = [a, a]` doubles in two pushes. The cap bounds what any one register
+/// can hold, and so what a snapshot of 256 registers can cost.
+pub const MAX_AGGREGATE_SIZE: usize = 256;
+
 impl Value {
+    /// How many values this one holds, itself included: 1 for a scalar, 1 plus each element's size
+    /// for an aggregate.
+    pub fn size(&self) -> usize {
+        match self {
+            Value::Array(items) | Value::Tuple(items) => {
+                1 + items.iter().map(Value::size).sum::<usize>()
+            }
+            _ => 1,
+        }
+    }
+
+    /// The bytes a receipt carries for this value when an execution returns it.
+    ///
+    /// A scalar is its own little-endian bytes (an integer, a float's bits, a bool's byte, a byte
+    /// string or a string's UTF-8), unchanged from before aggregates existed. An aggregate is
+    /// self-describing so a reader can walk it without knowing its type: `[ARRAY|TUPLE tag]`,
+    /// a `u16` element count, then each element as `[tag][u32 length][its return bytes]`.
+    pub fn return_bytes(&self) -> Vec<u8> {
+        match self {
+            Value::I64(v) => v.to_le_bytes().to_vec(),
+            Value::F64(v) => v.to_bits().to_le_bytes().to_vec(),
+            Value::Bool(v) => vec![u8::from(*v)],
+            Value::Bytes(v) => v.clone(),
+            Value::String(s) => s.as_bytes().to_vec(),
+            Value::Addr(a) => a.to_le_bytes().to_vec(),
+            Value::Unit => Vec::new(),
+            Value::Array(items) | Value::Tuple(items) => {
+                let kind = if matches!(self, Value::Array(_)) {
+                    x3_common::value_tags::ARRAY
+                } else {
+                    x3_common::value_tags::TUPLE
+                };
+                // `MAX_AGGREGATE_SIZE` keeps the count far below `u16::MAX`.
+                let mut out = vec![kind];
+                out.extend_from_slice(&(items.len() as u16).to_le_bytes());
+                for item in items {
+                    let body = item.return_bytes();
+                    out.push(item.kind_tag());
+                    out.extend_from_slice(&(body.len() as u32).to_le_bytes());
+                    out.extend_from_slice(&body);
+                }
+                out
+            }
+        }
+    }
+
+    fn kind_tag(&self) -> u8 {
+        use x3_common::value_tags as tag;
+        match self {
+            Value::I64(_) => tag::INT,
+            Value::Bool(_) => tag::BOOL,
+            Value::F64(_) => tag::F64,
+            Value::Addr(_) => tag::ADDR,
+            Value::Bytes(_) => tag::BYTES,
+            Value::String(_) => tag::STRING,
+            Value::Array(_) => tag::ARRAY,
+            Value::Tuple(_) => tag::TUPLE,
+            Value::Unit => tag::UNIT,
+        }
+    }
+
     /// Convert constant value to runtime value.
     pub fn from_const(c: &ConstValue) -> Self {
         match c {
@@ -1375,6 +1447,174 @@ impl VM {
             }
 
             // ================================================================
+            // Aggregates: arrays, tuples, and structs held as tuples of fields.
+            //
+            // Operand layouts are the emitter's (`x3-backend/src/emit.rs`): field, capacity and
+            // tuple indices are u16. Every write that can grow a value is checked against
+            // `MAX_AGGREGATE_SIZE` before it lands.
+            // ================================================================
+            Opcode::Inc | Opcode::Dec => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let src = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let v = self.regs[src].as_i64()?;
+                // Wrapping, like `AddI`/`SubI`.
+                self.regs[dst] = Value::I64(if opcode == Opcode::Inc {
+                    v.wrapping_add(1)
+                } else {
+                    v.wrapping_sub(1)
+                });
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::NewArray => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let capacity = self.read_u16(ip + 2)? as usize;
+                // The capacity is a hint; the size cap, not it, bounds what the array can hold.
+                self.regs[dst] = Value::Array(Vec::with_capacity(capacity.min(MAX_AGGREGATE_SIZE)));
+                Ok(StepResult::Continue(ip + 4))
+            }
+
+            Opcode::ArrayLen => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let len = match &self.regs[arr] {
+                    Value::Array(items) | Value::Tuple(items) => items.len(),
+                    Value::Bytes(bytes) => bytes.len(),
+                    Value::String(text) => text.len(),
+                    other => return Err(self.type_mismatch(ip, "array", other)),
+                };
+                self.regs[dst] = Value::I64(len as i64);
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::ArrayPush => {
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let val = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let item = self.regs[val].clone();
+                let grown = self.regs[arr].size() + item.size();
+                self.check_aggregate_size(ip, grown)?;
+                match &mut self.regs[arr] {
+                    Value::Array(items) => items.push(item),
+                    other => {
+                        let other = other.clone();
+                        return Err(self.type_mismatch(ip, "array", &other));
+                    }
+                }
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::ArrayPop => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let popped = match &mut self.regs[arr] {
+                    Value::Array(items) => items.pop(),
+                    other => {
+                        let other = other.clone();
+                        return Err(self.type_mismatch(ip, "array", &other));
+                    }
+                };
+                let item = popped.ok_or_else(|| self.error_at(ip, VMErrorKind::EmptyArray))?;
+                self.regs[dst] = item;
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::LoadIndex => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let idx = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
+                let index = self.regs[idx].as_i64()?;
+                let item = match &self.regs[arr] {
+                    Value::Array(items) | Value::Tuple(items) => {
+                        let at = self.checked_index(ip, index, items.len())?;
+                        items[at].clone()
+                    }
+                    Value::Bytes(bytes) => {
+                        let at = self.checked_index(ip, index, bytes.len())?;
+                        Value::I64(i64::from(bytes[at]))
+                    }
+                    other => return Err(self.type_mismatch(ip, "array", other)),
+                };
+                self.regs[dst] = item;
+                Ok(StepResult::Continue(ip + 4))
+            }
+
+            Opcode::StoreIndex => {
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let idx = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let val = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
+                let index = self.regs[idx].as_i64()?;
+                let item = self.regs[val].clone();
+                let (at, replaced_size) = match &self.regs[arr] {
+                    Value::Array(items) => {
+                        let at = self.checked_index(ip, index, items.len())?;
+                        (at, items[at].size())
+                    }
+                    // A tuple's shape is fixed by its constructor; its elements change through
+                    // `store_field`, which names them by position at compile time.
+                    other => return Err(self.type_mismatch(ip, "array", other)),
+                };
+                let grown = self.regs[arr].size() - replaced_size + item.size();
+                self.check_aggregate_size(ip, grown)?;
+                if let Value::Array(items) = &mut self.regs[arr] {
+                    items[at] = item;
+                }
+                Ok(StepResult::Continue(ip + 4))
+            }
+
+            Opcode::NewTuple => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let count = self.read_u16(ip + 2)? as usize;
+                let mut items = Vec::with_capacity(count.min(MAX_AGGREGATE_SIZE));
+                let mut size = 1usize;
+                for i in 0..count {
+                    let reg = self.resolve_reg_checked(self.read_u8(ip + 4 + i)? as usize, ip)?;
+                    size += self.regs[reg].size();
+                    self.check_aggregate_size(ip, size)?;
+                    items.push(self.regs[reg].clone());
+                }
+                self.regs[dst] = Value::Tuple(items);
+                Ok(StepResult::Continue(ip + 4 + count))
+            }
+
+            Opcode::TupleGet | Opcode::LoadField => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let obj = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let field = self.read_u16(ip + 3)?;
+                let item = match &self.regs[obj] {
+                    Value::Tuple(items) => items.get(field as usize).cloned().ok_or_else(|| {
+                        self.error_at(ip, VMErrorKind::TupleIndexOutOfBounds(field, items.len()))
+                    })?,
+                    other => return Err(self.type_mismatch(ip, "tuple", other)),
+                };
+                self.regs[dst] = item;
+                Ok(StepResult::Continue(ip + 5))
+            }
+
+            Opcode::StoreField => {
+                let obj = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let field = self.read_u16(ip + 2)?;
+                let val = self.resolve_reg_checked(self.read_u8(ip + 4)? as usize, ip)?;
+                let item = self.regs[val].clone();
+                let replaced_size = match &self.regs[obj] {
+                    Value::Tuple(items) => {
+                        items.get(field as usize).map(Value::size).ok_or_else(|| {
+                            self.error_at(
+                                ip,
+                                VMErrorKind::TupleIndexOutOfBounds(field, items.len()),
+                            )
+                        })?
+                    }
+                    other => return Err(self.type_mismatch(ip, "tuple", other)),
+                };
+                let grown = self.regs[obj].size() - replaced_size + item.size();
+                self.check_aggregate_size(ip, grown)?;
+                if let Value::Tuple(items) = &mut self.regs[obj] {
+                    items[field as usize] = item;
+                }
+                Ok(StepResult::Continue(ip + 5))
+            }
+
+            // ================================================================
             // Block context (see `context.rs`): a field the host did not supply is refused,
             // never answered with a default.
             // ================================================================
@@ -1808,6 +2048,28 @@ impl VM {
         VMError::at_ip(ip, kind)
     }
 
+    fn type_mismatch(&self, ip: usize, expected: &str, found: &Value) -> VMError {
+        self.error_at(
+            ip,
+            VMErrorKind::TypeMismatch(expected.to_string(), format!("{found:?}")),
+        )
+    }
+
+    /// `index` as a position in a sequence of `len`, refused when negative or past the end.
+    fn checked_index(&self, ip: usize, index: i64, len: usize) -> VMResult<usize> {
+        usize::try_from(index)
+            .ok()
+            .filter(|at| *at < len)
+            .ok_or_else(|| self.error_at(ip, VMErrorKind::ArrayIndexOutOfBounds(index, len)))
+    }
+
+    fn check_aggregate_size(&self, ip: usize, size: usize) -> VMResult<()> {
+        if size > MAX_AGGREGATE_SIZE {
+            return Err(self.error_at(ip, VMErrorKind::AggregateTooLarge(size, MAX_AGGREGATE_SIZE)));
+        }
+        Ok(())
+    }
+
     /// A context figure as the engine's integer, refused rather than wrapped when it does not fit.
     fn context_i64(&self, ip: usize, figure: u128) -> VMResult<i64> {
         i64::try_from(figure).map_err(|_| self.error_at(ip, VMErrorKind::IntegerOverflow))
@@ -1829,7 +2091,16 @@ impl VM {
             Opcode::And | Opcode::Or | Opcode::Xor | Opcode::Not => 1,
             Opcode::Shl | Opcode::Shr | Opcode::UShr => 1,
             Opcode::AtomicBegin | Opcode::AtomicCommit => 5,
-            // Same figure as the verifier's table.
+            // Same figures as the verifier's table.
+            Opcode::Inc | Opcode::Dec | Opcode::ArrayLen => 2,
+            Opcode::LoadIndex
+            | Opcode::StoreIndex
+            | Opcode::LoadField
+            | Opcode::StoreField
+            | Opcode::ArrayPush
+            | Opcode::ArrayPop => 5,
+            Opcode::TupleGet => 3,
+            Opcode::NewArray | Opcode::NewTuple => 10,
             Opcode::CtxSender
             | Opcode::CtxBlockHeight
             | Opcode::CtxTimestamp
@@ -1933,6 +2204,11 @@ fn tagged_value(value: &Value) -> Result<(u8, Vec<u8>), String> {
         // Deleting a slot is not spelled this way, and an event argument that is Unit is a value
         // the program never computed.
         Value::Unit => return Err("unit is not a storable value".to_string()),
+        // A slot is 32 bytes and an event argument is one tagged scalar; an aggregate is neither,
+        // and flattening it would store something the program did not write.
+        Value::Array(_) | Value::Tuple(_) => {
+            return Err("an array or tuple is not a storable value".to_string())
+        }
     };
     if data.len() > u8::MAX as usize {
         return Err(format!(
@@ -2036,7 +2312,9 @@ fn value_to_storage_value(value: &Value) -> Option<[u8; 32]> {
             out[..len].copy_from_slice(&bytes[..len]);
         }
         Value::Addr(value) => out[..8].copy_from_slice(&value.to_le_bytes()),
-        Value::Unit => return None,
+        // An aggregate has no 32-byte form, so a global holding one is not mirrored to storage,
+        // as with Unit; the global itself still holds the whole value.
+        Value::Unit | Value::Array(_) | Value::Tuple(_) => return None,
     }
     Some(out)
 }
@@ -3177,5 +3455,253 @@ mod tests {
         let code = vec![Opcode::CtxValue as u8, 1, Opcode::Ret as u8, 1];
         let err = run_with_context(code, Some(context)).expect_err("does not fit an i64");
         assert!(matches!(err.kind, VMErrorKind::IntegerOverflow), "{err:?}");
+    }
+
+    // ------------------------------------------------------------------------
+    // Aggregates
+    // ------------------------------------------------------------------------
+
+    fn run_code(code: Vec<u8>) -> VMResult<ExecutionResult> {
+        let mut vm = VM::from_bytes(&storage_module(code, 0, 16)).expect("loads");
+        vm.call_function(0, &[])
+    }
+
+    fn op(o: Opcode) -> u8 {
+        o as u8
+    }
+
+    #[test]
+    fn an_array_is_built_indexed_written_measured_and_popped() {
+        let code = vec![
+            op(Opcode::NewArray),
+            1,
+            4,
+            0, // r1 = []
+            op(Opcode::LoadImm),
+            2,
+            10,
+            op(Opcode::ArrayPush),
+            1,
+            2, // push 10
+            op(Opcode::LoadImm),
+            2,
+            20,
+            op(Opcode::ArrayPush),
+            1,
+            2, // push 20
+            op(Opcode::LoadImm),
+            2,
+            30,
+            op(Opcode::ArrayPush),
+            1,
+            2, // push 30
+            op(Opcode::LoadImm),
+            3,
+            1,
+            op(Opcode::LoadImm),
+            4,
+            99, //
+            op(Opcode::StoreIndex),
+            1,
+            3,
+            4, // r1[1] = 99
+            op(Opcode::ArrayPop),
+            5,
+            1, // r5 = pop() = 30
+            op(Opcode::ArrayLen),
+            6,
+            1, // r6 = 2
+            op(Opcode::LoadIndex),
+            7,
+            1,
+            3, // r7 = r1[1] = 99
+            op(Opcode::NewTuple),
+            8,
+            3,
+            0,
+            5,
+            6,
+            7, // r8 = (30, 2, 99)
+            op(Opcode::Ret),
+            8,
+        ];
+        let result = run_code(code).expect("runs");
+        assert_eq!(
+            result.value,
+            Some(Value::Tuple(vec![
+                Value::I64(30),
+                Value::I64(2),
+                Value::I64(99)
+            ]))
+        );
+    }
+
+    #[test]
+    fn a_struct_is_a_tuple_whose_fields_are_read_and_written_by_index() {
+        let code = vec![
+            op(Opcode::LoadImm),
+            1,
+            7,
+            op(Opcode::LoadTrue),
+            2, //
+            op(Opcode::NewTuple),
+            3,
+            2,
+            0,
+            1,
+            2, // r3 = (7, true)
+            op(Opcode::LoadImm),
+            4,
+            8, //
+            op(Opcode::StoreField),
+            3,
+            0,
+            0,
+            4, // r3.0 = 8
+            op(Opcode::LoadField),
+            5,
+            3,
+            0,
+            0, // r5 = r3.0
+            op(Opcode::TupleGet),
+            6,
+            3,
+            1,
+            0, // r6 = r3.1
+            op(Opcode::Inc),
+            5,
+            5, // r5 = 9
+            op(Opcode::NewTuple),
+            7,
+            2,
+            0,
+            5,
+            6, //
+            op(Opcode::Ret),
+            7,
+        ];
+        let result = run_code(code).expect("runs");
+        assert_eq!(
+            result.value,
+            Some(Value::Tuple(vec![Value::I64(9), Value::Bool(true)]))
+        );
+    }
+
+    #[test]
+    fn indexing_past_the_end_or_below_zero_is_refused() {
+        for index in [3i8, -1] {
+            let code = vec![
+                op(Opcode::NewArray),
+                1,
+                0,
+                0, //
+                op(Opcode::LoadImm),
+                2,
+                5,
+                op(Opcode::ArrayPush),
+                1,
+                2, //
+                op(Opcode::LoadImm),
+                3,
+                index as u8, //
+                op(Opcode::LoadIndex),
+                4,
+                1,
+                3, //
+                op(Opcode::Ret),
+                4,
+            ];
+            let err = run_code(code).expect_err("out of bounds");
+            assert!(
+                matches!(err.kind, VMErrorKind::ArrayIndexOutOfBounds(i, 1) if i == index as i64),
+                "{err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn popping_an_empty_array_is_refused() {
+        let code = vec![
+            op(Opcode::NewArray),
+            1,
+            0,
+            0,
+            op(Opcode::ArrayPop),
+            2,
+            1,
+            op(Opcode::Ret),
+            2,
+        ];
+        let err = run_code(code).expect_err("nothing to pop");
+        assert!(matches!(err.kind, VMErrorKind::EmptyArray), "{err:?}");
+    }
+
+    #[test]
+    fn a_self_doubling_array_hits_the_size_cap_instead_of_exhausting_memory() {
+        // r1 = [0]; loop { push r1 into a copy of itself } — size doubles each round.
+        let mut code = vec![
+            op(Opcode::NewArray),
+            1,
+            0,
+            0, //
+            op(Opcode::LoadImm),
+            2,
+            0,
+            op(Opcode::ArrayPush),
+            1,
+            2, //
+        ];
+        for _ in 0..12 {
+            code.extend_from_slice(&[op(Opcode::Mov), 3, 1, op(Opcode::ArrayPush), 1, 3]);
+        }
+        code.extend_from_slice(&[op(Opcode::RetVoid)]);
+        let err = run_code(code).expect_err("2^12 values would exceed the cap");
+        assert!(
+            matches!(
+                err.kind,
+                VMErrorKind::AggregateTooLarge(_, MAX_AGGREGATE_SIZE)
+            ),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn an_aggregate_cannot_be_stored_in_a_slot() {
+        let code = vec![
+            op(Opcode::NewArray),
+            1,
+            0,
+            0, //
+            op(Opcode::LoadImm),
+            2,
+            0, //
+            op(Opcode::EvmSstore),
+            2,
+            1, //
+            op(Opcode::RetVoid),
+        ];
+        let err = run_code(code).expect_err("a slot holds a scalar");
+        assert!(
+            matches!(err.kind, VMErrorKind::UnencodableStorageValue(_)),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn a_returned_aggregate_is_self_describing() {
+        let value = Value::Tuple(vec![Value::I64(1), Value::Array(vec![Value::Bool(true)])]);
+        let bytes = value.return_bytes();
+        // [TUPLE][count=2]
+        assert_eq!(&bytes[..3], &[x3_common::value_tags::TUPLE, 2, 0]);
+        // element 0: [INT][len=8][1i64]
+        assert_eq!(bytes[3], x3_common::value_tags::INT);
+        assert_eq!(&bytes[4..8], &8u32.to_le_bytes());
+        assert_eq!(&bytes[8..16], &1i64.to_le_bytes());
+        // element 1: [ARRAY][len][ARRAY][count=1][BOOL][len=1][1]
+        assert_eq!(bytes[16], x3_common::value_tags::ARRAY);
+        assert_eq!(&bytes[21..24], &[x3_common::value_tags::ARRAY, 1, 0]);
+        assert_eq!(&bytes[24..], &[x3_common::value_tags::BOOL, 1, 0, 0, 0, 1]);
+        // A scalar's bytes are unchanged from before aggregates existed.
+        assert_eq!(Value::I64(5).return_bytes(), 5i64.to_le_bytes().to_vec());
     }
 }

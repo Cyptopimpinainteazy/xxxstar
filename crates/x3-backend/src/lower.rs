@@ -419,11 +419,16 @@ impl BytecodeCompiler {
                 field,
                 field_ty,
             } => {
-                let obj_reg = self.compile_expr(hir, object)?;
-                let val_reg = self.compile_expr(hir, value)?;
-                // Field index resolution requires type layout from type checker
-                let field_idx = 0u16; // Placeholder
-                self.emitter.emit_store_field(obj_reg, field_idx, val_reg);
+                // The HIR names the field but carries no struct layout, so its index is unknown
+                // here. This emitted index 0 for every field — a write to the wrong field that
+                // compiled cleanly — and now the VM executes `store_field`, that would be real.
+                return Err(BackendError::new(
+                    BackendErrorKind::NotImplemented(format!(
+                        "assignment to field `{field:?}`: the HIR-direct backend has no struct \
+                         layout to resolve its index"
+                    )),
+                    value.span,
+                ));
             }
 
             AssignTarget::Index {
@@ -517,10 +522,14 @@ impl BytecodeCompiler {
             }
 
             HirExprKind::Field { object, field } => {
-                let obj_reg = self.compile_expr(hir, object)?;
-                // Field index resolution requires struct layout from type checker
-                let field_idx = 0u16;
-                self.emitter.emit_load_field(dst, obj_reg, field_idx);
+                // Same reason as the field assignment above: no layout, so no honest index.
+                return Err(BackendError::new(
+                    BackendErrorKind::NotImplemented(format!(
+                        "read of field `{field:?}`: the HIR-direct backend has no struct layout \
+                         to resolve its index"
+                    )),
+                    expr.span,
+                ));
             }
 
             HirExprKind::Index { array, index } => {
