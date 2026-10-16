@@ -30,6 +30,7 @@ use crate::prelude::*;
 use x3_backend::bc_format::{BytecodeModule, ConstValue};
 use x3_backend::opcode::Opcode;
 
+use crate::context::BlockContext;
 use crate::error::{VMError, VMErrorKind, VMResult};
 use crate::events::{EventBuffer, VmEvent};
 use crate::hostcall::HostcallRegistry;
@@ -108,6 +109,11 @@ pub const fn engine_executes(opcode: Opcode) -> bool {
         | Opcode::AtomicCommit
         | Opcode::AtomicRollback
         | Opcode::AtomicCheck
+        | Opcode::CtxSender
+        | Opcode::CtxBlockHeight
+        | Opcode::CtxTimestamp
+        | Opcode::CtxValue
+        | Opcode::CtxChainId
         | Opcode::Emit
         | Opcode::EvmSload
         | Opcode::EvmSstore
@@ -147,13 +153,9 @@ pub const fn engine_executes(opcode: Opcode) -> bool {
         | Opcode::F32ToF64
         | Opcode::F64ToF32
         | Opcode::ToBool
-        // Context: needs the block context the kernel has not handed the engine yet.
-        | Opcode::CtxSender
-        | Opcode::CtxBlockHeight
-        | Opcode::CtxTimestamp
-        | Opcode::CtxValue
+        // `ctx_gas` answers with the engine's remaining gas, so a program branching on it would
+        // change behaviour whenever a runtime upgrade reprices an opcode (TICKET-149).
         | Opcode::CtxGas
-        | Opcode::CtxChainId
         // Agents: no agent registry.
         | Opcode::AgentSelf
         | Opcode::AgentInit
@@ -333,6 +335,8 @@ pub struct VM {
     gas_used: u64,
     /// Atomic nesting depth.
     atomic_depth: usize,
+    /// What the host told the engine about this execution (see `context.rs`).
+    context: BlockContext,
     /// Snapshot stack for atomic windows (regs, globals)
     atomic_snapshots: Vec<(Vec<Value>, Vec<Value>)>,
     /// Global storage (module.globals length)
@@ -411,6 +415,7 @@ impl VM {
             config,
             gas_used: 0,
             atomic_depth: 0,
+            context: BlockContext::unknown(),
             atomic_snapshots: Vec::new(),
             globals,
             hostcalls: HostcallRegistry::with_standard(),
@@ -457,6 +462,19 @@ impl VM {
             let _ = self.state_machine.reset();
         }
         events
+    }
+
+    /// Tell the engine what the host knows about this execution.
+    ///
+    /// Without a call to this every context opcode refuses with `ContextUnavailable`, and so does
+    /// one whose field is `None` here.
+    pub fn set_context(&mut self, context: BlockContext) {
+        self.context = context;
+    }
+
+    /// The context the engine is executing with.
+    pub fn context(&self) -> &BlockContext {
+        &self.context
     }
 
     /// Drain storage writes for cross-VM delta sync.
@@ -1356,6 +1374,57 @@ impl VM {
                 Ok(StepResult::Continue(ip + 3)) // opcode + id:u16
             }
 
+            // ================================================================
+            // Block context (see `context.rs`): a field the host did not supply is refused,
+            // never answered with a default.
+            // ================================================================
+            Opcode::CtxSender => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let sender = self
+                    .context
+                    .sender
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::ContextUnavailable("sender")))?;
+                self.regs[dst] = Value::Bytes(sender.to_vec());
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::CtxBlockHeight => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let height = self.context.block_height.ok_or_else(|| {
+                    self.error_at(ip, VMErrorKind::ContextUnavailable("block height"))
+                })?;
+                self.regs[dst] = Value::I64(self.context_i64(ip, height as u128)?);
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::CtxTimestamp => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let millis = self.context.timestamp_ms.ok_or_else(|| {
+                    self.error_at(ip, VMErrorKind::ContextUnavailable("timestamp"))
+                })?;
+                self.regs[dst] = Value::I64(self.context_i64(ip, millis as u128)?);
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::CtxValue => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let value = self
+                    .context
+                    .value
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::ContextUnavailable("value")))?;
+                self.regs[dst] = Value::I64(self.context_i64(ip, value)?);
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::CtxChainId => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let chain = self.context.chain_id.ok_or_else(|| {
+                    self.error_at(ip, VMErrorKind::ContextUnavailable("chain id"))
+                })?;
+                self.regs[dst] = Value::I64(self.context_i64(ip, chain as u128)?);
+                Ok(StepResult::Continue(ip + 2))
+            }
+
             Opcode::AtomicCheck => {
                 // `atomic_check dst`: whether an atomic window is open at this instruction.
                 let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
@@ -1739,6 +1808,11 @@ impl VM {
         VMError::at_ip(ip, kind)
     }
 
+    /// A context figure as the engine's integer, refused rather than wrapped when it does not fit.
+    fn context_i64(&self, ip: usize, figure: u128) -> VMResult<i64> {
+        i64::try_from(figure).map_err(|_| self.error_at(ip, VMErrorKind::IntegerOverflow))
+    }
+
     fn opcode_gas_cost(&self, opcode: Opcode) -> u64 {
         match opcode {
             Opcode::Nop => 1,
@@ -1755,6 +1829,12 @@ impl VM {
             Opcode::And | Opcode::Or | Opcode::Xor | Opcode::Not => 1,
             Opcode::Shl | Opcode::Shr | Opcode::UShr => 1,
             Opcode::AtomicBegin | Opcode::AtomicCommit => 5,
+            // Same figure as the verifier's table.
+            Opcode::CtxSender
+            | Opcode::CtxBlockHeight
+            | Opcode::CtxTimestamp
+            | Opcode::CtxValue
+            | Opcode::CtxChainId => 5,
             Opcode::AtomicRollback => 10,
             // Same figures as the verifier's table (`verifier::opcode_gas_cost`), so
             // the bound a module is verified against is the bound it is charged.
@@ -3016,5 +3096,86 @@ mod tests {
             vm.call_function(0, &[]).unwrap().value,
             Some(Value::F64(1.5))
         );
+    }
+
+    // ------------------------------------------------------------------------
+    // Block context
+    // ------------------------------------------------------------------------
+
+    fn run_with_context(code: Vec<u8>, context: Option<BlockContext>) -> VMResult<ExecutionResult> {
+        let mut vm = VM::from_bytes(&storage_module(code, 0, 16)).expect("loads");
+        if let Some(context) = context {
+            vm.set_context(context);
+        }
+        vm.call_function(0, &[])
+    }
+
+    fn full_context() -> BlockContext {
+        BlockContext {
+            sender: Some([7u8; 32]),
+            block_height: Some(1_234),
+            timestamp_ms: Some(1_760_000_000_000),
+            value: Some(0),
+            chain_id: Some(650_000),
+        }
+    }
+
+    #[test]
+    fn each_context_opcode_reads_its_own_field() {
+        let cases: [(Opcode, Value); 5] = [
+            (Opcode::CtxSender, Value::Bytes(vec![7u8; 32])),
+            (Opcode::CtxBlockHeight, Value::I64(1_234)),
+            (Opcode::CtxTimestamp, Value::I64(1_760_000_000_000)),
+            (Opcode::CtxValue, Value::I64(0)),
+            (Opcode::CtxChainId, Value::I64(650_000)),
+        ];
+        for (opcode, expected) in cases {
+            let code = vec![opcode as u8, 1, Opcode::Ret as u8, 1];
+            let result = run_with_context(code, Some(full_context()))
+                .unwrap_or_else(|e| panic!("{opcode:?}: {e:?}"));
+            assert_eq!(result.value, Some(expected), "{opcode:?}");
+        }
+    }
+
+    #[test]
+    fn a_context_field_the_host_did_not_supply_is_refused_not_answered_as_zero() {
+        for opcode in [
+            Opcode::CtxSender,
+            Opcode::CtxBlockHeight,
+            Opcode::CtxTimestamp,
+            Opcode::CtxValue,
+            Opcode::CtxChainId,
+        ] {
+            let code = vec![opcode as u8, 1, Opcode::Ret as u8, 1];
+            // No context at all.
+            let err = run_with_context(code.clone(), None).expect_err("no context was given");
+            assert!(
+                matches!(err.kind, VMErrorKind::ContextUnavailable(_)),
+                "{opcode:?}: {err:?}"
+            );
+            // A context missing only this field is refused the same way: the others do not leak.
+            let mut partial = full_context();
+            match opcode {
+                Opcode::CtxSender => partial.sender = None,
+                Opcode::CtxBlockHeight => partial.block_height = None,
+                Opcode::CtxTimestamp => partial.timestamp_ms = None,
+                Opcode::CtxValue => partial.value = None,
+                _ => partial.chain_id = None,
+            }
+            let err = run_with_context(code, Some(partial)).expect_err("this field is missing");
+            assert!(
+                matches!(err.kind, VMErrorKind::ContextUnavailable(_)),
+                "{opcode:?}: {err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_value_too_large_for_the_engines_integer_is_refused_not_wrapped() {
+        let mut context = full_context();
+        context.value = Some(u128::from(u64::MAX) + 1);
+        let code = vec![Opcode::CtxValue as u8, 1, Opcode::Ret as u8, 1];
+        let err = run_with_context(code, Some(context)).expect_err("does not fit an i64");
+        assert!(matches!(err.kind, VMErrorKind::IntegerOverflow), "{err:?}");
     }
 }

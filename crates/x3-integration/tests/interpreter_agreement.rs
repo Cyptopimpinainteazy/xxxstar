@@ -63,6 +63,8 @@ fn agreed_refusals() -> Vec<(u8, &'static str)> {
         (0x73, "array_pop"),
         (0x74, "new_tuple"),
         (0x75, "tuple_get"),
+        // The context reads below are implemented by `x3-vm` now, and still refused here because
+        // `VM::from_bytes` is given no context: with nothing supplied, neither engine answers.
         (0x80, "ctx_sender"),
         (0x81, "ctx_block_height"),
         (0x82, "ctx_timestamp"),

@@ -1828,6 +1828,8 @@ impl pallet_x3_kernel::Config for Runtime {
     type MaxPreparedOpsPerBlock = MaxPreparedOpsPerBlock;
     type RequireCrossVmProof = RequireCrossVmProof;
     type PrivateSubmissionChannel = RuntimePrivateSubmissionChannel;
+    // The EVM's chain id, so an X3 program and an EVM contract name this chain the same way.
+    type X3ChainId = ChainId;
     type WeightInfo = pallet_x3_kernel::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     // VM adapters:

@@ -248,6 +248,9 @@ pub enum VMErrorKind {
     #[error("atomic windows nested deeper than {0}")]
     AtomicDepthExceeded(usize),
 
+    #[error("the host supplied no {0} for this execution")]
+    ContextUnavailable(&'static str),
+
     #[error("hostcall {0} not found")]
     HostcallNotFound(u8),
 

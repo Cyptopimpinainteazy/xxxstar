@@ -176,6 +176,7 @@ impl pallet_x3_kernel::Config for StorageTest {
     // This test chain speaks no private channel; the intake check must still see the posture as a
     // runtime decision rather than a constant baked into the pallet.
     type PrivateSubmissionChannel = ConstBool<false>;
+    type X3ChainId = frame_support::traits::ConstU64<650_000>;
     type CrossChainProofVerifier = TestProofVerifier;
     type BridgeEvmEscrow = TestBridgeEvmEscrow;
     type BridgeSvmEscrow = TestBridgeSvmEscrow;
@@ -661,6 +662,91 @@ fn a_balance_shaped_change_still_reaches_the_ledger() {
             Kernel::x3_contract_slot(evm_slot_key(0)),
             None,
             "an EVM balance change must not be written to the X3VM slot keyspace"
+        );
+    });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Block context: what a program on this chain learns about its call
+// ---------------------------------------------------------------------------------------------
+
+/// `main() { sstore(0, ctx_block_height()); sstore(1, ctx_chain_id()); sstore(2, ctx_timestamp()); }`
+fn store_block_context_in_slots() -> Vec<u8> {
+    module_with_code(vec![
+        0x18, 0x01, 0x00, // LoadImm r1, 0
+        0x81, 0x02, //       CtxBlockHeight r2
+        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
+        0x18, 0x01, 0x01, // LoadImm r1, 1
+        0x85, 0x02, //       CtxChainId r2
+        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
+        0x18, 0x01, 0x02, // LoadImm r1, 2
+        0x82, 0x02, //       CtxTimestamp r2
+        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
+        0x06, // RetVoid
+    ])
+}
+
+#[test]
+fn a_submitted_program_reads_the_real_block_chain_id_and_timestamp() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(42);
+        submit_v2(
+            H256::from_low_u64_be(0xC7_01),
+            Vec::new(),
+            store_block_context_in_slots(),
+        )
+        .expect("the comit must be accepted");
+
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(0)),
+            Some(encoded_i64_payload(42)),
+            "ctx_block_height is the block the comit executed in"
+        );
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(1)),
+            Some(encoded_i64_payload(
+                <<StorageTest as pallet_x3_kernel::Config>::X3ChainId as Get<u64>>::get() as i64
+            )),
+            "ctx_chain_id is the chain's configured id"
+        );
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(2)),
+            Some(encoded_i64_payload(12_000)),
+            "ctx_timestamp is the block timestamp in milliseconds"
+        );
+    });
+}
+
+#[test]
+fn ctx_sender_is_the_signing_account_and_is_refused_where_there_is_none() {
+    new_test_ext().execute_with(|| {
+        // `main() { return ctx_sender(); }`
+        let program = module_with_code(vec![0x80, 0x00, 0x05, 0x00]);
+
+        let signed = Kernel::x3_call_context(Some(&ALICE));
+        let receipt = X3VmAdapter::execute_with_context(&program, 5_000_000, &[], false, &signed)
+            .expect("executes");
+        assert!(receipt.success);
+        // A `u64` account is not 32 bytes, so it is identified by the hash of its encoding.
+        assert_eq!(
+            receipt.return_data,
+            sp_io::hashing::blake2_256(&parity_scale_codec::Encode::encode(&ALICE)).to_vec()
+        );
+        let bob = Kernel::x3_call_context(Some(&BOB));
+        assert_ne!(
+            signed.sender, bob.sender,
+            "different signers, different senders"
+        );
+
+        // A cross-VM call has no signer: the program is told so instead of reading an invented one.
+        let unsigned = Kernel::x3_call_context(None);
+        let receipt = X3VmAdapter::execute_with_context(&program, 5_000_000, &[], false, &unsigned)
+            .expect("a receipt");
+        assert!(!receipt.success);
+        assert!(
+            String::from_utf8_lossy(&receipt.return_data).contains("ContextUnavailable"),
+            "{}",
+            String::from_utf8_lossy(&receipt.return_data)
         );
     });
 }

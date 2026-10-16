@@ -99,6 +99,7 @@ pub mod vm;
 // Re-exports
 #[cfg(feature = "std")]
 pub use bridge::{BridgeConfig, BridgeError, X3VMBridge};
+pub use context::BlockContext;
 #[cfg(feature = "std")]
 pub use contract_upgrade_pattern::{
     ProxyContract, StorageLayout, UpgradeSafetyChecker, UpgradeableConfig,
@@ -120,6 +121,7 @@ pub use x3_backend::bc_format::BytecodeModule;
 
 // X3VM sub-modules
 pub mod bytecode;
+pub mod context;
 pub mod events;
 pub mod gas;
 #[cfg(feature = "std")]

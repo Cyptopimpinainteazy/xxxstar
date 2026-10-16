@@ -74,6 +74,8 @@ pub mod compiler_bridge;
 pub use error::{X3IntegrationError, X3Result};
 pub use executor::{X3Executor, X3ExecutorConfig};
 pub use types::{X3ExecutionReceipt, X3StateChange, X3StorageWrite};
+/// What the host knows about a call, read by the context opcodes (see `x3_vm::BlockContext`).
+pub use x3_vm::BlockContext as X3BlockContext;
 
 #[cfg(all(feature = "std", feature = "compile"))]
 pub use compiler_bridge::CompilationPolicy;

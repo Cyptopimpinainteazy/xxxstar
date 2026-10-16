@@ -91,8 +91,8 @@ fn atomic_check_runs_on_chain() {
 
 #[test]
 fn an_opcode_the_engine_cannot_run_is_refused_before_anything_runs() {
-    // `ctx_sender r1` — the engine has no block context yet.
-    let program = bytes(vec![0x80, 0x01, 0x05, 0x01]);
+    // `agent_self r1` — there is no agent registry, so the engine has no arm for it.
+    let program = bytes(vec![0xA0, 0x01, 0x05, 0x01]);
     match X3Executor::execute_on_chain(&program, GAS, &[], false) {
         Err(X3IntegrationError::VerificationFailed(reason)) => {
             assert!(reason.contains("NotExecutable"), "{reason}")
@@ -179,4 +179,23 @@ fn a_seeded_slot_is_read_and_reported_as_the_old_value() {
     assert_eq!(receipt.return_data, 7i64.to_le_bytes().to_vec());
     assert_eq!(receipt.storage_writes.len(), 1);
     assert_eq!(receipt.storage_writes[0].old_value, Some(seven));
+}
+
+#[test]
+fn context_opcodes_read_what_the_host_supplied_and_refuse_what_it_did_not() {
+    // `main() { return ctx_chain_id(); }`
+    let program = bytes(vec![0x85, 0x01, 0x05, 0x01]);
+    let context = x3_x3_integration::X3BlockContext {
+        chain_id: Some(650_000),
+        ..x3_x3_integration::X3BlockContext::unknown()
+    };
+    let receipt = X3Executor::execute_on_chain_with_context(&program, GAS, &[], false, &context)
+        .expect("runs");
+    assert!(receipt.success);
+    assert_eq!(receipt.return_data, 650_000i64.to_le_bytes().to_vec());
+
+    // `execute_on_chain` supplies no context, so the same program is told so.
+    let receipt = X3Executor::execute_on_chain(&program, GAS, &[], false).expect("a receipt");
+    assert!(!receipt.success);
+    assert!(String::from_utf8_lossy(&receipt.return_data).contains("ContextUnavailable"));
 }
