@@ -238,6 +238,14 @@ impl MirBytecodeCompiler {
                                 self.emitter.emit_evm_sstore(arg_regs[0], arg_regs[1]);
                                 // The call's value is unit, which this backend represents as 0.
                                 self.emitter.emit_int(dst, 0)?;
+                            } else if intrinsic == x3_common::intrinsics::CTX_BLOCK_HEIGHT {
+                                self.emitter.emit_ctx_block_height(dst);
+                            } else if intrinsic == x3_common::intrinsics::CTX_TIMESTAMP {
+                                self.emitter.emit_ctx_timestamp(dst);
+                            } else if intrinsic == x3_common::intrinsics::CTX_VALUE {
+                                self.emitter.emit_ctx_value(dst);
+                            } else if intrinsic == x3_common::intrinsics::CTX_CHAIN_ID {
+                                self.emitter.emit_ctx_chain_id(dst);
                             } else {
                                 return Err(BackendError::new(
                                     BackendErrorKind::Internal(format!(

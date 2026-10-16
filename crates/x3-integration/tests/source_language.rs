@@ -275,3 +275,53 @@ fn nested_function_calls_and_arithmetic_agree() {
         42
     );
 }
+
+// ─── Block context ──────────────────────────────────────────────────────────────────────────────
+
+/// Source reads the block it runs in. `ctx_*` are host calls (`x3_common::intrinsics`), resolved
+/// and typed like `evm_sload`, so a program that declares its own `ctx_chain_id` still wins.
+#[test]
+fn source_reads_the_block_context_it_is_given() {
+    let bytes = compile_source(
+        "fn main() -> i64 { \
+           let lease_ends = ctx_timestamp() + 30000; \
+           if ctx_chain_id() != 650000 { return 0 - 1; } \
+           return ctx_block_height() * 1000000 + (lease_ends - ctx_timestamp()) + ctx_value(); \
+         }",
+    )
+    .unwrap_or_else(|e| panic!("must compile: {e}"));
+    let context = x3_x3_integration::X3BlockContext {
+        sender: None,
+        block_height: Some(42),
+        timestamp_ms: Some(1_760_000_000_000),
+        value: Some(0),
+        chain_id: Some(650_000),
+    };
+    let receipt =
+        X3Executor::execute_on_chain_with_context(&bytes, 1_000_000, &[], false, &context).unwrap();
+    assert!(
+        receipt.success,
+        "{}",
+        String::from_utf8_lossy(&receipt.return_data)
+    );
+    assert_eq!(
+        receipt.return_data,
+        (42i64 * 1_000_000 + 30_000).to_le_bytes().to_vec()
+    );
+
+    // With no context the same program is refused by the first read, not answered with zeros.
+    let receipt = X3Executor::execute_on_chain(&bytes, 1_000_000, &[], false).unwrap();
+    assert!(!receipt.success);
+    assert!(String::from_utf8_lossy(&receipt.return_data).contains("ContextUnavailable"));
+}
+
+#[test]
+fn a_programs_own_function_named_like_a_context_read_still_wins() {
+    let bytes = compile_source(
+        "fn ctx_chain_id() -> i64 { return 7; } fn main() -> i64 { return ctx_chain_id(); }",
+    )
+    .unwrap_or_else(|e| panic!("must compile: {e}"));
+    let receipt = X3Executor::execute_on_chain(&bytes, 1_000_000, &[], false).unwrap();
+    assert!(receipt.success);
+    assert_eq!(receipt.return_data, 7i64.to_le_bytes().to_vec());
+}
