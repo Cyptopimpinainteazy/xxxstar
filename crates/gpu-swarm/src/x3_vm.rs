@@ -369,15 +369,12 @@ impl X3VmExecutor {
             .call_function(0, &[])
             .map_err(|e| SwarmError::ExecutionError(format!("x3 vm execute failed: {:?}", e)))?;
 
-        let result_data = match exec.value {
-            Some(Value::Bytes(b)) => b,
-            Some(Value::String(s)) => s.into_bytes(),
-            Some(Value::I64(v)) => v.to_le_bytes().to_vec(),
-            Some(Value::F64(v)) => v.to_le_bytes().to_vec(),
-            Some(Value::Bool(v)) => vec![u8::from(v)],
-            Some(Value::Addr(v)) => v.to_le_bytes().to_vec(),
-            Some(Value::Unit) | None => Vec::new(),
-        };
+        // The engine's one encoding for a returned value, the bytes a block's receipt carries.
+        let result_data = exec
+            .value
+            .as_ref()
+            .map(Value::return_bytes)
+            .unwrap_or_default();
 
         let mut result_hash = [0u8; 32];
         result_hash.copy_from_slice(blake3::hash(&result_data).as_bytes());

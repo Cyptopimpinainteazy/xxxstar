@@ -1070,11 +1070,20 @@ impl Verifier {
 }
 
 /// Get gas cost for an opcode.
+/// The gas one execution of `opcode` costs: the single table both the verifier's static bound and
+/// the interpreter's charge read.
+///
+/// The interpreter used to keep its own table, which disagreed on 78 of 114 opcodes: an `emit`
+/// (whose payload is consensus state) cost 1, an atomic window (which copies every register and
+/// global) cost 5, and the verifier's bound described charges no block made. One table means a
+/// simulation's figure, the verifier's estimate and a block's charge are the same arithmetic.
+///
+/// Every instruction costs at least 1, so the gas a run consumed bounds the instructions it ran.
 pub fn opcode_gas_cost(opcode: u8) -> u64 {
     match Opcode::from_byte(opcode) {
         Some(op) => match op {
-            // Free operations
-            Opcode::Nop => 0,
+            // The floor: no instruction is free.
+            Opcode::Nop => 1,
 
             // Very cheap (1 gas)
             Opcode::Mov
@@ -1205,9 +1214,9 @@ pub fn opcode_gas_cost(opcode: u8) -> u64 {
             Opcode::GpuBenchmark => 1000,
             Opcode::GpuSecp256k1Verify => 600,
 
-            // Debug (0 gas in dev, forbidden on-chain)
-            Opcode::DebugPrint => 0,
-            Opcode::Breakpoint => 0,
+            // Debug (forbidden on-chain; the floor off it)
+            Opcode::DebugPrint => 1,
+            Opcode::Breakpoint => 1,
             Opcode::Assert => 5,
             Opcode::Panic => 5,
         },
@@ -1559,8 +1568,13 @@ mod tests {
 
     #[test]
     fn gas_costs_reasonable() {
-        // Ensure all costs are set
-        assert_eq!(opcode_gas_cost(Opcode::Nop.to_byte()), 0);
+        // Ensure all costs are set, and that none is free.
+        assert_eq!(opcode_gas_cost(Opcode::Nop.to_byte()), 1);
+        for byte in 0u8..=255 {
+            if Opcode::from_byte(byte).is_some() {
+                assert!(opcode_gas_cost(byte) >= 1, "0x{byte:02X} is free");
+            }
+        }
         assert_eq!(opcode_gas_cost(Opcode::AddI.to_byte()), 2);
         assert_eq!(opcode_gas_cost(Opcode::MulI.to_byte()), 3);
         assert_eq!(opcode_gas_cost(Opcode::EvmSstore.to_byte()), 5000);
@@ -1990,7 +2004,8 @@ mod tests {
         assert_eq!(opcode_gas_cost(Opcode::SvmGetRent.to_byte()), 100);
         assert_eq!(opcode_gas_cost(Opcode::SvmGetClock.to_byte()), 100);
 
-        assert_eq!(opcode_gas_cost(Opcode::Breakpoint.to_byte()), 0);
+        // The floor: no instruction is free (`gas_costs_reasonable` checks every opcode).
+        assert_eq!(opcode_gas_cost(Opcode::Breakpoint.to_byte()), 1);
         assert_eq!(opcode_gas_cost(Opcode::Assert.to_byte()), 5);
         assert_eq!(opcode_gas_cost(Opcode::Panic.to_byte()), 5);
     }

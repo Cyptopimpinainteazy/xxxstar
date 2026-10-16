@@ -452,6 +452,22 @@ fn format_value_internal(value: &Value) -> String {
         Value::String(s) => format!("\"{}\"", s),
         Value::Bytes(b) => format!("0x{}", hex::encode(b)),
         Value::Addr(a) => format!("@{:#x}", a),
+        Value::Array(items) => format!(
+            "[{}]",
+            items
+                .iter()
+                .map(format_value_internal)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Value::Tuple(items) => format!(
+            "({})",
+            items
+                .iter()
+                .map(format_value_internal)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         Value::Unit => "()".to_string(),
     }
 }

@@ -2075,53 +2075,10 @@ impl VM {
         i64::try_from(figure).map_err(|_| self.error_at(ip, VMErrorKind::IntegerOverflow))
     }
 
+    /// What one execution of `opcode` costs: the verifier's table, the only one (see
+    /// `verifier::opcode_gas_cost`).
     fn opcode_gas_cost(&self, opcode: Opcode) -> u64 {
-        match opcode {
-            Opcode::Nop => 1,
-            Opcode::Jump | Opcode::JumpIf | Opcode::JumpUnless => 2,
-            Opcode::Call => 10,
-            Opcode::Ret | Opcode::RetVoid => 2,
-            Opcode::Halt => 1,
-            Opcode::LoadConst | Opcode::Mov | Opcode::LoadImm => 1,
-            Opcode::LoadGlobal | Opcode::StoreGlobal => 3,
-            Opcode::AddI | Opcode::SubI | Opcode::MulI => 1,
-            Opcode::DivI | Opcode::ModI => 5,
-            Opcode::AddF | Opcode::SubF | Opcode::MulF | Opcode::DivF | Opcode::ModF => 2,
-            Opcode::EqI | Opcode::NeI | Opcode::LtI | Opcode::LeI | Opcode::GtI | Opcode::GeI => 1,
-            Opcode::And | Opcode::Or | Opcode::Xor | Opcode::Not => 1,
-            Opcode::Shl | Opcode::Shr | Opcode::UShr => 1,
-            Opcode::AtomicBegin | Opcode::AtomicCommit => 5,
-            // Same figures as the verifier's table.
-            Opcode::Inc | Opcode::Dec | Opcode::ArrayLen => 2,
-            Opcode::LoadIndex
-            | Opcode::StoreIndex
-            | Opcode::LoadField
-            | Opcode::StoreField
-            | Opcode::ArrayPush
-            | Opcode::ArrayPop => 5,
-            Opcode::TupleGet => 3,
-            Opcode::NewArray | Opcode::NewTuple => 10,
-            Opcode::CtxSender
-            | Opcode::CtxBlockHeight
-            | Opcode::CtxTimestamp
-            | Opcode::CtxValue
-            | Opcode::CtxChainId => 5,
-            Opcode::AtomicRollback => 10,
-            // Same figures as the verifier's table (`verifier::opcode_gas_cost`), so
-            // the bound a module is verified against is the bound it is charged.
-            Opcode::EvmSload => 200,
-            Opcode::EvmSstore => 5000,
-            // GPU intrinsics — expensive (real CUDA kernel launch)
-            Opcode::GpuSha256Batch
-            | Opcode::GpuEd25519Verify
-            | Opcode::GpuPohChain
-            | Opcode::GpuKeccak256Batch => 500,
-            Opcode::GpuSecp256k1Verify => 600, // ECC scalar mul is heavier
-            Opcode::GpuSha256Streamed => 750,  // stream pipeline setup overhead
-            Opcode::GpuDeviceCount => 10,      // device query only
-            Opcode::GpuBenchmark => 1000,      // full benchmark run
-            _ => 1,
-        }
+        crate::verifier::opcode_gas_cost(opcode as u8)
     }
 }
 
@@ -3703,5 +3660,44 @@ mod tests {
         assert_eq!(&bytes[24..], &[x3_common::value_tags::BOOL, 1, 0, 0, 0, 1]);
         // A scalar's bytes are unchanged from before aggregates existed.
         assert_eq!(Value::I64(5).return_bytes(), 5i64.to_le_bytes().to_vec());
+    }
+
+    #[test]
+    fn the_interpreter_charges_exactly_the_verifiers_table() {
+        // A straight-line program: the charge must be the sum of the table over what ran.
+        let code = vec![
+            op(Opcode::LoadImm),
+            1,
+            3, // 1
+            op(Opcode::LoadImm),
+            2,
+            4, // 1
+            op(Opcode::MulI),
+            3,
+            1,
+            2, // 3
+            op(Opcode::AtomicBegin),
+            0,
+            0, // 100
+            op(Opcode::AtomicCommit),
+            0,
+            0,               // 100
+            op(Opcode::Nop), // 1
+            op(Opcode::Ret),
+            3, // 2
+        ];
+        let mut vm = VM::from_bytes(&storage_module(code.clone(), 0, 16)).expect("loads");
+        vm.call_function(0, &[]).expect("runs");
+        let instrs = crate::verifier::Verifier::decode_all_instructions(&code).expect("decodes");
+        let expected: u64 = instrs
+            .iter()
+            .map(|i| crate::verifier::opcode_gas_cost(i.opcode))
+            .sum();
+        assert_eq!(expected, 208);
+        assert_eq!(
+            vm.gas_used(),
+            expected,
+            "one table: the verifier's figure is the charge"
+        );
     }
 }
