@@ -481,7 +481,54 @@ pub mod intrinsics {
         symbol: usize::MAX - 1,
     };
 
-    pub const ALL: [Intrinsic; 2] = [EVM_SLOAD, EVM_SSTORE];
+    /// `ctx_block_height() -> i64`: the block the call executes in.
+    ///
+    /// The four context reads are host calls rather than expressions so they reach MIR as calls,
+    /// which no optimizer pass merges or removes: two reads in one execution see the same block,
+    /// but the value is the host's, not something constant propagation may assume. Each fails at
+    /// run time (`ContextUnavailable`) when the host supplied no such field.
+    pub const CTX_BLOCK_HEIGHT: Intrinsic = Intrinsic {
+        name: "ctx_block_height",
+        arity: 0,
+        returns_value: true,
+        symbol: usize::MAX - 3,
+    };
+
+    /// `ctx_timestamp() -> i64`: the block timestamp, milliseconds since the Unix epoch.
+    pub const CTX_TIMESTAMP: Intrinsic = Intrinsic {
+        name: "ctx_timestamp",
+        arity: 0,
+        returns_value: true,
+        symbol: usize::MAX - 4,
+    };
+
+    /// `ctx_value() -> i64`: native value attached to the call (0 when none).
+    pub const CTX_VALUE: Intrinsic = Intrinsic {
+        name: "ctx_value",
+        arity: 0,
+        returns_value: true,
+        symbol: usize::MAX - 5,
+    };
+
+    /// `ctx_chain_id() -> i64`: the chain the call executes on.
+    pub const CTX_CHAIN_ID: Intrinsic = Intrinsic {
+        name: "ctx_chain_id",
+        arity: 0,
+        returns_value: true,
+        symbol: usize::MAX - 6,
+    };
+
+    // `ctx_sender` is not here yet: its value is a 32-byte account, and every host call in this
+    // table is typed as taking and returning `i64`. It needs an address type in the signature.
+
+    pub const ALL: [Intrinsic; 6] = [
+        EVM_SLOAD,
+        EVM_SSTORE,
+        CTX_BLOCK_HEIGHT,
+        CTX_TIMESTAMP,
+        CTX_VALUE,
+        CTX_CHAIN_ID,
+    ];
 
     /// The reserved symbol `emit` lowers to.
     ///
