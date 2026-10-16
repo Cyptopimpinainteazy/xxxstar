@@ -325,3 +325,108 @@ fn a_programs_own_function_named_like_a_context_read_still_wins() {
     assert!(receipt.success);
     assert_eq!(receipt.return_data, 7i64.to_le_bytes().to_vec());
 }
+
+// ─── Arrays and tuples ──────────────────────────────────────────────────────────────────────────
+
+fn on_chain(source: &str) -> X3ExecutionReceiptView {
+    let bytes = compile_source(source).unwrap_or_else(|e| panic!("must compile: {e}\n{source}"));
+    let receipt = X3Executor::execute_on_chain(&bytes, 1_000_000, &[], false).unwrap();
+    X3ExecutionReceiptView {
+        success: receipt.success,
+        data: receipt.return_data,
+    }
+}
+
+struct X3ExecutionReceiptView {
+    success: bool,
+    data: Vec<u8>,
+}
+
+fn returns(source: &str, expected: i64) {
+    let view = on_chain(source);
+    assert!(
+        view.success,
+        "{}\n{source}",
+        String::from_utf8_lossy(&view.data)
+    );
+    assert_eq!(view.data, expected.to_le_bytes().to_vec(), "{source}");
+}
+
+#[test]
+fn an_array_literal_is_indexed_measured_and_summed_in_a_loop() {
+    returns(
+        "fn main() -> i64 { let xs = [3, 5, 8, 13]; let mut i = 0; let mut sum = 0; \
+         while i < xs.len() { sum = sum + xs[i]; i = i + 1; } return sum * 10 + xs.len(); }",
+        294,
+    );
+}
+
+/// `a[i] = v` rebinds `a`; a copy taken before the write keeps its old element (value semantics,
+/// which is what lets MIR stay in SSA form and is what the engine does with `mov`).
+#[test]
+fn element_assignment_has_value_semantics() {
+    returns(
+        "fn main() -> i64 { let mut a = [1, 2, 3]; let before = a; a[1] = 20; \
+         return a[1] * 100 + before[1]; }",
+        2002,
+    );
+}
+
+#[test]
+fn an_array_built_in_a_loop_and_passed_to_a_function() {
+    returns(
+        "fn total(xs: [i64; 4]) -> i64 { let mut i = 0; let mut s = 0; \
+         while i < xs.len() { s = s + xs[i]; i = i + 1; } return s; } \
+         fn main() -> i64 { let mut a = [0, 0, 0, 0]; let mut i = 0; \
+         while i < 4 { a[i] = i * i; i = i + 1; } return total(a); }",
+        14,
+    );
+}
+
+#[test]
+fn a_tuple_is_built_and_read_by_position() {
+    returns(
+        "fn main() -> i64 { let t = (7, 9); return t[0] * 10 + t[1]; }",
+        79,
+    );
+}
+
+#[test]
+fn reading_past_the_end_fails_the_execution_and_writes_nothing() {
+    let view = on_chain("fn main() -> i64 { evm_sstore(0, 1); let a = [1, 2]; return a[5]; }");
+    assert!(!view.success);
+    assert!(String::from_utf8_lossy(&view.data).contains("ArrayIndexOutOfBounds"));
+}
+
+#[test]
+fn aggregate_misuse_is_refused_at_compile_time() {
+    let cases = [
+        (
+            "fn main() -> i64 { let a = [1, 2]; a[0] = 5; return a[0]; }",
+            "immutable",
+        ),
+        (
+            "fn main() -> i64 { let t = (1, 2); let i = 1; return t[i]; }",
+            "tuple index",
+        ),
+        (
+            "fn main() -> i64 { let mut a = [1, 2]; a[0] = true; return a[0]; }",
+            "Mismatch",
+        ),
+        (
+            "fn main() -> i64 { let a = [1, true]; return 0; }",
+            "InconsistentArrayElements",
+        ),
+        (
+            "fn f() -> [i64; 2] { return [1, 2]; } fn main() -> i64 { f()[0] = 3; return 0; }",
+            "named array",
+        ),
+    ];
+    for (source, expected) in cases {
+        let why = refusal(source);
+        assert!(
+            why.to_lowercase().contains(&expected.to_lowercase()),
+            "{source}\n  refused with: {why}\n  expected it to mention `{expected}`"
+        );
+    }
+}

@@ -408,6 +408,29 @@ impl StructuralValidator {
                 self.validate_expression(&range.start, ctx)?;
                 self.validate_expression(&range.end, ctx)?;
             }
+            Expression::Array(array) => {
+                self.validate_span(&array.span)?;
+                for element in &array.elements {
+                    self.validate_expression(element, ctx)?;
+                }
+            }
+            Expression::Tuple(tuple) => {
+                self.validate_span(&tuple.span)?;
+                for element in &tuple.elements {
+                    self.validate_expression(element, ctx)?;
+                }
+            }
+            Expression::Index(index) => {
+                self.validate_span(&index.span)?;
+                self.validate_expression(&index.base, ctx)?;
+                self.validate_expression(&index.index, ctx)?;
+            }
+            Expression::IndexAssign(assign) => {
+                self.validate_span(&assign.span)?;
+                self.validate_identifier(&assign.target)?;
+                self.validate_expression(&assign.index, ctx)?;
+                self.validate_expression(&assign.value, ctx)?;
+            }
         }
         Ok(())
     }

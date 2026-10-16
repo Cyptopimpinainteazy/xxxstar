@@ -539,6 +539,29 @@ pub mod intrinsics {
     /// function.
     pub const EMIT_SYMBOL: usize = usize::MAX - 2;
 
+    // Aggregate operations, lowered as calls to these reserved symbols.
+    //
+    // Not in [`ALL`] either: their operands are arrays and tuples, not the `i64`s a named host call
+    // takes, and source spells them as literals, `a[i]`, `a[i] = v` and `a.len()`, not as calls.
+    // A call is what every optimizer pass already treats safely (its arguments are uses, it is
+    // never merged with another call or dropped), so the aggregates need no new MIR form for the
+    // passes to learn.
+    //
+    // Aggregates have value semantics: `a[i] = v` produces a new array equal to `a` with element
+    // `i` replaced, and the variable is rebound to it. That is what keeps MIR in SSA form, and it
+    // matches the engine, where every register owns its value and `mov` copies it.
+
+    /// `[e0, e1, ...]`: a new array of the arguments, in order.
+    pub const ARRAY_NEW_SYMBOL: usize = usize::MAX - 7;
+    /// `(e0, e1, ...)`: a new tuple of the arguments, in order.
+    pub const TUPLE_NEW_SYMBOL: usize = usize::MAX - 8;
+    /// `base[index]`: the element, for an array or a tuple.
+    pub const INDEX_GET_SYMBOL: usize = usize::MAX - 9;
+    /// `base[index] = value`, as a value: `base` with that element replaced.
+    pub const INDEX_SET_SYMBOL: usize = usize::MAX - 10;
+    /// `base.len()`: the number of elements.
+    pub const LEN_SYMBOL: usize = usize::MAX - 11;
+
     pub fn by_name(name: &str) -> Option<Intrinsic> {
         ALL.iter().copied().find(|intrinsic| intrinsic.name == name)
     }

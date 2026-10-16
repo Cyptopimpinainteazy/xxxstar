@@ -3,11 +3,12 @@ use crate::error::{ParseError, ParseResult};
 use crate::grammar::{binary_binding_power, symbol_to_binary_op, PREFIX_BP};
 use crate::tokens::MAX_NESTING_DEPTH;
 use x3_ast::{
-    Agent, AssignExpression, AtomicBlock, BinaryExpression, Block, BreakStatement, CallExpression,
-    Const, ContinueStatement, EmitStatement, Expression, FieldAccessExpression, ForLoopKind,
-    ForStatement, Function, GlobalLet, Identifier, IfStatement, Item, LetStatement,
-    LiteralExpression, LoopStatement, Module, Param, RangeExpression, Statement, TypeAnnotation,
-    UnaryExpression, UnaryOp, WhileStatement,
+    Agent, ArrayExpression, AssignExpression, AtomicBlock, BinaryExpression, Block, BreakStatement,
+    CallExpression, Const, ContinueStatement, EmitStatement, Expression, FieldAccessExpression,
+    ForLoopKind, ForStatement, Function, GlobalLet, Identifier, IfStatement, IndexAssignExpression,
+    IndexExpression, Item, LetStatement, LiteralExpression, LoopStatement, Module, Param,
+    RangeExpression, Statement, TupleExpression, TypeAnnotation, TypeShape, UnaryExpression,
+    UnaryOp, WhileStatement,
 };
 use x3_common::{Keyword, Literal, Span, Symbol, Token, TokenKind};
 use x3_lexer::Lexer;
@@ -154,13 +155,111 @@ impl Parser {
         Ok(params)
     }
 
+    /// A type: a name (`i64`), an array (`[T; N]`, `[T]`), or a tuple (`(T1, T2, ...)`).
     fn parse_type_annotation(&mut self) -> ParseResult<TypeAnnotation> {
+        if self.peek_symbol(Symbol::LeftBracket) {
+            let open = self.expect_symbol(Symbol::LeftBracket)?;
+            let element = self.parse_type_annotation()?;
+            let size = if self.accept_symbol(Symbol::Semicolon) {
+                let token = self.bump();
+                match token.kind {
+                    TokenKind::Literal(Literal::Integer(n)) if n >= 0 => Some(n as usize),
+                    other => {
+                        return Err(ParseError::new(
+                            format!(
+                                "an array size must be a non-negative integer, found {other:?}"
+                            ),
+                            token.span,
+                        ))
+                    }
+                }
+            } else {
+                None
+            };
+            let close = self.expect_symbol(Symbol::RightBracket)?;
+            let span = open.span.merge(close.span);
+            let (name, shape) = match size {
+                Some(size) => (
+                    "array",
+                    TypeShape::Array {
+                        element: Box::new(element),
+                        size,
+                    },
+                ),
+                None => (
+                    "vec",
+                    TypeShape::Vector {
+                        element: Box::new(element),
+                    },
+                ),
+            };
+            return Ok(TypeAnnotation {
+                name: Identifier {
+                    name: name.to_string(),
+                    span,
+                },
+                span,
+                shape,
+            });
+        }
+        if self.peek_symbol(Symbol::LeftParen) {
+            let open = self.expect_symbol(Symbol::LeftParen)?;
+            let mut elements = Vec::new();
+            if !self.peek_symbol(Symbol::RightParen) {
+                loop {
+                    elements.push(self.parse_type_annotation()?);
+                    if !self.accept_symbol(Symbol::Comma) {
+                        break;
+                    }
+                }
+            }
+            let close = self.expect_symbol(Symbol::RightParen)?;
+            let span = open.span.merge(close.span);
+            if elements.is_empty() {
+                // `()` is the unit type, as `unit` is.
+                return Ok(TypeAnnotation {
+                    name: Identifier {
+                        name: "()".to_string(),
+                        span,
+                    },
+                    span,
+                    shape: TypeShape::Named,
+                });
+            }
+            return Ok(TypeAnnotation {
+                name: Identifier {
+                    name: "tuple".to_string(),
+                    span,
+                },
+                span,
+                shape: TypeShape::Tuple { elements },
+            });
+        }
         let identifier = self.expect_identifier()?;
         let span = identifier.span;
         Ok(TypeAnnotation {
             name: identifier,
             span,
+            shape: TypeShape::Named,
         })
+    }
+
+    /// The elements of a bracketed or parenthesised list, up to and including `close`.
+    fn parse_expression_list(&mut self, close: Symbol) -> ParseResult<(Vec<Expression>, Span)> {
+        let mut elements = Vec::new();
+        if !self.peek_symbol(close) {
+            loop {
+                elements.push(self.parse_expression_bp(0)?);
+                if !self.accept_symbol(Symbol::Comma) {
+                    break;
+                }
+                if self.peek_symbol(close) {
+                    break; // trailing comma
+                }
+            }
+        }
+        let end = self.expect_symbol(close)?;
+        Ok((elements, end.span))
     }
 
     fn parse_block(&mut self) -> ParseResult<Block> {
@@ -515,6 +614,24 @@ impl Parser {
     fn parse_assignment(&mut self, lhs: Expression) -> ParseResult<Expression> {
         let equals = self.expect_symbol(Symbol::Equals)?;
         match lhs {
+            // `name[index] = value`. Only a named array can be written: arrays have value
+            // semantics, so the write rebinds the variable.
+            Expression::Index(IndexExpression { base, index, span }) => match *base {
+                Expression::Identifier(target) => {
+                    let rhs = self.parse_expression_bp(1)?;
+                    let span = span.merge(rhs.span());
+                    Ok(Expression::IndexAssign(IndexAssignExpression {
+                        target,
+                        index,
+                        value: Box::new(rhs),
+                        span,
+                    }))
+                }
+                _ => Err(ParseError::new(
+                    "an element can only be assigned through a named array (`a[i] = v`)",
+                    equals.span,
+                )),
+            },
             Expression::Identifier(ident) => {
                 let rhs = self.parse_expression_bp(1)?;
                 let span = ident.span.merge(rhs.span());
@@ -602,10 +719,30 @@ impl Parser {
                 Ok(self.finish_postfix(Expression::Identifier(identifier))?)
             }
             TokenKind::Symbol(Symbol::LeftParen) => {
-                let _ = self.expect_symbol(Symbol::LeftParen)?;
-                let expr = self.parse_expression_bp(0)?;
+                let open = self.expect_symbol(Symbol::LeftParen)?;
+                let first = self.parse_expression_bp(0)?;
+                if self.accept_symbol(Symbol::Comma) {
+                    // `(a, b, ...)`: a tuple. `(a)` stays a parenthesised expression.
+                    let (mut rest, end) = self.parse_expression_list(Symbol::RightParen)?;
+                    let mut elements = vec![first];
+                    elements.append(&mut rest);
+                    let tuple = Expression::Tuple(TupleExpression {
+                        elements,
+                        span: open.span.merge(end),
+                    });
+                    return self.finish_postfix(tuple);
+                }
                 self.expect_symbol(Symbol::RightParen)?;
-                Ok(self.finish_postfix(expr)?)
+                Ok(self.finish_postfix(first)?)
+            }
+            TokenKind::Symbol(Symbol::LeftBracket) => {
+                let open = self.expect_symbol(Symbol::LeftBracket)?;
+                let (elements, end) = self.parse_expression_list(Symbol::RightBracket)?;
+                let array = Expression::Array(ArrayExpression {
+                    elements,
+                    span: open.span.merge(end),
+                });
+                Ok(self.finish_postfix(array)?)
             }
             other => Err(ParseError::new(
                 format!("unexpected token {other:?} in expression"),
@@ -632,6 +769,16 @@ impl Parser {
                 base = Expression::Call(CallExpression {
                     callee: Box::new(base),
                     args,
+                    span,
+                });
+            } else if self.peek_symbol(Symbol::LeftBracket) {
+                self.expect_symbol(Symbol::LeftBracket)?;
+                let index = self.parse_expression_bp(0)?;
+                let close = self.expect_symbol(Symbol::RightBracket)?;
+                let span = base.span().merge(close.span);
+                base = Expression::Index(IndexExpression {
+                    base: Box::new(base),
+                    index: Box::new(index),
                     span,
                 });
             } else if self.peek_symbol(Symbol::Dot) {

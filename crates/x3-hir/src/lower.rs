@@ -181,6 +181,23 @@ impl HirLowerer {
 
     /// Resolve a type annotation from AST.
     fn resolve_type_annotation(&self, ty: &x3_ast::TypeAnnotation) -> Type {
+        match &ty.shape {
+            x3_ast::TypeShape::Array { element, size } => {
+                return Type::array(self.resolve_type_annotation(element), *size)
+            }
+            x3_ast::TypeShape::Vector { element } => {
+                return Type::vector(self.resolve_type_annotation(element))
+            }
+            x3_ast::TypeShape::Tuple { elements } => {
+                return Type::tuple(
+                    elements
+                        .iter()
+                        .map(|element| self.resolve_type_annotation(element))
+                        .collect(),
+                )
+            }
+            x3_ast::TypeShape::Named => {}
+        }
         // Simple type name resolution
         match ty.name.name.as_str() {
             "i8" => Type::i8(),
@@ -818,6 +835,42 @@ impl HirLowerer {
             });
         }
 
+        // `a[i] = v`: rebinds `a`, so the same rules as `a = v` (a mutable local).
+        if let Expression::IndexAssign(assign) = expr {
+            let target_info = match scope.lookup(&assign.target.name) {
+                Some(info) => info,
+                None if self.top_level.contains_key(&assign.target.name) => {
+                    return Err(HirError::immutable_assign(&assign.target.name, assign.span));
+                }
+                None => {
+                    return Err(HirError::unknown_symbol(
+                        &assign.target.name,
+                        assign.target.span,
+                    ))
+                }
+            };
+            if !target_info.mutable {
+                return Err(HirError::immutable_assign(&assign.target.name, assign.span));
+            }
+            let array = HirExpr::new(
+                HirExprKind::Var(target_info.symbol),
+                target_info.ty.clone(),
+                assign.target.span,
+            );
+            let element_ty = Self::element_type(&target_info.ty, &assign.index);
+            let index = self.lower_expression(&assign.index, scope)?;
+            let value = self.lower_expression(&assign.value, scope)?;
+            return Ok(HirStmt::Assign {
+                target: AssignTarget::Index {
+                    array: Box::new(array),
+                    index: Box::new(index),
+                    element_ty,
+                },
+                value,
+                span: assign.span,
+            });
+        }
+
         let expr = self.lower_expression(expr, scope)?;
         Ok(HirStmt::Expr(expr))
     }
@@ -897,6 +950,50 @@ impl HirLowerer {
                 ))
             }
 
+            Expression::Array(array) => {
+                let elements = array
+                    .elements
+                    .iter()
+                    .map(|element| self.lower_expression(element, scope))
+                    .collect::<HirResult<Vec<_>>>()?;
+                let element_ty = elements
+                    .first()
+                    .map(|element| element.ty.clone())
+                    .unwrap_or_else(Type::any);
+                let ty = Type::array(element_ty, elements.len());
+                Ok(HirExpr::new(HirExprKind::Array(elements), ty, array.span))
+            }
+
+            Expression::Tuple(tuple) => {
+                let elements = tuple
+                    .elements
+                    .iter()
+                    .map(|element| self.lower_expression(element, scope))
+                    .collect::<HirResult<Vec<_>>>()?;
+                let ty = Type::tuple(elements.iter().map(|e| e.ty.clone()).collect());
+                Ok(HirExpr::new(HirExprKind::Tuple(elements), ty, tuple.span))
+            }
+
+            Expression::Index(index) => {
+                let base = self.lower_expression(&index.base, scope)?;
+                let ty = Self::element_type(&base.ty, &index.index);
+                let at = self.lower_expression(&index.index, scope)?;
+                Ok(HirExpr::new(
+                    HirExprKind::Index {
+                        array: Box::new(base),
+                        index: Box::new(at),
+                    },
+                    ty,
+                    index.span,
+                ))
+            }
+
+            // An element write is a statement (see `lower_expression_statement`).
+            Expression::IndexAssign(assign) => Err(HirError::new(
+                HirErrorKind::InvalidAssignTarget,
+                assign.span,
+            )),
+
             Expression::Range(range) => {
                 // Range expressions should only appear in for-loop contexts
                 // Lower to a tuple for now (start, end)
@@ -964,12 +1061,46 @@ impl HirLowerer {
         ))
     }
 
+    /// The type of `base[index]`: an array's element type, or the tuple element a constant index
+    /// names (the type checker has already refused any other tuple index).
+    fn element_type(base: &Type, index: &Expression) -> Type {
+        match &base.kind {
+            TypeKind::Array { element, .. } | TypeKind::Vector(element) => (**element).clone(),
+            TypeKind::Tuple(elements) => match index {
+                Expression::Literal(literal) => match literal.literal {
+                    x3_common::Literal::Integer(n) if n >= 0 && (n as usize) < elements.len() => {
+                        elements[n as usize].clone()
+                    }
+                    _ => Type::any(),
+                },
+                _ => Type::any(),
+            },
+            TypeKind::Bytes => Type::i64(),
+            _ => Type::any(),
+        }
+    }
+
     /// Lower a function call.
     fn lower_call(
         &mut self,
         call: &x3_ast::CallExpression,
         scope: &ScopeStack,
     ) -> HirResult<HirExpr> {
+        // `x.len()`: the one method the language has, on arrays, tuples and strings.
+        if let Expression::FieldAccess(field) = &*call.callee {
+            if field.field.name == "len" && call.args.is_empty() {
+                let receiver = self.lower_expression(&field.object, scope)?;
+                return Ok(HirExpr::new(
+                    HirExprKind::MethodCall {
+                        receiver: Box::new(receiver),
+                        method: "len".to_string(),
+                        args: Vec::new(),
+                    },
+                    Type::i64(),
+                    call.span,
+                ));
+            }
+        }
         // For now, only support direct function calls
         if let Expression::Identifier(callee) = &*call.callee {
             // Resolve callee
