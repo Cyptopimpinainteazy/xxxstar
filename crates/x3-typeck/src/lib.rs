@@ -50,4 +50,4 @@ mod types;
 pub use checker::{TypeChecker, TypedModule};
 pub use env::{TypeBinding, TypeEnv};
 pub use error::{TypeError, TypeErrorKind, TypeResult};
-pub use types::{FunctionSignature, PrimitiveType, Type, TypeId, TypeKind};
+pub use types::{FunctionSignature, PrimitiveType, StructType, Type, TypeId, TypeKind};

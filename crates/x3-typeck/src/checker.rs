@@ -61,6 +61,8 @@ pub struct TypeChecker {
     /// it, at which point every value it stands for must fit that type. A variable never bound
     /// defaults to `i64`, the X3VM's integer.
     int_literals: std::collections::BTreeMap<u32, Vec<i128>>,
+    /// Declared structs, by name, once their field types are resolved.
+    structs: std::collections::BTreeMap<String, crate::types::StructType>,
 }
 
 impl Default for TypeChecker {
@@ -79,6 +81,7 @@ impl TypeChecker {
             current_return_type: None,
             in_atomic: false,
             int_literals: std::collections::BTreeMap::new(),
+            structs: std::collections::BTreeMap::new(),
         }
     }
 
@@ -105,6 +108,8 @@ impl TypeChecker {
 
     /// Collect type declarations from all items.
     fn collect_declarations(&mut self, module: &Module, resolved: &ResolvedModule) {
+        // Structs first: every signature after them may name one.
+        self.collect_structs(module);
         for item in &module.items {
             match item {
                 Item::Function(func) => self.collect_function_type(func, resolved),
@@ -113,6 +118,102 @@ impl TypeChecker {
                 Item::Const(const_item) => self.collect_const_type(const_item, resolved),
                 // Arb programs are lowered by later compilation phases.
                 Item::ArbProgram(_) => {}
+                Item::Struct(_) => {}
+            }
+        }
+    }
+
+    /// Resolve every struct declaration, in dependency order, refusing a struct declared twice,
+    /// one that contains itself (it would have no finite size), and a field of an unknown type.
+    fn collect_structs(&mut self, module: &Module) {
+        let mut defs: std::collections::BTreeMap<String, &x3_ast::StructDef> =
+            std::collections::BTreeMap::new();
+        for item in &module.items {
+            if let Item::Struct(def) = item {
+                if defs.insert(def.name.name.clone(), def).is_some() {
+                    self.errors.push(TypeError::invalid_operation(
+                        "declaring a struct name twice",
+                        Type::named(&def.name.name),
+                        def.name.span,
+                    ));
+                }
+            }
+        }
+        let names: Vec<String> = defs.keys().cloned().collect();
+        for name in names {
+            let mut visiting = Vec::new();
+            self.resolve_struct(&name, &defs, &mut visiting);
+        }
+    }
+
+    fn resolve_struct(
+        &mut self,
+        name: &str,
+        defs: &std::collections::BTreeMap<String, &x3_ast::StructDef>,
+        visiting: &mut Vec<String>,
+    ) -> Option<Type> {
+        if let Some(done) = self.structs.get(name) {
+            return Some(Type::new(TypeKind::Struct(done.clone())));
+        }
+        let def = *defs.get(name)?;
+        if visiting.iter().any(|v| v == name) {
+            self.errors.push(TypeError::new(
+                TypeErrorKind::RecursiveType(name.to_string()),
+                def.name.span,
+            ));
+            return Some(Type::error());
+        }
+        visiting.push(name.to_string());
+        let mut fields = Vec::with_capacity(def.fields.len());
+        for field in &def.fields {
+            let ty = self.resolve_field_annotation(&field.ty, defs, visiting);
+            fields.push((field.name.name.clone(), ty));
+        }
+        visiting.pop();
+        let resolved = crate::types::StructType {
+            name: name.to_string(),
+            fields,
+        };
+        self.structs.insert(name.to_string(), resolved.clone());
+        Some(Type::new(TypeKind::Struct(resolved)))
+    }
+
+    /// A field's type: like [`Self::resolve_type_annotation`], resolving structs it names first.
+    fn resolve_field_annotation(
+        &mut self,
+        annotation: &x3_ast::TypeAnnotation,
+        defs: &std::collections::BTreeMap<String, &x3_ast::StructDef>,
+        visiting: &mut Vec<String>,
+    ) -> Type {
+        match &annotation.shape {
+            x3_ast::TypeShape::Array { element, size } => Type::array(
+                self.resolve_field_annotation(element, defs, visiting),
+                *size,
+            ),
+            x3_ast::TypeShape::Vector { element } => {
+                Type::vector(self.resolve_field_annotation(element, defs, visiting))
+            }
+            x3_ast::TypeShape::Tuple { elements } => Type::tuple(
+                elements
+                    .iter()
+                    .map(|e| self.resolve_field_annotation(e, defs, visiting))
+                    .collect(),
+            ),
+            x3_ast::TypeShape::Named => {
+                if defs.contains_key(&annotation.name.name) {
+                    return self
+                        .resolve_struct(&annotation.name.name, defs, visiting)
+                        .unwrap_or_else(Type::error);
+                }
+                let ty = self.resolve_type_annotation(annotation);
+                if matches!(ty.kind, TypeKind::Named(_)) {
+                    self.errors.push(TypeError::new(
+                        TypeErrorKind::UnknownType(annotation.name.name.clone()),
+                        annotation.span,
+                    ));
+                    return Type::error();
+                }
+                ty
             }
         }
     }
@@ -201,6 +302,15 @@ impl TypeChecker {
                 Item::Agent(_) => {
                     // Nested agents are handled by semantics - skip here
                 }
+                Item::Struct(_) => {
+                    // Structs are module items; the parser accepts one here, the type
+                    // checker does not register it.
+                    self.errors.push(TypeError::invalid_operation(
+                        "declaring a struct inside an agent",
+                        Type::named(&agent.name.name),
+                        agent.span,
+                    ));
+                }
             }
         }
 
@@ -253,6 +363,9 @@ impl TypeChecker {
             }
             x3_ast::TypeShape::Named => {}
         }
+        if let Some(def) = self.structs.get(&annotation.name.name) {
+            return Type::new(TypeKind::Struct(def.clone()));
+        }
         // For now, simple name-based lookup
         if let Some(ty) = self.env.lookup_type(&annotation.name.name) {
             return ty.clone();
@@ -272,6 +385,7 @@ impl TypeChecker {
             Item::GlobalLet(global) => self.check_global_let(global, resolved),
             Item::Const(const_item) => self.check_const(const_item, resolved),
             Item::ArbProgram(_) => {}
+            Item::Struct(_) => {}
         }
     }
 
@@ -556,8 +670,8 @@ impl TypeChecker {
                     self.env.apply_substitutions(&target).kind,
                     TypeKind::Tuple(_)
                 ) {
-                    // A tuple's elements are fixed by its constructor; a struct's fields will be
-                    // written by name once structs exist.
+                    // A tuple's elements are fixed by its constructor; a struct's fields are
+                    // written by name (`s.f = v`).
                     self.errors.push(TypeError::invalid_operation(
                         "element assignment",
                         target.clone(),
@@ -566,6 +680,51 @@ impl TypeChecker {
                 }
                 let value = self.infer_expression_type(&assign.value, resolved);
                 self.check_type_compatibility(&element, &value, assign.span);
+                Type::unit()
+            }
+            Expression::StructLiteral(literal) => self.infer_struct_literal(literal, resolved),
+            Expression::FieldAssign(assign) => {
+                let target = self.infer_identifier_type(&assign.target, resolved);
+                let value = self.infer_expression_type(&assign.value, resolved);
+                match self.env.apply_substitutions(&target).kind {
+                    TypeKind::Struct(def) => match def.field(&assign.field.name) {
+                        Some((_, field_ty)) => {
+                            let field_ty = field_ty.clone();
+                            self.check_type_compatibility(&field_ty, &value, assign.span);
+                        }
+                        None => self.errors.push(TypeError::no_field(
+                            target.clone(),
+                            &assign.field.name,
+                            assign.field.span,
+                        )),
+                    },
+                    // `t.0 = v`: a tuple's element by position.
+                    TypeKind::Tuple(elements) => {
+                        match assign
+                            .field
+                            .name
+                            .parse::<usize>()
+                            .ok()
+                            .and_then(|i| elements.get(i))
+                        {
+                            Some(element) => {
+                                let element = element.clone();
+                                self.check_type_compatibility(&element, &value, assign.span);
+                            }
+                            None => self.errors.push(TypeError::no_field(
+                                target.clone(),
+                                &assign.field.name,
+                                assign.field.span,
+                            )),
+                        }
+                    }
+                    TypeKind::Error => {}
+                    _ => self.errors.push(TypeError::invalid_operation(
+                        "field assignment",
+                        target.clone(),
+                        assign.span,
+                    )),
+                }
                 Type::unit()
             }
         };
@@ -797,7 +956,31 @@ impl TypeChecker {
         let object_type = self.infer_expression_type(&field.object, resolved);
 
         // Look up field in agent type
+        let object_type = self.env.apply_substitutions(&object_type);
         match &object_type.kind {
+            TypeKind::Struct(def) => {
+                if let Some((_, ty)) = def.field(&field.field.name) {
+                    return ty.clone();
+                }
+                self.errors.push(TypeError::no_field(
+                    object_type.clone(),
+                    &field.field.name,
+                    field.field.span,
+                ));
+                Type::error()
+            }
+            // `t.0`: a tuple's element by position.
+            TypeKind::Tuple(elements) => match field.field.name.parse::<usize>() {
+                Ok(i) if i < elements.len() => elements[i].clone(),
+                _ => {
+                    self.errors.push(TypeError::no_field(
+                        object_type.clone(),
+                        &field.field.name,
+                        field.field.span,
+                    ));
+                    Type::error()
+                }
+            },
             TypeKind::Agent(agent) => {
                 if let Some((_, ty)) = agent
                     .fields
@@ -823,6 +1006,61 @@ impl TypeChecker {
                 Type::error()
             }
         }
+    }
+
+    /// `Name { f: v, ... }`: a declared struct, every field given exactly once, each value
+    /// accepted by its field's type.
+    fn infer_struct_literal(
+        &mut self,
+        literal: &x3_ast::StructLiteralExpression,
+        resolved: &ResolvedModule,
+    ) -> Type {
+        let Some(def) = self.structs.get(&literal.name.name).cloned() else {
+            for field in &literal.fields {
+                self.infer_expression_type(&field.value, resolved);
+            }
+            self.errors.push(TypeError::new(
+                TypeErrorKind::UnknownType(literal.name.name.clone()),
+                literal.name.span,
+            ));
+            return Type::error();
+        };
+        let ty = Type::new(TypeKind::Struct(def.clone()));
+        for (i, init) in literal.fields.iter().enumerate() {
+            let value = self.infer_expression_type(&init.value, resolved);
+            if literal.fields[..i]
+                .iter()
+                .any(|f| f.name.name == init.name.name)
+            {
+                self.errors.push(TypeError::invalid_operation(
+                    &format!("giving field `{}` twice", init.name.name),
+                    ty.clone(),
+                    init.name.span,
+                ));
+                continue;
+            }
+            match def.field(&init.name.name) {
+                Some((_, field_ty)) => {
+                    let field_ty = field_ty.clone();
+                    self.check_type_compatibility(&field_ty, &value, init.span);
+                }
+                None => self.errors.push(TypeError::no_field(
+                    ty.clone(),
+                    &init.name.name,
+                    init.name.span,
+                )),
+            }
+        }
+        for (name, _) in &def.fields {
+            if !literal.fields.iter().any(|f| &f.name.name == name) {
+                self.errors.push(TypeError::invalid_operation(
+                    &format!("leaving out field `{name}`"),
+                    ty.clone(),
+                    literal.span,
+                ));
+            }
+        }
+        ty
     }
 
     /// `[e0, e1, ...]`: every element has the first element's type.
@@ -1007,6 +1245,7 @@ impl TypeChecker {
                     let (t1, t2) = (t1.clone(), t2.clone());
                     t1.len() == t2.len() && t1.iter().zip(&t2).all(|(a, b)| self.accept(a, b))
                 }
+                (TypeKind::Struct(s1), TypeKind::Struct(s2)) => s1.name == s2.name,
                 _ => self.types_compatible(&expected, &found),
             },
         }

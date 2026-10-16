@@ -16,6 +16,24 @@ pub enum Item {
     Const(Const),
     ArbProgram(ArbProgram),
     Agent(Agent),
+    /// `struct Name { field: Type, ... }`
+    Struct(StructDef),
+}
+
+/// A struct declaration. A value of the struct is its fields, in declaration order.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StructDef {
+    pub name: Identifier,
+    pub fields: Vec<StructField>,
+    pub span: Span,
+}
+
+/// One declared field.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StructField {
+    pub name: Identifier,
+    pub ty: TypeAnnotation,
+    pub span: Span,
 }
 
 /// A free-standing binding, potentially mutable.
@@ -242,6 +260,10 @@ pub enum Expression {
     Index(IndexExpression),
     /// `name[index] = value`
     IndexAssign(IndexAssignExpression),
+    /// `Name { field: value, ... }`
+    StructLiteral(StructLiteralExpression),
+    /// `name.field = value`
+    FieldAssign(FieldAssignExpression),
 }
 
 impl Expression {
@@ -259,6 +281,8 @@ impl Expression {
             Expression::Tuple(expr) => expr.span,
             Expression::Index(expr) => expr.span,
             Expression::IndexAssign(expr) => expr.span,
+            Expression::StructLiteral(expr) => expr.span,
+            Expression::FieldAssign(expr) => expr.span,
         }
     }
 }
@@ -341,6 +365,31 @@ pub struct IndexExpression {
 pub struct IndexAssignExpression {
     pub target: Identifier,
     pub index: Box<Expression>,
+    pub value: Box<Expression>,
+    pub span: Span,
+}
+
+/// `Name { field: value, ... }`: every declared field, each once, in any order.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StructLiteralExpression {
+    pub name: Identifier,
+    pub fields: Vec<FieldInit>,
+    pub span: Span,
+}
+
+/// `field: value` inside a struct literal.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FieldInit {
+    pub name: Identifier,
+    pub value: Expression,
+    pub span: Span,
+}
+
+/// `name.field = value`: rebinds `name` to a copy with `field` replaced, as `a[i] = v` does.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FieldAssignExpression {
+    pub target: Identifier,
+    pub field: Identifier,
     pub value: Box<Expression>,
     pub span: Span,
 }

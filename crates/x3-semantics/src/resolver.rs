@@ -123,6 +123,8 @@ impl Resolver {
                 Item::Agent(agent) => {
                     self.declare_agent(agent);
                 }
+                // Struct names are types; the type checker resolves them.
+                Item::Struct(_) => {}
             }
         }
     }
@@ -266,6 +268,7 @@ impl Resolver {
             Item::Const(const_item) => self.resolve_const(const_item),
             Item::ArbProgram(_) => {}
             Item::Agent(agent) => self.resolve_agent(agent),
+            Item::Struct(_) => {}
         }
     }
 
@@ -355,6 +358,7 @@ impl Resolver {
                         agent.span,
                     ));
                 }
+                Item::Struct(_) => {}
             }
         }
 
@@ -620,6 +624,16 @@ impl Resolver {
                 self.resolve_expression(&assign.value);
                 self.resolve_expression(&assign.index);
                 // `a[i] = v` rebinds `a`, so `a` must be a mutable variable, as for `a = v`.
+                self.resolve_assignment_target(&assign.target);
+            }
+            Expression::StructLiteral(literal) => {
+                for field in &literal.fields {
+                    self.resolve_expression(&field.value);
+                }
+            }
+            Expression::FieldAssign(assign) => {
+                self.resolve_expression(&assign.value);
+                // `s.f = v` rebinds `s`, as `a[i] = v` rebinds `a`.
                 self.resolve_assignment_target(&assign.target);
             }
         }
