@@ -17,13 +17,19 @@
 //!
 //! # Security
 //!
-//! - Does NOT trust a single relayer: the header chain must prove
-//!   cumulative work via increasing height.
-//! - Does NOT trust tx position: the Merkle proof proves inclusion.
-//! - Fails closed on any decoding error, hash mismatch, or invalid proof.
-//! - The most-work chain tip is assumed final (Bitcoin consensus rule).
+//! This is a **stateless** check: the prover supplies the headers, so what it proves is
+//! that someone did real work on top of the transaction — every header must meet its own
+//! target, no target may be easier than the caller's `max_target_bits` (the difficulty the
+//! caller knows Bitcoin to be at), and the targets may not change between consecutive
+//! headers off a retarget boundary. That bounds the cost of a forgery at the caller's
+//! difficulty times the confirmations required; it does **not** show the headers are on
+//! Bitcoin's best chain. Settlement that moves value verifies against an anchored header
+//! store instead (`x3_btc_spv::LightClient`, the settlement engine's checkpointed chain).
+//!
+//! The previous version checked only that headers linked, never that any of them carried
+//! proof of work, and applied the Merkle path at the *block height* rather than the
+//! transaction's position in the block. Linked headers with no work cost nothing to make.
 
-use alloc::vec::Vec;
 use core::fmt;
 
 /// A Bitcoin block header (80 bytes).
@@ -44,6 +50,18 @@ pub struct BtcBlockHeader {
 }
 
 impl BtcBlockHeader {
+    /// The same header in `x3-btc-spv`'s form, which hashes and checks it.
+    pub fn to_spv(&self) -> x3_btc_spv::BlockHeader {
+        x3_btc_spv::BlockHeader {
+            version: self.version as i32,
+            prev_blockhash: self.prev_blockhash,
+            merkle_root: self.merkle_root,
+            time: self.timestamp,
+            bits: self.bits,
+            nonce: self.nonce,
+        }
+    }
+
     /// Compute the SHA-256d (double SHA-256) hash of this block header.
     ///
     /// The bytes returned are the digest in **wire (internal) order** — the same bytes
@@ -53,27 +71,8 @@ impl BtcBlockHeader {
     /// genesis block); anything that prints a hash has to reverse it, and anything that compares one
     /// must not. The previous doc comment here claimed display order, which the code has never
     /// returned — a comment that would have had a reader reverse a hash before comparing it.
-    ///
-    /// Only compiled where `sha2` is available (`test` or `std`); the verification path in this
-    /// module hashes through `sha256d(&serialize_header(..))` on every build.
-    #[cfg(any(test, feature = "std"))]
     pub fn hash(&self) -> [u8; 32] {
-        use sha2::{Digest, Sha256};
-        let mut data = Vec::with_capacity(80);
-        data.extend_from_slice(&self.version.to_le_bytes());
-        data.extend_from_slice(&self.prev_blockhash);
-        data.extend_from_slice(&self.merkle_root);
-        data.extend_from_slice(&self.timestamp.to_le_bytes());
-        data.extend_from_slice(&self.bits.to_le_bytes());
-        data.extend_from_slice(&self.nonce.to_le_bytes());
-
-        // SHA-256d: SHA-256(SHA-256(data))
-        let hash1 = Sha256::digest(&data);
-        let hash2 = Sha256::digest(hash1);
-
-        let mut result = [0u8; 32];
-        result.copy_from_slice(&hash2);
-        result
+        self.to_spv().block_hash()
     }
 }
 
@@ -118,6 +117,10 @@ pub enum BtcProofError {
     ArithmeticOverflow,
     /// Header RLP/data decode error.
     InvalidHeaderData,
+    /// A header's hash does not meet its own target, or its target exceeds Bitcoin's limit.
+    InsufficientWork { height: u64 },
+    /// A header's target is easier than the caller's floor, or changes off a retarget boundary.
+    DifficultyTooLow { height: u64, bits: u32 },
 }
 
 impl fmt::Display for BtcProofError {
@@ -164,6 +167,18 @@ impl fmt::Display for BtcProofError {
             }
             Self::ArithmeticOverflow => write!(f, "BTC proof: arithmetic overflow"),
             Self::InvalidHeaderData => write!(f, "BTC proof: invalid header data"),
+            Self::InsufficientWork { height } => {
+                write!(
+                    f,
+                    "BTC proof: header at height {} lacks proof of work",
+                    height
+                )
+            }
+            Self::DifficultyTooLow { height, bits } => write!(
+                f,
+                "BTC proof: header at height {} has target {:#010x}, easier than allowed",
+                height, bits
+            ),
         }
     }
 }
@@ -171,127 +186,46 @@ impl fmt::Display for BtcProofError {
 #[cfg(feature = "std")]
 impl std::error::Error for BtcProofError {}
 
-/// Serialize a block header to its 80-byte wire format.
-fn serialize_header(header: &BtcBlockHeader) -> Vec<u8> {
-    let mut data = Vec::with_capacity(80);
-    data.extend_from_slice(&header.version.to_le_bytes());
-    data.extend_from_slice(&header.prev_blockhash);
-    data.extend_from_slice(&header.merkle_root);
-    data.extend_from_slice(&header.timestamp.to_le_bytes());
-    data.extend_from_slice(&header.bits.to_le_bytes());
-    data.extend_from_slice(&header.nonce.to_le_bytes());
-    data
-}
-
-/// Compute the SHA-256d hash of a serialized block header.
-fn sha256d(data: &[u8]) -> [u8; 32] {
-    use sha2::{Digest, Sha256};
-    let hash1 = Sha256::digest(data);
-    let hash2 = Sha256::digest(hash1);
-    let mut result = [0u8; 32];
-    result.copy_from_slice(&hash2);
-    result
-}
-
-/// Verify a Merkle proof that a transaction is included in a block.
-///
-/// # Arguments
-///
-/// * `tx_id` - The transaction ID (double-SHA256 of the transaction).
-/// * `merkle_proof` - Ordered list of sibling hashes that prove inclusion.
-/// * `index` - Bit index of the transaction in the block (used to determine
-///   left/right ordering at each level).
-/// * `root` - The expected Merkle root.
-///
-/// Returns `true` if the computed root matches the expected root.
-fn verify_merkle_proof(
-    tx_id: &[u8; 32],
-    merkle_proof: &[[u8; 32]],
-    index: u64,
-    root: &[u8; 32],
-) -> bool {
-    let mut current = *tx_id;
-    let mut idx = index;
-
-    for sibling in merkle_proof {
-        let combined = if idx.is_multiple_of(2) {
-            // Current is left, sibling is right
-            let mut data = Vec::with_capacity(64);
-            data.extend_from_slice(&current);
-            data.extend_from_slice(sibling);
-            sha256d(&data)
-        } else {
-            // Sibling is left, current is right
-            let mut data = Vec::with_capacity(64);
-            data.extend_from_slice(sibling);
-            data.extend_from_slice(&current);
-            sha256d(&data)
-        };
-        current = combined;
-        idx >>= 1;
-    }
-
-    &current == root
-}
-
 /// Verify a BTC SPV proof.
 ///
 /// # Arguments
 ///
-/// * `headers` - Ordered list of block headers (tip first, or genesis first).
-///   Must contain at least `confirmations` blocks.
-/// * `tx_id` - The Bitcoin transaction ID (double-SHA256 digest).
+/// * `headers` - Consecutive block headers, oldest first. `headers[0]` contains the
+///   transaction; each later header confirms it once more.
+/// * `tx_id` - The Bitcoin transaction ID (double-SHA256 digest, internal byte order).
+/// * `tx_index` - The transaction's position in its block.
 /// * `output_index` - The output index to prove (the UTXO).
-/// * `merkle_proof` - Ordered sibling hashes proving inclusion of `tx_id`
-///   in the containing block's Merkle tree.
-/// * `tx_block_height` - The position of the containing block in the chain.
+/// * `merkle_proof` - Sibling hashes from the transaction up to the Merkle root.
+/// * `tx_block_height` - The containing block's height.
 /// * `num_outputs` - Number of outputs in the transaction.
 /// * `required_confirmations` - Minimum confirmations required.
-///
-/// # Returns
-///
-/// A verified `BtcSpvProof` with the proof details.
+/// * `max_target_bits` - The easiest target (as `nBits`) a header may carry: the difficulty
+///   the caller knows Bitcoin to be at.
 ///
 /// # Errors
 ///
 /// Returns `BtcProofError` if any validation step fails.
+#[allow(clippy::too_many_arguments)]
 pub fn verify_btc_spv_proof(
     headers: &[BtcBlockHeader],
     tx_id: &[u8; 32],
+    tx_index: u32,
     output_index: u32,
     merkle_proof: &[[u8; 32]],
     tx_block_height: u64,
     num_outputs: u32,
     required_confirmations: u64,
+    max_target_bits: u32,
 ) -> Result<BtcSpvProof, BtcProofError> {
     if headers.is_empty() {
         return Err(BtcProofError::EmptyHeaderChain);
     }
-
-    // Validate output index
     if output_index >= num_outputs {
         return Err(BtcProofError::OutputIndexOutOfRange {
             index: output_index,
             num_outputs,
         });
     }
-
-    // Validate header chain: each header's hash must equal the next header's prev_blockhash
-    for i in 1..headers.len() {
-        let computed_hash = sha256d(&serialize_header(&headers[i - 1]));
-        if computed_hash != headers[i].prev_blockhash {
-            return Err(BtcProofError::HeaderChainBroken {
-                expected_prev: headers[i].prev_blockhash,
-                actual_hash: computed_hash,
-                height: tx_block_height + i as u64 - 1,
-            });
-        }
-    }
-
-    // The containing block is the first header (tip of the proof chain)
-    let containing_block = &headers[0];
-
-    // Check confirmations FIRST, before any per-tx validation
     let confirmations = headers.len() as u64;
     if confirmations < required_confirmations {
         return Err(BtcProofError::InsufficientConfirmations {
@@ -300,23 +234,59 @@ pub fn verify_btc_spv_proof(
         });
     }
 
-    // Verify Merkle proof (after confirmations check so test assertions are correct)
-    if !verify_merkle_proof(
-        tx_id,
-        merkle_proof,
-        tx_block_height,
-        &containing_block.merkle_root,
-    ) {
-        return Err(BtcProofError::MerkleProofInvalid {
-            tx_id: *tx_id,
-            claimed_root: containing_block.merkle_root,
-        });
+    let floor = x3_btc_spv::target_from_bits(max_target_bits)
+        .map_err(|_| BtcProofError::InvalidHeaderData)?;
+    let mainnet = x3_btc_spv::Params::mainnet();
+    for (i, header) in headers.iter().enumerate() {
+        let height = tx_block_height
+            .checked_add(i as u64)
+            .ok_or(BtcProofError::ArithmeticOverflow)?;
+        let spv = header.to_spv();
+        x3_btc_spv::check_proof_of_work(&spv, &mainnet)
+            .map_err(|_| BtcProofError::InsufficientWork { height })?;
+        let target = x3_btc_spv::target_from_bits(header.bits)
+            .map_err(|_| BtcProofError::InvalidHeaderData)?;
+        if target > floor {
+            return Err(BtcProofError::DifficultyTooLow {
+                height,
+                bits: header.bits,
+            });
+        }
+        if i > 0 {
+            let parent = &headers[i - 1];
+            let computed_hash = parent.to_spv().block_hash();
+            if computed_hash != header.prev_blockhash {
+                return Err(BtcProofError::HeaderChainBroken {
+                    expected_prev: header.prev_blockhash,
+                    actual_hash: computed_hash,
+                    height: height - 1,
+                });
+            }
+            if !height.is_multiple_of(mainnet.retarget_interval) && header.bits != parent.bits {
+                return Err(BtcProofError::DifficultyTooLow {
+                    height,
+                    bits: header.bits,
+                });
+            }
+        }
     }
+
+    let containing_block = &headers[0];
+    x3_btc_spv::verify_merkle_inclusion(
+        tx_id,
+        tx_index,
+        merkle_proof,
+        &containing_block.merkle_root,
+    )
+    .map_err(|_| BtcProofError::MerkleProofInvalid {
+        tx_id: *tx_id,
+        claimed_root: containing_block.merkle_root,
+    })?;
 
     Ok(BtcSpvProof {
         tx_id: *tx_id,
         output_index,
-        block_hash: sha256d(&serialize_header(containing_block)),
+        block_hash: containing_block.to_spv().block_hash(),
         block_height: tx_block_height,
         confirmations,
         merkle_root: containing_block.merkle_root,
@@ -326,178 +296,170 @@ pub fn verify_btc_spv_proof(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
+    use alloc::vec::Vec;
 
-    /// Create a minimal valid header for testing.
-    fn make_test_header(
-        version: u32,
-        prev: [u8; 32],
-        merkle: [u8; 32],
-        nonce: u32,
-    ) -> BtcBlockHeader {
-        BtcBlockHeader {
-            version,
-            prev_blockhash: prev,
-            merkle_root: merkle,
-            timestamp: 1_234_567,
-            bits: 0x1d00ffff, // mainnet difficulty 1
-            nonce,
+    fn display(hex: &str) -> [u8; 32] {
+        let mut out = [0u8; 32];
+        for (i, byte) in out.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap();
         }
+        out.reverse();
+        out
     }
 
-    fn make_test_header_chain(length: u64) -> Vec<BtcBlockHeader> {
-        let mut headers = Vec::with_capacity(length as usize);
-        let mut prev = [0u8; 32];
-        let merkle = [0xabu8; 32];
-
-        for i in 0..length {
-            let header = make_test_header(1, prev, merkle, i as u32);
-            let hash = sha256d(&serialize_header(&header));
-            prev = hash;
-            headers.push(header);
-        }
-
-        headers
+    /// Bitcoin mainnet blocks 0, 1 and 2. Each is a one-transaction block, so its Merkle
+    /// root is its coinbase's txid.
+    fn mainnet_0_to_2() -> Vec<BtcBlockHeader> {
+        let genesis = BtcBlockHeader {
+            version: 1,
+            prev_blockhash: [0; 32],
+            merkle_root: display(
+                "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+            ),
+            timestamp: 1231006505,
+            bits: 0x1d00ffff,
+            nonce: 2083236893,
+        };
+        let one = BtcBlockHeader {
+            version: 1,
+            prev_blockhash: genesis.to_spv().block_hash(),
+            merkle_root: display(
+                "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098",
+            ),
+            timestamp: 1231469665,
+            bits: 0x1d00ffff,
+            nonce: 2573394689,
+        };
+        let two = BtcBlockHeader {
+            version: 1,
+            prev_blockhash: one.to_spv().block_hash(),
+            merkle_root: display(
+                "9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5",
+            ),
+            timestamp: 1231469744,
+            bits: 0x1d00ffff,
+            nonce: 1639830024,
+        };
+        vec![genesis, one, two]
     }
+
+    const DIFFICULTY_1: u32 = 0x1d00ffff;
 
     #[test]
-    fn header_hash_is_deterministic() {
-        let header = make_test_header(1, [0u8; 32], [0xabu8; 32], 0);
-        let hash = header.hash();
-        let hash2 = sha256d(&serialize_header(&header));
-        assert_eq!(hash, hash2, "struct hash and serialized hash must match");
-    }
-
-    #[test]
-    fn verify_spv_with_0_confirmations_fails() {
-        let headers = make_test_header_chain(1);
-        let tx_id = [0xbbu8; 32];
-        let result = verify_btc_spv_proof(&headers, &tx_id, 0, &[], 0, 1, 2);
+    fn header_hash_matches_the_published_genesis_id() {
+        let headers = mainnet_0_to_2();
         assert_eq!(
-            result,
-            Err(BtcProofError::InsufficientConfirmations {
-                required: 2,
-                actual: 1,
-            })
+            headers[0].hash(),
+            display("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f")
         );
     }
 
     #[test]
-    fn verify_spv_empty_headers_fails() {
-        let tx_id = [0xbbu8; 32];
-        let result = verify_btc_spv_proof(&[], &tx_id, 0, &[], 0, 1, 1);
-        assert_eq!(result, Err(BtcProofError::EmptyHeaderChain));
+    fn the_genesis_coinbase_is_proven_under_two_real_confirmations() {
+        let headers = mainnet_0_to_2();
+        let coinbase = headers[0].merkle_root;
+        let proof = verify_btc_spv_proof(&headers, &coinbase, 0, 0, &[], 0, 1, 3, DIFFICULTY_1)
+            .expect("real blocks prove a real transaction");
+        assert_eq!(proof.confirmations, 3);
+        assert_eq!(proof.block_hash, headers[0].hash());
     }
 
     #[test]
-    fn verify_spv_output_index_out_of_range() {
-        let headers = make_test_header_chain(1);
-        let tx_id = [0xbbu8; 32];
-        let result = verify_btc_spv_proof(&headers, &tx_id, 5, &[], 0, 2, 1);
+    fn too_few_headers_are_refused() {
+        let headers = mainnet_0_to_2();
+        let coinbase = headers[0].merkle_root;
         assert_eq!(
-            result,
-            Err(BtcProofError::OutputIndexOutOfRange {
-                index: 5,
-                num_outputs: 2,
-            })
-        );
-    }
-
-    #[test]
-    fn verify_spv_broken_header_chain() {
-        let mut headers = make_test_header_chain(3);
-        // Corrupt the second header's prev_blockhash
-        headers[1].prev_blockhash = [0xffu8; 32];
-
-        let tx_id = [0xbbu8; 32];
-        let result = verify_btc_spv_proof(&headers, &tx_id, 0, &[], 0, 1, 1);
-        assert!(matches!(
-            result,
-            Err(BtcProofError::HeaderChainBroken { .. })
-        ));
-    }
-
-    #[test]
-    fn verify_spv_merkle_proof_mismatch() {
-        let headers = make_test_header_chain(1);
-        let tx_id = [0xbbu8; 32];
-
-        // Provide a fake merkle proof that won't match the header's root
-        let merkle_proof = vec![[0xccu8; 32], [0xddu8; 32]];
-
-        let result = verify_btc_spv_proof(&headers, &tx_id, 0, &merkle_proof, 0, 1, 1);
-        assert!(matches!(
-            result,
-            Err(BtcProofError::MerkleProofInvalid { .. })
-        ));
-    }
-
-    #[test]
-    fn merkle_proof_verification_logic() {
-        // Two-leaf tree:
-        //        root = sha256d(left || right)
-        //       /    \
-        //   left    right
-        let left = [0x01u8; 32];
-        let right = [0x02u8; 32];
-
-        let mut combined = Vec::with_capacity(64);
-        combined.extend_from_slice(&left);
-        combined.extend_from_slice(&right);
-        let root = sha256d(&combined);
-
-        // Prove 'right' at index 1
-        let proof = vec![left]; // sibling is left
-        assert!(verify_merkle_proof(&right, &proof, 1, &root));
-
-        // Prove 'left' at index 0
-        let proof = vec![right]; // sibling is right
-        assert!(verify_merkle_proof(&left, &proof, 0, &root));
-
-        // Invalid: try to prove 'left' at index 1 with wrong sibling
-        let proof = vec![left];
-        assert!(!verify_merkle_proof(&left, &proof, 1, &root));
-    }
-
-    #[test]
-    fn header_chain_validates_continuity() {
-        let headers = make_test_header_chain(5);
-        // Verify all links are valid by re-computing
-        for i in 1..headers.len() {
-            let computed = sha256d(&serialize_header(&headers[i - 1]));
-            assert_eq!(
-                computed,
-                headers[i].prev_blockhash,
-                "header {} should link to {}",
-                i,
-                i - 1
-            );
-        }
-    }
-
-    #[test]
-    fn confirmations_correctly_counted() {
-        // 3 headers = 3 confirmations
-        let headers = make_test_header_chain(3);
-        let tx_id = [0xbbu8; 32];
-
-        // Need 3 confirmations = pass
-        // Need 4 confirmations = fail
-        let result_ok = verify_btc_spv_proof(&headers, &tx_id, 0, &[], 0, 1, 3);
-        assert_eq!(
-            result_ok,
-            Err(BtcProofError::MerkleProofInvalid {
-                tx_id: [0xbbu8; 32],
-                claimed_root: [0xabu8; 32]
-            }),
-            "should fail on merkle proof (not confirmations)"
-        );
-
-        let result_fail = verify_btc_spv_proof(&headers, &tx_id, 0, &[], 0, 1, 4);
-        assert_eq!(
-            result_fail,
+            verify_btc_spv_proof(&headers, &coinbase, 0, 0, &[], 0, 1, 4, DIFFICULTY_1),
             Err(BtcProofError::InsufficientConfirmations {
                 required: 4,
-                actual: 3,
+                actual: 3
+            })
+        );
+        assert_eq!(
+            verify_btc_spv_proof(&[], &coinbase, 0, 0, &[], 0, 1, 1, DIFFICULTY_1),
+            Err(BtcProofError::EmptyHeaderChain)
+        );
+    }
+
+    #[test]
+    fn linked_headers_without_work_are_refused() {
+        // What the previous version accepted: headers that link and carry no work.
+        let mut headers = Vec::new();
+        let mut prev = [0u8; 32];
+        for nonce in 0..3 {
+            let header = BtcBlockHeader {
+                version: 1,
+                prev_blockhash: prev,
+                merkle_root: [0xab; 32],
+                timestamp: 1_234_567,
+                bits: DIFFICULTY_1,
+                nonce,
+            };
+            prev = header.hash();
+            headers.push(header);
+        }
+        assert_eq!(
+            verify_btc_spv_proof(&headers, &[0xab; 32], 0, 0, &[], 0, 1, 3, DIFFICULTY_1),
+            Err(BtcProofError::InsufficientWork { height: 0 })
+        );
+    }
+
+    #[test]
+    fn a_floor_harder_than_the_headers_refuses_them() {
+        let headers = mainnet_0_to_2();
+        assert_eq!(
+            verify_btc_spv_proof(
+                &headers,
+                &headers[0].merkle_root,
+                0,
+                0,
+                &[],
+                0,
+                1,
+                1,
+                0x1b0404cb
+            ),
+            Err(BtcProofError::DifficultyTooLow {
+                height: 0,
+                bits: DIFFICULTY_1
+            })
+        );
+    }
+
+    #[test]
+    fn a_broken_link_and_a_wrong_position_are_refused() {
+        let mut headers = mainnet_0_to_2();
+        let coinbase = headers[0].merkle_root;
+        assert!(matches!(
+            verify_btc_spv_proof(&headers, &coinbase, 1, 0, &[], 0, 1, 1, DIFFICULTY_1),
+            Err(BtcProofError::MerkleProofInvalid { .. })
+        ));
+        headers.swap(1, 2);
+        assert!(matches!(
+            verify_btc_spv_proof(&headers, &coinbase, 0, 0, &[], 0, 1, 1, DIFFICULTY_1),
+            Err(BtcProofError::HeaderChainBroken { height: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn output_index_out_of_range_is_refused() {
+        let headers = mainnet_0_to_2();
+        assert_eq!(
+            verify_btc_spv_proof(
+                &headers,
+                &headers[0].merkle_root,
+                0,
+                5,
+                &[],
+                0,
+                2,
+                1,
+                DIFFICULTY_1
+            ),
+            Err(BtcProofError::OutputIndexOutOfRange {
+                index: 5,
+                num_outputs: 2
             })
         );
     }

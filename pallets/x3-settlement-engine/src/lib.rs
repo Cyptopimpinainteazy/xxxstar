@@ -390,6 +390,17 @@ pub mod pallet {
     #[pallet::getter(fn btc_best_height)]
     pub type BtcBestHeight<T: Config> = StorageValue<_, u64, ValueQuery>;
 
+    /// The best Bitcoin chain this pallet holds: `height` → block hash, from the checkpoint up to
+    /// `BtcBestHeight`.
+    ///
+    /// `BtcBestHeight` alone said how tall the tallest branch was, and confirmations were counted
+    /// against it for *any* admitted block — so a block on a losing branch was credited with the
+    /// winning branch's depth. A block counts as confirmed only where this index names it. A new
+    /// tip rewrites the index back to where its branch meets the old one, so a reorganisation
+    /// costs one write per replaced block.
+    #[pallet::storage]
+    pub type BtcBestChain<T: Config> = StorageMap<_, Twox64Concat, u64, H256, OptionQuery>;
+
     /// Heights this chain has committed to as Bitcoin checkpoints: `height` → block hash.
     ///
     /// This is the SPV trust root. A header chain is only worth anything to this
@@ -952,6 +963,8 @@ pub mod pallet {
         /// A native X3 leg's held funds are not all still held, so it cannot be paid out or
         /// returned in full. Nothing is moved.
         NativeEscrowCustodyMismatch,
+        /// The block is admitted but on a branch that is not the best chain.
+        BtcBlockNotOnBestChain,
     }
 
     // ============================================================================
@@ -1030,7 +1043,7 @@ pub mod pallet {
                         anchored: true,
                     },
                 );
-                BtcBestHeight::<T>::mutate(|best| *best = (*best).max(header.height));
+                Pallet::<T>::btc_offer_tip(block_hash, header.height);
             }
         }
     }
@@ -1963,8 +1976,12 @@ pub mod pallet {
 
             // Confirmations come from the height the chain derived from the parent
             // link, not from the `height` field the caller's header carried.
+            // …and only for a block on the best chain: a block on a losing branch has no
+            // confirmations, however tall the winning branch is.
+            let height = Self::btc_best_chain_height(&block_hash)
+                .ok_or(Error::<T>::BtcBlockNotOnBestChain)?;
             let best_height = BtcBestHeight::<T>::get();
-            let confirmations = best_height.saturating_sub(meta.height) + 1;
+            let confirmations = best_height.saturating_sub(height) + 1;
 
             ensure!(
                 confirmations >= T::MinBtcConfirmations::get() as u64,
@@ -3543,37 +3560,19 @@ pub mod pallet {
             proof: &[H256],
             header: &BtcBlockHeader,
         ) -> Result<bool, DispatchError> {
-            // C-009: Bitcoin Merkle trees require direction-aware concatenation.
-            // When the current node is a LEFT child (index is even), it goes first.
-            // When it is a RIGHT child (index is odd), the sibling goes first.
-            // Without this, the reconstructed root will be wrong for any tx that
-            // is not the leftmost leaf at every level.
-            let mut current_hash = *txid;
-            let mut index = tx_index;
-
-            for sibling in proof {
-                let combined = if index.is_multiple_of(2) {
-                    // Current node is a left child — concatenate current || sibling
-                    let mut buf = [0u8; 64];
-                    buf[0..32].copy_from_slice(current_hash.as_bytes());
-                    buf[32..64].copy_from_slice(sibling.as_bytes());
-                    buf
-                } else {
-                    // Current node is a right child — concatenate sibling || current
-                    let mut buf = [0u8; 64];
-                    buf[0..32].copy_from_slice(sibling.as_bytes());
-                    buf[32..64].copy_from_slice(current_hash.as_bytes());
-                    buf
-                };
-
-                // Double-SHA256 (Bitcoin's standard hash)
-                let first_hash = sp_io::hashing::sha2_256(&combined);
-                current_hash = H256::from(sp_io::hashing::sha2_256(&first_hash));
-                index /= 2;
-            }
-
-            // Verify the reconstructed hash matches the merkle root from the block header
-            Ok(current_hash == header.merkle_root)
+            // Bitcoin's rule, with position (C-009), with the position bounded by the path's depth,
+            // and with a duplicated right subtree (CVE-2012-2459) refused. An empty path is a
+            // one-transaction block.
+            let path: Vec<[u8; 32]> = proof.iter().map(|node| node.0).collect();
+            Ok(
+                x3_btc_spv::verify_merkle_inclusion(
+                    &txid.0,
+                    tx_index,
+                    &path,
+                    &header.merkle_root.0,
+                )
+                .is_ok(),
+            )
         }
 
         /// Verify BTC proof of work - validates block meets target difficulty
@@ -3810,13 +3809,63 @@ pub mod pallet {
 
             BtcHeaders::<T>::insert(block_hash, header.clone());
             BtcHeaderMetaStore::<T>::insert(block_hash, BtcHeaderMeta { height, anchored });
-            BtcBestHeight::<T>::mutate(|best| *best = (*best).max(height));
+            Self::btc_offer_tip(block_hash, height);
             Self::deposit_event(Event::BtcHeaderAdmitted {
                 block_hash,
                 height,
                 anchored,
             });
             Ok((block_hash, height, anchored))
+        }
+
+        /// Make `hash` the best tip if it is taller than the current one (or there is none yet),
+        /// rewriting [`BtcBestChain`] down to where its branch meets the indexed chain.
+        ///
+        /// Height, not cumulative work, picks the tip. Within a retarget window every branch
+        /// carries the same `nBits` (`btc_bits_follow_parent`), so the taller branch is the one
+        /// with more work; across a boundary the two can differ by the 4x clamp per window, which
+        /// a fork long enough to span one would have to pay for in real Bitcoin work.
+        pub(crate) fn btc_offer_tip(hash: H256, height: u64) {
+            let best = BtcBestHeight::<T>::get();
+            if BtcBestChain::<T>::contains_key(best) && height <= best {
+                return;
+            }
+            // Heights above the new tip belonged to a branch that no longer leads.
+            let mut stale = height.saturating_add(1);
+            while stale <= best && BtcBestChain::<T>::take(stale).is_some() {
+                stale = stale.saturating_add(1);
+            }
+            let (mut cursor, mut at) = (hash, height);
+            loop {
+                if BtcBestChain::<T>::get(at) == Some(cursor) {
+                    break;
+                }
+                BtcBestChain::<T>::insert(at, cursor);
+                let Some(header) = BtcHeaders::<T>::get(cursor) else {
+                    break;
+                };
+                match BtcHeaderMetaStore::<T>::get(header.prev_block_hash) {
+                    Some(parent) if at > 0 => {
+                        cursor = header.prev_block_hash;
+                        at = parent.height;
+                    }
+                    _ => break,
+                }
+            }
+            BtcBestHeight::<T>::put(height);
+        }
+
+        /// The height of `hash` if it is on the best Bitcoin chain this pallet holds.
+        pub fn btc_best_chain_height(hash: &H256) -> Option<u64> {
+            let meta = BtcHeaderMetaStore::<T>::get(hash)?;
+            (meta.anchored && BtcBestChain::<T>::get(meta.height) == Some(*hash))
+                .then_some(meta.height)
+        }
+
+        /// The best Bitcoin chain's height, `None` until a checkpoint is anchored.
+        pub fn btc_best_chain_tip_height() -> Option<u64> {
+            let best = BtcBestHeight::<T>::get();
+            BtcBestChain::<T>::contains_key(best).then_some(best)
         }
 
         /// The 80 bytes Bitcoin hashes: version, previous block hash, merkle root,

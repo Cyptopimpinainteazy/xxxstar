@@ -13,6 +13,7 @@ sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable
 sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 x3-common = { path = "../x3-common" }
 sha2 = "0.10"
+x3-btc-spv = { path = "../x3-btc-spv" }
 hex = "0.4"
 tracing = "0.1"
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }

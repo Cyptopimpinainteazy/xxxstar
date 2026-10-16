@@ -5558,3 +5558,107 @@ fn an_uncollected_settlement_fee_is_recorded_as_waived() {
         );
     });
 }
+
+/// `count` mined headers above `parent`, marked with `tag` so two branches differ.
+fn mined_branch(parent: &BtcBlockHeader, count: u64, tag: u8) -> Vec<BtcBlockHeader> {
+    let mut out = Vec::new();
+    let mut prev = parent.clone();
+    for i in 1..=count {
+        let header = mine_btc_header(BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::from(btc_wire_hash(&prev)),
+            merkle_root: H256::from([tag; 32]),
+            timestamp: parent.timestamp + (600 * i as u32),
+            bits: parent.bits,
+            nonce: 0,
+            height: parent.height + i,
+        });
+        out.push(header.clone());
+        prev = header;
+    }
+    out
+}
+
+#[test]
+fn only_the_best_branch_counts_and_a_reorg_moves_the_index() {
+    new_test_ext().execute_with(|| {
+        let anchor = batch_anchor();
+        let anchor_hash = Pallet::<Test>::compute_btc_block_hash(&anchor);
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&anchor_hash),
+            Some(anchor.height)
+        );
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_tip_height(),
+            Some(anchor.height)
+        );
+
+        let a = mined_branch(&anchor, 2, 0xa0);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            a.clone()
+        ));
+        let a1 = Pallet::<Test>::compute_btc_block_hash(&a[0]);
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&a1),
+            Some(anchor.height + 1)
+        );
+
+        // A taller branch from the anchor takes over: branch A's blocks stop counting, even though
+        // they are admitted and anchored, and the tall branch's tip is the one confirmations are
+        // measured to.
+        let b = mined_branch(&anchor, 3, 0xb0);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            b.clone()
+        ));
+        assert!(
+            crate::BtcHeaderMetaStore::<Test>::get(a1)
+                .expect("still admitted")
+                .anchored
+        );
+        assert_eq!(Pallet::<Test>::btc_best_chain_height(&a1), None);
+        for header in &b {
+            assert_eq!(
+                Pallet::<Test>::btc_best_chain_height(&Pallet::<Test>::compute_btc_block_hash(
+                    header
+                )),
+                Some(header.height)
+            );
+        }
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_tip_height(),
+            Some(anchor.height + 3)
+        );
+
+        // A shorter extension of the losing branch does not move the tip.
+        let a3 = mined_branch(&a[1], 1, 0xa3);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            a3.clone()
+        ));
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&Pallet::<Test>::compute_btc_block_hash(&a3[0])),
+            None
+        );
+
+        // Branch A outgrowing branch B reorganises back, and B's top block is cleared.
+        let a4 = mined_branch(&a3[0], 1, 0xa4);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            a4.clone()
+        ));
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&a1),
+            Some(anchor.height + 1)
+        );
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&Pallet::<Test>::compute_btc_block_hash(&b[2])),
+            None
+        );
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_tip_height(),
+            Some(anchor.height + 4)
+        );
+    });
+}

@@ -97,6 +97,8 @@ pallet-x3-supply-ledger = { path = "../pallets/x3-supply-ledger", default-featur
 pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-features = false }
 pallet-x3-token-factory = { path = "../pallets/x3-token-factory", default-features = false }
 pallet-x3-crosschain-gateway = { path = "../pallets/x3-crosschain-gateway", default-features = false }
+# For `BtcHeaderAnchor`: the gateway's Bitcoin verifier reads the settlement engine's header store.
+x3-verification-router = { path = "../crates/x3-verification-router", default-features = false }
 pallet-cross-chain-validator = { path = "../pallets/cross-chain-validator", default-features = false }
 pallet-x3-automation = { path = "../pallets/x3-automation", default-features = false }
 pallet-x3-oracle = { path = "../pallets/x3-oracle", default-features = false }
@@ -290,6 +292,7 @@ std = [
 	"pallet-x3-cross-vm-router/std",
 	"pallet-x3-token-factory/std",
 	"pallet-x3-crosschain-gateway/std",
+	"x3-verification-router/std",
 	"pallet-x3-automation/std",
 	"pallet-x3-oracle/std",
 	"pallet-x3-vrf/std",

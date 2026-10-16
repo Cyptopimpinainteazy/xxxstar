@@ -2835,7 +2835,26 @@ impl pallet_x3_crosschain_gateway::Config for Runtime {
     /// pallet has recorded a receipts root for, and its confirmation depth is
     /// measured from the attested head rather than from the proof.
     type EvmHeaderAnchor = pallet_cross_chain_validator::Pallet<Runtime>;
+    /// The settlement engine's Bitcoin header store — checkpoint-anchored, proof-of-work and
+    /// difficulty checked — is what a Bitcoin deposit's block must be on, at its best chain's
+    /// depth.
+    type BtcHeaderAnchor = SettlementEngineBtcAnchor;
     type WeightInfo = pallet_x3_crosschain_gateway::weights::SubstrateWeight<Runtime>;
+}
+
+/// The settlement engine's best Bitcoin chain, as the gateway's verifier reads it.
+pub struct SettlementEngineBtcAnchor;
+
+impl x3_verification_router::BtcHeaderAnchor for SettlementEngineBtcAnchor {
+    fn best_chain_height(block_hash: &[u8; 32]) -> Option<u64> {
+        pallet_x3_settlement_engine::Pallet::<Runtime>::btc_best_chain_height(&H256::from(
+            *block_hash,
+        ))
+    }
+
+    fn best_height() -> Option<u64> {
+        pallet_x3_settlement_engine::Pallet::<Runtime>::btc_best_chain_tip_height()
+    }
 }
 
 // ===== Swarm Pallet Configuration =====

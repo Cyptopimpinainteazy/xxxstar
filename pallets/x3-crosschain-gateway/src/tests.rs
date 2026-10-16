@@ -1486,3 +1486,109 @@ fn the_two_derivations_agree() {
         pallet_id, crate_id
     );
 }
+
+// ── Bitcoin SPV route ─────────────────────────────────────────────────────
+
+/// Bitcoin's genesis block, and its only transaction.
+fn bitcoin_genesis() -> (x3_btc_spv::BlockHeader, Vec<u8>) {
+    let hex = |s: &str| -> Vec<u8> {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    };
+    let coinbase = hex("01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4d04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73ffffffff0100f2052a01000000434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac00000000");
+    let header = x3_btc_spv::BlockHeader {
+        version: 1,
+        prev_blockhash: [0; 32],
+        merkle_root: x3_btc_spv::sha256d(&coinbase),
+        time: 1231006505,
+        bits: 0x1d00ffff,
+        nonce: 2083236893,
+    };
+    (header, coinbase)
+}
+
+fn enable_bitcoin_route(vault_script: &[u8]) {
+    register_asset(ExternalChainId::BitcoinTestnet, "0xBTCTOKEN", [11u8; 32]);
+    let mut route = _bitcoin_route();
+    route.max_amount = u128::MAX;
+    route.daily_limit = u128::MAX;
+    route.contract_address = frame_support::BoundedVec::try_from(vault_script.to_vec()).unwrap();
+    enable_route_for(route);
+}
+
+fn bitcoin_deposit(payload: Vec<u8>, proof_id: [u8; 32], amount: u128) -> crate::DepositProof {
+    deposit_proof_with(
+        proof_id,
+        amount,
+        ExternalChainId::BitcoinTestnet,
+        bitcoin_asset(),
+        1,
+        frame_support::BoundedVec::try_from(payload).unwrap(),
+    )
+}
+
+#[test]
+fn a_bitcoin_deposit_in_a_block_this_chain_does_not_hold_is_refused() {
+    new_test_ext().execute_with(|| {
+        let (header, coinbase) = bitcoin_genesis();
+        let vault = x3_btc_spv::transaction_outputs(&coinbase).unwrap()[0]
+            .script_pubkey
+            .clone();
+        enable_bitcoin_route(&vault);
+        let txid = x3_btc_spv::sha256d(&coinbase);
+        let payload = x3_verification_router::encode_btc_proof_v1(&header, 0, &[], 0, &coinbase);
+        let id = x3_verification_router::bitcoin_deposit_id(&txid, 0);
+
+        // A real block with real proof of work, paying the route's script — but not on this
+        // chain's Bitcoin view, so it proves nothing here.
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [4u8; 32],
+                bitcoin_deposit(payload.clone(), id, 5_000_000_000),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+
+        // Held, deep enough, paying the vault — and still refused: the transaction does not name
+        // the beneficiary, so whoever submits it would be the one credited.
+        anchor_btc_block(header.block_hash(), 0, 100);
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [4u8; 32],
+                bitcoin_deposit(payload, id, 5_000_000_000),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+        assert_eq!(Pallet::<Test>::external_locked([11u8; 32]), 0);
+    });
+}
+
+#[test]
+fn the_payload_the_old_bitcoin_verifier_accepted_is_refused() {
+    new_test_ext().execute_with(|| {
+        enable_bitcoin_route(b"0xGATEWAY");
+        // Tip 200, an all-zero header with an easy target, "index" 100, an all-zero txid.
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&200u64.to_le_bytes());
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        let mut header = [0u8; 80];
+        header[72..76].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0x1E]);
+        header[76..80].copy_from_slice(&2561u32.to_le_bytes());
+        payload.extend_from_slice(&header);
+        payload.extend_from_slice(&100u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&[0u8; 32]);
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [4u8; 32],
+                bitcoin_deposit(payload, [1u8; 32], 100),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+    });
+}

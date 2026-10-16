@@ -30,6 +30,8 @@ ed25519-dalek = { version = "2.1", default-features = false }
 # Bitcoin SPV verifier path. Promotes `x3-bitcoin-vault` from a workspace
 # island to a real compiled consumer of production verification flow.
 x3-bitcoin-vault = { path = "../x3-bitcoin-vault", default-features = false }
+# Bitcoin consensus checks: proof of work, Bitcoin's Merkle rule, transaction parsing.
+x3-btc-spv = { path = "../x3-btc-spv", default-features = false }
 
 [features]
 default = ["std"]

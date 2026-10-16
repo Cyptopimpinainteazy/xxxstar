@@ -12358,6 +12358,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3-btc-spv",
  "x3-crosschain-gateway",
  "x3-verification-router",
 ]
@@ -12755,6 +12756,7 @@ dependencies = [
  "x3-asset-kernel-types",
  "x3-atomic-swap",
  "x3-bitcoin-vault",
+ "x3-btc-spv",
  "x3-crosschain-intent",
  "x3-verification-router",
 ]
@@ -25958,6 +25960,7 @@ dependencies = [
  "sp-io",
  "sp-std 14.0.0",
  "tracing",
+ "x3-btc-spv",
  "x3-common",
 ]
 
@@ -25990,6 +25993,13 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "x3-btc-spv"
+version = "0.1.0"
+dependencies = [
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -26256,6 +26266,7 @@ dependencies = [
  "x3-revenue-sharing",
  "x3-security-events",
  "x3-svm-integration",
+ "x3-verification-router",
  "x3-x3-integration",
 ]
 
@@ -26410,6 +26421,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "thiserror 2.0.20",
+ "x3-btc-spv",
  "x3-verification-router",
 ]
 
@@ -27581,6 +27593,7 @@ dependencies = [
  "sha2 0.10.9",
  "tiny-keccak",
  "x3-bitcoin-vault",
+ "x3-btc-spv",
 ]
 
 [[package]]
