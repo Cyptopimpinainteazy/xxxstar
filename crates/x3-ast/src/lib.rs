@@ -69,6 +69,26 @@ pub struct Param {
 pub struct TypeAnnotation {
     pub name: Identifier,
     pub span: Span,
+    /// The shape for a compound type; `Named` for a plain name such as `i64`.
+    #[serde(default)]
+    pub shape: TypeShape,
+}
+
+/// What kind of type an annotation spells.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub enum TypeShape {
+    /// A type named by `TypeAnnotation::name`.
+    #[default]
+    Named,
+    /// `[T; N]`: a fixed-size array (`name` is `"array"`).
+    Array {
+        element: Box<TypeAnnotation>,
+        size: usize,
+    },
+    /// `[T]`: an array whose length is known only at run time (`name` is `"vec"`).
+    Vector { element: Box<TypeAnnotation> },
+    /// `(T1, T2, ...)`: a tuple (`name` is `"tuple"`).
+    Tuple { elements: Vec<TypeAnnotation> },
 }
 
 /// A block of statements.
@@ -214,6 +234,14 @@ pub enum Expression {
     Assign(AssignExpression),
     FieldAccess(FieldAccessExpression),
     Range(RangeExpression),
+    /// `[e0, e1, ...]`
+    Array(ArrayExpression),
+    /// `(e0, e1, ...)` with at least two elements (`(e)` is a parenthesised expression).
+    Tuple(TupleExpression),
+    /// `base[index]`
+    Index(IndexExpression),
+    /// `name[index] = value`
+    IndexAssign(IndexAssignExpression),
 }
 
 impl Expression {
@@ -227,6 +255,10 @@ impl Expression {
             Expression::Assign(expr) => expr.span,
             Expression::FieldAccess(expr) => expr.span,
             Expression::Range(expr) => expr.span,
+            Expression::Array(expr) => expr.span,
+            Expression::Tuple(expr) => expr.span,
+            Expression::Index(expr) => expr.span,
+            Expression::IndexAssign(expr) => expr.span,
         }
     }
 }
@@ -276,6 +308,40 @@ pub struct AssignExpression {
 pub struct FieldAccessExpression {
     pub object: Box<Expression>,
     pub field: Identifier,
+    pub span: Span,
+}
+
+/// Array literal: `[e0, e1, ...]`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ArrayExpression {
+    pub elements: Vec<Expression>,
+    pub span: Span,
+}
+
+/// Tuple literal: `(e0, e1, ...)`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TupleExpression {
+    pub elements: Vec<Expression>,
+    pub span: Span,
+}
+
+/// Element read: `base[index]`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct IndexExpression {
+    pub base: Box<Expression>,
+    pub index: Box<Expression>,
+    pub span: Span,
+}
+
+/// Element write: `target[index] = value`.
+///
+/// The target is a name, not an expression: an array has value semantics, so the write rebinds the
+/// variable to a copy with one element replaced, and only a variable can be rebound.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct IndexAssignExpression {
+    pub target: Identifier,
+    pub index: Box<Expression>,
+    pub value: Box<Expression>,
     pub span: Span,
 }
 

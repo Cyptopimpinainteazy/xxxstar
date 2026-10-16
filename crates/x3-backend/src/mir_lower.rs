@@ -220,6 +220,11 @@ impl MirBytecodeCompiler {
                             // `emit` is a statement, so its MIR value is the unit this backend
                             // represents as 0 — the same as a host call that returns nothing.
                             self.emitter.emit_int(dst, 0)?;
+                        } else if let Some(()) =
+                            self.compile_aggregate_call(target.0, dst, &arg_regs)?
+                        {
+                            // An array, tuple, index or length operation (see
+                            // `x3_common::intrinsics::ARRAY_NEW_SYMBOL` and its neighbours).
                         } else if let Some(intrinsic) = x3_common::intrinsics::by_symbol(target.0) {
                             if arg_regs.len() != intrinsic.arity {
                                 return Err(BackendError::new(
@@ -458,6 +463,58 @@ impl MirBytecodeCompiler {
     }
 
     /// Allocate a new register.
+    /// Emit an aggregate operation if `symbol` names one; `None` if it does not.
+    fn compile_aggregate_call(
+        &mut self,
+        symbol: usize,
+        dst: Register,
+        args: &[Register],
+    ) -> BackendResult<Option<()>> {
+        use x3_common::intrinsics as i;
+        let arity = |n: usize, what: &str| -> BackendResult<()> {
+            if args.len() == n {
+                Ok(())
+            } else {
+                Err(BackendError::new(
+                    BackendErrorKind::Internal(format!(
+                        "{what} takes {n} operand(s), MIR passed {}",
+                        args.len()
+                    )),
+                    self.current_span,
+                ))
+            }
+        };
+        if symbol == i::ARRAY_NEW_SYMBOL {
+            let capacity = u16::try_from(args.len()).map_err(|_| {
+                BackendError::new(
+                    BackendErrorKind::Internal("array literal too long".to_string()),
+                    self.current_span,
+                )
+            })?;
+            self.emitter.emit_new_array(dst, capacity);
+            for item in args {
+                self.emitter.emit_array_push(dst, *item);
+            }
+        } else if symbol == i::TUPLE_NEW_SYMBOL {
+            self.emitter.emit_new_tuple(dst, args);
+        } else if symbol == i::INDEX_GET_SYMBOL {
+            arity(2, "an index read")?;
+            self.emitter.emit_load_index(dst, args[0], args[1]);
+        } else if symbol == i::INDEX_SET_SYMBOL {
+            arity(3, "an element assignment")?;
+            // Value semantics: copy the array, then replace the element in the copy, so the
+            // original SSA value is unchanged for anything else that reads it.
+            self.emitter.emit_mov(dst, args[0]);
+            self.emitter.emit_store_index(dst, args[1], args[2]);
+        } else if symbol == i::LEN_SYMBOL {
+            arity(1, "`len`")?;
+            self.emitter.emit_array_len(dst, args[0]);
+        } else {
+            return Ok(None);
+        }
+        Ok(Some(()))
+    }
+
     /// Allocate the next register, or refuse when the register file is exhausted.
     ///
     /// The runtime addresses registers with one byte and its register file holds
