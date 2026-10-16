@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code, unused_imports, unused_variables)]
 #![allow(
     clippy::manual_range_contains,
@@ -84,14 +85,35 @@
 //! let module = Module::from_bytes(&bytes)?;
 //! ```
 
+extern crate alloc;
+
+/// The `alloc` names `std` puts in its prelude, for the modules that also build without it.
+pub(crate) mod prelude {
+    pub use alloc::{
+        borrow::ToOwned,
+        boxed::Box,
+        format,
+        string::{String, ToString},
+        vec,
+        vec::Vec,
+    };
+}
+
+// Bytecode format, opcode table and decoder: no_std, used by the on-chain VM.
 pub mod bc_format;
 pub mod bc_format_helpers;
-pub mod emit;
 pub mod error;
-pub mod layout;
-pub mod lower;
-pub mod mir_lower;
 pub mod opcode;
+
+// HIR/MIR lowering: the compiler front end, off-chain only.
+#[cfg(feature = "std")]
+pub mod emit;
+#[cfg(feature = "std")]
+pub mod layout;
+#[cfg(feature = "std")]
+pub mod lower;
+#[cfg(feature = "std")]
+pub mod mir_lower;
 
 pub use bc_format::{
     BytecodeModule, ConstPool, DebugInfo, FeatureFlags, FunctionEntry, GlobalEntry, ModuleFlags,
@@ -101,9 +123,13 @@ pub use bc_format::{
 pub use bc_format_helpers::{
     assemble_branch_module, assemble_halt_module, assemble_param_module, assemble_simple_module,
 };
+#[cfg(feature = "std")]
 pub use emit::BytecodeEmitter;
 pub use error::{BackendError, BackendErrorKind};
+#[cfg(feature = "std")]
 pub use layout::LayoutComputer;
+#[cfg(feature = "std")]
 pub use lower::BytecodeCompiler;
+#[cfg(feature = "std")]
 pub use mir_lower::MirBytecodeCompiler;
 pub use opcode::{Opcode, Register};

@@ -26,6 +26,7 @@
 //! └─────────────────────────────────────────────────┘
 //! ```
 
+use crate::prelude::*;
 use x3_backend::bc_format::{BytecodeModule, ConstValue};
 use x3_backend::opcode::Opcode;
 
@@ -33,6 +34,7 @@ use crate::error::{VMError, VMErrorKind, VMResult};
 use crate::events::{EventBuffer, VmEvent};
 use crate::hostcall::HostcallRegistry;
 use crate::isolation::IsolationContext;
+#[cfg(feature = "std")]
 use crate::jit_compiler::{JitCompiler, JitConfig, JitStats};
 use crate::state::{StateMachine, VmState};
 use crate::storage::{StorageValue, VmStorage, WriteRecord};
@@ -206,6 +208,8 @@ pub struct VM {
     /// Journaled VM storage.
     storage: VmStorage,
     /// Hot-path tracker and compiled-function cache.
+    // The JIT has no backend outside tests (`backend_available()` is false), and needs std.
+    #[cfg(feature = "std")]
     jit: JitCompiler,
 }
 
@@ -273,6 +277,7 @@ impl VM {
             isolation: IsolationContext::new([0u8; 32]).with_max_call_depth(isolation_depth),
             event_buffer: EventBuffer::new(),
             storage,
+            #[cfg(feature = "std")]
             jit: JitCompiler::new(JitConfig::default()),
         })
     }
@@ -318,6 +323,7 @@ impl VM {
     }
 
     /// Snapshot JIT counters and compilation cache statistics.
+    #[cfg(feature = "std")]
     pub fn jit_stats(&self) -> JitStats {
         self.jit.stats()
     }
@@ -612,15 +618,18 @@ impl VM {
                     ));
                 }
 
-                let func_id = func_idx as u32;
-                self.jit.record_execution(func_id);
-                if self.jit.should_compile(func_id)
-                    && self.jit.get_compiled(func_id).is_none()
-                    && self.jit.backend_available()
+                #[cfg(feature = "std")]
                 {
-                    self.jit
-                        .compile(func_id, &self.module.code)
-                        .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                    let func_id = func_idx as u32;
+                    self.jit.record_execution(func_id);
+                    if self.jit.should_compile(func_id)
+                        && self.jit.get_compiled(func_id).is_none()
+                        && self.jit.backend_available()
+                    {
+                        self.jit
+                            .compile(func_id, &self.module.code)
+                            .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                    }
                 }
 
                 self.isolation.enter_call().map_err(|err| {
@@ -2433,7 +2442,7 @@ mod tests {
             let bytes = storage_module(store_then_load(0), 1, 4);
             let mut vm = VM::from_bytes(&bytes).expect("module should load");
             let result = vm
-                .call_function(0, std::slice::from_ref(&input))
+                .call_function(0, core::slice::from_ref(&input))
                 .unwrap_or_else(|e| panic!("store/load of {input:?} failed: {e:?}"));
             assert_eq!(
                 result.value,

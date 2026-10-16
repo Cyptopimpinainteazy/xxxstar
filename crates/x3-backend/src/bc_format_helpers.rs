@@ -23,6 +23,7 @@
 
 use crate::bc_format::{ConstValue, FunctionEntry, MAGIC, VERSION};
 use crate::opcode::Opcode;
+use crate::prelude::*;
 
 /// Assemble a simple module that adds two constants and returns the result.
 ///

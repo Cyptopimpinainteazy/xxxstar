@@ -48,8 +48,9 @@
 //!
 //! Bytecode declares a `min_version` - the loader must be at least that version.
 
+use crate::prelude::*;
+use alloc::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 use crate::error::{BackendError, BackendErrorKind, BackendResult};
 use crate::opcode::{ConstIdx, FuncIdx, Register};
@@ -143,8 +144,8 @@ impl VersionInfo {
     }
 }
 
-impl std::fmt::Display for VersionInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for VersionInfo {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
     }
 }
