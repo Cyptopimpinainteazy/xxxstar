@@ -27608,6 +27608,7 @@ dependencies = [
  "libloading 0.9.0",
  "log",
  "parking_lot 0.12.5",
+ "proptest",
  "serde",
  "sp-core",
  "thiserror 2.0.20",

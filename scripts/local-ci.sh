@@ -644,7 +644,7 @@ GATES_FAST=(
   # this gate to exist before it will pass.
   "test x3-external-chains:cargo test -p x3-external-chains"
   "test x3-asset-registry:cargo test -p pallet-x3-asset-registry"
-  # `x3-x3-integration` is the crate the chain executes X3 bytecode through (`mini_x3` and the
+  # `x3-x3-integration` is the crate the chain executes X3 bytecode through (`x3-vm` and the
   # adapters `pallets/x3-kernel` calls). Its suite — the compiler bridge, the cross-decoder body
   # parity test, and the bytecode version-compatibility matrix — needs the `compile` feature to
   # build at all, which is why the feature is named here rather than left to unification.
@@ -709,6 +709,11 @@ GATES_FAST=(
   # std off. `check-no-default-features.sh` covers the host target only, and std leaks
   # (println!, HashMap, a std-only dependency) show up only on wasm.
   "x3-vm no_std wasm:cargo check -p x3-vm --no-default-features --target wasm32v1-none"
+  # The chain's X3 engine and its verifier. Nothing ran this suite: it holds the interpreter, the
+  # verifier, journaled storage and nested rollback, the one gas table, and `tests/robustness.rs`,
+  # whose properties (no panic on any input, gas bounds, determinism) are the engine's safety
+  # claims. (`test x3-integration` above runs the chain entry point over the same engine.)
+  "test x3-vm:cargo test -p x3-vm"
   # Gate 7 of the public testnet gate is the one criterion that decides a launch
   # from a forced-restart proof the operator supplies, and until 2026-09-30 the
   # rule that reads that proof was inline in a script that cannot run without a
