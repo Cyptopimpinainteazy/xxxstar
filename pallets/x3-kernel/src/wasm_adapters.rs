@@ -314,6 +314,23 @@ impl X3ExecutorAdapter for WasmX3Adapter {
         slots: &[(sp_core::H256, [u8; 32])],
         private_channel_available: bool,
     ) -> Result<ExecutionReceipt, DispatchError> {
+        // No context supplied: every context opcode refuses (fail closed).
+        Self::execute_with_context(
+            payload,
+            gas_limit,
+            slots,
+            private_channel_available,
+            &x3_x3_integration::X3BlockContext::unknown(),
+        )
+    }
+
+    fn execute_with_context(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(sp_core::H256, [u8; 32])],
+        private_channel_available: bool,
+        context: &x3_x3_integration::X3BlockContext,
+    ) -> Result<ExecutionReceipt, DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
@@ -326,11 +343,12 @@ impl X3ExecutorAdapter for WasmX3Adapter {
             .collect();
         // The engine refuses an artifact that demands private submission unless the pallet, which
         // holds `Config::PrivateSubmissionChannel`, says a private channel exists.
-        x3_x3_integration::X3Executor::execute_on_chain(
+        x3_x3_integration::X3Executor::execute_on_chain_with_context(
             payload,
             gas_limit,
             &seeds,
             private_channel_available,
+            context,
         )
         .map(|rec| ExecutionReceipt {
             version: crate::EXECUTION_RECEIPT_VERSION,

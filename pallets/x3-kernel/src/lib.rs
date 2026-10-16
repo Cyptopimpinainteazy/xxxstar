@@ -588,6 +588,13 @@ pub mod pallet {
         #[pallet::constant]
         type PrivateSubmissionChannel: Get<bool>;
 
+        /// The chain id an X3 program reads with `ctx_chain_id`.
+        ///
+        /// Wired to the same constant the runtime gives `pallet_evm`, so an X3 program and an EVM
+        /// contract on this chain name it identically.
+        #[pallet::constant]
+        type X3ChainId: Get<u64>;
+
         /// Weight information provider for extrinsics.
         type WeightInfo: WeightInfo;
 
@@ -1918,11 +1925,12 @@ pub mod pallet {
                 // earlier comit persisted must see that value, and a program that writes over one
                 // must report it as the write's `old_value`.
                 let slots = Self::x3_storage_view()?;
-                match T::X3Adapter::execute_with_slots_and_policy(
+                match T::X3Adapter::execute_with_context(
                     tx,
                     x3_gas_limit,
                     &slots,
                     T::PrivateSubmissionChannel::get(),
+                    &Self::x3_call_context(Some(&who)),
                 ) {
                     Ok(receipt) => Some(receipt),
                     Err(_e) => {
@@ -3612,6 +3620,32 @@ pub mod pallet {
         /// `Error::X3StorageViewTooLarge` for why a partial view would be worse than a refusal.
         /// `submit_comit_v2`'s weight pays for the bound, so a block cannot be made to read an
         /// unbounded map here.
+        /// What the chain knows about an X3 call, for the program's context opcodes.
+        ///
+        /// `sender` is the signing account when there is one (a cross-VM call has none, so the
+        /// program's `ctx_sender` is refused there rather than answered with an invented account).
+        /// An `AccountId32` is the account's own 32 bytes; an account type of any other width is
+        /// identified by the BLAKE2-256 of its SCALE encoding, which is still unique per account.
+        /// `value` is `Some(0)`: no X3 call path in this pallet transfers native value to the
+        /// program, so zero is the true answer, not a default.
+        pub fn x3_call_context(sender: Option<&T::AccountId>) -> x3_x3_integration::X3BlockContext {
+            let sender = sender.map(|account| {
+                let encoded = account.encode();
+                <[u8; 32]>::try_from(encoded.as_slice()).unwrap_or_else(|_| blake2_256(&encoded))
+            });
+            x3_x3_integration::X3BlockContext {
+                sender,
+                block_height: Some(
+                    frame_system::Pallet::<T>::block_number().saturated_into::<u64>(),
+                ),
+                timestamp_ms: Some(
+                    <pallet_timestamp::Pallet<T> as UnixTime>::now().as_millis() as u64
+                ),
+                value: Some(0),
+                chain_id: Some(T::X3ChainId::get()),
+            }
+        }
+
         fn x3_storage_view() -> Result<Vec<(H256, [u8; 32])>, DispatchError> {
             let limit = T::MaxX3StorageSlots::get() as usize;
             let mut view: Vec<(H256, [u8; 32])> = Vec::new();
@@ -4020,11 +4054,13 @@ pub mod pallet {
             // the VM and not on another.
             Pallet::<T>::ensure_private_submission_available(call.payload.as_slice())?;
             let slots = Pallet::<T>::x3_storage_view()?;
-            let receipt = T::X3Adapter::execute_with_slots_and_policy(
+            // A cross-VM call carries no signing account, so the program's sender is unknown here.
+            let receipt = T::X3Adapter::execute_with_context(
                 call.payload.as_slice(),
                 call.gas_budget,
                 &slots,
                 T::PrivateSubmissionChannel::get(),
+                &Pallet::<T>::x3_call_context(None),
             )?;
             let result = if receipt.success {
                 CrossVmResult::success(receipt.return_data, receipt.gas_used)

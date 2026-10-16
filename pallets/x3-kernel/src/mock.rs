@@ -499,6 +499,7 @@ impl pallet_x3_kernel::Config for Test {
     type MaxReplayPruneItemsPerBlock = ConstU32<64>;
     type RequireCrossVmProof = ConstBool<false>;
     type PrivateSubmissionChannel = TestPrivateSubmissionChannel;
+    type X3ChainId = frame_support::traits::ConstU64<650_000>;
     type CrossChainProofVerifier = TestProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;

@@ -1390,9 +1390,9 @@ mod tests {
 
     #[test]
     fn an_opcode_the_engine_cannot_run_is_refused_on_chain_and_admitted_off_it() {
-        // `ctx_sender dst` — decodes, and the interpreter has no arm for it.
+        // `agent_self dst` — decodes, and the interpreter has no arm for it (no agent registry).
         let mut module = make_simple_module(vec![
-            Opcode::CtxSender.to_byte(),
+            Opcode::AgentSelf.to_byte(),
             0x00,
             Opcode::Halt.to_byte(),
         ]);
@@ -1400,7 +1400,7 @@ mod tests {
         let refusal = Verifier::verify_module(&module, &VerifyOptions::on_chain())
             .expect_err("a block could not run it");
         assert!(
-            matches!(refusal.kind, VerifierErrorKind::NotExecutable(b) if b == Opcode::CtxSender.to_byte()),
+            matches!(refusal.kind, VerifierErrorKind::NotExecutable(b) if b == Opcode::AgentSelf.to_byte()),
             "{refusal:?}"
         );
         // Off chain the verifier stays a structural check: tools may inspect such a module.

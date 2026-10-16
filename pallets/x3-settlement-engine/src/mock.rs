@@ -181,6 +181,7 @@ impl pallet_x3_kernel::Config for Test {
     type MaxPreparedOpsPerBlock = ConstU32<8>;
     type RequireCrossVmProof = ConstBool<false>;
     type PrivateSubmissionChannel = ConstBool<false>;
+    type X3ChainId = frame_support::traits::ConstU64<650_000>;
     type CrossChainProofVerifier = pallet_x3_kernel::NoopProofVerifier;
     type BridgeEvmEscrow = MockBridgeEvmEscrow;
     type BridgeSvmEscrow = MockBridgeSvmEscrow;

@@ -378,6 +378,27 @@ impl X3Executor {
         seeds: &[([u8; 32], [u8; 32])],
         private_channel_available: bool,
     ) -> X3Result<X3ExecutionReceipt> {
+        Self::execute_on_chain_with_context(
+            bytecode,
+            gas_limit,
+            seeds,
+            private_channel_available,
+            &x3_vm::BlockContext::unknown(),
+        )
+    }
+
+    /// `execute_on_chain`, with what the host knows about the call.
+    ///
+    /// The context is what `ctx_sender`, `ctx_block_height`, `ctx_timestamp`, `ctx_value` and
+    /// `ctx_chain_id` read. A field left `None` is refused by the opcode that reads it, so a caller
+    /// supplies only what it actually knows; `execute_on_chain` supplies nothing.
+    pub fn execute_on_chain_with_context(
+        bytecode: &[u8],
+        gas_limit: u64,
+        seeds: &[([u8; 32], [u8; 32])],
+        private_channel_available: bool,
+        context: &x3_vm::BlockContext,
+    ) -> X3Result<X3ExecutionReceipt> {
         use x3_vm::{BytecodeModule as Module, VMConfig as Config, VMErrorKind, Value, VM as Vm};
 
         Self::verify_on_chain(bytecode)?;
@@ -410,6 +431,7 @@ impl X3Executor {
         )
         .map_err(|e| X3IntegrationError::ExecutionFailed(format!("{:?}", e)))?;
 
+        vm.set_context(*context);
         // The runtime calls the entry function with no arguments; the verifier has already
         // refused an entry that declares any.
         let result = vm.call_function(0, &[]);
