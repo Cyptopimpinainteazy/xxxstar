@@ -1,0 +1,340 @@
+/* ==========================================================================
+   Bottom Navigation Orrery Strip
+   ========================================================================== */
+
+#bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 160px;
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  background: linear-gradient(180deg, rgba(8, 10, 25, 0) 0%, rgba(8, 10, 25, 0.92) 20%);
+  border-top: 1px solid rgba(0, 240, 255, 0.08);
+  pointer-events: auto;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+/* Orrery mini-map (left) */
+.bn-orrery {
+  flex: 0 0 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.bn-orrery-canvas {
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 240, 255, 0.06);
+  cursor: crosshair;
+}
+
+/* Center info area */
+.bn-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 20px;
+  gap: 6px;
+}
+
+.bn-mode {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(0, 240, 255, 0.5);
+  text-transform: uppercase;
+}
+
+.bn-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.bn-stat {
+  font-size: 11px;
+  color: rgba(200, 210, 255, 0.6);
+}
+
+.bn-stat b {
+  color: rgba(0, 240, 255, 0.9);
+  font-weight: 600;
+}
+
+/* Event ripple timeline */
+.bn-events {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 12px;
+}
+
+.bn-event-pip {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: opacity 0.3s ease;
+}
+
+/* Right panel — pulse meter */
+.bn-right {
+  flex: 0 0 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.bn-pulse {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.bn-pulse-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(0, 240, 255, 0.4);
+  text-transform: uppercase;
+}
+
+.bn-pulse-value {
+  font-size: 18px;
+  color: rgba(0, 240, 255, 0.9);
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+/* ==========================================================================
+   Landing Prompt
+   ========================================================================== */
+
+.landing-prompt {
+  position: fixed;
+  bottom: 180px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 28px;
+  background: rgba(8, 10, 30, 0.9);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.landing-prompt.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+  pointer-events: none;
+}
+
+.lp-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.lp-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lp-action {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+}
+
+.lp-action kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #00f0ff;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 2px;
+}
+
+.lp-name {
+  font-size: 15px;
+  color: rgba(0, 240, 255, 0.9);
+  font-weight: 700;
+}
+
+.lp-type {
+  font-size: 10px;
+  color: rgba(200, 210, 255, 0.5);
+  letter-spacing: 1px;
+}
+
+/* ==========================================================================
+   Planet Detail Panel
+   ========================================================================== */
+
+.planet-detail {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  width: 280px;
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  z-index: 120;
+  background: rgba(8, 10, 30, 0.92);
+  border: 1px solid rgba(0, 240, 255, 0.12);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  padding: 16px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.planet-detail.hidden {
+  opacity: 0;
+  transform: translateX(20px);
+  pointer-events: none;
+}
+
+.pd-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: rgba(200, 210, 255, 0.4);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+.pd-close:hover {
+  color: #ff4466;
+}
+
+.pd-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pd-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pd-name {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 700;
+}
+
+.pd-category {
+  font-size: 10px;
+  color: rgba(200, 210, 255, 0.5);
+  letter-spacing: 1px;
+}
+
+.pd-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.pd-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: rgba(200, 210, 255, 0.6);
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.pd-row span:last-child {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+.pd-green { color: #44ff88 !important; }
+.pd-red { color: #ff4466 !important; }
+
+.pd-section-title {
+  font-size: 10px;
+  color: rgba(0, 240, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 8px 0 4px;
+}
+
+.pd-empty {
+  font-style: italic;
+  color: rgba(200, 210, 255, 0.3);
+}
+
+.pd-agent-type {
+  text-transform: capitalize;
+}
+
+.pd-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.pd-badge-active { background: rgba(68, 255, 136, 0.15); color: #44ff88; }
+.pd-badge-idle { background: rgba(255, 200, 0, 0.15); color: #ffcc00; }
+.pd-badge-offline { background: rgba(200, 210, 255, 0.1); color: rgba(200, 210, 255, 0.4); }
+.pd-badge-error { background: rgba(255, 68, 68, 0.15); color: #ff4444; }
+
+.pd-dim {
+  color: rgba(200, 210, 255, 0.4) !important;
+  font-weight: 400 !important;
+}
+
+.pd-land-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 240, 255, 0.08);
+  color: #00f0ff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.pd-land-btn:hover {
+  background: rgba(0, 240, 255, 0.18);
+  border-color: rgba(0, 240, 255, 0.5);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+/* Scrollbar styling for panel */
+.planet-detail::-webkit-scrollbar { width: 4px; }
+.planet-detail::-webkit-scrollbar-track { background: transparent; }
+.planet-detail::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.15); border-radius: 2px; }

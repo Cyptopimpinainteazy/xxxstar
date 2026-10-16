@@ -1,0 +1,105 @@
+{
+ "method": "sTPS (paritytech/polkadot-stps): keep-alive transfers between untouched endowed accounts, counted in finalized blocks over on-chain time",
+ "chain": "X3 Chain Development",
+ "spec_version": 22,
+ "best_block": 318,
+ "transfers_requested": 2000,
+ "submitted_accepted": 2000,
+ "rejected": 0,
+ "reject_reasons": {},
+ "submit_wall_ms": 892,
+ "finalized_transfers": 2000,
+ "blocks_with_transfers": 17,
+ "max_transfers_in_a_block": 136,
+ "onchain_span_ms": 3400,
+ "stps": 588.24,
+ "complete": true,
+ "collector_errors": 0,
+ "blocks": [
+  {
+   "number": 297,
+   "ts": 1791909375400,
+   "transfers": 113
+  },
+  {
+   "number": 298,
+   "ts": 1791909375601,
+   "transfers": 115
+  },
+  {
+   "number": 299,
+   "ts": 1791909375800,
+   "transfers": 104
+  },
+  {
+   "number": 300,
+   "ts": 1791909376000,
+   "transfers": 112
+  },
+  {
+   "number": 301,
+   "ts": 1791909376200,
+   "transfers": 118
+  },
+  {
+   "number": 302,
+   "ts": 1791909376400,
+   "transfers": 112
+  },
+  {
+   "number": 303,
+   "ts": 1791909376600,
+   "transfers": 122
+  },
+  {
+   "number": 304,
+   "ts": 1791909376801,
+   "transfers": 120
+  },
+  {
+   "number": 305,
+   "ts": 1791909377000,
+   "transfers": 103
+  },
+  {
+   "number": 306,
+   "ts": 1791909377200,
+   "transfers": 124
+  },
+  {
+   "number": 307,
+   "ts": 1791909377400,
+   "transfers": 114
+  },
+  {
+   "number": 308,
+   "ts": 1791909377601,
+   "transfers": 125
+  },
+  {
+   "number": 309,
+   "ts": 1791909377800,
+   "transfers": 131
+  },
+  {
+   "number": 310,
+   "ts": 1791909378000,
+   "transfers": 120
+  },
+  {
+   "number": 311,
+   "ts": 1791909378202,
+   "transfers": 136
+  },
+  {
+   "number": 312,
+   "ts": 1791909378400,
+   "transfers": 114
+  },
+  {
+   "number": 313,
+   "ts": 1791909378600,
+   "transfers": 117
+  }
+ ]
+}

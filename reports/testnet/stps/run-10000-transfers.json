@@ -1,0 +1,490 @@
+{
+ "method": "sTPS (paritytech/polkadot-stps): keep-alive transfers between untouched endowed accounts, counted in finalized blocks over on-chain time",
+ "chain": "X3 Chain Development",
+ "spec_version": 22,
+ "best_block": 1357,
+ "transfers_requested": 10000,
+ "submitted_accepted": 10000,
+ "rejected": 0,
+ "reject_reasons": {},
+ "submit_wall_ms": 8576,
+ "finalized_transfers": 10000,
+ "blocks_with_transfers": 94,
+ "max_transfers_in_a_block": 214,
+ "onchain_span_ms": 25600,
+ "stps": 390.63,
+ "complete": true,
+ "collector_errors": 0,
+ "blocks": [
+  {
+   "number": 1258,
+   "ts": 1791911392200,
+   "transfers": 8
+  },
+  {
+   "number": 1259,
+   "ts": 1791911392403,
+   "transfers": 79
+  },
+  {
+   "number": 1260,
+   "ts": 1791911392600,
+   "transfers": 92
+  },
+  {
+   "number": 1261,
+   "ts": 1791911392800,
+   "transfers": 92
+  },
+  {
+   "number": 1262,
+   "ts": 1791911393000,
+   "transfers": 81
+  },
+  {
+   "number": 1263,
+   "ts": 1791911393200,
+   "transfers": 84
+  },
+  {
+   "number": 1264,
+   "ts": 1791911393400,
+   "transfers": 102
+  },
+  {
+   "number": 1265,
+   "ts": 1791911393600,
+   "transfers": 81
+  },
+  {
+   "number": 1266,
+   "ts": 1791911393800,
+   "transfers": 85
+  },
+  {
+   "number": 1267,
+   "ts": 1791911394000,
+   "transfers": 83
+  },
+  {
+   "number": 1268,
+   "ts": 1791911394200,
+   "transfers": 102
+  },
+  {
+   "number": 1269,
+   "ts": 1791911394401,
+   "transfers": 90
+  },
+  {
+   "number": 1270,
+   "ts": 1791911394600,
+   "transfers": 103
+  },
+  {
+   "number": 1271,
+   "ts": 1791911394800,
+   "transfers": 114
+  },
+  {
+   "number": 1272,
+   "ts": 1791911395000,
+   "transfers": 138
+  },
+  {
+   "number": 1273,
+   "ts": 1791911395200,
+   "transfers": 95
+  },
+  {
+   "number": 1274,
+   "ts": 1791911395400,
+   "transfers": 108
+  },
+  {
+   "number": 1275,
+   "ts": 1791911395601,
+   "transfers": 117
+  },
+  {
+   "number": 1276,
+   "ts": 1791911395800,
+   "transfers": 122
+  },
+  {
+   "number": 1277,
+   "ts": 1791911396000,
+   "transfers": 92
+  },
+  {
+   "number": 1278,
+   "ts": 1791911396200,
+   "transfers": 109
+  },
+  {
+   "number": 1279,
+   "ts": 1791911396400,
+   "transfers": 85
+  },
+  {
+   "number": 1280,
+   "ts": 1791911396600,
+   "transfers": 142
+  },
+  {
+   "number": 1281,
+   "ts": 1791911396800,
+   "transfers": 126
+  },
+  {
+   "number": 1282,
+   "ts": 1791911397001,
+   "transfers": 81
+  },
+  {
+   "number": 1283,
+   "ts": 1791911397201,
+   "transfers": 81
+  },
+  {
+   "number": 1284,
+   "ts": 1791911397400,
+   "transfers": 69
+  },
+  {
+   "number": 1285,
+   "ts": 1791911397600,
+   "transfers": 119
+  },
+  {
+   "number": 1286,
+   "ts": 1791911397800,
+   "transfers": 137
+  },
+  {
+   "number": 1287,
+   "ts": 1791911398000,
+   "transfers": 119
+  },
+  {
+   "number": 1288,
+   "ts": 1791911398200,
+   "transfers": 114
+  },
+  {
+   "number": 1289,
+   "ts": 1791911398400,
+   "transfers": 122
+  },
+  {
+   "number": 1290,
+   "ts": 1791911398600,
+   "transfers": 104
+  },
+  {
+   "number": 1291,
+   "ts": 1791911398801,
+   "transfers": 76
+  },
+  {
+   "number": 1292,
+   "ts": 1791911399000,
+   "transfers": 127
+  },
+  {
+   "number": 1293,
+   "ts": 1791911399200,
+   "transfers": 97
+  },
+  {
+   "number": 1294,
+   "ts": 1791911399400,
+   "transfers": 96
+  },
+  {
+   "number": 1295,
+   "ts": 1791911399600,
+   "transfers": 81
+  },
+  {
+   "number": 1296,
+   "ts": 1791911399800,
+   "transfers": 130
+  },
+  {
+   "number": 1297,
+   "ts": 1791911400000,
+   "transfers": 107
+  },
+  {
+   "number": 1298,
+   "ts": 1791911400200,
+   "transfers": 110
+  },
+  {
+   "number": 1299,
+   "ts": 1791911400401,
+   "transfers": 87
+  },
+  {
+   "number": 1300,
+   "ts": 1791911400600,
+   "transfers": 49
+  },
+  {
+   "number": 1301,
+   "ts": 1791911400800,
+   "transfers": 146
+  },
+  {
+   "number": 1302,
+   "ts": 1791911401000,
+   "transfers": 81
+  },
+  {
+   "number": 1303,
+   "ts": 1791911401200,
+   "transfers": 98
+  },
+  {
+   "number": 1304,
+   "ts": 1791911401400,
+   "transfers": 67
+  },
+  {
+   "number": 1305,
+   "ts": 1791911401600,
+   "transfers": 6
+  },
+  {
+   "number": 1306,
+   "ts": 1791911401803,
+   "transfers": 87
+  },
+  {
+   "number": 1307,
+   "ts": 1791911402000,
+   "transfers": 61
+  },
+  {
+   "number": 1308,
+   "ts": 1791911402201,
+   "transfers": 55
+  },
+  {
+   "number": 1309,
+   "ts": 1791911402402,
+   "transfers": 67
+  },
+  {
+   "number": 1310,
+   "ts": 1791911402601,
+   "transfers": 51
+  },
+  {
+   "number": 1311,
+   "ts": 1791911402801,
+   "transfers": 95
+  },
+  {
+   "number": 1312,
+   "ts": 1791911403000,
+   "transfers": 109
+  },
+  {
+   "number": 1313,
+   "ts": 1791911403200,
+   "transfers": 77
+  },
+  {
+   "number": 1314,
+   "ts": 1791911403403,
+   "transfers": 61
+  },
+  {
+   "number": 1315,
+   "ts": 1791911403600,
+   "transfers": 93
+  },
+  {
+   "number": 1316,
+   "ts": 1791911403800,
+   "transfers": 84
+  },
+  {
+   "number": 1317,
+   "ts": 1791911404000,
+   "transfers": 116
+  },
+  {
+   "number": 1318,
+   "ts": 1791911404201,
+   "transfers": 49
+  },
+  {
+   "number": 1319,
+   "ts": 1791911404401,
+   "transfers": 67
+  },
+  {
+   "number": 1320,
+   "ts": 1791911404600,
+   "transfers": 40
+  },
+  {
+   "number": 1321,
+   "ts": 1791911404800,
+   "transfers": 66
+  },
+  {
+   "number": 1322,
+   "ts": 1791911405200,
+   "transfers": 167
+  },
+  {
+   "number": 1323,
+   "ts": 1791911407064,
+   "transfers": 212
+  },
+  {
+   "number": 1324,
+   "ts": 1791911409065,
+   "transfers": 213
+  },
+  {
+   "number": 1325,
+   "ts": 1791911410153,
+   "transfers": 213
+  },
+  {
+   "number": 1328,
+   "ts": 1791911411307,
+   "transfers": 60
+  },
+  {
+   "number": 1329,
+   "ts": 1791911411407,
+   "transfers": 117
+  },
+  {
+   "number": 1330,
+   "ts": 1791911411600,
+   "transfers": 142
+  },
+  {
+   "number": 1331,
+   "ts": 1791911411800,
+   "transfers": 107
+  },
+  {
+   "number": 1332,
+   "ts": 1791911412201,
+   "transfers": 214
+  },
+  {
+   "number": 1333,
+   "ts": 1791911412469,
+   "transfers": 53
+  },
+  {
+   "number": 1334,
+   "ts": 1791911412600,
+   "transfers": 90
+  },
+  {
+   "number": 1335,
+   "ts": 1791911412800,
+   "transfers": 159
+  },
+  {
+   "number": 1336,
+   "ts": 1791911413000,
+   "transfers": 90
+  },
+  {
+   "number": 1337,
+   "ts": 1791911413201,
+   "transfers": 61
+  },
+  {
+   "number": 1338,
+   "ts": 1791911413400,
+   "transfers": 137
+  },
+  {
+   "number": 1339,
+   "ts": 1791911413600,
+   "transfers": 126
+  },
+  {
+   "number": 1340,
+   "ts": 1791911414578,
+   "transfers": 213
+  },
+  {
+   "number": 1341,
+   "ts": 1791911414921,
+   "transfers": 210
+  },
+  {
+   "number": 1342,
+   "ts": 1791911415122,
+   "transfers": 57
+  },
+  {
+   "number": 1343,
+   "ts": 1791911415222,
+   "transfers": 145
+  },
+  {
+   "number": 1344,
+   "ts": 1791911415702,
+   "transfers": 203
+  },
+  {
+   "number": 1345,
+   "ts": 1791911415914,
+   "transfers": 56
+  },
+  {
+   "number": 1346,
+   "ts": 1791911416014,
+   "transfers": 153
+  },
+  {
+   "number": 1347,
+   "ts": 1791911416200,
+   "transfers": 117
+  },
+  {
+   "number": 1348,
+   "ts": 1791911416400,
+   "transfers": 144
+  },
+  {
+   "number": 1349,
+   "ts": 1791911416600,
+   "transfers": 128
+  },
+  {
+   "number": 1350,
+   "ts": 1791911417000,
+   "transfers": 213
+  },
+  {
+   "number": 1351,
+   "ts": 1791911417233,
+   "transfers": 107
+  },
+  {
+   "number": 1352,
+   "ts": 1791911417400,
+   "transfers": 166
+  },
+  {
+   "number": 1353,
+   "ts": 1791911417600,
+   "transfers": 115
+  }
+ ]
+}

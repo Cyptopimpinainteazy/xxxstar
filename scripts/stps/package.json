@@ -1,0 +1,10 @@
+{
+  "name": "x3-stps",
+  "private": true,
+  "description": "Standard Transactions Per Second (sTPS) for X3, after paritytech/polkadot-stps (Unlicense)",
+  "dependencies": {
+    "@polkadot/api": "^14.0.1",
+    "@polkadot/keyring": "^13.0.0",
+    "@polkadot/util-crypto": "^13.0.0"
+  }
+}

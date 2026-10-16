@@ -1,0 +1,26 @@
+[package]
+name = "x3-runtime-fuzz"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0 OR MIT"
+description = "Whole-runtime fuzzing harness for x3-chain-runtime (adapted from SRLabs' substrate-runtime-fuzzer)"
+
+[dependencies]
+x3-chain-runtime = { path = "../../runtime", default-features = false, features = ["std"] }
+codec = { workspace = true, features = ["std"] }
+frame-support = { workspace = true, features = ["std"] }
+frame-system = { workspace = true, features = ["std"] }
+pallet-balances = { workspace = true, features = ["std"] }
+pallet-timestamp = { workspace = true, features = ["std"] }
+sp-consensus-aura = { workspace = true, features = ["std"] }
+sp-core = { workspace = true, features = ["std"] }
+sp-runtime = { workspace = true, features = ["std"] }
+sp-state-machine = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+
+[features]
+default = []
+# Runs every pallet's try_state hook after each input. Off by default: enabling it in a
+# workspace-wide build would compile the runtime with try-runtime for every other crate.
+try-runtime = ["x3-chain-runtime/try-runtime", "frame-support/try-runtime"]

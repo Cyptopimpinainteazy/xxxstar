@@ -1,0 +1,8 @@
+x3-runtime-fuzz is adapted from substrate-runtime-fuzzer by SRLabs
+(https://github.com/srlabs/substrate-runtime-fuzzer, templates/solochain, at 93c24d0),
+which is licensed under either of the Apache License, Version 2.0 or the MIT license.
+This crate is offered under the same terms (Apache-2.0 OR MIT).
+
+Changes: targets x3-chain-runtime; starts from the runtime's dev genesis preset
+(dropping sections a runtime variant does not compile); exposes the harness as a
+library with a seeded smoke test; try_state behind an optional feature.

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quantum Kernel Voyager</title>
+    <link rel="stylesheet" href="/src/styles/main.css" />
+    <link rel="stylesheet" href="/src/styles/overlay.css" />
+    <link rel="stylesheet" href="/src/styles/components.css" />
+    <link rel="stylesheet" href="/src/styles/bottom-nav.css" />
+  </head>
+  <body>
+    <div id="canvas-container"></div>
+    <div id="overlay-container">
+      <div id="top-bar"></div>
+      <div id="side-panel" class="collapsed"></div>
+      <div id="bottom-bar"></div>
+      <div id="modal-root"></div>
+      <div id="context-menu-root"></div>
+      <div id="dev-tools" class="hidden"></div>
+    </div>
+    <!-- Boot splash shown until main.ts removes it -->
+    <div id="boot-splash">
+      <div class="splash-content">
+        <h1 class="splash-title">QUANTUM KERNEL VOYAGER</h1>
+        <p class="splash-sub">Atlas Sphere Blockchain Explorer</p>
+        <div class="splash-spinner"></div>
+        <p class="splash-status" id="splash-status">Initializing systems...</p>
+        <p class="splash-hint">Press <kbd>Enter</kbd> to enter the solar system</p>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
