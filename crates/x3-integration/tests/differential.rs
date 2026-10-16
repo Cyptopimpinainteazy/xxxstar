@@ -1,5 +1,10 @@
 //! Differential end-to-end tests for the chain compiler.
 //!
+//! **Since the runtime switched engines:** blocks execute `crates/x3-vm` through
+//! `X3Executor::execute_on_chain` in every build (`tests/chain_engine.rs`). `mini_x3` is no longer
+//! on any chain path; it stays as the reference this file holds the new engine to, until the old
+//! engines are retired. Where the text below says a block runs `mini_x3`, read "used to run".
+//!
 //! One program is compiled at every optimization level and in two function orders (as written,
 //! and with `main` moved to the front), and every build is executed on **both** of the runtime's
 //! engines — `X3Executor` (the std on-chain path) and `mini_x3` (the no-std reader the kernel's

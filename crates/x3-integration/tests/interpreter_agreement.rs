@@ -1,5 +1,10 @@
 //! The two interpreters must refuse the same opcodes.
 //!
+//! **Since the runtime switched engines:** blocks execute `crates/x3-vm` through
+//! `X3Executor::execute_on_chain` in every build (`tests/chain_engine.rs`). `mini_x3` is no longer
+//! on any chain path; it stays as the reference this file holds the new engine to, until the old
+//! engines are retired. Where the text below says a block runs `mini_x3`, read "used to run".
+//!
 //! `crates/x3-vm` (reached by tests, tools and simulation) and
 //! `crates/x3-integration::mini_x3` (reached by a block — the node builds a `WasmExecutor`, so the
 //! runtime executes the `no_std` one) are two implementations of one ISA. `compiler_bridge.rs`

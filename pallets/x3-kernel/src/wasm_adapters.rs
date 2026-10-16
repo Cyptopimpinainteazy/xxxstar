@@ -2,7 +2,7 @@
 //!
 //! `WasmEvmAdapter`  — uses `x3_evm_integration::mini_evm`
 //! `WasmSvmAdapter`  — uses `x3_svm_integration::interp_execute_bpf`
-//! `WasmX3Adapter`   — uses `x3_x3_integration::X3Executor` (mini_x3 in no-std)
+//! `WasmX3Adapter`   — uses `x3_x3_integration::X3Executor::execute_on_chain` (`x3-vm`, every build)
 //!
 //! These are available in both std and no-std builds; the underlying
 //! integration crates choose their fast (native) or mini (WASM) path
@@ -287,10 +287,10 @@ impl SvmExecutorAdapter for WasmSvmAdapter {
 
 /// The runtime's X3 adapter: `X3Executor`'s on-chain engine, the same code in every build.
 ///
-/// This used to call `X3Executor::execute`, which is `mini_x3` in the wasm build and `x3-vm` in a
-/// `std` one, so the chain ran one engine and the native runtime — its tests and its benchmarks —
-/// ran another (see `X3Executor::execute_on_chain`). `X3VmAdapter`, the native runtime's adapter,
-/// now delegates here as well.
+/// `execute_on_chain` runs `x3-vm` in the wasm runtime and the native one alike, so blocks, the
+/// native runtime's tests and benchmarks, and every off-chain simulation execute the same engine.
+/// (It used to run `mini_x3`, a separate interpreter, because `x3-vm` needed `std`.)
+/// `X3VmAdapter`, the native runtime's adapter, delegates here as well.
 pub struct WasmX3Adapter;
 
 impl X3ExecutorAdapter for WasmX3Adapter {
@@ -339,10 +339,10 @@ impl X3ExecutorAdapter for WasmX3Adapter {
             return_data: rec.return_data,
             logs: Vec::new(),
             state_changes: Vec::new(),
-            // Carry the executor's slot channel through unchanged. Both engines journal the
-            // slot writes they made (`mini_x3` on a block, `x3-vm` in std builds), and they
-            // must not be dropped on the way to the pallet or a contract's state would
-            // silently vanish between execution and the receipt the chain stores.
+            // Carry the executor's slot channel through unchanged. The engine journals the slot
+            // writes it made, and they must not be dropped on the way to the pallet or a
+            // contract's state would silently vanish between execution and the receipt the
+            // chain stores.
             storage_writes: rec
                 .storage_writes
                 .into_iter()

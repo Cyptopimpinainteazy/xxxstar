@@ -110,6 +110,21 @@ pub enum VerifierErrorKind {
 
     #[error("parse error: {0}")]
     ParseError(String),
+
+    #[error("function {0} has entry point {1}, which is not the start of an instruction")]
+    FunctionEntryUnaligned(usize, u32),
+
+    #[error("call to function {0} passes {2} arguments, but it declares {1} parameters")]
+    CallArgumentCountMismatch(u32, u8, usize),
+
+    #[error("function {0} needs {1} registers for its parameters and locals (max {2})")]
+    FunctionFrameTooLarge(usize, usize, usize),
+
+    #[error("the module has no entry function")]
+    MissingEntryFunction,
+
+    #[error("opcode 0x{0:02x} is not executed by this engine, so a block could not run it")]
+    NotExecutable(u8),
 }
 
 // =============================================================================
@@ -229,6 +244,9 @@ pub enum VMErrorKind {
 
     #[error("atomic transaction aborted")]
     AtomicAborted,
+
+    #[error("atomic windows nested deeper than {0}")]
+    AtomicDepthExceeded(usize),
 
     #[error("hostcall {0} not found")]
     HostcallNotFound(u8),

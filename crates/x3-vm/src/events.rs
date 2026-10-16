@@ -32,12 +32,20 @@ pub enum EventError {
     DataTooLarge,
     /// Tried to flush on rollback (should not happen in normal flow).
     FlushOnRollback,
+    /// The execution has already journalled [`MAX_EVENTS`] events.
+    TooManyEvents,
 }
 
 /// Maximum topics per event (EVM-compatible).
 pub const MAX_TOPICS: usize = 4;
 /// Maximum event data size in bytes.
 pub const MAX_DATA_SIZE: usize = 4_096;
+/// Maximum events one execution may journal.
+///
+/// A receipt is consensus state, so how much of it a program can make the chain store is bounded
+/// here and not by whatever gas the program happens to have. Pending and committed events count
+/// together: an event a window has not committed yet still occupies the engine's memory.
+pub const MAX_EVENTS: usize = 64;
 
 /// Buffered event log for a single execution context.
 pub struct EventBuffer {
@@ -67,6 +75,9 @@ impl EventBuffer {
         }
         if data.len() > MAX_DATA_SIZE {
             return Err(EventError::DataTooLarge);
+        }
+        if self.pending.len() + self.committed.len() >= MAX_EVENTS {
+            return Err(EventError::TooManyEvents);
         }
         self.pending.push(VmEvent {
             emitter,
@@ -159,6 +170,26 @@ mod tests {
             buf.emit(addr(1), vec![], data),
             Err(EventError::DataTooLarge)
         );
+    }
+
+    #[test]
+    fn the_event_after_the_cap_is_refused_whether_or_not_earlier_ones_were_committed() {
+        let mut buf = EventBuffer::new();
+        for i in 0..MAX_EVENTS / 2 {
+            buf.emit(addr(1), vec![], vec![i as u8]).unwrap();
+        }
+        buf.commit();
+        for i in MAX_EVENTS / 2..MAX_EVENTS {
+            buf.emit(addr(1), vec![], vec![i as u8]).unwrap();
+        }
+        assert_eq!(
+            buf.emit(addr(1), vec![], vec![0xFF]),
+            Err(EventError::TooManyEvents),
+            "committed and pending events count together toward the cap"
+        );
+        // The refused event left nothing behind.
+        buf.commit();
+        assert_eq!(buf.committed_count(), MAX_EVENTS);
     }
 
     #[test]
