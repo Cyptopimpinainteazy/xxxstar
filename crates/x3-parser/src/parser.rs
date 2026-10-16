@@ -155,8 +155,32 @@ impl Parser {
         Ok(params)
     }
 
+    /// Run `parse` one nesting level deeper, refusing past [`MAX_NESTING_DEPTH`].
+    ///
+    /// Expressions, blocks and types all recurse, and every later pass walks the tree the same
+    /// way, so each of them counts against one budget: a program nested past it is refused with a
+    /// parse error instead of overflowing the stack of whatever compiles it.
+    fn descend<R>(&mut self, parse: impl FnOnce(&mut Self) -> ParseResult<R>) -> ParseResult<R> {
+        self.nesting_depth += 1;
+        if self.nesting_depth > MAX_NESTING_DEPTH {
+            let span = self.peek().span;
+            self.nesting_depth -= 1;
+            return Err(ParseError::new(
+                format!("maximum nesting depth ({MAX_NESTING_DEPTH}) exceeded"),
+                span,
+            ));
+        }
+        let result = parse(self);
+        self.nesting_depth -= 1;
+        result
+    }
+
     /// A type: a name (`i64`), an array (`[T; N]`, `[T]`), or a tuple (`(T1, T2, ...)`).
     fn parse_type_annotation(&mut self) -> ParseResult<TypeAnnotation> {
+        self.descend(Self::parse_type_annotation_inner)
+    }
+
+    fn parse_type_annotation_inner(&mut self) -> ParseResult<TypeAnnotation> {
         if self.peek_symbol(Symbol::LeftBracket) {
             let open = self.expect_symbol(Symbol::LeftBracket)?;
             let element = self.parse_type_annotation()?;
@@ -263,6 +287,10 @@ impl Parser {
     }
 
     fn parse_block(&mut self) -> ParseResult<Block> {
+        self.descend(Self::parse_block_inner)
+    }
+
+    fn parse_block_inner(&mut self) -> ParseResult<Block> {
         let left = self.expect_symbol(Symbol::LeftBrace)?;
         let mut statements = Vec::new();
         while !self.accept_symbol(Symbol::RightBrace) {
@@ -563,20 +591,7 @@ impl Parser {
     }
 
     fn parse_expression_bp(&mut self, min_bp: u8) -> ParseResult<Expression> {
-        // Track nesting depth for bounded memory
-        self.nesting_depth += 1;
-        if self.nesting_depth > MAX_NESTING_DEPTH {
-            let span = self.peek().span;
-            self.nesting_depth -= 1;
-            return Err(ParseError::new(
-                format!("maximum nesting depth ({MAX_NESTING_DEPTH}) exceeded"),
-                span,
-            ));
-        }
-
-        let result = self.parse_expression_bp_inner(min_bp);
-        self.nesting_depth -= 1;
-        result
+        self.descend(|parser| parser.parse_expression_bp_inner(min_bp))
     }
 
     fn parse_expression_bp_inner(&mut self, min_bp: u8) -> ParseResult<Expression> {

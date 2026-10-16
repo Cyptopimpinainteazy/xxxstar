@@ -26326,6 +26326,7 @@ dependencies = [
  "blake2 0.10.6",
  "invariant-macros",
  "jsonschema",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

@@ -5,8 +5,15 @@
 
 use x3_common::{Keyword, Span, Symbol, Token, TokenKind};
 
-/// Maximum expression nesting depth before the parser errors out.
-pub const MAX_NESTING_DEPTH: usize = 256;
+/// Maximum nesting depth (expressions, blocks and types together) before the parser errors out.
+///
+/// Every pass after the parser recurses over the same tree, so this is the bound on the whole
+/// compiler's stack use. It was 256, which only counted expressions; an unoptimized build of the
+/// pipeline overflowed a 2 MiB thread stack (Rust's default for spawned threads) at about 200
+/// nested unary operators and at about 100 nested `if` blocks, and nested blocks and types were
+/// not counted at all. 64 leaves room on that stack in a debug build of every pass and is far
+/// deeper than any program a person writes.
+pub const MAX_NESTING_DEPTH: usize = 64;
 
 /// Error returned when nesting exceeds the configured limit.
 #[derive(Debug)]

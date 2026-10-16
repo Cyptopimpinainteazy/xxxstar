@@ -35,6 +35,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+proptest = { workspace = true }
 blake2 = "0.10"
 invariant-macros = { path = "../../crates/invariant-macros" }
 jsonschema = "0.18"
