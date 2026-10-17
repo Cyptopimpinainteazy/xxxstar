@@ -1,5 +1,10 @@
 # X3Lang Architecture Authority
 
+> **Superseded 2026-10-17** for bytecode, opcodes, verifier rules, gas and VM execution: root X3BC
+> (`crates/x3-backend` format, `crates/x3-vm` engine) is the canonical production path. See
+> `docs/roadmap/X3LANG_PRODUCTION_UNIFICATION.md` §0. `x3-lang/vm` is a reference/test oracle until
+> differential parity is demonstrated. The parser/semantic/IR authority below is unchanged.
+
 Status: authoritative for X3Lang 1.0 core-hardening work
 Date: 2026-09-02
 
