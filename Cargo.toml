@@ -47,6 +47,12 @@ exclude = [
     # testing tools actually detect defects before we trust them on X3 code.
     # See scripts/external-toolchain/validate-fuzz-detection.sh.
     "tools/tool-validation",
+    # The X3 Lang language workspace (its own `[workspace]`, CI'd by
+    # `.github/workflows/x3-lang-nested-workspace.yml`). `crates/x3-integration` path-depends on its
+    # compiler and reference VM for the production trading suites; without this entry cargo would
+    # adopt those path dependencies as members of *this* workspace and resolve their
+    # `*.workspace = true` keys against the wrong root.
+    "x3-lang",
 ]
 members = [
     "pallets/x3-kernel",

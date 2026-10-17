@@ -139,7 +139,17 @@ Filled in as tests land. Status values: NOT RUN / RUNNING / PASS / FAIL / BLOCKE
 
 | Feature | Test | Status |
 |---|---|---|
-| (populated in Phase B) | | NOT RUN |
+| `.x3` → X3BC → decode → verify → x3-vm → commit → signed receipt → replay | `crates/x3-integration/tests/x3lang_trading_production_e2e.rs::x3lang_trading_source_to_signed_replayed_receipt_on_production_path` | RED |
+| Trap after a state-changing swap rolls back everything | `…production_e2e.rs::x3lang_trading_trap_after_swap_rolls_back_everything` | RED |
+| Compile-time refusals (unresolved binding/debt, overflow, off-chain asset, asset id width) | `crates/x3-integration/tests/x3lang_trading_negative.rs` | RED |
+| Artifact refusals (truncated, malformed section, unsupported version, 1.0 reader) | `x3lang_trading_negative.rs` | RED |
+| Runtime refusals (chain, capability version, missing capability, gas, oracle stale/missing/divergent/deviation, slippage, flash fee, profit floor, cost ceiling, host refusal, failure before repay, overflow, deadline, private route, checked conversion) | `x3lang_trading_negative.rs` | RED |
+| Signed receipt, forged/modified receipt, unknown/impostor/revoked attestor, artifact binding, canonical encoding | `crates/x3-integration/tests/x3lang_trading_receipt_replay.rs` | RED |
+| Commit releases every journaled effect; failure at every step leaves nothing; nested windows | `crates/x3-integration/tests/x3lang_trading_rollback.rs` | RED |
+| Production engine vs nested reference oracle | `crates/x3-integration/tests/x3lang_trading_differential.rs` | RED |
+| One opcode table: decoder, verifier, gas, execution, traps, differential coverage; dead tables removed | `crates/x3-vm/tests/opcode_spec_exhaustive.rs` | RED |
+| Nested compiler lowers to canonical X3BC; explicit diagnostics for unsupported constructs; mode propagation | `x3-lang/compiler/tests/test_x3bc_lowering.rs` | RED |
+| Root/nested fmt, check, clippy `-D warnings`, tests; no_std core and engine builds | `.github/workflows/x3lang-production-unification.yml` | NOT RUN |
 
 ## 9. Baseline CI at `70423054`
 

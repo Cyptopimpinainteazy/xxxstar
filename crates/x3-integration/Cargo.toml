@@ -40,6 +40,10 @@ thiserror = { version = "1.0", optional = true }
 log = { version = "0.4", default-features = false }
 
 [dev-dependencies]
+# The X3 Lang production trading suites compile real `.x3` trading programs with the canonical
+# front end and hold the production engine to the nested reference VM (differential suite).
+x3-lang-compiler = { path = "../../x3-lang/compiler" }
+x3-lang-vm = { path = "../../x3-lang/vm" }
 env_logger = "0.10"
 # An artifact attestation travels as a JSON sidecar beside the artifact; the test round-trips one.
 serde_json = { workspace = true }

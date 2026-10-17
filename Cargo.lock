@@ -1894,6 +1894,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d86b93f97252c47b41663388e6d155714a9d0c398b99f1005cbc5f978b29f445"
 
 [[package]]
+name = "beef"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
+
+[[package]]
 name = "binary-merkle-tree"
 version = "16.1.0"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b102d8bc051b2aa58a41acce91da347cfa1"
@@ -9885,6 +9891,39 @@ name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+
+[[package]]
+name = "logos"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7251356ef8cb7aec833ddf598c6cb24d17b689d20b993f9d11a3d764e34e6458"
+dependencies = [
+ "logos-derive",
+]
+
+[[package]]
+name = "logos-codegen"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59f80069600c0d66734f5ff52cc42f2dabd6b29d205f333d61fd7832e9e9963f"
+dependencies = [
+ "beef",
+ "fnv",
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "regex-syntax",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "logos-derive"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24fb722b06a9dc12adb0963ed585f19fc61dc5413e6a9be9422ef92c091e731d"
+dependencies = [
+ "logos-codegen",
+]
 
 [[package]]
 name = "loom"
@@ -26910,6 +26949,64 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-lang-ast"
+version = "0.1.0"
+dependencies = [
+ "indexmap 2.14.2",
+ "serde",
+ "thiserror 1.0.69",
+ "x3-lang-common",
+]
+
+[[package]]
+name = "x3-lang-common"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "serde",
+ "smallvec",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "x3-lang-compiler"
+version = "0.1.0"
+dependencies = [
+ "indexmap 2.14.2",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "x3-lang-ast",
+ "x3-lang-common",
+ "x3-lang-lexer",
+]
+
+[[package]]
+name = "x3-lang-lexer"
+version = "0.1.0"
+dependencies = [
+ "logos",
+ "serde",
+ "thiserror 1.0.69",
+ "x3-lang-common",
+]
+
+[[package]]
+name = "x3-lang-vm"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "ed25519-dalek 2.2.0",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sha3",
+ "x3-lang-common",
+ "x3-lang-compiler",
+]
+
+[[package]]
 name = "x3-launch-validator"
 version = "0.1.0"
 dependencies = [
@@ -27689,6 +27786,8 @@ dependencies = [
  "x3-common",
  "x3-compiler",
  "x3-evm-integration",
+ "x3-lang-compiler",
+ "x3-lang-vm",
  "x3-mir",
  "x3-opt",
  "x3-svm-integration",
