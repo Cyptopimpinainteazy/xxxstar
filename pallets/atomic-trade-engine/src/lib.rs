@@ -669,6 +669,14 @@ pub mod pallet {
             let current_block: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
             ensure!(batch.deadline > current_block, Error::<T>::DeadlineExpired);
 
+            // Validate aggregate accounting before any adapter executes. A
+            // bounded leg count does not bound the sum of u128 input amounts.
+            let total_input = batch
+                .legs
+                .iter()
+                .try_fold(0u128, |total, leg| total.checked_add(leg.amount_in))
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
+
             // Update status to executing
             batch.status = BatchStatus::Executing;
             TradeBatches::<T>::insert(batch_id, batch.clone());
@@ -727,7 +735,6 @@ pub mod pallet {
                     // Update metrics
                     CompletedBatchCount::<T>::mutate(|c| *c = c.saturating_add(1));
 
-                    let total_input: u128 = batch.legs.iter().map(|l| l.amount_in).sum();
                     TotalVolume::<T>::mutate(|v| *v = v.saturating_add(total_input));
 
                     // ── Protocol trade fee (best-effort, does not block success) ──
@@ -1133,6 +1140,14 @@ pub mod pallet {
             let current_block: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
             ensure!(batch.deadline > current_block, Error::<T>::DeadlineExpired);
 
+            // The kernel path must apply the same pre-execution accounting
+            // check as direct batch execution, including for persisted batches.
+            let total_input = batch
+                .legs
+                .iter()
+                .try_fold(0u128, |total, leg| total.checked_add(leg.amount_in))
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
+
             // Update status to executing
             batch.status = BatchStatus::Executing;
             TradeBatches::<T>::insert(batch_id, batch.clone());
@@ -1252,7 +1267,6 @@ pub mod pallet {
                     Self::remove_from_pending(&who, batch_id);
                     CompletedBatchCount::<T>::mutate(|c| *c = c.saturating_add(1));
 
-                    let total_input: u128 = batch.legs.iter().map(|l| l.amount_in).sum();
                     TotalVolume::<T>::mutate(|v| *v = v.saturating_add(total_input));
 
                     // --- Settlement bridge: register completed batch ---

@@ -23,6 +23,82 @@ use sp_core::H256;
 // ============================================================================
 
 #[test]
+fn aggregate_input_overflow_is_rejected_before_native_execution_changes_state() {
+    assert_aggregate_input_overflow(true);
+}
+
+#[test]
+fn aggregate_input_overflow_is_rejected_before_kernel_execution_changes_state() {
+    assert_aggregate_input_overflow(false);
+}
+
+fn assert_aggregate_input_overflow(via_native: bool) {
+    new_test_ext().execute_with(|| {
+        let owner = account(1);
+        pallet_x3_kernel::AuthorizedAccounts::<Test>::insert(owner, ());
+        LAST_EVM_CALLER.with(|last| last.set(None));
+        assert_ok!(AtomicTradeEngine::create_trade_batch(
+            RuntimeOrigin::signed(owner),
+            vec![evm_leg(u128::MAX, 1), svm_leg(1, 1)],
+            500,
+            100,
+            0,
+        ));
+        let batch_id = AtomicTradeEngine::pending_batches(owner)[0];
+        assert_noop!(
+            if !via_native {
+                AtomicTradeEngine::execute_trade_batch_via_kernel_comit_v2(
+                    RuntimeOrigin::signed(owner),
+                    batch_id,
+                    H256::from_low_u64_be(9001),
+                )
+            } else {
+                AtomicTradeEngine::execute_trade_batch(RuntimeOrigin::signed(owner), batch_id)
+            },
+            Error::<Test>::ArithmeticOverflow
+        );
+        LAST_EVM_CALLER.with(|last| assert_eq!(last.get(), None));
+        assert_eq!(pallet_x3_kernel::Nonces::<Test>::get(owner), 0);
+        assert_eq!(
+            AtomicTradeEngine::trade_batches(batch_id).unwrap().status,
+            BatchStatus::Pending
+        );
+    });
+}
+
+#[test]
+fn aggregate_input_at_u128_limit_still_executes_in_both_paths() {
+    for via_kernel in [false, true] {
+        new_test_ext().execute_with(|| {
+            let owner = account(1);
+            pallet_x3_kernel::AuthorizedAccounts::<Test>::insert(owner, ());
+            assert_ok!(AtomicTradeEngine::create_trade_batch(
+                RuntimeOrigin::signed(owner),
+                vec![evm_leg(u128::MAX - 1, 1), svm_leg(1, 1)],
+                500,
+                100,
+                0,
+            ));
+            let batch_id = AtomicTradeEngine::pending_batches(owner)[0];
+            assert_ok!(if via_kernel {
+                AtomicTradeEngine::execute_trade_batch_via_kernel_comit_v2(
+                    RuntimeOrigin::signed(owner),
+                    batch_id,
+                    H256::from_low_u64_be(9002),
+                )
+            } else {
+                AtomicTradeEngine::execute_trade_batch(RuntimeOrigin::signed(owner), batch_id)
+            });
+            assert_eq!(
+                AtomicTradeEngine::trade_batches(batch_id).unwrap().status,
+                BatchStatus::Completed
+            );
+            assert_eq!(AtomicTradeEngine::total_volume(), u128::MAX);
+        });
+    }
+}
+
+#[test]
 fn second_leg_failure_clears_rolled_back_success_metadata_and_events() {
     new_test_ext().execute_with(|| {
         let amount = 1_000_000_000_000_000_000u128;
