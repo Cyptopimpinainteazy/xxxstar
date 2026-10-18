@@ -164,17 +164,49 @@ All workflows run on self-hosted `[self-hosted, Linux, X64, x3]` runners. `x3-la
 is `workflow_dispatch` only, and this session's GitHub API token is invalid, so it can only run when
 someone dispatches it; push-triggered workflows are the provable path.
 
-## Status at stopping point (2026-10-17)
+## Status (2026-10-18)
 
-- GREEN locally (Rust stable 1.97 in a cloud workspace; the repo pins 1.90): every row of the
-  matrix above; root suites for x3bc-core, x3-common, x3-backend, x3-vm, x3-x3-integration,
-  x3-opt, pallet-x3-dex (638 tests); nested workspace fmt, clippy `-D warnings` and full tests.
-- Not yet proven: exact-head CI runs on the self-hosted runners; independent review.
-- Not on chain yet. The trading engine runs in `x3-vm` and `x3-x3-integration`; the kernel
-  pallet has no trading extrinsic. Work in progress on branch `codex/x3lang-onchain-wip`:
-  x3-dex pools custody real ledger balances and LP positions have owners; x3-flashloan's
-  unenforced native `borrow` is refused and asset-id flash pools are added. The runtime does not
-  build against that branch yet (new Config items unwired).
-- Security findings recorded for follow-up: native flash `borrow` was unenforced; x3-dex moved
-  no funds and LP positions had no owner; kernel `WasmX3Adapter` drops logs; the atomic-kernel
-  reverter may use the wrong storage prefix; `x3-verifier::verify_bytecode` is a stub.
+### On chain
+
+- `pallet_x3_kernel::submit_trade` (call 44) runs a compiled trading module on the production
+  engine against chain state and settles it on `CanonicalLedger`; `set_trading_config` (call 45,
+  governance) sets the cost schedule and fee collector, and trading is refused until it is set.
+  Asset decimals come from `AssetRegistry`; a program declaring others is refused. A rolled-back
+  trade moves nothing and its receipt is recorded; a settlement the chain's state disagrees with
+  fails the extrinsic and writes nothing.
+- The runtime's `X3TradingHost` exposes `pallet_x3_dex` pools (venues), `pallet_x3_flashloan`
+  asset pools (flash provider) and `pallet_x3_oracle` medians. `mainnet-rc1` has none of those
+  pallets, so there `TradingHost = ()` and every trade is refused. `spec_version` 22 → 23.
+- No private submission channel exists on chain, so a program that demands one (the flagship
+  `x3chain_flash_arb.x3` does) is refused; the same program with public submission commits.
+
+### Verified locally (Rust stable 1.97; the repo pins 1.90; wasm target unavailable here)
+
+| Gate | Result |
+|---|---|
+| `pallet-x3-kernel` tests (incl. 9 `tests_trading`) | 270 pass |
+| `x3-chain-runtime` tests (incl. `tests_trading` E2E on real dex/flash/oracle pallets) | 114 pass |
+| `pallet-x3-dex` / `pallet-x3-flashloan` (all features) | 28 / 19 pass |
+| settlement-engine, atomic-trade-engine, x3-coin (kernel mocks changed) | 341 pass |
+| trading suites, x3bc-core, x3-vm, x3-integration, x3-backend, x3-common, x3-opt, x3-bench | pass |
+| clippy `-D warnings --no-deps`: kernel, dex, flashloan, runtime (default, `mainnet-rc1`, `runtime-benchmarks`) | clean |
+| nested `x3-lang` fmt / clippy / tests | pass |
+| Local CI python gates | no new failures vs master (7 fail on master too) |
+
+Not proven yet: exact-head CI on the self-hosted runners (they use 1.90 and build the wasm
+runtime); independent review; runtime wasm hash re-recording (`check-runtime-hash-freshness` is
+already failing on master: its recorded revision is not in the repository).
+
+### Behaviour changes to know about
+
+- `x3-dex` pool ids are sequential from 1 (the old hash collided for every pool on one chain).
+- `x3-flashloan::borrow` (native) is refused: it never enforced repayment inside the extrinsic.
+- Launchpad graduation's pool creation is refused (`TokenNotOnLedger`): token-factory balances
+  are not on `CanonicalLedger`, so the pool could not custody anything. It previously recorded an
+  empty pool under a wrong id (0).
+
+### Security findings recorded for follow-up
+
+- Kernel `WasmX3Adapter` drops logs; the atomic-kernel reverter may use the wrong storage prefix;
+  `x3-verifier::verify_bytecode` is a stub; `x3-flashloan::pool_account` (native pool) decodes an
+  account with `.expect` (left unchanged: the account already holds funds).
