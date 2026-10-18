@@ -759,6 +759,9 @@ GATES_FAST=(
   # nothing on a normal commit. It is standard library only and takes seconds.
   "test x3-ai-router:python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'"
   "test validator launcher:python3 tests/test_validator_launcher.py"
+  # Physical seven-machine preflight regressions use mocked SSH/RPC and run on any CI runner.
+  # This does NOT claim a live seven-validator network passed; live preflight is opt-in.
+  "test physical seven preflight:python3 -m unittest discover -s tests -p test_physical_seven_preflight.py -v"
   "test source scan:python3 tests/test_fake_code_scan.py"
   # x3-gateway is Postgres-backed in production, but its normal unit/concurrency tests never
   # connect to a server. This gate owns a disposable Postgres container, runs the crate's
