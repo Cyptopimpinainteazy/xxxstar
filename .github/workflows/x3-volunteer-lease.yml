@@ -12,13 +12,20 @@ on:
       - '.github/workflows/x3-volunteer-lease.yml'
 jobs:
   lease-tests:
-    runs-on: ubuntu-latest
+    # This public repository must never run a fork's code on our own machines.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      # The tests use the standard library; use the runner's installed Python
+      # without changing toolchains shared with another runner.
+      - name: Python toolchain
+        run: python3 --version
       - name: Run authenticated lease regression tests
         run: python3 -m unittest discover -s services/x3-volunteer-worker -p 'test_*.py' -v
