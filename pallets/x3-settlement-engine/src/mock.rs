@@ -187,6 +187,7 @@ impl pallet_x3_kernel::Config for Test {
     type BridgeSvmEscrow = MockBridgeSvmEscrow;
     type MaxReplayPruneItemsPerBlock = ConstU32<64>;
     type EmergencyHaltController = TestEmergencyHaltController;
+    type TradingHost = ();
 }
 
 impl pallet_x3_atomic_kernel::Config for Test {

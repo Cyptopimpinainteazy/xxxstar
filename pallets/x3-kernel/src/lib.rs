@@ -67,6 +67,8 @@ pub mod mint_burn;
 pub mod pending_transfer;
 pub mod registry;
 pub mod supply;
+pub mod trading;
+pub use trading::{KernelTradingHost, TradingConfig};
 
 pub use adapters::{
     EvmExecutorAdapter, FailingMockEvmAdapter, FailingMockSvmAdapter, FailingMockX3Adapter,
@@ -484,7 +486,10 @@ pub mod pallet {
             + MaxEncodedLen
             + CheckedAdd
             + From<<Self::Currency as frame_support::traits::Currency<Self::AccountId>>::Balance>
-            + Into<<Self::Currency as frame_support::traits::Currency<Self::AccountId>>::Balance>;
+            + Into<<Self::Currency as frame_support::traits::Currency<Self::AccountId>>::Balance>
+            // The trading engine's amounts are `u128`; conversions are checked both ways.
+            + TryFrom<u128>
+            + Into<u128>;
 
         /// Identifier type for registered assets.
         type AssetId: Parameter
@@ -493,7 +498,9 @@ pub mod pallet {
             + Default
             + Copy
             + MaxEncodedLen
-            + MaybeSerializeDeserialize;
+            + MaybeSerializeDeserialize
+            // Trading artifacts name assets by `u32` ledger id (checked conversion).
+            + TryFrom<u32>;
 
         /// Identifier type used to map substrate accounts to X3 IDs.
         type AtlasId: Parameter + Member + Default + Copy + MaxEncodedLen;
@@ -629,6 +636,10 @@ pub mod pallet {
         /// Concrete halt hook used by `emergency_halt` to flip the runtime's
         /// production halt state.
         type EmergencyHaltController: EmergencyHaltController;
+
+        /// The venues, flash pools and oracle prices `submit_trade` runs against. `()` offers
+        /// none, so every trade that needs one is refused by the engine.
+        type TradingHost: crate::trading::KernelTradingHost<Self::AccountId>;
     }
 
     type AssetSymbolOf<T> = BoundedVec<u8, <T as Config>::MaxAssetSymbolLength>;
@@ -674,6 +685,27 @@ pub mod pallet {
         T::Balance,
         ValueQuery,
     >;
+
+    /// The trade cost schedule and fee collector (`set_trading_config`). `None` refuses every
+    /// trade: the chain does not run trades against costs nobody set.
+    #[pallet::storage]
+    pub type TradingConfiguration<T: Config> =
+        StorageValue<_, crate::trading::TradingConfig<T::AccountId>, OptionQuery>;
+
+    /// Every trade `submit_trade` ran, committed or rolled back, by receipt digest.
+    #[pallet::storage]
+    pub type TradeReceipts<T: Config> = StorageMap<
+        _,
+        Identity,
+        H256,
+        crate::trading::TradeRecord<T::AccountId, BlockNumberFor<T>>,
+        OptionQuery,
+    >;
+
+    /// Committed trades per trader.
+    #[pallet::storage]
+    pub type TradeNonces<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
 
     /// Maps accounts to their X3 identifiers.
     #[pallet::storage]
@@ -1021,6 +1053,21 @@ pub mod pallet {
         ProtocolUnpaused,
         /// Emergency halt activated — all asset movement frozen due to invariant violation.
         EmergencyHalted,
+        /// A trade committed and its ledger movements were applied.
+        TradeCommitted {
+            trader: T::AccountId,
+            receipt: H256,
+            gas_used: u64,
+        },
+        /// A trade rolled back: nothing moved. `trap` is the receipt's `TrapId`.
+        TradeRolledBack {
+            trader: T::AccountId,
+            receipt: H256,
+            trap: u8,
+            op_index: u16,
+        },
+        /// Governance set the trade cost schedule and fee collector.
+        TradingConfigured,
     }
 
     #[pallet::error]
@@ -1139,6 +1186,25 @@ pub mod pallet {
         /// An X3 call asked for more gas than `DefaultX3GasLimit`, the most one extrinsic's weight
         /// pays for.
         X3GasBudgetExceedsLimit,
+        /// A ledger transfer would leave the sender below zero.
+        InsufficientLedgerBalance,
+        /// A ledger amount does not fit the ledger's balance type, or a sum overflowed.
+        LedgerOverflow,
+        /// Governance has not set the trade cost schedule (`set_trading_config`).
+        TradingNotConfigured,
+        /// The trading module exceeds `MAX_TRADE_MODULE_BYTES`.
+        TradeModuleTooLarge,
+        /// The trading module was refused before it ran: not decodable, not a trading module, not
+        /// for this chain, refused by the verifier, or demanding a private channel.
+        TradeRefused,
+        /// The trade's receipt exceeds `MAX_TRADE_RECEIPT_BYTES`.
+        TradeReceiptTooLarge,
+        /// A receipt with this digest is already recorded.
+        DuplicateTradeReceipt,
+        /// The chain's state after settlement disagrees with the engine's.
+        TradeSettlementInconsistent,
+        /// The trading module declares an asset's decimals differently from the asset registry.
+        TradeAssetMismatch,
     }
 
     /// Storage for atomic settlement roots (per transaction ID).
@@ -1227,6 +1293,50 @@ pub mod pallet {
             T::EmergencyHaltController::trigger();
 
             Self::deposit_event(Event::EmergencyHalted);
+            Ok(())
+        }
+
+        /// Run a compiled X3 Lang trading module (X3BC format 1.1) on the production engine and
+        /// settle it on `CanonicalLedger` (see [`crate::trading`]).
+        ///
+        /// `submitted_at_block` is the block the trader signed against; the module's compiled
+        /// deadline counts from it, and it may not be in the future. A trade the engine rolls back
+        /// still succeeds as an extrinsic: nothing moves, and its receipt and `TradeRolledBack` are
+        /// recorded. A module refused before it runs (`TradeRefused`), or a settlement the chain's
+        /// state disagrees with (`TradeSettlementInconsistent`), fails the extrinsic and writes
+        /// nothing.
+        #[pallet::call_index(44)]
+        #[pallet::weight(Pallet::<T>::trade_weight())]
+        pub fn submit_trade(
+            origin: OriginFor<T>,
+            module: BoundedVec<u8, ConstU32<{ crate::trading::MAX_TRADE_MODULE_BYTES }>>,
+            submitted_at_block: BlockNumberFor<T>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(
+                submitted_at_block <= frame_system::Pallet::<T>::block_number(),
+                Error::<T>::TradeRefused
+            );
+            Self::do_submit_trade(who, &module, submitted_at_block.saturated_into::<u64>())
+        }
+
+        /// Set the trade cost schedule and fee collector. Until this is called, every trade is
+        /// refused (`TradingNotConfigured`).
+        #[pallet::call_index(45)]
+        #[pallet::weight(T::DbWeight::get().writes(1))]
+        pub fn set_trading_config(
+            origin: OriginFor<T>,
+            config: crate::trading::TradingConfig<T::AccountId>,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            let id =
+                T::AssetId::try_from(config.fee_asset).map_err(|_| Error::<T>::UnknownAsset)?;
+            ensure!(
+                AssetRegistry::<T>::contains_key(id),
+                Error::<T>::UnknownAsset
+            );
+            TradingConfiguration::<T>::put(config);
+            Self::deposit_event(Event::TradingConfigured);
             Ok(())
         }
 
@@ -2655,6 +2765,17 @@ pub mod pallet {
         /// (`DefaultX3GasLimit`). Every extrinsic that executes X3 charges this: it used to charge
         /// nothing for the execution, while the measured cost of the old 6,000,000-gas limit was
         /// 137 ms against a 150 ms block.
+        /// What `submit_trade` is charged: one engine run at the gas limit, plus the ledger,
+        /// registry, venue, flash-pool and oracle reads and writes a module bounded by the
+        /// section limits (`x3bc_core::trading::MAX_*`) can make.
+        pub fn trade_weight() -> Weight {
+            let bounded = (x3bc_core::trading::MAX_ASSETS * 4
+                + x3bc_core::trading::MAX_OPS * 6
+                + x3bc_core::trading::MAX_CAPABILITIES) as u64;
+            Self::x3_execution_weight()
+                .saturating_add(T::DbWeight::get().reads_writes(bounded + 4, bounded + 3))
+        }
+
         pub fn x3_execution_weight() -> Weight {
             let gas = T::DefaultX3GasLimit::get().min(u32::MAX as u64) as u32;
             <T as Config>::WeightInfo::x3_execute(gas)
@@ -4826,6 +4947,10 @@ mod test_helpers;
 
 #[cfg(test)]
 mod tests;
+
+// `submit_trade`: compiled X3 Lang trading programs run and settled on `CanonicalLedger`.
+#[cfg(test)]
+mod tests_trading;
 
 #[cfg(test)]
 mod chaos_tests;

@@ -504,6 +504,7 @@ impl pallet_x3_kernel::Config for Test {
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
     type EmergencyHaltController = TestEmergencyHaltController;
+    type TradingHost = TestTradingHost;
 }
 
 pub struct ExtBuilder {
@@ -663,16 +664,14 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
         evm_tx: Option<Vec<u8>>,
         svm_tx: Option<Vec<u8>>,
     ) -> Result<pallet_x3_kernel::SphereState, DispatchError> {
-        let _evm_receipt = if evm_tx.is_some() {
-            Some(self.execute_evm_tx(evm_tx.unwrap())?)
-        } else {
-            None
+        let _evm_receipt = match evm_tx {
+            Some(tx) => Some(self.execute_evm_tx(tx)?),
+            None => None,
         };
 
-        let _svm_receipt = if svm_tx.is_some() {
-            Some(self.execute_svm_tx(svm_tx.unwrap())?)
-        } else {
-            None
+        let _svm_receipt = match svm_tx {
+            Some(tx) => Some(self.execute_svm_tx(tx)?),
+            None => None,
         };
 
         Ok(pallet_x3_kernel::SphereState {
@@ -729,5 +728,104 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
             }
         }
         Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Trading host (test-only): venues and flash pools whose reserves are `CanonicalLedger` balances
+// of their custody accounts, like `pallet_x3_dex` and `pallet_x3_flashloan` in the runtime.
+// ---------------------------------------------------------------------------------------------
+
+thread_local! {
+    static TRADING_VENUES: core::cell::RefCell<
+        std::collections::BTreeMap<String, (x3bc_core::state::VenueState, AccountId)>,
+    > = Default::default();
+    static TRADING_FLASH: core::cell::RefCell<
+        std::collections::BTreeMap<u32, (u16, AccountId)>,
+    > = Default::default();
+    static TRADING_PRICES: core::cell::RefCell<std::collections::BTreeMap<u32, (u128, u64)>> =
+        Default::default();
+}
+
+/// The test trading host. Reset per test with [`TestTradingHost::reset`]. Its venue table is
+/// thread-local, not storage, so a failed extrinsic's storage rollback does not restore it; tests
+/// that fail settlement assert on `CanonicalLedger`, which is storage.
+pub struct TestTradingHost;
+
+impl TestTradingHost {
+    pub fn reset() {
+        TRADING_VENUES.with(|v| v.borrow_mut().clear());
+        TRADING_FLASH.with(|v| v.borrow_mut().clear());
+        TRADING_PRICES.with(|v| v.borrow_mut().clear());
+    }
+
+    pub fn add_venue(venue: x3bc_core::state::VenueState, custody: AccountId) {
+        TRADING_VENUES.with(|v| v.borrow_mut().insert(venue.name.clone(), (venue, custody)));
+    }
+
+    pub fn add_flash_pool(asset: u32, fee_bps: u16, custody: AccountId) {
+        TRADING_FLASH.with(|v| v.borrow_mut().insert(asset, (fee_bps, custody)));
+    }
+
+    pub fn set_price(asset: u32, usd: u128, block: u64) {
+        TRADING_PRICES.with(|v| v.borrow_mut().insert(asset, (usd, block)));
+    }
+
+    pub fn venue_state(name: &str) -> Option<x3bc_core::state::VenueState> {
+        TRADING_VENUES.with(|v| v.borrow().get(name).map(|(venue, _)| venue.clone()))
+    }
+}
+
+impl pallet_x3_kernel::KernelTradingHost<AccountId> for TestTradingHost {
+    fn venue(name: &str) -> Option<(x3bc_core::state::VenueState, AccountId)> {
+        TRADING_VENUES.with(|v| v.borrow().get(name).cloned())
+    }
+
+    fn set_venue_reserves(
+        name: &str,
+        reserve_a: u128,
+        reserve_b: u128,
+    ) -> frame_support::dispatch::DispatchResult {
+        TRADING_VENUES.with(|v| {
+            let mut venues = v.borrow_mut();
+            let (venue, custody) = venues
+                .get_mut(name)
+                .ok_or(sp_runtime::DispatchError::Other("unknown venue"))?;
+            let held_a = AtlasKernel::ledger_balance_of(venue.asset_a, custody);
+            let held_b = AtlasKernel::ledger_balance_of(venue.asset_b, custody);
+            if reserve_a > held_a || reserve_b > held_b {
+                return Err(sp_runtime::DispatchError::Other("reserves exceed custody"));
+            }
+            venue.reserve_a = reserve_a;
+            venue.reserve_b = reserve_b;
+            Ok(())
+        })
+    }
+
+    fn flash_pool(
+        provider: &str,
+        asset: u32,
+    ) -> Option<(x3bc_core::state::FlashPoolState, AccountId)> {
+        if provider != x3bc_core::trading::FLASH_PROVIDER {
+            return None;
+        }
+        TRADING_FLASH.with(|v| {
+            v.borrow().get(&asset).map(|(fee_bps, custody)| {
+                (
+                    x3bc_core::state::FlashPoolState {
+                        provider: provider.into(),
+                        version: x3bc_core::trading::CAPABILITY_VERSION,
+                        asset,
+                        liquidity: AtlasKernel::ledger_balance_of(asset, custody),
+                        fee_bps: *fee_bps,
+                    },
+                    *custody,
+                )
+            })
+        })
+    }
+
+    fn usd_price(asset: u32) -> Option<(u128, u64)> {
+        TRADING_PRICES.with(|v| v.borrow().get(&asset).copied())
     }
 }

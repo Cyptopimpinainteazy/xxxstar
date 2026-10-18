@@ -1,0 +1,440 @@
+//! `submit_trade` on the kernel: a compiled X3 Lang program run on the production engine and
+//! settled on `CanonicalLedger`.
+//!
+//! The program is the flagship `x3-lang/examples/x3chain_flash_arb.x3`, compiled by the canonical
+//! lowering (`compile_trading_x3bc`) — no hand-assembled bytecode. The flagship demands private
+//! submission, which the chain cannot offer, so the committed path compiles the same program with
+//! that one policy line set to `false` (an ordinary public trade), and a separate test holds the
+//! chain to refusing the original.
+//!
+//! Expected figures are re-derived from the constant-product formula here, not read back from the
+//! engine, and every committed test checks conservation of every asset across every account.
+
+use crate::mock::*;
+use crate::pallet::{
+    CanonicalLedger, Error, Event, TradeNonces, TradeReceipts, TradingConfiguration,
+};
+use crate::trading::TradingConfig;
+use frame_support::{assert_noop, assert_ok, BoundedVec};
+use std::collections::BTreeMap;
+use x3_lang_compiler::semantic::CompilationMode;
+use x3_lang_compiler::x3bc::compile_trading_x3bc;
+use x3bc_core::receipt::{self, Account, Outcome};
+use x3bc_core::state::VenueState;
+
+const FLAGSHIP: &str = include_str!("../../../x3-lang/examples/x3chain_flash_arb.x3");
+
+const USDX: u32 = 1;
+const WETX: u32 = 2;
+const UNIT: u128 = 1_000_000;
+
+const TRADER: AccountId = ALICE;
+const VENUE_1: AccountId = 1_001;
+const VENUE_2: AccountId = 1_002;
+const FLASH: AccountId = 1_003;
+const FEE_COLLECTOR: AccountId = 1_004;
+
+const TRADER_USDX: u128 = 50 * UNIT;
+const BORROW: u128 = 1_000 * UNIT;
+const POOL1: (u128, u128) = (1_000_000 * UNIT, 500_000 * UNIT); // USDX, WETX
+const POOL2: (u128, u128) = (400_000 * UNIT, 830_000 * UNIT); // WETX, USDX
+const FLASH_LIQUIDITY: u128 = 5_000_000 * UNIT;
+const FEE_BPS: u16 = 30;
+const FLASH_FEE_BPS: u16 = 5;
+
+const SUBMITTED_AT: u64 = 1_000;
+const EXECUTED_AT: u64 = 1_002;
+
+const ACCOUNTS: [AccountId; 5] = [TRADER, VENUE_1, VENUE_2, FLASH, FEE_COLLECTOR];
+
+fn public(source: &str) -> String {
+    let public = source.replace(
+        "require_private_submission: true",
+        "require_private_submission: false",
+    );
+    assert_ne!(public, source, "the flagship's policy line moved");
+    public
+}
+
+fn module(
+    source: &str,
+) -> BoundedVec<u8, frame_support::traits::ConstU32<{ crate::trading::MAX_TRADE_MODULE_BYTES }>> {
+    let artifact = compile_trading_x3bc(source, CompilationMode::Testnet)
+        .unwrap_or_else(|error| panic!("the trading source must compile: {error:?}"));
+    artifact.bytes.try_into().expect("fits the module bound")
+}
+
+fn fund(who: AccountId, asset: u32, amount: u128) {
+    CanonicalLedger::<Test>::mutate(who, asset, |balance| *balance += amount);
+}
+
+fn balances() -> BTreeMap<(AccountId, u32), u128> {
+    let mut out = BTreeMap::new();
+    for who in ACCOUNTS {
+        for asset in [USDX, WETX] {
+            out.insert((who, asset), CanonicalLedger::<Test>::get(who, asset));
+        }
+    }
+    out
+}
+
+fn supply(snapshot: &BTreeMap<(AccountId, u32), u128>, asset: u32) -> u128 {
+    snapshot
+        .iter()
+        .filter(|((_, a), _)| *a == asset)
+        .map(|(_, v)| *v)
+        .sum()
+}
+
+fn config() -> TradingConfig<AccountId> {
+    TradingConfig {
+        fee_asset: USDX,
+        gas_price: 10,
+        settlement_fee: 200_000,
+        relay_fee: 300_000,
+        protocol_fee: 100_000,
+        oracle_fee: 10_000,
+        solver_fee: 0,
+        cross_domain_fee: 0,
+        fee_collector: FEE_COLLECTOR,
+    }
+}
+
+/// Registered assets, funded pools whose reserves are their custody balances, oracle prices at the
+/// pools' mid (2 USDX per WETX), and the governance cost schedule.
+fn chain(decimals_wetx: u8) {
+    TestTradingHost::reset();
+    frame_system::Pallet::<Test>::set_block_number(EXECUTED_AT);
+    assert_ok!(AtlasKernel::register_asset(
+        RuntimeOrigin::root(),
+        USDX,
+        b"USDX".to_vec(),
+        6
+    ));
+    assert_ok!(AtlasKernel::register_asset(
+        RuntimeOrigin::root(),
+        WETX,
+        b"WETX".to_vec(),
+        decimals_wetx
+    ));
+    fund(TRADER, USDX, TRADER_USDX);
+    fund(VENUE_1, USDX, POOL1.0);
+    fund(VENUE_1, WETX, POOL1.1);
+    fund(VENUE_2, WETX, POOL2.0);
+    fund(VENUE_2, USDX, POOL2.1);
+    fund(FLASH, USDX, FLASH_LIQUIDITY);
+    TestTradingHost::add_venue(
+        VenueState {
+            name: "x3dex_pool_1".into(),
+            version: 1,
+            asset_a: USDX,
+            asset_b: WETX,
+            reserve_a: POOL1.0,
+            reserve_b: POOL1.1,
+            fee_bps: FEE_BPS,
+        },
+        VENUE_1,
+    );
+    TestTradingHost::add_venue(
+        VenueState {
+            name: "x3dex_pool_2".into(),
+            version: 1,
+            asset_a: WETX,
+            asset_b: USDX,
+            reserve_a: POOL2.0,
+            reserve_b: POOL2.1,
+            fee_bps: FEE_BPS,
+        },
+        VENUE_2,
+    );
+    TestTradingHost::add_flash_pool(USDX, FLASH_FEE_BPS, FLASH);
+    // USD per whole unit, 6 decimals: USDX $1, WETX $2.
+    TestTradingHost::set_price(USDX, 1_000_000, EXECUTED_AT - 1);
+    TestTradingHost::set_price(WETX, 2_000_000, EXECUTED_AT - 1);
+    assert_ok!(AtlasKernel::set_trading_config(
+        RuntimeOrigin::root(),
+        config()
+    ));
+}
+
+/// `in_after_fee * reserve_out / (reserve_in + in_after_fee)`, fee taken from the input.
+fn cp_out(amount_in: u128, reserve_in: u128, reserve_out: u128) -> u128 {
+    let net = amount_in - amount_in * u128::from(FEE_BPS) / 10_000;
+    net * reserve_out / (reserve_in + net)
+}
+
+fn last_trade_event() -> Event<Test> {
+    frame_system::Pallet::<Test>::events()
+        .into_iter()
+        .rev()
+        .find_map(|record| match record.event {
+            RuntimeEvent::AtlasKernel(
+                event @ (Event::TradeCommitted { .. } | Event::TradeRolledBack { .. }),
+            ) => Some(event),
+            _ => None,
+        })
+        .expect("a trade event")
+}
+
+#[test]
+fn a_compiled_public_arbitrage_commits_on_chain_and_moves_exactly_what_its_receipt_says() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let before = balances();
+        let bytecode = module(&public(FLAGSHIP));
+
+        assert_ok!(AtlasKernel::submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            bytecode.clone(),
+            SUBMITTED_AT
+        ));
+        let Event::TradeCommitted {
+            trader,
+            receipt: digest,
+            gas_used,
+        } = last_trade_event()
+        else {
+            panic!("the trade must commit");
+        };
+        assert_eq!(trader, TRADER);
+        assert!(gas_used > 0);
+
+        // The stored receipt is the canonical encoding of a committed trade, under its digest.
+        let record = TradeReceipts::<Test>::get(digest).expect("the receipt is recorded");
+        assert!(record.committed);
+        let receipt = receipt::decode(&record.receipt).expect("canonical receipt");
+        assert_eq!(receipt::digest(&receipt), digest.0);
+        assert_eq!(receipt.outcome, Outcome::Committed);
+        assert_eq!(receipt.anchor.block_number, EXECUTED_AT);
+        assert_eq!(receipt.pre_state.submitted_at_block, SUBMITTED_AT);
+        assert!(!receipt.pre_state.private_channel);
+
+        // The chain moved exactly the receipt's intents and nothing else.
+        let after = balances();
+        let mut replayed = before.clone();
+        for intent in &receipt.intents {
+            let account = |a: &Account| match a {
+                Account::Trader => TRADER,
+                Account::FeeCollector => FEE_COLLECTOR,
+                Account::FlashPool(_) => FLASH,
+                Account::Venue(name) if name == "x3dex_pool_1" => VENUE_1,
+                Account::Venue(name) if name == "x3dex_pool_2" => VENUE_2,
+                Account::Venue(name) => panic!("unexpected venue {name}"),
+            };
+            *replayed
+                .get_mut(&(account(&intent.from), intent.asset))
+                .expect("known") -= intent.amount;
+            *replayed
+                .get_mut(&(account(&intent.to), intent.asset))
+                .expect("known") += intent.amount;
+        }
+        assert_eq!(after, replayed);
+        for asset in [USDX, WETX] {
+            assert_eq!(
+                supply(&before, asset),
+                supply(&after, asset),
+                "asset {asset} conserved"
+            );
+        }
+
+        // The figures the formula gives, independently of the engine.
+        let swap1 = cp_out(BORROW, POOL1.0, POOL1.1);
+        let swap2 = cp_out(swap1, POOL2.0, POOL2.1);
+        let flash_fee = BORROW * u128::from(FLASH_FEE_BPS) / 10_000;
+        assert_eq!(after[&(VENUE_1, USDX)], POOL1.0 + BORROW);
+        assert_eq!(after[&(VENUE_1, WETX)], POOL1.1 - swap1);
+        assert_eq!(after[&(VENUE_2, WETX)], POOL2.0 + swap1);
+        assert_eq!(after[&(VENUE_2, USDX)], POOL2.1 - swap2);
+        assert_eq!(after[&(FLASH, USDX)], FLASH_LIQUIDITY + flash_fee);
+        let costs = after[&(FEE_COLLECTOR, USDX)];
+        assert!(costs > 0, "the chain's costs were charged");
+        assert_eq!(
+            after[&(TRADER, USDX)],
+            TRADER_USDX + swap2 - BORROW - flash_fee - costs
+        );
+        assert!(
+            after[&(TRADER, USDX)] >= TRADER_USDX + UNIT,
+            "the profit floor held"
+        );
+
+        // The venues' recorded reserves are their custody balances.
+        let venue1 = TestTradingHost::venue_state("x3dex_pool_1").expect("venue");
+        assert_eq!(
+            (venue1.reserve_a, venue1.reserve_b),
+            (after[&(VENUE_1, USDX)], after[&(VENUE_1, WETX)])
+        );
+        let venue2 = TestTradingHost::venue_state("x3dex_pool_2").expect("venue");
+        assert_eq!(
+            (venue2.reserve_a, venue2.reserve_b),
+            (after[&(VENUE_2, WETX)], after[&(VENUE_2, USDX)])
+        );
+        assert_eq!(TradeNonces::<Test>::get(TRADER), 1);
+
+        // Anyone can re-execute the on-chain receipt from its own pre-state and get it back.
+        let key = x3_x3_integration::trading::AttestorKey::from_seed("test-attestor", [9u8; 32]);
+        let signed = x3_x3_integration::trading::sign_receipt(&receipt, &key);
+        let mut registry = x3_x3_integration::trading::AttestorRegistry::new();
+        registry.trust(&key);
+        x3_x3_integration::trading::replay_receipt(&bytecode, &signed, &registry)
+            .expect("the on-chain receipt replays");
+    });
+}
+
+#[test]
+fn a_trade_that_misses_its_profit_floor_rolls_back_on_chain_and_moves_nothing() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let before = balances();
+        let greedy = public(FLAGSHIP).replace("net_profit >= 1 USDX", "net_profit >= 1_000 USDX");
+        assert_ok!(AtlasKernel::submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&greedy),
+            SUBMITTED_AT
+        ));
+        let Event::TradeRolledBack {
+            trader,
+            receipt: digest,
+            ..
+        } = last_trade_event()
+        else {
+            panic!("the trade must roll back");
+        };
+        assert_eq!(trader, TRADER);
+        assert_eq!(balances(), before, "a rolled-back trade moves nothing");
+        let record = TradeReceipts::<Test>::get(digest).expect("the refusal is recorded");
+        assert!(!record.committed);
+        let receipt = receipt::decode(&record.receipt).expect("canonical receipt");
+        assert!(
+            matches!(
+                receipt.outcome,
+                Outcome::RolledBack {
+                    trap: x3bc_core::trap::TrapId::ProfitBelowFloor,
+                    ..
+                }
+            ),
+            "{:?}",
+            receipt.outcome
+        );
+        assert_eq!(TradeNonces::<Test>::get(TRADER), 0);
+        assert_eq!(
+            TestTradingHost::venue_state("x3dex_pool_1")
+                .expect("venue")
+                .reserve_a,
+            POOL1.0
+        );
+    });
+}
+
+#[test]
+fn the_private_flagship_is_refused_on_chain_because_no_private_channel_exists() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(FLAGSHIP),
+                SUBMITTED_AT
+            ),
+            Error::<Test>::TradeRefused
+        );
+    });
+}
+
+#[test]
+fn trading_is_refused_until_governance_sets_the_cost_schedule() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        TradingConfiguration::<Test>::kill();
+        assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
+            Error::<Test>::TradingNotConfigured
+        );
+    });
+}
+
+#[test]
+fn only_governance_sets_the_cost_schedule_and_only_in_a_registered_asset() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        assert!(AtlasKernel::set_trading_config(RuntimeOrigin::signed(TRADER), config()).is_err());
+        let unknown = TradingConfig {
+            fee_asset: 99,
+            ..config()
+        };
+        assert_noop!(
+            AtlasKernel::set_trading_config(RuntimeOrigin::root(), unknown),
+            Error::<Test>::UnknownAsset
+        );
+    });
+}
+
+#[test]
+fn a_program_whose_declared_decimals_disagree_with_the_registry_is_refused() {
+    new_test_ext().execute_with(|| {
+        // The program says WETX has 6 decimals; the chain says 18.
+        chain(18);
+        assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
+            Error::<Test>::TradeAssetMismatch
+        );
+    });
+}
+
+#[test]
+fn a_submission_signed_against_a_future_block_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                EXECUTED_AT + 1
+            ),
+            Error::<Test>::TradeRefused
+        );
+    });
+}
+
+#[test]
+fn a_venue_whose_custody_does_not_cover_its_reserves_fails_settlement_and_writes_nothing() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        // Pool 2 claims reserves its custody account does not hold: the engine trades against
+        // the claim, and settlement must refuse to record reserves nobody paid in.
+        CanonicalLedger::<Test>::mutate(VENUE_2, USDX, |balance| *balance -= 100_000 * UNIT);
+        let before = balances();
+        assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
+            sp_runtime::DispatchError::Other("reserves exceed custody")
+        );
+        assert_eq!(balances(), before);
+    });
+}
+
+#[test]
+fn trading_is_refused_while_the_protocol_is_paused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        crate::pallet::ProtocolPaused::<Test>::put(true);
+        assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
+            Error::<Test>::ProtocolIsPaused
+        );
+    });
+}

@@ -37,6 +37,8 @@ sp-std = { workspace = true, default-features = false }
 x3-evm-integration = { path = "../../crates/evm-integration", default-features = false }
 x3-svm-integration = { path = "../../crates/svm-integration", default-features = false }
 x3-x3-integration = { path = "../../crates/x3-integration", default-features = false }
+x3-vm = { path = "../../crates/x3-vm", default-features = false }
+x3bc-core = { path = "../../crates/x3bc-core", default-features = false }
 x3-cross-vm-bridge = { path = "../../crates/cross-vm-bridge", default-features = false }
 x3-packet-schema = { path = "../../crates/x3-packet-schema", default-features = false }
 # The per-asset supply ledger's own type, so the runtime API below returns the shape the
@@ -70,6 +72,8 @@ std = [
     "x3-evm-integration/std",
     "x3-svm-integration/std",
     "x3-x3-integration/std",
+    "x3-vm/std",
+    "x3bc-core/std",
     "x3-cross-vm-bridge/std",
     "x3-packet-schema/std",
     "x3-common/std",
@@ -99,3 +103,6 @@ x3-x3-integration = { path = "../../crates/x3-integration", default-features = f
 # `main` performs a real `evm_sstore`, which the `.x3` compiler cannot emit yet, so the test builds
 # the module with the writer the compiler itself uses rather than embedding opaque bytes.
 x3-backend = { path = "../../crates/x3-backend" }
+# The canonical X3 Lang trading lowering, so the on-chain trading tests run a compiled `.x3`
+# program rather than hand-assembled bytecode.
+x3-lang-compiler = { path = "../../x3-lang/compiler" }

@@ -181,6 +181,7 @@ impl pallet_x3_kernel::Config for StorageTest {
     type BridgeEvmEscrow = TestBridgeEvmEscrow;
     type BridgeSvmEscrow = TestBridgeSvmEscrow;
     type EmergencyHaltController = TestEmergencyHaltController;
+    type TradingHost = ();
 }
 
 const ALICE: AccountId = 1;

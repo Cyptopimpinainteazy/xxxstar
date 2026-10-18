@@ -12584,9 +12584,12 @@ dependencies = [
  "x3-common",
  "x3-cross-vm-bridge",
  "x3-evm-integration",
+ "x3-lang-compiler",
  "x3-packet-schema",
  "x3-svm-integration",
+ "x3-vm",
  "x3-x3-integration",
+ "x3bc-core",
 ]
 
 [[package]]

@@ -162,6 +162,7 @@ impl pallet_x3_kernel::Config for Test {
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
     type EmergencyHaltController = ();
+    type TradingHost = ();
 }
 
 // ─── pallet_x3_coin ──────────────────────────────────────────────────────────
