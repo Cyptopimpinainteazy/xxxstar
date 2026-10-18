@@ -1,0 +1,33 @@
+test_arbitrary_execution_denied (test_dispatch.DispatchTests.test_arbitrary_execution_denied) ... ok
+test_authenticated_fixed_workload (test_dispatch.DispatchTests.test_authenticated_fixed_workload) ... ok
+test_consent_and_stop (test_dispatch.DispatchTests.test_consent_and_stop) ... ok
+test_invalid_manifest_denied (test_dispatch.DispatchTests.test_invalid_manifest_denied) ... ok
+test_manifest_tampering_denied (test_dispatch.DispatchTests.test_manifest_tampering_denied) ... ok
+test_oversized_manifest_denied (test_dispatch.DispatchTests.test_oversized_manifest_denied) ... ok
+test_replay_denied (test_dispatch.DispatchTests.test_replay_denied) ... ok
+test_malformed_output_ignored (test_gpu_discovery.DiscoveryTests.test_malformed_output_ignored) ... ok
+test_missing_driver (test_gpu_discovery.DiscoveryTests.test_missing_driver) ... ok
+test_no_automatic_execution_or_enrollment (test_gpu_discovery.DiscoveryTests.test_no_automatic_execution_or_enrollment) ... ok
+test_nvidia_devices (test_gpu_discovery.DiscoveryTests.test_nvidia_devices) ... ok
+test_timeout (test_gpu_discovery.DiscoveryTests.test_timeout) ... ok
+test_expired (test_lease_auth.LeaseTests.test_expired) ... ok
+test_fail_closed_bad_secret_and_lease (test_lease_auth.LeaseTests.test_fail_closed_bad_secret_and_lease) ... ok
+test_restart_preserves_nonce (test_lease_auth.LeaseTests.test_restart_preserves_nonce) ... ok
+test_tampering_and_wrong_worker (test_lease_auth.LeaseTests.test_tampering_and_wrong_worker) ... ok
+test_valid_then_replay (test_lease_auth.LeaseTests.test_valid_then_replay) ... ok
+test_fixed_job (test_safe_benchmark.SafeBenchmarkTests.test_fixed_job) ... ok
+test_rejects_arbitrary_code (test_safe_benchmark.SafeBenchmarkTests.test_rejects_arbitrary_code) ... ok
+test_rejects_unknown_manifest (test_safe_benchmark.SafeBenchmarkTests.test_rejects_unknown_manifest) ... ok
+test_requires_consent (test_safe_benchmark.SafeBenchmarkTests.test_requires_consent) ... ok
+test_revocation (test_safe_benchmark.SafeBenchmarkTests.test_revocation) ... ok
+test_timeout_bound (test_safe_benchmark.SafeBenchmarkTests.test_timeout_bound) ... ok
+test_direct_execution_requires_actual_boolean_consent (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_consent) ... ok
+test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) ... ok
+test_direct_execution_requires_integer_protocol_version (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_integer_protocol_version) ... ok
+test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) ... ok
+test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.120s
+
+OK
