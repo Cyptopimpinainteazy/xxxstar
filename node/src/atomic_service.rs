@@ -27,7 +27,7 @@ use std::sync::Arc;
 use substrate_frame_rpc_system::AccountNonceApi;
 use tokio::sync::mpsc;
 use x3_chain_runtime::opaque::Block;
-use x3_chain_runtime::{AccountId, UncheckedExtrinsic};
+use x3_chain_runtime::{AccountId, Runtime, UncheckedExtrinsic};
 
 /// Transaction pool type used by the node atomic gateway service.
 pub type AtomicPool = sc_transaction_pool::TransactionPoolHandle<Block, FullClient>;
@@ -290,7 +290,58 @@ impl AtomicGatewayService {
                 .map_err(|e| format!("execute_bundle_leg {index} rejected: {e}"))?;
             log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} leg {index} submitted for on-chain execution");
         }
-        Ok(())
+        self.wait_for_leg_journals(bundle_id, executions.len() as u32)
+            .await
+    }
+
+    /// Wait until the chain recorded a journal for every leg: a leg extrinsic accepted by the pool
+    /// can still fail in its block (insufficient funds, a refused program, a held slot), and the
+    /// chain will not finalize a bundle with a leg missing. Reported here, by leg, instead of as a
+    /// refused finalization later.
+    async fn wait_for_leg_journals(&self, bundle_id: H256, legs: u32) -> Result<(), String> {
+        use sc_client_api::StorageProvider;
+        use sp_core::storage::StorageKey;
+        let keys: Vec<StorageKey> = (0..legs)
+            .map(|leg| {
+                StorageKey(
+                    pallet_x3_atomic_kernel::ChainJournal::<Runtime>::hashed_key_for(
+                        bundle_id, leg,
+                    ),
+                )
+            })
+            .collect();
+        for _ in 0..150 {
+            let at = self.client.info().best_hash;
+            let mut missing = None;
+            for (leg, key) in keys.iter().enumerate() {
+                let recorded = self
+                    .client
+                    .storage(at, key)
+                    .map_err(|e| format!("reading leg {leg}'s journal failed: {e}"))?;
+                if recorded.is_none() {
+                    missing = Some(leg);
+                    break;
+                }
+            }
+            let Some(leg) = missing else {
+                return Ok(());
+            };
+            let status = self
+                .client
+                .runtime_api()
+                .get_bundle_status(at, bundle_id)
+                .map_err(|e| format!("bundle status runtime call failed: {e}"))?;
+            if !matches!(status, Some(BundleStatus::Executing)) {
+                return Err(format!(
+                    "bundle {bundle_id:?} left Executing ({status:?}) before leg {leg} executed"
+                ));
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        Err(format!(
+            "bundle {bundle_id:?}: not every leg executed on chain within the timeout; it will not \
+             be finalized"
+        ))
     }
 
     async fn finalize_bundle(
