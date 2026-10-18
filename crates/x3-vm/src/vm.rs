@@ -611,6 +611,18 @@ impl VM {
         self.call_function(func_idx, args)
     }
 
+    /// Charge gas an instruction owes beyond its table cost (a cost that depends on its operands),
+    /// with the same rule as the table charge: refused unless the whole amount fits the limit.
+    fn charge_extra_gas(&mut self, ip: usize, amount: u64) -> VMResult<()> {
+        let charged = self
+            .gas_used
+            .checked_add(amount)
+            .filter(|charged| *charged <= self.config.gas_limit)
+            .ok_or_else(|| self.error_at(ip, VMErrorKind::GasLimitExceeded))?;
+        self.gas_used = charged;
+        Ok(())
+    }
+
     /// Main execution loop.
     fn execute(&mut self) -> VMResult<Option<Value>> {
         loop {
@@ -1692,6 +1704,12 @@ impl VM {
                     data.push(bytes.len() as u8);
                     data.extend_from_slice(&bytes);
                 }
+                // The payload is priced per byte before it is journaled, so an event the program
+                // cannot pay for is never recorded.
+                let data_gas = (data.len() as u64)
+                    .checked_mul(x3bc_core::spec::EMIT_GAS_PER_DATA_BYTE)
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::GasLimitExceeded))?;
+                self.charge_extra_gas(ip, data_gas)?;
                 let topic = sp_core::hashing::sha2_256(&name);
                 // The emitter is the contract identity, which this engine does not have: an
                 // execution here is a module, not a deployed account. It stays zero rather than
