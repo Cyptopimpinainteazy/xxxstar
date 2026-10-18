@@ -1033,7 +1033,10 @@ impl Database {
         let row = sqlx::query_as(
             "SELECT
                 COUNT(*)::BIGINT AS total_grants,
-                COUNT(*) FILTER (WHERE status = 'open')::BIGINT AS open_grants,
+                COUNT(*) FILTER (WHERE status = 'open'
+                    AND metadata->>'expired' IS DISTINCT FROM 'true'
+                    AND (metadata->>'deadline' IS NULL
+                         OR metadata->>'deadline' >= TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE 'UTC','YYYY-MM-DD')))::BIGINT AS open_grants,
                 COUNT(*) FILTER (WHERE status = 'submitted')::BIGINT AS submitted_proposals,
                 COUNT(*) FILTER (WHERE status = 'approved')::BIGINT AS approved_grants,
                 COUNT(*) FILTER (WHERE status = 'funded' AND award_verified)::BIGINT AS funded_grants,

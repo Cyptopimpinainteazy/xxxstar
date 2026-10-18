@@ -1,0 +1,157 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, Check, Database, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
+import './MoneySwarmWorkspace.css';
+
+interface Grant {
+  grant_id: string; external_id: string; title: string; sponsor: string;
+  status: string; stage: string; score: number; amount_usd: number;
+  metadata: Record<string, unknown>; created_at: string; updated_at: string;
+}
+interface Scoreboard {
+  total_grants: number; open_grants: number; submitted_proposals: number;
+  approved_grants: number; funded_grants: number; total_awarded_usd: number;
+  last_event_at: string | null;
+}
+interface TimelineItem {
+  item_id: string; title: string; occurred_at: string; data: Record<string, unknown>;
+}
+
+const gateway = (import.meta.env.VITE_X3_GATEWAY_URL || '/money-api').replace(/\/$/, '');
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+function text(value: unknown, fallback = 'Not provided by source'): string {
+  return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+function officialUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null; }
+  catch { return null; }
+}
+function date(value: unknown): string {
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return 'Not verified';
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(value));
+}
+
+async function request<T>(path: string, token = '', payload?: unknown): Promise<T> {
+  const response = await fetch(`${gateway}${path}`, {
+    method: payload === undefined ? 'GET' : 'POST',
+    headers: { ...(token ? { 'x-admin-token': token } : {}),
+      ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }) },
+    ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+  });
+  if (!response.ok) throw new Error(`Funding service unavailable (HTTP ${response.status}). Check the gateway connection and operator credential, then retry.`);
+  return response.json() as Promise<T>;
+}
+
+export function MoneySwarmWorkspace() {
+  const [grants, setGrants] = useState<Grant[]>([]);
+  const [stats, setStats] = useState<Scoreboard | null>(null);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [query, setQuery] = useState('');
+  const [token, setToken] = useState('');
+  const [sourceKeyword, setSourceKeyword] = useState('distributed computing');
+  const [selected, setSelected] = useState<Grant | null>(null);
+  const [view, setView] = useState<'opportunities' | 'review' | 'activity'>('opportunities');
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const detailsRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!selected) return;
+    const previous = document.activeElement;
+    detailsRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelected(null);
+      if (event.key !== 'Tab') return;
+      const controls = Array.from(detailsRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled)') || []);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('keydown', onKey); if (previous instanceof HTMLElement) previous.focus(); };
+  }, [selected]);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const [summary, records, events] = await Promise.all([
+        request<Scoreboard>('/api/public/funding-swarm/scoreboard'),
+        request<Grant[]>('/api/public/funding-swarm/grants?limit=100'),
+        request<TimelineItem[]>('/api/public/funding-swarm/timeline?limit=50'),
+      ]);
+      if (!Array.isArray(records) || !Array.isArray(events) || typeof summary.total_grants !== 'number') throw new Error('Funding service returned an invalid response. Retry after checking the gateway.');
+      setStats(summary); setGrants(records); setTimeline(events);
+    } catch (failure) { setStats(null); setGrants([]); setTimeline([]); setError(failure instanceof Error ? failure.message : 'Funding service unavailable. Retry the connection.'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const discover = async () => {
+    if (!token || busy) return;
+    setBusy(true); setNotice(''); setError('');
+    try {
+      const result = await request<{ imported: number; changed: number }>('/api/v1/admin/funding-swarm/discovery/grants-gov', token, { keyword: sourceKeyword, pages: 1 });
+      setNotice(`Source refresh complete: ${result.imported} opportunities checked, ${result.changed} new or changed. Eligibility remains subject to review.`);
+      await load();
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Source refresh failed.'); }
+    finally { setBusy(false); }
+  };
+
+  const advance = async (grant: Grant, action: string) => {
+    if (!token || busy) return;
+    setBusy(true); setError('');
+    try {
+      const updated = await request<Grant>(`/api/v1/admin/funding-swarm/grants/${encodeURIComponent(grant.grant_id)}/${action}`, token, {});
+      setSelected(updated); setNotice(`Updated review stage for ${grant.title}. No application was submitted.`);
+      await load();
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Review action failed.'); }
+    finally { setBusy(false); }
+  };
+
+  const filtered = grants.filter(grant => `${grant.title} ${grant.sponsor} ${grant.external_id}`.toLowerCase().includes(query.toLowerCase()) && (view !== 'review' || grant.stage !== 'discovery'));
+  const sourceCount = new Set(grants.map(grant => text(grant.metadata.source, 'manual'))).size;
+
+  return <main className="money-workspace">
+    <aside className="money-nav" aria-label="Money Swarm navigation">
+      <a className="money-wordmark" href="/money-swarm"><span aria-hidden="true">✳</span> X3 <strong>Money Swarm</strong></a>
+      <p className="money-nav-label">FUNDING OPERATIONS</p>
+      <nav>{([['opportunities', 'Opportunity ledger', Search], ['review', 'Application review', ShieldCheck], ['activity', 'Audit activity', Database]] as const).map(([id, label, Icon]) =>
+        <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => setView(id)}><Icon size={17} aria-hidden="true" />{label}</button>)}</nav>
+      <div className="money-nav-note"><ShieldCheck size={20} aria-hidden="true" /><strong>Human decisions. Verified evidence.</strong><p>External submissions, spending and outreach require separate authorization.</p></div>
+      <a className="money-back" href="/">← Inferstructor</a>
+    </aside>
+    <div className="money-content">
+      <header className="money-header"><div><p className="money-eyebrow">X3 / INFRASTRUCTURE FUNDING</p><h1>{view === 'activity' ? 'Audit activity' : view === 'review' ? 'Application review' : 'Funding intelligence'}</h1><p>Find the next opportunity. Keep the evidence in view.</p></div>
+        <button className="money-button" disabled={loading || busy} onClick={() => void load()}><RefreshCw size={16} aria-hidden="true" />{loading ? 'Loading records…' : 'Refresh records'}</button></header>
+
+      <div className="money-trust"><span className="money-dot" aria-hidden="true" /><span>Database records · Source timestamps shown per opportunity</span><span>Eligibility unknown until reviewed</span></div>
+      {error && <div className="money-error" role="alert">{error}</div>}
+      {notice && <div className="money-notice" role="status"><Check size={18} aria-hidden="true" />{notice}</div>}
+      {stats && <section className="money-summary" aria-label="Funding pipeline">
+        <div><span>Opportunities recorded</span><strong>{stats.total_grants.toLocaleString()}</strong><small>{sourceCount} sources in this view</small></div>
+        <div><span>Open opportunities</span><strong>{stats.open_grants.toLocaleString()}</strong><small>Not confirmed eligibility</small></div>
+        <div><span>Approved drafts</span><strong>{stats.approved_grants.toLocaleString()}</strong><small>Submission remains a human action</small></div>
+        <div><span>Verified awards</span><strong>{money.format(stats.total_awarded_usd)}</strong><small>{stats.funded_grants === 0 ? 'No verified awards' : `${stats.funded_grants} verified award records`}</small></div>
+      </section>}
+
+      <section className="money-operator" aria-label="Operator access"><div><h2>Operator access</h2><p>A credential enables source discovery and review actions. It stays in memory for this session.</p></div>
+        <label>Operator credential<input type="password" autoComplete="off" value={token} onChange={event => setToken(event.target.value)} placeholder="Enter your operator credential" /></label></section>
+
+      {view !== 'activity' && <>
+        <section className="money-discovery" aria-label="Official source discovery"><div><h2>Discover from Grants.gov</h2><p>Read official opportunities. No application is sent.</p></div><label>Research keyword<input maxLength={120} value={sourceKeyword} onChange={event => setSourceKeyword(event.target.value)} /></label><button className="money-button primary" onClick={() => void discover()} disabled={!token || !sourceKeyword.trim() || busy || loading}>{busy ? 'Working…' : 'Discover opportunities'}<ArrowUpRight size={16} aria-hidden="true" /></button>{!token && <small>Enter an operator credential to refresh the official source.</small>}</section>
+        <section className="money-ledger" aria-label="Opportunity ledger"><div className="money-section-heading"><div><h2>{view === 'review' ? 'Review pipeline' : 'Opportunity ledger'}</h2><p>{loading ? 'Retrieving records from the gateway…' : `${filtered.length} records shown · First 100 opportunities`}</p></div><label className="money-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Search opportunities" placeholder="Search title, agency or identifier" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
+          {filtered.length === 0 && !loading && !error && <div className="money-empty"><Database size={26} aria-hidden="true" /><h3>{query ? 'No opportunities match your search' : view === 'review' ? 'No applications in review' : 'No opportunities recorded yet'}</h3><p>{query ? 'Try another research term or agency.' : 'Discover from an official source, then open a record to begin research.'}</p></div>}
+          {filtered.map(grant => {
+            const url = officialUrl(grant.metadata.official_url);
+            return <article className="money-opportunity" key={grant.grant_id}><div className="money-opportunity-main"><p className="money-agency">{grant.sponsor}<span>{grant.external_id}</span></p><button className="money-title" onClick={() => setSelected(grant)}>{grant.title}</button><div className="money-opportunity-meta"><span>Deadline {text(grant.metadata.deadline, 'not provided')}</span><span className="money-status">{grant.stage.replaceAll('_', ' ')}</span></div></div><div className="money-evidence"><span className="money-unknown">Eligibility unknown</span><small>Source verified {date(grant.metadata.last_verified_at)}</small>{url ? <a href={url} target="_blank" rel="noopener noreferrer">Official source <ArrowUpRight size={14} aria-hidden="true" /></a> : <small>Official URL requires verification</small>}</div></article>;
+          })}
+        </section>
+      </>}
+      {view === 'activity' && <section className="money-ledger"><div className="money-section-heading"><h2>Public audit events</h2><p>Private review notes are excluded.</p></div>{timeline.length === 0 && <div className="money-empty"><h3>No public events recorded</h3><p>Approved workflow transitions will appear here.</p></div>}{timeline.map(event => <article className="money-event" key={event.item_id}><time>{date(event.occurred_at)}</time><strong>{event.title.replaceAll('_', ' ')}</strong><code>{event.item_id}</code></article>)}</section>}
+      <footer className="money-footer">X3 Money Swarm · No automatic submissions or financial commitments · GPU execution is not activated by this workspace</footer>
+    </div>
+    {selected && <div className="money-detail-backdrop"><section ref={detailsRef} className="money-detail" role="dialog" aria-modal="true" aria-labelledby="money-detail-title"><button className="money-close money-button" aria-label="Close opportunity details" onClick={() => setSelected(null)}><X size={18} /></button><p className="money-eyebrow">OPPORTUNITY EVIDENCE</p><h2 id="money-detail-title">{selected.title}</h2><p>{selected.sponsor}</p><dl><dt>Eligibility</dt><dd>Unknown — verified organizational facts and funder review required.</dd><dt>Requirements from source</dt><dd className="money-source-text">{text(selected.metadata.eligibility_requirements)}</dd><dt>Description</dt><dd className="money-source-text">{text(selected.metadata.description)}</dd><dt>Review stage</dt><dd>{selected.stage}</dd><dt>Source last verified</dt><dd>{date(selected.metadata.last_verified_at)} UTC</dd></dl><div className="money-review-actions">{selected.stage === 'discovery' && <button className="money-button primary" disabled={!token || busy} onClick={() => void advance(selected, 'research')}>Begin research</button>}{selected.stage === 'research' && <button className="money-button primary" disabled={!token || busy} onClick={() => void advance(selected, 'draft')}>Move to drafting</button>}{selected.stage === 'draft' && <button className="money-button primary" disabled={!token || busy} onClick={() => void advance(selected, 'approve')}>Approve draft for review</button>}</div><p className="money-limit">Approval changes the internal review record. It does not establish eligibility, submit an application or commit funds.</p></section></div>}
+  </main>;
+}

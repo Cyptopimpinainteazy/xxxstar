@@ -1,0 +1,1 @@
+../../x3-gateway/migrations/0010_funding_normalization_versions.sql

@@ -15,6 +15,12 @@ export default defineConfig({
     hmr: host ? { protocol: 'ws', host, port: 5174 } : undefined,
     watch: { ignored: ['**/src-tauri/**'] },
     strictPort: true,
+    proxy: {
+      '/money-api': {
+        target: process.env.X3_FUNDING_GATEWAY_URL || 'http://127.0.0.1:9086',
+        rewrite: path => path.replace(/^\/money-api/, ''),
+      },
+    },
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {

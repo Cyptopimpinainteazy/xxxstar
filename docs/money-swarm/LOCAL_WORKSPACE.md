@@ -1,0 +1,72 @@
+# Running the funding workspace
+
+This milestone implements official Grants.gov discovery, persistent versioned
+source evidence and the funding review dashboard. It does not complete V1–V6.
+Hardware exchange, donor identities, scheduling, signed GPU execution, private
+organization eligibility and external applications remain separate work.
+
+## Local operator
+
+From the repository root, run `python3 scripts/money-swarm/local.py start`.
+Docker, Rust, Node and npm must already be installed. The launcher creates only
+its labeled PostgreSQL container/volume and loopback services. It never installs
+host tools or changes existing validator, GPU or CI roles. The PostgreSQL image
+is pinned by digest. First start builds the gateway and installs locked dashboard
+dependencies. Optional `--no-build` requires a previously built current gateway;
+`X3_GATEWAY_BINARY` can select that binary explicitly.
+
+Open <http://127.0.0.1:5176/money-swarm>. Read-only records require no credential.
+The operator token is generated in `.env.money-swarm.local` (mode 600). Enter it
+in the dashboard's Operator credential field for discovery/internal review; it
+stays in component memory and is not stored in localStorage or URLs. Keep this
+file private. Never paste it into logs, tickets or commits.
+
+`python3 scripts/money-swarm/local.py refresh --keyword 'distributed computing'`
+retrieves actual official records. `status` checks the database-backed gateway,
+dashboard and canonical discovery route. `stop` stops only recorded owned
+processes and the labeled database; the persistent volume remains available.
+Restart with `start`. Logs and PID state are in ignored `.local/money-swarm/`.
+
+This is a loopback development pilot. The Vite development server and single
+operator token are not an Internet deployment or multi-user authorization model.
+Do not expose these ports publicly. Production requires TLS, managed identities,
+role-specific authorization, least-privilege database accounts, managed secrets,
+backups, monitoring and independent security review.
+
+## API and source contract
+
+Public reads retain `/api/public/funding-swarm/{grants,scoreboard,timeline}`.
+`POST /api/v1/admin/funding-swarm/discovery/grants-gov` requires `x-admin-token`
+matching `FUNDING_SWARM_ADMIN_TOKEN` and explicit
+`X3_FUNDING_DISCOVERY_ENABLED=1`. Absent credentials fail closed in every build.
+JSON accepts only `keyword` and `pages` (1–3); source URLs cannot be supplied.
+Official search and detail endpoints are fixed, HTTPS-only, without redirects.
+Requests have bounded bodies, deadlines, global pacing and limited retries.
+Rate-limit responses defer when their Retry-After cannot be honored safely.
+
+Each source ID is checked against the requested detail ID. Award ranges use exact
+integer cents, with missing values remaining unknown. Eligibility always remains
+UNKNOWN pending verified organizational facts and funder review. Source text is
+inert content. It never authorizes actions or overrides policy.
+
+`funding_source_snapshots` retains immutable raw documents and normalized
+interpretations keyed by source-document hash and normalization version. A new
+normalizer preserves prior interpretations. Refresh updates the current record
+and retrieval timestamp without resetting human review stages. Source changes
+and review transitions create transactional audit events. Upstream failures are
+recorded separately and never generate invented opportunities.
+
+## Recovery and data protection
+
+Before schema upgrades, save an operator-owned database backup using `pg_dump`
+inside `x3-money-swarm-pilot-db` and redirect to a private file (umask 077).
+Use `--format=custom --username=x3_money --dbname=x3_money`; do not put passwords
+in command arguments. Test restoration into a separate disposable database with
+`pg_restore --exit-on-error`, then verify source, snapshot and audit row counts.
+Do not restore over the running pilot without an approved maintenance procedure.
+
+Migrations are shared with x3-indexer through existing canonical symlinks. Never
+edit an applied migration. Stop services before binary rollback; restore a tested
+backup into a separate database if a prior binary cannot read newer schemas.
+The launcher retains failed-start state for diagnosis instead of pretending
+startup succeeded. Readiness is not proof of upstream availability or eligibility.
