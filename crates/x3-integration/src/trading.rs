@@ -281,67 +281,157 @@ mod attestation {
     /// zero across all accounts.
     fn audit_economics(receipt: &TradingReceipt) -> Result<(), ReplayError> {
         use x3_vm::trading::Account;
-        let mut balances: BTreeMap<u32, i128> = receipt
+
+        // Ledger balances are u128. Casting to i128 reinterprets balances above
+        // i128::MAX as negative and can overflow when an otherwise valid swap
+        // crosses the signed boundary in a non-profit asset.
+        let mut balances: BTreeMap<u32, u128> = receipt
             .pre_balances
             .iter()
-            .map(|(asset, amount)| (*asset, *amount as i128))
+            .copied()
             .collect();
         for intent in &receipt.intents {
-            let amount =
-                i128::try_from(intent.amount).map_err(|_| ReplayError::Inconsistent("intent"))?;
-            if intent.from == Account::Trader {
-                *balances.entry(intent.asset).or_insert(0) -= amount;
-            }
-            if intent.to == Account::Trader {
-                *balances.entry(intent.asset).or_insert(0) += amount;
-            }
             if intent.from == intent.to {
                 return Err(ReplayError::Inconsistent(
                     "intent moves value to its own account",
                 ));
             }
+            if intent.from == Account::Trader {
+                let balance = balances.entry(intent.asset).or_insert(0);
+                *balance = balance
+                    .checked_sub(intent.amount)
+                    .ok_or(ReplayError::Inconsistent("intent"))?;
+            }
+            if intent.to == Account::Trader {
+                let balance = balances.entry(intent.asset).or_insert(0);
+                *balance = balance
+                    .checked_add(intent.amount)
+                    .ok_or(ReplayError::Inconsistent("intent"))?;
+            }
         }
         for (asset, amount) in &receipt.post_balances {
-            if balances.get(asset).copied().unwrap_or(0) != *amount as i128 {
+            if balances.get(asset).copied().unwrap_or(0) != *amount {
                 return Err(ReplayError::Inconsistent("post balances"));
             }
         }
-        let pre = |asset: u32| {
-            receipt
-                .pre_balances
-                .iter()
-                .find(|(a, _)| *a == asset)
-                .map(|(_, v)| *v as i128)
-                .unwrap_or(0)
+
+        // Subtract before converting to signed. An unsigned balance may exceed
+        // i128::MAX even when its net change is a representable i128.
+        let pre = receipt
+            .pre_balances
+            .iter()
+            .find(|(asset, _)| *asset == receipt.profit.asset)
+            .map(|(_, amount)| *amount)
+            .unwrap_or(0);
+        let post = receipt
+            .post_balances
+            .iter()
+            .find(|(asset, _)| *asset == receipt.profit.asset)
+            .map(|(_, amount)| *amount)
+            .unwrap_or(0);
+        let net = if post >= pre {
+            i128::try_from(post - pre).map_err(|_| ReplayError::Inconsistent("profit"))?
+        } else {
+            let decrease = pre - post;
+            if decrease == (i128::MAX as u128) + 1 {
+                i128::MIN
+            } else {
+                -i128::try_from(decrease).map_err(|_| ReplayError::Inconsistent("profit"))?
+            }
         };
-        let post = |asset: u32| {
-            receipt
-                .post_balances
-                .iter()
-                .find(|(a, _)| *a == asset)
-                .map(|(_, v)| *v as i128)
-                .unwrap_or(0)
-        };
-        if post(receipt.profit.asset) - pre(receipt.profit.asset) != receipt.profit.net {
+        if net != receipt.profit.net {
             return Err(ReplayError::Inconsistent("profit"));
         }
-        // Every non-embedded cost was paid to the fee collector, exactly once.
-        let charged: u128 = receipt
-            .costs
-            .iter()
-            .filter(|cost| !cost.embedded)
-            .map(|cost| cost.amount)
-            .sum();
-        let collected: u128 = receipt
-            .intents
+
+        // Non-embedded charges and their fee-collector transfers must reconcile
+        // *per asset*, not only as a cross-asset total. All sums are checked.
+        audit_costs_by_asset(&receipt.costs, &receipt.intents)?;
+        Ok(())
+    }
+
+    fn audit_costs_by_asset(
+        costs: &[x3bc_core::receipt::CostEntry],
+        intents: &[x3bc_core::receipt::LedgerIntent],
+    ) -> Result<(), ReplayError> {
+        use x3_vm::trading::Account;
+        let mut charged: BTreeMap<u32, u128> = BTreeMap::new();
+        for cost in costs.iter().filter(|cost| !cost.embedded) {
+            let sum = charged.entry(cost.asset).or_insert(0);
+            *sum = sum
+                .checked_add(cost.amount)
+                .ok_or(ReplayError::Inconsistent("costs"))?;
+        }
+        let mut collected: BTreeMap<u32, u128> = BTreeMap::new();
+        for intent in intents
             .iter()
             .filter(|intent| intent.to == Account::FeeCollector)
-            .map(|intent| intent.amount)
-            .sum();
-        if charged != collected {
-            return Err(ReplayError::Inconsistent("costs"));
+        {
+            let sum = collected.entry(intent.asset).or_insert(0);
+            *sum = sum
+                .checked_add(intent.amount)
+                .ok_or(ReplayError::Inconsistent("costs"))?;
+        }
+        for (asset, amount) in &charged {
+            if collected.get(asset).copied().unwrap_or(0) != *amount {
+                return Err(ReplayError::Inconsistent("costs"));
+            }
+        }
+        for (asset, amount) in &collected {
+            if charged.get(asset).copied().unwrap_or(0) != *amount {
+                return Err(ReplayError::Inconsistent("costs"));
+            }
         }
         Ok(())
+    }
+
+    #[cfg(test)]
+    mod economic_audit_regressions {
+        use super::*;
+        use x3bc_core::receipt::{Account, CostEntry, CostKind, LedgerIntent};
+
+        #[test]
+        fn fees_in_different_assets_cannot_cancel_each_other() {
+            let cost = CostEntry {
+                kind: CostKind::SettlementFee,
+                asset: 1,
+                amount: 7,
+                embedded: false,
+            };
+            let transfer = LedgerIntent {
+                asset: 2,
+                from: Account::Trader,
+                to: Account::FeeCollector,
+                amount: 7,
+            };
+            // A full receipt isn't needed to exercise cost reconciliation;
+            // the helper below applies the same production economic rule.
+            assert_eq!(
+                super::audit_costs_by_asset(&[cost], &[transfer]),
+                Err(ReplayError::Inconsistent("costs"))
+            );
+        }
+
+        #[test]
+        fn fee_totals_fail_closed_on_overflow() {
+            let costs = [
+                CostEntry {
+                    kind: CostKind::Gas,
+                    asset: 1,
+                    amount: u128::MAX,
+                    embedded: false,
+                },
+                CostEntry {
+                    kind: CostKind::SettlementFee,
+                    asset: 1,
+                    amount: 1,
+                    embedded: false,
+                },
+            ];
+            assert_eq!(
+                super::audit_costs_by_asset(&costs, &[]),
+                Err(ReplayError::Inconsistent("costs"))
+            );
+        }
     }
 
     /// Verify a signed receipt against the artifact it claims to describe.
