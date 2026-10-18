@@ -86,9 +86,10 @@ use sp_std::prelude::*;
 
 /// Bridge to the settlement engine.
 ///
-/// The trade engine calls these methods after a batch completes
-/// successfully.  The runtime wires this to `pallet_x3_settlement`
-/// in production and a no-op adapter in tests.
+/// Registration runs inside the batch's FRAME storage transaction, after VM
+/// execution and before success is committed. An error rolls back that batch's
+/// on-chain effects. External effects require their own atomicity protocol.
+/// The runtime wires this to `pallet_x3_settlement_engine` in production.
 pub trait SettlementBridge<AccountId> {
     /// Register a completed batch with the settlement layer.
     ///
@@ -381,6 +382,7 @@ pub mod pallet {
         /// A trade batch failed and was rolled back.
         TradeBatchFailed {
             batch_id: H256,
+            /// Index for leg-specific failures; zero for batch finalization failures.
             failed_leg_index: u32,
             reason: BatchFailureReason,
         },
@@ -696,7 +698,8 @@ pub mod pallet {
                 state_root: initial_checkpoint.state_root,
             });
 
-            // Execute all legs inside one FRAME storage transaction. Checkpoint
+            // Execute legs, fee collection and settlement registration inside one
+            // FRAME storage transaction. Checkpoint
             // metadata and final batch status remain outside this boundary so
             // failed batches can still be audited after the swap state reverts.
             // This only covers effects committed through transactional FRAME
@@ -705,7 +708,17 @@ pub mod pallet {
             let mut failed_leg = None;
             let transactional_result: Result<(u128, u64), DispatchError> =
                 with_transaction(|| match Self::execute_all_legs(&mut batch) {
-                    Ok(result) => TransactionOutcome::Commit(Ok(result)),
+                    Ok(result) => {
+                        Self::collect_protocol_fee(&who, total_input);
+                        match Self::register_batch_settlement(&batch) {
+                            Ok(_) => TransactionOutcome::Commit(Ok(result)),
+                            Err(error) => {
+                                failed_leg =
+                                    Some((0, BatchFailureReason::SettlementRegistrationFailed));
+                                TransactionOutcome::Rollback(Err(error))
+                            }
+                        }
+                    }
                     Err(failure) => {
                         failed_leg = Some(failure);
                         TransactionOutcome::Rollback(Err(Error::<T>::X3TradeFailed.into()))
@@ -737,58 +750,6 @@ pub mod pallet {
 
                     TotalVolume::<T>::mutate(|v| *v = v.saturating_add(total_input));
 
-                    // ── Protocol trade fee (best-effort, does not block success) ──
-                    let fee_bps = T::ProtocolFeeBps::get() as u128;
-                    if fee_bps > 0 {
-                        let fee_raw = total_input.saturating_mul(fee_bps).saturating_div(10_000);
-                        if fee_raw > 0 {
-                            let fee: BalanceOf<T> = fee_raw.saturated_into();
-                            if <T as Config>::Currency::transfer(
-                                &who,
-                                &T::ProtocolTreasury::get(),
-                                fee,
-                                frame_support::traits::ExistenceRequirement::KeepAlive,
-                            )
-                            .is_ok()
-                            {
-                                Self::deposit_event(Event::ProtocolFeeCollected {
-                                    who: who.clone(),
-                                    fee,
-                                });
-                            } else {
-                                Self::deposit_event(Event::ProtocolFeeWaived {
-                                    who: who.clone(),
-                                    fee,
-                                });
-                            }
-                        }
-                    }
-
-                    // --- Settlement bridge: register completed batch ---
-                    let secret_seed = (batch_id.as_bytes(), current_block.to_le_bytes());
-                    let secret_hash = H256::from(blake2_256(&codec::Encode::encode(&secret_seed)));
-
-                    let legs_summary: Vec<(VmType, u128)> = batch
-                        .legs
-                        .iter()
-                        .map(|l| (l.vm_type, l.actual_amount_out.unwrap_or(0)))
-                        .collect();
-
-                    // Best-effort: log but don't fail the batch if settlement wiring fails
-                    if let Err(e) = T::Settlement::register_completed_batch(
-                        &who,
-                        batch_id,
-                        secret_hash,
-                        &legs_summary,
-                    ) {
-                        log::warn!(
-                            target: "trade-engine",
-                            "Settlement registration failed for batch {:?}: {:?}",
-                            batch_id,
-                            e,
-                        );
-                    }
-
                     Self::deposit_event(Event::TradeBatchCompleted {
                         batch_id,
                         total_input,
@@ -806,7 +767,9 @@ pub mod pallet {
                     // legs would still advertise committed output and gas.
                     batch = TradeBatches::<T>::get(batch_id).ok_or(Error::<T>::BatchNotFound)?;
                     for (index, leg) in batch.legs.iter_mut().enumerate() {
-                        if u32::try_from(index).ok() == Some(failed_leg_index) {
+                        if !matches!(&reason, BatchFailureReason::SettlementRegistrationFailed)
+                            && u32::try_from(index).ok() == Some(failed_leg_index)
+                        {
                             leg.status = TradeLegStatus::Failed;
                         }
                     }
@@ -1233,6 +1196,7 @@ pub mod pallet {
             // from the top-level extrinsic. Since AtomicTradeEngine intentionally persists a
             // failed batch status (returns `Ok(())`), we must isolate kernel writes in a nested
             // storage transaction and roll them back if the kernel call fails.
+            let mut settlement_failed = false;
             let kernel_result = with_transaction(|| {
                 let res = pallet_x3_kernel::Pallet::<T>::submit_comit_v2(
                     frame_system::RawOrigin::Signed(who.clone()).into(),
@@ -1246,7 +1210,13 @@ pub mod pallet {
                 );
 
                 match res {
-                    Ok(()) => TransactionOutcome::Commit(Ok(())),
+                    Ok(()) => match Self::register_batch_settlement(&batch) {
+                        Ok(_) => TransactionOutcome::Commit(Ok(())),
+                        Err(error) => {
+                            settlement_failed = true;
+                            TransactionOutcome::Rollback(Err(error))
+                        }
+                    },
                     Err(e) => TransactionOutcome::Rollback(Err(e)),
                 }
             });
@@ -1269,32 +1239,6 @@ pub mod pallet {
 
                     TotalVolume::<T>::mutate(|v| *v = v.saturating_add(total_input));
 
-                    // --- Settlement bridge: register completed batch ---
-                    let current_blk: u64 =
-                        frame_system::Pallet::<T>::block_number().saturated_into();
-                    let secret_seed = (batch_id.as_bytes(), current_blk.to_le_bytes());
-                    let secret_hash = H256::from(blake2_256(&codec::Encode::encode(&secret_seed)));
-
-                    let legs_summary: Vec<(VmType, u128)> = batch
-                        .legs
-                        .iter()
-                        .map(|l| (l.vm_type, l.actual_amount_out.unwrap_or(0)))
-                        .collect();
-
-                    if let Err(e) = T::Settlement::register_completed_batch(
-                        &who,
-                        batch_id,
-                        secret_hash,
-                        &legs_summary,
-                    ) {
-                        log::warn!(
-                            target: "trade-engine",
-                            "Settlement registration failed for kernel-v2 batch {:?}: {:?}",
-                            batch_id,
-                            e,
-                        );
-                    }
-
                     Self::deposit_event(Event::TradeBatchExecutedViaKernelComitV2 {
                         batch_id,
                         comit_id,
@@ -1311,7 +1255,11 @@ pub mod pallet {
                     Self::rollback_to_checkpoint(batch_id, 0)?;
 
                     for leg in batch.legs.iter_mut() {
-                        leg.status = TradeLegStatus::Failed;
+                        leg.status = if settlement_failed {
+                            TradeLegStatus::Pending
+                        } else {
+                            TradeLegStatus::Failed
+                        };
                     }
                     batch.status = BatchStatus::Failed;
                     TradeBatches::<T>::insert(batch_id, batch);
@@ -1321,7 +1269,11 @@ pub mod pallet {
                     Self::deposit_event(Event::TradeBatchFailed {
                         batch_id,
                         failed_leg_index: 0,
-                        reason: BatchFailureReason::KernelComitSubmissionFailed { comit_id },
+                        reason: if settlement_failed {
+                            BatchFailureReason::SettlementRegistrationFailed
+                        } else {
+                            BatchFailureReason::KernelComitSubmissionFailed { comit_id }
+                        },
                     });
 
                     // Notify the security swarm: kernel-v2 batch rejection is a
@@ -1411,6 +1363,57 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
+        /// Called only within the execution transaction. Preserve the existing
+        /// fee-waiver policy, but roll back a collected fee if settlement fails.
+        fn collect_protocol_fee(who: &T::AccountId, total_input: u128) {
+            let fee_bps = u128::from(T::ProtocolFeeBps::get());
+            if fee_bps > 0 {
+                let fee_raw = total_input.saturating_mul(fee_bps).saturating_div(10_000);
+                if fee_raw > 0 {
+                    let fee: BalanceOf<T> = fee_raw.saturated_into();
+                    if <T as Config>::Currency::transfer(
+                        who,
+                        &T::ProtocolTreasury::get(),
+                        fee,
+                        frame_support::traits::ExistenceRequirement::KeepAlive,
+                    )
+                    .is_ok()
+                    {
+                        Self::deposit_event(Event::ProtocolFeeCollected {
+                            who: who.clone(),
+                            fee,
+                        });
+                    } else {
+                        Self::deposit_event(Event::ProtocolFeeWaived {
+                            who: who.clone(),
+                            fee,
+                        });
+                    }
+                }
+            }
+        }
+
+        /// Register in the same transaction as VM effects, without swallowing
+        /// bridge errors. A successful return is required for batch completion.
+        fn register_batch_settlement(
+            batch: &TradeBatch<T::AccountId, BalanceOf<T>, T::MaxTradeLegs>,
+        ) -> Result<H256, DispatchError> {
+            let current_block: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
+            let secret_seed = (batch.batch_id.as_bytes(), current_block.to_le_bytes());
+            let secret_hash = H256::from(blake2_256(&codec::Encode::encode(&secret_seed)));
+            let legs_summary: Vec<(VmType, u128)> = batch
+                .legs
+                .iter()
+                .map(|leg| (leg.vm_type, leg.actual_amount_out.unwrap_or(0)))
+                .collect();
+            T::Settlement::register_completed_batch(
+                &batch.origin,
+                batch.batch_id,
+                secret_hash,
+                &legs_summary,
+            )
+        }
+
         /// Generate a unique batch ID from inputs.
         fn generate_batch_id(origin: &T::AccountId, nonce: u64, legs: &[TradeLegInput]) -> H256 {
             let mut data = Vec::new();
@@ -2492,6 +2495,8 @@ pub enum BatchFailureReason {
     KernelComitSubmissionFailed {
         comit_id: H256,
     },
+    /// Settlement registration failed after execution; all FRAME effects reverted.
+    SettlementRegistrationFailed,
 }
 
 /// State checkpoint for rollback support.

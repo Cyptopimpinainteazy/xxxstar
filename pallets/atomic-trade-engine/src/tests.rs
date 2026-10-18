@@ -23,6 +23,149 @@ use sp_core::H256;
 // ============================================================================
 
 #[test]
+fn settlement_registration_failure_rolls_back_native_execution_and_fees() {
+    assert_settlement_registration_failure(false);
+}
+
+#[test]
+fn settlement_registration_failure_rolls_back_kernel_execution_and_fees() {
+    assert_settlement_registration_failure(true);
+}
+
+fn assert_settlement_registration_failure(via_kernel: bool) {
+    new_test_ext().execute_with(|| {
+        let owner = account(1);
+        let comit_id = H256::from_low_u64_be(9003);
+        pallet_x3_kernel::AuthorizedAccounts::<Test>::insert(owner, ());
+        ProtocolFeeBps::set(20);
+        sp_io::storage::set(SETTLEMENT_TEST_MODE, &[1]);
+        assert_ok!(AtomicTradeEngine::create_trade_batch(
+            RuntimeOrigin::signed(owner),
+            vec![evm_leg(1_000_000_000_000, 1)],
+            500,
+            100,
+            0,
+        ));
+        let batch_id = AtomicTradeEngine::pending_batches(owner)[0];
+        let balances = (
+            Balances::free_balance(owner),
+            Balances::free_balance(account(3)),
+            Balances::free_balance(ProtocolTreasury::get()),
+            Balances::total_issuance(),
+        );
+        assert_ok!(if via_kernel {
+            AtomicTradeEngine::execute_trade_batch_via_kernel_comit_v2(
+                RuntimeOrigin::signed(owner),
+                batch_id,
+                comit_id,
+            )
+        } else {
+            AtomicTradeEngine::execute_trade_batch(RuntimeOrigin::signed(owner), batch_id)
+        });
+        let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+        assert_eq!(batch.status, BatchStatus::Failed);
+        assert!(batch
+            .legs
+            .iter()
+            .all(|leg| leg.status == TradeLegStatus::Pending
+                && leg.actual_amount_out.is_none()
+                && leg.gas_used == 0));
+        assert_eq!(
+            (
+                Balances::free_balance(owner),
+                Balances::free_balance(account(3)),
+                Balances::free_balance(ProtocolTreasury::get()),
+                Balances::total_issuance()
+            ),
+            balances
+        );
+        assert!(!sp_io::storage::exists(VM_TEST_WRITE));
+        assert!(!sp_io::storage::exists(SETTLEMENT_TEST_WRITE));
+        assert_eq!(pallet_x3_kernel::Nonces::<Test>::get(owner), 0);
+        assert!(!pallet_x3_kernel::SubmittedComits::<Test>::contains_key(
+            comit_id
+        ));
+        assert_eq!(AtomicTradeEngine::completed_batch_count(), 0);
+        assert_eq!(AtomicTradeEngine::total_volume(), 0);
+        assert_eq!(AtomicTradeEngine::failed_batch_count(), 1);
+        assert!(AtomicTradeEngine::pending_batches(owner).is_empty());
+        assert_eq!(AtomicTradeEngine::checkpoints(batch_id).len(), 1);
+        assert!(!System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::AtlasKernel(
+                pallet_x3_kernel::Event::ComitSubmitted { .. }
+                    | pallet_x3_kernel::Event::FeeDeducted { .. }
+            )
+        )));
+        assert!(!System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::AtomicTradeEngine(
+                Event::TradeLegCompleted { .. }
+                    | Event::TradeBatchCompleted { .. }
+                    | Event::ProtocolFeeCollected { .. }
+                    | Event::TradeBatchExecutedViaKernelComitV2 { .. }
+            )
+        )));
+        assert!(System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::AtomicTradeEngine(Event::TradeBatchFailed {
+                failed_leg_index: 0,
+                reason: BatchFailureReason::SettlementRegistrationFailed,
+                ..
+            })
+        )));
+        assert_noop!(
+            AtomicTradeEngine::execute_trade_batch(RuntimeOrigin::signed(owner), batch_id),
+            Error::<Test>::BatchNotPending
+        );
+    });
+}
+
+#[test]
+fn successful_registration_commits_vm_fee_and_settlement_effects_together() {
+    new_test_ext().execute_with(|| {
+        ProtocolFeeBps::set(20);
+        sp_io::storage::set(SETTLEMENT_TEST_MODE, &[0]);
+        let amount = 1_000_000_000_000;
+        let fee = amount * 20 / 10_000;
+        let before_owner = Balances::free_balance(account(1));
+        let before_recipient = Balances::free_balance(account(3));
+        let issuance = Balances::total_issuance();
+        assert_ok!(AtomicTradeEngine::create_trade_batch(
+            RuntimeOrigin::signed(account(1)),
+            vec![evm_leg(amount, 1)],
+            500,
+            100,
+            0,
+        ));
+        let batch_id = AtomicTradeEngine::pending_batches(account(1))[0];
+        assert_ok!(AtomicTradeEngine::execute_trade_batch(
+            RuntimeOrigin::signed(account(1)),
+            batch_id
+        ));
+        assert_eq!(
+            AtomicTradeEngine::trade_batches(batch_id).unwrap().status,
+            BatchStatus::Completed
+        );
+        assert_eq!(
+            Balances::free_balance(account(1)),
+            before_owner - fee - SETTLEMENT_TEST_TRANSFER
+        );
+        assert_eq!(
+            Balances::free_balance(account(3)),
+            before_recipient + SETTLEMENT_TEST_TRANSFER
+        );
+        assert_eq!(Balances::free_balance(ProtocolTreasury::get()), fee);
+        assert_eq!(Balances::total_issuance(), issuance);
+        assert!(sp_io::storage::exists(VM_TEST_WRITE));
+        assert_eq!(
+            sp_io::storage::get(SETTLEMENT_TEST_WRITE).unwrap().as_ref(),
+            batch_id.as_bytes()
+        );
+    });
+}
+
+#[test]
 fn aggregate_input_overflow_is_rejected_before_native_execution_changes_state() {
     assert_aggregate_input_overflow(true);
 }
