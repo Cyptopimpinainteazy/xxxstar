@@ -355,7 +355,19 @@ impl X3ExecutorAdapter for WasmX3Adapter {
             success: rec.success,
             gas_used: rec.gas_used,
             return_data: rec.return_data,
-            logs: Vec::new(),
+            // The engine's committed events, in order (a rolled-back window's are not here).
+            // They used to be dropped here, so an X3 program's `emit` never reached the chain.
+            // An X3 execution is a module, not a deployed account, so there is no emitter address.
+            logs: rec
+                .logs
+                .into_iter()
+                .map(|log| crate::ExecutionLog {
+                    address: Vec::new(),
+                    topics: alloc::vec![log.topic],
+                    data: log.data,
+                    block_number: context.block_height.unwrap_or_default(),
+                })
+                .collect(),
             state_changes: Vec::new(),
             // Carry the executor's slot channel through unchanged. The engine journals the slot
             // writes it made, and they must not be dropped on the way to the pallet or a

@@ -68,6 +68,11 @@ pub mod pending_transfer;
 pub mod registry;
 pub mod supply;
 pub mod trading;
+
+/// Largest X3 event payload the kernel delivers: the engine's own bound
+/// (`x3_vm::events::MAX_DATA_SIZE`), held equal at compile time.
+pub const MAX_X3_LOG_BYTES: u32 = 4_096;
+const _: () = assert!(MAX_X3_LOG_BYTES as usize == x3_vm::events::MAX_DATA_SIZE);
 pub use trading::{KernelTradingHost, TradingConfig};
 
 pub use adapters::{
@@ -1072,6 +1077,14 @@ pub mod pallet {
         },
         /// Governance set the trade cost schedule and fee collector.
         TradingConfigured,
+        /// An accepted comit's X3 program emitted an event: `topic` is the sha-256 of the event's
+        /// name, `data` its encoded arguments, `index` its position among the program's events.
+        X3LogEmitted {
+            comit_id: H256,
+            index: u32,
+            topic: H256,
+            data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>>,
+        },
     }
 
     #[pallet::error]
@@ -1211,6 +1224,9 @@ pub mod pallet {
         TradeAssetMismatch,
         /// The chain's economic halt freezes asset movement.
         TradingHalted,
+        /// An X3 log exceeds `MAX_X3_LOG_BYTES` (the engine's own bound; an adapter that exceeds
+        /// it is refused rather than truncated).
+        X3LogTooLarge,
     }
 
     /// Storage for atomic settlement roots (per transaction ID).
@@ -2162,8 +2178,24 @@ pub mod pallet {
 
             // Only comits that passed every check above reach this point, so a stored receipt is
             // always a receipt for an accepted comit.
+            //
+            // Its logs are delivered as events, not stored: `Emit` is priced per event, not per
+            // byte, so keeping them in state would let a program write up to
+            // `MAX_EVENTS * MAX_X3_LOG_BYTES` of permanent state for a few fee units.
             if let Some(ref receipt) = x3_receipt {
-                X3ExecutionReceipts::<T>::insert(comit_id, receipt.clone());
+                let mut stored = receipt.clone();
+                let logs = core::mem::take(&mut stored.logs);
+                X3ExecutionReceipts::<T>::insert(comit_id, stored);
+                for (index, log) in logs.into_iter().enumerate() {
+                    let data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>> =
+                        log.data.try_into().map_err(|_| Error::<T>::X3LogTooLarge)?;
+                    Self::deposit_event(Event::X3LogEmitted {
+                        comit_id,
+                        index: index as u32,
+                        topic: log.topics.first().copied().unwrap_or_default(),
+                        data,
+                    });
+                }
             }
 
             SubmittedComits::<T>::insert(comit_id, current_block);

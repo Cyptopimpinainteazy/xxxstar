@@ -751,3 +751,51 @@ fn ctx_sender_is_the_signing_account_and_is_refused_where_there_is_none() {
         );
     });
 }
+
+/// An X3 program's `emit` reaches the chain. The production adapter used to replace the engine's
+/// events with an empty list, so an accepted comit's events were lost between execution and the
+/// chain. They are now delivered as `X3LogEmitted` events, in order; the receipt kept in state does
+/// not store them (an event is priced per event, not per byte).
+#[test]
+fn an_emitted_event_reaches_the_chain_as_a_kernel_event() {
+    let program =
+        compile_source("fn main() -> i64 { emit Transfer(1, 2); emit Closed(9); return 7; }")
+            .expect("the emitting program compiles");
+    new_test_ext().execute_with(|| {
+        let comit_id = H256::from_low_u64_be(0xE417);
+        submit_v2(comit_id, Vec::new(), program).expect("the comit must be accepted");
+
+        let logs: Vec<(u32, H256, Vec<u8>)> = System::events()
+            .into_iter()
+            .filter_map(|record| match record.event {
+                RuntimeEvent::Kernel(pallet_x3_kernel::Event::X3LogEmitted {
+                    comit_id: id,
+                    index,
+                    topic,
+                    data,
+                }) if id == comit_id => Some((index, topic, data.into_inner())),
+                _ => None,
+            })
+            .collect();
+
+        // Each argument is one tagged scalar: tag 1 (int), length 8, little-endian digits.
+        let int = |n: i64| {
+            let mut out = vec![1u8, 8];
+            out.extend_from_slice(&n.to_le_bytes());
+            out
+        };
+        let topic = |name: &str| H256::from(sp_io::hashing::sha2_256(name.as_bytes()));
+        assert_eq!(
+            logs,
+            vec![
+                (0, topic("Transfer"), [int(1), int(2)].concat()),
+                (1, topic("Closed"), int(9)),
+            ]
+        );
+        let receipt = Kernel::x3_execution_receipt(comit_id).expect("the receipt is stored");
+        assert!(
+            receipt.logs.is_empty(),
+            "logs are delivered as events, not kept in state"
+        );
+    });
+}
