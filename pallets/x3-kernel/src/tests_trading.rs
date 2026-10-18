@@ -47,6 +47,20 @@ const EXECUTED_AT: u64 = 1_002;
 
 const ACCOUNTS: [AccountId; 5] = [TRADER, VENUE_1, VENUE_2, FLASH, FEE_COLLECTOR];
 
+/// `submit_trade` with its post-dispatch weight dropped, so refusals compare by error alone.
+fn submit_trade(
+    origin: RuntimeOrigin,
+    module: BoundedVec<
+        u8,
+        frame_support::traits::ConstU32<{ crate::trading::MAX_TRADE_MODULE_BYTES }>,
+    >,
+    submitted_at_block: u64,
+) -> frame_support::dispatch::DispatchResult {
+    AtlasKernel::submit_trade(origin, module, submitted_at_block)
+        .map(|_| ())
+        .map_err(|e| e.error)
+}
+
 fn public(source: &str) -> String {
     let public = source.replace(
         "require_private_submission: true",
@@ -183,7 +197,7 @@ fn a_compiled_public_arbitrage_commits_on_chain_and_moves_exactly_what_its_recei
         let before = balances();
         let bytecode = module(&public(FLAGSHIP));
 
-        assert_ok!(AtlasKernel::submit_trade(
+        assert_ok!(submit_trade(
             RuntimeOrigin::signed(TRADER),
             bytecode.clone(),
             SUBMITTED_AT
@@ -288,7 +302,7 @@ fn a_trade_that_misses_its_profit_floor_rolls_back_on_chain_and_moves_nothing() 
         chain(6);
         let before = balances();
         let greedy = public(FLAGSHIP).replace("net_profit >= 1 USDX", "net_profit >= 1_000 USDX");
-        assert_ok!(AtlasKernel::submit_trade(
+        assert_ok!(submit_trade(
             RuntimeOrigin::signed(TRADER),
             module(&greedy),
             SUBMITTED_AT
@@ -336,7 +350,7 @@ fn the_private_flagship_is_refused_on_chain_because_no_private_channel_exists() 
     new_test_ext().execute_with(|| {
         chain(6);
         assert_noop!(
-            AtlasKernel::submit_trade(
+            submit_trade(
                 RuntimeOrigin::signed(TRADER),
                 module(FLAGSHIP),
                 SUBMITTED_AT
@@ -352,7 +366,7 @@ fn trading_is_refused_until_governance_sets_the_cost_schedule() {
         chain(6);
         TradingConfiguration::<Test>::kill();
         assert_noop!(
-            AtlasKernel::submit_trade(
+            submit_trade(
                 RuntimeOrigin::signed(TRADER),
                 module(&public(FLAGSHIP)),
                 SUBMITTED_AT
@@ -384,7 +398,7 @@ fn a_program_whose_declared_decimals_disagree_with_the_registry_is_refused() {
         // The program says WETX has 6 decimals; the chain says 18.
         chain(18);
         assert_noop!(
-            AtlasKernel::submit_trade(
+            submit_trade(
                 RuntimeOrigin::signed(TRADER),
                 module(&public(FLAGSHIP)),
                 SUBMITTED_AT
@@ -399,7 +413,7 @@ fn a_submission_signed_against_a_future_block_is_refused() {
     new_test_ext().execute_with(|| {
         chain(6);
         assert_noop!(
-            AtlasKernel::submit_trade(
+            submit_trade(
                 RuntimeOrigin::signed(TRADER),
                 module(&public(FLAGSHIP)),
                 EXECUTED_AT + 1
@@ -418,7 +432,7 @@ fn a_venue_whose_custody_does_not_cover_its_reserves_fails_settlement_and_writes
         CanonicalLedger::<Test>::mutate(VENUE_2, USDX, |balance| *balance -= 100_000 * UNIT);
         let before = balances();
         assert_noop!(
-            AtlasKernel::submit_trade(
+            submit_trade(
                 RuntimeOrigin::signed(TRADER),
                 module(&public(FLAGSHIP)),
                 SUBMITTED_AT
@@ -441,7 +455,7 @@ fn trading_is_refused_while_the_protocol_is_paused() {
         chain(6);
         crate::pallet::ProtocolPaused::<Test>::put(true);
         assert_noop!(
-            AtlasKernel::submit_trade(
+            submit_trade(
                 RuntimeOrigin::signed(TRADER),
                 module(&public(FLAGSHIP)),
                 SUBMITTED_AT
@@ -457,7 +471,7 @@ fn trading_is_refused_while_the_economic_halt_freezes_transfers() {
         chain(6);
         TestTradingHost::set_halted(true);
         assert_noop!(
-            AtlasKernel::submit_trade(
+            submit_trade(
                 RuntimeOrigin::signed(TRADER),
                 module(&public(FLAGSHIP)),
                 SUBMITTED_AT
@@ -479,7 +493,7 @@ fn a_trader_who_is_the_fee_collector_is_refused() {
             }
         ));
         assert_noop!(
-            AtlasKernel::submit_trade(
+            submit_trade(
                 RuntimeOrigin::signed(TRADER),
                 module(&public(FLAGSHIP)),
                 SUBMITTED_AT
@@ -497,7 +511,7 @@ fn a_pool_holding_more_than_its_reserves_still_settles_to_old_reserves_plus_flow
         chain(6);
         let surplus = 7 * UNIT;
         fund(VENUE_1, WETX, surplus);
-        assert_ok!(AtlasKernel::submit_trade(
+        assert_ok!(submit_trade(
             RuntimeOrigin::signed(TRADER),
             module(&public(FLAGSHIP)),
             SUBMITTED_AT
@@ -528,8 +542,7 @@ fn an_aliased_venue_name_never_reaches_a_pool() {
                 let bytes: BoundedVec<_, _> = artifact.bytes.try_into().expect("fits");
                 // Refused before execution, or rolled back by the engine: either way no pool
                 // is reached and nothing moves.
-                let _ =
-                    AtlasKernel::submit_trade(RuntimeOrigin::signed(TRADER), bytes, SUBMITTED_AT);
+                let _ = submit_trade(RuntimeOrigin::signed(TRADER), bytes, SUBMITTED_AT);
                 assert!(!matches!(
                     frame_system::Pallet::<Test>::events()
                         .last()
@@ -616,7 +629,7 @@ fn the_oracle_conversion_uses_each_assets_registry_decimals() {
             source.contains("decimals: 18"),
             "the WETX declaration moved"
         );
-        assert_ok!(AtlasKernel::submit_trade(
+        assert_ok!(submit_trade(
             RuntimeOrigin::signed(TRADER),
             module(&source),
             SUBMITTED_AT
@@ -634,6 +647,43 @@ fn the_oracle_conversion_uses_each_assets_registry_decimals() {
             reading.price_num * 2,
             reading.price_den * SCALE,
             "1 USDX base unit is worth 0.5e12 WETX base units"
+        );
+    });
+}
+
+/// A trade is charged for the largest trade up front and refunded to what it did: the flagship
+/// pays under a tenth of the bound, and a module refused before it runs pays less again.
+#[test]
+fn a_trade_pays_for_what_it_did_not_for_the_largest_trade_possible() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let bound = AtlasKernel::trade_weight();
+        let committed = AtlasKernel::submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT,
+        )
+        .expect("commits")
+        .actual_weight
+        .expect("an actual weight");
+        assert!(
+            committed.ref_time() * 10 < bound.ref_time(),
+            "{committed:?} vs {bound:?}"
+        );
+        assert!(committed.ref_time() > 0);
+
+        let refused = AtlasKernel::submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(FLAGSHIP),
+            SUBMITTED_AT,
+        )
+        .expect_err("the private flagship is refused")
+        .post_info
+        .actual_weight
+        .expect("an actual weight");
+        assert!(
+            refused.ref_time() < committed.ref_time(),
+            "{refused:?} vs {committed:?}"
         );
     });
 }

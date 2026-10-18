@@ -59,106 +59,116 @@ fn cp_out(amount_in: u128, reserve_in: u128, reserve_out: u128) -> u128 {
     net * reserve_out / (reserve_in + net)
 }
 
+/// The market both tests trade in, built through the pallets' own extrinsics: two registered
+/// assets, two dex pools of the same pair (ids 1 and 2), a governance-opened flash pool funded by
+/// a provider, three oracle submitters, and the cost schedule. Returns (lp, provider, trader,
+/// fee collector).
+fn market() -> (AccountId, AccountId, AccountId, AccountId) {
+    System::set_block_number(EXECUTED_AT);
+    let (lp, provider, trader, collector) = (account(1), account(2), account(3), account(4));
+
+    // Governance: assets, the flash pool, oracle submitters, the cost schedule.
+    assert_ok!(AtlasKernel::register_asset(
+        RuntimeOrigin::root(),
+        USDX,
+        b"USDX".to_vec(),
+        6
+    ));
+    assert_ok!(AtlasKernel::register_asset(
+        RuntimeOrigin::root(),
+        WETX,
+        b"WETX".to_vec(),
+        6
+    ));
+    assert_ok!(X3FlashLoan::create_asset_pool(
+        RuntimeOrigin::root(),
+        USDX,
+        5
+    ));
+    let oracles = [account(10), account(11), account(12)];
+    for oracle in &oracles {
+        assert_ok!(X3Oracle::authorize_oracle(
+            RuntimeOrigin::root(),
+            oracle.clone()
+        ));
+    }
+    assert_ok!(AtlasKernel::set_trading_config(
+        RuntimeOrigin::root(),
+        pallet_x3_kernel::TradingConfig {
+            fee_asset: USDX,
+            gas_price: 10,
+            settlement_fee: 200_000,
+            relay_fee: 300_000,
+            protocol_fee: 100_000,
+            oracle_fee: 10_000,
+            solver_fee: 0,
+            cross_domain_fee: 0,
+            fee_collector: collector.clone(),
+        }
+    ));
+
+    // Starting balances.
+    mint(&lp, USDX, POOL1.0 + POOL2.1);
+    mint(&lp, WETX, POOL1.1 + POOL2.0);
+    mint(&provider, USDX, FLASH_LIQUIDITY);
+    mint(&trader, USDX, TRADER_USDX);
+
+    // Two pools of the same pair, ids 1 and 2, funded through the dex's own extrinsics.
+    assert_ok!(X3Dex::create_pool(
+        RuntimeOrigin::signed(lp.clone()),
+        token(USDX),
+        token(WETX),
+        30
+    ));
+    assert_ok!(X3Dex::add_liquidity(
+        RuntimeOrigin::signed(lp.clone()),
+        1,
+        POOL1.0,
+        POOL1.1,
+        0,
+        0
+    ));
+    assert_ok!(X3Dex::create_pool(
+        RuntimeOrigin::signed(lp.clone()),
+        token(WETX),
+        token(USDX),
+        30
+    ));
+    assert_ok!(X3Dex::add_liquidity(
+        RuntimeOrigin::signed(lp.clone()),
+        2,
+        POOL2.0,
+        POOL2.1,
+        0,
+        0
+    ));
+    assert_ok!(X3FlashLoan::provide_asset_liquidity(
+        RuntimeOrigin::signed(provider.clone()),
+        USDX,
+        FLASH_LIQUIDITY,
+        0
+    ));
+    // $1 per USDX and $2 per WETX (6 decimals), from three submitters.
+    for oracle in &oracles {
+        assert_ok!(X3Oracle::submit_price(
+            RuntimeOrigin::signed(oracle.clone()),
+            USDX,
+            1_000_000
+        ));
+        assert_ok!(X3Oracle::submit_price(
+            RuntimeOrigin::signed(oracle.clone()),
+            WETX,
+            2_000_000
+        ));
+    }
+
+    (lp, provider, trader, collector)
+}
+
 #[test]
 fn a_compiled_x3lang_arbitrage_runs_on_this_runtime_against_real_dex_flash_and_oracle_pallets() {
     sp_io::TestExternalities::default().execute_with(|| {
-        System::set_block_number(EXECUTED_AT);
-        let (lp, provider, trader, collector) = (account(1), account(2), account(3), account(4));
-
-        // Governance: assets, the flash pool, oracle submitters, the cost schedule.
-        assert_ok!(AtlasKernel::register_asset(
-            RuntimeOrigin::root(),
-            USDX,
-            b"USDX".to_vec(),
-            6
-        ));
-        assert_ok!(AtlasKernel::register_asset(
-            RuntimeOrigin::root(),
-            WETX,
-            b"WETX".to_vec(),
-            6
-        ));
-        assert_ok!(X3FlashLoan::create_asset_pool(
-            RuntimeOrigin::root(),
-            USDX,
-            5
-        ));
-        let oracles = [account(10), account(11), account(12)];
-        for oracle in &oracles {
-            assert_ok!(X3Oracle::authorize_oracle(
-                RuntimeOrigin::root(),
-                oracle.clone()
-            ));
-        }
-        assert_ok!(AtlasKernel::set_trading_config(
-            RuntimeOrigin::root(),
-            pallet_x3_kernel::TradingConfig {
-                fee_asset: USDX,
-                gas_price: 10,
-                settlement_fee: 200_000,
-                relay_fee: 300_000,
-                protocol_fee: 100_000,
-                oracle_fee: 10_000,
-                solver_fee: 0,
-                cross_domain_fee: 0,
-                fee_collector: collector.clone(),
-            }
-        ));
-
-        // Starting balances.
-        mint(&lp, USDX, POOL1.0 + POOL2.1);
-        mint(&lp, WETX, POOL1.1 + POOL2.0);
-        mint(&provider, USDX, FLASH_LIQUIDITY);
-        mint(&trader, USDX, TRADER_USDX);
-
-        // Two pools of the same pair, ids 1 and 2, funded through the dex's own extrinsics.
-        assert_ok!(X3Dex::create_pool(
-            RuntimeOrigin::signed(lp.clone()),
-            token(USDX),
-            token(WETX),
-            30
-        ));
-        assert_ok!(X3Dex::add_liquidity(
-            RuntimeOrigin::signed(lp.clone()),
-            1,
-            POOL1.0,
-            POOL1.1,
-            0,
-            0
-        ));
-        assert_ok!(X3Dex::create_pool(
-            RuntimeOrigin::signed(lp.clone()),
-            token(WETX),
-            token(USDX),
-            30
-        ));
-        assert_ok!(X3Dex::add_liquidity(
-            RuntimeOrigin::signed(lp.clone()),
-            2,
-            POOL2.0,
-            POOL2.1,
-            0,
-            0
-        ));
-        assert_ok!(X3FlashLoan::provide_asset_liquidity(
-            RuntimeOrigin::signed(provider.clone()),
-            USDX,
-            FLASH_LIQUIDITY,
-            0
-        ));
-        // $1 per USDX and $2 per WETX (6 decimals), from three submitters.
-        for oracle in &oracles {
-            assert_ok!(X3Oracle::submit_price(
-                RuntimeOrigin::signed(oracle.clone()),
-                USDX,
-                1_000_000
-            ));
-            assert_ok!(X3Oracle::submit_price(
-                RuntimeOrigin::signed(oracle.clone()),
-                WETX,
-                2_000_000
-            ));
-        }
+        let (lp, provider, trader, collector) = market();
 
         let pool1 = pallet_x3_dex::Pallet::<Runtime>::pool_account(1);
         let pool2 = pallet_x3_dex::Pallet::<Runtime>::pool_account(2);
@@ -303,8 +313,70 @@ fn a_trade_is_refused_on_this_runtime_while_transfers_are_halted() {
                 RuntimeOrigin::signed(account(3)),
                 artifact.bytes.try_into().expect("fits"),
                 SUBMITTED_AT
-            ),
+            )
+            .map_err(|e| e.error),
             pallet_x3_kernel::Error::<Runtime>::TradingHalted
         );
+    });
+}
+
+/// A trade that misses its profit floor rolls back on this runtime: the extrinsic succeeds and
+/// records the refusal, and not one balance, pool reserve or flash-pool share moves.
+#[test]
+fn a_trade_that_misses_its_profit_floor_rolls_back_on_this_runtime_and_moves_nothing() {
+    sp_io::TestExternalities::default().execute_with(|| {
+        let (lp, provider, trader, collector) = market();
+        let pool1 = pallet_x3_dex::Pallet::<Runtime>::pool_account(1);
+        let pool2 = pallet_x3_dex::Pallet::<Runtime>::pool_account(2);
+        let flash = pallet_x3_flashloan::Pallet::<Runtime>::asset_pool_account(USDX);
+        let everyone = [&lp, &provider, &trader, &collector, &pool1, &pool2, &flash];
+        let snapshot = || {
+            everyone
+                .iter()
+                .flat_map(|who| [balance(who, USDX), balance(who, WETX)])
+                .collect::<Vec<_>>()
+        };
+        let before = snapshot();
+        let pools_before = (X3Dex::pools(1), X3Dex::pools(2));
+
+        let greedy = FLAGSHIP
+            .replace(
+                "require_private_submission: true",
+                "require_private_submission: false",
+            )
+            .replace("net_profit >= 1 USDX", "net_profit >= 1_000 USDX");
+        let artifact = compile_trading_x3bc(&greedy, CompilationMode::Testnet).expect("compiles");
+        assert_ok!(AtlasKernel::submit_trade(
+            RuntimeOrigin::signed(trader.clone()),
+            artifact.bytes.try_into().expect("fits"),
+            SUBMITTED_AT
+        ));
+        let (digest, trap) = System::events()
+            .into_iter()
+            .find_map(|record| match record.event {
+                RuntimeEvent::AtlasKernel(pallet_x3_kernel::Event::TradeRolledBack {
+                    receipt,
+                    trap,
+                    ..
+                }) => Some((receipt, trap)),
+                RuntimeEvent::AtlasKernel(pallet_x3_kernel::Event::TradeCommitted { .. }) => {
+                    panic!("a trade below its profit floor committed")
+                }
+                _ => None,
+            })
+            .expect("the trade rolled back");
+        assert_eq!(trap, x3bc_core::trap::TrapId::ProfitBelowFloor as u8);
+        assert!(
+            !pallet_x3_kernel::TradeReceipts::<Runtime>::get(digest)
+                .expect("recorded")
+                .committed
+        );
+        assert_eq!(snapshot(), before, "no balance moved");
+        assert_eq!(
+            (X3Dex::pools(1), X3Dex::pools(2)),
+            pools_before,
+            "no pool moved"
+        );
+        assert_eq!(pallet_x3_kernel::TradeNonces::<Runtime>::get(&trader), 0);
     });
 }

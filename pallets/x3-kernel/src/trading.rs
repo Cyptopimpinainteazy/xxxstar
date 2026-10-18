@@ -48,6 +48,88 @@ pub const MAX_TRADE_RECEIPT_BYTES: u32 = 64 * 1024;
 /// Decimals of the oracle's USD prices (`pallet_x3_oracle::Price`).
 pub const ORACLE_PRICE_DECIMALS: u32 = 6;
 
+/// Most ledger intents one trade can produce: the engine emits one per borrow and per repay, two
+/// per swap, and one per cost kind when costs are charged (seven kinds, charged once).
+pub const MAX_INTENTS: u64 = 2 * x3bc_core::trading::MAX_OPS as u64 + 7;
+
+// Database accesses per item, counted from the code paths `submit_trade` runs. The up-front charge
+// is these at the section limits; the refund is these at the trade's own sizes, so the two can
+// only differ by how big the trade actually was.
+//
+// Fixed: `ProtocolPaused` (twice), the transfer halt, `TradingConfiguration`, the receipt's
+// existence check, `TradeNonces`, and the system reads for the anchor; writes: the receipt record,
+// the nonce, the event.
+const FIXED_READS: u64 = 8;
+const FIXED_WRITES: u64 = 3;
+/// Registry, the trader's balance, and the post-settlement balance check.
+const READS_PER_ASSET: u64 = 3;
+/// A venue capability: the dex pool and its custody marker.
+const READS_PER_CAPABILITY: u64 = 3;
+/// A borrow (flash pool and its liquidity) or a swap pair (two oracle prices).
+const READS_PER_OP: u64 = 3;
+/// Each side's account (a venue or flash pool lookup, two reads each) and the transfer itself
+/// (pause flag, registry, both balances); two balance writes.
+const READS_PER_INTENT: u64 = 8;
+const WRITES_PER_INTENT: u64 = 2;
+/// The pool, its custody marker and both custody balances; the pool write.
+const READS_PER_VENUE_UPDATE: u64 = 7;
+const WRITES_PER_VENUE_UPDATE: u64 = 1;
+/// The flash pool, its liquidity and the final balance check.
+const READS_PER_FLASH_CHECK: u64 = 4;
+
+/// What one `submit_trade` did, filled in as it runs; `weight` prices it. Every count is the
+/// size of a structure the call actually walked, so a refused module pays only for what was
+/// read before the refusal.
+#[derive(Default, Clone, Copy, Debug)]
+pub struct TradeMeter {
+    pub assets: u64,
+    pub capabilities: u64,
+    pub ops: u64,
+    pub intents: u64,
+    pub venue_updates: u64,
+    pub flash_checks: u64,
+    /// Gas the engine used; `None` when it never ran.
+    pub gas: Option<u64>,
+}
+
+impl TradeMeter {
+    /// The largest trade a section within its limits can make, with the engine at its gas limit.
+    pub fn upper_bound(gas_limit: u64) -> Self {
+        use x3bc_core::trading::{MAX_ASSETS, MAX_CAPABILITIES, MAX_OPS};
+        Self {
+            // The section's assets plus the fee asset.
+            assets: MAX_ASSETS as u64 + 1,
+            capabilities: MAX_CAPABILITIES as u64,
+            ops: MAX_OPS as u64,
+            intents: MAX_INTENTS,
+            // Every venue the trade touched is a capability, and every flash pool a borrow.
+            venue_updates: MAX_CAPABILITIES as u64,
+            flash_checks: MAX_OPS as u64,
+            gas: Some(gas_limit),
+        }
+    }
+
+    pub fn weight<T: Config>(&self) -> Weight {
+        let reads = FIXED_READS
+            .saturating_add(self.assets.saturating_mul(READS_PER_ASSET))
+            .saturating_add(self.capabilities.saturating_mul(READS_PER_CAPABILITY))
+            .saturating_add(self.ops.saturating_mul(READS_PER_OP))
+            .saturating_add(self.intents.saturating_mul(READS_PER_INTENT))
+            .saturating_add(self.venue_updates.saturating_mul(READS_PER_VENUE_UPDATE))
+            .saturating_add(self.flash_checks.saturating_mul(READS_PER_FLASH_CHECK));
+        let writes = FIXED_WRITES
+            .saturating_add(self.intents.saturating_mul(WRITES_PER_INTENT))
+            .saturating_add(self.venue_updates.saturating_mul(WRITES_PER_VENUE_UPDATE));
+        let execution = match self.gas {
+            Some(gas) => <<T as Config>::WeightInfo as crate::WeightInfo>::x3_execute(
+                gas.min(u64::from(u32::MAX)) as u32,
+            ),
+            None => Weight::zero(),
+        };
+        execution.saturating_add(T::DbWeight::get().reads_writes(reads, writes))
+    }
+}
+
 /// What the runtime provides to the trading engine. `()` provides nothing, so every trade that
 /// names a venue, a flash pool or an oracle price is refused by the engine.
 pub trait KernelTradingHost<AccountId> {
@@ -187,6 +269,7 @@ impl<T: Config> Pallet<T> {
 
     /// Run a trading module and settle it. The dispatchable's body.
     pub(crate) fn do_submit_trade(
+        meter: &mut TradeMeter,
         who: T::AccountId,
         bytecode: &[u8],
         submitted_at_block: u64,
@@ -213,6 +296,9 @@ impl<T: Config> Pallet<T> {
         // `MAX_ASSETS`), before any chain state is read on its behalf. The engine verifies the
         // whole module again before it runs.
         x3bc_core::trading::verify_section(section).map_err(|_| Error::<T>::TradeRefused)?;
+        meter.assets = section.assets.len() as u64 + 1;
+        meter.capabilities = section.capabilities.len() as u64;
+        meter.ops = section.ops.len() as u64;
 
         let block_number = Self::current_block_u64();
         let pre =
@@ -220,8 +306,15 @@ impl<T: Config> Pallet<T> {
         let anchor = Self::trading_anchor(block_number);
         let gas_limit = T::DefaultX3GasLimit::get();
 
+        // `execute_trade` refuses before the interpreter starts (decode, verifier, private
+        // channel). Such a refusal pays the engine's base cost plus one gas unit's cost per module
+        // byte: decoding and verifying are linear in the module's size, and the benchmarked
+        // per-gas cost is the interpreter's, a conservative price for a byte of verification. A
+        // trade that ran pays for the gas it used.
+        meter.gas = Some((bytecode.len() as u64).min(gas_limit));
         let run = x3_x3_integration::trading::execute_trade(bytecode, &pre, &anchor, gas_limit)
             .map_err(|_| Error::<T>::TradeRefused)?;
+        meter.gas = Some(run.gas_used.max(bytecode.len() as u64).min(gas_limit));
         // A trading module is not a deployed contract: it has no slots to write. A write here
         // would be dropped, so it is refused instead.
         ensure!(run.storage_writes.is_empty(), Error::<T>::TradeRefused);
@@ -238,6 +331,9 @@ impl<T: Config> Pallet<T> {
 
         let committed = match (&run.receipt.outcome, run.committed, &run.delta) {
             (Outcome::Committed, true, Some(delta)) => {
+                meter.intents = delta.intents.len() as u64;
+                meter.venue_updates = delta.venue_reserves.len() as u64;
+                meter.flash_checks = delta.flash_liquidity.len() as u64;
                 Self::settle_trade(&who, &config, &pre, delta)?;
                 true
             }

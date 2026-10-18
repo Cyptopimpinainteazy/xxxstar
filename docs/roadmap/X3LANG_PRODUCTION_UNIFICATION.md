@@ -179,14 +179,22 @@ someone dispatches it; push-triggered workflows are the provable path.
   pallets, so there `TradingHost = ()` and every trade is refused. `spec_version` 22 → 23.
 - No private submission channel exists on chain, so a program that demands one (the flagship
   `x3chain_flash_arb.x3` does) is refused; the same program with public submission commits.
+- Weight: `submit_trade` is charged up front for the largest trade the section limits allow and
+  refunded to what it did (`TradeMeter`), from the same per-item read/write counts; a module
+  refused before the interpreter runs pays the engine's base cost plus one gas unit per byte.
+  The flagship pays under a tenth of the bound.
+- Trades are refused while the supply ledger's transfer halt is set. Receipts are carried in
+  the trade's event; state keeps only the digest, trader, block and outcome.
+- Independent review (2026-10-18): no fund-theft path found; its high and medium findings and
+  the low ones listed in commit `791f555d` are fixed, each with a test.
 
 ### Verified locally (Rust stable 1.97; the repo pins 1.90; wasm target unavailable here)
 
 | Gate | Result |
 |---|---|
-| `pallet-x3-kernel` tests (incl. 9 `tests_trading`) | 270 pass |
-| `x3-chain-runtime` tests (incl. `tests_trading` E2E on real dex/flash/oracle pallets) | 114 pass |
-| `pallet-x3-dex` / `pallet-x3-flashloan` (all features) | 28 / 19 pass |
+| `pallet-x3-kernel` tests (incl. 15 `tests_trading`) | 276 pass |
+| `x3-chain-runtime` tests (incl. 3 `tests_trading` on real dex/flash/oracle pallets: commit, rollback, halt) | 116 pass |
+| `pallet-x3-dex` + `pallet-x3-flashloan` (all features) | 48 pass |
 | settlement-engine, atomic-trade-engine, x3-coin (kernel mocks changed) | 341 pass |
 | trading suites, x3bc-core, x3-vm, x3-integration, x3-backend, x3-common, x3-opt, x3-bench | pass |
 | clippy `-D warnings --no-deps`: kernel, dex, flashloan, runtime (default, `mainnet-rc1`, `runtime-benchmarks`) | clean |

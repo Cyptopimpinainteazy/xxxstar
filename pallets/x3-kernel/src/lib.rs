@@ -1317,13 +1317,28 @@ pub mod pallet {
             origin: OriginFor<T>,
             module: BoundedVec<u8, ConstU32<{ crate::trading::MAX_TRADE_MODULE_BYTES }>>,
             submitted_at_block: BlockNumberFor<T>,
-        ) -> DispatchResult {
+        ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
             ensure!(
                 submitted_at_block <= frame_system::Pallet::<T>::block_number(),
                 Error::<T>::TradeRefused
             );
-            Self::do_submit_trade(who, &module, submitted_at_block.saturated_into::<u64>())
+            // Charged for the largest trade up front; refunded down to what this one did, refused
+            // ones included, so a block is not filled by the upper bound of every trade.
+            let mut meter = crate::trading::TradeMeter::default();
+            let result = Self::do_submit_trade(
+                &mut meter,
+                who,
+                &module,
+                submitted_at_block.saturated_into::<u64>(),
+            );
+            let post_info = frame_support::dispatch::PostDispatchInfo {
+                actual_weight: Some(meter.weight::<T>().min(Self::trade_weight())),
+                pays_fee: frame_support::dispatch::Pays::Yes,
+            };
+            result.map(|()| post_info).map_err(|error| {
+                frame_support::dispatch::DispatchErrorWithPostInfo { post_info, error }
+            })
         }
 
         /// Set the trade cost schedule and fee collector. Until this is called, every trade is
@@ -2775,11 +2790,7 @@ pub mod pallet {
         /// registry, venue, flash-pool and oracle reads and writes a module bounded by the
         /// section limits (`x3bc_core::trading::MAX_*`) can make.
         pub fn trade_weight() -> Weight {
-            let bounded = (x3bc_core::trading::MAX_ASSETS * 4
-                + x3bc_core::trading::MAX_OPS * 6
-                + x3bc_core::trading::MAX_CAPABILITIES) as u64;
-            Self::x3_execution_weight()
-                .saturating_add(T::DbWeight::get().reads_writes(bounded + 4, bounded + 3))
+            crate::trading::TradeMeter::upper_bound(T::DefaultX3GasLimit::get()).weight::<T>()
         }
 
         pub fn x3_execution_weight() -> Weight {
