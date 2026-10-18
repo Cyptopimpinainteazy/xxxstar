@@ -719,3 +719,23 @@ fn a_genesis_trading_schedule_is_in_force_from_block_one() {
         assert_eq!(TradingConfiguration::<Test>::get(), Some(config()));
     });
 }
+
+/// The `submit_trade` benchmark runs a committed module (the wasm runtime has no compiler). It has
+/// to be exactly what the canonical lowering makes of the public flagship today; regenerate with
+/// `X3_BLESS_BENCHMARK_TRADE=1 cargo test -p pallet-x3-kernel the_benchmark_trade`.
+#[test]
+fn the_benchmark_trade_is_the_compiled_flagship() {
+    let compiled = module(&public(FLAGSHIP)).into_inner();
+    if std::env::var_os("X3_BLESS_BENCHMARK_TRADE").is_some() {
+        std::fs::write(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/src/benchmark_trade.x3bc"),
+            &compiled,
+        )
+        .expect("write the benchmark module");
+    }
+    assert_eq!(
+        crate::trading::BENCHMARK_TRADE_MODULE,
+        compiled.as_slice(),
+        "the benchmark module is stale"
+    );
+}

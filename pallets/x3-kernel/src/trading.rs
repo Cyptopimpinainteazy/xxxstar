@@ -150,7 +150,36 @@ pub trait KernelTradingHost<AccountId> {
     /// Whether the chain's economic halt freezes asset movement. A trade moves assets, so it is
     /// refused while this is true.
     fn transfers_halted() -> bool;
+
+    /// Build the market the `submit_trade` benchmark trades in, through the runtime's own pallets:
+    /// assets [`BENCHMARK_USDX`] and [`BENCHMARK_WETX`] registered (6 decimals); venue
+    /// `x3dex_pool_1` (USDX/WETX, 1 000 000 / 500 000 whole units) and `x3dex_pool_2` (WETX/USDX,
+    /// 400 000 / 830 000), both 30 bps; a `x3_flashloan` pool of 5 000 000 USDX; prices of $1 and
+    /// $2 updated in the current block; and `trader` holding 50 USDX. The benchmark sets the cost
+    /// schedule itself. A host that cannot build it returns an error and the benchmark stops.
+    #[cfg(feature = "runtime-benchmarks")]
+    fn benchmark_market(_trader: &AccountId) -> Result<(), &'static str> {
+        Err("this trading host cannot build the benchmark market")
+    }
 }
+
+/// The benchmark market's quote asset (see [`KernelTradingHost::benchmark_market`]).
+#[cfg(feature = "runtime-benchmarks")]
+pub const BENCHMARK_USDX: u32 = 1;
+/// The benchmark market's base asset.
+#[cfg(feature = "runtime-benchmarks")]
+pub const BENCHMARK_WETX: u32 = 2;
+/// The block the benchmark trade was signed against; it executes [`BENCHMARK_EXECUTED_AT`].
+#[cfg(feature = "runtime-benchmarks")]
+pub const BENCHMARK_SUBMITTED_AT: u32 = 1_000;
+#[cfg(feature = "runtime-benchmarks")]
+pub const BENCHMARK_EXECUTED_AT: u32 = 1_002;
+
+/// The benchmark trade: `x3-lang/examples/x3chain_flash_arb.x3` with its private-submission line
+/// set to `false`, compiled by `compile_trading_x3bc` (testnet mode). A committed build product,
+/// because the benchmark also runs inside the wasm runtime where the compiler does not;
+/// `tests_trading::the_benchmark_trade_is_the_compiled_flagship` fails if it goes stale.
+pub const BENCHMARK_TRADE_MODULE: &[u8] = include_bytes!("benchmark_trade.x3bc");
 
 impl<AccountId> KernelTradingHost<AccountId> for () {
     fn venue(_name: &str) -> Option<(VenueState, AccountId)> {

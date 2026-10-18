@@ -795,6 +795,57 @@ impl TestTradingHost {
 }
 
 impl pallet_x3_kernel::KernelTradingHost<AccountId> for TestTradingHost {
+    #[cfg(feature = "runtime-benchmarks")]
+    fn benchmark_market(trader: &AccountId) -> Result<(), &'static str> {
+        use pallet_x3_kernel::trading::{BENCHMARK_EXECUTED_AT, BENCHMARK_USDX, BENCHMARK_WETX};
+        const UNIT: u128 = 1_000_000;
+        const VENUE_1: AccountId = 1_001;
+        const VENUE_2: AccountId = 1_002;
+        const FLASH: AccountId = 1_003;
+        Self::reset();
+        for (asset, symbol) in [(BENCHMARK_USDX, b"USDX"), (BENCHMARK_WETX, b"WETX")] {
+            pallet_x3_kernel::AssetRegistry::<Test>::insert(
+                asset,
+                pallet_x3_kernel::AssetMetadata {
+                    symbol: symbol.to_vec().try_into().map_err(|_| "symbol")?,
+                    decimals: 6,
+                },
+            );
+        }
+        let fund = |who: AccountId, asset: u32, amount: u128| {
+            pallet_x3_kernel::CanonicalLedger::<Test>::mutate(who, asset, |b| *b += amount)
+        };
+        let venue =
+            |name: &str, asset_a, asset_b, reserve_a, reserve_b| x3bc_core::state::VenueState {
+                name: name.into(),
+                version: x3bc_core::trading::CAPABILITY_VERSION,
+                asset_a,
+                asset_b,
+                reserve_a,
+                reserve_b,
+                fee_bps: 30,
+            };
+        let (usdx, wetx) = (BENCHMARK_USDX, BENCHMARK_WETX);
+        fund(VENUE_1, usdx, 1_000_000 * UNIT);
+        fund(VENUE_1, wetx, 500_000 * UNIT);
+        fund(VENUE_2, wetx, 400_000 * UNIT);
+        fund(VENUE_2, usdx, 830_000 * UNIT);
+        fund(FLASH, usdx, 5_000_000 * UNIT);
+        fund(*trader, usdx, 50 * UNIT);
+        Self::add_venue(
+            venue("x3dex_pool_1", usdx, wetx, 1_000_000 * UNIT, 500_000 * UNIT),
+            VENUE_1,
+        );
+        Self::add_venue(
+            venue("x3dex_pool_2", wetx, usdx, 400_000 * UNIT, 830_000 * UNIT),
+            VENUE_2,
+        );
+        Self::add_flash_pool(usdx, 5, FLASH);
+        Self::set_price(usdx, 1_000_000, u64::from(BENCHMARK_EXECUTED_AT));
+        Self::set_price(wetx, 2_000_000, u64::from(BENCHMARK_EXECUTED_AT));
+        Ok(())
+    }
+
     fn venue(name: &str) -> Option<(x3bc_core::state::VenueState, AccountId)> {
         let (mut venue, custody) = TRADING_VENUES.with(|v| v.borrow().get(name).cloned())?;
         let (reserve_a, reserve_b): (u128, u128) =

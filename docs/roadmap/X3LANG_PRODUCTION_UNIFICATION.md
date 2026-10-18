@@ -238,3 +238,23 @@ already failing on master: its recorded revision is not in the repository).
 - Fixed: `Emit` charges 20 gas plus 8 per data byte (`x3bc_core::spec::EMIT_GAS_PER_DATA_BYTE`).
 - Left unchanged: `x3-flashloan::pool_account` (native pool) decodes its account with `.expect`;
   changing the derivation would move an account that already holds funds.
+
+### `submit_trade` benchmark
+
+`pallet_x3_kernel` benchmark `submit_trade` runs the compiled public flagship
+(`pallets/x3-kernel/src/benchmark_trade.x3bc`, held to the compiler by
+`tests_trading::the_benchmark_trade_is_the_compiled_flagship`) against the market
+`KernelTradingHost::benchmark_market` builds through the dex, flash-loan and oracle pallets, and
+fails unless the trade commits. Verified locally: the pallet benchmark suite (mock) and the runtime
+test `the_benchmark_market_commits_the_benchmark_trade` (`--features runtime-benchmarks`). Not yet
+measured on reference hardware; on the server:
+
+```bash
+cargo build --release -p x3-chain-node --features runtime-benchmarks
+./target/release/x3-chain-node benchmark pallet --chain dev --pallet pallet_x3_kernel \
+  --extrinsic submit_trade --steps 2 --repeat 20
+```
+
+Compare the result with `Pallet::trade_weight()` (the charged upper bound); it is a model of
+measured `x3_execute` plus per-structure database weight and does not price verification and
+settlement compute separately.

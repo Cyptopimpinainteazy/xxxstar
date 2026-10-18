@@ -2014,6 +2014,57 @@ impl pallet_x3_kernel::KernelTradingHost<AccountId> for X3TradingHost {
     fn transfers_halted() -> bool {
         <X3SupplyLedger as x3_asset_kernel_types::traits::EconomicHaltInspect>::is_halted()
     }
+
+    /// The benchmark market, built through the dex, flash-loan and oracle pallets' own calls (the
+    /// same market `tests_trading` trades in). Only starting `CanonicalLedger` balances are
+    /// written directly, as a mint would.
+    #[cfg(feature = "runtime-benchmarks")]
+    fn benchmark_market(trader: &AccountId) -> Result<(), &'static str> {
+        use pallet_x3_kernel::trading::{BENCHMARK_USDX as USDX, BENCHMARK_WETX as WETX};
+        const UNIT: u128 = 1_000_000;
+        const LEDGER_CHAIN: u32 = 650_000;
+        let token = |asset: u32| x3_dex::TokenId {
+            chain_id: LEDGER_CHAIN,
+            asset_id: u128::from(asset),
+        };
+        let mint = |who: &AccountId, asset: u32, amount: u128| {
+            pallet_x3_kernel::CanonicalLedger::<Runtime>::mutate(who, asset, |b| *b += amount)
+        };
+        let seed = |byte: u8| AccountId::new([byte; 32]);
+        let (lp, provider) = (seed(0xB1), seed(0xB2));
+        let oracles = [seed(0xB3), seed(0xB4), seed(0xB5)];
+        let root = || RuntimeOrigin::root();
+        let signed = |who: &AccountId| RuntimeOrigin::signed(who.clone());
+        let refused = |_| "the benchmark market could not be built";
+
+        AtlasKernel::register_asset(root(), USDX, b"USDX".to_vec(), 6).map_err(refused)?;
+        AtlasKernel::register_asset(root(), WETX, b"WETX".to_vec(), 6).map_err(refused)?;
+        X3FlashLoan::create_asset_pool(root(), USDX, 5).map_err(refused)?;
+        for oracle in &oracles {
+            X3Oracle::authorize_oracle(root(), oracle.clone()).map_err(refused)?;
+        }
+        mint(&lp, USDX, 1_830_000 * UNIT);
+        mint(&lp, WETX, 900_000 * UNIT);
+        mint(&provider, USDX, 5_000_000 * UNIT);
+        mint(trader, USDX, 50 * UNIT);
+        let first = pallet_x3_dex::NextPoolId::<Runtime>::get().saturating_add(1);
+        if first != 1 {
+            return Err("the benchmark market needs dex pool ids 1 and 2 free");
+        }
+        X3Dex::create_pool(signed(&lp), token(USDX), token(WETX), 30).map_err(refused)?;
+        X3Dex::add_liquidity(signed(&lp), 1, 1_000_000 * UNIT, 500_000 * UNIT, 0, 0)
+            .map_err(refused)?;
+        X3Dex::create_pool(signed(&lp), token(WETX), token(USDX), 30).map_err(refused)?;
+        X3Dex::add_liquidity(signed(&lp), 2, 400_000 * UNIT, 830_000 * UNIT, 0, 0)
+            .map_err(refused)?;
+        X3FlashLoan::provide_asset_liquidity(signed(&provider), USDX, 5_000_000 * UNIT, 0)
+            .map_err(refused)?;
+        for oracle in &oracles {
+            X3Oracle::submit_price(signed(oracle), USDX, 1_000_000).map_err(refused)?;
+            X3Oracle::submit_price(signed(oracle), WETX, 2_000_000).map_err(refused)?;
+        }
+        Ok(())
+    }
 }
 
 impl pallet_x3_coin::Config for Runtime {

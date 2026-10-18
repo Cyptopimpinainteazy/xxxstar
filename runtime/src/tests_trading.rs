@@ -380,3 +380,41 @@ fn a_trade_that_misses_its_profit_floor_rolls_back_on_this_runtime_and_moves_not
         assert_eq!(pallet_x3_kernel::TradeNonces::<Runtime>::get(&trader), 0);
     });
 }
+
+/// The market `X3TradingHost::benchmark_market` builds is one the benchmark trade commits in: the
+/// `submit_trade` benchmark would otherwise stop (or measure a rollback) on this runtime.
+#[cfg(feature = "runtime-benchmarks")]
+#[test]
+fn the_benchmark_market_commits_the_benchmark_trade() {
+    use pallet_x3_kernel::trading::{
+        KernelTradingHost, BENCHMARK_EXECUTED_AT, BENCHMARK_SUBMITTED_AT, BENCHMARK_TRADE_MODULE,
+    };
+    sp_io::TestExternalities::default().execute_with(|| {
+        System::set_block_number(BENCHMARK_EXECUTED_AT);
+        let trader = account(0x42);
+        assert_ok!(crate::X3TradingHost::benchmark_market(&trader));
+        assert_ok!(AtlasKernel::set_trading_config(
+            RuntimeOrigin::root(),
+            pallet_x3_kernel::TradingConfig {
+                fee_asset: USDX,
+                gas_price: 10,
+                settlement_fee: 200_000,
+                relay_fee: 300_000,
+                protocol_fee: 100_000,
+                oracle_fee: 10_000,
+                solver_fee: 0,
+                cross_domain_fee: 0,
+                fee_collector: account(0x43),
+            }
+        ));
+        assert_ok!(AtlasKernel::submit_trade(
+            RuntimeOrigin::signed(trader),
+            BENCHMARK_TRADE_MODULE.to_vec().try_into().expect("fits"),
+            BENCHMARK_SUBMITTED_AT
+        ));
+        assert!(System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::AtlasKernel(pallet_x3_kernel::Event::TradeCommitted { .. })
+        )));
+    });
+}
