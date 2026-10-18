@@ -25946,6 +25946,7 @@ dependencies = [
  "x3-parser",
  "x3-typeck",
  "x3-vm",
+ "x3bc-core",
 ]
 
 [[package]]
