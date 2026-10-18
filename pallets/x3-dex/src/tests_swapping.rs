@@ -142,3 +142,49 @@ fn test_slippage_protection() {
         );
     });
 }
+
+#[test]
+fn two_pool_second_leg_slippage_rolls_back_first_leg_and_events() {
+    use frame_support::storage::{with_transaction, TransactionOutcome};
+    use sp_runtime::DispatchError;
+
+    new_test_ext().execute_with(|| {
+        let a = TokenId { chain_id: 1, asset_id: 10 };
+        let b = TokenId { chain_id: 1, asset_id: 11 };
+        let c = TokenId { chain_id: 1, asset_id: 12 };
+        let first = pool_id(&a, &b, 30);
+        let second = pool_id(&b, &c, 30);
+
+        assert_ok!(DEX::create_pool(RuntimeOrigin::signed(1), a.clone(), b.clone(), 30));
+        assert_ok!(DEX::create_pool(RuntimeOrigin::signed(1), b.clone(), c.clone(), 30));
+        for id in [first, second] {
+            assert_ok!(DEX::add_liquidity(RuntimeOrigin::signed(1), id, 10_000, 10_000, 1, 1));
+        }
+
+        let before_first = DEX::pools(first).expect("first pool exists");
+        let before_second = DEX::pools(second).expect("second pool exists");
+        let events_before = System::events();
+
+        let result: Result<(), DispatchError> = with_transaction(|| {
+            if let Err(err) = DEX::swap(RuntimeOrigin::signed(2), first, a.clone(), 100, 1) {
+                return TransactionOutcome::Rollback(Err(err));
+            }
+            assert_ne!(
+                DEX::pools(first).expect("first pool remains"),
+                before_first,
+                "first leg must mutate state inside transaction"
+            );
+            match DEX::swap(RuntimeOrigin::signed(2), second, b.clone(), 100, u128::MAX) {
+                Ok(()) => TransactionOutcome::Commit(Ok(())),
+                Err(err) => TransactionOutcome::Rollback(Err(err)),
+            }
+        });
+
+        assert!(result.is_err(), "second-leg impossible minimum must fail");
+        assert_eq!(DEX::pools(first).unwrap().reserve_a, before_first.reserve_a);
+        assert_eq!(DEX::pools(first).unwrap().reserve_b, before_first.reserve_b);
+        assert_eq!(DEX::pools(second).unwrap().reserve_a, before_second.reserve_a);
+        assert_eq!(DEX::pools(second).unwrap().reserve_b, before_second.reserve_b);
+        assert_eq!(System::events(), events_before, "failed bundle must not leak swap events");
+    });
+}
