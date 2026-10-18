@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod volunteer_policy;
+
 use anyhow::Context;
 use serde::Deserialize;
 use std::{env, path::PathBuf, time::Duration};
