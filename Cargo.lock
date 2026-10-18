@@ -26306,6 +26306,7 @@ dependencies = [
  "x3-cross-vm-bridge",
  "x3-dex",
  "x3-ixl",
+ "x3-lang-compiler",
  "x3-packet-schema",
  "x3-packet-standard",
  "x3-revenue-sharing",
@@ -26313,6 +26314,7 @@ dependencies = [
  "x3-svm-integration",
  "x3-verification-router",
  "x3-x3-integration",
+ "x3bc-core",
 ]
 
 [[package]]

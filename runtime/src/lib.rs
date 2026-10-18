@@ -146,6 +146,10 @@ use precompiles::FrontierPrecompiles;
 #[cfg(all(test, feature = "std"))]
 mod tests;
 
+// `submit_trade` against the real dex, flash-loan and oracle pallets (absent from mainnet-rc1).
+#[cfg(all(test, feature = "std", not(feature = "mainnet-rc1")))]
+mod tests_trading;
+
 pub mod fraud_proofs;
 
 #[cfg(any(feature = "std", test))]
@@ -404,7 +408,7 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // Same release: signed Ethereum transactions become self-contained extrinsics
     // (fp_self_contained::UncheckedExtrinsic). Existing signed extrinsics encode
     // exactly as before, so `transaction_version` is unchanged.
-    spec_version: 22,
+    spec_version: 23,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -1122,6 +1126,10 @@ impl pallet_x3_vrf::Config for Runtime {
 
 parameter_types! {
     pub const MaxPools: u32 = 100;
+    pub const DexPalletId: PalletId = PalletId(*b"x3/dexpl");
+    /// `TokenId::chain_id` of this chain's ledger assets: the X3 chain id the trading catalog uses
+    /// (`x3bc_core::trading::X3_CHAIN_ID`).
+    pub const DexLedgerChainId: u32 = 650_000;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -1129,6 +1137,12 @@ impl pallet_x3_dex::Config for Runtime {
     type MaxPools = MaxPools;
     type WeightInfo = pallet_x3_dex::weights::SubstrateWeight<Runtime>;
     type EconomicHalt = X3SupplyLedger;
+    // Pool reserves are `CanonicalLedger` balances of each pool's custody account.
+    type Ledger = KernelCanonicalLedger;
+    type PalletId = DexPalletId;
+    type LedgerChainId = DexLedgerChainId;
+    #[cfg(feature = "runtime-benchmarks")]
+    type BenchmarkHelper = KernelCanonicalLedger;
 }
 
 parameter_types! {
@@ -1862,6 +1876,111 @@ impl pallet_x3_kernel::Config for Runtime {
     type BridgeSvmEscrow = BridgeSvmEscrowStorage;
     type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
     type EmergencyHaltController = RuntimeEmergencyHaltController;
+    // `submit_trade` runs against the chain's dex pools, flash pools and oracle. The release
+    // candidate does not include those pallets, so there the host offers nothing and every trade
+    // is refused.
+    #[cfg(not(feature = "mainnet-rc1"))]
+    type TradingHost = X3TradingHost;
+    #[cfg(feature = "mainnet-rc1")]
+    type TradingHost = ();
+}
+
+/// The kernel's `CanonicalLedger`, as the ledger the dex and flash-loan pallets custody on.
+pub struct KernelCanonicalLedger;
+
+impl x3_asset_kernel_types::traits::CanonicalLedgerTransfer<AccountId> for KernelCanonicalLedger {
+    fn ledger_transfer(
+        asset: u32,
+        from: &AccountId,
+        to: &AccountId,
+        amount: u128,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_x3_kernel::Pallet::<Runtime>::ledger_transfer(asset, from, to, amount)
+    }
+
+    fn ledger_balance(asset: u32, who: &AccountId) -> u128 {
+        pallet_x3_kernel::Pallet::<Runtime>::ledger_balance_of(asset, who)
+    }
+}
+
+/// Benchmarks fund their accounts directly on the ledger, registering the asset if needed.
+#[cfg(feature = "runtime-benchmarks")]
+impl x3_asset_kernel_types::traits::LedgerBenchmarkFunding<AccountId> for KernelCanonicalLedger {
+    fn fund(asset: u32, who: &AccountId, amount: u128) {
+        if !pallet_x3_kernel::AssetRegistry::<Runtime>::contains_key(asset) {
+            let symbol = b"BENCH".to_vec().try_into().unwrap_or_default();
+            pallet_x3_kernel::AssetRegistry::<Runtime>::insert(
+                asset,
+                pallet_x3_kernel::AssetMetadata {
+                    symbol,
+                    decimals: 6,
+                },
+            );
+        }
+        pallet_x3_kernel::CanonicalLedger::<Runtime>::mutate(who, asset, |balance| {
+            *balance = balance.saturating_add(amount)
+        });
+    }
+}
+
+/// The kernel trading engine's view of this chain: `pallet_x3_dex` pools as venues,
+/// `pallet_x3_flashloan` asset pools as the flash provider, `pallet_x3_oracle` median prices.
+#[cfg(not(feature = "mainnet-rc1"))]
+pub struct X3TradingHost;
+
+#[cfg(not(feature = "mainnet-rc1"))]
+impl pallet_x3_kernel::KernelTradingHost<AccountId> for X3TradingHost {
+    fn venue(name: &str) -> Option<(x3bc_core::state::VenueState, AccountId)> {
+        let pool_id = x3bc_core::trading::venue_pool_id(name)?;
+        let pool = pallet_x3_dex::Pallet::<Runtime>::trading_pool(pool_id)?;
+        Some((
+            x3bc_core::state::VenueState {
+                name: name.into(),
+                version: x3bc_core::trading::CAPABILITY_VERSION,
+                asset_a: pool.asset_a,
+                asset_b: pool.asset_b,
+                reserve_a: pool.reserve_a,
+                reserve_b: pool.reserve_b,
+                fee_bps: pool.fee_bps,
+            },
+            pallet_x3_dex::Pallet::<Runtime>::pool_account(pool_id),
+        ))
+    }
+
+    fn set_venue_reserves(
+        name: &str,
+        reserve_a: u128,
+        reserve_b: u128,
+    ) -> sp_runtime::DispatchResult {
+        let pool_id = x3bc_core::trading::venue_pool_id(name)
+            .ok_or(sp_runtime::DispatchError::Other("not an x3dex venue"))?;
+        pallet_x3_dex::Pallet::<Runtime>::apply_trading_reserves(pool_id, reserve_a, reserve_b)
+    }
+
+    fn flash_pool(
+        provider: &str,
+        asset: u32,
+    ) -> Option<(x3bc_core::state::FlashPoolState, AccountId)> {
+        if provider != x3bc_core::trading::FLASH_PROVIDER {
+            return None;
+        }
+        let (fee_bps, liquidity) = pallet_x3_flashloan::Pallet::<Runtime>::asset_pool(asset)?;
+        Some((
+            x3bc_core::state::FlashPoolState {
+                provider: provider.into(),
+                version: x3bc_core::trading::CAPABILITY_VERSION,
+                asset,
+                liquidity,
+                fee_bps,
+            },
+            pallet_x3_flashloan::Pallet::<Runtime>::asset_pool_account(asset),
+        ))
+    }
+
+    fn usd_price(asset: u32) -> Option<(u128, u64)> {
+        let price = pallet_x3_oracle::Pallet::<Runtime>::get_price(asset)?;
+        Some((u128::from(price.price), u64::from(price.last_updated)))
+    }
 }
 
 impl pallet_x3_coin::Config for Runtime {
@@ -3524,7 +3643,12 @@ pub struct LaunchpadDexBridge;
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
     fn create_pool(creator: &AccountId, token_a: u32, token_b: u32) -> Result<u64, DispatchError> {
-        // Use the DEX create_pool extrinsic with standard 30 bps fee
+        // Use the DEX create_pool extrinsic with standard 30 bps fee.
+        //
+        // Token-factory assets are not `CanonicalLedger` assets, so they are named on chain 0, and
+        // `pallet_x3_dex` refuses a pool it cannot custody (`TokenNotOnLedger`): graduation fails
+        // closed instead of recording a pool that holds nothing. Naming them on the ledger's chain
+        // id would be wrong in a worse way: factory asset N is not ledger asset N.
         let fee_bps = 30u32;
         pallet_x3_dex::Pallet::<Runtime>::create_pool(
             frame_system::RawOrigin::Signed(creator.clone()).into(),
@@ -3539,8 +3663,8 @@ impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
             fee_bps,
         )
         .map(|_| {
-            // The pool was just created; derive pool_id from NextPoolId - 1
-            pallet_x3_dex::NextPoolId::<Runtime>::get().saturating_sub(1)
+            // `NextPoolId` holds the id `create_pool` just assigned.
+            pallet_x3_dex::NextPoolId::<Runtime>::get()
         })
     }
 }
@@ -3648,6 +3772,9 @@ impl pallet_x3_flashloan::Config for Runtime {
     type FeeBasisPoints = FlashLoanFeeBasisPoints;
     type MaxLoanFraction = FlashLoanMaxLoanFraction;
     type WeightInfo = pallet_x3_flashloan::weights::SubstrateWeight<Runtime>;
+    // Asset pools custody liquidity on `CanonicalLedger`; governance opens them.
+    type Ledger = KernelCanonicalLedger;
+    type AssetPoolOrigin = EnsureRootOrHalfCouncil;
 }
 
 // ===== SVM Runtime Configuration =====
