@@ -28,6 +28,23 @@ fn an_honest_receipt_replays() {
     replay_receipt(&bytes, &signed, &registry()).expect("honest receipt");
 }
 
+
+#[test]
+fn a_large_non_profit_asset_balance_replays_without_signed_overflow() {
+    // WETX is not the profit asset. Its opening balance fits u128 but approaches
+    // i128::MAX; the first swap credits it past that boundary before the second
+    // swap spends its output. Replay must use checked unsigned balances here.
+    let artifact = compile(ARB_SOURCE);
+    let mut pre = pre_state();
+    pre.trader_balances.insert(WETX, i128::MAX as u128 - 10);
+    let run = execute_trade(&artifact.bytes, &pre, &anchor(), GAS_LIMIT)
+        .expect("the chain VM must run the trade");
+    assert!(run.committed, "the production engine committed this valid trade");
+    let signed = sign_receipt(&run.receipt, &attestor());
+    replay_receipt(&artifact.bytes, &signed, &registry())
+        .expect("economic replay must not overflow for a valid u128 balance");
+}
+
 #[test]
 fn a_modified_receipt_breaks_the_signature() {
     let (bytes, mut signed) = honest();
