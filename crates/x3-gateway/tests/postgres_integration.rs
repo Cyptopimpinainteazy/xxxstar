@@ -10,6 +10,7 @@ const TEST_DATABASE_URL_ENV: &str = "X3_GATEWAY_TEST_DATABASE_URL";
 async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
     funding_workflow_enforces_state_and_preserves_audit().await;
     funding_source_snapshots_are_durable_and_preserve_review().await;
+    proposal_versions_bind_source_and_serialize_edits().await;
     fresh_schema_supports_chain_queries().await;
     gateway_schema_upgrades_both_legacy_histories().await;
     control_plane_roundtrip_and_duplicate_vote_rejection().await;
@@ -777,4 +778,149 @@ async fn control_plane_sync_upserts_are_idempotent() {
         "replayed control-plane sync must not duplicate votes"
     );
     db.pool().close().await;
+}
+
+async fn proposal_versions_bind_source_and_serialize_edits() {
+    use sha2::{Digest, Sha256};
+    use x3_gateway::funding_discovery::normalize_opportunity;
+    use x3_gateway::funding_proposals::ProposalInput;
+    let url = std::env::var(TEST_DATABASE_URL_ENV).unwrap();
+    let db = Database::connect(&DatabaseConfig::new(url.clone()))
+        .await
+        .unwrap();
+    let mut source = serde_json::json!({"id":789,"opportunityNumber":"PROPOSAL-FIXTURE",
+        "opportunityTitle":"Proposal source fixture","synopsis":{"agencyName":"Fixture agency","synopsisDesc":"Original evidence"}});
+    db.store_funding_snapshot(
+        &normalize_opportunity(source.clone(), 789, chrono::Utc::now()).unwrap(),
+        &source,
+    )
+    .await
+    .unwrap();
+    let id: String = sqlx::query_scalar(
+        "SELECT grant_id FROM funding_swarm_grants WHERE external_id='grants.gov:789'",
+    )
+    .fetch_one(db.pool())
+    .await
+    .unwrap();
+    let context = db.proposal_context(&id).await.unwrap();
+    let original_source = source.clone();
+    source["synopsis"]["synopsisDesc"] = serde_json::json!("Intermediate source B");
+    db.store_funding_snapshot(
+        &normalize_opportunity(source.clone(), 789, chrono::Utc::now()).unwrap(),
+        &source,
+    )
+    .await
+    .unwrap();
+    let superseded_snapshot = db.proposal_context(&id).await.unwrap().source.snapshot_id;
+    source = original_source;
+    assert!(
+        !db.store_funding_snapshot(
+            &normalize_opportunity(source.clone(), 789, chrono::Utc::now()).unwrap(),
+            &source
+        )
+        .await
+        .unwrap(),
+        "revisited source A reuses its immutable document"
+    );
+    assert_eq!(
+        db.proposal_context(&id).await.unwrap().source.snapshot_id,
+        context.source.snapshot_id,
+        "A to B to A must select current A, not most recently created B"
+    );
+    let make_input = |expected_version, snapshot_id: String| ProposalInput {
+        expected_version,
+        source_snapshot_id: snapshot_id,
+        project_title: "Fixture project".into(),
+        research_question: "Fixture research question".into(),
+        technical_approach: "Compare with a sequential reference".into(),
+        evaluation_plan: "Publish actual measurements".into(),
+        organization_facts: "Fixture self-report, not verified eligibility".into(),
+        requested_usd_cents: Some(12345),
+    };
+    assert!(
+        db.save_proposal(&id, make_input(0, context.source.snapshot_id.clone()))
+            .await
+            .is_err(),
+        "discovery is not an editable proposal stage"
+    );
+    db.admin_advance_funding_swarm_stage(&id, "research", "open")
+        .await
+        .unwrap();
+    assert!(db
+        .save_proposal(&id, make_input(0, "foreign-source".into()))
+        .await
+        .is_err());
+    assert!(
+        db.save_proposal(&id, make_input(0, superseded_snapshot))
+            .await
+            .is_err(),
+        "a newer-created B snapshot must not supersede current A"
+    );
+    let first = db
+        .save_proposal(&id, make_input(0, context.source.snapshot_id.clone()))
+        .await
+        .unwrap();
+    assert_eq!(first.version, 1);
+    assert_eq!(first.package["eligibility_status"], "UNKNOWN");
+    assert_eq!(first.package["external_submission"], false);
+    assert_eq!(
+        first.package_sha256,
+        hex::encode(Sha256::digest(serde_json::to_vec(&first.package).unwrap()))
+    );
+    assert!(
+        db.save_proposal(&id, make_input(0, context.source.snapshot_id.clone()))
+            .await
+            .is_err(),
+        "stale editor must not overwrite a version"
+    );
+    let (a, b) = tokio::join!(
+        db.save_proposal(&id, make_input(1, context.source.snapshot_id.clone())),
+        db.save_proposal(&id, make_input(1, context.source.snapshot_id.clone()))
+    );
+    assert_eq!(
+        usize::from(a.is_ok()) + usize::from(b.is_ok()),
+        1,
+        "exactly one competing edit commits"
+    );
+    sqlx::query("CREATE FUNCTION reject_proposal_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected proposal audit failure'; END $$").execute(db.pool()).await.unwrap();
+    sqlx::query("CREATE TRIGGER reject_proposal_event BEFORE INSERT ON funding_swarm_events FOR EACH ROW WHEN (NEW.event_type='proposal_version_saved') EXECUTE FUNCTION reject_proposal_event()").execute(db.pool()).await.unwrap();
+    assert!(db
+        .save_proposal(&id, make_input(2, context.source.snapshot_id.clone()))
+        .await
+        .is_err());
+    sqlx::query("DROP TRIGGER reject_proposal_event ON funding_swarm_events")
+        .execute(db.pool())
+        .await
+        .unwrap();
+    sqlx::query("DROP FUNCTION reject_proposal_event()")
+        .execute(db.pool())
+        .await
+        .unwrap();
+    source["synopsis"]["synopsisDesc"] = serde_json::json!("Changed source evidence");
+    db.store_funding_snapshot(
+        &normalize_opportunity(source.clone(), 789, chrono::Utc::now()).unwrap(),
+        &source,
+    )
+    .await
+    .unwrap();
+    assert!(
+        db.save_proposal(&id, make_input(2, context.source.snapshot_id))
+            .await
+            .is_err(),
+        "an upstream change requires another evidence review"
+    );
+    let reopened = Database::connect(&DatabaseConfig::new(url)).await.unwrap();
+    let context = reopened.proposal_context(&id).await.unwrap();
+    assert_eq!(
+        context.versions.len(),
+        2,
+        "failed audit insert leaves no partial version"
+    );
+    assert_eq!(
+        context.versions[1].package_sha256, first.package_sha256,
+        "older versions remain intact"
+    );
+    assert_ne!(context.source.snapshot_id, first.source_snapshot_id);
+    let audit:i64=sqlx::query_scalar("SELECT COUNT(*) FROM funding_swarm_events WHERE grant_id=$1 AND event_type='proposal_version_saved' AND visibility='private'").bind(&id).fetch_one(reopened.pool()).await.unwrap();
+    assert_eq!(audit, 2);
 }

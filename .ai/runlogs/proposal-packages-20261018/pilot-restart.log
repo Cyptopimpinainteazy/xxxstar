@@ -1,0 +1,11 @@
+x3-money-swarm-pilot-db
+Pilot stopped; PostgreSQL data volume retained
+x3-money-swarm-pilot-db
+{
+  "gateway_ready": true,
+  "dashboard_reachable": true,
+  "discovery_route_available": true,
+  "url": "http://127.0.0.1:5176/money-swarm",
+  "credentials_file": "/home/lojak/x3-grant-compute-20261018/.env.money-swarm.local",
+  "state_file": "/home/lojak/x3-grant-compute-20261018/.local/money-swarm/processes.json"
+}

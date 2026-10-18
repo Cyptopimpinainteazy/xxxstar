@@ -1,0 +1,104 @@
+warning: /home/lojak/x3-grant-compute-20261018/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/x3-grant-compute-20261018/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/x3-grant-compute-20261018/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/x3-grant-compute-20261018/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+warning: x3-chain-runtime@0.1.0: runtime/build.rs embedded cached runtime WASM from /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
+   Compiling x3-gateway v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-gateway)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 42.80s
+     Running unittests src/lib.rs (/home/lojak/Desktop/xxxstar-main/target/debug/deps/x3_gateway-ff07c6a4a38e5cce)
+
+running 55 tests
+test config::tests::rejects_malformed_listen_addr ... ok
+test db::tests::funding_intake_rejects_invalid_amounts_and_non_object_metadata ... ok
+test db::tests::dedupe_removes_grants_with_duplicate_external_ids ... ok
+test db::tests::evidence_bundle_validation_requires_summary_object ... ok
+test config::tests::defaults_to_loopback ... ok
+test db::tests::funding_swarm_grant_validator_accepts_valid_input ... ok
+test db::tests::funding_swarm_grant_validator_rejects_empty_sponsor ... ok
+test db::tests::funding_swarm_grant_validator_rejects_empty_external_id ... ok
+test db::tests::openrouter_provider_draft_contains_prompt_sections ... ok
+test db::tests::orchestra_intent_validation_rejects_non_object_payload ... ok
+test db::tests::public_filter_keeps_only_published_or_public_visibility_items ... ok
+test db::tests::scoring_classifies_grant_above_threshold_as_high_priority ... ok
+test db::tests::scoring_classifies_grant_below_threshold_as_normal ... ok
+test db::tests::swarm_stage_from_str_unknown_returns_none ... ok
+test db::tests::swarm_stage_roundtrip_from_str ... ok
+test db::tests::swarm_audit_event_detail_contains_stage_fields ... ok
+test db::tests::swarm_transition_award_paid_is_public ... ok
+test db::tests::swarm_transition_illegal_returns_bad_request ... ok
+test db::tests::vote_window_validation_rejects_invalid_time_range ... ok
+test error::tests::maps_variants_to_http_status ... ok
+test db::tests::swarm_transition_draft_reject_is_private ... ok
+test error::tests::message_includes_detail ... ok
+test db::tests::swarm_transition_discovery_to_research_is_private ... ok
+test graphql::tests::exposes_version_metadata ... ok
+test orchestra::tests::parses_governance_vocabulary ... ok
+test orchestra::tests::rejects_out_of_vocabulary_kinds ... ok
+test orchestra::tests::standalone_transitions_require_upstream_authority ... ok
+test rest::tests::benchmark_report_matches_log_class_case_insensitive ... ok
+test rest::tests::bounded_limit_clamps_values ... ok
+test db::tests::stub_ai_provider_draft_contains_grant_title ... ok
+test rest::tests::funding_swarm_grants_returns_json_array ... ok
+test db::tests::swarm_transition_draft_approve_is_public ... ok
+test rest::tests::provider_onboarding_reports_require_signed_metadata ... ok
+test db::tests::funding_swarm_grant_validator_rejects_empty_title ... ok
+test rest::tests::sort_benchmark_reports_by_generated_at_asc ... ok
+test db::tests::funding_swarm_publication_validator_rejects_empty_kind ... ok
+test rest::tests::sort_benchmark_reports_by_high_conflict_ratio_desc ... ok
+test rest::tests::sort_benchmark_reports_default_is_generated_at_desc ... ok
+test rest::tests::rest_reads_stay_segregated_by_workflow_type ... ok
+test db::tests::funding_swarm_publication_validator_rejects_empty_title ... ok
+test rest::tests::vote_window_request_shape_uses_ordered_times ... ok
+test rest::tests::benchmark_report_matches_conflict_filters ... ok
+test rest::tests::orchestra_intent_request_shape_uses_object_payload ... ok
+test rest::tests::sort_benchmark_reports_by_serial_fraction_asc ... ok
+test funding_discovery::tests::never_retains_the_optional_service_token_as_source_evidence ... ok
+test rest::tests::funding_swarm_scoreboard_returns_ok_with_expected_shape ... ok
+test rest::tests::funding_swarm_timeline_returns_json_array ... ok
+test graphql::tests::schema_builds_without_a_live_backend ... ok
+test rest::tests::evidence_bundle_request_shape_uses_object_summary ... ok
+test rest::tests::funding_operator_auth_fails_closed_even_in_dev_builds ... ok
+test rest::tests::orchestra_write_endpoints_relay_to_control_plane_when_configured ... ok
+test rest::tests::sort_benchmark_reports_by_generated_at_desc ... ok
+test rest::tests::orchestra_evidence_fetch_refuses_mismatched_control_plane_bundle ... ok
+test funding_discovery::tests::rejects_source_failure_missing_fields_and_oversized_documents ... ok
+test rest::tests::router_serves_real_http_over_ephemeral_port_without_db has been running for over 60 seconds
+test rest::tests::router_serves_real_http_over_ephemeral_port_without_db ... ok
+
+test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 60.26s
+
+     Running tests/funding_discovery_contract.rs (/home/lojak/Desktop/xxxstar-main/target/debug/deps/funding_discovery_contract-560381549d9a7c2a)
+
+running 7 tests
+test enforces_bounded_discovery_request_and_rejects_unrecognized_fields ... ok
+test missing_deadline_and_award_remain_unknown_and_expiry_is_date_based ... ok
+test prefers_structured_agency_identity_to_a_free_form_contact_name ... ok
+test rejects_present_malformed_deadline_types_and_suffixes ... ok
+test treats_source_instructions_as_inert_content_not_decisions ... ok
+test normalizes_authoritative_ids_dates_and_unknown_eligibility ... ok
+test rejects_wrong_identity_malformed_dates_and_financial_overflow ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/funding_proposals_contract.rs (/home/lojak/Desktop/xxxstar-main/target/debug/deps/funding_proposals_contract-0dcf2e7a740bec0a)
+
+running 1 test
+test proposal_contract_rejects_empty_unbounded_and_ambiguous_inputs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/migrations_cover_tables.rs (/home/lojak/Desktop/xxxstar-main/target/debug/deps/migrations_cover_tables-6a32610d3a0f1e6f)
+
+running 1 test
+test every_table_the_gateway_queries_is_created_by_a_migration ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s

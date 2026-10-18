@@ -454,10 +454,16 @@ impl Database {
             .bind(Uuid::new_v4().to_string()).bind(&grant_id).bind(SOURCE).bind(&digest)
             .bind(&opportunity.official_url).bind(opportunity.last_verified_at).bind(&metadata).bind(raw).bind(NORMALIZATION_VERSION)
             .execute(&mut *tx).await?.rows_affected() == 1;
+        // Snapshot creation time is not current-source identity: A -> B -> A
+        // must point back to A while preserving both immutable documents.
+        let snapshot_id: String = sqlx::query_scalar("SELECT snapshot_id FROM funding_source_snapshots WHERE grant_id=$1 AND content_sha256=$2 AND normalization_version=$3")
+            .bind(&grant_id).bind(&digest).bind(NORMALIZATION_VERSION).fetch_one(&mut *tx).await?;
+        sqlx::query("UPDATE funding_swarm_grants SET metadata=jsonb_set(metadata,'{source_snapshot_id}',to_jsonb($2::text)) WHERE grant_id=$1")
+            .bind(&grant_id).bind(&snapshot_id).execute(&mut *tx).await?;
         if inserted {
             sqlx::query("INSERT INTO funding_swarm_events (event_id,grant_id,event_type,visibility,detail) VALUES ($1,$2,'official_source_snapshot','public',$3)")
                 .bind(Uuid::new_v4().to_string()).bind(&grant_id)
-                .bind(json!({"source":SOURCE,"content_sha256":digest,"official_url":opportunity.official_url}))
+                .bind(json!({"source":SOURCE,"content_sha256":digest,"official_url":opportunity.official_url,"source_snapshot_id":snapshot_id,"normalization_version":NORMALIZATION_VERSION}))
                 .execute(&mut *tx).await?;
         }
         tx.commit().await?;

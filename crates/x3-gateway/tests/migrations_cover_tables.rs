@@ -16,6 +16,7 @@ use std::collections::BTreeSet;
 use std::fs;
 
 const SOURCES: &[&str] = &[
+    include_str!("../src/funding_proposals.rs"),
     include_str!("../src/funding_discovery.rs"),
     include_str!("../src/db.rs"),
     include_str!("../src/orchestra.rs"),

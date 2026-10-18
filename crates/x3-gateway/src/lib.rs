@@ -21,6 +21,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod funding_discovery;
+pub mod funding_proposals;
 pub mod graphql;
 pub mod orchestra;
 pub mod rest;

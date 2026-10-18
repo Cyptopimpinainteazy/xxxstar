@@ -610,3 +610,12 @@
     line-height:1.8
   }
 }
+
+.money-proposal { border-top: 1px solid #5b6b80; margin-top: 24px; padding-top: 20px; }
+.money-proposal form, .money-proposal label { display: grid; gap: 12px; }
+.money-proposal label { gap: 6px; color: #b6c1cf; }
+.money-proposal textarea, .money-proposal input { width: 100%; padding: 10px; border: 1px solid #5b6b80; border-radius: 6px; color: #f0f4f8; background: #0b1016; font: inherit; }
+.money-proposal textarea { min-height: 90px; resize: vertical; }
+.money-proposal textarea:focus-visible, .money-proposal input:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.money-proposal code { display: block; overflow-wrap: anywhere; font-size: 12px; }
+.money-proposal li { margin-bottom: 16px; }
