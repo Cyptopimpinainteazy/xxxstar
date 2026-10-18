@@ -21,7 +21,7 @@ import type {
   VoteTally,
   VoteWindow,
 } from '../api';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   benchmarkJobsByStatus,
   benchmarkIntentCounts,
@@ -67,6 +67,12 @@ export function OrchestraOperationsPanel({
   onCloseVoteWindow,
   onImportVoteTally,
 }: OrchestraOperationsPanelProps) {
+  const [observedNow, setObservedNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    // Vote deadlines use second precision; advance the display even without API updates.
+    const timer = setInterval(() => setObservedNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [selectedApprovalCaseId, setSelectedApprovalCaseId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -289,7 +295,7 @@ export function OrchestraOperationsPanel({
                   const isClosing = actionLoadingId === `close:${window.window_id}`;
                   const isImporting = actionLoadingId === `import:${window.window_id}`;
                   const isOverdue = (normalize(window.status) === 'open' || normalize(window.status) === 'scheduled')
-                    && window.closes_at_unix < Math.floor(Date.now() / 1000);
+                    && window.closes_at_unix < observedNow;
                   return (
                     <div key={window.window_id} className="rounded-lg border border-gray-700 bg-gray-800/40 p-3">
                       <div className="mb-1 flex items-center justify-between gap-3">

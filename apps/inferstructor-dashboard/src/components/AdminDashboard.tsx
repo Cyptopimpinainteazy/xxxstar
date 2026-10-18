@@ -91,6 +91,7 @@ const IntelligencePanel = lazy(() => import('./AdminDashboardTelemetryPanels').t
 
 export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const { addToast } = useToast();
+  const [observedNow, setObservedNow] = useState(Date.now);
   const [tab, setTab] = useState<Tab>('overview');
   const [metrics, setMetrics] = useState<AggregatedMetrics | null>(null);
   const [metricsHistory, setMetricsHistory] = useState<AggregatedMetrics['aggregated'][]>([]);
@@ -137,6 +138,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
     } catch {
       setError('Failed to connect to Admin API');
     } finally {
+      setObservedNow(Date.now());
       setLoading(false);
     }
   }, []);
@@ -287,7 +289,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const upstreams = metrics?.upstreams || [];
   // Filter history by time range
   const rangeSeconds = TIME_RANGES.find(r => r.key === timeRange)?.seconds || 300;
-  const cutoff = Date.now() / 1000 - rangeSeconds;
+  const cutoff = observedNow / 1000 - rangeSeconds;
   const filteredHistory = metricsHistory.filter(p => (p as any).timestamp >= cutoff);
 
   // ──────────────── TAB CONTENT ────────────────

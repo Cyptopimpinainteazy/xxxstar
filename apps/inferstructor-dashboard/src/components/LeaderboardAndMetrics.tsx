@@ -36,12 +36,7 @@ export function LeaderboardAndMetrics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load metrics data on mount
-  useEffect(() => {
-    loadMetricsData();
-  }, []);
-
-  const loadMetricsData = async () => {
+  async function loadMetricsData() {
     try {
       setLoading(true);
       setError(null);
@@ -154,7 +149,11 @@ export function LeaderboardAndMetrics() {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadMetricsData();
+  }, []);
 
   // Save snapshots to localStorage whenever they change
   useEffect(() => {

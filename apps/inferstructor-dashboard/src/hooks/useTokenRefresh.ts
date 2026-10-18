@@ -23,9 +23,10 @@ interface UseTokenRefreshReturn {
   getTokenExpiry: () => number | null;
 }
 
+let externalLogoutCallback: (() => void) | null = null;
+
 export const useTokenRefresh = (): UseTokenRefreshReturn => {
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const logoutCallbackRef = useRef<(() => void) | null>(null);
 
   /**
    * Decode JWT payload (without verification - for client-side expiry check only)
@@ -116,15 +117,13 @@ export const useTokenRefresh = (): UseTokenRefreshReturn => {
     api.logout();
 
     // Call registered logout callback if available
-    if (logoutCallbackRef.current) {
-      logoutCallbackRef.current();
-    }
+    externalLogoutCallback?.();
   }, []);
 
   /**
    * Schedule token refresh
    */
-  const scheduleTokenRefresh = useCallback((): void => {
+  const scheduleTokenRefresh = useCallback(function scheduleNextRefresh(): void {
     // Clear any existing timeout
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current);
@@ -148,20 +147,13 @@ export const useTokenRefresh = (): UseTokenRefreshReturn => {
 
       if (success) {
         // Schedule next refresh
-        scheduleTokenRefresh();
+        scheduleNextRefresh();
       } else {
         // Refresh failed, logout
         logout();
       }
     }, refreshIn);
   }, [getTokenExpiry, refreshToken, logout]);
-
-  /**
-   * Set external logout callback (e.g., redirect to login)
-   */
-  const setLogoutCallback = useCallback((callback: () => void): void => {
-    logoutCallbackRef.current = callback;
-  }, []);
 
   /**
    * Main effect: schedule token refresh on mount and when token changes
@@ -187,9 +179,6 @@ export const useTokenRefresh = (): UseTokenRefreshReturn => {
     };
   }, [scheduleTokenRefresh, isTokenValid, logout]);
 
-  // Expose setLogoutCallback through the hook
-  (useTokenRefresh as any).setLogoutCallback = setLogoutCallback;
-
   return {
     logout,
     isTokenValid,
@@ -201,6 +190,6 @@ export const useTokenRefresh = (): UseTokenRefreshReturn => {
  * Set logout callback for useTokenRefresh hook
  * Call this in your root component to handle token expiry redirects
  */
-export const setTokenRefreshLogoutCallback = (callback: () => void): void => {
-  (useTokenRefresh as any).setLogoutCallback?.(callback);
+export const setTokenRefreshLogoutCallback = (callback: (() => void) | null): void => {
+  externalLogoutCallback = callback;
 };
