@@ -24,9 +24,10 @@ use sp_core::H256;
 use sp_runtime::traits::SaturatedConversion;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use substrate_frame_rpc_system::AccountNonceApi;
 use tokio::sync::mpsc;
 use x3_chain_runtime::opaque::Block;
-use x3_chain_runtime::AccountId;
+use x3_chain_runtime::{AccountId, UncheckedExtrinsic};
 
 /// Transaction pool type used by the node atomic gateway service.
 pub type AtomicPool = sc_transaction_pool::TransactionPoolHandle<Block, FullClient>;
@@ -87,6 +88,43 @@ impl AtomicGatewayService {
         })
     }
 
+    /// The nonce for the gateway's next extrinsic: the larger of the chain's nonce for the
+    /// account and the one after the last this service handed out. The chain's figure makes a
+    /// restarted node (or one whose account signed elsewhere) start where the account is; the
+    /// local one covers transactions still in the pool.
+    fn next_nonce(&self) -> Result<u32, String> {
+        let on_chain = self
+            .client
+            .runtime_api()
+            .account_nonce(self.client.info().best_hash, self.key.account())
+            .map_err(|e| format!("account_nonce runtime call failed: {e}"))?;
+        let on_chain = u64::from(on_chain);
+        let previous = self
+            .next_tx_nonce
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |local| {
+                Some(local.max(on_chain).saturating_add(1))
+            })
+            .unwrap_or_else(|unchanged| unchanged);
+        u32::try_from(previous.max(on_chain)).map_err(|_| "gateway nonce overflow".to_string())
+    }
+
+    /// Submit to the pool. A refused transaction never takes its nonce, so the local counter is
+    /// dropped and the next nonce comes from the chain again instead of leaving a gap that would
+    /// park every later extrinsic in the pool's future queue.
+    async fn submit(&self, at: H256, extrinsic: UncheckedExtrinsic) -> Result<(), String> {
+        match self
+            .pool
+            .submit_one(at, TransactionSource::External, extrinsic.into())
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                self.next_tx_nonce.store(0, Ordering::SeqCst);
+                Err(e.to_string())
+            }
+        }
+    }
+
     /// Run the service until the command channel closes.
     pub async fn run(self, mut commands: mpsc::Receiver<AtomicGatewayCommand>) {
         while let Some(cmd) = commands.recv().await {
@@ -97,7 +135,7 @@ impl AtomicGatewayService {
     }
 
     async fn handle(&self, command: AtomicGatewayCommand) -> Result<(), String> {
-        let tx_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+        let tx_nonce = self.next_nonce()?;
         let (extrinsic, legs_hash, executions, request_clone, should_finalize) = match command {
             AtomicGatewayCommand::SubmitBundle(request) => {
                 let legs_hash = request.legs_hash();
@@ -168,11 +206,9 @@ impl AtomicGatewayService {
         };
         let best_hash = self.client.info().best_hash;
         let at = best_hash;
-        self.pool
-            .submit_one(at, TransactionSource::External, extrinsic.into())
+        self.submit(at, extrinsic)
             .await
-            .map_err(|e| format!("transaction pool rejected atomic extrinsic: {e}"))
-            .map(|_| ())?;
+            .map_err(|e| format!("transaction pool rejected atomic extrinsic: {e}"))?;
         log::info!(target: "x3-atomic-gateway", "atomic extrinsic submitted");
 
         if let Some(legs_hash) = legs_hash {
@@ -201,16 +237,11 @@ impl AtomicGatewayService {
                 .map_err(|e| format!("find_bundle runtime call failed: {e}"))?;
 
             if let Some((bundle_id, BundleStatus::Pending)) = found {
-                let assign_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+                let assign_nonce = self.next_nonce()?;
                 let extrinsic =
                     self.key
                         .assign_bundle_executor(bundle_id, self.genesis_hash, assign_nonce)?;
-                self.pool
-                    .submit_one(
-                        self.client.info().best_hash,
-                        TransactionSource::External,
-                        extrinsic.into(),
-                    )
+                self.submit(self.client.info().best_hash, extrinsic)
                     .await
                     .map_err(|e| format!("assign_bundle_executor rejected: {e}"))?;
                 for _ in 0..50 {
@@ -246,7 +277,7 @@ impl AtomicGatewayService {
             .map(|(index, execution)| chain_leg(execution, &gateway, index))
             .collect::<Result<Vec<_>, _>>()?;
         for (index, execution) in chain_legs.into_iter().enumerate() {
-            let tx_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+            let tx_nonce = self.next_nonce()?;
             let extrinsic = self.key.execute_bundle_leg(
                 bundle_id,
                 index as u32,
@@ -254,12 +285,7 @@ impl AtomicGatewayService {
                 self.genesis_hash,
                 tx_nonce,
             )?;
-            self.pool
-                .submit_one(
-                    self.client.info().best_hash,
-                    TransactionSource::External,
-                    extrinsic.into(),
-                )
+            self.submit(self.client.info().best_hash, extrinsic)
                 .await
                 .map_err(|e| format!("execute_bundle_leg {index} rejected: {e}"))?;
             log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} leg {index} submitted for on-chain execution");
@@ -325,7 +351,7 @@ impl AtomicGatewayService {
                 finalized_block: block_num,
                 finality_cert,
             });
-            let finalize_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+            let finalize_nonce = self.next_nonce()?;
             let extrinsic = self.key.finalize_atomic_bundle(
                 bundle_id,
                 receipt_root,
@@ -335,14 +361,9 @@ impl AtomicGatewayService {
                 finalize_nonce,
             )?;
             return self
-                .pool
-                .submit_one(
-                    finalized_hash,
-                    TransactionSource::External,
-                    extrinsic.into(),
-                )
+                .submit(finalized_hash, extrinsic)
                 .await
-                .map(|_| log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} finalized"))
+                .map(|()| log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} finalized"))
                 .map_err(|e| format!("finalize_atomic_bundle rejected: {e}"));
         }
         Err("no anchored finality certificate within timeout".to_string())
