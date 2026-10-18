@@ -783,6 +783,35 @@ pub mod traits {
         fn ledger_balance(asset: u32, who: &AccountId) -> u128;
     }
 
+    /// Issues a new asset on the account-level ledger (the kernel's `CanonicalLedger`) and mints
+    /// or burns its balances. A token factory uses it so a launched token has real balances:
+    /// before, a factory token existed only as per-domain totals, and nothing could custody it.
+    pub trait LedgerAssetIssuer<AccountId> {
+        /// Register a new ledger asset and return its id. `Ok(None)` when the runtime keeps no
+        /// account-level ledger for issued tokens (see [`NoLedgerAssets`]).
+        fn issue(symbol: &[u8], decimals: u8) -> Result<Option<u32>, DispatchError>;
+        /// Credit `amount` of `asset` to `who`; checked, never saturating.
+        fn mint(asset: u32, who: &AccountId, amount: u128) -> Result<(), DispatchError>;
+        /// Debit `amount` of `asset` from `who`; refused when `who` holds less.
+        fn burn(asset: u32, who: &AccountId, amount: u128) -> Result<(), DispatchError>;
+    }
+
+    /// No account-level ledger: tokens are issued as per-domain totals only. Mint and burn are
+    /// refused, because there is no ledger asset to move.
+    pub struct NoLedgerAssets;
+
+    impl<AccountId> LedgerAssetIssuer<AccountId> for NoLedgerAssets {
+        fn issue(_symbol: &[u8], _decimals: u8) -> Result<Option<u32>, DispatchError> {
+            Ok(None)
+        }
+        fn mint(_asset: u32, _who: &AccountId, _amount: u128) -> Result<(), DispatchError> {
+            Err(DispatchError::Other("no account-level ledger"))
+        }
+        fn burn(_asset: u32, _who: &AccountId, _amount: u128) -> Result<(), DispatchError> {
+            Err(DispatchError::Other("no account-level ledger"))
+        }
+    }
+
     /// Benchmark-only funding of ledger balances, so a benchmark can measure a call that moves
     /// funds. A runtime wires this only under its `runtime-benchmarks` feature; nothing in a
     /// production build can reach it.

@@ -230,3 +230,32 @@ fn a_pre_sequential_pool_at_the_next_id_is_skipped_not_overwritten() {
         assert_eq!(DEX::pools(2).expect("new").token_a, token(0));
     });
 }
+
+#[test]
+fn only_a_positions_owner_can_hand_it_over() {
+    new_test_ext().execute_with(|| {
+        let pool_id = funded_pool();
+        let position = crate::NextPositionId::<Test>::get() - 1;
+        assert_eq!(DEX::position_owner(position), Some(1));
+        assert_noop!(
+            DEX::transfer_position(position, &2, &3),
+            Error::<Test>::NotPositionOwner
+        );
+        assert_ok!(DEX::transfer_position(position, &1, &3));
+        assert_eq!(DEX::position_owner(position), Some(3));
+        // The new owner, and only the new owner, can now withdraw it.
+        let lp = DEX::lp_positions(position).expect("position").lp_balance;
+        assert_noop!(
+            DEX::remove_liquidity(RuntimeOrigin::signed(1), position, lp, 0, 0),
+            Error::<Test>::NotPositionOwner
+        );
+        assert_ok!(DEX::remove_liquidity(
+            RuntimeOrigin::signed(3),
+            position,
+            lp,
+            0,
+            0
+        ));
+        assert_eq!(balance(0, DEX::pool_account(pool_id)), 0);
+    });
+}

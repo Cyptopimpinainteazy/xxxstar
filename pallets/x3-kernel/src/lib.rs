@@ -707,6 +707,10 @@ pub mod pallet {
         OptionQuery,
     >;
 
+    /// The next ledger asset id `issue_ledger_asset` tries (from `trading::ISSUED_ASSET_BASE`).
+    #[pallet::storage]
+    pub type NextIssuedAssetId<T: Config> = StorageValue<_, u32, ValueQuery>;
+
     /// Committed trades per trader.
     #[pallet::storage]
     pub type TradeNonces<T: Config> =

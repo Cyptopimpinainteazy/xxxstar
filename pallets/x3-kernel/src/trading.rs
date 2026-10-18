@@ -20,8 +20,8 @@
 //! nothing; its receipt is still recorded, so the refusal is on chain and replayable.
 
 use crate::pallet::{
-    AssetRegistry, CanonicalLedger, Config, Error, Event, Pallet, ProtocolPaused, TradeNonces,
-    TradeReceipts, TradingConfiguration,
+    AssetRegistry, CanonicalLedger, Config, Error, Event, NextIssuedAssetId, Pallet,
+    ProtocolPaused, TradeNonces, TradeReceipts, TradingConfiguration,
 };
 use alloc::collections::BTreeSet;
 use alloc::string::String;
@@ -40,6 +40,10 @@ use x3bc_core::trading::{
     CapabilityKind, TradeOp, TradingSection, CAPABILITY_VERSION, FLASH_PROVIDER, ORACLE,
     X3_CHAIN_ID,
 };
+
+/// Ledger asset ids from here up are issued by [`Pallet::issue_ledger_asset`] (factory tokens);
+/// ids below it are registered by governance.
+pub const ISSUED_ASSET_BASE: u32 = 1 << 31;
 
 /// Largest trading module `submit_trade` accepts.
 pub const MAX_TRADE_MODULE_BYTES: u32 = 64 * 1024;
@@ -268,6 +272,69 @@ impl<T: Config> Pallet<T> {
         CanonicalLedger::<T>::insert(from, id, from_balance);
         CanonicalLedger::<T>::insert(to, id, to_balance);
         Ok(())
+    }
+
+    /// Register a new ledger asset for an issuer (the token factory), at the next free id from
+    /// [`ISSUED_ASSET_BASE`] up, so issued tokens never take an id governance registers below it.
+    pub fn issue_ledger_asset(symbol: &[u8], decimals: u8) -> Result<u32, DispatchError> {
+        ensure!(!symbol.is_empty(), Error::<T>::EmptySymbol);
+        ensure!(decimals <= 30, Error::<T>::InvalidDecimals);
+        let bounded: BoundedVec<u8, T::MaxAssetSymbolLength> = symbol
+            .to_vec()
+            .try_into()
+            .map_err(|_| Error::<T>::SymbolTooLong)?;
+        let mut id = NextIssuedAssetId::<T>::get().max(ISSUED_ASSET_BASE);
+        // An id governance registered in the issued range is skipped; a run of them is refused
+        // rather than searched (the loop is bounded).
+        for attempt in 0..=16u8 {
+            ensure!(attempt < 16, Error::<T>::AssetAlreadyRegistered);
+            let key = T::AssetId::try_from(id).map_err(|_| Error::<T>::UnknownAsset)?;
+            if !AssetRegistry::<T>::contains_key(key) {
+                AssetRegistry::<T>::insert(
+                    key,
+                    crate::pallet::AssetMetadata {
+                        symbol: bounded,
+                        decimals,
+                    },
+                );
+                break;
+            }
+            id = id.checked_add(1).ok_or(Error::<T>::LedgerOverflow)?;
+        }
+        NextIssuedAssetId::<T>::put(id.checked_add(1).ok_or(Error::<T>::LedgerOverflow)?);
+        Ok(id)
+    }
+
+    /// Credit `amount` of a registered ledger asset to `who` (an issuer's mint).
+    pub fn mint_to_ledger(asset: u32, who: &T::AccountId, amount: u128) -> DispatchResult {
+        let id = T::AssetId::try_from(asset).map_err(|_| Error::<T>::UnknownAsset)?;
+        ensure!(
+            AssetRegistry::<T>::contains_key(id),
+            Error::<T>::UnknownAsset
+        );
+        let amount = T::Balance::try_from(amount).map_err(|_| Error::<T>::LedgerOverflow)?;
+        CanonicalLedger::<T>::try_mutate(who, id, |balance| -> DispatchResult {
+            *balance = balance
+                .checked_add(&amount)
+                .ok_or(Error::<T>::LedgerOverflow)?;
+            Ok(())
+        })
+    }
+
+    /// Debit `amount` of a registered ledger asset from `who` (an issuer's burn).
+    pub fn burn_from_ledger(asset: u32, who: &T::AccountId, amount: u128) -> DispatchResult {
+        let id = T::AssetId::try_from(asset).map_err(|_| Error::<T>::UnknownAsset)?;
+        ensure!(
+            AssetRegistry::<T>::contains_key(id),
+            Error::<T>::UnknownAsset
+        );
+        let amount = T::Balance::try_from(amount).map_err(|_| Error::<T>::LedgerOverflow)?;
+        CanonicalLedger::<T>::try_mutate(who, id, |balance| -> DispatchResult {
+            *balance = balance
+                .checked_sub(&amount)
+                .ok_or(Error::<T>::InsufficientLedgerBalance)?;
+            Ok(())
+        })
     }
 
     /// Run a trading module and settle it. The dispatchable's body.

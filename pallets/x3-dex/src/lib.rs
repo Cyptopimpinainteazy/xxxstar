@@ -142,6 +142,12 @@ pub mod pallet {
             amount_out: u128,
             user: T::AccountId,
         },
+        /// An LP position changed hands (see `transfer_position`).
+        PositionTransferred {
+            position_id: u64,
+            from: T::AccountId,
+            to: T::AccountId,
+        },
     }
 
     #[pallet::error]
@@ -464,6 +470,32 @@ pub mod pallet {
         }
 
         /// The account that custodies `pool_id`'s reserves.
+        /// Hand LP position `position_id` from its owner `from` to `to`. For pallets that hold a
+        /// position on someone's behalf (a launch's locked liquidity); there is no extrinsic, and
+        /// the transfer is refused unless `from` owns the position.
+        pub fn transfer_position(
+            position_id: u64,
+            from: &T::AccountId,
+            to: &T::AccountId,
+        ) -> DispatchResult {
+            ensure!(
+                PositionOwner::<T>::get(position_id).as_ref() == Some(from),
+                Error::<T>::NotPositionOwner
+            );
+            PositionOwner::<T>::insert(position_id, to.clone());
+            Self::deposit_event(Event::PositionTransferred {
+                position_id,
+                from: from.clone(),
+                to: to.clone(),
+            });
+            Ok(())
+        }
+
+        /// The account that owns LP position `position_id`.
+        pub fn position_owner(position_id: u64) -> Option<T::AccountId> {
+            PositionOwner::<T>::get(position_id)
+        }
+
         pub fn pool_account(pool_id: u64) -> T::AccountId {
             T::PalletId::get().into_sub_account_truncating(pool_id)
         }

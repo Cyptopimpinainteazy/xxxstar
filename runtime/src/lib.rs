@@ -150,6 +150,10 @@ mod tests;
 #[cfg(all(test, feature = "std", not(feature = "mainnet-rc1")))]
 mod tests_trading;
 
+// A token launch through the launchpad, token factory, kernel ledger and dex (absent from mainnet-rc1).
+#[cfg(all(test, feature = "std", not(feature = "mainnet-rc1")))]
+mod tests_launchpad;
+
 pub mod fraud_proofs;
 
 #[cfg(any(feature = "std", test))]
@@ -1906,6 +1910,19 @@ impl x3_asset_kernel_types::traits::CanonicalLedgerTransfer<AccountId> for Kerne
     }
 }
 
+/// Issued tokens (the token factory's) are kernel ledger assets.
+impl x3_asset_kernel_types::traits::LedgerAssetIssuer<AccountId> for KernelCanonicalLedger {
+    fn issue(symbol: &[u8], decimals: u8) -> Result<Option<u32>, sp_runtime::DispatchError> {
+        pallet_x3_kernel::Pallet::<Runtime>::issue_ledger_asset(symbol, decimals).map(Some)
+    }
+    fn mint(asset: u32, who: &AccountId, amount: u128) -> Result<(), sp_runtime::DispatchError> {
+        pallet_x3_kernel::Pallet::<Runtime>::mint_to_ledger(asset, who, amount)
+    }
+    fn burn(asset: u32, who: &AccountId, amount: u128) -> Result<(), sp_runtime::DispatchError> {
+        pallet_x3_kernel::Pallet::<Runtime>::burn_from_ledger(asset, who, amount)
+    }
+}
+
 /// Benchmarks fund their accounts directly on the ledger, registering the asset if needed.
 #[cfg(feature = "runtime-benchmarks")]
 impl x3_asset_kernel_types::traits::LedgerBenchmarkFunding<AccountId> for KernelCanonicalLedger {
@@ -2816,6 +2833,8 @@ impl pallet_x3_token_factory::Config for Runtime {
     type Ledger = X3SupplyLedger;
     type EconomicHalt = X3SupplyLedger;
     type Sentinel = X3Sentinel;
+    // Launched tokens get a `CanonicalLedger` asset, so their supply has real balances.
+    type LedgerAssets = KernelCanonicalLedger;
     type WeightInfo = pallet_x3_token_factory::weights::SubstrateWeight<Runtime>;
 }
 
@@ -3606,6 +3625,9 @@ parameter_types! {
 // Bridge trait impl: launchpad can call TokenFactory to create tokens
 pub struct LaunchpadTokenFactoryBridge;
 impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactoryBridge {
+    /// Launch the token through the factory with `creator` (the launch's custody) receiving the
+    /// supply, and return the ledger asset that holds it. A token without a ledger asset is
+    /// refused: the launchpad pays contributors and seeds the pool from ledger balances.
     fn create_token(
         creator: &AccountId,
         symbol: Vec<u8>,
@@ -3629,76 +3651,69 @@ impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactor
             class: x3_asset_kernel_types::TokenClass::FixedSupply,
             enabled_domains: enabled,
         };
-        // Use the extrinsic directly with a signed origin from the creator
-        pallet_x3_token_factory::Pallet::<Runtime>::create_token(
-            frame_system::RawOrigin::Signed(creator.clone()).into(),
-            config,
-        )
-        .map(|_| {
-            // The token was just created via the Factory + Registry; derive its asset_id
-            // from the nonce. For simplicity, return the current nonce - 1 as the last
-            // created asset id. In production, store this in a tracking map.
-            let nonce = pallet_x3_token_factory::FactoryNonce::<Runtime>::get();
-            nonce.saturating_sub(1) as u32
-        })
+        let (_asset_id, ledger_asset) =
+            pallet_x3_token_factory::Pallet::<Runtime>::do_create_token(creator.clone(), config)?;
+        ledger_asset.ok_or(DispatchError::Other("the token has no ledger asset"))
     }
 }
 
-// Bridge trait impl: launchpad can call DEX to create AMM pools
+// Bridge trait impl: launchpad seeds a DEX pool of ledger assets from the launch's custody.
 #[cfg(not(feature = "mainnet-rc1"))]
 pub struct LaunchpadDexBridge;
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
     fn create_pool(creator: &AccountId, token_a: u32, token_b: u32) -> Result<u64, DispatchError> {
-        // Use the DEX create_pool extrinsic with standard 30 bps fee.
-        //
-        // Token-factory assets are not `CanonicalLedger` assets, so they are named on chain 0, and
-        // `pallet_x3_dex` refuses a pool it cannot custody (`TokenNotOnLedger`): graduation fails
-        // closed instead of recording a pool that holds nothing. Naming them on the ledger's chain
-        // id would be wrong in a worse way: factory asset N is not ledger asset N.
-        let fee_bps = 30u32;
+        // Both sides are `CanonicalLedger` assets, named on the ledger's chain id so the dex can
+        // custody them.
         pallet_x3_dex::Pallet::<Runtime>::create_pool(
             frame_system::RawOrigin::Signed(creator.clone()).into(),
             x3_dex::TokenId {
-                chain_id: 0,
+                chain_id: DexLedgerChainId::get(),
                 asset_id: token_a as u128,
             },
             x3_dex::TokenId {
-                chain_id: 0,
+                chain_id: DexLedgerChainId::get(),
                 asset_id: token_b as u128,
             },
-            fee_bps,
-        )
-        .map(|_| {
-            // `NextPoolId` holds the id `create_pool` just assigned.
-            pallet_x3_dex::NextPoolId::<Runtime>::get()
-        })
+            30,
+        )?;
+        // `NextPoolId` holds the id `create_pool` just assigned.
+        Ok(pallet_x3_dex::NextPoolId::<Runtime>::get())
     }
-}
 
-// Bridge trait impl: launchpad can call LP Locker to lock tokens
-#[cfg(not(feature = "mainnet-rc1"))]
-pub struct LaunchpadLpLockerBridge;
-#[cfg(not(feature = "mainnet-rc1"))]
-impl pallet_x3_launchpad::LpLockCreate<AccountId, BlockNumber> for LaunchpadLpLockerBridge {
-    fn lock_lp_for(
-        owner: &AccountId,
+    fn add_liquidity(
+        provider: &AccountId,
         pool_id: u64,
-        lp_amount: u128,
-        unlock_at_block: BlockNumber,
-    ) -> frame_support::dispatch::DispatchResult {
-        pallet_x3_lp_locker::Pallet::<Runtime>::lock_lp(
-            frame_system::RawOrigin::Signed(owner.clone()).into(),
+        amount_a: u128,
+        amount_b: u128,
+    ) -> Result<u64, DispatchError> {
+        pallet_x3_dex::Pallet::<Runtime>::add_liquidity(
+            frame_system::RawOrigin::Signed(provider.clone()).into(),
             pool_id,
-            lp_amount,
-            unlock_at_block,
-        )
+            amount_a,
+            amount_b,
+            amount_a,
+            amount_b,
+        )?;
+        // The position `add_liquidity` just opened.
+        Ok(pallet_x3_dex::NextPositionId::<Runtime>::get().saturating_sub(1))
+    }
+
+    fn transfer_position(
+        position_id: u64,
+        from: &AccountId,
+        to: &AccountId,
+    ) -> frame_support::dispatch::DispatchResult {
+        pallet_x3_dex::Pallet::<Runtime>::transfer_position(position_id, from, to)
     }
 }
 
 parameter_types! {
     /// Asset ID of the quote token used in launchpad DEX pools (X3 native).
     pub const LaunchpadQuoteAssetId: u32 = 0;
+    pub const LaunchpadPalletId: PalletId = PalletId(*b"x3/lnchp");
+    /// Basis points of a launch's raise that seed its DEX pool at graduation.
+    pub const LaunchpadLiquidityBps: u16 = 5_000;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -3710,7 +3725,11 @@ impl pallet_x3_launchpad::Config for Runtime {
     type MaxLaunchDurationBlocks = LaunchpadMaxDurationBlocks;
     type TokenFactory = LaunchpadTokenFactoryBridge;
     type Dex = LaunchpadDexBridge;
-    type LpLocker = LaunchpadLpLockerBridge;
+    // A launch's funds, tokens and locked LP position live on the kernel's ledger in a custody
+    // account derived from `LaunchpadPalletId`; half of what it raises seeds the pool.
+    type Ledger = KernelCanonicalLedger;
+    type PalletId = LaunchpadPalletId;
+    type LiquidityBps = LaunchpadLiquidityBps;
     type QuoteAssetId = LaunchpadQuoteAssetId;
     // `pallets/x3-launchpad/src/weights.rs` exists but is not a module of the pallet (`lib.rs`
     // declares no `mod weights;` and defines its own `WeightInfo` trait inside `#[pallet::config]`),

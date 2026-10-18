@@ -12604,6 +12604,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3-asset-kernel-types",
 ]
 
 [[package]]
