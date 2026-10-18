@@ -1,0 +1,61 @@
+{
+  "_note": "Documentation-only RFC 5737 addresses. Replace all 7 hosts and paths before use. Never place keys or seed phrases here.",
+  "validators": [
+    {
+      "name": "x3star1",
+      "ssh_host": "lojak@192.0.2.101",
+      "rpc_port": 9944,
+      "binary_path": "/opt/x3/bin/x3-chain-node",
+      "chain_spec_path": "/etc/x3/testnet-raw.json",
+      "data_dir": "/var/lib/x3/validator"
+    },
+    {
+      "name": "x3star2",
+      "ssh_host": "lojak@192.0.2.102",
+      "rpc_port": 9944,
+      "binary_path": "/opt/x3/bin/x3-chain-node",
+      "chain_spec_path": "/etc/x3/testnet-raw.json",
+      "data_dir": "/var/lib/x3/validator"
+    },
+    {
+      "name": "x3star3",
+      "ssh_host": "lojak@192.0.2.103",
+      "rpc_port": 9944,
+      "binary_path": "/opt/x3/bin/x3-chain-node",
+      "chain_spec_path": "/etc/x3/testnet-raw.json",
+      "data_dir": "/var/lib/x3/validator"
+    },
+    {
+      "name": "x3star4",
+      "ssh_host": "lojak@192.0.2.104",
+      "rpc_port": 9944,
+      "binary_path": "/opt/x3/bin/x3-chain-node",
+      "chain_spec_path": "/etc/x3/testnet-raw.json",
+      "data_dir": "/var/lib/x3/validator"
+    },
+    {
+      "name": "x3star5",
+      "ssh_host": "lojak@192.0.2.105",
+      "rpc_port": 9944,
+      "binary_path": "/opt/x3/bin/x3-chain-node",
+      "chain_spec_path": "/etc/x3/testnet-raw.json",
+      "data_dir": "/var/lib/x3/validator"
+    },
+    {
+      "name": "x3star6",
+      "ssh_host": "lojak@192.0.2.106",
+      "rpc_port": 9944,
+      "binary_path": "/opt/x3/bin/x3-chain-node",
+      "chain_spec_path": "/etc/x3/testnet-raw.json",
+      "data_dir": "/var/lib/x3/validator"
+    },
+    {
+      "name": "x3star7",
+      "ssh_host": "lojak@192.0.2.107",
+      "rpc_port": 9944,
+      "binary_path": "/opt/x3/bin/x3-chain-node",
+      "chain_spec_path": "/etc/x3/testnet-raw.json",
+      "data_dir": "/var/lib/x3/validator"
+    }
+  ]
+}
