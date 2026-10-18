@@ -1,0 +1,8 @@
+[
+{"id":"amd-devcloud","name":"AMD Developer Cloud","url":"https://www.amd.com/en/developer/resources/cloud-access/amd-developer-cloud.html","type":"application_credit","company_required":false,"notes":"Qualified open-source/AI developers may apply for $100 credit; expires after 30 days"},
+{"id":"lightning","name":"Lightning AI","url":"https://lightning.ai/pricing","type":"introductory_gpu_credit","company_required":false,"notes":"Advertises up to 80 initial GPU hours; check actual quota and eligibility"},
+{"id":"modal","name":"Modal","url":"https://modal.com/pricing","type":"monthly_credit","company_required":false,"notes":"$30/month starter credit; guard against overages"},
+{"id":"petals","name":"Petals","url":"https://github.com/bigscience-workshop/petals","type":"community_inference","company_required":false,"notes":"Model-specific shared inference, not arbitrary GPU job execution"},
+{"id":"boinc","name":"BOINC","url":"https://github.com/BOINC/boinc/wiki/Using-BOINC-for-AI","type":"volunteer_architecture","company_required":false,"notes":"Architecture reference; not unrestricted free compute"},
+{"id":"salad","name":"SaladCloud","url":"https://salad.com/salad-container-engine-community/","type":"paid_marketplace","company_required":false,"notes":"Exclude from zero-spend allocation unless approved credit confirmed"}
+]
