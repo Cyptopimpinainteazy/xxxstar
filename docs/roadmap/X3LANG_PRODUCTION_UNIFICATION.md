@@ -224,9 +224,17 @@ already failing on master: its recorded revision is not in the repository).
   wrong EVM hasher) and reported `Reverted`. Its diffs come from an unsigned, unauthenticated
   extrinsic, so correcting the keys would have let anyone choose what a rollback writes. It now
   refuses every non-empty diff (`UnauthenticatedStateDiff`) and the pallet reports
-  `IncompleteVmRevert`. **Open design question:** leg diffs need to be produced or verified by the
-  chain before any VM revert can be applied.
-- Open: `Emit` costs a flat 20 gas whatever its payload (up to 4 KiB); pricing per byte is a gas
-  schedule (consensus) decision.
+  `IncompleteVmRevert`.
+- Fixed (spec 24): legs now execute on chain. The bundle's executor calls the signed
+  `execute_bundle_leg` (call 9); the runtime's `RuntimeLegExecutor` runs an X3 program on the
+  kernel engine or a `CanonicalLedger` transfer of the executor's own funds, and the pallet stores
+  the journal and its hash (`ChainJournal`). Rollback applies a journal only when its hash matches,
+  newest leg first, all or nothing per leg; a slot is restored only while it still holds the
+  leg's value. The unsigned `record_leg_execution_receipt` refuses every call and
+  `validate_unsigned` drops it. The node gateway submits `execute_bundle_leg` and refuses legs the
+  chain cannot run (EVM/SVM bytecode, transfers from another account or another VM's balances).
+  Tests: `pallet-x3-atomic-kernel` (rollback, forgery, conflict, executor-funds-only) and
+  `runtime` `chain_executed_legs_are_undone_exactly_by_a_rollback`.
+- Fixed: `Emit` charges 20 gas plus 8 per data byte (`x3bc_core::spec::EMIT_GAS_PER_DATA_BYTE`).
 - Left unchanged: `x3-flashloan::pool_account` (native pool) decodes its account with `.expect`;
   changing the derivation would move an account that already holds funds.

@@ -200,6 +200,7 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type X3LangOrigin = frame_system::EnsureSigned<u64>;
     type SettlementOrigin = frame_system::EnsureRoot<u64>;
     type VmReverter = pallet_x3_atomic_kernel::vm_revert::NoopVmReverter;
+    type LegExecutor = ();
 }
 
 impl pallet_x3_settlement_engine::Config for Test {

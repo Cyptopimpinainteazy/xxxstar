@@ -1158,3 +1158,161 @@ fn the_guardian_gates_are_wired_and_refuse_an_unprivileged_caller() {
         );
     });
 }
+
+// ── Bundle legs executed by the chain, and undone from the chain's journal ────────────────────
+
+/// The slot key the X3 VM derives for EVM-style slot `n`: `"X3EVM_SL"` little-endian, then `n`.
+fn x3_evm_slot_key(slot: u64) -> H256 {
+    let mut key = [0u8; 32];
+    key[..8].copy_from_slice(&0x5833_4556_4D5F_534C_u64.to_le_bytes());
+    key[8..16].copy_from_slice(&slot.to_le_bytes());
+    H256::from(key)
+}
+
+/// The gateway submits a two-leg bundle, the chain runs both legs (a ledger transfer of the
+/// gateway's own funds and a compiled X3 program that writes a contract slot), and a rollback
+/// undoes both from the journals the chain recorded: balances and the slot are back where they
+/// were, with no `IncompleteVmRevert`.
+#[test]
+fn chain_executed_legs_are_undone_exactly_by_a_rollback() {
+    use frame_support::BoundedVec;
+    use pallet_x3_atomic_kernel::chain_legs::LegExecution;
+    use pallet_x3_atomic_kernel::{BundleRollbackReason, BundleStatus, Bundles};
+
+    let program = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 { evm_sstore(7, 41); return evm_sload(7); }",
+    )
+    .expect("the slot writer compiles");
+
+    atomic_test_ext().execute_with(|| {
+        let gateway = atomic_gateway();
+        let recipient = AccountId::from([0x77; 32]);
+        assert_ok!(crate::AtlasKernel::register_asset(
+            RuntimeOrigin::root(),
+            0,
+            b"X3".to_vec(),
+            12
+        ));
+        pallet_x3_kernel::CanonicalLedger::<Runtime>::insert(&gateway, 0, 5_000u128);
+        let slot = x3_evm_slot_key(7);
+        assert_eq!(
+            pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot),
+            None
+        );
+
+        assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            BoundedVec::try_from(vec![atomic_leg(), atomic_leg()]).expect("two legs fit"),
+            100,
+            ATOMIC_CHAIN_ID,
+            ATOMIC_NONCE,
+        ));
+        let (bundle_id, _) = Bundles::<Runtime>::iter().next().expect("stored");
+        assert_ok!(crate::X3AtomicKernel::assign_bundle_executor(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id
+        ));
+
+        assert_ok!(crate::X3AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            0,
+            LegExecution::Transfer {
+                asset: 0,
+                to: recipient.clone(),
+                amount: 1_200,
+            }
+        ));
+        assert_ok!(crate::X3AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            1,
+            LegExecution::X3 {
+                program: BoundedVec::try_from(program).expect("small program"),
+            }
+        ));
+        let ledger = |who: &AccountId| pallet_x3_kernel::CanonicalLedger::<Runtime>::get(who, 0);
+        assert_eq!((ledger(&gateway), ledger(&recipient)), (3_800, 1_200));
+        assert!(
+            pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot).is_some(),
+            "the X3 leg wrote chain storage"
+        );
+        for leg in 0..2 {
+            assert!(
+                pallet_x3_atomic_kernel::ChainJournal::<Runtime>::get(bundle_id, leg).is_some(),
+                "the chain recorded leg {leg}'s journal"
+            );
+        }
+
+        assert_ok!(crate::X3AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            BundleRollbackReason::SubmitterCancelled,
+        ));
+        assert_eq!((ledger(&gateway), ledger(&recipient)), (5_000, 0));
+        assert_eq!(
+            pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot),
+            None,
+            "the slot is back to empty"
+        );
+        assert_eq!(
+            Bundles::<Runtime>::get(bundle_id).map(|b| b.status),
+            Some(BundleStatus::RolledBack)
+        );
+        assert!(!System::events().iter().any(|r| matches!(
+            r.event,
+            RuntimeEvent::X3AtomicKernel(pallet_x3_atomic_kernel::Event::IncompleteVmRevert { .. })
+        )));
+    });
+}
+
+/// A leg spends only the executor's funds, and a refused leg leaves nothing behind.
+#[test]
+fn a_chain_leg_cannot_spend_more_than_the_executor_holds() {
+    use frame_support::BoundedVec;
+    use pallet_x3_atomic_kernel::chain_legs::LegExecution;
+
+    atomic_test_ext().execute_with(|| {
+        let gateway = atomic_gateway();
+        assert_ok!(crate::AtlasKernel::register_asset(
+            RuntimeOrigin::root(),
+            0,
+            b"X3".to_vec(),
+            12
+        ));
+        pallet_x3_kernel::CanonicalLedger::<Runtime>::insert(&gateway, 0, 100u128);
+        assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            BoundedVec::try_from(vec![atomic_leg()]).expect("one leg"),
+            100,
+            ATOMIC_CHAIN_ID,
+            ATOMIC_NONCE,
+        ));
+        let (bundle_id, _) = pallet_x3_atomic_kernel::Bundles::<Runtime>::iter()
+            .next()
+            .expect("stored");
+        assert_ok!(crate::X3AtomicKernel::assign_bundle_executor(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id
+        ));
+        assert!(crate::X3AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            0,
+            LegExecution::Transfer {
+                asset: 0,
+                to: AccountId::from([0x77; 32]),
+                amount: 101,
+            }
+        )
+        .is_err());
+        assert_eq!(
+            pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&gateway, 0),
+            100
+        );
+        assert!(
+            pallet_x3_atomic_kernel::ChainJournal::<Runtime>::get(bundle_id, 0).is_none(),
+            "a refused leg records no journal"
+        );
+    });
+}

@@ -87,6 +87,9 @@ pub mod proof;
 // VM reversion interface for bundle rollback
 pub mod vm_revert;
 
+/// Legs executed on chain and the journals that undo them.
+pub mod chain_legs;
+
 // Re-export weights for runtime integration
 pub mod weights;
 pub use weights::WeightInfo;
@@ -116,6 +119,7 @@ pub fn finality_cert_from_block_hash(block_hash: &[u8]) -> sp_core::H256 {
 #[frame_support::pallet]
 pub mod pallet {
     use super::proof::{BundleLeg, PoaeProof, VmType};
+    use crate::chain_legs::LegExecutor;
     use crate::vm_revert::{StateDiff, VmReverter};
     use crate::weights::WeightInfo;
     use frame_support::{
@@ -201,6 +205,10 @@ pub mod pallet {
         /// and will log a warning. Production runtimes MUST set this to a real
         /// implementation that can revert EVM/SVM/X3VM state diffs.
         type VmReverter: crate::vm_revert::VmReverter;
+
+        /// Executes bundle legs against chain state and undoes them from the journals it returns
+        /// (`execute_bundle_leg`). `()` executes nothing.
+        type LegExecutor: crate::chain_legs::LegExecutor<Self::AccountId>;
     }
 
     // ── Storage ───────────────────────────────────────────────────────────────
@@ -276,6 +284,12 @@ pub mod pallet {
         BoundedVec<crate::vm_revert::LegReceipt, T::MaxLegsPerBundle>,
         ValueQuery,
     >;
+
+    /// The hash of each executed leg's chain journal, written only by `execute_bundle_leg`. A
+    /// rollback applies a leg receipt's diff only when it hashes to this.
+    #[pallet::storage]
+    pub type ChainJournal<T: Config> =
+        StorageDoubleMap<_, Blake2_128Concat, H256, Twox64Concat, u32, H256, OptionQuery>;
 
     // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -423,6 +437,12 @@ pub mod pallet {
             leg_index: u32,
             vm_type: VmType,
         },
+        /// A leg ran on chain and its journal was recorded.
+        LegExecutedOnChain {
+            bundle_id: H256,
+            leg_index: u32,
+            journal: H256,
+        },
         /// A bond was slashed during bundle rollback.
         BondSlashed {
             submitter: T::AccountId,
@@ -499,6 +519,16 @@ pub mod pallet {
         /// The off-chain executor should not re-submit receipts for legs that
         /// have already been persisted.
         LegAlreadyExecuted,
+        /// Leg receipts are produced by the chain (`execute_bundle_leg`); a submitted state diff is
+        /// not accepted.
+        LegReceiptsAreChainProduced,
+        /// Only the bundle's assigned executor may execute its legs.
+        NotBundleExecutor,
+        /// The leg's execution does not match its VM: only X3 legs (an X3 program or a ledger
+        /// transfer) execute on chain; EVM and SVM keep no persistent state here.
+        UnsupportedLegExecution,
+        /// The leg's journal exceeds the receipt's state-diff bound.
+        JournalTooLarge,
     }
 
     // ── Hooks ─────────────────────────────────────────────────────────────────
@@ -559,66 +589,8 @@ pub mod pallet {
                 let _ = SubmitTransaction::<T, Call<T>>::submit_transaction(xt);
             }
 
-            // ── Single-pass scan: finalization + leg receipts per bundle ──
-            for (bundle_id, record) in Bundles::<T>::iter() {
-                if record.status != BundleStatus::Executing {
-                    continue;
-                }
-
-                // --- Leg execution receipts (x3leg:) ---
-                let leg_count = record.leg_count;
-                for leg_index in 0..leg_count {
-                    let mut leg_key = b"x3leg:".to_vec();
-                    leg_key.extend_from_slice(bundle_id.as_bytes());
-                    leg_key.extend_from_slice(&leg_index.to_le_bytes());
-
-                    let data =
-                        match sp_io::offchain::local_storage_get(StorageKind::PERSISTENT, &leg_key)
-                        {
-                            Some(v) if !v.is_empty() => v,
-                            _ => continue,
-                        };
-
-                    let state_diff = match StateDiff::decode(&mut &data[..]) {
-                        Ok(diff) => diff,
-                        Err(e) => {
-                            log::warn!(
-                                target: "x3-atomic-kernel",
-                                "[OCW] bundle {:?} leg {}: corrupt StateDiff, clearing: {:?}",
-                                bundle_id, leg_index, e
-                            );
-                            sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &leg_key);
-                            continue;
-                        }
-                    };
-
-                    let call = Call::record_leg_execution_receipt {
-                        bundle_id,
-                        leg_index,
-                        state_diff,
-                    };
-
-                    match SubmitTransaction::<T, Call<T>>::submit_transaction(T::create_bare(
-                        call.into(),
-                    )) {
-                        Ok(()) => {
-                            sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &leg_key);
-                            log::debug!(
-                                target: "x3-atomic-kernel",
-                                "[OCW] submitted leg receipt for bundle {:?} leg {}/{}",
-                                bundle_id, leg_index, leg_count
-                            );
-                        }
-                        Err(()) => {
-                            log::error!(
-                                target: "x3-atomic-kernel",
-                                "[OCW] failed to submit leg receipt for bundle {:?} leg {}",
-                                bundle_id, leg_index
-                            );
-                        }
-                    }
-                }
-            }
+            // Leg receipts are no longer posted from here: a leg is executed on chain by
+            // `execute_bundle_leg`, which records its own journal (see `chain_legs`).
         }
 
         /// On each block, expire bundles that have passed their deadline.
@@ -667,6 +639,7 @@ pub mod pallet {
 
                         // Clean up leg receipts storage
                         BundleLegReceipts::<T>::remove(bundle_id);
+                        let _ = ChainJournal::<T>::clear_prefix(bundle_id, u32::MAX, None);
 
                         Self::deposit_event(Event::BundleRolledBack {
                             bundle_id: *bundle_id,
@@ -998,57 +971,80 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Record a single leg's execution receipt on-chain.
+        /// Retired: a leg's receipt is produced by the chain when `execute_bundle_leg` runs it.
         ///
-        /// Called by the off-chain executor (via unsigned transaction)
-        /// after each leg completes execution.  Stores the VM-specific
-        /// `state_diff` so that [`crate::vm_revert::VmReverter`] can
-        /// restore pre-execution VM state if the bundle is rolled back
-        /// before finalisation.
-        ///
-        /// # Security
-        ///
-        /// - Unsigned only — the validate_unsigned guard ensures the
-        ///   bundle is `Executing` and the leg index is in-range.
-        /// - Each leg may be recorded at most once per bundle.
+        /// This call took a state diff from an unsigned, gossiped transaction whose only checks
+        /// were the bundle state and the leg index, and a rollback then wrote that diff's "old
+        /// values" into storage. It refuses every call; the index stays so that no other call can
+        /// ever take its meaning.
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::record_leg_execution_receipt())]
         pub fn record_leg_execution_receipt(
             origin: OriginFor<T>,
-            bundle_id: H256,
-            leg_index: u32,
-            state_diff: StateDiff,
+            _bundle_id: H256,
+            _leg_index: u32,
+            _state_diff: StateDiff,
         ) -> DispatchResult {
             ensure_none(origin)?;
+            Err(Error::<T>::LegReceiptsAreChainProduced.into())
+        }
 
+        /// Execute leg `leg_index` of an executing bundle on chain and record its journal.
+        ///
+        /// Only the bundle's assigned executor, and the leg runs as that executor: the runtime's
+        /// `LegExecutor` runs it against chain state (an X3 program on the kernel's engine, or a
+        /// ledger transfer of the executor's own funds) and returns the journal of every write; the pallet stores it as the
+        /// leg's receipt and its hash in `ChainJournal`, which is what a rollback checks before it
+        /// applies anything. A leg that fails writes nothing (one storage transaction).
+        #[pallet::call_index(9)]
+        #[pallet::weight(T::WeightInfo::record_leg_execution_receipt()
+            .saturating_add(T::LegExecutor::max_weight()))]
+        pub fn execute_bundle_leg(
+            origin: OriginFor<T>,
+            bundle_id: H256,
+            leg_index: u32,
+            execution: crate::chain_legs::LegExecution<T::AccountId>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let record = Bundles::<T>::get(bundle_id).ok_or(Error::<T>::BundleNotFound)?;
+            ensure!(
+                record.status == BundleStatus::Executing,
+                Error::<T>::InvalidBundleState
+            );
+            ensure!(
+                record.executor.as_ref() == Some(&who),
+                Error::<T>::NotBundleExecutor
+            );
             let mut receipts = BundleLegReceipts::<T>::get(bundle_id);
             let idx = leg_index as usize;
             ensure!(idx < receipts.len(), Error::<T>::InvalidBundleState);
-
-            // Check leg not already executed before taking mutable reference.
             ensure!(!receipts[idx].executed, Error::<T>::LegAlreadyExecuted);
-
-            // Mutate and write back — scoped so the immutable borrow for the
-            // vm_type clone below doesn't conflict.
-            {
-                let receipt = &mut receipts[idx];
-                receipt.executed = true;
-                receipt.state_diff = state_diff;
-            }
-            let vm_type = receipts[idx].vm_type.clone();
-            BundleLegReceipts::<T>::insert(bundle_id, receipts);
-            Self::deposit_event(Event::LegExecutionRecorded {
-                bundle_id,
-                leg_index,
-                vm_type,
-            });
-
-            log::debug!(
-                target: "x3-atomic-kernel",
-                "Bundle {:?} leg {} executed and receipt stored",
-                bundle_id, leg_index
+            // EVM and SVM keep no persistent state on this chain, so there is nothing for such a
+            // leg to execute against or journal.
+            ensure!(
+                receipts[idx].vm_type == VmType::X3,
+                Error::<T>::UnsupportedLegExecution
             );
 
+            let mut context = bundle_id.as_bytes().to_vec();
+            context.extend_from_slice(&leg_index.to_le_bytes());
+            let context = H256(sp_io::hashing::blake2_256(&context));
+            // As the executor, never the submitter: the executor chooses what a leg does, so a leg
+            // may only spend what the executor itself holds.
+            let entries = T::LegExecutor::execute(context, &who, &execution)?;
+            let diff =
+                crate::chain_legs::encode_journal(&entries).ok_or(Error::<T>::JournalTooLarge)?;
+            let journal = crate::chain_legs::journal_hash(&diff);
+
+            receipts[idx].executed = true;
+            receipts[idx].state_diff = diff;
+            BundleLegReceipts::<T>::insert(bundle_id, receipts);
+            ChainJournal::<T>::insert(bundle_id, leg_index, journal);
+            Self::deposit_event(Event::LegExecutedOnChain {
+                bundle_id,
+                leg_index,
+                journal,
+            });
             Ok(())
         }
     }
@@ -1092,40 +1088,10 @@ pub mod pallet {
                     .longevity(10)
                     .propagate(true)
                     .build()
-            } else if let Call::record_leg_execution_receipt {
-                bundle_id,
-                leg_index,
-                state_diff: _,
-            } = call
-            {
-                // Guard: state diffs must be non-trivial.
-                // An empty diff signals a read-only leg — no revert needed,
-                // so recording it is wasteful but not harmful.
-
-                // Bundle must be Executing and have an assigned executor.
-                match Bundles::<T>::get(bundle_id) {
-                    Some(record)
-                        if record.status == BundleStatus::Executing
-                            && record.executor.is_some() =>
-                    {
-                        let receipts = BundleLegReceipts::<T>::get(bundle_id);
-                        if (*leg_index as usize) >= receipts.len() {
-                            return InvalidTransaction::Stale.into();
-                        }
-                        if receipts[*leg_index as usize].executed {
-                            return InvalidTransaction::Stale.into();
-                        }
-                        let mut tag = bundle_id.as_bytes().to_vec();
-                        tag.extend_from_slice(&leg_index.to_le_bytes());
-                        ValidTransaction::with_tag_prefix("X3AtomicLegReceipt")
-                            .priority(TransactionPriority::MAX / 2)
-                            .and_provides([tag.as_slice()])
-                            .longevity(5)
-                            .propagate(true)
-                            .build()
-                    }
-                    _ => InvalidTransaction::Stale.into(),
-                }
+            } else if let Call::record_leg_execution_receipt { .. } = call {
+                // Retired: leg receipts are produced on chain by `execute_bundle_leg`. Refused at
+                // the pool so the call is never gossiped.
+                InvalidTransaction::Call.into()
             } else {
                 InvalidTransaction::Call.into()
             }
@@ -1149,9 +1115,25 @@ pub mod pallet {
             let mut revert_failures: u32 = 0;
             let leg_count = receipts.len() as u32;
 
-            for receipt in receipts.iter() {
+            // Newest leg first: a later leg may depend on what an earlier one wrote.
+            for receipt in receipts.iter().rev() {
                 if receipt.executed && !receipt.state_diff.is_empty() {
-                    match T::VmReverter::revert_leg(receipt.vm_type.clone(), &receipt.state_diff) {
+                    // A chain journal is applied only when it is the one `execute_bundle_leg`
+                    // recorded for this leg; any other diff goes to the configured reverter, which
+                    // in the runtime refuses it.
+                    let journal = ChainJournal::<T>::get(bundle_id, receipt.leg_index)
+                        .filter(|recorded| {
+                            *recorded == crate::chain_legs::journal_hash(&receipt.state_diff)
+                        })
+                        .and_then(|_| crate::chain_legs::decode_journal(&receipt.state_diff));
+                    let outcome = match journal {
+                        Some(entries) => T::LegExecutor::revert(&entries)
+                            .map(|()| crate::vm_revert::RevertOutcome::Reverted),
+                        None => {
+                            T::VmReverter::revert_leg(receipt.vm_type.clone(), &receipt.state_diff)
+                        }
+                    };
+                    match outcome {
                         Ok(crate::vm_revert::RevertOutcome::Reverted)
                         | Ok(crate::vm_revert::RevertOutcome::NoSideEffects) => {}
                         Err(err) => {
@@ -1289,6 +1271,7 @@ pub mod pallet {
 
                 // Clean up leg receipts storage after rollback
                 BundleLegReceipts::<T>::remove(bundle_id);
+                let _ = ChainJournal::<T>::clear_prefix(bundle_id, u32::MAX, None);
 
                 Self::deposit_event(Event::BundleRolledBack { bundle_id, reason });
 

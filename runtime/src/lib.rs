@@ -412,7 +412,16 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // Same release: signed Ethereum transactions become self-contained extrinsics
     // (fp_self_contained::UncheckedExtrinsic). Existing signed extrinsics encode
     // exactly as before, so `transaction_version` is unchanged.
-    spec_version: 23,
+    // 23: `AtlasKernel.submit_trade` (the X3BC 1.1 trading section settled on the
+    // CanonicalLedger) and its trading configuration; launchpad custody on the ledger.
+    // New calls and storage only, so no migration.
+    // 24: atomic bundle legs execute on chain. `X3AtomicKernel.execute_bundle_leg`
+    // (call 9, the bundle's executor, spending only its own funds) runs a leg and records
+    // its journal in the new `ChainJournal` map; rollback applies only a journal whose
+    // hash the chain recorded. The unsigned `record_leg_execution_receipt` (call 7) now
+    // refuses every call. No existing storage changes shape, so no migration;
+    // `transaction_version` is unchanged: no existing call's encoding moved.
+    spec_version: 24,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -3226,6 +3235,115 @@ impl pallet_x3_atomic_kernel::Config for Runtime {
     // Production: CompositeReverter dispatches EVM/SVM/X3VM state-diff reversion
     // per leg. See pallets/x3-atomic-kernel/src/vm_revert.rs for per-VM implementations.
     type VmReverter = pallet_x3_atomic_kernel::vm_revert::CompositeReverter;
+    // Legs run on chain (`execute_bundle_leg`): X3 programs on the kernel's engine and ledger
+    // transfers, journaled so a rollback can undo exactly what they did.
+    type LegExecutor = RuntimeLegExecutor;
+}
+
+/// The runtime's on-chain bundle-leg executor (see `pallet_x3_atomic_kernel::chain_legs`).
+///
+/// It writes only through the owning pallets' typed APIs (`CanonicalLedger` transfers, the
+/// kernel's X3 execution), never raw storage keys, so a journal always names state that exists.
+pub struct RuntimeLegExecutor;
+
+impl pallet_x3_atomic_kernel::chain_legs::LegExecutor<AccountId> for RuntimeLegExecutor {
+    fn execute(
+        context: H256,
+        executor: &AccountId,
+        execution: &pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId>,
+    ) -> Result<Vec<pallet_x3_atomic_kernel::chain_legs::JournalEntry>, DispatchError> {
+        use pallet_x3_atomic_kernel::chain_legs::{JournalEntry, LegExecution};
+        use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
+        match execution {
+            LegExecution::Transfer { asset, to, amount } => {
+                KernelCanonicalLedger::ledger_transfer(*asset, executor, to, *amount)?;
+                Ok(vec![JournalEntry::LedgerTransfer {
+                    asset: *asset,
+                    from: executor.encode(),
+                    to: to.encode(),
+                    amount: *amount,
+                }])
+            }
+            LegExecution::X3 { program } => {
+                let writes = pallet_x3_kernel::Pallet::<Runtime>::execute_x3_program(
+                    context, executor, program,
+                )?;
+                Ok(writes
+                    .into_iter()
+                    .map(|write| JournalEntry::X3Slot {
+                        key: write.key,
+                        old: write.old_value,
+                        new: write.new_value,
+                    })
+                    .collect())
+            }
+        }
+    }
+
+    fn revert(
+        entries: &[pallet_x3_atomic_kernel::chain_legs::JournalEntry],
+    ) -> Result<(), pallet_x3_atomic_kernel::vm_revert::RevertError> {
+        use frame_support::storage::{with_transaction, TransactionOutcome};
+        use pallet_x3_atomic_kernel::chain_legs::JournalEntry;
+        use pallet_x3_atomic_kernel::vm_revert::RevertError;
+        use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
+        let failed = |reason: &str| RevertError::RevertFailed {
+            reason: reason.as_bytes().to_vec(),
+        };
+        // All or nothing: if any write cannot be undone, none is.
+        let mut refused = None;
+        with_transaction(|| {
+            let result = entries.iter().rev().try_for_each(|entry| match entry {
+                JournalEntry::LedgerTransfer {
+                    asset,
+                    from,
+                    to,
+                    amount,
+                } => {
+                    let from = AccountId::decode(&mut &from[..])
+                        .map_err(|_| RevertError::InvalidStateDiff)?;
+                    let to = AccountId::decode(&mut &to[..])
+                        .map_err(|_| RevertError::InvalidStateDiff)?;
+                    // Moved back by the same amount: a later change to either balance stands.
+                    KernelCanonicalLedger::ledger_transfer(*asset, &to, &from, *amount)
+                        .map_err(|_| failed("the recipient no longer holds the amount"))
+                }
+                JournalEntry::X3Slot { key, old, new } => {
+                    // Restored only while the slot still holds what the leg wrote.
+                    if pallet_x3_kernel::X3ContractStorage::<Runtime>::get(key) != *new {
+                        return Err(failed("the slot was written after the leg"));
+                    }
+                    match old {
+                        Some(value) => {
+                            pallet_x3_kernel::X3ContractStorage::<Runtime>::insert(key, value)
+                        }
+                        None => pallet_x3_kernel::X3ContractStorage::<Runtime>::remove(key),
+                    }
+                    Ok(())
+                }
+            });
+            match result {
+                Ok(()) => TransactionOutcome::Commit(Ok(())),
+                Err(error) => {
+                    refused = Some(error);
+                    TransactionOutcome::Rollback(Err(sp_runtime::DispatchError::Other(
+                        "journal revert refused",
+                    )))
+                }
+            }
+        })
+        .map_err(|_: sp_runtime::DispatchError| {
+            refused.unwrap_or(RevertError::RevertFailed {
+                reason: b"storage layer".to_vec(),
+            })
+        })
+    }
+
+    fn max_weight() -> Weight {
+        // The larger of the two leg kinds: an X3 program at the kernel's gas limit, or a transfer.
+        pallet_x3_kernel::Pallet::<Runtime>::x3_program_weight()
+            .max(<Runtime as frame_system::Config>::DbWeight::get().reads_writes(4, 2))
+    }
 }
 
 // ===== X3 Slash Configuration =====

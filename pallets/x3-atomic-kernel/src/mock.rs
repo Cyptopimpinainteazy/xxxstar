@@ -9,6 +9,7 @@ use frame_support::{
     traits::{ConstU32, EnsureOrigin},
 };
 use frame_system as system;
+use parity_scale_codec::{Decode, Encode};
 use sp_core::offchain::{
     testing::{TestOffchainExt, TestTransactionPoolExt},
     OffchainDbExt, TransactionPoolExt,
@@ -290,6 +291,132 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type X3LangOrigin = RootOrSignedAccount;
     type SettlementOrigin = SettlementOnlyOrigin;
     type VmReverter = SwitchableVmReverter;
+    type LegExecutor = TestLegExecutor;
+}
+
+// ── On-chain leg executor (test) ──────────────────────────────────────────
+//
+// A ledger of (asset, account) balances and a map of contract slots, with the runtime's rules:
+// a transfer leg moves the executor's own funds and is undone by moving them back; an X3 leg's
+// "program" here is `[slot_byte, value_byte]`, writing one slot, undone only while the slot still
+// holds what it wrote. Both live in storage so they roll back with the extrinsic.
+
+fn ledger_key(asset: u32, who: &AccountId) -> Vec<u8> {
+    (b"test-ledger", asset, who).encode()
+}
+
+fn slot_key(key: &H256) -> Vec<u8> {
+    (b"test-slot", key).encode()
+}
+
+pub struct TestLegExecutor;
+
+impl TestLegExecutor {
+    pub fn balance(asset: u32, who: &AccountId) -> u128 {
+        frame_support::storage::unhashed::get(&ledger_key(asset, who)).unwrap_or(0)
+    }
+    pub fn set_balance(asset: u32, who: &AccountId, amount: u128) {
+        frame_support::storage::unhashed::put(&ledger_key(asset, who), &amount);
+    }
+    pub fn slot(key: &H256) -> Option<[u8; 32]> {
+        frame_support::storage::unhashed::get(&slot_key(key))
+    }
+    pub fn set_slot(key: &H256, value: Option<[u8; 32]>) {
+        match value {
+            Some(v) => frame_support::storage::unhashed::put(&slot_key(key), &v),
+            None => frame_support::storage::unhashed::kill(&slot_key(key)),
+        }
+    }
+    fn transfer(asset: u32, from: &AccountId, to: &AccountId, amount: u128) -> Result<(), ()> {
+        let from_balance = Self::balance(asset, from).checked_sub(amount).ok_or(())?;
+        Self::set_balance(asset, from, from_balance);
+        Self::set_balance(asset, to, Self::balance(asset, to) + amount);
+        Ok(())
+    }
+}
+
+impl pallet_x3_atomic_kernel::chain_legs::LegExecutor<AccountId> for TestLegExecutor {
+    fn execute(
+        _context: H256,
+        executor: &AccountId,
+        execution: &pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId>,
+    ) -> Result<Vec<pallet_x3_atomic_kernel::chain_legs::JournalEntry>, sp_runtime::DispatchError>
+    {
+        use pallet_x3_atomic_kernel::chain_legs::{JournalEntry, LegExecution};
+        match execution {
+            LegExecution::Transfer { asset, to, amount } => {
+                Self::transfer(*asset, executor, to, *amount)
+                    .map_err(|_| sp_runtime::DispatchError::Other("insufficient balance"))?;
+                Ok(vec![JournalEntry::LedgerTransfer {
+                    asset: *asset,
+                    from: executor.encode(),
+                    to: to.encode(),
+                    amount: *amount,
+                }])
+            }
+            LegExecution::X3 { program } => {
+                let [slot, value] = program.as_slice() else {
+                    return Err(sp_runtime::DispatchError::Other("program fails"));
+                };
+                let key = H256::repeat_byte(*slot);
+                let old = Self::slot(&key);
+                let new = Some([*value; 32]);
+                Self::set_slot(&key, new);
+                Ok(vec![JournalEntry::X3Slot { key, old, new }])
+            }
+        }
+    }
+
+    fn revert(
+        entries: &[pallet_x3_atomic_kernel::chain_legs::JournalEntry],
+    ) -> Result<(), pallet_x3_atomic_kernel::vm_revert::RevertError> {
+        use frame_support::storage::{with_transaction, TransactionOutcome};
+        use pallet_x3_atomic_kernel::chain_legs::JournalEntry;
+        use pallet_x3_atomic_kernel::vm_revert::RevertError;
+        let failed = || RevertError::RevertFailed {
+            reason: b"conflict".to_vec(),
+        };
+        let mut refused = None;
+        with_transaction(|| {
+            let result = entries.iter().rev().try_for_each(|entry| match entry {
+                JournalEntry::LedgerTransfer {
+                    asset,
+                    from,
+                    to,
+                    amount,
+                } => {
+                    let from = AccountId::decode(&mut &from[..]).map_err(|_| failed())?;
+                    let to = AccountId::decode(&mut &to[..]).map_err(|_| failed())?;
+                    Self::transfer(*asset, &to, &from, *amount).map_err(|_| failed())
+                }
+                JournalEntry::X3Slot { key, old, new } => {
+                    if Self::slot(key) != *new {
+                        return Err(failed());
+                    }
+                    Self::set_slot(key, *old);
+                    Ok(())
+                }
+            });
+            match result {
+                Ok(()) => TransactionOutcome::Commit(Ok(())),
+                Err(error) => {
+                    refused = Some(error);
+                    TransactionOutcome::Rollback(Err(sp_runtime::DispatchError::Other(
+                        "journal revert refused",
+                    )))
+                }
+            }
+        })
+        .map_err(|_: sp_runtime::DispatchError| {
+            refused.unwrap_or(RevertError::RevertFailed {
+                reason: b"storage layer".to_vec(),
+            })
+        })
+    }
+
+    fn max_weight() -> frame_support::weights::Weight {
+        frame_support::weights::Weight::from_parts(1_000_000, 0)
+    }
 }
 
 // ── Test Externalities Builder ────────────────────────────────────────────

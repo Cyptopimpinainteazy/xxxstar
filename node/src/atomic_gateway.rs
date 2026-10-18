@@ -71,6 +71,26 @@ impl AtomicGatewayKey {
         self.signed_extrinsic(call, genesis_hash, tx_nonce)
     }
 
+    /// Build a signed `execute_bundle_leg` extrinsic: the chain runs the leg itself and records
+    /// the journal a rollback would undo.
+    pub fn execute_bundle_leg(
+        &self,
+        bundle_id: H256,
+        leg_index: u32,
+        execution: pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId>,
+        genesis_hash: H256,
+        tx_nonce: u32,
+    ) -> Result<UncheckedExtrinsic, String> {
+        let call = RuntimeCall::X3AtomicKernel(
+            pallet_x3_atomic_kernel::Call::<Runtime>::execute_bundle_leg {
+                bundle_id,
+                leg_index,
+                execution,
+            },
+        );
+        self.signed_extrinsic(call, genesis_hash, tx_nonce)
+    }
+
     /// Build a signed `finalize_atomic_bundle` extrinsic for the finalized
     /// block that owns the bundle.
     pub fn finalize_atomic_bundle(

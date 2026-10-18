@@ -162,8 +162,10 @@ fn is_leg_receipt(call: &RuntimeCall, bundle_id: H256, leg_index: u32) -> bool {
     )
 }
 
+/// The offchain worker anchors finality certs and no longer posts leg receipts: a leg's receipt
+/// is produced on chain by `execute_bundle_leg`, so an `x3leg:` value in local storage is ignored.
 #[test]
-fn ocw_anchors_a_flash_cert_and_submits_leg_receipts() {
+fn ocw_anchors_a_flash_cert_and_posts_no_leg_receipts() {
     let (mut ext, submitted) = new_test_ext_offchain();
     ext.execute_with(|| {
         System::set_block_number(7);
@@ -178,31 +180,22 @@ fn ocw_anchors_a_flash_cert_and_submits_leg_receipts() {
         assert_eq!(submitted().len(), 0);
         assert_eq!(get_persistent(&key), Some(encoded.clone()));
 
-        // Cert for this block + Executing bundle: one anchor, one receipt.
+        // Cert for this block + Executing bundle: one anchor, and no leg receipt.
         let cert = H256::repeat_byte(0x5A);
         set_persistent(&ff_key(7), cert.as_bytes());
         mark_executing(bundle_id);
         AtomicKernel::offchain_worker(7);
 
         let transactions = submitted();
-        assert_eq!(
-            transactions.len(),
-            2,
-            "one finality anchor + one leg receipt"
-        );
+        assert_eq!(transactions.len(), 1, "one finality anchor, nothing else");
         let calls: Vec<RuntimeCall> = transactions.iter().map(|tx| decode_call(tx)).collect();
         assert!(
             calls.iter().any(|call| is_anchor(call, 7, cert)),
             "the 32-byte cert must be anchored"
         );
         assert!(
-            calls.iter().any(|call| is_leg_receipt(call, bundle_id, 0)),
-            "the Executing bundle's leg receipt must be submitted"
-        );
-        assert_eq!(
-            get_persistent(&key),
-            None,
-            "an accepted leg value is cleared"
+            !calls.iter().any(|call| is_leg_receipt(call, bundle_id, 0)),
+            "no leg receipt is posted from local storage"
         );
     });
 }
@@ -235,8 +228,10 @@ fn ocw_accepts_only_exactly_32_byte_nonzero_certs() {
     });
 }
 
+/// Leg values in local storage are no longer read at all (leg receipts are produced on chain):
+/// with good, empty and corrupt values present, nothing is submitted and nothing is cleared.
 #[test]
-fn ocw_skips_empty_leg_values_and_clears_corrupt_diffs() {
+fn ocw_reads_no_leg_values() {
     let (mut ext, submitted) = new_test_ext_offchain();
     ext.execute_with(|| {
         System::set_block_number(2);
@@ -253,33 +248,14 @@ fn ocw_skips_empty_leg_values_and_clears_corrupt_diffs() {
         let encoded = StateDiff::from(vec![0x01]).encode();
         set_persistent(&good_key, &encoded);
         set_persistent(&empty_key, b"");
-        // 0xFF starts a four-byte SCALE compact length with only one byte left.
         set_persistent(&corrupt_key, &[0xFF, 0x01]);
 
         AtomicKernel::offchain_worker(2);
 
-        let transactions = submitted();
-        assert_eq!(
-            transactions.len(),
-            1,
-            "only the decodable non-empty diff is submitted"
-        );
-        assert!(is_leg_receipt(&decode_call(&transactions[0]), good, 0));
-        assert_eq!(
-            get_persistent(&good_key),
-            None,
-            "the accepted key is cleared"
-        );
-        assert_eq!(
-            get_persistent(&empty_key),
-            Some(Vec::new()),
-            "an empty value is skipped, not cleared"
-        );
-        assert_eq!(
-            get_persistent(&corrupt_key),
-            None,
-            "a corrupt diff is cleared so the OCW does not retry it forever"
-        );
+        assert!(submitted().is_empty(), "no leg receipt is submitted");
+        assert_eq!(get_persistent(&good_key), Some(encoded));
+        assert_eq!(get_persistent(&empty_key), Some(Vec::new()));
+        assert_eq!(get_persistent(&corrupt_key), Some(vec![0xFF, 0x01]));
     });
 }
 
@@ -335,8 +311,10 @@ fn validate_unsigned_pins_anchor_zero_cert_window_and_priority() {
     });
 }
 
+/// The retired unsigned leg-receipt call is refused at the pool in every bundle state, so it is
+/// never gossiped: leg receipts come from `execute_bundle_leg`.
 #[test]
-fn validate_unsigned_pins_leg_receipt_guards_and_priority() {
+fn validate_unsigned_refuses_every_leg_receipt() {
     new_test_ext().execute_with(|| {
         System::set_block_number(10);
         let bundle_id = submit_one(1_000, 50, 1);
@@ -348,47 +326,15 @@ fn validate_unsigned_pins_leg_receipt_guards_and_priority() {
         let validate =
             |call: &Call<Test>| AtomicKernel::validate_unsigned(TransactionSource::External, call);
 
-        // Pending without an executor: refused.
-        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Stale);
-
-        // Pending *with* an executor assigned: the conjunction must still refuse.
-        Bundles::<Test>::mutate(bundle_id, |maybe| {
-            maybe.as_mut().expect("stored").executor = Some(ALICE);
-        });
-        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Stale);
-
-        // Executing without an executor: refused.
+        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Call);
+        // Even the state that used to be valid: Executing with an executor assigned.
         Bundles::<Test>::mutate(bundle_id, |maybe| {
             let record = maybe.as_mut().expect("stored");
             record.status = BundleStatus::Executing;
-            record.executor = None;
+            record.executor = Some(ALICE);
         });
-        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Stale);
-
-        // Executing with an executor: valid, at the leg-receipt priority.
-        Bundles::<Test>::mutate(bundle_id, |maybe| {
-            maybe.as_mut().expect("stored").executor = Some(ALICE);
-        });
-        let valid = expect_valid(validate(&leg_receipt(0)));
-        assert_eq!(valid.priority, TransactionPriority::MAX / 2);
-
-        // receipts.len() == 1 here, so index 1 is one past the end.
-        expect_invalid(validate(&leg_receipt(1)), InvalidTransaction::Stale);
-        expect_invalid(validate(&leg_receipt(999)), InvalidTransaction::Stale);
-
-        // An already-executed leg cannot be recorded twice.
-        let mut receipts = BundleLegReceipts::<Test>::get(bundle_id).to_vec();
-        receipts[0].executed = true;
-        set_receipts(bundle_id, receipts);
-        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Stale);
-
-        // Unknown bundles are refused.
-        let missing = Call::<Test>::record_leg_execution_receipt {
-            bundle_id: H256::repeat_byte(0xEE),
-            leg_index: 0,
-            state_diff: StateDiff::from(Vec::new()),
-        };
-        expect_invalid(validate(&missing), InvalidTransaction::Stale);
+        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Call);
+        expect_invalid(validate(&leg_receipt(999)), InvalidTransaction::Call);
     });
 }
 

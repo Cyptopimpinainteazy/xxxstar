@@ -3861,6 +3861,49 @@ pub mod pallet {
         // `pub(crate)` only so the pallet's own tests can drive the refusal paths that a
         // well-behaved adapter never produces. It is not part of the pallet's public API; the only
         // production caller is `submit_comit_v2`.
+        /// Run an X3 program for `who` against the chain's contract slots, persist its slot writes
+        /// and deliver its events, exactly as an accepted comit's X3 leg does; returns the writes
+        /// (each with the value it replaced) for a caller that journals them (the atomic kernel's
+        /// on-chain bundle legs). `context` identifies the execution in `X3LogEmitted`. A program
+        /// that fails, or that the verifier refuses, writes nothing.
+        pub fn execute_x3_program(
+            context: H256,
+            who: &T::AccountId,
+            program: &[u8],
+        ) -> Result<Vec<StorageWrite>, DispatchError> {
+            ensure!(!ProtocolPaused::<T>::get(), Error::<T>::ProtocolIsPaused);
+            let slots = Self::x3_storage_view()?;
+            let receipt = T::X3Adapter::execute_with_context(
+                program,
+                T::DefaultX3GasLimit::get(),
+                &slots,
+                T::PrivateSubmissionChannel::get(),
+                &Self::x3_call_context(Some(who)),
+            )?;
+            ensure!(receipt.success, DispatchError::Other("X3 program failed"));
+            Self::apply_x3_storage_writes(context, Some(&receipt))?;
+            for (index, log) in receipt.logs.into_iter().enumerate() {
+                let data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>> =
+                    log.data.try_into().map_err(|_| Error::<T>::X3LogTooLarge)?;
+                Self::deposit_event(Event::X3LogEmitted {
+                    comit_id: context,
+                    index: index as u32,
+                    topic: log.topics.first().copied().unwrap_or_default(),
+                    data,
+                });
+            }
+            Ok(receipt.storage_writes)
+        }
+
+        /// The most weight `execute_x3_program` can take: one engine run at the gas limit, the
+        /// slot view, and the writes `apply_x3_storage_writes` allows.
+        pub fn x3_program_weight() -> Weight {
+            Self::x3_execution_weight().saturating_add(T::DbWeight::get().reads_writes(
+                u64::from(T::MaxX3StorageSlots::get()).saturating_add(2),
+                Self::MAX_STATE_CHANGES as u64,
+            ))
+        }
+
         pub(crate) fn apply_x3_storage_writes(
             _comit_id: H256,
             x3_receipt: Option<&ExecutionReceipt>,
