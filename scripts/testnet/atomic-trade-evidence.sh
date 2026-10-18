@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Evidence-first atomic trading test runner. Never treats an unexecuted test as a pass.
+set -Eeuo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+OUT="${X3_ATOMIC_EVIDENCE_DIR:-$ROOT/target/x3-atomic-evidence}"
+mkdir -p "$OUT"
+git rev-parse HEAD > "$OUT/head.txt"
+git status --short > "$OUT/worktree.txt"
+printf 'repo=%s\nhead=%s\n' "$ROOT" "$(cat "$OUT/head.txt")"
+run() {
+  local label="$1"; shift
+  printf '\n>>> %s\n' "$label"
+  set +e
+  "$@" > "$OUT/$label.log" 2>&1
+  local code=$?
+  set -e
+  printf '%s %s\n' "$label" "$code" | tee -a "$OUT/status.txt"
+  tail -n 12 "$OUT/$label.log"
+  return "$code"
+}
+: > "$OUT/status.txt"
+fail=0
+# The nested X3Lang workspace owns x3-lang-vm.
+(
+ cd "$ROOT/x3-lang"
+ run vm-all cargo test -p x3-lang-vm --lib --locked
+) || fail=1
+(
+ cd "$ROOT/x3-lang"
+ run vm-trading cargo test -p x3-lang-vm --lib trading --locked
+) || fail=1
+(
+ cd "$ROOT/x3-lang"
+ run vm-receipt cargo test -p x3-lang-vm --lib receipt --locked
+) || fail=1
+# Inventory concrete test names for a later instruction-level trace adapter.
+(
+ cd "$ROOT/x3-lang"
+ run vm-test-inventory cargo test -p x3-lang-vm --lib -- --list
+) || fail=1
+if ((fail)); then echo 'FAIL: see evidence logs'; exit 1; fi
+echo 'PASS: commands completed; review logs for test coverage before claiming atomic settlement.'
