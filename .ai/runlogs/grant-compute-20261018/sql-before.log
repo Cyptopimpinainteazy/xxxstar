@@ -1,0 +1,8 @@
+Baseline API SQL accepted discovery -> approved without validation: grant-demo-opensource-security-tooling|DEMO-001|Open-source security tooling for cross-chain dapps|Foundations Collective|approved|approved|92.4|75000|{"focus": ["security", "developer-tooling"], "region": "global"}|2026-10-18 20:35:15.196+00|2026-10-18 20:35:15.580355+00
+UPDATE 1
+
+Baseline fabricated award dollars: 120000
+
+Traceback (most recent call last):
+  File "<stdin>", line 14, in <module>
+AssertionError: SECURITY REGRESSION: illegal approval transition accepted by production UPDATE

@@ -1036,10 +1036,13 @@ impl Database {
                 COUNT(*) FILTER (WHERE status = 'open')::BIGINT AS open_grants,
                 COUNT(*) FILTER (WHERE status = 'submitted')::BIGINT AS submitted_proposals,
                 COUNT(*) FILTER (WHERE status = 'approved')::BIGINT AS approved_grants,
-                COUNT(*) FILTER (WHERE status = 'funded')::BIGINT AS funded_grants,
-                COALESCE(SUM(amount_usd) FILTER (WHERE status = 'funded'), 0)::DOUBLE PRECISION AS total_awarded_usd,
-                (SELECT MAX(created_at) FROM funding_swarm_events WHERE visibility = 'public') AS last_event_at
-             FROM funding_swarm_grants",
+                COUNT(*) FILTER (WHERE status = 'funded' AND award_verified)::BIGINT AS funded_grants,
+                COALESCE(SUM(amount_usd) FILTER (WHERE status = 'funded' AND award_verified), 0)::DOUBLE PRECISION AS total_awarded_usd,
+                (SELECT MAX(e.created_at) FROM funding_swarm_events e
+                 WHERE e.visibility = 'public' AND NOT e.is_example
+                 AND NOT EXISTS (SELECT 1 FROM funding_swarm_grants g
+                     WHERE g.grant_id = e.grant_id AND g.is_example)) AS last_event_at
+             FROM funding_swarm_grants WHERE NOT is_example",
         )
         .fetch_one(&self.pool)
         .await?;
@@ -1055,6 +1058,7 @@ impl Database {
         sqlx::query_as(
             "SELECT *
              FROM funding_swarm_grants
+             WHERE NOT is_example
              ORDER BY score DESC, created_at DESC
              LIMIT $1 OFFSET $2",
         )
@@ -1080,7 +1084,9 @@ impl Database {
                 detail AS data,
                 created_at AS occurred_at
              FROM funding_swarm_events
-             WHERE visibility = 'public'
+             WHERE visibility = 'public' AND NOT is_example
+               AND NOT EXISTS (SELECT 1 FROM funding_swarm_grants g
+                 WHERE g.grant_id = funding_swarm_events.grant_id AND g.is_example)
              UNION ALL
              SELECT
                 publication_id AS item_id,
@@ -1091,7 +1097,9 @@ impl Database {
                 jsonb_build_object('title', title, 'body', body) AS data,
                 COALESCE(published_at, created_at) AS occurred_at
              FROM funding_swarm_publications
-             WHERE status = 'published'
+             WHERE status = 'published' AND NOT is_example
+               AND NOT EXISTS (SELECT 1 FROM funding_swarm_grants g
+                 WHERE g.grant_id = funding_swarm_publications.grant_id AND g.is_example)
              ORDER BY occurred_at DESC
              LIMIT $1 OFFSET $2",
         )
@@ -1145,31 +1153,73 @@ impl Database {
         .map_err(Into::into)
     }
 
-    /// Advance a grant to a new stage and status.  Returns `None` if not found.
-    ///
-    /// Workflow transitions:
-    /// - research  → stage='research',  status='open'
-    /// - draft     → stage='draft',     status='pending_human_approval'
-    /// - approve   → stage='approved',  status='approved'  (human approval gate)
-    /// - award_paid → stage='submitted', status='award_paid'
+    /// Advance a reviewed grant through the existing state machine, atomically
+    /// with its audit event. Callers must authenticate the human approval action.
+    /// Submission, awards and payments require evidence-bearing workflows and
+    /// cannot be recorded through this legacy stage/status interface.
     pub async fn admin_advance_funding_swarm_stage(
         &self,
         grant_id: &str,
         stage: &str,
         status: &str,
     ) -> Result<Option<FundingSwarmGrant>> {
-        sqlx::query_as(
+        let action = match (stage, status) {
+            ("research", "open") => "research",
+            ("draft", "pending_human_approval") => "draft",
+            ("approved", "approved") => "approve",
+            ("rejected", "rejected") => "reject",
+            _ => return Err(GatewayError::BadRequest(
+                "unsupported funding transition; submission, award and payment require verified evidence".into(),
+            )),
+        };
+        let mut tx = self.pool.begin().await?;
+        // Serialize competing actions on the same grant. A follower must check
+        // the newly committed stage, never the state read before acquiring a lock.
+        let current: Option<(String, bool)> = sqlx::query_as(
+            "SELECT stage, is_example FROM funding_swarm_grants WHERE grant_id = $1 FOR UPDATE",
+        )
+        .bind(grant_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some((current, is_example)) = current else {
+            return Ok(None);
+        };
+        if is_example {
+            return Err(GatewayError::BadRequest(
+                "historical examples cannot enter the live workflow".into(),
+            ));
+        }
+        let current = SwarmJobStage::from_str(&current)
+            .ok_or_else(|| GatewayError::BadRequest("unknown persisted funding stage".into()))?;
+        let (next, next_status, event) = compute_swarm_transition(grant_id, current, action)?;
+        let grant = sqlx::query_as(
             "UPDATE funding_swarm_grants
              SET stage = $2, status = $3, updated_at = NOW()
              WHERE grant_id = $1
              RETURNING *",
         )
         .bind(grant_id)
-        .bind(stage)
-        .bind(status)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(Into::into)
+        .bind(next.as_str())
+        .bind(next_status)
+        .fetch_one(&mut *tx)
+        .await?;
+        let visibility = match event.visibility {
+            AuditVisibility::Public => "public",
+            AuditVisibility::Private => "private",
+        };
+        sqlx::query(
+            "INSERT INTO funding_swarm_events (event_id, grant_id, event_type, visibility, detail)
+             VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(grant_id)
+        .bind(event.event_type)
+        .bind(visibility)
+        .bind(event.detail)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(Some(grant))
     }
 
     /// Create a publication entry for a grant and return it.
@@ -1707,6 +1757,23 @@ fn integration_tier_as_str(value: &BenchmarkIntegrationTier) -> &'static str {
 // ─── Funding Swarm: standalone validators ────────────────────────────────────
 
 pub(crate) fn validate_new_funding_swarm_grant(input: &NewFundingSwarmGrant) -> Result<()> {
+    if input
+        .amount_usd
+        .is_some_and(|amount| !amount.is_finite() || amount < 0.0)
+    {
+        return Err(GatewayError::BadRequest(
+            "amount_usd must be finite and nonnegative".into(),
+        ));
+    }
+    if input
+        .metadata
+        .as_ref()
+        .is_some_and(|value| !value.is_object())
+    {
+        return Err(GatewayError::BadRequest(
+            "metadata must be a JSON object".into(),
+        ));
+    }
     if input.external_id.trim().is_empty() {
         return Err(GatewayError::BadRequest(
             "external_id must not be empty".into(),
@@ -2184,6 +2251,25 @@ mod tests {
     }
 
     // ── Swarm state machine unit tests ───────────────────────────────────────
+
+    #[test]
+    fn funding_intake_rejects_invalid_amounts_and_non_object_metadata() {
+        let mut input = NewFundingSwarmGrant {
+            external_id: "source-id".into(),
+            title: "Research".into(),
+            sponsor: "Funder".into(),
+            amount_usd: None,
+            metadata: None,
+        };
+        for amount in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            input.amount_usd = Some(amount);
+            assert!(validate_new_funding_swarm_grant(&input).is_err());
+        }
+        input.amount_usd = Some(0.0);
+        assert!(validate_new_funding_swarm_grant(&input).is_ok());
+        input.metadata = Some(serde_json::json!(["unstructured"]));
+        assert!(validate_new_funding_swarm_grant(&input).is_err());
+    }
 
     #[test]
     fn swarm_stage_roundtrip_from_str() {
