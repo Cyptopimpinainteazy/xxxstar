@@ -124,6 +124,21 @@ benchmarks! {
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(executor.clone()).into(), bundle_id).unwrap();
+        // Finalization requires every leg executed with the journal the chain recorded. The leg
+        // here holds an empty journal: this measures finalization's fixed cost, and the cost of
+        // each journal entry is charged on top (`finish_legs_weight`).
+        let journal = crate::chain_legs::encode_journal(&[]).expect("an empty journal fits");
+        BundleLegReceipts::<T>::mutate(bundle_id, |receipts| {
+            for receipt in receipts.iter_mut() {
+                receipt.executed = true;
+                receipt.state_diff = journal.clone();
+                ChainJournal::<T>::insert(
+                    bundle_id,
+                    receipt.leg_index,
+                    crate::chain_legs::journal_hash(&journal),
+                );
+            }
+        });
 
         let finality_cert = H256::repeat_byte(0x22);
         let block_number: BlockNumberFor<T> = 1u32.into();

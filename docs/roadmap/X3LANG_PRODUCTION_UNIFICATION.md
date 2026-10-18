@@ -235,6 +235,30 @@ already failing on master: its recorded revision is not in the repository).
   chain cannot run (EVM/SVM bytecode, transfers from another account or another VM's balances).
   Tests: `pallet-x3-atomic-kernel` (rollback, forgery, conflict, executor-funds-only) and
   `runtime` `chain_executed_legs_are_undone_exactly_by_a_rollback`.
+- Fixed after independent review (same spec 24):
+  - a bundle finalized with legs never executed: finalization now requires every declared leg
+    executed with its recorded journal (`LegNotExecuted`), so a bundle declaring EVM/SVM legs
+    cannot finalize at all;
+  - a rollback that undid some legs and still reported `RolledBack`: rollback is one storage
+    transaction over every leg and refuses (`LegRevertFailed`) rather than half-apply; expiry
+    retries such a bundle next block instead of marking it rolled back;
+  - what made a revert fail in the first place: transfer legs pay into a per-bundle escrow (paid
+    out on finalize, back on rollback), so a recipient never holds revocable funds; X3 slots a leg
+    writes are held for the bundle (`X3SlotHolds`) and no other program may write them;
+  - unbounded finishing work: a bundle's legs hold at most 64 journal entries together,
+    `rollback`/`finalize` are charged for all of them, and `on_initialize` undoes at most 4 expired
+    bundles per block, carrying the rest;
+  - legs now refuse during an economic halt and after the bundle's deadline; finalized bundles
+    drop their receipts and journals.
+  - Launchpad: a launch whose soft cap cannot seed a pool is refused at creation; any account may
+    graduate a successful launch; governance may cancel an ungraduated successful launch so
+    contributors are refunded.
+- Open: what a leg executes is not bound to the `BundleLeg` it fills (token, amount, access); the
+  executor is a genesis-authorized gateway, so this is an integrity gap rather than an open
+  exploit. Binding it needs a declared-execution commitment in the submission (a call-encoding
+  change).
+- Open: the token factory's "ledger balances sum to the `X3Native` supply leg" holds only while
+  `x3-cross-vm-router`'s gateway debit of that leg is not used on a factory asset.
 - Fixed: `Emit` charges 20 gas plus 8 per data byte (`x3bc_core::spec::EMIT_GAS_PER_DATA_BYTE`).
 - Left unchanged: `x3-flashloan::pool_account` (native pool) decodes its account with `.expect`;
   changing the derivation would move an account that already holds funds.

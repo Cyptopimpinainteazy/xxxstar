@@ -793,6 +793,13 @@ pub mod pallet {
     pub type X3ContractStorage<T: Config> =
         StorageMap<_, Blake2_128Concat, H256, [u8; 32], OptionQuery>;
 
+    /// Contract slots held by an unfinished atomic bundle, and the bundle that holds each. Only the
+    /// holder may write a held slot until it releases it (`release_x3_slot`), so a bundle's
+    /// rollback can always put back the value it replaced. Written only through
+    /// `execute_x3_program`'s `holder`.
+    #[pallet::storage]
+    pub type X3SlotHolds<T: Config> = StorageMap<_, Blake2_128Concat, H256, H256, OptionQuery>;
+
     /// EVM transactions keyed by transaction hash (keccak256 of raw tx).
     /// Stores full transaction data (including gas and input) for RPC compatibility.
     /// This is separate from receipts to allow querying transaction metadata without
@@ -1245,6 +1252,8 @@ pub mod pallet {
         /// An X3 log exceeds `MAX_X3_LOG_BYTES` (the engine's own bound; an adapter that exceeds
         /// it is refused rather than truncated).
         X3LogTooLarge,
+        /// The program writes a contract slot an unfinished atomic bundle holds.
+        X3SlotHeld,
     }
 
     /// Storage for atomic settlement roots (per transaction ID).
@@ -2266,7 +2275,8 @@ pub mod pallet {
 
             // The X3VM slots are a separate channel from the balance-shaped ledger update above:
             // applied here so `DecodeFailureCount` stays untouched by a storage-writing comit.
-            let writes_applied = Self::apply_x3_storage_writes(comit_id, x3_receipt.as_ref())?;
+            let writes_applied =
+                Self::apply_x3_storage_writes(comit_id, x3_receipt.as_ref(), None)?;
 
             if writes_applied > 0 {
                 Self::deposit_event(Event::X3StorageUpdated {
@@ -3866,10 +3876,13 @@ pub mod pallet {
         /// (each with the value it replaced) for a caller that journals them (the atomic kernel's
         /// on-chain bundle legs). `context` identifies the execution in `X3LogEmitted`. A program
         /// that fails, or that the verifier refuses, writes nothing.
+        ///
+        /// Every slot it writes is held for `holder` (see `X3SlotHolds`) until `release_x3_slot`.
         pub fn execute_x3_program(
             context: H256,
             who: &T::AccountId,
             program: &[u8],
+            holder: H256,
         ) -> Result<Vec<StorageWrite>, DispatchError> {
             ensure!(!ProtocolPaused::<T>::get(), Error::<T>::ProtocolIsPaused);
             let slots = Self::x3_storage_view()?;
@@ -3881,7 +3894,7 @@ pub mod pallet {
                 &Self::x3_call_context(Some(who)),
             )?;
             ensure!(receipt.success, DispatchError::Other("X3 program failed"));
-            Self::apply_x3_storage_writes(context, Some(&receipt))?;
+            Self::apply_x3_storage_writes(context, Some(&receipt), Some(holder))?;
             for (index, log) in receipt.logs.into_iter().enumerate() {
                 let data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>> =
                     log.data.try_into().map_err(|_| Error::<T>::X3LogTooLarge)?;
@@ -3898,15 +3911,35 @@ pub mod pallet {
         /// The most weight `execute_x3_program` can take: one engine run at the gas limit, the
         /// slot view, and the writes `apply_x3_storage_writes` allows.
         pub fn x3_program_weight() -> Weight {
-            Self::x3_execution_weight().saturating_add(T::DbWeight::get().reads_writes(
-                u64::from(T::MaxX3StorageSlots::get()).saturating_add(2),
-                Self::MAX_STATE_CHANGES as u64,
-            ))
+            // Per write: the hold check (a read), the slot and its hold (two writes).
+            Self::x3_execution_weight().saturating_add(
+                T::DbWeight::get().reads_writes(
+                    u64::from(T::MaxX3StorageSlots::get())
+                        .saturating_add(2)
+                        .saturating_add(Self::MAX_STATE_CHANGES as u64),
+                    (Self::MAX_STATE_CHANGES as u64).saturating_mul(2),
+                ),
+            )
         }
 
+        /// Release a slot `holder` holds. Only the atomic kernel calls this, when the bundle that
+        /// holds the slot ends (after restoring it, on rollback).
+        pub fn release_x3_slot(holder: H256, key: H256) -> DispatchResult {
+            ensure!(
+                X3SlotHolds::<T>::get(key) == Some(holder),
+                Error::<T>::X3SlotHeld
+            );
+            X3SlotHolds::<T>::remove(key);
+            Ok(())
+        }
+
+        /// Persist an X3 receipt's slot writes. A slot an unfinished bundle holds is written only
+        /// by that bundle (`holder`); a write by anyone else refuses the whole receipt. With a
+        /// `holder`, every slot written becomes held for it.
         pub(crate) fn apply_x3_storage_writes(
             _comit_id: H256,
             x3_receipt: Option<&ExecutionReceipt>,
+            holder: Option<H256>,
         ) -> Result<u32, DispatchError> {
             let receipt = match x3_receipt {
                 Some(receipt) => receipt,
@@ -3924,8 +3957,17 @@ pub mod pallet {
                 return Err(Error::<T>::TooManyStorageWrites.into());
             }
 
+            for write in receipt.storage_writes.iter() {
+                if let Some(held_by) = X3SlotHolds::<T>::get(write.key) {
+                    ensure!(Some(held_by) == holder, Error::<T>::X3SlotHeld);
+                }
+            }
+
             let mut writes_applied = 0u32;
             for write in receipt.storage_writes.iter() {
+                if let Some(holder) = holder {
+                    X3SlotHolds::<T>::insert(write.key, holder);
+                }
                 match write.new_value {
                     Some(value) => {
                         X3ContractStorage::<T>::insert(write.key, value);

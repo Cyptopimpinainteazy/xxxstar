@@ -296,6 +296,21 @@ fn a_bundle_finalizes_once_with_the_receipt_root_the_chain_requires() {
             RuntimeOrigin::signed(gateway.clone()),
             bundle_id
         ));
+        // A bundle finalizes only once its leg ran on chain.
+        assert_ok!(crate::X3AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            0,
+            pallet_x3_atomic_kernel::chain_legs::LegExecution::X3 {
+                program: BoundedVec::try_from(
+                    x3_x3_integration::compiler_bridge::compile_source(
+                        "fn main() -> i64 { evm_sstore(3, 1); return 1; }",
+                    )
+                    .expect("compiles"),
+                )
+                .expect("small program"),
+            }
+        ));
 
         // The anchor map is keyed by `u64`; the call takes the runtime's own block number.
         let now_u32 = System::block_number();
@@ -1232,7 +1247,16 @@ fn chain_executed_legs_are_undone_exactly_by_a_rollback() {
             }
         ));
         let ledger = |who: &AccountId| pallet_x3_kernel::CanonicalLedger::<Runtime>::get(who, 0);
-        assert_eq!((ledger(&gateway), ledger(&recipient)), (3_800, 1_200));
+        // The transfer waits in the bundle's escrow; the X3 leg's slot is held for the bundle.
+        let escrow = crate::RuntimeLegExecutor::escrow(bundle_id);
+        assert_eq!(
+            (ledger(&gateway), ledger(&recipient), ledger(&escrow)),
+            (3_800, 0, 1_200)
+        );
+        assert_eq!(
+            pallet_x3_kernel::X3SlotHolds::<Runtime>::get(slot),
+            Some(bundle_id)
+        );
         assert!(
             pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot).is_some(),
             "the X3 leg wrote chain storage"
@@ -1249,7 +1273,11 @@ fn chain_executed_legs_are_undone_exactly_by_a_rollback() {
             bundle_id,
             BundleRollbackReason::SubmitterCancelled,
         ));
-        assert_eq!((ledger(&gateway), ledger(&recipient)), (5_000, 0));
+        assert_eq!(
+            (ledger(&gateway), ledger(&recipient), ledger(&escrow)),
+            (5_000, 0, 0)
+        );
+        assert_eq!(pallet_x3_kernel::X3SlotHolds::<Runtime>::get(slot), None);
         assert_eq!(
             pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot),
             None,
@@ -1314,5 +1342,107 @@ fn a_chain_leg_cannot_spend_more_than_the_executor_holds() {
             pallet_x3_atomic_kernel::ChainJournal::<Runtime>::get(bundle_id, 0).is_none(),
             "a refused leg records no journal"
         );
+    });
+}
+
+/// Finalizing a bundle makes its legs' held effects final: the escrowed transfer reaches its
+/// recipient and the slot is released. While the bundle holds the slot, no comit can write it.
+#[test]
+fn a_finalized_bundle_pays_its_escrow_and_releases_its_slots() {
+    use frame_support::BoundedVec;
+    use pallet_x3_atomic_kernel::chain_legs::LegExecution;
+    use pallet_x3_atomic_kernel::Bundles;
+
+    let writer = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 { evm_sstore(7, 41); return evm_sload(7); }",
+    )
+    .expect("the slot writer compiles");
+    let other_writer = x3_x3_integration::compiler_bridge::compile_source(
+        "fn main() -> i64 { evm_sstore(7, 99); return 0; }",
+    )
+    .expect("compiles");
+
+    atomic_test_ext().execute_with(|| {
+        let gateway = atomic_gateway();
+        let recipient = AccountId::from([0x77; 32]);
+        assert_ok!(crate::AtlasKernel::register_asset(
+            RuntimeOrigin::root(),
+            0,
+            b"X3".to_vec(),
+            12
+        ));
+        pallet_x3_kernel::CanonicalLedger::<Runtime>::insert(&gateway, 0, 5_000u128);
+        assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            BoundedVec::try_from(vec![atomic_leg(), atomic_leg()]).expect("two legs fit"),
+            100,
+            ATOMIC_CHAIN_ID,
+            ATOMIC_NONCE,
+        ));
+        let (bundle_id, _) = Bundles::<Runtime>::iter().next().expect("stored");
+        assert_ok!(crate::X3AtomicKernel::assign_bundle_executor(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id
+        ));
+        assert_ok!(crate::X3AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            0,
+            LegExecution::Transfer {
+                asset: 0,
+                to: recipient.clone(),
+                amount: 1_200,
+            }
+        ));
+        assert_ok!(crate::X3AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            1,
+            LegExecution::X3 {
+                program: BoundedVec::try_from(writer).expect("small program"),
+            }
+        ));
+        let slot = x3_evm_slot_key(7);
+        let held_value = pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot);
+
+        // Anyone else's program that writes the held slot is refused, and writes nothing.
+        assert!(pallet_x3_kernel::Pallet::<Runtime>::execute_x3_program(
+            H256::repeat_byte(0x01),
+            &recipient,
+            &other_writer,
+            H256::repeat_byte(0x02),
+        )
+        .is_err());
+        assert_eq!(
+            pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot),
+            held_value
+        );
+
+        let now_u32 = System::block_number();
+        let now: u64 = now_u32.into();
+        let cert = H256::repeat_byte(0x56);
+        pallet_x3_atomic_kernel::FinalityCertAnchors::<Runtime>::insert(now, cert);
+        let root = runtime_receipt_root(bundle_id, cert, now);
+        assert_ok!(crate::X3AtomicKernel::finalize_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            root,
+            cert,
+            now_u32
+        ));
+
+        let ledger = |who: &AccountId| pallet_x3_kernel::CanonicalLedger::<Runtime>::get(who, 0);
+        let escrow = crate::RuntimeLegExecutor::escrow(bundle_id);
+        assert_eq!(
+            (ledger(&gateway), ledger(&recipient), ledger(&escrow)),
+            (3_800, 1_200, 0)
+        );
+        assert_eq!(pallet_x3_kernel::X3SlotHolds::<Runtime>::get(slot), None);
+        assert_eq!(
+            pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot),
+            held_value,
+            "the leg's write is final"
+        );
+        assert!(pallet_x3_atomic_kernel::BundleLegReceipts::<Runtime>::get(bundle_id).is_empty());
     });
 }

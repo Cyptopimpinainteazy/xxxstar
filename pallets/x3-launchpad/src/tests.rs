@@ -393,17 +393,58 @@ fn graduate_launch_happy_path() {
 }
 
 #[test]
-fn graduate_launch_fails_for_non_creator() {
+fn any_account_can_graduate_a_successful_launch() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
 
-        // Non-creator (account 2) cannot graduate.
+        // A contributor graduates it: a creator who walks away cannot strand the raise.
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(10), id));
+        assert!(crate::Graduations::<Test>::get(id).is_some());
+    });
+}
+
+/// A successful launch that cannot graduate is not a trap: governance cancels it and every
+/// contributor is refunded from custody. A graduated launch cannot be cancelled.
+#[test]
+fn governance_can_cancel_an_ungraduated_successful_launch_and_contributors_are_refunded() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        let graduated = create_default_launch();
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
+        assert_ok!(Launchpad::contribute(
+            RuntimeOrigin::signed(10),
+            graduated,
+            800
+        ));
+        jump_to(13);
+        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::finalize_launch(
+            RuntimeOrigin::signed(99),
+            graduated
+        ));
+
+        let custody = Launchpad::launch_account(id);
+        // (The mock's u64 accounts truncate every launch's custody to one account, so custody is
+        // checked by what left it.)
+        let (before, held) = (
+            TestLedger::balance(QUOTE, 10),
+            TestLedger::balance(QUOTE, custody),
+        );
+        assert_ok!(Launchpad::cancel_launch(RuntimeOrigin::signed(1), id));
+        assert_ok!(Launchpad::claim_refund(RuntimeOrigin::signed(10), id));
+        assert_eq!(TestLedger::balance(QUOTE, 10), before + 800);
+        assert_eq!(TestLedger::balance(QUOTE, custody), held - 800);
+
+        assert_ok!(Launchpad::graduate_launch(
+            RuntimeOrigin::signed(10),
+            graduated
+        ));
         assert_noop!(
-            Launchpad::graduate_launch(RuntimeOrigin::signed(2), id),
-            Error::<Test>::NotCreator
+            Launchpad::cancel_launch(RuntimeOrigin::signed(1), graduated),
+            Error::<Test>::LaunchNotActive
         );
     });
 }
@@ -548,25 +589,12 @@ fn the_lp_position_stays_locked_in_custody_until_the_lock_expires() {
 }
 
 #[test]
-fn a_raise_too_small_to_seed_a_pool_does_not_graduate() {
+fn a_launch_whose_soft_cap_cannot_seed_a_pool_is_refused_at_creation() {
     new_test_ext().execute_with(|| {
-        assert_ok!(Launchpad::create_launch(
-            RuntimeOrigin::signed(1),
-            1,
-            5,
-            1_000,
-            10,
-            1u64,
-            12u64,
-            5u64
-        ));
-        let id = crate::NextLaunchId::<Test>::get() - 1;
-        // 15 raised at 10 per token: 1 token for contributors, but 50% (7) buys no pool token.
-        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 15));
-        jump_to(13);
-        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        // A soft cap of 5 at 10 per token: 50% of the smallest successful raise (2) buys no pool
+        // token, so the launch could succeed and never graduate.
         assert_noop!(
-            Launchpad::graduate_launch(RuntimeOrigin::signed(1), id),
+            Launchpad::create_launch(RuntimeOrigin::signed(1), 1, 5, 1_000, 10, 1u64, 12u64, 5u64),
             Error::<Test>::RaiseTooSmallForPool
         );
     });

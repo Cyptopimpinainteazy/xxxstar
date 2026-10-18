@@ -8,10 +8,19 @@
 //! journal together with its hash in `ChainJournal`. A rollback applies a journal only when its hash
 //! is the one the chain recorded, so no submitted bytes can choose what a rollback writes.
 //!
-//! Journal entries are inverse operations, not snapshots: a transfer is undone by moving the amount
-//! back, a contract slot only when it still holds the value the leg wrote. A rollback therefore
-//! never overwrites a change something else made after the leg; if one is in the way, the revert
-//! fails and the pallet reports `IncompleteVmRevert`.
+//! A leg's effects are held for its bundle until the bundle ends, so that ending it either way
+//! always succeeds and nobody outside the bundle can stand in the way:
+//!
+//! - a transfer moves the executor's funds into the bundle's escrow, not to the recipient. When the
+//!   bundle finalizes the escrow pays the recipient; when it rolls back the escrow pays the
+//!   executor back. Nobody but the bundle can spend escrow, so a revert cannot find the funds gone,
+//!   and a recipient never holds funds a rollback could claw back from it.
+//! - an X3 slot a leg writes is locked to the bundle until it ends: no other program can write it,
+//!   so restoring the old value on rollback cannot overwrite anyone else's change.
+//!
+//! The pallet applies every leg's undo (or commit) inside one storage transaction: all legs or
+//! none. A bundle's journals together hold at most [`MAX_BUNDLE_JOURNAL_ENTRIES`] entries, which
+//! is what bounds the weight of finishing it.
 
 use crate::vm_revert::{RevertError, StateDiff};
 use frame_support::pallet_prelude::*;
@@ -21,6 +30,10 @@ use sp_std::vec::Vec;
 
 /// Largest X3 program a leg may carry.
 pub const MAX_LEG_PROGRAM_BYTES: u32 = 64 * 1024;
+
+/// Most journal entries all legs of one bundle may make together. Finalizing or rolling a bundle
+/// back touches each entry once, so this bounds the weight of both.
+pub const MAX_BUNDLE_JOURNAL_ENTRIES: u32 = 64;
 
 /// Magic prefix of a chain journal inside a leg receipt's `state_diff`.
 pub const JOURNAL_MAGIC: [u8; 8] = *b"x3jrnl\0\0";
@@ -43,8 +56,9 @@ pub enum LegExecution<AccountId> {
     X3 {
         program: BoundedVec<u8, ConstU32<MAX_LEG_PROGRAM_BYTES>>,
     },
-    /// Move `amount` of `CanonicalLedger` asset `asset` from the bundle's executor to `to`. Only
-    /// the executor's own funds: the executor chooses the leg, so a leg cannot spend anyone else's.
+    /// Pay `amount` of `CanonicalLedger` asset `asset` from the bundle's executor to `to` when the
+    /// bundle finalizes; until then it is held in the bundle's escrow. Only the executor's own
+    /// funds: the executor chooses the leg, so a leg cannot spend anyone else's.
     Transfer {
         asset: u32,
         to: AccountId,
@@ -52,17 +66,19 @@ pub enum LegExecution<AccountId> {
     },
 }
 
-/// One write an executed leg made, as the operation that undoes it.
+/// One effect an executed leg holds for its bundle.
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug)]
 pub enum JournalEntry {
-    /// Undone by moving `amount` of `asset` back from `to` to `from` (accounts SCALE-encoded).
-    LedgerTransfer {
+    /// `amount` of `asset` moved from `from` into the bundle's escrow, owed to `to` (accounts
+    /// SCALE-encoded). Committed by paying `to`, undone by paying `from`.
+    LedgerEscrow {
         asset: u32,
         from: Vec<u8>,
         to: Vec<u8>,
         amount: u128,
     },
-    /// Undone by restoring `old`, only while the slot still holds `new`.
+    /// The slot, locked to the bundle, went from `old` to `new`. Committed by unlocking it, undone
+    /// by restoring `old` and unlocking it.
     X3Slot {
         key: H256,
         old: Option<[u8; 32]>,
@@ -70,37 +86,53 @@ pub enum JournalEntry {
     },
 }
 
-/// Runs bundle legs against chain state and undoes them from their journals.
+/// Runs bundle legs against chain state, and ends what they hold when their bundle ends.
 pub trait LegExecutor<AccountId> {
-    /// Execute `execution` as `executor`, the bundle's assigned executor (a transfer spends its
-    /// funds); `context` identifies the leg (for events). Returns the journal of every write, in order.
+    /// Execute `execution` as `executor`, the assigned executor of `bundle` (a transfer spends its
+    /// funds into the bundle's escrow; an X3 program's slots are locked to the bundle); `context`
+    /// identifies the leg (for events). Returns the journal of every effect, in order.
     fn execute(
+        bundle: H256,
         context: H256,
         executor: &AccountId,
         execution: &LegExecution<AccountId>,
     ) -> Result<Vec<JournalEntry>, DispatchError>;
 
-    /// Undo a journal, newest write first. All or nothing: an implementation must leave state
-    /// unchanged when it returns an error.
-    fn revert(entries: &[JournalEntry]) -> Result<(), RevertError>;
+    /// Undo a journal of `bundle`, newest entry first: escrow back to the executor, slots
+    /// restored and unlocked. All or nothing: state is unchanged when this returns an error.
+    fn revert(bundle: H256, entries: &[JournalEntry]) -> Result<(), RevertError>;
+
+    /// Make a journal of a finalized `bundle` final: escrow paid to its recipients, slots
+    /// unlocked. All or nothing.
+    fn commit(bundle: H256, entries: &[JournalEntry]) -> Result<(), DispatchError>;
 
     /// The most weight one `execute` can take.
     fn max_weight() -> Weight;
+
+    /// The most weight reverting or committing one journal entry can take.
+    fn max_entry_weight() -> Weight;
 }
 
-/// No on-chain leg execution: every leg is refused and nothing can be reverted.
+/// No on-chain leg execution: every leg is refused and nothing can be reverted or committed.
 impl<AccountId> LegExecutor<AccountId> for () {
     fn execute(
+        _bundle: H256,
         _context: H256,
         _executor: &AccountId,
         _execution: &LegExecution<AccountId>,
     ) -> Result<Vec<JournalEntry>, DispatchError> {
         Err(DispatchError::Other("no on-chain leg executor"))
     }
-    fn revert(_entries: &[JournalEntry]) -> Result<(), RevertError> {
+    fn revert(_bundle: H256, _entries: &[JournalEntry]) -> Result<(), RevertError> {
         Err(RevertError::VmNotAvailable(crate::proof::VmType::X3))
     }
+    fn commit(_bundle: H256, _entries: &[JournalEntry]) -> Result<(), DispatchError> {
+        Err(DispatchError::Other("no on-chain leg executor"))
+    }
     fn max_weight() -> Weight {
+        Weight::zero()
+    }
+    fn max_entry_weight() -> Weight {
         Weight::zero()
     }
 }
@@ -134,7 +166,7 @@ mod tests {
     #[test]
     fn a_journal_round_trips_and_nothing_else_reads_as_one() {
         let entries = vec![
-            JournalEntry::LedgerTransfer {
+            JournalEntry::LedgerEscrow {
                 asset: 3,
                 from: vec![1; 32],
                 to: vec![2; 32],

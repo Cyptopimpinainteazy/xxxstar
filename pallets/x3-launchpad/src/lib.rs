@@ -384,6 +384,17 @@ pub mod pallet {
                 Error::<T>::SoftCapExceeded
             );
             ensure!(price_per_token > 0, Error::<T>::BadDuration);
+            // A launch that reaches its soft cap must be able to graduate: the pool's share of the
+            // smallest successful raise has to buy at least one token at the launch price.
+            // Otherwise contributors' funds would sit in custody with no path out.
+            let smallest_pool_quote = soft_cap
+                .checked_mul(u128::from(T::LiquidityBps::get()))
+                .ok_or(Error::<T>::ArithmeticOverflow)?
+                / 10_000;
+            ensure!(
+                smallest_pool_quote >= price_per_token,
+                Error::<T>::RaiseTooSmallForPool
+            );
 
             let duration = end_block.saturating_sub(start_block);
             ensure!(
@@ -530,16 +541,17 @@ pub mod pallet {
         /// it from custody with `LiquidityBps` of the raised funds plus the matching tokens at the
         /// launch price. Custody owns the LP position until `claim_lp`.
         ///
-        /// Creator only, on a `Successful` launch. After it, contributors `claim_allocation` and
-        /// the creator `withdraw_raised_funds` (the share the pool did not take).
+        /// Any signed account, on a `Successful` launch: the outcome is fixed by the raise, so a
+        /// creator who walks away cannot hold contributors' funds hostage. After it, contributors
+        /// `claim_allocation` and the creator `withdraw_raised_funds` (the share the pool did not
+        /// take).
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::graduate_launch())]
         #[transactional]
         pub fn graduate_launch(origin: OriginFor<T>, launch_id: LaunchId) -> DispatchResult {
-            let caller = ensure_signed(origin)?;
+            ensure_signed(origin)?;
 
             let state = Launches::<T>::get(launch_id).ok_or(Error::<T>::LaunchNotFound)?;
-            ensure!(state.creator == caller, Error::<T>::NotCreator);
             ensure!(
                 state.status == LaunchStatus::Successful,
                 Error::<T>::LaunchNotSuccessful
@@ -707,20 +719,25 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Cancel a launch.
+        /// Cancel a launch: an `Active` one, or a `Successful` one that has not graduated (when
+        /// graduation cannot complete, e.g. the token factory or DEX refuse it). Either way the
+        /// launch becomes `Failed` and every contributor can `claim_refund` from custody.
         #[pallet::call_index(5)]
         #[pallet::weight(T::WeightInfo::cancel_launch())]
         pub fn cancel_launch(origin: OriginFor<T>, launch_id: LaunchId) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(
-                    state.status == LaunchStatus::Active,
-                    Error::<T>::LaunchNotActive
-                );
-                ExpiryQueue::<T>::remove(state.end_block, launch_id);
+                match state.status {
+                    LaunchStatus::Active => {
+                        ExpiryQueue::<T>::remove(state.end_block, launch_id);
+                        ActiveLaunchCount::<T>::mutate(|c| *c = c.saturating_sub(1));
+                    }
+                    LaunchStatus::Successful
+                        if !GraduatedLaunches::<T>::contains_key(launch_id) => {}
+                    _ => return Err(Error::<T>::LaunchNotActive.into()),
+                }
                 state.status = LaunchStatus::Failed;
-                ActiveLaunchCount::<T>::mutate(|c| *c = c.saturating_sub(1));
                 Self::deposit_event(Event::LaunchCancelled { launch_id });
                 Ok(())
             })

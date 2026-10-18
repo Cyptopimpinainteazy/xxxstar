@@ -417,10 +417,15 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // New calls and storage only, so no migration.
     // 24: atomic bundle legs execute on chain. `X3AtomicKernel.execute_bundle_leg`
     // (call 9, the bundle's executor, spending only its own funds) runs a leg and records
-    // its journal in the new `ChainJournal` map; rollback applies only a journal whose
-    // hash the chain recorded. The unsigned `record_leg_execution_receipt` (call 7) now
-    // refuses every call. No existing storage changes shape, so no migration;
-    // `transaction_version` is unchanged: no existing call's encoding moved.
+    // its journal in the new `ChainJournal` map; transfers wait in a per-bundle escrow and
+    // X3 slots are held for the bundle (`AtlasKernel.X3SlotHolds`) until it ends. A bundle
+    // finalizes only with every leg executed (escrow paid, slots released); a rollback
+    // undoes every leg or refuses. The unsigned `record_leg_execution_receipt` (call 7)
+    // now refuses every call. New storage only, so no migration; `transaction_version` is
+    // unchanged: no existing call's encoding moved. A bundle `Executing` across the
+    // upgrade has no journals: it cannot finalize, and its rollback is refused if any leg
+    // carries an old off-chain diff (expiry retries it); none exist on a network that ran
+    // only the refusing call 7.
     spec_version: 24,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
@@ -3294,11 +3299,53 @@ impl pallet_x3_atomic_kernel::Config for Runtime {
 /// The runtime's on-chain bundle-leg executor (see `pallet_x3_atomic_kernel::chain_legs`).
 ///
 /// It writes only through the owning pallets' typed APIs (`CanonicalLedger` transfers, the
-/// kernel's X3 execution), never raw storage keys, so a journal always names state that exists.
+/// kernel's X3 execution and slot holds), never raw storage keys, so a journal always names state
+/// that exists. A transfer leg's funds wait in the bundle's escrow account
+/// ([`RuntimeLegExecutor::escrow`]) until the bundle ends; an X3 leg's slots are held for the
+/// bundle by the kernel.
 pub struct RuntimeLegExecutor;
+
+parameter_types! {
+    pub const AtomicLegEscrowPalletId: PalletId = PalletId(*b"x3/legsc");
+}
+
+impl RuntimeLegExecutor {
+    /// The account that holds bundle `bundle`'s transfer legs until it ends. Only this executor
+    /// moves funds out of it.
+    pub fn escrow(bundle: H256) -> AccountId {
+        use sp_runtime::traits::AccountIdConversion;
+        AtomicLegEscrowPalletId::get().into_sub_account_truncating(bundle)
+    }
+
+    fn accounts(from: &[u8], to: &[u8]) -> Option<(AccountId, AccountId)> {
+        Some((
+            AccountId::decode(&mut &from[..]).ok()?,
+            AccountId::decode(&mut &to[..]).ok()?,
+        ))
+    }
+
+    /// Run `apply` over `entries` (in the order given) in one storage transaction: every entry or
+    /// none.
+    fn all_or_nothing<'a, E>(
+        mut entries: impl Iterator<Item = &'a pallet_x3_atomic_kernel::chain_legs::JournalEntry>,
+        apply: impl Fn(&pallet_x3_atomic_kernel::chain_legs::JournalEntry) -> Result<(), E>,
+    ) -> Result<(), Option<E>> {
+        use frame_support::storage::{with_transaction, TransactionOutcome};
+        let mut refused = None;
+        with_transaction(|| match entries.try_for_each(&apply) {
+            Ok(()) => TransactionOutcome::Commit(Ok(())),
+            Err(error) => {
+                refused = Some(error);
+                TransactionOutcome::Rollback(Err(DispatchError::Other("journal refused")))
+            }
+        })
+        .map_err(|_: DispatchError| refused)
+    }
+}
 
 impl pallet_x3_atomic_kernel::chain_legs::LegExecutor<AccountId> for RuntimeLegExecutor {
     fn execute(
+        bundle: H256,
         context: H256,
         executor: &AccountId,
         execution: &pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId>,
@@ -3307,8 +3354,13 @@ impl pallet_x3_atomic_kernel::chain_legs::LegExecutor<AccountId> for RuntimeLegE
         use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
         match execution {
             LegExecution::Transfer { asset, to, amount } => {
-                KernelCanonicalLedger::ledger_transfer(*asset, executor, to, *amount)?;
-                Ok(vec![JournalEntry::LedgerTransfer {
+                KernelCanonicalLedger::ledger_transfer(
+                    *asset,
+                    executor,
+                    &Self::escrow(bundle),
+                    *amount,
+                )?;
+                Ok(vec![JournalEntry::LedgerEscrow {
                     asset: *asset,
                     from: executor.encode(),
                     to: to.encode(),
@@ -3317,7 +3369,7 @@ impl pallet_x3_atomic_kernel::chain_legs::LegExecutor<AccountId> for RuntimeLegE
             }
             LegExecution::X3 { program } => {
                 let writes = pallet_x3_kernel::Pallet::<Runtime>::execute_x3_program(
-                    context, executor, program,
+                    context, executor, program, bundle,
                 )?;
                 Ok(writes
                     .into_iter()
@@ -3332,68 +3384,88 @@ impl pallet_x3_atomic_kernel::chain_legs::LegExecutor<AccountId> for RuntimeLegE
     }
 
     fn revert(
+        bundle: H256,
         entries: &[pallet_x3_atomic_kernel::chain_legs::JournalEntry],
     ) -> Result<(), pallet_x3_atomic_kernel::vm_revert::RevertError> {
-        use frame_support::storage::{with_transaction, TransactionOutcome};
         use pallet_x3_atomic_kernel::chain_legs::JournalEntry;
         use pallet_x3_atomic_kernel::vm_revert::RevertError;
         use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
         let failed = |reason: &str| RevertError::RevertFailed {
             reason: reason.as_bytes().to_vec(),
         };
-        // All or nothing: if any write cannot be undone, none is.
-        let mut refused = None;
-        with_transaction(|| {
-            let result = entries.iter().rev().try_for_each(|entry| match entry {
-                JournalEntry::LedgerTransfer {
-                    asset,
-                    from,
-                    to,
-                    amount,
-                } => {
-                    let from = AccountId::decode(&mut &from[..])
-                        .map_err(|_| RevertError::InvalidStateDiff)?;
-                    let to = AccountId::decode(&mut &to[..])
-                        .map_err(|_| RevertError::InvalidStateDiff)?;
-                    // Moved back by the same amount: a later change to either balance stands.
-                    KernelCanonicalLedger::ledger_transfer(*asset, &to, &from, *amount)
-                        .map_err(|_| failed("the recipient no longer holds the amount"))
+        Self::all_or_nothing(entries.iter().rev(), |entry| match entry {
+            JournalEntry::LedgerEscrow {
+                asset,
+                from,
+                to,
+                amount,
+            } => {
+                let (from, _) = Self::accounts(from, to).ok_or(RevertError::InvalidStateDiff)?;
+                KernelCanonicalLedger::ledger_transfer(
+                    *asset,
+                    &Self::escrow(bundle),
+                    &from,
+                    *amount,
+                )
+                .map_err(|_| failed("the escrow does not hold the leg's funds"))
+            }
+            JournalEntry::X3Slot { key, old, new } => {
+                // The slot is held for the bundle, so nothing else wrote it; the check guards
+                // against a journal that does not describe this chain's state.
+                if pallet_x3_kernel::X3ContractStorage::<Runtime>::get(key) != *new {
+                    return Err(failed("the slot does not hold the leg's value"));
                 }
-                JournalEntry::X3Slot { key, old, new } => {
-                    // Restored only while the slot still holds what the leg wrote.
-                    if pallet_x3_kernel::X3ContractStorage::<Runtime>::get(key) != *new {
-                        return Err(failed("the slot was written after the leg"));
+                match old {
+                    Some(value) => {
+                        pallet_x3_kernel::X3ContractStorage::<Runtime>::insert(key, value)
                     }
-                    match old {
-                        Some(value) => {
-                            pallet_x3_kernel::X3ContractStorage::<Runtime>::insert(key, value)
-                        }
-                        None => pallet_x3_kernel::X3ContractStorage::<Runtime>::remove(key),
-                    }
-                    Ok(())
+                    None => pallet_x3_kernel::X3ContractStorage::<Runtime>::remove(key),
                 }
-            });
-            match result {
-                Ok(()) => TransactionOutcome::Commit(Ok(())),
-                Err(error) => {
-                    refused = Some(error);
-                    TransactionOutcome::Rollback(Err(sp_runtime::DispatchError::Other(
-                        "journal revert refused",
-                    )))
-                }
+                pallet_x3_kernel::Pallet::<Runtime>::release_x3_slot(bundle, *key)
+                    .map_err(|_| failed("the slot is not held for the bundle"))
             }
         })
-        .map_err(|_: sp_runtime::DispatchError| {
+        .map_err(|refused| {
             refused.unwrap_or(RevertError::RevertFailed {
                 reason: b"storage layer".to_vec(),
             })
         })
     }
 
+    fn commit(
+        bundle: H256,
+        entries: &[pallet_x3_atomic_kernel::chain_legs::JournalEntry],
+    ) -> Result<(), DispatchError> {
+        use pallet_x3_atomic_kernel::chain_legs::JournalEntry;
+        use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
+        Self::all_or_nothing(entries.iter(), |entry| match entry {
+            JournalEntry::LedgerEscrow {
+                asset,
+                from,
+                to,
+                amount,
+            } => {
+                let (_, to) = Self::accounts(from, to)
+                    .ok_or(DispatchError::Other("a journal account does not decode"))?;
+                KernelCanonicalLedger::ledger_transfer(*asset, &Self::escrow(bundle), &to, *amount)
+            }
+            JournalEntry::X3Slot { key, .. } => {
+                pallet_x3_kernel::Pallet::<Runtime>::release_x3_slot(bundle, *key)
+            }
+        })
+        .map_err(|refused| refused.unwrap_or(DispatchError::Other("journal commit refused")))
+    }
+
     fn max_weight() -> Weight {
         // The larger of the two leg kinds: an X3 program at the kernel's gas limit, or a transfer.
         pallet_x3_kernel::Pallet::<Runtime>::x3_program_weight()
             .max(<Runtime as frame_system::Config>::DbWeight::get().reads_writes(4, 2))
+    }
+
+    fn max_entry_weight() -> Weight {
+        // A ledger transfer (asset, both balances; both written) or a slot restore and release
+        // (value and hold read; both written).
+        <Runtime as frame_system::Config>::DbWeight::get().reads_writes(3, 2)
     }
 }
 

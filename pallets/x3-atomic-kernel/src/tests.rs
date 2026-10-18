@@ -199,6 +199,21 @@ fn submit_and_assign(deadline_blocks: u64, nonce: u64) -> H256 {
     bundle_id
 }
 
+/// `submit_and_assign`, then the bundle's one leg executed on chain (an X3 program writing slot
+/// `0x30 + nonce`), so the bundle can finalize.
+fn submit_assign_and_execute(deadline_blocks: u64, nonce: u64) -> H256 {
+    let bundle_id = submit_and_assign(deadline_blocks, nonce);
+    assert_ok!(AtomicKernel::execute_bundle_leg(
+        RuntimeOrigin::signed(BOB),
+        bundle_id,
+        0,
+        crate::chain_legs::LegExecution::X3 {
+            program: BoundedVec::try_from(vec![0x30u8.wrapping_add(nonce as u8), 1]).expect("fits"),
+        }
+    ));
+    bundle_id
+}
+
 /// Asserts the bond was settled exactly once: nothing left reserved, the
 /// submitter down by exactly `penalty`, issuance unchanged (slashed funds move to
 /// the treasury rather than being burned), and a matching `BondSlashed` event.
@@ -1229,7 +1244,7 @@ fn finalization_requires_the_receipt_root_the_bundle_commits_to() {
     // The commitment check is compiled in for this build, so a receipt root that is not the hash of
     // the bundle's own fields is refused — and the right one is accepted.
     new_test_ext().execute_with(|| {
-        let bundle_id = submit_and_assign(100, 9);
+        let bundle_id = submit_assign_and_execute(100, 9);
         let cert = H256::repeat_byte(0x55);
         anchor_cert(1, cert);
 
@@ -1251,7 +1266,7 @@ fn finalization_requires_the_receipt_root_the_bundle_commits_to() {
 #[test]
 fn finalization_happens_once() {
     new_test_ext().execute_with(|| {
-        let bundle_id = submit_and_assign(100, 10);
+        let bundle_id = submit_assign_and_execute(100, 10);
         let cert = H256::repeat_byte(0x77);
         anchor_cert(1, cert);
         let root = committed_receipt_root(bundle_id, cert, 1);
@@ -1281,7 +1296,7 @@ fn finalization_happens_once() {
 #[test]
 fn a_finalized_bundle_cannot_be_rolled_back() {
     new_test_ext().execute_with(|| {
-        let bundle_id = submit_and_assign(100, 20);
+        let bundle_id = submit_assign_and_execute(100, 20);
         let cert = H256::repeat_byte(0xA1);
         anchor_cert(1, cert);
         let root = committed_receipt_root(bundle_id, cert, 1);
@@ -1476,7 +1491,16 @@ fn a_rollback_undoes_the_legs_the_chain_executed() {
                 program: BoundedVec::try_from(vec![0x50, 9]).expect("fits"),
             }
         ));
-        assert_eq!(crate::mock::TestLegExecutor::balance(3, &CHARLIE), 400);
+        // The transfer waits in the bundle's escrow; the recipient holds nothing a rollback
+        // would have to claw back.
+        assert_eq!(crate::mock::TestLegExecutor::balance(3, &CHARLIE), 0);
+        assert_eq!(
+            crate::mock::TestLegExecutor::balance(
+                3,
+                &crate::mock::TestLegExecutor::escrow(bundle_id)
+            ),
+            400
+        );
         assert_eq!(
             crate::mock::TestLegExecutor::slot(&H256::repeat_byte(0x50)),
             Some([9; 32])
@@ -1507,39 +1531,167 @@ fn a_rollback_undoes_the_legs_the_chain_executed() {
     });
 }
 
-/// A journal is inverse operations, not snapshots: when something changed the leg's state after
-/// it ran, the revert refuses rather than overwrite that change, and says so.
+/// A rollback is all legs or none. When one leg cannot be undone (here its slot was changed
+/// around the hold, which the chain itself never allows), the rollback refuses and changes
+/// nothing: the earlier leg's escrow is not paid back, the bundle stays `Executing` with its
+/// journals, and the rollback succeeds once the leg can be undone.
 #[test]
-fn a_rollback_refuses_to_overwrite_a_change_made_after_the_leg() {
+fn a_rollback_that_cannot_undo_every_leg_changes_nothing() {
     new_test_ext().execute_with(|| {
-        let bundle_id = submit_and_assign(100, 26);
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            two_x3_legs(),
+            100,
+            1,
+            26,
+        ));
+        let (bundle_id, _) = Bundles::<Test>::iter().next().expect("stored");
+        assert_ok!(AtomicKernel::assign_bundle_executor(
+            RuntimeOrigin::signed(BOB),
+            bundle_id
+        ));
+        crate::mock::TestLegExecutor::set_balance(3, &BOB, 1_000);
         assert_ok!(AtomicKernel::execute_bundle_leg(
             RuntimeOrigin::signed(BOB),
             bundle_id,
             0,
+            crate::chain_legs::LegExecution::Transfer {
+                asset: 3,
+                to: CHARLIE,
+                amount: 400
+            }
+        ));
+        assert_ok!(AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(BOB),
+            bundle_id,
+            1,
             crate::chain_legs::LegExecution::X3 {
                 program: BoundedVec::try_from(vec![0x60, 1]).expect("fits"),
             }
         ));
-        // Someone else writes the slot afterwards.
-        crate::mock::TestLegExecutor::set_slot(&H256::repeat_byte(0x60), Some([2; 32]));
+        let slot = H256::repeat_byte(0x60);
+        crate::mock::TestLegExecutor::set_slot(&slot, Some([2; 32]));
+
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            Error::<Test>::LegRevertFailed
+        );
+        assert_eq!(crate::mock::TestLegExecutor::balance(3, &BOB), 600);
+        assert_eq!(
+            Bundles::<Test>::get(bundle_id).expect("record").status,
+            BundleStatus::Executing
+        );
+        assert_eq!(
+            crate::ChainJournal::<Test>::iter_prefix(bundle_id).count(),
+            2
+        );
+
+        // Once the leg can be undone, the same rollback undoes both.
+        crate::mock::TestLegExecutor::set_slot(&slot, Some([1; 32]));
         assert_ok!(AtomicKernel::rollback_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             bundle_id,
             BundleRollbackReason::SubmitterCancelled,
         ));
-        assert_eq!(
-            crate::mock::TestLegExecutor::slot(&H256::repeat_byte(0x60)),
-            Some([2; 32]),
-            "the later write stands"
+        assert_eq!(crate::mock::TestLegExecutor::balance(3, &BOB), 1_000);
+        assert_eq!(crate::mock::TestLegExecutor::slot(&slot), None);
+        assert_eq!(crate::mock::TestLegExecutor::holder(&slot), None);
+    });
+}
+
+/// A bundle finalizes only when every leg it declared ran on chain; finalizing pays each escrowed
+/// transfer to its recipient, releases the slots, and drops the journals.
+#[test]
+fn a_bundle_finalizes_only_with_every_leg_executed_and_then_pays_its_escrow() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            two_x3_legs(),
+            100,
+            1,
+            28,
+        ));
+        let (bundle_id, _) = Bundles::<Test>::iter().next().expect("stored");
+        assert_ok!(AtomicKernel::assign_bundle_executor(
+            RuntimeOrigin::signed(BOB),
+            bundle_id
+        ));
+        crate::mock::TestLegExecutor::set_balance(3, &BOB, 1_000);
+        assert_ok!(AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(BOB),
+            bundle_id,
+            0,
+            crate::chain_legs::LegExecution::Transfer {
+                asset: 3,
+                to: CHARLIE,
+                amount: 400
+            }
+        ));
+        let cert = H256::repeat_byte(0x5A);
+        anchor_cert(1, cert);
+        let root = committed_receipt_root(bundle_id, cert, 1);
+        assert_noop!(
+            finalize(bundle_id, root, cert),
+            Error::<Test>::LegNotExecuted
         );
-        assert!(System::events().iter().any(|r| matches!(
-            r.event,
-            RuntimeEvent::AtomicKernel(Event::IncompleteVmRevert {
-                failed_count: 1,
-                ..
-            })
-        )));
+
+        assert_ok!(AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(BOB),
+            bundle_id,
+            1,
+            crate::chain_legs::LegExecution::X3 {
+                program: BoundedVec::try_from(vec![0x61, 4]).expect("fits"),
+            }
+        ));
+        assert_ok!(finalize(bundle_id, root, cert));
+        assert_eq!(crate::mock::TestLegExecutor::balance(3, &CHARLIE), 400);
+        assert_eq!(
+            crate::mock::TestLegExecutor::balance(
+                3,
+                &crate::mock::TestLegExecutor::escrow(bundle_id)
+            ),
+            0
+        );
+        let slot = H256::repeat_byte(0x61);
+        assert_eq!(crate::mock::TestLegExecutor::slot(&slot), Some([4; 32]));
+        assert_eq!(crate::mock::TestLegExecutor::holder(&slot), None);
+        assert!(crate::BundleLegReceipts::<Test>::get(bundle_id).is_empty());
+        assert_eq!(
+            crate::ChainJournal::<Test>::iter_prefix(bundle_id).count(),
+            0
+        );
+        assert_eq!(crate::BundleJournalEntries::<Test>::get(bundle_id), 0);
+    });
+}
+
+/// A leg cannot run after the bundle's deadline, nor while the economic halt is on, and a
+/// bundle's legs together hold at most `MAX_BUNDLE_JOURNAL_ENTRIES` entries.
+#[test]
+fn a_leg_respects_the_deadline_and_the_halt() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(5, 29);
+        let leg = || crate::chain_legs::LegExecution::X3 {
+            program: BoundedVec::try_from(vec![0x62, 1]).expect("fits"),
+        };
+        let economy = crate::mock::economy_open();
+        economy.halt();
+        assert_noop!(
+            AtomicKernel::execute_bundle_leg(RuntimeOrigin::signed(BOB), bundle_id, 0, leg()),
+            Error::<Test>::EconomicHaltActive
+        );
+        economy.resume();
+        let deadline = Bundles::<Test>::get(bundle_id)
+            .expect("record")
+            .deadline_block;
+        System::set_block_number(deadline + 1);
+        assert_noop!(
+            AtomicKernel::execute_bundle_leg(RuntimeOrigin::signed(BOB), bundle_id, 0, leg()),
+            Error::<Test>::DeadlineExpired
+        );
     });
 }
 
@@ -1564,11 +1716,16 @@ fn a_journal_the_chain_did_not_record_is_not_applied() {
             bundle_id,
             BoundedVec::<_, MaxLegsPerBundle>::try_from(receipts).expect("fits"),
         );
-        assert_ok!(AtomicKernel::rollback_atomic_bundle(
-            RuntimeOrigin::signed(ALICE),
-            bundle_id,
-            BundleRollbackReason::SubmitterCancelled,
-        ));
+        // Not the chain's journal, so it goes to the configured reverter, which refuses it; the
+        // rollback is then refused as a whole rather than reported done.
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            Error::<Test>::LegRevertFailed
+        );
         assert_eq!(
             crate::mock::TestLegExecutor::slot(&H256::repeat_byte(0x70)),
             None,
@@ -1662,7 +1819,7 @@ fn finalization_has_no_unsigned_entry_point() {
     // reach finalization through. The mock's `X3LangOrigin` accepts any *signed* account, so this
     // asserts the property that matters here: no signature, no finalization.
     new_test_ext().execute_with(|| {
-        let bundle_id = submit_and_assign(100, 11);
+        let bundle_id = submit_assign_and_execute(100, 11);
         let cert = H256::repeat_byte(0x88);
         anchor_cert(1, cert);
         let root = committed_receipt_root(bundle_id, cert, 1);
