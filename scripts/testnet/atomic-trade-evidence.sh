@@ -34,6 +34,11 @@ fail=0
  cd "$ROOT/x3-lang"
  run vm-receipt cargo test -p x3-lang-vm --test trading_execution receipt --locked
 ) || fail=1
+# Root-workspace DEX rollback regression against real FRAME pallet storage.
+(
+ cd "$ROOT"
+ run dex-two-pool-rollback cargo test -p pallet-x3-dex two_pool_second_leg_slippage_rolls_back_first_leg_and_events --locked
+) || fail=1
 # Inventory concrete test names for a later instruction-level trace adapter.
 (
  cd "$ROOT/x3-lang"
