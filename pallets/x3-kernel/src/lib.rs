@@ -1054,10 +1054,13 @@ pub mod pallet {
         /// Emergency halt activated — all asset movement frozen due to invariant violation.
         EmergencyHalted,
         /// A trade committed and its ledger movements were applied.
+        /// `receipt_bytes` is the canonical receipt; `receipt` is its digest, as recorded in
+        /// `TradeReceipts`.
         TradeCommitted {
             trader: T::AccountId,
             receipt: H256,
             gas_used: u64,
+            receipt_bytes: crate::trading::ReceiptBytes,
         },
         /// A trade rolled back: nothing moved. `trap` is the receipt's `TrapId`.
         TradeRolledBack {
@@ -1065,6 +1068,7 @@ pub mod pallet {
             receipt: H256,
             trap: u8,
             op_index: u16,
+            receipt_bytes: crate::trading::ReceiptBytes,
         },
         /// Governance set the trade cost schedule and fee collector.
         TradingConfigured,
@@ -1205,6 +1209,8 @@ pub mod pallet {
         TradeSettlementInconsistent,
         /// The trading module declares an asset's decimals differently from the asset registry.
         TradeAssetMismatch,
+        /// The chain's economic halt freezes asset movement.
+        TradingHalted,
     }
 
     /// Storage for atomic settlement roots (per transaction ID).

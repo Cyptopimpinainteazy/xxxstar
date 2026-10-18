@@ -1895,6 +1895,9 @@ impl x3_asset_kernel_types::traits::CanonicalLedgerTransfer<AccountId> for Kerne
         to: &AccountId,
         amount: u128,
     ) -> Result<(), sp_runtime::DispatchError> {
+        // No halt check here: the supply ledger's transfer halt stops new flows (a dex swap, a
+        // kernel trade) at their entry points, and leaves exits such as removing liquidity open
+        // so a halt does not strand funds.
         pallet_x3_kernel::Pallet::<Runtime>::ledger_transfer(asset, from, to, amount)
     }
 
@@ -1980,6 +1983,10 @@ impl pallet_x3_kernel::KernelTradingHost<AccountId> for X3TradingHost {
     fn usd_price(asset: u32) -> Option<(u128, u64)> {
         let price = pallet_x3_oracle::Pallet::<Runtime>::get_price(asset)?;
         Some((u128::from(price.price), u64::from(price.last_updated)))
+    }
+
+    fn transfers_halted() -> bool {
+        <X3SupplyLedger as x3_asset_kernel_types::traits::EconomicHaltInspect>::is_halted()
     }
 }
 

@@ -61,6 +61,9 @@ pub trait KernelTradingHost<AccountId> {
     /// `asset`'s USD price per whole unit, with [`ORACLE_PRICE_DECIMALS`] decimals, and the block
     /// it was last updated in.
     fn usd_price(asset: u32) -> Option<(u128, u64)>;
+    /// Whether the chain's economic halt freezes asset movement. A trade moves assets, so it is
+    /// refused while this is true.
+    fn transfers_halted() -> bool;
 }
 
 impl<AccountId> KernelTradingHost<AccountId> for () {
@@ -75,6 +78,9 @@ impl<AccountId> KernelTradingHost<AccountId> for () {
     }
     fn usd_price(_asset: u32) -> Option<(u128, u64)> {
         None
+    }
+    fn transfers_halted() -> bool {
+        false
     }
 }
 
@@ -107,15 +113,21 @@ pub struct TradingConfig<AccountId> {
 }
 
 /// A trade's on-chain record, keyed by its receipt digest.
+///
+/// Only the digest is kept in state: the full receipt (up to [`MAX_TRADE_RECEIPT_BYTES`]) is in
+/// the trade's event, where an indexer or a replayer reads it and checks it against this digest.
+/// Keeping every receipt in state would let anyone grow the chain's state by tens of KiB per
+/// trade, rolled-back ones included, for a transaction fee.
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 #[scale_info(skip_type_params(BlockNumber))]
 pub struct TradeRecord<AccountId, BlockNumber> {
     pub trader: AccountId,
     pub block: BlockNumber,
     pub committed: bool,
-    /// The canonical receipt encoding (`x3bc_core::receipt::encode`).
-    pub receipt: BoundedVec<u8, ConstU32<MAX_TRADE_RECEIPT_BYTES>>,
 }
+
+/// A receipt as a trade event carries it: the canonical encoding (`x3bc_core::receipt::encode`).
+pub type ReceiptBytes = BoundedVec<u8, ConstU32<MAX_TRADE_RECEIPT_BYTES>>;
 
 /// The 32-byte key the engine knows the trader by: the account's encoding when it is 32 bytes
 /// (the runtime's `AccountId32`), its blake2-256 otherwise.
@@ -184,10 +196,23 @@ impl<T: Config> Pallet<T> {
             bytecode.len() <= MAX_TRADE_MODULE_BYTES as usize,
             Error::<T>::TradeModuleTooLarge
         );
+        // A trade moves assets; the chain's economic halt freezes asset movement, as it does for
+        // a direct dex swap.
+        ensure!(
+            !T::TradingHost::transfers_halted(),
+            Error::<T>::TradingHalted
+        );
         let config = TradingConfiguration::<T>::get().ok_or(Error::<T>::TradingNotConfigured)?;
+        // A transfer to oneself moves nothing, so a trader who is also the fee collector would
+        // settle against a debit that never happened. Refused up front rather than at the check.
+        ensure!(config.fee_collector != who, Error::<T>::TradeRefused);
         let module = BytecodeModule::from_bytes(bytecode).map_err(|_| Error::<T>::TradeRefused)?;
         let section = module.trading.as_ref().ok_or(Error::<T>::TradeRefused)?;
         ensure!(section.chain_id == X3_CHAIN_ID, Error::<T>::TradeRefused);
+        // The section's own rules, including its size bounds (`MAX_OPS`, `MAX_CAPABILITIES`,
+        // `MAX_ASSETS`), before any chain state is read on its behalf. The engine verifies the
+        // whole module again before it runs.
+        x3bc_core::trading::verify_section(section).map_err(|_| Error::<T>::TradeRefused)?;
 
         let block_number = Self::current_block_u64();
         let pre =
@@ -203,7 +228,7 @@ impl<T: Config> Pallet<T> {
 
         let encoded = receipt::encode(&run.receipt);
         let digest = H256(receipt::digest(&run.receipt));
-        let bounded: BoundedVec<u8, ConstU32<MAX_TRADE_RECEIPT_BYTES>> = encoded
+        let bounded: ReceiptBytes = encoded
             .try_into()
             .map_err(|_| Error::<T>::TradeReceiptTooLarge)?;
         ensure!(
@@ -213,7 +238,7 @@ impl<T: Config> Pallet<T> {
 
         let committed = match (&run.receipt.outcome, run.committed, &run.delta) {
             (Outcome::Committed, true, Some(delta)) => {
-                Self::settle_trade(&who, &config, delta)?;
+                Self::settle_trade(&who, &config, &pre, delta)?;
                 true
             }
             (Outcome::RolledBack { .. }, false, None) => false,
@@ -228,7 +253,6 @@ impl<T: Config> Pallet<T> {
                 trader: who.clone(),
                 block: frame_system::Pallet::<T>::block_number(),
                 committed,
-                receipt: bounded,
             },
         );
         if committed {
@@ -236,6 +260,7 @@ impl<T: Config> Pallet<T> {
                 trader: who,
                 receipt: digest,
                 gas_used: run.gas_used,
+                receipt_bytes: bounded,
             });
         } else {
             let (trap, op_index) = match run.receipt.outcome {
@@ -247,6 +272,7 @@ impl<T: Config> Pallet<T> {
                 receipt: digest,
                 trap,
                 op_index,
+                receipt_bytes: bounded,
             });
         }
         Ok(())
@@ -434,6 +460,7 @@ impl<T: Config> Pallet<T> {
     fn settle_trade(
         who: &T::AccountId,
         config: &crate::trading::TradingConfig<T::AccountId>,
+        pre: &TradingPreState,
         delta: &x3_vm::trading::TradingDelta,
     ) -> DispatchResult {
         for intent in &delta.intents {
@@ -442,6 +469,32 @@ impl<T: Config> Pallet<T> {
             Self::ledger_transfer(intent.asset, &from, &to, intent.amount)?;
         }
         for (venue, (reserve_a, reserve_b)) in &delta.venue_reserves {
+            // New reserves are the old reserves plus exactly what the intents moved into and out
+            // of this venue, per asset. Custody covering the new figure is not enough: a pool
+            // holding more than its reserves would otherwise let a trade record reserves the moved
+            // funds do not account for.
+            let before = pre
+                .venues
+                .iter()
+                .find(|v| &v.name == venue)
+                .ok_or(Error::<T>::TradeSettlementInconsistent)?;
+            let flowed = |asset: u32, reserve: u128| -> Option<u128> {
+                let mut value = reserve;
+                for intent in delta.intents.iter().filter(|i| i.asset == asset) {
+                    if matches!(&intent.to, Account::Venue(name) if name == venue) {
+                        value = value.checked_add(intent.amount)?;
+                    }
+                    if matches!(&intent.from, Account::Venue(name) if name == venue) {
+                        value = value.checked_sub(intent.amount)?;
+                    }
+                }
+                Some(value)
+            };
+            ensure!(
+                flowed(before.asset_a, before.reserve_a) == Some(*reserve_a)
+                    && flowed(before.asset_b, before.reserve_b) == Some(*reserve_b),
+                Error::<T>::TradeSettlementInconsistent
+            );
             T::TradingHost::set_venue_reserves(venue, *reserve_a, *reserve_b)?;
         }
         for (asset, expected) in &delta.trader_balances {

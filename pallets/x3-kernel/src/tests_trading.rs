@@ -192,6 +192,7 @@ fn a_compiled_public_arbitrage_commits_on_chain_and_moves_exactly_what_its_recei
             trader,
             receipt: digest,
             gas_used,
+            receipt_bytes,
         } = last_trade_event()
         else {
             panic!("the trade must commit");
@@ -200,9 +201,10 @@ fn a_compiled_public_arbitrage_commits_on_chain_and_moves_exactly_what_its_recei
         assert!(gas_used > 0);
 
         // The stored receipt is the canonical encoding of a committed trade, under its digest.
+        // State keeps the digest; the event carries the canonical receipt that hashes to it.
         let record = TradeReceipts::<Test>::get(digest).expect("the receipt is recorded");
         assert!(record.committed);
-        let receipt = receipt::decode(&record.receipt).expect("canonical receipt");
+        let receipt = receipt::decode(&receipt_bytes).expect("canonical receipt");
         assert_eq!(receipt::digest(&receipt), digest.0);
         assert_eq!(receipt.outcome, Outcome::Committed);
         assert_eq!(receipt.anchor.block_number, EXECUTED_AT);
@@ -294,6 +296,8 @@ fn a_trade_that_misses_its_profit_floor_rolls_back_on_chain_and_moves_nothing() 
         let Event::TradeRolledBack {
             trader,
             receipt: digest,
+            trap,
+            receipt_bytes,
             ..
         } = last_trade_event()
         else {
@@ -303,7 +307,9 @@ fn a_trade_that_misses_its_profit_floor_rolls_back_on_chain_and_moves_nothing() 
         assert_eq!(balances(), before, "a rolled-back trade moves nothing");
         let record = TradeReceipts::<Test>::get(digest).expect("the refusal is recorded");
         assert!(!record.committed);
-        let receipt = receipt::decode(&record.receipt).expect("canonical receipt");
+        assert_eq!(trap, x3bc_core::trap::TrapId::ProfitBelowFloor as u8);
+        let receipt = receipt::decode(&receipt_bytes).expect("canonical receipt");
+        assert_eq!(receipt::digest(&receipt), digest.0);
         assert!(
             matches!(
                 receipt.outcome,
@@ -420,6 +426,12 @@ fn a_venue_whose_custody_does_not_cover_its_reserves_fails_settlement_and_writes
             sp_runtime::DispatchError::Other("reserves exceed custody")
         );
         assert_eq!(balances(), before);
+        let venue1 = TestTradingHost::venue_state("x3dex_pool_1").expect("venue");
+        assert_eq!(
+            (venue1.reserve_a, venue1.reserve_b),
+            POOL1,
+            "venue writes rolled back too"
+        );
     });
 }
 
@@ -435,6 +447,193 @@ fn trading_is_refused_while_the_protocol_is_paused() {
                 SUBMITTED_AT
             ),
             Error::<Test>::ProtocolIsPaused
+        );
+    });
+}
+
+#[test]
+fn trading_is_refused_while_the_economic_halt_freezes_transfers() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        TestTradingHost::set_halted(true);
+        assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
+            Error::<Test>::TradingHalted
+        );
+    });
+}
+
+#[test]
+fn a_trader_who_is_the_fee_collector_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        assert_ok!(AtlasKernel::set_trading_config(
+            RuntimeOrigin::root(),
+            TradingConfig {
+                fee_collector: TRADER,
+                ..config()
+            }
+        ));
+        assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
+            Error::<Test>::TradeRefused
+        );
+    });
+}
+
+/// A pool that holds more than its recorded reserves (a donation, a governance balance edit)
+/// must not let a trade record reserves the trade's own movements do not account for.
+#[test]
+fn a_pool_holding_more_than_its_reserves_still_settles_to_old_reserves_plus_flows() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let surplus = 7 * UNIT;
+        fund(VENUE_1, WETX, surplus);
+        assert_ok!(AtlasKernel::submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+        assert!(matches!(last_trade_event(), Event::TradeCommitted { .. }));
+        let swap1 = cp_out(BORROW, POOL1.0, POOL1.1);
+        let venue1 = TestTradingHost::venue_state("x3dex_pool_1").expect("venue");
+        assert_eq!(venue1.reserve_b, POOL1.1 - swap1);
+        assert_eq!(
+            CanonicalLedger::<Test>::get(VENUE_1, WETX),
+            POOL1.1 - swap1 + surplus,
+            "the surplus stays in custody, outside the reserves"
+        );
+    });
+}
+
+/// A program may not name one pool twice: `x3dex_pool_+1` is not a venue.
+#[test]
+fn an_aliased_venue_name_never_reaches_a_pool() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let before = balances();
+        let aliased = public(FLAGSHIP).replace("via x3dex_pool_2", "via x3dex_pool_+1");
+        match compile_trading_x3bc(&aliased, CompilationMode::Testnet) {
+            // Refused at compile time: nothing to submit.
+            Err(_) => {}
+            Ok(artifact) => {
+                let bytes: BoundedVec<_, _> = artifact.bytes.try_into().expect("fits");
+                // Refused before execution, or rolled back by the engine: either way no pool
+                // is reached and nothing moves.
+                let _ =
+                    AtlasKernel::submit_trade(RuntimeOrigin::signed(TRADER), bytes, SUBMITTED_AT);
+                assert!(!matches!(
+                    frame_system::Pallet::<Test>::events()
+                        .last()
+                        .map(|r| &r.event),
+                    Some(RuntimeEvent::AtlasKernel(Event::TradeCommitted { .. }))
+                ));
+            }
+        }
+        assert_eq!(balances(), before);
+    });
+}
+
+/// Different decimals on the two sides: the oracle conversion is exercised where the powers of ten
+/// do not cancel. WETX has 18 decimals on chain and in the program; pool and price figures are the
+/// same economic market as the 6-decimal tests.
+#[test]
+fn the_oracle_conversion_uses_each_assets_registry_decimals() {
+    new_test_ext().execute_with(|| {
+        const SCALE: u128 = 1_000_000_000_000; // 10^(18-6)
+        TestTradingHost::reset();
+        frame_system::Pallet::<Test>::set_block_number(EXECUTED_AT);
+        assert_ok!(AtlasKernel::register_asset(
+            RuntimeOrigin::root(),
+            USDX,
+            b"USDX".to_vec(),
+            6
+        ));
+        assert_ok!(AtlasKernel::register_asset(
+            RuntimeOrigin::root(),
+            WETX,
+            b"WETX".to_vec(),
+            18
+        ));
+        fund(TRADER, USDX, TRADER_USDX);
+        fund(VENUE_1, USDX, POOL1.0);
+        fund(VENUE_1, WETX, POOL1.1 * SCALE);
+        fund(VENUE_2, WETX, POOL2.0 * SCALE);
+        fund(VENUE_2, USDX, POOL2.1);
+        fund(FLASH, USDX, FLASH_LIQUIDITY);
+        for (name, a, b, ra, rb, custody) in [
+            (
+                "x3dex_pool_1",
+                USDX,
+                WETX,
+                POOL1.0,
+                POOL1.1 * SCALE,
+                VENUE_1,
+            ),
+            (
+                "x3dex_pool_2",
+                WETX,
+                USDX,
+                POOL2.0 * SCALE,
+                POOL2.1,
+                VENUE_2,
+            ),
+        ] {
+            TestTradingHost::add_venue(
+                VenueState {
+                    name: name.into(),
+                    version: 1,
+                    asset_a: a,
+                    asset_b: b,
+                    reserve_a: ra,
+                    reserve_b: rb,
+                    fee_bps: FEE_BPS,
+                },
+                custody,
+            );
+        }
+        TestTradingHost::add_flash_pool(USDX, FLASH_FEE_BPS, FLASH);
+        TestTradingHost::set_price(USDX, 1_000_000, EXECUTED_AT - 1);
+        TestTradingHost::set_price(WETX, 2_000_000, EXECUTED_AT - 1);
+        assert_ok!(AtlasKernel::set_trading_config(
+            RuntimeOrigin::root(),
+            config()
+        ));
+
+        let source = public(FLAGSHIP).replace(
+            "asset WETX = x3.x3chain.asset_2 {\n    decimals: 6",
+            "asset WETX = x3.x3chain.asset_2 {\n    decimals: 18",
+        );
+        assert!(
+            source.contains("decimals: 18"),
+            "the WETX declaration moved"
+        );
+        assert_ok!(AtlasKernel::submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&source),
+            SUBMITTED_AT
+        ));
+        let Event::TradeCommitted { receipt_bytes, .. } = last_trade_event() else {
+            panic!(
+                "the trade must commit: a wrong conversion is off by 10^24 and trips the oracle"
+            );
+        };
+        let receipt = receipt::decode(&receipt_bytes).expect("canonical receipt");
+        let reading = receipt.oracle.first().expect("an oracle reading");
+        // WETX base units per USDX base unit: ($1 / $2) * 10^18 / 10^6 = SCALE / 2.
+        assert_eq!((reading.base, reading.quote), (USDX, WETX));
+        assert_eq!(
+            reading.price_num * 2,
+            reading.price_den * SCALE,
+            "1 USDX base unit is worth 0.5e12 WETX base units"
         );
     });
 }

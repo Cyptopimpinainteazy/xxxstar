@@ -745,11 +745,19 @@ thread_local! {
     > = Default::default();
     static TRADING_PRICES: core::cell::RefCell<std::collections::BTreeMap<u32, (u128, u64)>> =
         Default::default();
+    static TRADING_HALTED: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
-/// The test trading host. Reset per test with [`TestTradingHost::reset`]. Its venue table is
-/// thread-local, not storage, so a failed extrinsic's storage rollback does not restore it; tests
-/// that fail settlement assert on `CanonicalLedger`, which is storage.
+/// Venue reserves live in storage, not in the thread-local table, so a failed extrinsic's
+/// storage rollback restores them exactly as it would a real dex pool's.
+fn venue_reserves_key(name: &str) -> Vec<u8> {
+    let mut key = b"x3-kernel-mock/venue-reserves/".to_vec();
+    key.extend_from_slice(name.as_bytes());
+    key
+}
+
+/// The test trading host. Reset per test with [`TestTradingHost::reset`]. Venue reserves are kept
+/// in storage, so they roll back with the extrinsic.
 pub struct TestTradingHost;
 
 impl TestTradingHost {
@@ -757,9 +765,18 @@ impl TestTradingHost {
         TRADING_VENUES.with(|v| v.borrow_mut().clear());
         TRADING_FLASH.with(|v| v.borrow_mut().clear());
         TRADING_PRICES.with(|v| v.borrow_mut().clear());
+        TRADING_HALTED.with(|h| h.set(false));
+    }
+
+    pub fn set_halted(halted: bool) {
+        TRADING_HALTED.with(|h| h.set(halted));
     }
 
     pub fn add_venue(venue: x3bc_core::state::VenueState, custody: AccountId) {
+        frame_support::storage::unhashed::put(
+            &venue_reserves_key(&venue.name),
+            &(venue.reserve_a, venue.reserve_b),
+        );
         TRADING_VENUES.with(|v| v.borrow_mut().insert(venue.name.clone(), (venue, custody)));
     }
 
@@ -772,13 +789,18 @@ impl TestTradingHost {
     }
 
     pub fn venue_state(name: &str) -> Option<x3bc_core::state::VenueState> {
-        TRADING_VENUES.with(|v| v.borrow().get(name).map(|(venue, _)| venue.clone()))
+        <Self as pallet_x3_kernel::KernelTradingHost<AccountId>>::venue(name).map(|(v, _)| v)
     }
 }
 
 impl pallet_x3_kernel::KernelTradingHost<AccountId> for TestTradingHost {
     fn venue(name: &str) -> Option<(x3bc_core::state::VenueState, AccountId)> {
-        TRADING_VENUES.with(|v| v.borrow().get(name).cloned())
+        let (mut venue, custody) = TRADING_VENUES.with(|v| v.borrow().get(name).cloned())?;
+        let (reserve_a, reserve_b): (u128, u128) =
+            frame_support::storage::unhashed::get(&venue_reserves_key(name))?;
+        venue.reserve_a = reserve_a;
+        venue.reserve_b = reserve_b;
+        Some((venue, custody))
     }
 
     fn set_venue_reserves(
@@ -786,20 +808,16 @@ impl pallet_x3_kernel::KernelTradingHost<AccountId> for TestTradingHost {
         reserve_a: u128,
         reserve_b: u128,
     ) -> frame_support::dispatch::DispatchResult {
-        TRADING_VENUES.with(|v| {
-            let mut venues = v.borrow_mut();
-            let (venue, custody) = venues
-                .get_mut(name)
-                .ok_or(sp_runtime::DispatchError::Other("unknown venue"))?;
-            let held_a = AtlasKernel::ledger_balance_of(venue.asset_a, custody);
-            let held_b = AtlasKernel::ledger_balance_of(venue.asset_b, custody);
-            if reserve_a > held_a || reserve_b > held_b {
-                return Err(sp_runtime::DispatchError::Other("reserves exceed custody"));
-            }
-            venue.reserve_a = reserve_a;
-            venue.reserve_b = reserve_b;
-            Ok(())
-        })
+        let (venue, custody) = TRADING_VENUES
+            .with(|v| v.borrow().get(name).cloned())
+            .ok_or(sp_runtime::DispatchError::Other("unknown venue"))?;
+        let held_a = AtlasKernel::ledger_balance_of(venue.asset_a, &custody);
+        let held_b = AtlasKernel::ledger_balance_of(venue.asset_b, &custody);
+        if reserve_a > held_a || reserve_b > held_b {
+            return Err(sp_runtime::DispatchError::Other("reserves exceed custody"));
+        }
+        frame_support::storage::unhashed::put(&venue_reserves_key(name), &(reserve_a, reserve_b));
+        Ok(())
     }
 
     fn flash_pool(
@@ -827,5 +845,9 @@ impl pallet_x3_kernel::KernelTradingHost<AccountId> for TestTradingHost {
 
     fn usd_price(asset: u32) -> Option<(u128, u64)> {
         TRADING_PRICES.with(|v| v.borrow().get(&asset).copied())
+    }
+
+    fn transfers_halted() -> bool {
+        TRADING_HALTED.with(|h| h.get())
     }
 }

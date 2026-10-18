@@ -72,6 +72,9 @@ pub mod pallet {
         pub total_shares: u128,
     }
 
+    /// Shares the first deposit into an asset pool locks forever (see `provide_asset_liquidity`).
+    pub const MINIMUM_LOCKED_SHARES: u128 = 1_000;
+
     /// The interface version of an asset flash pool, which a trading artifact requires.
     pub const ASSET_POOL_VERSION: u16 = 1;
 
@@ -182,6 +185,10 @@ pub mod pallet {
         NothingToMove,
         /// The provider holds fewer shares than it tried to redeem.
         InsufficientShares,
+        /// The first deposit must exceed the shares it locks (`MINIMUM_LOCKED_SHARES`).
+        FirstDepositTooSmall,
+        /// The deposit would mint fewer shares than the depositor's `min_shares`.
+        SharesBelowMinimum,
     }
 
     #[pallet::call]
@@ -247,34 +254,49 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Deposit `amount` of `asset` into its flash pool for shares.
+        /// Deposit `amount` of `asset` into its flash pool for at least `min_shares` shares.
+        ///
+        /// The first deposit locks [`MINIMUM_LOCKED_SHARES`] of its shares permanently (owned by
+        /// no account), so the share price cannot be inflated from a dust deposit: without it, a
+        /// first depositor holding one share could raise the pool's balance by paying fees into it
+        /// and make the next deposit round down to a fraction of its value. `min_shares` bounds
+        /// what rounding can cost any depositor.
         #[pallet::call_index(4)]
         #[pallet::weight(<T as Config>::WeightInfo::add_liquidity())]
         pub fn provide_asset_liquidity(
             origin: OriginFor<T>,
             asset: u32,
             amount: u128,
+            min_shares: u128,
         ) -> DispatchResult {
             let provider = ensure_signed(origin)?;
             let mut pool = AssetPools::<T>::get(asset).ok_or(Error::<T>::AssetPoolNotFound)?;
             let account = Self::asset_pool_account(asset);
             let liquidity = T::Ledger::ledger_balance(asset, &account);
-            let shares = if pool.total_shares == 0 || liquidity == 0 {
-                amount
+            let (shares, minted) = if pool.total_shares == 0 {
+                ensure!(
+                    amount > MINIMUM_LOCKED_SHARES,
+                    Error::<T>::FirstDepositTooSmall
+                );
+                (amount - MINIMUM_LOCKED_SHARES, amount)
             } else {
-                multiply_by_rational_with_rounding(
+                // Shares outstanding with nothing behind them: no price to mint at.
+                ensure!(liquidity > 0, Error::<T>::NothingToMove);
+                let shares = multiply_by_rational_with_rounding(
                     amount,
                     pool.total_shares,
                     liquidity,
                     Rounding::Down,
                 )
-                .ok_or(Error::<T>::FeeOverflow)?
+                .ok_or(Error::<T>::FeeOverflow)?;
+                (shares, shares)
             };
             ensure!(amount > 0 && shares > 0, Error::<T>::NothingToMove);
+            ensure!(shares >= min_shares, Error::<T>::SharesBelowMinimum);
             T::Ledger::ledger_transfer(asset, &provider, &account, amount)?;
             pool.total_shares = pool
                 .total_shares
-                .checked_add(shares)
+                .checked_add(minted)
                 .ok_or(Error::<T>::FeeOverflow)?;
             AssetShares::<T>::try_mutate(asset, &provider, |held| -> DispatchResult {
                 *held = held.checked_add(shares).ok_or(Error::<T>::FeeOverflow)?;

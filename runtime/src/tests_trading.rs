@@ -143,7 +143,8 @@ fn a_compiled_x3lang_arbitrage_runs_on_this_runtime_against_real_dex_flash_and_o
         assert_ok!(X3FlashLoan::provide_asset_liquidity(
             RuntimeOrigin::signed(provider.clone()),
             USDX,
-            FLASH_LIQUIDITY
+            FLASH_LIQUIDITY,
+            0
         ));
         // $1 per USDX and $2 per WETX (6 decimals), from three submitters.
         for oracle in &oracles {
@@ -178,13 +179,14 @@ fn a_compiled_x3lang_arbitrage_runs_on_this_runtime_against_real_dex_flash_and_o
             SUBMITTED_AT
         ));
 
-        let digest = System::events()
+        let (digest, receipt_bytes) = System::events()
             .into_iter()
             .find_map(|record| match record.event {
                 RuntimeEvent::AtlasKernel(pallet_x3_kernel::Event::TradeCommitted {
                     receipt,
+                    receipt_bytes,
                     ..
-                }) => Some(receipt),
+                }) => Some((receipt, receipt_bytes)),
                 RuntimeEvent::AtlasKernel(pallet_x3_kernel::Event::TradeRolledBack {
                     trap,
                     op_index,
@@ -194,7 +196,13 @@ fn a_compiled_x3lang_arbitrage_runs_on_this_runtime_against_real_dex_flash_and_o
             })
             .expect("the trade committed");
         let record = pallet_x3_kernel::TradeReceipts::<Runtime>::get(digest).expect("recorded");
-        let receipt = receipt::decode(&record.receipt).expect("canonical receipt");
+        assert!(record.committed);
+        let receipt = receipt::decode(&receipt_bytes).expect("canonical receipt");
+        assert_eq!(
+            receipt::digest(&receipt),
+            digest.0,
+            "the event's receipt is the recorded one"
+        );
         assert_eq!(receipt.outcome, Outcome::Committed);
         assert_eq!(receipt.anchor.spec_version, crate::VERSION.spec_version);
 
@@ -235,12 +243,68 @@ fn a_compiled_x3lang_arbitrage_runs_on_this_runtime_against_real_dex_flash_and_o
             (POOL2.0 + swap1, POOL2.1 - swap2)
         );
 
-        // And the flash pool's providers own the fee.
+        // And the flash pool's providers own the fee: the provider redeems every share it holds
+        // (the first deposit's locked shares stay in the pool) for its pro-rata part of it.
+        let shares = pallet_x3_flashloan::AssetShares::<Runtime>::get(USDX, &provider);
+        assert_eq!(
+            shares,
+            FLASH_LIQUIDITY - pallet_x3_flashloan::MINIMUM_LOCKED_SHARES
+        );
         assert_ok!(X3FlashLoan::withdraw_asset_liquidity(
             RuntimeOrigin::signed(provider.clone()),
             USDX,
-            FLASH_LIQUIDITY
+            shares
         ));
-        assert_eq!(balance(&provider, USDX), FLASH_LIQUIDITY + flash_fee);
+        let pool_after = FLASH_LIQUIDITY + flash_fee;
+        assert_eq!(
+            balance(&provider, USDX),
+            shares * pool_after / FLASH_LIQUIDITY
+        );
+        assert!(
+            balance(&provider, USDX) > shares,
+            "the fee accrued to the provider"
+        );
+    });
+}
+
+/// The supply ledger's transfer halt stops a kernel trade, as it stops a direct dex swap.
+#[test]
+fn a_trade_is_refused_on_this_runtime_while_transfers_are_halted() {
+    sp_io::TestExternalities::default().execute_with(|| {
+        System::set_block_number(EXECUTED_AT);
+        assert_ok!(AtlasKernel::register_asset(
+            RuntimeOrigin::root(),
+            USDX,
+            b"USDX".to_vec(),
+            6
+        ));
+        assert_ok!(AtlasKernel::set_trading_config(
+            RuntimeOrigin::root(),
+            pallet_x3_kernel::TradingConfig {
+                fee_asset: USDX,
+                gas_price: 10,
+                settlement_fee: 0,
+                relay_fee: 0,
+                protocol_fee: 0,
+                oracle_fee: 0,
+                solver_fee: 0,
+                cross_domain_fee: 0,
+                fee_collector: account(4),
+            }
+        ));
+        pallet_x3_supply_ledger::TransferHalted::<Runtime>::put(true);
+        let source = FLAGSHIP.replace(
+            "require_private_submission: true",
+            "require_private_submission: false",
+        );
+        let artifact = compile_trading_x3bc(&source, CompilationMode::Testnet).expect("compiles");
+        frame_support::assert_noop!(
+            AtlasKernel::submit_trade(
+                RuntimeOrigin::signed(account(3)),
+                artifact.bytes.try_into().expect("fits"),
+                SUBMITTED_AT
+            ),
+            pallet_x3_kernel::Error::<Runtime>::TradingHalted
+        );
     });
 }
