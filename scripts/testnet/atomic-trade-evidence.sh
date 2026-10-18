@@ -24,20 +24,20 @@ fail=0
 # The nested X3Lang workspace owns x3-lang-vm.
 (
  cd "$ROOT/x3-lang"
- run vm-all cargo test -p x3-lang-vm --lib --locked
+ run vm-all cargo test -p x3-lang-vm --locked
 ) || fail=1
 (
  cd "$ROOT/x3-lang"
- run vm-trading cargo test -p x3-lang-vm --lib trading --locked
+ run vm-trading cargo test -p x3-lang-vm --test trading_execution --locked
 ) || fail=1
 (
  cd "$ROOT/x3-lang"
- run vm-receipt cargo test -p x3-lang-vm --lib receipt --locked
+ run vm-receipt cargo test -p x3-lang-vm --test trading_execution receipt --locked
 ) || fail=1
 # Inventory concrete test names for a later instruction-level trace adapter.
 (
  cd "$ROOT/x3-lang"
- run vm-test-inventory cargo test -p x3-lang-vm --lib -- --list
+ run vm-test-inventory cargo test -p x3-lang-vm --test trading_execution --locked -- --list
 ) || fail=1
 if ((fail)); then echo 'FAIL: see evidence logs'; exit 1; fi
 echo 'PASS: commands completed; review logs for test coverage before claiming atomic settlement.'
