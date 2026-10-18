@@ -450,12 +450,11 @@ pub mod pallet {
         }
 
         /// The account that custodies `asset`'s flash pool on the ledger.
+        ///
+        /// A `PalletId` sub-account, which cannot fail to derive for any account type.
         pub fn asset_pool_account(asset: u32) -> T::AccountId {
-            let mut bytes = [0u8; 32];
-            bytes[0..8].copy_from_slice(b"x3flasha");
-            bytes[8..12].copy_from_slice(&asset.to_le_bytes());
-            T::AccountId::decode(&mut &bytes[..])
-                .expect("x3-flashloan asset pool account decodes from 32 bytes")
+            use sp_runtime::traits::AccountIdConversion;
+            frame_support::PalletId(*b"x3flasha").into_sub_account_truncating(asset)
         }
 
         /// `asset`'s flash pool as the trading extension sees it: fee and liquidity.

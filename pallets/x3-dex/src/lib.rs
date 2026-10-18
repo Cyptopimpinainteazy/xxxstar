@@ -89,13 +89,18 @@ pub mod pallet {
     #[pallet::getter(fn lp_positions)]
     pub type LPPositions<T: Config> = StorageMap<_, Blake2_128Concat, u64, LPPosition>;
 
-    /// Next pool ID counter
-    #[pallet::storage]
-    pub type NextPoolId<T: Config> = StorageValue<_, u64, ValueQuery>;
-
     /// Next position ID counter
     #[pallet::storage]
     pub type NextPositionId<T: Config> = StorageValue<_, u64, ValueQuery>;
+
+    /// The last pool id `create_pool` assigned; the next pool is the next unused id after it.
+    ///
+    /// Pool ids used to come from `x3_dex::amm_pools::AMMPool::generate_pool_id`, which hashes the
+    /// chain ids and only the upper 64 bits of each asset id: every pool between two tokens on the
+    /// same chain got the same id, so a second pool was refused as a duplicate. Ids are now
+    /// sequential from 1, which is also how a program names a venue (`x3dex_pool_<id>`).
+    #[pallet::storage]
+    pub type NextPoolId<T: Config> = StorageValue<_, u64, ValueQuery>;
 
     /// Pools whose reserves are custodied on the ledger. A pool without an entry predates custody,
     /// holds no funds, and is frozen.
@@ -183,16 +188,26 @@ pub mod pallet {
             Self::ledger_asset(&token_a)?;
             Self::ledger_asset(&token_b)?;
 
-            // Create pool using the DEX crate
-            let pool = AMMPool::create_pool(token_a.clone(), token_b.clone(), fee_basis_points)
+            // Validate the pair and fee with the DEX crate; the id is the pallet's.
+            let mut pool = AMMPool::create_pool(token_a.clone(), token_b.clone(), fee_basis_points)
                 .map_err(|_| Error::<T>::InvalidTokenPair)?;
 
-            // Check if pool already exists
-            let pool_id = pool.pool_id;
-            ensure!(
-                !Pools::<T>::contains_key(pool_id),
-                Error::<T>::PoolAlreadyExists
-            );
+            // The next unused sequential id. A pool from before sequential ids sits at a hashed
+            // id; one of those is skipped, and a run of them is refused rather than searched.
+            let mut pool_id = NextPoolId::<T>::get();
+            let mut attempts = 0u8;
+            loop {
+                pool_id = pool_id
+                    .checked_add(1)
+                    .ok_or(Error::<T>::ArithmeticOverflow)?;
+                if !Pools::<T>::contains_key(pool_id) {
+                    break;
+                }
+                attempts += 1;
+                ensure!(attempts < 8, Error::<T>::PoolAlreadyExists);
+            }
+            NextPoolId::<T>::put(pool_id);
+            pool.pool_id = pool_id;
 
             // Store pool
             Pools::<T>::insert(pool_id, pool);

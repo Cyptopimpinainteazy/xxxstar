@@ -3,12 +3,12 @@
 use super::*;
 use crate::mock::*;
 use frame_support::{assert_noop, assert_ok};
-use x3_dex::amm_pools::{AMMPool, TokenId};
+use x3_dex::amm_pools::TokenId;
 
-fn pool_id(token_a: &TokenId, token_b: &TokenId, fee_basis_points: u32) -> u64 {
-    AMMPool::create_pool(token_a.clone(), token_b.clone(), fee_basis_points)
-        .expect("valid test pool")
-        .pool_id
+/// The id of the pool the test just created: the pallet assigns ids sequentially, and every
+/// caller asks right after its one `create_pool`.
+fn pool_id(_token_a: &TokenId, _token_b: &TokenId, _fee_basis_points: u32) -> u64 {
+    crate::NextPoolId::<Test>::get()
 }
 
 #[test]

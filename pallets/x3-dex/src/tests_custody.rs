@@ -22,7 +22,7 @@ fn funded_pool() -> u64 {
         b.clone(),
         30
     ));
-    let pool_id = AMMPool::create_pool(a, b, 30).expect("pool").pool_id;
+    let pool_id = crate::NextPoolId::<Test>::get();
     assert_ok!(DEX::add_liquidity(
         RuntimeOrigin::signed(1),
         pool_id,
@@ -176,5 +176,57 @@ fn trading_reserves_are_refused_beyond_custody() {
         assert_ok!(DEX::apply_trading_reserves(pool_id, 99_000, 50_000));
         let view = DEX::trading_pool(pool_id).expect("custodied");
         assert_eq!((view.asset_a, view.asset_b, view.reserve_a), (0, 1, 99_000));
+    });
+}
+
+#[test]
+fn two_pools_of_the_same_pair_coexist_under_sequential_ids() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token(0),
+            token(1),
+            30
+        ));
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token(1),
+            token(0),
+            30
+        ));
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token(0),
+            token(1),
+            5
+        ));
+        assert_eq!(crate::NextPoolId::<Test>::get(), 3);
+        for id in 1..=3u64 {
+            assert_eq!(DEX::pools(id).expect("pool").pool_id, id);
+        }
+        assert_eq!(DEX::pools(2).expect("pool").token_a, token(1));
+    });
+}
+
+#[test]
+fn a_pre_sequential_pool_at_the_next_id_is_skipped_not_overwritten() {
+    new_test_ext().execute_with(|| {
+        let legacy = AMMPool::create_pool(token(2), token(3), 30).expect("pool");
+        crate::Pools::<Test>::insert(
+            1,
+            LiquidityPool {
+                pool_id: 1,
+                ..legacy.clone()
+            },
+        );
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token(0),
+            token(1),
+            30
+        ));
+        assert_eq!(crate::NextPoolId::<Test>::get(), 2);
+        assert_eq!(DEX::pools(1).expect("legacy").token_a, token(2));
+        assert_eq!(DEX::pools(2).expect("new").token_a, token(0));
     });
 }

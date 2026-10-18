@@ -6,7 +6,7 @@ use frame_benchmarking::{v2::benchmarks, whitelisted_caller};
 use frame_support::traits::Get;
 use frame_system::RawOrigin;
 use x3_asset_kernel_types::traits::LedgerBenchmarkFunding;
-use x3_dex::amm_pools::{AMMPool, TokenId};
+use x3_dex::amm_pools::TokenId;
 
 /// Give `who` enough of both benchmark assets to provide liquidity and swap.
 fn fund<T: Config>(who: &T::AccountId) {
@@ -56,15 +56,13 @@ mod benchmarks {
             asset_id: 1,
         };
 
-        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
-            .expect("benchmark token pair is valid")
-            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
             token_b.clone(),
             30
         ));
+        let pool_id = NextPoolId::<T>::get();
 
         #[extrinsic_call]
         add_liquidity(RawOrigin::Signed(caller), pool_id, 1000, 1000, 900, 900);
@@ -83,15 +81,13 @@ mod benchmarks {
             asset_id: 1,
         };
 
-        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
-            .expect("benchmark token pair is valid")
-            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
             token_b.clone(),
             30
         ));
+        let pool_id = NextPoolId::<T>::get();
         assert_ok!(DEXPallet::<T>::add_liquidity(
             RawOrigin::Signed(caller.clone()).into(),
             pool_id,
@@ -121,15 +117,13 @@ mod benchmarks {
             asset_id: 1,
         };
 
-        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
-            .expect("benchmark token pair is valid")
-            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
             token_b.clone(),
             30
         ));
+        let pool_id = NextPoolId::<T>::get();
         assert_ok!(DEXPallet::<T>::add_liquidity(
             RawOrigin::Signed(caller.clone()).into(),
             pool_id,
