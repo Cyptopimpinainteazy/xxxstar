@@ -143,10 +143,10 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Root check
         if: ${{ !cancelled() }}
-        run: cargo check --locked --workspace --all-targets
+        run: bash scripts/ci/cargo-annotate.sh cargo check --locked --workspace --all-targets --message-format=short
       - name: Root clippy (warnings denied)
         if: ${{ !cancelled() }}
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+        run: bash scripts/ci/cargo-annotate.sh cargo clippy --locked --workspace --all-targets --message-format=short -- -D warnings
       - name: Root tests
         if: ${{ !cancelled() }}
-        run: cargo test --locked --workspace
+        run: bash scripts/ci/cargo-annotate.sh cargo test --locked --workspace
