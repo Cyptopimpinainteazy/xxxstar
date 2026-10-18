@@ -1,0 +1,214 @@
+test_direct_execution_requires_actual_boolean_consent (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_consent) ...
+  test_direct_execution_requires_actual_boolean_consent (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_consent) (consent='false') ... FAIL
+  test_direct_execution_requires_actual_boolean_consent (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_consent) (consent='true') ... FAIL
+  test_direct_execution_requires_actual_boolean_consent (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_consent) (consent=1) ... FAIL
+test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) ...
+  test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked='') ... FAIL
+  test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked=0) ... FAIL
+  test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked=None) ... FAIL
+  test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked=[]) ... FAIL
+  test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked={}) ... FAIL
+test_direct_execution_requires_integer_protocol_version (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_integer_protocol_version) ...
+  test_direct_execution_requires_integer_protocol_version (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_integer_protocol_version) (version=True) ... FAIL
+  test_direct_execution_requires_integer_protocol_version (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_integer_protocol_version) (version=1.0) ... FAIL
+test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) ...
+  test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) (payload=b'{"kind":"fixed_cpu_smoke","version":true}') ... FAIL
+  test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) (payload=b'{"kind":"fixed_cpu_smoke","version":1.0}') ... FAIL
+  test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) (payload=b'{"kind":"fixed_cpu_smoke","version":2,"version":1}') ... FAIL
+  test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) (payload=b'{"kind":"shell","kind":"fixed_cpu_smoke","version":1}') ... FAIL
+test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) ...
+  test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) (flags={'consent': 'false'}) ... FAIL
+  test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) (flags={'consent': 1}) ... FAIL
+  test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) (flags={'consent': True, 'revoked': None}) ... FAIL
+  test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) (flags={'consent': True, 'stop_requested': 0}) ... FAIL
+
+======================================================================
+FAIL: test_direct_execution_requires_actual_boolean_consent (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_consent) (consent='false')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 19, in test_direct_execution_requires_actual_boolean_consent
+    with self.subTest(consent=value), self.assertRaises(PermissionError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: PermissionError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_actual_boolean_consent (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_consent) (consent='true')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 19, in test_direct_execution_requires_actual_boolean_consent
+    with self.subTest(consent=value), self.assertRaises(PermissionError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: PermissionError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_actual_boolean_consent (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_consent) (consent=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 19, in test_direct_execution_requires_actual_boolean_consent
+    with self.subTest(consent=value), self.assertRaises(PermissionError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: PermissionError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked='')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 24, in test_direct_execution_requires_actual_boolean_revocation
+    with self.subTest(revoked=value), self.assertRaises(PermissionError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: PermissionError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 24, in test_direct_execution_requires_actual_boolean_revocation
+    with self.subTest(revoked=value), self.assertRaises(PermissionError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: PermissionError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 24, in test_direct_execution_requires_actual_boolean_revocation
+    with self.subTest(revoked=value), self.assertRaises(PermissionError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: PermissionError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked=[])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 24, in test_direct_execution_requires_actual_boolean_revocation
+    with self.subTest(revoked=value), self.assertRaises(PermissionError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: PermissionError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_actual_boolean_revocation (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_actual_boolean_revocation) (revoked={})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 24, in test_direct_execution_requires_actual_boolean_revocation
+    with self.subTest(revoked=value), self.assertRaises(PermissionError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: PermissionError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_integer_protocol_version (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_integer_protocol_version) (version=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 29, in test_direct_execution_requires_integer_protocol_version
+    with self.subTest(version=value), self.assertRaises(ValueError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_direct_execution_requires_integer_protocol_version (test_strict_inputs.StrictInputsTests.test_direct_execution_requires_integer_protocol_version) (version=1.0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 29, in test_direct_execution_requires_integer_protocol_version
+    with self.subTest(version=value), self.assertRaises(ValueError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) (payload=b'{"kind":"fixed_cpu_smoke","version":true}')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 64, in test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption
+    self.dispatch(payload, consent=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 45, in dispatch
+    self.assertEqual(count, 0, "invalid inputs consumed a lease")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : invalid inputs consumed a lease
+
+======================================================================
+FAIL: test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) (payload=b'{"kind":"fixed_cpu_smoke","version":1.0}')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 64, in test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption
+    self.dispatch(payload, consent=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 45, in dispatch
+    self.assertEqual(count, 0, "invalid inputs consumed a lease")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : invalid inputs consumed a lease
+
+======================================================================
+FAIL: test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) (payload=b'{"kind":"fixed_cpu_smoke","version":2,"version":1}')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 64, in test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption
+    self.dispatch(payload, consent=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 45, in dispatch
+    self.assertEqual(count, 0, "invalid inputs consumed a lease")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : invalid inputs consumed a lease
+
+======================================================================
+FAIL: test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption (test_strict_inputs.StrictInputsTests.test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption) (payload=b'{"kind":"shell","kind":"fixed_cpu_smoke","version":1}')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 64, in test_dispatch_rejects_ambiguous_manifests_before_nonce_consumption
+    self.dispatch(payload, consent=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 45, in dispatch
+    self.assertEqual(count, 0, "invalid inputs consumed a lease")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : invalid inputs consumed a lease
+
+======================================================================
+FAIL: test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) (flags={'consent': 'false'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 54, in test_dispatch_requires_exact_boolean_safety_controls
+    self.dispatch(**flags)
+    ~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 45, in dispatch
+    self.assertEqual(count, 0, "invalid inputs consumed a lease")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : invalid inputs consumed a lease
+
+======================================================================
+FAIL: test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) (flags={'consent': 1})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 54, in test_dispatch_requires_exact_boolean_safety_controls
+    self.dispatch(**flags)
+    ~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 45, in dispatch
+    self.assertEqual(count, 0, "invalid inputs consumed a lease")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : invalid inputs consumed a lease
+
+======================================================================
+FAIL: test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) (flags={'consent': True, 'revoked': None})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 54, in test_dispatch_requires_exact_boolean_safety_controls
+    self.dispatch(**flags)
+    ~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 45, in dispatch
+    self.assertEqual(count, 0, "invalid inputs consumed a lease")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : invalid inputs consumed a lease
+
+======================================================================
+FAIL: test_dispatch_requires_exact_boolean_safety_controls (test_strict_inputs.StrictInputsTests.test_dispatch_requires_exact_boolean_safety_controls) (flags={'consent': True, 'stop_requested': 0})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 54, in test_dispatch_requires_exact_boolean_safety_controls
+    self.dispatch(**flags)
+    ~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/lojak/x3-volunteer-consent-20261018/services/x3-volunteer-worker/test_strict_inputs.py", line 45, in dispatch
+    self.assertEqual(count, 0, "invalid inputs consumed a lease")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : invalid inputs consumed a lease
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.448s
+
+FAILED (failures=18)
