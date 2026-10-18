@@ -912,6 +912,9 @@ pub mod pallet {
         pub evm_escrow: sp_core::H160,
         /// Bridge escrow address for SVM cross-chain operations.
         pub svm_escrow: [u8; 32],
+        /// The trade cost schedule a development or test network starts with. `None` (every
+        /// production chain) leaves trading refused until governance calls `set_trading_config`.
+        pub trading_config: Option<crate::trading::TradingConfig<T::AccountId>>,
     }
 
     #[pallet::genesis_build]
@@ -946,6 +949,17 @@ pub mod pallet {
                     decimals: *decimals,
                 };
                 AssetRegistry::<T>::insert(asset_id, metadata);
+            }
+
+            // After the registry: the fee asset must be one this genesis registered.
+            if let Some(config) = &self.trading_config {
+                let fee_asset = T::AssetId::try_from(config.fee_asset)
+                    .unwrap_or_else(|_| panic!("trading fee asset does not fit the asset id type"));
+                assert!(
+                    AssetRegistry::<T>::contains_key(fee_asset),
+                    "Trading fee asset is not registered in genesis"
+                );
+                TradingConfiguration::<T>::put(config.clone());
             }
 
             // Set escrow addresses

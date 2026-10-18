@@ -166,7 +166,8 @@ impl<AccountId> KernelTradingHost<AccountId> for () {
     }
 }
 
-/// The chain's trade cost schedule and fee collector, set by governance.
+/// The chain's trade cost schedule and fee collector, set by governance (or at genesis on a
+/// development or test network).
 #[derive(
     Clone,
     PartialEq,
@@ -177,6 +178,8 @@ impl<AccountId> KernelTradingHost<AccountId> for () {
     RuntimeDebug,
     TypeInfo,
     MaxEncodedLen,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct TradingConfig<AccountId> {
     /// `CanonicalLedger` asset every chain-mandated cost is paid in.

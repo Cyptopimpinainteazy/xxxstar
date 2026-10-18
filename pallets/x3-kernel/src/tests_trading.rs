@@ -687,3 +687,35 @@ fn a_trade_pays_for_what_it_did_not_for_the_largest_trade_possible() {
         );
     });
 }
+
+/// A genesis may only start trading in a fee asset it registers: anything else is a chain that
+/// would refuse its first trade, so the genesis itself is refused.
+#[test]
+#[should_panic(expected = "Trading fee asset is not registered in genesis")]
+fn a_genesis_trading_schedule_in_an_unregistered_asset_is_refused() {
+    use sp_runtime::BuildStorage;
+    let _ = crate::pallet::GenesisConfig::<Test> {
+        assets: vec![(USDX, b"USDX".to_vec(), 6)],
+        trading_config: Some(TradingConfig {
+            fee_asset: 99,
+            ..config()
+        }),
+        ..Default::default()
+    }
+    .build_storage();
+}
+
+#[test]
+fn a_genesis_trading_schedule_is_in_force_from_block_one() {
+    use sp_runtime::BuildStorage;
+    let storage = crate::pallet::GenesisConfig::<Test> {
+        assets: vec![(USDX, b"USDX".to_vec(), 6)],
+        trading_config: Some(config()),
+        ..Default::default()
+    }
+    .build_storage()
+    .expect("genesis builds");
+    sp_io::TestExternalities::new(storage).execute_with(|| {
+        assert_eq!(TradingConfiguration::<Test>::get(), Some(config()));
+    });
+}

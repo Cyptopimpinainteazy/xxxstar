@@ -212,6 +212,7 @@ fn new_test_ext() -> TestExternalities {
         authorized_accounts: vec![ALICE, BOB, CHARLIE],
         evm_escrow: H160::repeat_byte(0xE3),
         svm_escrow: [0x53; 32],
+        trading_config: None,
     }
     .assimilate_storage(&mut storage)
     .expect("kernel genesis");

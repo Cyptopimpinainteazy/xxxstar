@@ -562,6 +562,7 @@ impl ExtBuilder {
             authorized_accounts: self.authorized_accounts.clone(),
             evm_escrow: self.evm_escrow,
             svm_escrow: self.svm_escrow,
+            trading_config: None,
         }
         .assimilate_storage(&mut storage)
         .expect("Failed to assimilate x3-kernel storage");
