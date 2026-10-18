@@ -426,10 +426,13 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // upgrade has no journals: it cannot finalize, and its rollback is refused if any leg
     // carries an old off-chain diff (expiry retries it); none exist on a network that ran
     // only the refusing call 7.
+    // Same release: `submit_atomic_bundle` gains `execution_commitments` (one hash per
+    // leg; a leg runs only the execution it committed to), so its encoding changed and
+    // `transaction_version` goes to 2.
     spec_version: 24,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
-    transaction_version: 1,
+    transaction_version: 2,
     // X3 (stable2512): RuntimeVersion no longer carries `state_version`.
     system_version: 1,
 };

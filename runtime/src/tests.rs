@@ -209,6 +209,28 @@ fn atomic_test_ext() -> sp_io::TestExternalities {
     ext
 }
 
+/// Commitments that match no execution: for bundles a test never executes.
+fn runtime_uncommitted(
+    legs: usize,
+) -> frame_support::BoundedVec<H256, <Runtime as pallet_x3_atomic_kernel::Config>::MaxLegsPerBundle>
+{
+    frame_support::BoundedVec::try_from(vec![H256::zero(); legs]).expect("within the leg bound")
+}
+
+/// The commitments for exactly these executions, in leg order.
+fn runtime_committed(
+    executions: &[pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId>],
+) -> frame_support::BoundedVec<H256, <Runtime as pallet_x3_atomic_kernel::Config>::MaxLegsPerBundle>
+{
+    frame_support::BoundedVec::try_from(
+        executions
+            .iter()
+            .map(pallet_x3_atomic_kernel::chain_legs::execution_commitment)
+            .collect::<Vec<_>>(),
+    )
+    .expect("within the leg bound")
+}
+
 /// The receipt root the chain computes for a bundle — the same commitment `do_finalize_bundle`
 /// checks on a build without `dev`/`testnet`.
 fn runtime_receipt_root(bundle_id: H256, cert: H256, finalized_block: u64) -> H256 {
@@ -282,9 +304,19 @@ fn a_bundle_finalizes_once_with_the_receipt_root_the_chain_requires() {
 
     atomic_test_ext().execute_with(|| {
         let gateway = atomic_gateway();
+        let leg = pallet_x3_atomic_kernel::chain_legs::LegExecution::X3 {
+            program: BoundedVec::try_from(
+                x3_x3_integration::compiler_bridge::compile_source(
+                    "fn main() -> i64 { evm_sstore(3, 1); return 1; }",
+                )
+                .expect("compiles"),
+            )
+            .expect("small program"),
+        };
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+            runtime_committed(&[leg.clone()]),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,
@@ -301,15 +333,7 @@ fn a_bundle_finalizes_once_with_the_receipt_root_the_chain_requires() {
             RuntimeOrigin::signed(gateway.clone()),
             bundle_id,
             0,
-            pallet_x3_atomic_kernel::chain_legs::LegExecution::X3 {
-                program: BoundedVec::try_from(
-                    x3_x3_integration::compiler_bridge::compile_source(
-                        "fn main() -> i64 { evm_sstore(3, 1); return 1; }",
-                    )
-                    .expect("compiles"),
-                )
-                .expect("small program"),
-            }
+            leg
         ));
 
         // The anchor map is keyed by `u64`; the call takes the runtime's own block number.
@@ -373,6 +397,7 @@ fn a_bundle_nonce_cannot_be_replayed() {
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             legs(),
+            runtime_uncommitted(1),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,
@@ -381,6 +406,7 @@ fn a_bundle_nonce_cannot_be_replayed() {
             crate::X3AtomicKernel::submit_atomic_bundle(
                 RuntimeOrigin::signed(gateway),
                 legs(),
+                runtime_uncommitted(1),
                 100,
                 ATOMIC_CHAIN_ID,
                 ATOMIC_NONCE,
@@ -423,6 +449,7 @@ fn the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime() {
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+            runtime_uncommitted(1),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,
@@ -442,6 +469,7 @@ fn the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime() {
             crate::X3AtomicKernel::submit_atomic_bundle(
                 RuntimeOrigin::signed(gateway),
                 BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+                runtime_uncommitted(1),
                 100,
                 ATOMIC_CHAIN_ID,
                 ATOMIC_NONCE + 1,
@@ -473,6 +501,7 @@ fn a_kernel_pause_leaves_a_pending_atomic_bundle_recoverable() {
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+            runtime_uncommitted(1),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,
@@ -1215,9 +1244,20 @@ fn chain_executed_legs_are_undone_exactly_by_a_rollback() {
             None
         );
 
+        let runs = vec![
+            LegExecution::Transfer {
+                asset: 0,
+                to: recipient.clone(),
+                amount: 1_200,
+            },
+            LegExecution::X3 {
+                program: BoundedVec::try_from(program).expect("small program"),
+            },
+        ];
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             BoundedVec::try_from(vec![atomic_leg(), atomic_leg()]).expect("two legs fit"),
+            runtime_committed(&runs),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,
@@ -1232,19 +1272,13 @@ fn chain_executed_legs_are_undone_exactly_by_a_rollback() {
             RuntimeOrigin::signed(gateway.clone()),
             bundle_id,
             0,
-            LegExecution::Transfer {
-                asset: 0,
-                to: recipient.clone(),
-                amount: 1_200,
-            }
+            runs[0].clone()
         ));
         assert_ok!(crate::X3AtomicKernel::execute_bundle_leg(
             RuntimeOrigin::signed(gateway.clone()),
             bundle_id,
             1,
-            LegExecution::X3 {
-                program: BoundedVec::try_from(program).expect("small program"),
-            }
+            runs[1].clone()
         ));
         let ledger = |who: &AccountId| pallet_x3_kernel::CanonicalLedger::<Runtime>::get(who, 0);
         // The transfer waits in the bundle's escrow; the X3 leg's slot is held for the bundle.
@@ -1309,9 +1343,15 @@ fn a_chain_leg_cannot_spend_more_than_the_executor_holds() {
             12
         ));
         pallet_x3_kernel::CanonicalLedger::<Runtime>::insert(&gateway, 0, 100u128);
+        let leg = LegExecution::Transfer {
+            asset: 0,
+            to: AccountId::from([0x77; 32]),
+            amount: 101,
+        };
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             BoundedVec::try_from(vec![atomic_leg()]).expect("one leg"),
+            runtime_committed(&[leg.clone()]),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,
@@ -1327,11 +1367,7 @@ fn a_chain_leg_cannot_spend_more_than_the_executor_holds() {
             RuntimeOrigin::signed(gateway.clone()),
             bundle_id,
             0,
-            LegExecution::Transfer {
-                asset: 0,
-                to: AccountId::from([0x77; 32]),
-                amount: 101,
-            }
+            leg
         )
         .is_err());
         assert_eq!(
@@ -1372,9 +1408,20 @@ fn a_finalized_bundle_pays_its_escrow_and_releases_its_slots() {
             12
         ));
         pallet_x3_kernel::CanonicalLedger::<Runtime>::insert(&gateway, 0, 5_000u128);
+        let runs = vec![
+            LegExecution::Transfer {
+                asset: 0,
+                to: recipient.clone(),
+                amount: 1_200,
+            },
+            LegExecution::X3 {
+                program: BoundedVec::try_from(writer).expect("small program"),
+            },
+        ];
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             BoundedVec::try_from(vec![atomic_leg(), atomic_leg()]).expect("two legs fit"),
+            runtime_committed(&runs),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,
@@ -1388,19 +1435,13 @@ fn a_finalized_bundle_pays_its_escrow_and_releases_its_slots() {
             RuntimeOrigin::signed(gateway.clone()),
             bundle_id,
             0,
-            LegExecution::Transfer {
-                asset: 0,
-                to: recipient.clone(),
-                amount: 1_200,
-            }
+            runs[0].clone()
         ));
         assert_ok!(crate::X3AtomicKernel::execute_bundle_leg(
             RuntimeOrigin::signed(gateway.clone()),
             bundle_id,
             1,
-            LegExecution::X3 {
-                program: BoundedVec::try_from(writer).expect("small program"),
-            }
+            runs[1].clone()
         ));
         let slot = x3_evm_slot_key(7);
         let held_value = pallet_x3_kernel::X3ContractStorage::<Runtime>::get(slot);

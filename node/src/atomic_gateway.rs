@@ -33,10 +33,12 @@ impl AtomicGatewayKey {
         account_from_public(self.pair.public())
     }
 
-    /// Build a signed `submit_atomic_bundle` extrinsic.
+    /// Build a signed `submit_atomic_bundle` extrinsic committing each leg to the execution in
+    /// `executions` (same order): the chain will run each leg only as committed here.
     pub fn submit_atomic_bundle(
         &self,
         legs: Vec<pallet_x3_atomic_kernel::proof::BundleLeg>,
+        executions: &[pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId>],
         deadline_blocks: u32,
         chain_id: u32,
         nonce: u64,
@@ -47,9 +49,19 @@ impl AtomicGatewayKey {
         let legs: BoundedVec<_, MaxLegs> = legs
             .try_into()
             .map_err(|_| "atomic bundle exceeds maximum leg count".to_string())?;
+        let execution_commitments: BoundedVec<H256, MaxLegs> = executions
+            .iter()
+            .map(pallet_x3_atomic_kernel::chain_legs::execution_commitment)
+            .collect::<Vec<_>>()
+            .try_into()
+            .map_err(|_| "atomic bundle exceeds maximum leg count".to_string())?;
+        if execution_commitments.len() != legs.len() {
+            return Err("every leg needs exactly one execution".to_string());
+        }
         let call = RuntimeCall::X3AtomicKernel(
             pallet_x3_atomic_kernel::Call::<Runtime>::submit_atomic_bundle {
                 legs,
+                execution_commitments,
                 deadline_blocks,
                 chain_id,
                 nonce,
@@ -259,12 +271,24 @@ mod tests {
         }
     }
 
+    fn execution() -> pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId> {
+        pallet_x3_atomic_kernel::chain_legs::LegExecution::X3 {
+            program: BoundedVec::try_from(vec![1, 2, 3]).unwrap(),
+        }
+    }
+
     #[test]
     fn submit_atomic_bundle_builds_signable_extrinsic() {
         let xt = gateway()
-            .submit_atomic_bundle(vec![leg()], 100, 1, 1, H256::zero(), 0)
+            .submit_atomic_bundle(vec![leg()], &[execution()], 100, 1, 1, H256::zero(), 0)
             .expect("submit extrinsic builds");
         assert!(!xt.encode().is_empty());
+        assert!(
+            gateway()
+                .submit_atomic_bundle(vec![leg()], &[], 100, 1, 1, H256::zero(), 0)
+                .is_err(),
+            "a leg without an execution to commit to is refused before signing"
+        );
     }
 
     #[test]

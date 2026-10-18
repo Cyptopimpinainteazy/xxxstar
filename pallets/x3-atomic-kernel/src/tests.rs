@@ -28,6 +28,40 @@ type Balances = pallet_balances::Pallet<Test>;
 
 /// A minimal executable bundle: one X3 leg with declared access.
 #[allow(dead_code)]
+/// Commitments that match no execution: for bundles a test never executes.
+fn uncommitted(legs: usize) -> BoundedVec<H256, MaxLegsPerBundle> {
+    BoundedVec::try_from(vec![H256::zero(); legs]).expect("within MaxLegsPerBundle")
+}
+
+/// The commitments for exactly these executions, in leg order.
+fn committed(
+    executions: &[crate::chain_legs::LegExecution<u64>],
+) -> BoundedVec<H256, MaxLegsPerBundle> {
+    BoundedVec::try_from(
+        executions
+            .iter()
+            .map(crate::chain_legs::execution_commitment)
+            .collect::<Vec<_>>(),
+    )
+    .expect("within MaxLegsPerBundle")
+}
+
+/// An X3 leg in the mock: the program `[slot, value]` writes `value` into slot `slot`.
+fn x3_leg(slot: u8, value: u8) -> crate::chain_legs::LegExecution<u64> {
+    crate::chain_legs::LegExecution::X3 {
+        program: BoundedVec::try_from(vec![slot, value]).expect("fits"),
+    }
+}
+
+/// A transfer leg of asset 3.
+fn transfer_leg(to: u64, amount: u128) -> crate::chain_legs::LegExecution<u64> {
+    crate::chain_legs::LegExecution::Transfer {
+        asset: 3,
+        to,
+        amount,
+    }
+}
+
 fn one_leg_bundle() -> BoundedVec<BundleLeg, MaxLegsPerBundle> {
     BoundedVec::try_from(vec![BundleLeg {
         vm_type: VmType::X3,
@@ -77,6 +111,7 @@ fn economic_halt_blocks_bundle_submission() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             one_leg_bundle(),
+            uncommitted(1),
             10,
             1,
             1,
@@ -93,6 +128,7 @@ fn economic_halt_blocks_bundle_submission() {
             AtomicKernel::submit_atomic_bundle(
                 RuntimeOrigin::signed(ALICE),
                 one_leg_bundle(),
+                uncommitted(1),
                 10,
                 1,
                 2,
@@ -111,6 +147,7 @@ fn economic_halt_blocks_bundle_submission() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             one_leg_bundle(),
+            uncommitted(1),
             10,
             1,
             2,
@@ -128,6 +165,7 @@ fn economic_halt_does_not_trap_pending_bundle_funds() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             one_leg_bundle(),
+            uncommitted(1),
             10,
             1,
             1,
@@ -170,6 +208,7 @@ fn economic_halt_does_not_trap_pending_bundle_funds() {
             AtomicKernel::submit_atomic_bundle(
                 RuntimeOrigin::signed(ALICE),
                 one_leg_bundle(),
+                uncommitted(1),
                 10,
                 1,
                 2,
@@ -182,9 +221,24 @@ fn economic_halt_does_not_trap_pending_bundle_funds() {
 /// Submits one bundle and assigns an executor, returning its id.
 #[allow(dead_code)]
 fn submit_and_assign(deadline_blocks: u64, nonce: u64) -> H256 {
+    submit_and_assign_committing(deadline_blocks, nonce, default_leg(nonce))
+}
+
+/// The leg `submit_and_assign` commits to: an X3 program writing slot `0x30 + nonce`.
+fn default_leg(nonce: u64) -> crate::chain_legs::LegExecution<u64> {
+    x3_leg(0x30u8.wrapping_add(nonce as u8), 1)
+}
+
+/// Submit `one_leg_bundle` as ALICE committing its leg to `execution`, and assign BOB.
+fn submit_and_assign_committing(
+    deadline_blocks: u64,
+    nonce: u64,
+    execution: crate::chain_legs::LegExecution<u64>,
+) -> H256 {
     assert_ok!(AtomicKernel::submit_atomic_bundle(
         RuntimeOrigin::signed(ALICE),
         one_leg_bundle(),
+        committed(&[execution]),
         deadline_blocks,
         1,
         nonce,
@@ -199,17 +253,14 @@ fn submit_and_assign(deadline_blocks: u64, nonce: u64) -> H256 {
     bundle_id
 }
 
-/// `submit_and_assign`, then the bundle's one leg executed on chain (an X3 program writing slot
-/// `0x30 + nonce`), so the bundle can finalize.
+/// `submit_and_assign`, then the bundle's one leg executed on chain, so the bundle can finalize.
 fn submit_assign_and_execute(deadline_blocks: u64, nonce: u64) -> H256 {
     let bundle_id = submit_and_assign(deadline_blocks, nonce);
     assert_ok!(AtomicKernel::execute_bundle_leg(
         RuntimeOrigin::signed(BOB),
         bundle_id,
         0,
-        crate::chain_legs::LegExecution::X3 {
-            program: BoundedVec::try_from(vec![0x30u8.wrapping_add(nonce as u8), 1]).expect("fits"),
-        }
+        default_leg(nonce)
     ));
     bundle_id
 }
@@ -1099,6 +1150,7 @@ fn economic_halt_does_not_block_inflight_bundle_assignment() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             one_leg_bundle(),
+            uncommitted(1),
             10,
             1,
             1,
@@ -1123,6 +1175,7 @@ fn economic_halt_does_not_block_inflight_bundle_assignment() {
             AtomicKernel::submit_atomic_bundle(
                 RuntimeOrigin::signed(ALICE),
                 one_leg_bundle(),
+                uncommitted(1),
                 10,
                 1,
                 2,
@@ -1208,6 +1261,7 @@ fn finalization_refuses_a_bundle_nobody_has_been_assigned_to() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             one_leg_bundle(),
+            uncommitted(1),
             100,
             1,
             7,
@@ -1370,7 +1424,7 @@ fn a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice() {
 #[test]
 fn a_leg_executes_once_and_keeps_its_first_journal() {
     new_test_ext().execute_with(|| {
-        let bundle_id = submit_and_assign(100, 22);
+        let bundle_id = submit_and_assign_committing(100, 22, x3_leg(0x40, 1));
         let program = |slot: u8, value: u8| crate::chain_legs::LegExecution::X3 {
             program: BoundedVec::try_from(vec![slot, value]).expect("fits"),
         };
@@ -1461,6 +1515,7 @@ fn a_rollback_undoes_the_legs_the_chain_executed() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             two_x3_legs(),
+            committed(&[transfer_leg(CHARLIE, 400), x3_leg(0x50, 9)]),
             100,
             1,
             25,
@@ -1541,6 +1596,7 @@ fn a_rollback_that_cannot_undo_every_leg_changes_nothing() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             two_x3_legs(),
+            committed(&[transfer_leg(CHARLIE, 400), x3_leg(0x60, 1)]),
             100,
             1,
             26,
@@ -1611,6 +1667,7 @@ fn a_bundle_finalizes_only_with_every_leg_executed_and_then_pays_its_escrow() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             two_x3_legs(),
+            committed(&[transfer_leg(CHARLIE, 400), x3_leg(0x61, 4)]),
             100,
             1,
             28,
@@ -1743,6 +1800,7 @@ fn a_submission_nonce_cannot_be_spent_twice_or_rewound() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             one_leg_bundle(),
+            uncommitted(1),
             10,
             1,
             30,
@@ -1759,6 +1817,7 @@ fn a_submission_nonce_cannot_be_spent_twice_or_rewound() {
             AtomicKernel::submit_atomic_bundle(
                 RuntimeOrigin::signed(ALICE),
                 one_leg_bundle(),
+                uncommitted(1),
                 10,
                 1,
                 31,
@@ -1771,6 +1830,7 @@ fn a_submission_nonce_cannot_be_spent_twice_or_rewound() {
             AtomicKernel::submit_atomic_bundle(
                 RuntimeOrigin::signed(ALICE),
                 one_leg_bundle_with(1_001),
+                uncommitted(1),
                 10,
                 1,
                 30,
@@ -1782,6 +1842,7 @@ fn a_submission_nonce_cannot_be_spent_twice_or_rewound() {
             AtomicKernel::submit_atomic_bundle(
                 RuntimeOrigin::signed(ALICE),
                 one_leg_bundle_with(1_002),
+                uncommitted(1),
                 10,
                 1,
                 29,
@@ -1798,6 +1859,7 @@ fn a_submission_nonce_cannot_be_spent_twice_or_rewound() {
         assert_ok!(AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             one_leg_bundle_with(1_003),
+            uncommitted(1),
             10,
             1,
             31,
@@ -1946,7 +2008,7 @@ fn an_anchor_for_a_height_the_chain_has_no_hash_for_is_refused() {
 #[test]
 fn an_executor_cannot_spend_the_submitters_funds() {
     new_test_ext().execute_with(|| {
-        let bundle_id = submit_and_assign(100, 26);
+        let bundle_id = submit_and_assign_committing(100, 26, transfer_leg(CHARLIE, 400));
         crate::mock::TestLegExecutor::set_balance(3, &ALICE, 1_000);
         assert!(AtomicKernel::execute_bundle_leg(
             RuntimeOrigin::signed(BOB),
@@ -1965,5 +2027,43 @@ fn an_executor_cannot_spend_the_submitters_funds() {
             !crate::BundleLegReceipts::<Test>::get(bundle_id)[0].executed,
             "a refused leg records nothing"
         );
+    });
+}
+
+/// A bundle commits to what each leg will execute, and a leg runs only that: a different program,
+/// recipient or amount is refused, and a submission must commit to every declared leg.
+#[test]
+fn a_leg_runs_only_the_execution_its_bundle_committed_to() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                two_x3_legs(),
+                uncommitted(1),
+                100,
+                1,
+                60,
+            ),
+            Error::<Test>::ExecutionCommitmentMismatch
+        );
+
+        let bundle_id = submit_and_assign_committing(100, 61, transfer_leg(CHARLIE, 400));
+        crate::mock::TestLegExecutor::set_balance(3, &BOB, 1_000);
+        for other in [
+            transfer_leg(CHARLIE, 401),
+            transfer_leg(CHARLIE + 1, 400),
+            x3_leg(0x63, 1),
+        ] {
+            assert_noop!(
+                AtomicKernel::execute_bundle_leg(RuntimeOrigin::signed(BOB), bundle_id, 0, other),
+                Error::<Test>::ExecutionNotCommitted
+            );
+        }
+        assert_ok!(AtomicKernel::execute_bundle_leg(
+            RuntimeOrigin::signed(BOB),
+            bundle_id,
+            0,
+            transfer_leg(CHARLIE, 400)
+        ));
     });
 }
