@@ -213,8 +213,20 @@ already failing on master: its recorded revision is not in the repository).
   are not on `CanonicalLedger`, so the pool could not custody anything. It previously recorded an
   empty pool under a wrong id (0).
 
-### Security findings recorded for follow-up
+### Security findings from the audit
 
-- Kernel `WasmX3Adapter` drops logs; the atomic-kernel reverter may use the wrong storage prefix;
-  `x3-verifier::verify_bytecode` is a stub; `x3-flashloan::pool_account` (native pool) decodes an
-  account with `.expect` (left unchanged: the account already holds funds).
+- Fixed: kernel `WasmX3Adapter` dropped every X3 event; they are now delivered as
+  `X3LogEmitted` events (not kept in state: `Emit` is priced per event, not per byte).
+- Fixed: `x3-verifier::verify_bytecode` accepted everything; it is removed, and the std
+  `X3Executor::estimate_gas` now verifies with the chain's verifier and returns the chain's estimate.
+- Fixed (fail closed): the atomic kernel's `CompositeReverter` wrote every revert to keys no
+  pallet reads (crate names instead of runtime pallet names, two nonexistent storage items, the
+  wrong EVM hasher) and reported `Reverted`. Its diffs come from an unsigned, unauthenticated
+  extrinsic, so correcting the keys would have let anyone choose what a rollback writes. It now
+  refuses every non-empty diff (`UnauthenticatedStateDiff`) and the pallet reports
+  `IncompleteVmRevert`. **Open design question:** leg diffs need to be produced or verified by the
+  chain before any VM revert can be applied.
+- Open: `Emit` costs a flat 20 gas whatever its payload (up to 4 KiB); pricing per byte is a gas
+  schedule (consensus) decision.
+- Left unchanged: `x3-flashloan::pool_account` (native pool) decodes its account with `.expect`;
+  changing the derivation would move an account that already holds funds.
