@@ -41,6 +41,13 @@ def configuration():
         raise RuntimeError("Invalid local configuration; expected two generated 32-byte hex secrets")
     if SECRETS.stat().st_mode & 0o077:
         raise RuntimeError("Local credentials must be private: chmod 600 .env.money-swarm.local")
+    # Compose consumes a mounted secret rather than interpolating a credential.
+    # This private copy is also ignored with all local runtime artifacts.
+    password_file = LOCAL / "postgres-password"
+    descriptor = os.open(password_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "w") as output:
+        os.fchmod(output.fileno(), 0o600)
+        output.write(values["X3_MONEY_DB_PASSWORD"])
     environment = dict(os.environ, **values)
     environment.update(X3_GATEWAY_LISTEN="127.0.0.1:9086", X3_FUNDING_DISCOVERY_ENABLED="1",
                        X3_GATEWAY_DATABASE_URL=f"postgres://x3_money:{values['X3_MONEY_DB_PASSWORD']}@127.0.0.1:15486/x3_money")

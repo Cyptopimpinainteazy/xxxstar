@@ -9,7 +9,9 @@ services:
     environment:
       POSTGRES_USER: x3_money
       POSTGRES_DB: x3_money
-      POSTGRES_PASSWORD: ${X3_MONEY_DB_PASSWORD:?Run the local pilot launcher to create secrets}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
     ports:
       - '127.0.0.1:15486:5432'
     volumes:
@@ -24,3 +26,7 @@ volumes:
     name: x3-money-swarm-pilot-data
     labels:
       io.x3.money-swarm: local-pilot
+
+secrets:
+  postgres_password:
+    file: ../../.local/money-swarm/postgres-password
