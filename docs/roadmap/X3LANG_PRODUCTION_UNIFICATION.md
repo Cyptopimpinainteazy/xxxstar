@@ -139,16 +139,16 @@ Filled in as tests land. Status values: NOT RUN / RUNNING / PASS / FAIL / BLOCKE
 
 | Feature | Test | Status |
 |---|---|---|
-| `.x3` → X3BC → decode → verify → x3-vm → commit → signed receipt → replay | `crates/x3-integration/tests/x3lang_trading_production_e2e.rs::x3lang_trading_source_to_signed_replayed_receipt_on_production_path` | RED |
-| Trap after a state-changing swap rolls back everything | `…production_e2e.rs::x3lang_trading_trap_after_swap_rolls_back_everything` | RED |
-| Compile-time refusals (unresolved binding/debt, overflow, off-chain asset, asset id width) | `crates/x3-integration/tests/x3lang_trading_negative.rs` | RED |
-| Artifact refusals (truncated, malformed section, unsupported version, 1.0 reader) | `x3lang_trading_negative.rs` | RED |
-| Runtime refusals (chain, capability version, missing capability, gas, oracle stale/missing/divergent/deviation, slippage, flash fee, profit floor, cost ceiling, host refusal, failure before repay, overflow, deadline, private route, checked conversion) | `x3lang_trading_negative.rs` | RED |
-| Signed receipt, forged/modified receipt, unknown/impostor/revoked attestor, artifact binding, canonical encoding | `crates/x3-integration/tests/x3lang_trading_receipt_replay.rs` | RED |
-| Commit releases every journaled effect; failure at every step leaves nothing; nested windows | `crates/x3-integration/tests/x3lang_trading_rollback.rs` | RED |
-| Production engine vs nested reference oracle | `crates/x3-integration/tests/x3lang_trading_differential.rs` | RED |
-| One opcode table: decoder, verifier, gas, execution, traps, differential coverage; dead tables removed | `crates/x3-vm/tests/opcode_spec_exhaustive.rs` | RED |
-| Nested compiler lowers to canonical X3BC; explicit diagnostics for unsupported constructs; mode propagation | `x3-lang/compiler/tests/test_x3bc_lowering.rs` | RED |
+| `.x3` → X3BC → decode → verify → x3-vm → commit → signed receipt → replay | `crates/x3-integration/tests/x3lang_trading_production_e2e.rs::x3lang_trading_source_to_signed_replayed_receipt_on_production_path` | GREEN locally (exact-head CI pending) |
+| Trap after a state-changing swap rolls back everything | `…production_e2e.rs::x3lang_trading_trap_after_swap_rolls_back_everything` | GREEN locally (exact-head CI pending) |
+| Compile-time refusals (unresolved binding/debt, overflow, off-chain asset, asset id width) | `crates/x3-integration/tests/x3lang_trading_negative.rs` | GREEN locally (exact-head CI pending) |
+| Artifact refusals (truncated, malformed section, unsupported version, 1.0 reader) | `x3lang_trading_negative.rs` | GREEN locally (exact-head CI pending) |
+| Runtime refusals (chain, capability version, missing capability, gas, oracle stale/missing/divergent/deviation, slippage, flash fee, profit floor, cost ceiling, host refusal, failure before repay, overflow, deadline, private route, checked conversion) | `x3lang_trading_negative.rs` | GREEN locally (exact-head CI pending) |
+| Signed receipt, forged/modified receipt, unknown/impostor/revoked attestor, artifact binding, canonical encoding | `crates/x3-integration/tests/x3lang_trading_receipt_replay.rs` | GREEN locally (exact-head CI pending) |
+| Commit releases every journaled effect; failure at every step leaves nothing; nested windows | `crates/x3-integration/tests/x3lang_trading_rollback.rs` | GREEN locally (exact-head CI pending) |
+| Production engine vs nested reference oracle | `crates/x3-integration/tests/x3lang_trading_differential.rs` | GREEN locally (exact-head CI pending) |
+| One opcode table: decoder, verifier, gas, execution, traps, differential coverage; dead tables removed | `crates/x3-vm/tests/opcode_spec_exhaustive.rs` | GREEN locally (exact-head CI pending) |
+| Nested compiler lowers to canonical X3BC; explicit diagnostics for unsupported constructs; mode propagation | `x3-lang/compiler/tests/test_x3bc_lowering.rs` | GREEN locally (exact-head CI pending) |
 | Root/nested fmt, check, clippy `-D warnings`, tests; no_std core and engine builds | `.github/workflows/x3lang-production-unification.yml` | NOT RUN |
 
 ## 9. Baseline CI at `70423054`
@@ -163,3 +163,18 @@ Filled in as tests land. Status values: NOT RUN / RUNNING / PASS / FAIL / BLOCKE
 All workflows run on self-hosted `[self-hosted, Linux, X64, x3]` runners. `x3-lang-trading-core.yml`
 is `workflow_dispatch` only, and this session's GitHub API token is invalid, so it can only run when
 someone dispatches it; push-triggered workflows are the provable path.
+
+## Status at stopping point (2026-10-17)
+
+- GREEN locally (Rust stable 1.97 in a cloud workspace; the repo pins 1.90): every row of the
+  matrix above; root suites for x3bc-core, x3-common, x3-backend, x3-vm, x3-x3-integration,
+  x3-opt, pallet-x3-dex (638 tests); nested workspace fmt, clippy `-D warnings` and full tests.
+- Not yet proven: exact-head CI runs on the self-hosted runners; independent review.
+- Not on chain yet. The trading engine runs in `x3-vm` and `x3-x3-integration`; the kernel
+  pallet has no trading extrinsic. Work in progress on branch `codex/x3lang-onchain-wip`:
+  x3-dex pools custody real ledger balances and LP positions have owners; x3-flashloan's
+  unenforced native `borrow` is refused and asset-id flash pools are added. The runtime does not
+  build against that branch yet (new Config items unwired).
+- Security findings recorded for follow-up: native flash `borrow` was unenforced; x3-dex moved
+  no funds and LP positions had no owner; kernel `WasmX3Adapter` drops logs; the atomic-kernel
+  reverter may use the wrong storage prefix; `x3-verifier::verify_bytecode` is a stub.

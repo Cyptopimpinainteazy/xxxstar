@@ -96,7 +96,7 @@ fn test_invariant_preservation() {
 
         // Verify invariant is preserved (approximately, accounting for fees)
         let pool = DEX::pools(pool_id(&token_a, &token_b, 30)).unwrap();
-        let final_k = pool.reserve_a as u128 * pool.reserve_b as u128;
+        let final_k = pool.reserve_a * pool.reserve_b;
         assert!(final_k >= initial_k); // Should not decrease (fees make it increase slightly)
     });
 }
