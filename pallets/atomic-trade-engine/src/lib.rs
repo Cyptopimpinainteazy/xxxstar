@@ -705,7 +705,13 @@ pub mod pallet {
                 });
             let execution_result = match transactional_result {
                 Ok(result) => Ok(result),
-                Err(_) => Err(failed_leg.expect("rollback error originates from failed leg; qed")),
+                Err(error) => match failed_leg {
+                    Some(failure) => Err(failure),
+                    // FRAME can refuse to open a transaction before invoking
+                    // the closure (e.g. at its nesting limit). Propagate that
+                    // error so the dispatchable's storage layer also reverts.
+                    None => return Err(error),
+                },
             };
 
             match execution_result {
@@ -787,6 +793,16 @@ pub mod pallet {
                     // Failure - rollback to initial checkpoint
                     Self::rollback_to_checkpoint(batch_id, 0)?;
 
+                    // Storage rollback cannot restore the in-memory batch
+                    // mutated by execute_all_legs. Reload the restored snapshot
+                    // before persisting failure metadata, otherwise reverted
+                    // legs would still advertise committed output and gas.
+                    batch = TradeBatches::<T>::get(batch_id).ok_or(Error::<T>::BatchNotFound)?;
+                    for (index, leg) in batch.legs.iter_mut().enumerate() {
+                        if u32::try_from(index).ok() == Some(failed_leg_index) {
+                            leg.status = TradeLegStatus::Failed;
+                        }
+                    }
                     batch.status = BatchStatus::Failed;
                     TradeBatches::<T>::insert(batch_id, batch);
 

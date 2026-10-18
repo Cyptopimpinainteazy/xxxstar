@@ -22,6 +22,97 @@ use sp_core::H256;
 // Helper Functions
 // ============================================================================
 
+#[test]
+fn second_leg_failure_clears_rolled_back_success_metadata_and_events() {
+    new_test_ext().execute_with(|| {
+        let amount = 1_000_000_000_000_000_000u128;
+        assert_ok!(AtomicTradeEngine::create_trade_batch(
+            RuntimeOrigin::signed(account(1)),
+            vec![evm_leg(amount, 1), evm_leg(0, u128::MAX)],
+            500,
+            100,
+            0,
+        ));
+        let batch_id = AtomicTradeEngine::pending_batches(account(1))[0];
+        let balance_before = Balances::free_balance(account(1));
+        assert_ok!(AtomicTradeEngine::execute_trade_batch(
+            RuntimeOrigin::signed(account(1)),
+            batch_id,
+        ));
+        let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+        assert_eq!(batch.status, BatchStatus::Failed);
+        assert_eq!(batch.legs[1].status, TradeLegStatus::Failed);
+        assert_eq!(batch.legs[0].status, TradeLegStatus::Pending);
+        assert!(batch
+            .legs
+            .iter()
+            .all(|leg| leg.actual_amount_out.is_none() && leg.gas_used == 0));
+        assert_eq!(Balances::free_balance(account(1)), balance_before);
+        assert_eq!(AtomicTradeEngine::completed_batch_count(), 0);
+        assert_eq!(AtomicTradeEngine::failed_batch_count(), 1);
+        assert!(AtomicTradeEngine::pending_batches(account(1)).is_empty());
+        assert!(!System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::AtomicTradeEngine(
+                Event::TradeLegCompleted { .. } | Event::TradeBatchCompleted { .. }
+            )
+        )));
+        assert!(System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::AtomicTradeEngine(Event::TradeBatchFailed {
+                failed_leg_index: 1,
+                ..
+            })
+        )));
+        assert_noop!(
+            AtomicTradeEngine::execute_trade_batch(RuntimeOrigin::signed(account(1)), batch_id),
+            Error::<Test>::BatchNotPending
+        );
+    });
+}
+
+#[test]
+fn exhausted_transaction_layers_reject_batch_without_panicking_or_changing_state() {
+    use frame_support::storage::{
+        transactional::TRANSACTIONAL_LIMIT, with_transaction, TransactionOutcome,
+    };
+    use sp_runtime::{DispatchError, TransactionalError};
+
+    fn execute_at_depth(depth: u32, batch_id: H256) -> Result<(), DispatchError> {
+        if depth == 0 {
+            return AtomicTradeEngine::execute_trade_batch(
+                RuntimeOrigin::signed(account(1)),
+                batch_id,
+            );
+        }
+        with_transaction(|| match execute_at_depth(depth - 1, batch_id) {
+            Ok(()) => TransactionOutcome::Commit(Ok(())),
+            Err(error) => TransactionOutcome::Rollback(Err(error)),
+        })
+    }
+
+    new_test_ext().execute_with(|| {
+        assert_ok!(AtomicTradeEngine::create_trade_batch(
+            RuntimeOrigin::signed(account(1)),
+            vec![evm_leg(1_000_000_000_000_000_000, 1)],
+            500,
+            100,
+            0,
+        ));
+        let batch_id = AtomicTradeEngine::pending_batches(account(1))[0];
+        // The dispatchable itself opens one layer; exhaust the additional
+        // boundary around its legs through real nested FRAME transactions.
+        assert_noop!(
+            execute_at_depth(TRANSACTIONAL_LIMIT - 1, batch_id),
+            TransactionalError::LimitReached
+        );
+        assert_eq!(
+            AtomicTradeEngine::trade_batches(batch_id).unwrap().status,
+            BatchStatus::Pending
+        );
+    });
+}
+
 /// Create a test trade leg input
 fn create_test_leg(
     vm_type: VmType,
