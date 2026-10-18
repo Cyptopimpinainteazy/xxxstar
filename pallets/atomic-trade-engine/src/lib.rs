@@ -688,8 +688,25 @@ pub mod pallet {
                 state_root: initial_checkpoint.state_root,
             });
 
-            // Execute legs
-            let execution_result = Self::execute_all_legs(&mut batch);
+            // Execute all legs inside one FRAME storage transaction. Checkpoint
+            // metadata and final batch status remain outside this boundary so
+            // failed batches can still be audited after the swap state reverts.
+            // This only covers effects committed through transactional FRAME
+            // storage; external/off-chain adapter side effects need separate
+            // settlement guarantees.
+            let mut failed_leg = None;
+            let transactional_result: Result<(u128, u64), DispatchError> =
+                with_transaction(|| match Self::execute_all_legs(&mut batch) {
+                    Ok(result) => TransactionOutcome::Commit(Ok(result)),
+                    Err(failure) => {
+                        failed_leg = Some(failure);
+                        TransactionOutcome::Rollback(Err(Error::<T>::X3TradeFailed.into()))
+                    }
+                });
+            let execution_result = match transactional_result {
+                Ok(result) => Ok(result),
+                Err(_) => Err(failed_leg.expect("rollback error originates from failed leg; qed")),
+            };
 
             match execution_result {
                 Ok((total_output, total_gas)) => {
