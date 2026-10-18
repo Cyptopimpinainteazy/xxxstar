@@ -28,7 +28,6 @@ fn an_honest_receipt_replays() {
     replay_receipt(&bytes, &signed, &registry()).expect("honest receipt");
 }
 
-
 #[test]
 fn a_large_non_profit_asset_balance_replays_without_signed_overflow() {
     // WETX is not the profit asset. Its opening balance fits u128 but approaches
@@ -39,7 +38,10 @@ fn a_large_non_profit_asset_balance_replays_without_signed_overflow() {
     pre.trader_balances.insert(WETX, i128::MAX as u128 - 10);
     let run = execute_trade(&artifact.bytes, &pre, &anchor(), GAS_LIMIT)
         .expect("the chain VM must run the trade");
-    assert!(run.committed, "the production engine committed this valid trade");
+    assert!(
+        run.committed,
+        "the production engine committed this valid trade"
+    );
     let signed = sign_receipt(&run.receipt, &attestor());
     replay_receipt(&artifact.bytes, &signed, &registry())
         .expect("economic replay must not overflow for a valid u128 balance");
