@@ -188,10 +188,12 @@ fn x3lang_trading_source_to_signed_replayed_receipt_on_production_path() {
 
 #[test]
 fn x3lang_trading_trap_after_swap_rolls_back_everything() {
-    // Pool 2 is too shallow to return `min_out 1_005 USDX`: the second swap traps after the borrow
-    // and the first swap have already moved balances, reserves and debt inside the VM.
+    // Pool 2 is too shallow to return `min_out 1_005 USDX` (at the oracle's price, so the oracle
+    // firewall passes): the second swap traps after the borrow and the first swap have already
+    // moved balances, reserves and debt inside the VM.
     let artifact = compile(ARB_SOURCE);
     let mut pre = pre_state();
+    pre.venues[1].reserve_a = 550 * UNIT;
     pre.venues[1].reserve_b = 1_100 * UNIT;
 
     let run =
@@ -216,7 +218,14 @@ fn x3lang_trading_trap_after_swap_rolls_back_everything() {
         .iter()
         .map(|call| call.kind)
         .collect();
-    assert_eq!(kinds[..2], [HostCallKind::Borrow, HostCallKind::Swap]);
+    assert_eq!(
+        kinds[..3],
+        [
+            HostCallKind::Begin,
+            HostCallKind::Borrow,
+            HostCallKind::Swap
+        ]
+    );
 
     // … and none of them survive: balances, reserves, debts, costs, events and intents are the
     // pre-state exactly.

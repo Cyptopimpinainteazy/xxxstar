@@ -101,13 +101,20 @@ fn a_failure_at_every_step_rolls_back_everything() {
             step: "swap 1",
             trap: TrapId::MinOutput,
             source: same,
-            pre: |pre| pre.venues[0].reserve_b = 400 * UNIT,
+            // A shallow pool 1 at the oracle's price: ~222 WETX for 1_000 USDX, under min_out 490.
+            pre: |pre| {
+                pre.venues[0].reserve_a = 800 * UNIT;
+                pre.venues[0].reserve_b = 400 * UNIT;
+            },
         },
         Mutation {
             step: "swap 2",
             trap: TrapId::MinOutput,
             source: same,
-            pre: |pre| pre.venues[1].reserve_b = 1_100 * UNIT,
+            pre: |pre| {
+                pre.venues[1].reserve_a = 550 * UNIT;
+                pre.venues[1].reserve_b = 1_100 * UNIT;
+            },
         },
         Mutation {
             step: "repay",
@@ -183,6 +190,8 @@ fn nested_atomic_rollback_discards_inner_and_outer_effects() {
     op(&mut code, Opcode::AtomicBegin, &1u16.to_le_bytes());
     op(&mut code, Opcode::TradeSwap, &1u16.to_le_bytes()); // state-changing, inside the inner window
     op(&mut code, Opcode::AtomicRollback, &1u16.to_le_bytes());
+    // Never reached (the rollback aborts the execution); present so the windows balance statically.
+    op(&mut code, Opcode::AtomicCommit, &0u16.to_le_bytes());
     op(&mut code, Opcode::RetVoid, &[]);
     let bytes = assemble_trading_module(section(), code);
     let run = execute_trade(&bytes, &pre_state(), &anchor(), GAS_LIMIT).expect("verdict");

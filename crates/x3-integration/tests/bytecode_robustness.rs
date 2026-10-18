@@ -176,7 +176,7 @@ fn the_header_fields_are_gates_in_every_reader() {
             ("a newer minor version", {
                 let mut b = bytes.clone();
                 b[VERSION_OFFSET..VERSION_OFFSET + 4]
-                    .copy_from_slice(&(bc::VERSION + 0x100).to_le_bytes());
+                    .copy_from_slice(&(bc::READER_VERSION + 0x100).to_le_bytes());
                 b
             }),
             ("a loader demand from the future", {

@@ -26,12 +26,16 @@ use x3bc_core::receipt::CostKind;
 
 const GAS_LIMIT: u64 = 1_000_000;
 
+/// The reference VM compares `current_block` against `deadline_blocks` and a quote's age directly,
+/// so it is driven in blocks elapsed since submission; the production engine counts its deadline
+/// from `submitted_at_block` itself (see `TradingSession::begin`).
+const ELAPSED: u64 = EXECUTED_AT - SUBMITTED_AT;
+
 /// Test-only reference host over the same seeded state: the same pools, the same formula.
 struct OracleHost {
     manifest: CapabilityManifest,
     pre: TradingPreState,
     reserves: BTreeMap<String, (u128, u128)>,
-    debts: BTreeMap<String, (u128, u128)>,
 }
 
 fn asset_id(key: &AssetKey) -> u32 {
@@ -66,7 +70,6 @@ impl OracleHost {
             manifest,
             pre,
             reserves,
-            debts: BTreeMap::new(),
         }
     }
 
@@ -93,9 +96,8 @@ impl TradingHost for OracleHost {
     }
     fn open_debt(&mut self, request: BorrowRequest) -> Result<BorrowResult, HostError> {
         let pool = &self.pre.flash_pools[0];
-        let fee = request.principal * u128::from(pool.fee_bps) / 10_000;
-        self.debts
-            .insert(request.provider.clone(), (request.principal, fee));
+        // Rounded up, as the production engine charges a provider's fee.
+        let fee = (request.principal * u128::from(pool.fee_bps)).div_ceil(10_000);
         Ok(BorrowResult {
             asset: request.asset,
             principal: request.principal,
@@ -111,7 +113,7 @@ impl TradingHost for OracleHost {
                 name: "x3_oracle".into(),
                 expected_output,
             }],
-            quote_block: EXECUTED_AT,
+            quote_block: ELAPSED,
         })
     }
     fn swap(&mut self, request: SwapRequest) -> Result<SwapResult, HostError> {
@@ -141,12 +143,13 @@ impl TradingHost for OracleHost {
         })
     }
     fn close_debt(&mut self, request: RepayRequest) -> Result<RepayResult, HostError> {
-        let (principal, fee) = self.debts.values().next().copied().expect("open debt");
+        // The reference protocol: the VM asks for principal plus the fee reported at the borrow,
+        // and a host that charges nothing more on repayment reports no further fee.
         Ok(RepayResult {
             debt_id: request.debt_id,
             asset: request.asset,
-            amount_paid: principal + fee,
-            fee,
+            amount_paid: request.amount,
+            fee: 0,
             state_commitment: [0u8; 32],
         })
     }
@@ -170,7 +173,7 @@ fn reference_usdx_delta(pre: &TradingPreState, source: &str) -> i128 {
             &mut host,
             TradeExecutionContext {
                 mode: ExecutionMode::Development,
-                current_block: EXECUTED_AT,
+                current_block: ELAPSED,
             },
         )
         .expect("the reference oracle commits the trade");
@@ -218,6 +221,7 @@ fn production_and_reference_agree_on_the_flagship_trade() {
 
 #[test]
 fn production_and_reference_agree_across_pool_depths_and_fees() {
+    let mut compared = 0;
     for (depth, fee_bps, flash_bps) in [(1u128, 30u16, 5u16), (2, 5, 1), (3, 100, 9), (5, 1, 0)] {
         let mut pre = pre_state();
         for venue in &mut pre.venues {
@@ -237,5 +241,10 @@ fn production_and_reference_agree_across_pool_depths_and_fees() {
             reference_usdx_delta(&pre, ARB_SOURCE),
             "depth {depth}, fee {fee_bps}, flash {flash_bps}"
         );
+        compared += 1;
     }
+    assert!(
+        compared >= 3,
+        "only {compared} cases committed: the sweep would prove nothing"
+    );
 }

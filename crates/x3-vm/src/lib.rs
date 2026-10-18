@@ -120,13 +120,11 @@ pub use vm::{ExecutionResult, Frame, VMConfig, Value, VM};
 pub use x3_backend::bc_format::BytecodeModule;
 
 // X3VM sub-modules
-pub mod bytecode;
 pub mod context;
 pub mod events;
-pub mod gas;
 #[cfg(feature = "std")]
 pub mod gpu;
 pub mod isolation;
-pub mod revert;
 pub mod state;
 pub mod storage;
+pub mod trading;

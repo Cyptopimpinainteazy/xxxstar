@@ -13,6 +13,10 @@ x3-backend = { path = "../x3-backend", default-features = false }
 # Compiler front end (std-only — heavy deps; not used in WASM runtime)
 x3-compiler = { path = "../x3-compiler", optional = true }
 x3-common = { path = "../x3-common", default-features = false }
+# The canonical X3BC semantic core: header rules, trading section, receipts, hashing.
+x3bc-core = { path = "../x3bc-core", default-features = false }
+# Attestor signatures over trading receipts (std: the attestor and replay are off-chain).
+ed25519-dalek = { version = "2.1", default-features = false, optional = true }
 x3-verifier = { path = "../x3-verifier", optional = true }
 
 # Cross-VM executor traits (real backends are provided by the caller)
@@ -67,6 +71,9 @@ std = [
     "thiserror",
     "log/std",
     "x3-common/std",
+    "x3bc-core/std",
+    "dep:ed25519-dalek",
+    "ed25519-dalek/std",
     "x3-evm-integration/std",
     # x3-svm-integration excluded from std: solana-program 3.x dual solana-address conflict
     "x3-vm/std",

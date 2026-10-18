@@ -453,6 +453,14 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
         // The module says it needs a loader at least this new; this one is older.
         return Err(X3Error::UnsupportedVersion(min_version));
     }
+    // This reader predates the trading extension (format 1.1) and has no implementation of it:
+    // it refuses a module that declares it, by the format version that introduced it, rather than
+    // reading past a section it cannot interpret.
+    if features & x3_common::bytecode::FEATURE_TRADING_EXTENSION != 0 {
+        return Err(X3Error::UnsupportedVersion(
+            x3_common::bytecode::TRADING_VERSION,
+        ));
+    }
     let expected = x3_common::bytecode::checksum(&bytes[x3_common::bytecode::HEADER_LEN..]);
     if checksum != expected {
         return Err(X3Error::ChecksumMismatch {
@@ -1928,7 +1936,8 @@ mod tests {
     #[test]
     fn test_a_module_requiring_a_newer_loader_is_rejected() {
         let mut payload = make_simple_module();
-        let newer_minor = (1u32 << 16) | (1u32 << 8);
+        // A minor newer than this loader reads.
+        let newer_minor = x3_common::bytecode::READER_VERSION + (1u32 << 8);
         payload[16..20].copy_from_slice(&newer_minor.to_le_bytes());
         assert!(matches!(
             parse_module(&payload),

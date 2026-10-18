@@ -60,12 +60,12 @@ fn on_chain_admissibility_matches_the_verifier() {
         let entry = spec::of(opcode);
         assert_eq!(
             x3_vm::verifier::admitted_on_chain(opcode, &x3_vm::VerifyOptions::on_chain_trading()),
-            entry.on_chain_with_trading,
+            entry.on_chain_with_trading(),
             "{opcode:?}"
         );
         assert_eq!(
             x3_vm::verifier::admitted_on_chain(opcode, &x3_vm::VerifyOptions::on_chain()),
-            entry.on_chain_base,
+            entry.on_chain_base(),
             "{opcode:?}"
         );
     }
@@ -94,7 +94,7 @@ fn every_on_chain_opcode_has_differential_coverage() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for opcode in all_opcodes() {
         let entry = spec::of(opcode);
-        if !entry.on_chain_with_trading {
+        if !entry.on_chain_with_trading() {
             continue;
         }
         let coverage = entry

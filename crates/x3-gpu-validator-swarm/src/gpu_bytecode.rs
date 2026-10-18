@@ -63,6 +63,7 @@ pub fn generate_sha256_batch_bytecode(inputs: Vec<u8>, count: i64) -> SwarmResul
         code,
         debug_info: None,
         metadata: None,
+        trading: None,
     })
 }
 
@@ -114,6 +115,7 @@ pub fn generate_keccak256_batch_bytecode(
         code,
         debug_info: None,
         metadata: None,
+        trading: None,
     })
 }
 

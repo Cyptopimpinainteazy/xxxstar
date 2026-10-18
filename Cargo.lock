@@ -25919,6 +25919,7 @@ dependencies = [
  "x3-mir",
  "x3-parser",
  "x3-typeck",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -26356,6 +26357,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -26979,6 +26981,7 @@ dependencies = [
  "x3-lang-ast",
  "x3-lang-common",
  "x3-lang-lexer",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -27728,6 +27731,7 @@ dependencies = [
  "x3-common",
  "x3-evm-integration",
  "x3-svm-integration",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -27770,6 +27774,7 @@ dependencies = [
 name = "x3-x3-integration"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek 2.2.0",
  "env_logger 0.10.2",
  "frame-support",
  "log",
@@ -27793,6 +27798,15 @@ dependencies = [
  "x3-svm-integration",
  "x3-verifier",
  "x3-vm",
+ "x3bc-core",
+]
+
+[[package]]
+name = "x3bc-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
 ]
 
 [[package]]

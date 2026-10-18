@@ -36,6 +36,10 @@ pub enum VerifierErrorKind {
     #[error("empty module")]
     EmptyModule,
 
+    /// A trading-extension rule the module breaks (format 1.1).
+    #[error("trading extension: {0}")]
+    Trading(String),
+
     #[error("invalid magic bytes (expected 'X3BC')")]
     BadMagic,
 
@@ -286,6 +290,11 @@ pub enum VMErrorKind {
 
     #[error("not implemented: {0}")]
     NotImplemented(String),
+
+    /// A trading-extension rule stopped the execution (`x3bc_core::trap`); the receipt carries the
+    /// trap and the whole trade rolls back.
+    #[error("trade trapped: {0}")]
+    Trade(x3bc_core::trap::TrapId),
 }
 
 // =============================================================================

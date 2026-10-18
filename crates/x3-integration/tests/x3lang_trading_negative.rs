@@ -63,10 +63,11 @@ fn amount_overflow_is_refused_at_compile_time() {
 
 #[test]
 fn an_asset_that_is_not_on_the_x3_chain_cannot_lower() {
-    let source = ARB_SOURCE.replace("x3.x3chain.asset_2", "evm.ethereum.0xC02a");
+    // A single-chain Ethereum trade passes the front end; no X3-chain venue can run it.
+    let source = ARB_SOURCE.replace("x3.x3chain.", "evm.ethereum.");
     let error = compile_err(&source);
     assert!(
-        error.contains("X3BC-L"),
+        error.contains("X3BC-L004"),
         "explicit lowering diagnostic: {error}"
     );
 }
@@ -249,7 +250,9 @@ fn host_refusal_rolls_back() {
 #[test]
 fn failure_after_swap_but_before_repay_rolls_back() {
     let mut pre = pre_state();
-    pre.venues[1].reserve_b = 1_100 * UNIT; // second swap cannot meet min_out
+    // A shallow pool 2 at the oracle's price: the second swap cannot meet min_out.
+    pre.venues[1].reserve_a = 550 * UNIT;
+    pre.venues[1].reserve_b = 1_100 * UNIT;
     let run = run_with(&pre);
     assert_rolled_back(&run, TrapId::MinOutput);
     assert!(
