@@ -294,6 +294,14 @@ pub mod pallet {
     pub type ChainJournal<T: Config> =
         StorageDoubleMap<_, Blake2_128Concat, H256, Twox64Concat, u32, H256, OptionQuery>;
 
+    /// What each leg of a bundle will execute, committed at submission:
+    /// `chain_legs::execution_commitment` of the `LegExecution`, one per declared leg. A leg runs
+    /// only the execution its commitment names, so the bundle the submitter declared is the bundle
+    /// the chain executes.
+    #[pallet::storage]
+    pub type LegExecutionCommitments<T: Config> =
+        StorageMap<_, Blake2_128Concat, H256, BoundedVec<H256, T::MaxLegsPerBundle>, ValueQuery>;
+
     /// How many journal entries a bundle's executed legs hold together, bounded by
     /// `chain_legs::MAX_BUNDLE_JOURNAL_ENTRIES`: what finishing the bundle costs.
     #[pallet::storage]
@@ -546,6 +554,12 @@ pub mod pallet {
         LegRevertFailed,
         /// A leg's effects could not be made final, so the finalization changed nothing.
         LegCommitFailed,
+        /// A bundle commits to exactly one execution per declared leg.
+        ExecutionCommitmentMismatch,
+        /// The execution is not the one the bundle committed to for this leg.
+        ExecutionNotCommitted,
+        /// Too many bundles already expire at this deadline block; choose another deadline.
+        DeadlineSlotFull,
     }
 
     // ── Hooks ─────────────────────────────────────────────────────────────────
@@ -706,10 +720,12 @@ pub mod pallet {
         /// - Bond reserved on submission, slashed on rollback.
         /// - Nonce-based replay protection
         #[pallet::call_index(0)]
-        #[pallet::weight(T::WeightInfo::submit_atomic_bundle(legs.len() as u32))]
+        #[pallet::weight(T::WeightInfo::submit_atomic_bundle(legs.len() as u32)
+            .saturating_add(T::DbWeight::get().writes(1)))]
         pub fn submit_atomic_bundle(
             origin: OriginFor<T>,
             legs: BoundedVec<BundleLeg, T::MaxLegsPerBundle>,
+            execution_commitments: BoundedVec<H256, T::MaxLegsPerBundle>,
             deadline_blocks: BlockNumberFor<T>,
             chain_id: u32, // New parameter for chain ID
             nonce: u64,    // New parameter for nonce
@@ -740,6 +756,10 @@ pub mod pallet {
             ensure!(
                 legs.len() as u32 <= T::MaxLegsPerBundle::get(),
                 Error::<T>::TooManyLegs
+            );
+            ensure!(
+                execution_commitments.len() == legs.len(),
+                Error::<T>::ExecutionCommitmentMismatch
             );
 
             let now = <frame_system::Pallet<T>>::block_number();
@@ -785,10 +805,14 @@ pub mod pallet {
             BundleLegReceipts::<T>::insert(bundle_id, leg_receipts);
 
             // Add to deadline index for O(1) expiry lookup
+            LegExecutionCommitments::<T>::insert(bundle_id, execution_commitments);
+            // A bundle that is not in the deadline index would never expire, so a full slot
+            // refuses the submission instead of dropping the expiry.
             let mut deadline_bundles = DeadlineIndex::<T>::get(deadline);
-            if deadline_bundles.try_push(bundle_id).is_ok() {
-                DeadlineIndex::<T>::insert(deadline, deadline_bundles);
-            }
+            deadline_bundles
+                .try_push(bundle_id)
+                .map_err(|_| Error::<T>::DeadlineSlotFull)?;
+            DeadlineIndex::<T>::insert(deadline, deadline_bundles);
 
             Self::deposit_event(Event::BundleSubmitted {
                 bundle_id,
@@ -1052,6 +1076,14 @@ pub mod pallet {
                 Error::<T>::UnsupportedLegExecution
             );
 
+            ensure!(
+                LegExecutionCommitments::<T>::get(bundle_id)
+                    .get(idx)
+                    .copied()
+                    == Some(crate::chain_legs::execution_commitment(&execution)),
+                Error::<T>::ExecutionNotCommitted
+            );
+
             let mut context = bundle_id.as_bytes().to_vec();
             context.extend_from_slice(&leg_index.to_le_bytes());
             let context = H256(sp_io::hashing::blake2_256(&context));
@@ -1238,6 +1270,7 @@ pub mod pallet {
             BundleLegReceipts::<T>::remove(bundle_id);
             let _ = ChainJournal::<T>::clear_prefix(bundle_id, u32::MAX, None);
             BundleJournalEntries::<T>::remove(bundle_id);
+            LegExecutionCommitments::<T>::remove(bundle_id);
         }
 
         /// The most weight finishing (finalizing or rolling back) one bundle's legs takes: every

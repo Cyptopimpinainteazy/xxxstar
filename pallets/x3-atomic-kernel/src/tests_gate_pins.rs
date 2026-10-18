@@ -72,6 +72,7 @@ fn submit_one(amount_in: u128, deadline_blocks: u64, nonce: u64) -> H256 {
     assert_ok!(AtomicKernel::submit_atomic_bundle(
         RuntimeOrigin::signed(ALICE),
         legs,
+        BoundedVec::try_from(vec![H256::zero()]).expect("one leg"),
         deadline_blocks,
         1,
         nonce,

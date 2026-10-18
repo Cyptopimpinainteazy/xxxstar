@@ -137,6 +137,11 @@ impl<AccountId> LegExecutor<AccountId> for () {
     }
 }
 
+/// What a bundle commits to for a leg at submission: `blake2_256` of the SCALE-encoded execution.
+pub fn execution_commitment<AccountId: Encode>(execution: &LegExecution<AccountId>) -> H256 {
+    H256(sp_io::hashing::blake2_256(&execution.encode()))
+}
+
 /// A journal as a leg receipt's `state_diff`: [`JOURNAL_MAGIC`] then the SCALE-encoded entries.
 pub fn encode_journal(entries: &[JournalEntry]) -> Option<StateDiff> {
     let mut bytes = JOURNAL_MAGIC.to_vec();

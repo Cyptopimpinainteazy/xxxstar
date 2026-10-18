@@ -135,7 +135,8 @@ impl AtomicGatewayService {
     }
 
     async fn handle(&self, command: AtomicGatewayCommand) -> Result<(), String> {
-        let tx_nonce = self.next_nonce()?;
+        // Every step that can refuse runs before a nonce is taken, so a refused command leaves no
+        // gap in the gateway's nonce sequence.
         let (extrinsic, legs_hash, executions, request_clone, should_finalize) = match command {
             AtomicGatewayCommand::SubmitBundle(request) => {
                 let legs_hash = request.legs_hash();
@@ -146,8 +147,11 @@ impl AtomicGatewayService {
                     .iter()
                     .map(to_pallet_leg)
                     .collect::<Result<Vec<_>, _>>()?;
+                let chain_legs = self.chain_legs(&request.executions)?;
+                let tx_nonce = self.next_nonce()?;
                 let extrinsic = self.key.submit_atomic_bundle(
                     legs,
+                    &chain_legs,
                     request.deadline_blocks,
                     request.chain_id,
                     request.nonce,
@@ -171,8 +175,11 @@ impl AtomicGatewayService {
                     .iter()
                     .map(to_pallet_leg)
                     .collect::<Result<Vec<_>, _>>()?;
+                let chain_legs = self.chain_legs(&request.executions)?;
+                let tx_nonce = self.next_nonce()?;
                 let extrinsic = self.key.submit_atomic_bundle(
                     legs,
+                    &chain_legs,
                     request.deadline_blocks,
                     request.chain_id,
                     request.nonce,
@@ -188,16 +195,23 @@ impl AtomicGatewayService {
                 )
             }
             AtomicGatewayCommand::AssignExecutor { bundle_id } => (
-                self.key
-                    .assign_bundle_executor(bundle_id, self.genesis_hash, tx_nonce)?,
+                self.key.assign_bundle_executor(
+                    bundle_id,
+                    self.genesis_hash,
+                    self.next_nonce()?,
+                )?,
                 None,
                 None,
                 None,
                 false,
             ),
             AtomicGatewayCommand::Rollback { bundle_id, reason } => (
-                self.key
-                    .rollback_atomic_bundle(bundle_id, reason, self.genesis_hash, tx_nonce)?,
+                self.key.rollback_atomic_bundle(
+                    bundle_id,
+                    reason,
+                    self.genesis_hash,
+                    self.next_nonce()?,
+                )?,
                 None,
                 None,
                 None,
@@ -262,6 +276,20 @@ impl AtomicGatewayService {
         Err("bundle submission was not found on-chain within timeout".to_string())
     }
 
+    /// The chain-executed form of every requested leg; the bundle commits to exactly these at
+    /// submission, and `execute_legs` runs exactly these.
+    fn chain_legs(
+        &self,
+        executions: &[AtomicLegExecution],
+    ) -> Result<Vec<LegExecution<AccountId>>, String> {
+        let gateway = self.key.account();
+        executions
+            .iter()
+            .enumerate()
+            .map(|(index, execution)| chain_leg(execution, &gateway, index))
+            .collect()
+    }
+
     /// Have the chain execute every leg. Each leg is a signed `execute_bundle_leg` from the
     /// bundle's executor: the runtime runs it against chain state and records the journal a
     /// rollback undoes, so nothing this node computes decides what a leg wrote.
@@ -270,12 +298,7 @@ impl AtomicGatewayService {
         executions: &[AtomicLegExecution],
         bundle_id: H256,
     ) -> Result<(), String> {
-        let gateway = self.key.account();
-        let chain_legs = executions
-            .iter()
-            .enumerate()
-            .map(|(index, execution)| chain_leg(execution, &gateway, index))
-            .collect::<Result<Vec<_>, _>>()?;
+        let chain_legs = self.chain_legs(executions)?;
         for (index, execution) in chain_legs.into_iter().enumerate() {
             let tx_nonce = self.next_nonce()?;
             let extrinsic = self.key.execute_bundle_leg(

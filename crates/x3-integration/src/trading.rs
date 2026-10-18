@@ -380,6 +380,53 @@ mod attestation {
         Ok(())
     }
 
+    /// Verify a signed receipt against the artifact it claims to describe.
+    ///
+    /// The attestor must be registered and active and the signature valid over the receipt's
+    /// canonical digest; the artifact's hash must match; the receipt's economics must be internally
+    /// consistent; and re-executing the artifact from the receipt's pre-state and anchor must
+    /// produce the identical receipt.
+    pub fn replay_receipt(
+        bytecode: &[u8],
+        signed: &SignedTradingReceipt,
+        registry: &AttestorRegistry,
+    ) -> Result<ReplayReport, ReplayError> {
+        let attestation = &signed.attestation;
+        let trusted = registry
+            .active_key(&attestation.attestor_id)
+            .ok_or(ReplayError::UnknownAttestor)?;
+        if trusted != attestation.public_key
+            || x3bc_core::hash::sha256(&trusted) != attestation.key_id
+        {
+            return Err(ReplayError::UnknownAttestor);
+        }
+        let key = VerifyingKey::from_bytes(&trusted).map_err(|_| ReplayError::UnknownAttestor)?;
+        let digest = x3bc_core::receipt::digest(&signed.receipt);
+        key.verify(&digest, &Signature::from_bytes(&attestation.signature))
+            .map_err(|_| ReplayError::BadSignature)?;
+
+        let claimed = &signed.receipt;
+        if x3bc_core::hash::sha256(bytecode) != claimed.bytecode_hash {
+            return Err(ReplayError::ArtifactMismatch);
+        }
+        let run = execute_trade(
+            bytecode,
+            &claimed.pre_state,
+            &claimed.anchor,
+            claimed.gas_limit,
+        )
+        .map_err(|error| ReplayError::NotReplayable(format!("{error:?}")))?;
+        if let Some(field) = x3bc_core::receipt::first_divergence(&run.receipt, claimed) {
+            return Err(ReplayError::Diverged { field });
+        }
+        // A second, independent check: the identities must hold of the receipt itself, so an
+        // engine that produced an inconsistent receipt cannot vouch for it by reproducing it.
+        audit_economics(claimed)?;
+        Ok(ReplayReport {
+            recomputed: run.receipt,
+        })
+    }
+
     #[cfg(test)]
     mod economic_audit_regressions {
         use super::*;
@@ -428,52 +475,5 @@ mod attestation {
                 Err(ReplayError::Inconsistent("costs"))
             );
         }
-    }
-
-    /// Verify a signed receipt against the artifact it claims to describe.
-    ///
-    /// The attestor must be registered and active and the signature valid over the receipt's
-    /// canonical digest; the artifact's hash must match; the receipt's economics must be internally
-    /// consistent; and re-executing the artifact from the receipt's pre-state and anchor must
-    /// produce the identical receipt.
-    pub fn replay_receipt(
-        bytecode: &[u8],
-        signed: &SignedTradingReceipt,
-        registry: &AttestorRegistry,
-    ) -> Result<ReplayReport, ReplayError> {
-        let attestation = &signed.attestation;
-        let trusted = registry
-            .active_key(&attestation.attestor_id)
-            .ok_or(ReplayError::UnknownAttestor)?;
-        if trusted != attestation.public_key
-            || x3bc_core::hash::sha256(&trusted) != attestation.key_id
-        {
-            return Err(ReplayError::UnknownAttestor);
-        }
-        let key = VerifyingKey::from_bytes(&trusted).map_err(|_| ReplayError::UnknownAttestor)?;
-        let digest = x3bc_core::receipt::digest(&signed.receipt);
-        key.verify(&digest, &Signature::from_bytes(&attestation.signature))
-            .map_err(|_| ReplayError::BadSignature)?;
-
-        let claimed = &signed.receipt;
-        if x3bc_core::hash::sha256(bytecode) != claimed.bytecode_hash {
-            return Err(ReplayError::ArtifactMismatch);
-        }
-        let run = execute_trade(
-            bytecode,
-            &claimed.pre_state,
-            &claimed.anchor,
-            claimed.gas_limit,
-        )
-        .map_err(|error| ReplayError::NotReplayable(format!("{error:?}")))?;
-        if let Some(field) = x3bc_core::receipt::first_divergence(&run.receipt, claimed) {
-            return Err(ReplayError::Diverged { field });
-        }
-        // A second, independent check: the identities must hold of the receipt itself, so an
-        // engine that produced an inconsistent receipt cannot vouch for it by reproducing it.
-        audit_economics(claimed)?;
-        Ok(ReplayReport {
-            recomputed: run.receipt,
-        })
     }
 }
