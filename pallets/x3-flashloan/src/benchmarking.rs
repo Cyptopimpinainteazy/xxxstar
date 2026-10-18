@@ -50,17 +50,17 @@ mod benchmarks {
 
     #[benchmark]
     fn borrow() -> Result<(), BenchmarkError> {
-        let provider: T::AccountId = whitelisted_caller();
+        // `borrow` is refused (the cross-extrinsic native loan was never enforced; see the pallet
+        // docs). What a block pays for is the refusal.
         let borrower: T::AccountId = account("borrower", 0, 0);
-        fund::<T>(&provider, 1_000_000);
-        // The pool account has to hold the currency, not just `PoolBalance`: `borrow` transfers from
-        // it, so the liquidity goes in through the pallet's own extrinsic.
-        Pallet::<T>::add_liquidity(RawOrigin::Signed(provider).into(), scaled::<T>(100_000))?;
 
-        #[extrinsic_call]
-        borrow(RawOrigin::Signed(borrower), scaled::<T>(100));
+        #[block]
+        {
+            let refused = Pallet::<T>::borrow(RawOrigin::Signed(borrower).into(), scaled::<T>(100));
+            assert!(refused.is_err());
+        }
 
-        assert!(ActiveLoan::<T>::get().is_some());
+        assert!(ActiveLoan::<T>::get().is_none());
         Ok(())
     }
 
@@ -71,9 +71,16 @@ mod benchmarks {
         fund::<T>(&provider, 1_000_000);
         fund::<T>(&borrower, 1_000_000);
         Pallet::<T>::add_liquidity(RawOrigin::Signed(provider).into(), scaled::<T>(100_000))?;
-        Pallet::<T>::borrow(RawOrigin::Signed(borrower.clone()).into(), scaled::<T>(100))?;
-        let loan = ActiveLoan::<T>::get().ok_or(BenchmarkError::Weightless)?;
-        let required = loan.amount.saturating_add(loan.fee);
+        // A loan opened before the upgrade, as `borrow` used to record it.
+        let amount = scaled::<T>(100);
+        let fee = scaled::<T>(1);
+        ActiveLoan::<T>::put(FlashLoanRecord {
+            borrower: borrower.clone(),
+            amount,
+            fee,
+            repaid: false,
+        });
+        let required = amount.saturating_add(fee);
 
         #[extrinsic_call]
         repay(RawOrigin::Signed(borrower), required);

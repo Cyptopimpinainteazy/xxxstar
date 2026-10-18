@@ -56,13 +56,78 @@ impl system::Config for Test {
 
 parameter_types! {
     pub const MaxPools: u32 = 100;
+    pub const DexPalletId: frame_support::PalletId = frame_support::PalletId(*b"x3/dexpl");
+    pub const LedgerChainId: u32 = 1;
+}
+
+thread_local! {
+    /// The test ledger: (asset, account) -> balance.
+    static LEDGER: core::cell::RefCell<std::collections::BTreeMap<(u32, u64), u128>> =
+        Default::default();
+}
+
+/// A test-only canonical ledger: checked transfers over an in-memory map.
+pub struct TestLedger;
+
+impl TestLedger {
+    pub fn fund(asset: u32, who: u64, amount: u128) {
+        LEDGER.with(|ledger| {
+            *ledger.borrow_mut().entry((asset, who)).or_insert(0) += amount;
+        });
+    }
+}
+
+impl x3_asset_kernel_types::traits::CanonicalLedgerTransfer<u64> for TestLedger {
+    fn ledger_transfer(
+        asset: u32,
+        from: &u64,
+        to: &u64,
+        amount: u128,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        LEDGER.with(|ledger| {
+            let mut ledger = ledger.borrow_mut();
+            let from_balance = ledger.get(&(asset, *from)).copied().unwrap_or(0);
+            let remaining =
+                from_balance
+                    .checked_sub(amount)
+                    .ok_or(sp_runtime::DispatchError::Other(
+                        "insufficient ledger balance",
+                    ))?;
+            let to_balance = ledger.get(&(asset, *to)).copied().unwrap_or(0);
+            let credited = to_balance
+                .checked_add(amount)
+                .ok_or(sp_runtime::DispatchError::Other("ledger overflow"))?;
+            ledger.insert((asset, *from), remaining);
+            ledger.insert((asset, *to), credited);
+            Ok(())
+        })
+    }
+
+    fn ledger_balance(asset: u32, who: &u64) -> u128 {
+        LEDGER.with(|ledger| ledger.borrow().get(&(asset, *who)).copied().unwrap_or(0))
+    }
 }
 
 impl Config for Test {
     type MaxPools = MaxPools;
     type WeightInfo = ();
     type EconomicHalt = NoEconomicHalt;
+    type Ledger = TestLedger;
+    type PalletId = DexPalletId;
+    type LedgerChainId = LedgerChainId;
+    #[cfg(feature = "runtime-benchmarks")]
+    type BenchmarkHelper = TestLedger;
 }
+
+#[cfg(feature = "runtime-benchmarks")]
+impl x3_asset_kernel_types::traits::LedgerBenchmarkFunding<u64> for TestLedger {
+    fn fund(asset: u32, who: &u64, amount: u128) {
+        TestLedger::fund(asset, *who, amount);
+    }
+}
+
+/// Every test account starts with this much of every test asset.
+pub const STARTING_BALANCE: u128 = 1_000_000_000;
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
@@ -73,5 +138,11 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     ext.execute_with(|| {
         System::set_block_number(1);
     });
+    LEDGER.with(|ledger| ledger.borrow_mut().clear());
+    for asset in 0..4u32 {
+        for who in 1..=5u64 {
+            TestLedger::fund(asset, who, STARTING_BALANCE);
+        }
+    }
     ext
 }

@@ -28,11 +28,61 @@ parameter_types! {
     pub const MaxLoanFraction: u32 = 50; // 50%
 }
 
+thread_local! {
+    /// The test ledger: (asset, account) -> balance.
+    static LEDGER: core::cell::RefCell<std::collections::BTreeMap<(u32, u64), u128>> =
+        Default::default();
+}
+
+/// A test-only canonical ledger: checked transfers over an in-memory map.
+pub struct TestLedger;
+
+impl TestLedger {
+    pub fn fund(asset: u32, who: u64, amount: u128) {
+        LEDGER.with(|ledger| *ledger.borrow_mut().entry((asset, who)).or_insert(0) += amount);
+    }
+}
+
+impl x3_asset_kernel_types::traits::CanonicalLedgerTransfer<u64> for TestLedger {
+    fn ledger_transfer(
+        asset: u32,
+        from: &u64,
+        to: &u64,
+        amount: u128,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        LEDGER.with(|ledger| {
+            let mut ledger = ledger.borrow_mut();
+            let from_balance = ledger.get(&(asset, *from)).copied().unwrap_or(0);
+            let remaining =
+                from_balance
+                    .checked_sub(amount)
+                    .ok_or(sp_runtime::DispatchError::Other(
+                        "insufficient ledger balance",
+                    ))?;
+            let credited = ledger
+                .get(&(asset, *to))
+                .copied()
+                .unwrap_or(0)
+                .checked_add(amount)
+                .ok_or(sp_runtime::DispatchError::Other("ledger overflow"))?;
+            ledger.insert((asset, *from), remaining);
+            ledger.insert((asset, *to), credited);
+            Ok(())
+        })
+    }
+
+    fn ledger_balance(asset: u32, who: &u64) -> u128 {
+        LEDGER.with(|ledger| ledger.borrow().get(&(asset, *who)).copied().unwrap_or(0))
+    }
+}
+
 impl pallet_x3_flashloan::Config for Test {
     type Currency = Balances;
     type FeeBasisPoints = FeeBasisPoints;
     type MaxLoanFraction = MaxLoanFraction;
     type WeightInfo = pallet_x3_flashloan::weights::SubstrateWeight<Test>;
+    type Ledger = TestLedger;
+    type AssetPoolOrigin = frame_system::EnsureRoot<u64>;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
@@ -55,5 +105,9 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     }
     .assimilate_storage(&mut t)
     .unwrap();
+    LEDGER.with(|ledger| ledger.borrow_mut().clear());
+    for who in 1..=3u64 {
+        TestLedger::fund(7, who, 1_000_000);
+    }
     t.into()
 }
