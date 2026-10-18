@@ -3,6 +3,8 @@ import { MainNav } from './components/MainNav';
 import { ToastProvider } from './components/Toast';
 import { api } from './api';
 
+const MoneySwarmWorkspace = lazy(() => import('./components/MoneySwarmWorkspace').then(module => ({ default: module.MoneySwarmWorkspace })));
+
 const RegisterPage = lazy(() => import('./components/RegisterPage').then(module => ({ default: module.RegisterPage })));
 const LoginPage = lazy(() => import('./components/LoginPage').then(module => ({ default: module.LoginPage })));
 const Dashboard = lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
@@ -43,7 +45,7 @@ function AuthFallback() {
   );
 }
 
-function App() {
+function InfrastructureApp() {
   const [currentPage, setCurrentPage] = useState<Page>('register');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -177,10 +179,7 @@ function App() {
                 </div>
               )}
               {currentPage === 'funding' && (
-                <div className="px-6">
-                  <h1 className="text-3xl font-bold text-white mb-6">Funding</h1>
-                  <p className="text-gray-400">Funding controls and account management coming soon</p>
-                </div>
+                <Suspense fallback={<PageFallback />}><MoneySwarmWorkspace /></Suspense>
               )}
               {currentPage === 'settings' && (
                 <div className="px-6">
@@ -231,6 +230,14 @@ function App() {
       </div>
     </ToastProvider>
   );
+}
+
+function App() {
+  // Public source records are readable here; every administrative action still
+  // requires the gateway's operator credential, independently of infra login.
+  return window.location.pathname === '/money-swarm'
+    ? <Suspense fallback={<PageFallback />}><MoneySwarmWorkspace /></Suspense>
+    : <InfrastructureApp />;
 }
 
 export default App;

@@ -1,0 +1,23 @@
+{
+  "milestone": "official-source funding workspace",
+  "base": "6c2eec195e2068a49065f60b7dae7e4f2d474f6a",
+  "results": {
+    "gateway_library": "PASS:55",
+    "source_contract": "PASS:7",
+    "migration_table_coverage": "PASS:1",
+    "postgres_integration": "PASS",
+    "dashboard_tests": "PASS:68",
+    "dashboard_lint": "PASS",
+    "dashboard_build": "PASS",
+    "gateway_indexer_clippy": "PASS",
+    "browser_real_source_refresh": "PASS",
+    "pilot_restart_with_persistent_data": "PASS"
+  },
+  "limitations": [
+    "SKIP_WASM_BUILD used for scoped gateway checks; no fresh runtime WASM claim",
+    "Whole workspace checks and exact-head CI not established",
+    "V1-V6 overall mission incomplete",
+    "No real GPU execution or public volunteer activation",
+    "No application submission, external outreach, spending or contracts"
+  ]
+}

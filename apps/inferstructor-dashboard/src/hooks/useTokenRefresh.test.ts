@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useTokenRefresh } from './useTokenRefresh';
+import { useTokenRefresh, setTokenRefreshLogoutCallback } from './useTokenRefresh';
 import { api } from '../api';
 
 const buildJwt = (expSecondsFromNow: number): string => {
@@ -25,9 +25,17 @@ describe('useTokenRefresh', () => {
   });
 
   afterEach(() => {
+    setTokenRefreshLogoutCallback(null);
     vi.useRealTimers();
     localStorage.clear();
     sessionStorage.clear();
+  });
+
+  it('honors a logout callback registered before the hook mounts', () => {
+    const callback = vi.fn();
+    setTokenRefreshLogoutCallback(callback);
+    renderHook(() => useTokenRefresh());
+    expect(callback).toHaveBeenCalledOnce();
   });
 
   it('should attempt token refresh when token is near expiry', async () => {

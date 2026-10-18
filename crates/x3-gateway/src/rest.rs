@@ -159,7 +159,11 @@ fn api_routes() -> Router<AppState> {
             "/bridge/htlc/preimage-verify",
             post(post_htlc_preimage_verify),
         )
-        // ── Funding Swarm admin (requires X-Admin-Token header — human-gate placeholder) ──
+        // Funding Swarm operator actions always require X-Admin-Token.
+        .route(
+            "/admin/funding-swarm/discovery/grants-gov",
+            post(admin_discover_funding_opportunities),
+        )
         .route(
             "/admin/funding-swarm/grants",
             get(admin_list_funding_swarm_grants).post(admin_create_funding_swarm_grant),
@@ -892,24 +896,22 @@ async fn get_funding_swarm_timeline(
 // ── Funding Swarm admin authorization ────────────────────────────────────────
 //
 // HUMAN APPROVAL GATE — production auth.
-// FUNDING_SWARM_ADMIN_TOKEN env var MUST be set in production. When it is
-// unset and the `dev` feature is active, the gate is open for local dev.
+// FUNDING_SWARM_ADMIN_TOKEN must be configured even for development builds.
+// Source documents and feature flags cannot bypass operator authorization.
 
 fn authorize_funding_swarm_admin(headers: &axum::http::HeaderMap) -> Result<(), GatewayError> {
     let expected = std::env::var("FUNDING_SWARM_ADMIN_TOKEN").unwrap_or_default();
-    if expected.is_empty() {
-        #[cfg(feature = "dev")]
-        {
-            // Dev-only: no token configured, gate open for local dev.
-            return Ok(());
-        }
-        #[cfg(not(feature = "dev"))]
-        {
-            // Production: FUNDING_SWARM_ADMIN_TOKEN must be set.
-            return Err(GatewayError::BadRequest(
-                "FUNDING_SWARM_ADMIN_TOKEN not configured — admin endpoints disabled".to_string(),
-            ));
-        }
+    authorize_funding_token(headers, &expected)
+}
+
+fn authorize_funding_token(
+    headers: &axum::http::HeaderMap,
+    expected: &str,
+) -> Result<(), GatewayError> {
+    if expected.trim().is_empty() {
+        return Err(GatewayError::Unauthorized(
+            "funding operator access is disabled".into(),
+        ));
     }
     let provided = headers
         .get("x-admin-token")
@@ -918,13 +920,27 @@ fn authorize_funding_swarm_admin(headers: &axum::http::HeaderMap) -> Result<(), 
     if provided == expected {
         Ok(())
     } else {
-        Err(GatewayError::BadRequest(
+        Err(GatewayError::Unauthorized(
             "missing or invalid admin token".to_string(),
         ))
     }
 }
 
 // ── Funding Swarm admin handlers ─────────────────────────────────────────────
+
+async fn admin_discover_funding_opportunities(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(request): Json<crate::funding_discovery::DiscoveryRequest>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    if std::env::var("X3_FUNDING_DISCOVERY_ENABLED").as_deref() != Ok("1") {
+        return Err(GatewayError::BadRequest("official source discovery is disabled; an operator must enable X3_FUNDING_DISCOVERY_ENABLED=1".into()));
+    }
+    Ok(Json(
+        crate::funding_discovery::discover(&state.db, request).await?,
+    ))
+}
 
 async fn admin_list_funding_swarm_grants(
     State(state): State<AppState>,
@@ -1688,6 +1704,21 @@ fn sort_benchmark_reports(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn funding_operator_auth_fails_closed_even_in_dev_builds() {
+        use super::authorize_funding_token;
+        let mut headers = axum::http::HeaderMap::new();
+        assert!(authorize_funding_token(&headers, "").is_err());
+        assert!(authorize_funding_token(&headers, "   ").is_err());
+        assert!(authorize_funding_token(&headers, "configured-test-credential").is_err());
+        headers.insert("x-admin-token", "wrong-credential".parse().unwrap());
+        assert!(authorize_funding_token(&headers, "configured-test-credential").is_err());
+        headers.insert(
+            "x-admin-token",
+            "configured-test-credential".parse().unwrap(),
+        );
+        assert!(authorize_funding_token(&headers, "configured-test-credential").is_ok());
+    }
     use super::*;
     use crate::db::{NewEvidenceBundle, NewOrchestraIntent, NewVoteWindow};
     use crate::graphql::create_schema;

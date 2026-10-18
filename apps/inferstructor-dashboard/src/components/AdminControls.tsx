@@ -34,12 +34,7 @@ export const AdminControls: React.FC<AdminControlsProps> = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load admin data on mount
-  useEffect(() => {
-    loadAdminData();
-  }, []);
-
-  const loadAdminData = async () => {
+  async function loadAdminData() {
     try {
       setLoading(true);
       setError(null);
@@ -148,7 +143,11 @@ export const AdminControls: React.FC<AdminControlsProps> = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
 
   return (
     <div className="px-6">

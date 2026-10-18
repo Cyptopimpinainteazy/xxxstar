@@ -1,0 +1,16 @@
+{"at":"2026-10-18T21:06:29.436Z","action":"Navigate to Money Swarm and read first persisted source opportunity","result":{"status":"PASS","grant_id":"984043b8-2ed9-4072-bb50-123d555e5574","title":"Computational and Data-Enabled Science and Engineering"}}
+{"at":"2026-10-18T21:06:29.520Z","action":"Search loaded opportunities","result":{"status":"PASS","matches":1}}
+{"at":"2026-10-18T21:06:29.661Z","action":"Open source evidence; dismiss with Escape; restore keyboard focus","result":{"status":"PASS"}}
+{"at":"2026-10-18T21:06:30.084Z","action":"Render funding ledger","result":{"status":"PASS","viewport":{"width":1440,"height":1000},"screenshot":"/tmp/x3-money-ui-proof-20261018/desktop.png","horizontalOverflow":false}}
+{"at":"2026-10-18T21:06:30.350Z","action":"Render funding ledger","result":{"status":"PASS","viewport":{"width":800,"height":900},"screenshot":"/tmp/x3-money-ui-proof-20261018/tablet.png","horizontalOverflow":false}}
+{"at":"2026-10-18T21:06:30.569Z","action":"Render funding ledger","result":{"status":"PASS","viewport":{"width":375,"height":812},"screenshot":"/tmp/x3-money-ui-proof-20261018/mobile.png","horizontalOverflow":false}}
+{"at":"2026-10-18T21:06:36.119Z","action":"Authenticated refresh from official Grants.gov through the real browser","result":{"status":"PASS","message":"Source refresh complete: 10 opportunities checked, 1 new or changed. Eligibility remains subject to review."}}
+{"at":"2026-10-18T21:06:36.185Z","action":"Complete bounded verification","result":{"status":"PASS","records":10,"consoleErrors":[]}}
+{"at":"2026-10-18T21:34:40.617Z","action":"Navigate to Money Swarm and read first persisted source opportunity","result":{"status":"PASS","grant_id":"984043b8-2ed9-4072-bb50-123d555e5574","title":"Computational and Data-Enabled Science and Engineering"}}
+{"at":"2026-10-18T21:34:40.715Z","action":"Search loaded opportunities","result":{"status":"PASS","matches":1}}
+{"at":"2026-10-18T21:34:40.875Z","action":"Open source evidence; dismiss with Escape; restore keyboard focus","result":{"status":"PASS"}}
+{"at":"2026-10-18T21:34:41.229Z","action":"Render funding ledger","result":{"status":"PASS","viewport":{"width":1440,"height":1000},"screenshot":"/tmp/x3-money-ui-proof-20261018/desktop.png","horizontalOverflow":false}}
+{"at":"2026-10-18T21:34:41.476Z","action":"Render funding ledger","result":{"status":"PASS","viewport":{"width":800,"height":900},"screenshot":"/tmp/x3-money-ui-proof-20261018/tablet.png","horizontalOverflow":false}}
+{"at":"2026-10-18T21:34:41.687Z","action":"Render funding ledger","result":{"status":"PASS","viewport":{"width":375,"height":812},"screenshot":"/tmp/x3-money-ui-proof-20261018/mobile.png","horizontalOverflow":false}}
+{"at":"2026-10-18T21:34:47.262Z","action":"Authenticated refresh from official Grants.gov through the real browser","result":{"status":"PASS","message":"Source refresh complete: 10 opportunities checked, 10 new or changed. Eligibility remains subject to review."}}
+{"at":"2026-10-18T21:34:47.320Z","action":"Complete bounded verification","result":{"status":"PASS","records":10,"consoleErrors":[]}}

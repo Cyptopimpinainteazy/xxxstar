@@ -10,6 +10,13 @@ interface TpsLeaderboardProps {
 type SortField = 'tps_current' | 'tps_peak' | 'tps_theoretical' | 'latency' | 'finality';
 type Category = 'chain' | 'ecosystem' | 'provider';
 
+function SortIcon({ field, activeField, order }: { field: SortField; activeField: SortField; order: 'asc' | 'desc' }) {
+  if (activeField !== field) return <ChevronDown className="w-3 h-3 opacity-30" />;
+  return order === 'desc'
+    ? <ChevronDown className="w-3 h-3 text-blue-400" />
+    : <ChevronUp className="w-3 h-3 text-blue-400" />;
+}
+
 const ECOSYSTEM_COLORS: Record<string, string> = {
   x3: '#FFD700',
   evm: '#627EEA',
@@ -81,13 +88,6 @@ export function TpsLeaderboard({ onBack }: TpsLeaderboardProps) {
       setSortField(field);
       setSortOrder(field === 'latency' || field === 'finality' ? 'asc' : 'desc');
     }
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ChevronDown className="w-3 h-3 opacity-30" />;
-    return sortOrder === 'desc'
-      ? <ChevronDown className="w-3 h-3 text-blue-400" />
-      : <ChevronUp className="w-3 h-3 text-blue-400" />;
   };
 
   const getMedal = (i: number) => {
@@ -300,19 +300,19 @@ export function TpsLeaderboard({ onBack }: TpsLeaderboardProps) {
                     <th className="px-4 py-3 text-left">Chain</th>
                     <th className="px-4 py-3 text-left">Ecosystem</th>
                     <th className="px-4 py-3 text-right cursor-pointer hover:text-white select-none" onClick={() => toggleSort('tps_current')}>
-                      <span className="inline-flex items-center gap-1">Current TPS <SortIcon field="tps_current" /></span>
+                      <span className="inline-flex items-center gap-1">Current TPS <SortIcon field="tps_current" activeField={sortField} order={sortOrder} /></span>
                     </th>
                     <th className="px-4 py-3 text-right cursor-pointer hover:text-white select-none" onClick={() => toggleSort('tps_peak')}>
-                      <span className="inline-flex items-center gap-1">Peak <SortIcon field="tps_peak" /></span>
+                      <span className="inline-flex items-center gap-1">Peak <SortIcon field="tps_peak" activeField={sortField} order={sortOrder} /></span>
                     </th>
                     <th className="px-4 py-3 text-right cursor-pointer hover:text-white select-none" onClick={() => toggleSort('tps_theoretical')}>
-                      <span className="inline-flex items-center gap-1">Theoretical <SortIcon field="tps_theoretical" /></span>
+                      <span className="inline-flex items-center gap-1">Theoretical <SortIcon field="tps_theoretical" activeField={sortField} order={sortOrder} /></span>
                     </th>
                     <th className="px-4 py-3 text-right cursor-pointer hover:text-white select-none" onClick={() => toggleSort('latency')}>
-                      <span className="inline-flex items-center gap-1">Latency <SortIcon field="latency" /></span>
+                      <span className="inline-flex items-center gap-1">Latency <SortIcon field="latency" activeField={sortField} order={sortOrder} /></span>
                     </th>
                     <th className="px-4 py-3 text-right cursor-pointer hover:text-white select-none" onClick={() => toggleSort('finality')}>
-                      <span className="inline-flex items-center gap-1">Finality <SortIcon field="finality" /></span>
+                      <span className="inline-flex items-center gap-1">Finality <SortIcon field="finality" activeField={sortField} order={sortOrder} /></span>
                     </th>
                     <th className="px-4 py-3 text-right">Endpoints</th>
                   </tr>

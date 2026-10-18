@@ -1,0 +1,42 @@
+warning: /home/lojak/x3-grant-compute-20261018/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/x3-grant-compute-20261018/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/x3-grant-compute-20261018/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/x3-grant-compute-20261018/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+warning: x3-chain-runtime@0.1.0: runtime/build.rs embedded cached runtime WASM from /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
+   Compiling x3-gateway v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-gateway)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 49s
+     Running tests/funding_discovery_contract.rs (/home/lojak/Desktop/xxxstar-main/target/debug/deps/funding_discovery_contract-560381549d9a7c2a)
+
+running 7 tests
+test missing_deadline_and_award_remain_unknown_and_expiry_is_date_based ... ok
+test rejects_present_malformed_deadline_types_and_suffixes ... FAILED
+test rejects_wrong_identity_malformed_dates_and_financial_overflow ... ok
+test prefers_structured_agency_identity_to_a_free_form_contact_name ... ok
+test treats_source_instructions_as_inert_content_not_decisions ... ok
+test enforces_bounded_discovery_request_and_rejects_unrecognized_fields ... ok
+test normalizes_authoritative_ids_dates_and_unknown_eligibility ... ok
+
+failures:
+
+---- rejects_present_malformed_deadline_types_and_suffixes stdout ----
+
+thread 'rejects_present_malformed_deadline_types_and_suffixes' panicked at crates/x3-gateway/tests/funding_discovery_contract.rs:116:9:
+assertion failed: normalize_opportunity(input, 123, Utc::now()).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    rejects_present_malformed_deadline_types_and_suffixes
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p x3-gateway --test funding_discovery_contract`
