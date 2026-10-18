@@ -17,7 +17,6 @@ x3-common = { path = "../x3-common", default-features = false }
 x3bc-core = { path = "../x3bc-core", default-features = false }
 # Attestor signatures over trading receipts (std: the attestor and replay are off-chain).
 ed25519-dalek = { version = "2.1", default-features = false, optional = true }
-x3-verifier = { path = "../x3-verifier", optional = true }
 
 # Cross-VM executor traits (real backends are provided by the caller)
 x3-evm-integration = { path = "../evm-integration", default-features = false }
@@ -79,7 +78,6 @@ std = [
     "x3-vm/std",
     "x3-backend/std",
     "x3-compiler",
-    "x3-verifier",
 ]
 # Enable contract compilation from source
 compile = []

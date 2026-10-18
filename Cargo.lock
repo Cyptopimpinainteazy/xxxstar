@@ -27803,7 +27803,6 @@ dependencies = [
  "x3-mir",
  "x3-opt",
  "x3-svm-integration",
- "x3-verifier",
  "x3-vm",
  "x3bc-core",
 ]

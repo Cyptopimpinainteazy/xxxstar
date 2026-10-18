@@ -315,18 +315,6 @@ impl Verifier {
         }
         None
     }
-
-    /// Verify bytecode (post-compilation check)
-    pub fn verify_bytecode(&self, _bytecode: &[u8]) -> VerifierResult<VerificationReport> {
-        // Bytecode verification deferred to instruction-level decoder
-        // This would decode the bytecode and verify at the instruction level
-        Ok(VerificationReport {
-            errors: vec![],
-            gas_report: None,
-            passed: true,
-            stats: VerificationStats::default(),
-        })
-    }
 }
 
 #[cfg(test)]
