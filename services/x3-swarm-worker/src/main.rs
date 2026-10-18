@@ -1,4 +1,7 @@
 #[cfg(test)]
+mod volunteer_lease;
+
+#[cfg(test)]
 mod volunteer_policy;
 
 use anyhow::Context;
