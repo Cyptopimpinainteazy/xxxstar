@@ -39,6 +39,11 @@ fail=0
  cd "$ROOT"
  run dex-two-pool-rollback cargo test -p pallet-x3-dex two_pool_second_leg_slippage_rolls_back_first_leg_and_events --locked
 ) || fail=1
+# Production atomic trade engine pallet regressions.
+(
+ cd "$ROOT"
+ run atomic-engine-tests cargo test -p pallet-atomic-trade-engine --locked
+) || fail=1
 # Inventory concrete test names for a later instruction-level trace adapter.
 (
  cd "$ROOT/x3-lang"
