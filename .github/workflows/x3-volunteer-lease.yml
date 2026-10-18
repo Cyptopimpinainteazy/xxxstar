@@ -1,0 +1,24 @@
+name: X3 Volunteer Lease Security
+on:
+  pull_request:
+    paths:
+      - 'services/x3-volunteer-worker/**'
+      - '.github/workflows/x3-volunteer-lease.yml'
+  push:
+    branches:
+      - 'codex/x3-volunteer-compute-integration'
+    paths:
+      - 'services/x3-volunteer-worker/**'
+      - '.github/workflows/x3-volunteer-lease.yml'
+jobs:
+  lease-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run authenticated lease regression tests
+        run: python3 -m unittest discover -s services/x3-volunteer-worker -p 'test_*.py' -v
