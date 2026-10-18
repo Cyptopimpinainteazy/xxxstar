@@ -1281,6 +1281,105 @@ fn execute_one_evm_batch(who: u64) -> u128 {
 }
 
 #[test]
+fn protocol_fee_matches_wide_reference_and_conserves_balances_at_u128_boundaries() {
+    // The reference widens the product. Production fee calculation must not
+    // lose value when the product overflows u128 but its quotient still fits.
+    for amount in [
+        1,
+        499,
+        500,
+        501,
+        9_999,
+        10_000,
+        10_001,
+        u128::MAX / 20,
+        u128::MAX / 20 + 1,
+        u128::MAX / 20 + 10_000,
+        u128::MAX / 2,
+        u128::MAX,
+    ] {
+        for bps in [0, 1, 5, 20, 2_500] {
+            new_test_ext().execute_with(|| {
+                let owner = account(1);
+                ProtocolFeeBps::set(bps);
+                // Leave ample balance for the fee without overflowing total issuance.
+                Balances::make_free_balance_be(&owner, u128::MAX / 2);
+                let before_owner = Balances::free_balance(owner);
+                let before_treasury = Balances::free_balance(ProtocolTreasury::get());
+                let issuance = Balances::total_issuance();
+                let expected: u128 = ((sp_core::U256::from(amount) * sp_core::U256::from(bps))
+                    / sp_core::U256::from(10_000u32))
+                .try_into()
+                .unwrap();
+                assert_ok!(AtomicTradeEngine::create_trade_batch(
+                    RuntimeOrigin::signed(owner),
+                    vec![evm_leg(amount, 0)],
+                    100,
+                    100,
+                    0,
+                ));
+                let batch_id = AtomicTradeEngine::pending_batches(owner)[0];
+                assert_ok!(AtomicTradeEngine::execute_trade_batch(
+                    RuntimeOrigin::signed(owner),
+                    batch_id
+                ));
+                assert_eq!(
+                    AtomicTradeEngine::trade_batches(batch_id).unwrap().status,
+                    BatchStatus::Completed
+                );
+                assert_eq!(
+                    Balances::free_balance(ProtocolTreasury::get()),
+                    before_treasury + expected,
+                    "incorrect fee for input {amount} at {bps} bps"
+                );
+                assert_eq!(Balances::free_balance(owner), before_owner - expected);
+                assert_eq!(Balances::total_issuance(), issuance);
+                if expected > 0 {
+                    System::assert_has_event(RuntimeEvent::AtomicTradeEngine(
+                        Event::ProtocolFeeCollected {
+                            who: owner,
+                            fee: expected,
+                        },
+                    ));
+                }
+            });
+        }
+    }
+}
+
+#[test]
+fn unrepresentable_protocol_fee_is_rejected_before_vm_execution() {
+    // Cover overflow in the whole quotient's product and in the final addition.
+    for (bps, amount) in [
+        (u32::MAX, u128::MAX),
+        (10_001, (u128::MAX / 10_001) * 10_000 + 9_999),
+    ] {
+        new_test_ext().execute_with(|| {
+            let owner = account(1);
+            ProtocolFeeBps::set(bps);
+            LAST_EVM_CALLER.with(|last| last.set(None));
+            assert_ok!(AtomicTradeEngine::create_trade_batch(
+                RuntimeOrigin::signed(owner),
+                vec![evm_leg(amount, 1)],
+                100,
+                100,
+                0,
+            ));
+            let batch_id = AtomicTradeEngine::pending_batches(owner)[0];
+            assert_noop!(
+                AtomicTradeEngine::execute_trade_batch(RuntimeOrigin::signed(owner), batch_id),
+                Error::<Test>::ArithmeticOverflow
+            );
+            LAST_EVM_CALLER.with(|last| assert_eq!(last.get(), None));
+            assert_eq!(
+                AtomicTradeEngine::trade_batches(batch_id).unwrap().status,
+                BatchStatus::Pending
+            );
+        });
+    }
+}
+
+#[test]
 fn a_collected_protocol_fee_reaches_the_treasury() {
     new_test_ext().execute_with(|| {
         ProtocolFeeBps::set(20);

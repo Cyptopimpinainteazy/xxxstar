@@ -146,9 +146,12 @@ pub mod pallet {
 
     use frame_support::storage::{with_transaction, TransactionOutcome};
     use frame_support::traits::StorageVersion;
+    use sp_runtime::traits::Zero;
     use x3_security_events::{SecurityEvent, SecurityEventHook, SecurityEventKind};
 
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+    /// One unit expressed in basis points (100%). Fee division rounds down.
+    const PROTOCOL_FEE_DENOMINATOR: u128 = 10_000;
 
     #[pallet::pallet]
     #[pallet::storage_version(STORAGE_VERSION)]
@@ -678,6 +681,7 @@ pub mod pallet {
                 .iter()
                 .try_fold(0u128, |total, leg| total.checked_add(leg.amount_in))
                 .ok_or(Error::<T>::ArithmeticOverflow)?;
+            let protocol_fee = Self::calculate_protocol_fee(total_input)?;
 
             // Update status to executing
             batch.status = BatchStatus::Executing;
@@ -709,7 +713,7 @@ pub mod pallet {
             let transactional_result: Result<(u128, u64), DispatchError> =
                 with_transaction(|| match Self::execute_all_legs(&mut batch) {
                     Ok(result) => {
-                        Self::collect_protocol_fee(&who, total_input);
+                        Self::collect_protocol_fee(&who, protocol_fee);
                         match Self::register_batch_settlement(&batch) {
                             Ok(_) => TransactionOutcome::Commit(Ok(result)),
                             Err(error) => {
@@ -1363,32 +1367,48 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
+        /// Compute floor(input * bps / denominator) without an overflowing
+        /// intermediate product. Reject amounts the native currency cannot hold
+        /// before VM execution, rather than truncating or waiving them.
+        fn calculate_protocol_fee(total_input: u128) -> Result<BalanceOf<T>, DispatchError> {
+            let fee_bps = u128::from(T::ProtocolFeeBps::get());
+            // input = whole * denominator + remainder, so the integer fee is
+            // whole * bps + floor(remainder * bps / denominator).
+            let whole = (total_input / PROTOCOL_FEE_DENOMINATOR)
+                .checked_mul(fee_bps)
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
+            let fraction = (total_input % PROTOCOL_FEE_DENOMINATOR)
+                .checked_mul(fee_bps)
+                .ok_or(Error::<T>::ArithmeticOverflow)?
+                / PROTOCOL_FEE_DENOMINATOR;
+            let fee = whole
+                .checked_add(fraction)
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
+            fee.try_into()
+                .map_err(|_| Error::<T>::ArithmeticOverflow.into())
+        }
+
         /// Called only within the execution transaction. Preserve the existing
         /// fee-waiver policy, but roll back a collected fee if settlement fails.
-        fn collect_protocol_fee(who: &T::AccountId, total_input: u128) {
-            let fee_bps = u128::from(T::ProtocolFeeBps::get());
-            if fee_bps > 0 {
-                let fee_raw = total_input.saturating_mul(fee_bps).saturating_div(10_000);
-                if fee_raw > 0 {
-                    let fee: BalanceOf<T> = fee_raw.saturated_into();
-                    if <T as Config>::Currency::transfer(
-                        who,
-                        &T::ProtocolTreasury::get(),
+        fn collect_protocol_fee(who: &T::AccountId, fee: BalanceOf<T>) {
+            if !fee.is_zero() {
+                if <T as Config>::Currency::transfer(
+                    who,
+                    &T::ProtocolTreasury::get(),
+                    fee,
+                    frame_support::traits::ExistenceRequirement::KeepAlive,
+                )
+                .is_ok()
+                {
+                    Self::deposit_event(Event::ProtocolFeeCollected {
+                        who: who.clone(),
                         fee,
-                        frame_support::traits::ExistenceRequirement::KeepAlive,
-                    )
-                    .is_ok()
-                    {
-                        Self::deposit_event(Event::ProtocolFeeCollected {
-                            who: who.clone(),
-                            fee,
-                        });
-                    } else {
-                        Self::deposit_event(Event::ProtocolFeeWaived {
-                            who: who.clone(),
-                            fee,
-                        });
-                    }
+                    });
+                } else {
+                    Self::deposit_event(Event::ProtocolFeeWaived {
+                        who: who.clone(),
+                        fee,
+                    });
                 }
             }
         }
