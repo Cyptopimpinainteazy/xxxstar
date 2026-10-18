@@ -1,0 +1,15 @@
+warning: /home/lojak/x3-grant-compute-20261018/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/x3-grant-compute-20261018/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/x3-grant-compute-20261018/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/x3-grant-compute-20261018/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on build directory
+warning: x3-chain-runtime@0.1.0: runtime/build.rs embedded cached runtime WASM from /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
+   Compiling x3-gateway v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-gateway)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 28s

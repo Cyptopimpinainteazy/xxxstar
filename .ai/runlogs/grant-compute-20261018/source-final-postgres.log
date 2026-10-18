@@ -1,0 +1,22 @@
+gateway-postgres-integration: starting postgres:16-alpine as x3-gateway-postgres-2687458-2687474
+gateway-postgres-integration: running x3-gateway database integration test on 127.0.0.1:50653
+warning: /home/lojak/x3-grant-compute-20261018/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/x3-grant-compute-20261018/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/x3-grant-compute-20261018/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/x3-grant-compute-20261018/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+warning: x3-chain-runtime@0.1.0: runtime/build.rs embedded cached runtime WASM from /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
+   Compiling x3-gateway v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-gateway)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.80s
+     Running tests/postgres_integration.rs (/home/lojak/Desktop/xxxstar-main/target/debug/deps/postgres_integration-cbf89b65358da76b)
+
+running 1 test
+test migrations_and_funding_swarm_roundtrip_against_postgres ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.45s

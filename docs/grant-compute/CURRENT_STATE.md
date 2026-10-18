@@ -130,3 +130,18 @@ milestones, and finally real-data dashboard integration. Infrastructure deployme
 and live redundant GPU verification require reachable, explicitly opted-in hosts.
 External submission, financial commitments and new workload activation remain
 human-controlled. No end-to-end or production-readiness claim is supported yet.
+
+## Later read-only hardware discovery (2026-10-18)
+
+The initial configured GPU address was stale. Parsing only endpoint hosts from
+existing router configuration located x3gpu1 at 192.168.0.29; trusted-key,
+BatchMode SSH and read-only nvidia-smi succeeded. Actual discovery reported a
+GTX1070 (8192MiB) and RTX2060SUPER (8192MiB), driver580.178.04. Python3,
+cryptography and bwrap exist; torch, numpy and nvcc were absent. No package
+installation, enrollment, GPU job, power measurement or public workload activation
+occurred. Reachability is not consent, isolation proof or executed research.
+
+The local development host reports two XeonE5-2620v4 sockets (16 physical cores,
+32 logical CPUs) and approximately109GiB RAM. This does not validate historical
+fleet counts, free capacity, electrical cost, cooling or model compatibility.
+Manufacturer evidence and measured telemetry are still required for those claims.

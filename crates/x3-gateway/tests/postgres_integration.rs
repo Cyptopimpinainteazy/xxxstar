@@ -9,6 +9,7 @@ const TEST_DATABASE_URL_ENV: &str = "X3_GATEWAY_TEST_DATABASE_URL";
 #[ignore = "requires a real Postgres instance; run via scripts/gateway-postgres-integration.sh"]
 async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
     funding_workflow_enforces_state_and_preserves_audit().await;
+    funding_source_snapshots_are_durable_and_preserve_review().await;
     fresh_schema_supports_chain_queries().await;
     gateway_schema_upgrades_both_legacy_histories().await;
     control_plane_roundtrip_and_duplicate_vote_rejection().await;
@@ -89,6 +90,92 @@ async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
 
     assert_eq!(after.total_grants, before.total_grants + 1);
     assert_eq!(after.open_grants, before.open_grants + 1);
+}
+
+async fn funding_source_snapshots_are_durable_and_preserve_review() {
+    use x3_gateway::funding_discovery::normalize_opportunity;
+    let url = std::env::var(TEST_DATABASE_URL_ENV).unwrap();
+    let db = Database::connect(&DatabaseConfig::new(url.clone()))
+        .await
+        .unwrap();
+    let mut source = serde_json::json!({"id":456,"opportunityNumber":"SOURCE-FIXTURE",
+        "opportunityTitle":"Source snapshot fixture","synopsis":{"agencyName":"Fixture agency",
+        "synopsisDesc":"Original source description", "responseDateStr":"2030-01-01-00-00-00"}});
+    let opportunity = normalize_opportunity(source.clone(), 456, chrono::Utc::now()).unwrap();
+    assert!(db
+        .store_funding_snapshot(&opportunity, &source)
+        .await
+        .unwrap());
+    assert!(
+        !db.store_funding_snapshot(&opportunity, &source)
+            .await
+            .unwrap(),
+        "same source document is idempotent"
+    );
+    let grant_id: String = sqlx::query_scalar(
+        "SELECT grant_id FROM funding_swarm_grants WHERE external_id='grants.gov:456'",
+    )
+    .fetch_one(db.pool())
+    .await
+    .unwrap();
+    db.admin_advance_funding_swarm_stage(&grant_id, "research", "open")
+        .await
+        .unwrap();
+    source["synopsis"]["synopsisDesc"] = serde_json::json!("Changed source description");
+    let changed = normalize_opportunity(source.clone(), 456, chrono::Utc::now()).unwrap();
+    assert!(db.store_funding_snapshot(&changed, &source).await.unwrap());
+    let mut forged = changed.clone();
+    forged.official_url = "https://example.invalid/forged".into();
+    assert!(
+        db.store_funding_snapshot(&forged, &source).await.is_err(),
+        "normalized evidence must bind to the original source"
+    );
+    let open_before_clock = db.get_funding_swarm_scoreboard().await.unwrap().open_grants;
+    // Availability must age out without waiting for another upstream refresh.
+    sqlx::query("UPDATE funding_swarm_grants SET metadata=jsonb_set(metadata,'{deadline}','\"2000-01-01\"') WHERE grant_id=$1")
+        .bind(&grant_id).execute(db.pool()).await.unwrap();
+    assert_eq!(
+        db.get_funding_swarm_scoreboard().await.unwrap().open_grants,
+        open_before_clock - 1
+    );
+    sqlx::query("UPDATE funding_swarm_grants SET metadata=jsonb_set(metadata,'{deadline}','\"2030-01-01\"') WHERE grant_id=$1")
+        .bind(&grant_id).execute(db.pool()).await.unwrap();
+    let open_before = db.get_funding_swarm_scoreboard().await.unwrap().open_grants;
+    source["synopsis"]["responseDateStr"] = serde_json::json!("2000-01-01-00-00-00");
+    let expired = normalize_opportunity(source.clone(), 456, chrono::Utc::now()).unwrap();
+    assert!(db.store_funding_snapshot(&expired, &source).await.unwrap());
+    assert_eq!(
+        db.get_funding_swarm_scoreboard().await.unwrap().open_grants,
+        open_before - 1,
+        "expired research opportunities must leave the open count"
+    );
+    let reopened = Database::connect(&DatabaseConfig::new(url)).await.unwrap();
+    let stage: String =
+        sqlx::query_scalar("SELECT stage FROM funding_swarm_grants WHERE grant_id=$1")
+            .bind(&grant_id)
+            .fetch_one(reopened.pool())
+            .await
+            .unwrap();
+    assert_eq!(
+        stage, "research",
+        "source refresh must not reset human review"
+    );
+    let snapshots: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM funding_source_snapshots WHERE grant_id=$1")
+            .bind(&grant_id)
+            .fetch_one(reopened.pool())
+            .await
+            .unwrap();
+    assert_eq!(snapshots, 3);
+    let original: String = sqlx::query_scalar("SELECT source_document->'synopsis'->>'synopsisDesc' FROM funding_source_snapshots WHERE grant_id=$1 ORDER BY retrieved_at LIMIT 1")
+        .bind(&grant_id).fetch_one(reopened.pool()).await.unwrap();
+    assert_eq!(original, "Original source description");
+    let audit_events: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM funding_swarm_events WHERE grant_id=$1 AND event_type='official_source_snapshot'")
+        .bind(&grant_id).fetch_one(reopened.pool()).await.unwrap();
+    assert_eq!(
+        audit_events, 3,
+        "only changed source documents emit discovery events"
+    );
 }
 
 async fn funding_workflow_enforces_state_and_preserves_audit() {

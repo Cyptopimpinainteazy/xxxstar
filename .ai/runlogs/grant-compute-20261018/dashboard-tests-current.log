@@ -1,0 +1,12 @@
+
+> inferstructor-dashboard@1.0.0 test
+> vitest --run
+
+
+ RUN  v5.0.1 /home/lojak/x3-grant-compute-20261018/apps/inferstructor-dashboard
+
+
+ Test Files  9 passed (9)
+      Tests  68 passed (68)
+   Start at  15:28:50
+   Duration  13.61s (environment 63%, import 13%, setup 8%, tests 8%, transform 8%, worker 1%)

@@ -16,6 +16,8 @@ pub type Result<T> = std::result::Result<T, GatewayError>;
 /// Error taxonomy for the gateway service.
 #[derive(Debug, thiserror::Error)]
 pub enum GatewayError {
+    #[error("unauthorized: {0}")]
+    Unauthorized(String),
     /// Client sent an invalid request (validation or shape failure).
     #[error("bad request: {0}")]
     BadRequest(String),
@@ -40,6 +42,7 @@ impl GatewayError {
     /// Short numeric-independent machine code for HTTP consumers.
     fn code(&self) -> &'static str {
         match self {
+            GatewayError::Unauthorized(_) => "unauthorized",
             GatewayError::BadRequest(_) => "bad_request",
             GatewayError::NotFound(_) => "not_found",
             GatewayError::Internal(_) => "internal_error",
@@ -48,6 +51,7 @@ impl GatewayError {
 
     fn status(&self) -> StatusCode {
         match self {
+            GatewayError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             GatewayError::BadRequest(_) => StatusCode::BAD_REQUEST,
             GatewayError::NotFound(_) => StatusCode::NOT_FOUND,
             GatewayError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,

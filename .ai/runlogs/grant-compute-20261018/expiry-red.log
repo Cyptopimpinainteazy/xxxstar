@@ -1,0 +1,83 @@
+gateway-postgres-integration: starting postgres:16-alpine as x3-gateway-postgres-2673103-2673113
+gateway-postgres-integration: running x3-gateway database integration test on 127.0.0.1:45065
+warning: /home/lojak/x3-grant-compute-20261018/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/x3-grant-compute-20261018/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/x3-grant-compute-20261018/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/x3-grant-compute-20261018/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+warning: x3-chain-runtime@0.1.0: runtime/build.rs embedded cached runtime WASM from /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
+   Compiling x3-gateway v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-gateway)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.87s
+     Running tests/postgres_integration.rs (/home/lojak/Desktop/xxxstar-main/target/debug/deps/postgres_integration-cbf89b65358da76b)
+
+running 1 test
+test migrations_and_funding_swarm_roundtrip_against_postgres ...
+thread 'migrations_and_funding_swarm_roundtrip_against_postgres' panicked at crates/x3-gateway/tests/postgres_integration.rs:137:5:
+assertion `left == right` failed: expired research opportunities must leave the open count
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    migrations_and_funding_swarm_roundtrip_against_postgres
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+
+error: test failed, to rerun pass `-p x3-gateway --test postgres_integration`
+gateway-postgres-integration: Postgres logs follow because the gate failed
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+fixing permissions on existing directory /var/lib/postgresql/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/data -l logfile start
+
+waiting for server to start....2026-10-18 21:30:14.578 UTC [71] LOG:  starting PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+2026-10-18 21:30:14.579 UTC [71] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-18 21:30:14.583 UTC [74] LOG:  database system was shut down at 2026-10-18 21:30:14 UTC
+2026-10-18 21:30:14.590 UTC [71] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down....2026-10-18 21:30:14.747 UTC [71] LOG:  received fast shutdown request
+2026-10-18 21:30:14.748 UTC [71] LOG:  aborting any active transactions
+2026-10-18 21:30:14.752 UTC [71] LOG:  background worker "logical replication launcher" (PID 77) exited with exit code 1
+2026-10-18 21:30:14.753 UTC [72] LOG:  shutting down
+2026-10-18 21:30:14.753 UTC [72] LOG:  checkpoint starting: shutdown immediate
+2026-10-18 21:30:14.791 UTC [72] LOG:  checkpoint complete: wrote 926 buffers (5.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.034 s, sync=0.003 s, total=0.039 s; sync files=301, longest=0.001 s, average=0.001 s; distance=4283 kB, estimate=4283 kB; lsn=0/1925D60, redo lsn=0/1925D60
+2026-10-18 21:30:14.804 UTC [71] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.

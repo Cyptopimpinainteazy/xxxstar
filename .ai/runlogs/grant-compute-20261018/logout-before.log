@@ -1,0 +1,30 @@
+
+> inferstructor-dashboard@1.0.0 test
+> vitest --run src/hooks/useTokenRefresh.test.ts
+
+
+ RUN  v5.0.1 /home/lojak/x3-grant-compute-20261018/apps/inferstructor-dashboard
+
+ ❯ src/hooks/useTokenRefresh.test.ts (3 tests | 1 failed) 91ms
+   ❯ useTokenRefresh (3)
+     × honors a logout callback registered before the hook mounts 57ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/hooks/useTokenRefresh.test.ts > useTokenRefresh > honors a logout callback registered before the hook mounts
+AssertionError: expected "vi.fn()" to be called once, but got 0 times
+ ❯ src/hooks/useTokenRefresh.test.ts:37:22
+     35|     setTokenRefreshLogoutCallback(callback);
+     36|     renderHook(() => useTokenRefresh());
+     37|     expect(callback).toHaveBeenCalledOnce();
+       |                      ^
+     38|   });
+     39|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  15:28:15
+   Duration  9.62s (environment 47%, setup 34%, import 13%, transform 5%, tests 1%)

@@ -16,6 +16,7 @@ use std::collections::BTreeSet;
 use std::fs;
 
 const SOURCES: &[&str] = &[
+    include_str!("../src/funding_discovery.rs"),
     include_str!("../src/db.rs"),
     include_str!("../src/orchestra.rs"),
     include_str!("../src/rest.rs"),
@@ -95,8 +96,9 @@ fn every_table_the_gateway_queries_is_created_by_a_migration() {
         }
         let sql = fs::read_to_string(&path).expect("read migration file");
         let mut rest = sql.as_str();
-        while let Some(pos) = rest.find("CREATE TABLE IF NOT EXISTS ") {
-            let tail = &rest[pos + "CREATE TABLE IF NOT EXISTS ".len()..];
+        while let Some(pos) = rest.find("CREATE TABLE ") {
+            let tail = &rest[pos + "CREATE TABLE ".len()..];
+            let tail = tail.strip_prefix("IF NOT EXISTS ").unwrap_or(tail);
             let ident: String = tail
                 .chars()
                 .take_while(|c| c.is_ascii_lowercase() || *c == '_')
