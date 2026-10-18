@@ -161,6 +161,10 @@ fn api_routes() -> Router<AppState> {
         )
         // Funding Swarm operator actions always require X-Admin-Token.
         .route(
+            "/admin/funding-swarm/grants/{grant_id}/proposals",
+            get(admin_proposal_context).post(admin_save_proposal),
+        )
+        .route(
             "/admin/funding-swarm/discovery/grants-gov",
             post(admin_discover_funding_opportunities),
         )
@@ -927,6 +931,25 @@ fn authorize_funding_token(
 }
 
 // ── Funding Swarm admin handlers ─────────────────────────────────────────────
+
+async fn admin_proposal_context(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(grant_id): Path<String>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    Ok(Json(state.db.proposal_context(&grant_id).await?))
+}
+
+async fn admin_save_proposal(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(grant_id): Path<String>,
+    Json(input): Json<crate::funding_proposals::ProposalInput>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    Ok(Json(state.db.save_proposal(&grant_id, input).await?))
+}
 
 async fn admin_discover_funding_opportunities(
     State(state): State<AppState>,
