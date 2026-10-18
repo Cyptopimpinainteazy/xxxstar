@@ -138,6 +138,26 @@ jobs:
           ln -f "$HOME/.cargo/bin/rustup" "$iso/cargo/bin/rustup"
           { echo "CARGO_HOME=$iso/cargo"; echo "RUSTUP_HOME=$iso/rustup"; } >> "$GITHUB_ENV"
           echo "$iso/cargo/bin" >> "$GITHUB_PATH"
+      # Five root tests (x3-relayer receipt proofs, external-chains sends) boot a local EVM with
+      # `anvil`. Use the runner's own if it has one; otherwise install a pinned Foundry release
+      # into this runner's isolated directory, never system-wide.
+      - name: anvil for the EVM-backed root tests
+        run: |
+          set -euo pipefail
+          if ! command -v anvil >/dev/null 2>&1; then
+            FOUNDRY_DIR="$HOME/.x3ci-runner-${RUNNER_NAME}/foundry"
+            export FOUNDRY_DIR
+            if [ ! -x "$FOUNDRY_DIR/bin/anvil" ]; then
+              mkdir -p "$FOUNDRY_DIR/bin"
+              curl -fsSL https://raw.githubusercontent.com/foundry-rs/foundry/v1.0.0/foundryup/foundryup \
+                -o "$FOUNDRY_DIR/bin/foundryup"
+              chmod +x "$FOUNDRY_DIR/bin/foundryup"
+              "$FOUNDRY_DIR/bin/foundryup" --install v1.0.0
+            fi
+            echo "$FOUNDRY_DIR/bin" >> "$GITHUB_PATH"
+            export PATH="$FOUNDRY_DIR/bin:$PATH"
+          fi
+          anvil --version
       - name: Root fmt
         if: ${{ !cancelled() }}
         run: cargo fmt --all -- --check
