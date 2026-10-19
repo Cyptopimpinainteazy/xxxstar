@@ -1,0 +1,41 @@
+{
+  "commit": "d5b8197e66e61b0230b1d818ce6049eac6022d80",
+  "result": "BLOCKED",
+  "scope": "read-only physical validator inventory and SSH checks",
+  "checks": [
+    {
+      "host": "x3star1",
+      "command": "ssh -o BatchMode=yes -o ConnectTimeout=5 x3star1 hostname; systemctl list-units --all --no-legend *x3* *validator*",
+      "result": "192.168.0.70 port 22: No route to host"
+    },
+    {
+      "host": "x3gpu1",
+      "command": "ssh -o BatchMode=yes -o ConnectTimeout=5 x3gpu1 hostname; systemctl list-units --all --no-legend *x3* *validator*",
+      "result": "Permission denied (publickey,password)"
+    },
+    {
+      "host": "x3gpu2",
+      "command": "ssh -o BatchMode=yes -o ConnectTimeout=5 x3gpu2 hostname",
+      "result": "Could not resolve hostname x3gpu2: Temporary failure in name resolution"
+    },
+    {
+      "host": "x3gpu1",
+      "command": "hostname; systemctl list-units --all --no-legend *x3* *validator*; systemctl --user list-units --all --no-legend *x3* *validator*",
+      "result": "Current local host x3gpu1; only x3-ai-router.service active; no validator service"
+    },
+    {
+      "host": "192.168.0.23 (inventory alternate control address)",
+      "command": "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes -i ~/.ssh/x3-admin lojak@192.168.0.23 hostname",
+      "result": "192.168.0.23 port 22: No route to host"
+    }
+  ],
+  "unknown_addresses": [
+    "x3gpu2",
+    "x3build1",
+    "x3sim1",
+    "x3data1",
+    "x3net1",
+    "x3ops1"
+  ],
+  "required_action": "Identify deployed physical validator network and restore reachability to x3star1 and addresses/authentication for other validator hosts. Current host x3gpu1 has no deployed validator service. No remote state changed."
+}

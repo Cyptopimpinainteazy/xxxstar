@@ -1,0 +1,68 @@
+{
+  "pass": 10,
+  "recorded_utc": "2026-10-10T01:36:16.085241+00:00",
+  "change": "Checked parser annotation and policy integer conversions, preserved annotation and expression error spans, rejected invalid explicit limits rather than truncating or defaulting",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "scoped_status": "M x3-lang/compiler/src/parser.rs\n M x3-lang/compiler/tests/test_parser_coverage.rs"
+  },
+  "files": {
+    "x3-lang/compiler/src/parser.rs": "8697602b6b68de965e21b75ef9740f4178f89e30fc46fe2291323d8028458093",
+    "x3-lang/compiler/tests/test_parser_coverage.rs": "0bdb6ee51ba8e61b08f766b168c7967ded58f3c786aa974efd5b297d5217f29a"
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0,
+      "passed": 1396,
+      "failed": 0,
+      "suites": 99,
+      "log": "workspace-final.log"
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log"
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0,
+      "log": "check.log"
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest x3-lang/tests -q",
+      "exit_code": 0,
+      "passed": 23,
+      "log": "python.log"
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang/tests",
+      "exit_code": 0
+    }
+  ],
+  "code_scan": {
+    "scope": "x3-lang excluding build and dependency directories",
+    "matches": 71,
+    "interpretation": "Historical markers remain; no repository-wide placeholder-free claim"
+  },
+  "environment": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)"
+  },
+  "limitations": [
+    "Dirty shared checkout, no clean exact-commit certification",
+    "Other legacy parser and semantic error spans remain",
+    "Runtime local binding support outside the prior constant-binding scope remains unproven"
+  ],
+  "completion": "This parser hardening pass is complete; overall language readiness is not certified"
+}

@@ -1,0 +1,369 @@
+{
+  "result": "PASS",
+  "command": [
+    "scripts/mainnet/rc1_boot_test.py",
+    "--binary",
+    "/home/lojak/Desktop/xxxstar-master/target/release/x3-chain-node",
+    "--evidence",
+    "/home/lojak/Desktop/xxxstar-master/audit-artifacts/readiness-20261008/rc1"
+  ],
+  "commit": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+  "dirty": true,
+  "binary_sha256": "727d1a4f394f7ceb6728059ca9f199726a5e547c1e6c9d1970aee4c7eb408f6b",
+  "runtime_versions": [
+    {
+      "specName": "x3-chain",
+      "implName": "x3-chain",
+      "authoringVersion": 1,
+      "specVersion": 21,
+      "implVersion": 1,
+      "apis": [
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0xab3c0572291feb8b",
+          1
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xfbb6f67195cd4d67",
+          1
+        ],
+        [
+          "0xada7e9c48441a11a",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0xed99c5acb25eedf5",
+          3
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0xad4a46dfcced0e8c",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xfedda405e90ae979",
+          1
+        ],
+        [
+          "0x2c20e48a92fb79f1",
+          1
+        ],
+        [
+          "0x1465bdedeceda484",
+          1
+        ]
+      ],
+      "transactionVersion": 1,
+      "systemVersion": 1,
+      "stateVersion": 1
+    },
+    {
+      "specName": "x3-chain",
+      "implName": "x3-chain",
+      "authoringVersion": 1,
+      "specVersion": 21,
+      "implVersion": 1,
+      "apis": [
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0xab3c0572291feb8b",
+          1
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xfbb6f67195cd4d67",
+          1
+        ],
+        [
+          "0xada7e9c48441a11a",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0xed99c5acb25eedf5",
+          3
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0xad4a46dfcced0e8c",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xfedda405e90ae979",
+          1
+        ],
+        [
+          "0x2c20e48a92fb79f1",
+          1
+        ],
+        [
+          "0x1465bdedeceda484",
+          1
+        ]
+      ],
+      "transactionVersion": 1,
+      "systemVersion": 1,
+      "stateVersion": 1
+    },
+    {
+      "specName": "x3-chain",
+      "implName": "x3-chain",
+      "authoringVersion": 1,
+      "specVersion": 21,
+      "implVersion": 1,
+      "apis": [
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0xab3c0572291feb8b",
+          1
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xfbb6f67195cd4d67",
+          1
+        ],
+        [
+          "0xada7e9c48441a11a",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0xed99c5acb25eedf5",
+          3
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0xad4a46dfcced0e8c",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xfedda405e90ae979",
+          1
+        ],
+        [
+          "0x2c20e48a92fb79f1",
+          1
+        ],
+        [
+          "0x1465bdedeceda484",
+          1
+        ]
+      ],
+      "transactionVersion": 1,
+      "systemVersion": 1,
+      "stateVersion": 1
+    }
+  ],
+  "validators": [
+    {
+      "rpc_port": 19974,
+      "health": {
+        "peers": 2,
+        "isSyncing": false,
+        "shouldHavePeers": false
+      },
+      "finalized_height": 36,
+      "genesis_hash": "0x07d186c3e0f498f5a8c1929f0ea5d7b9f61c310ac41e78eab71e97e36cd8ad05"
+    },
+    {
+      "rpc_port": 19975,
+      "health": {
+        "peers": 2,
+        "isSyncing": false,
+        "shouldHavePeers": true
+      },
+      "finalized_height": 36,
+      "genesis_hash": "0x07d186c3e0f498f5a8c1929f0ea5d7b9f61c310ac41e78eab71e97e36cd8ad05"
+    },
+    {
+      "rpc_port": 19976,
+      "health": {
+        "peers": 2,
+        "isSyncing": false,
+        "shouldHavePeers": true
+      },
+      "finalized_height": 36,
+      "genesis_hash": "0x07d186c3e0f498f5a8c1929f0ea5d7b9f61c310ac41e78eab71e97e36cd8ad05"
+    }
+  ],
+  "finalized_height": 41,
+  "finalized_hash": "0xe229ca2308d163755a2feead287b9f4e38de41f3ea58383fef0aac404295374b",
+  "runtime": {
+    "specName": "x3-chain",
+    "implName": "x3-chain",
+    "authoringVersion": 1,
+    "specVersion": 21,
+    "implVersion": 1,
+    "apis": [
+      [
+        "0xdf6acb689907609b",
+        5
+      ],
+      [
+        "0xab3c0572291feb8b",
+        1
+      ],
+      [
+        "0xfbc577b9d747efd6",
+        1
+      ],
+      [
+        "0xd2bc9897eed08f15",
+        3
+      ],
+      [
+        "0xfbb6f67195cd4d67",
+        1
+      ],
+      [
+        "0xada7e9c48441a11a",
+        1
+      ],
+      [
+        "0xdd718d5cc53262d4",
+        1
+      ],
+      [
+        "0xed99c5acb25eedf5",
+        3
+      ],
+      [
+        "0x40fe3ad401f8959a",
+        6
+      ],
+      [
+        "0xbc9d89904f5b923f",
+        1
+      ],
+      [
+        "0xad4a46dfcced0e8c",
+        1
+      ],
+      [
+        "0x37c8bb1350a9a2a8",
+        4
+      ],
+      [
+        "0xf3ff14d5ab527059",
+        3
+      ],
+      [
+        "0x37e397fc7c91f5e4",
+        2
+      ],
+      [
+        "0xfedda405e90ae979",
+        1
+      ],
+      [
+        "0x2c20e48a92fb79f1",
+        1
+      ],
+      [
+        "0x1465bdedeceda484",
+        1
+      ]
+    ],
+    "transactionVersion": 1,
+    "systemVersion": 1,
+    "stateVersion": 1
+  }
+}
