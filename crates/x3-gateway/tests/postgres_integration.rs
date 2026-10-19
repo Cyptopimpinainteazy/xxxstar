@@ -118,10 +118,16 @@ async fn legacy_staging_preserves_public_funding_totals() {
     let make_request = |lead: serde_json::Value| -> LegacyImport {
         serde_json::from_value(serde_json::json!({"leads":[lead]})).unwrap()
     };
-    let first = db.import_legacy_leads(make_request(lead.clone())).await.unwrap();
+    let first = db
+        .import_legacy_leads(make_request(lead.clone()))
+        .await
+        .unwrap();
     assert_eq!((first.inserted, first.unchanged), (1, 0));
     assert_eq!(first.current_opportunities_verified, 0);
-    let replay = db.import_legacy_leads(make_request(lead.clone())).await.unwrap();
+    let replay = db
+        .import_legacy_leads(make_request(lead.clone()))
+        .await
+        .unwrap();
     assert_eq!((replay.inserted, replay.unchanged), (0, 1));
     let mut altered = lead.clone();
     altered["name"] = serde_json::json!("Changed evidence");
