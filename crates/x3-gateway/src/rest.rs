@@ -940,11 +940,11 @@ fn authorize_funding_token(
 async fn admin_list_legacy_leads(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Query(pagination): Query<Pagination>,
+    Query(query): Query<crate::funding_legacy::LegacyListQuery>,
 ) -> Result<impl IntoResponse, GatewayError> {
     authorize_funding_swarm_admin(&headers)?;
     Ok(Json(state.db.list_legacy_leads(
-        bounded_limit(pagination.limit), pagination.offset.max(0),
+        bounded_limit(query.limit), query.offset.max(0), &query.search,
     ).await?))
 }
 
