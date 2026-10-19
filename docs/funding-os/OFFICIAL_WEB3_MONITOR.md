@@ -45,6 +45,10 @@ npm ci && npm test -- --run MoneySwarmWorkspace.test.tsx && npm run build
 
 Live production source-page smoke tests were not performed by writing this code. Some sites may render incomplete HTML, block automated access, redirect to another same-site path or exceed the size budget; these conditions must fail safely and be recorded as blockers rather than reported as working live discovery.
 
+## Verified hardware-credit eligibility warning
+
+The official NVIDIA Inception page at https://www.nvidia.com/en-us/startups/ describes partner cloud credits and preferred hardware pricing, **not an unconditional equipment donation or cash grant**. The same published FAQ excludes companies associated with cryptocurrency and requires an incorporated applicant. Until a qualified legal applicant and any exception are independently confirmed, **do not mark X3 eligible or generate an approved application** for Inception. This should be a negative eligibility test when typed hardware/credit discovery is implemented; do not rely on historical sponsor CRM success percentages.
+
 ## Next milestones
 
 1. Verify exact-head targeted CI and disposable PostgreSQL tests.
