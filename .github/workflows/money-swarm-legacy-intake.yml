@@ -6,6 +6,7 @@ on:
   pull_request:
     branches:
       - codex/money-swarm-proposal-packages-20261018
+      - codex/funding-os-legacy-intake-20261018
     paths:
       - 'crates/x3-gateway/**'
       - 'crates/x3-indexer/migrations/**'
@@ -50,6 +51,7 @@ jobs:
         run: |
           cargo fmt --all -- --check
           cargo test -p x3-gateway --lib funding_legacy
+          cargo test -p x3-gateway --lib funding_web3
           cargo test -p x3-gateway --test migrations_cover_tables
       - name: Dashboard private archive tests
         working-directory: apps/inferstructor-dashboard

@@ -22,6 +22,7 @@ pub mod db;
 pub mod error;
 pub mod funding_discovery;
 pub mod funding_legacy;
+pub mod funding_web3;
 pub mod funding_proposals;
 pub mod graphql;
 pub mod orchestra;
