@@ -258,10 +258,22 @@ pub async fn discover(db: &Database, request: Web3DiscoveryRequest) -> Result<We
     // Only two manually selected official public pages. Operators must review
     // site policies before enabling this separate, disabled-by-default feature.
     let html = retrieve_public_page(src).await?;
-    let retrieved = Utc::now();
-    let normalized = normalize_page(src, &html, retrieved)?;
+    db.save_web3_source_snapshot(&request.provider, &html, Utc::now()).await
+}
+
+impl Database {
+    /// Persist vetted fixed-domain page content without modifying public grants.
+    /// This is also the offline PostgreSQL test entry point.
+    pub async fn save_web3_source_snapshot(
+        &self,
+        provider: &str,
+        html: &str,
+        retrieved: DateTime<Utc>,
+    ) -> Result<Web3DiscoveryResult> {
+        let src = source(provider)?;
+    let normalized = normalize_page(src, html, retrieved)?;
     let digest = hex::encode(Sha256::digest(html.as_bytes()));
-    let mut tx = db.pool().begin().await?;
+    let mut tx = self.pool().begin().await?;
     sqlx::query(
         "INSERT INTO funding_sources(source_id,official_url) VALUES($1,$2) ON CONFLICT DO NOTHING",
     )
@@ -290,7 +302,7 @@ pub async fn discover(db: &Database, request: Web3DiscoveryRequest) -> Result<We
     .bind(src.id)
     .bind(src.url)
     .bind(&digest)
-    .bind(&html)
+    .bind(html)
     .bind(&normalized)
     .bind(retrieved)
     .fetch_one(&mut *tx)
@@ -334,7 +346,9 @@ pub async fn discover(db: &Database, request: Web3DiscoveryRequest) -> Result<We
         eligibility_status: "UNKNOWN",
         awarded_funding_verified: false,
     })
+    }
 }
+
 
 impl Database {
     pub async fn list_web3_sources(&self) -> Result<Vec<Web3SourceRow>> {
