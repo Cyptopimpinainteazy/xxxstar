@@ -18,6 +18,7 @@ use std::fs;
 const SOURCES: &[&str] = &[
     include_str!("../src/funding_proposals.rs"),
     include_str!("../src/funding_discovery.rs"),
+    include_str!("../src/funding_legacy.rs"),
     include_str!("../src/db.rs"),
     include_str!("../src/orchestra.rs"),
     include_str!("../src/rest.rs"),
