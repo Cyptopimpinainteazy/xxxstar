@@ -145,6 +145,19 @@ pub struct LegacyImport {
     pub leads: Vec<LegacyLead>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LegacyListQuery {
+    #[serde(default = "default_list_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub offset: i64,
+    #[serde(default)]
+    pub search: String,
+}
+
+fn default_list_limit() -> i64 { 20 }
+
 impl LegacyImport {
     fn validate(&self) -> Result<Vec<Option<NaiveDate>>> {
         if self.leads.is_empty() || self.leads.len() > MAX_BATCH {
@@ -253,13 +266,18 @@ impl Database {
     }
 
     /// Private research queue only; never used in public funding totals.
-    pub async fn list_legacy_leads(&self, limit: i64, offset: i64) -> Result<Vec<LegacyLeadRow>> {
+    pub async fn list_legacy_leads(&self, limit: i64, offset: i64, search: &str) -> Result<Vec<LegacyLeadRow>> {
+        if search.len() > 120 || search.chars().any(char::is_control) {
+            return Err(bad_input("historical lead search must be bounded plain text"));
+        }
         sqlx::query_as::<_, LegacyLeadRow>(
             "SELECT * FROM funding_legacy_leads
+             WHERE $3 = '' OR POSITION(LOWER($3) IN LOWER(name || ' ' || category || ' ' || legacy_id)) > 0
              ORDER BY category,legacy_id LIMIT $1 OFFSET $2",
         )
         .bind(limit.clamp(1, 100))
         .bind(offset.max(0))
+        .bind(search.trim())
         .fetch_all(self.pool())
         .await
         .map_err(Into::into)
