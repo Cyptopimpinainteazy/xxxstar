@@ -9,6 +9,7 @@ const TEST_DATABASE_URL_ENV: &str = "X3_GATEWAY_TEST_DATABASE_URL";
 #[ignore = "requires a real Postgres instance; run via scripts/gateway-postgres-integration.sh"]
 async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
     legacy_staging_preserves_public_funding_totals().await;
+    web3_source_snapshots_are_private_and_idempotent().await;
     funding_workflow_enforces_state_and_preserves_audit().await;
     funding_source_snapshots_are_durable_and_preserve_review().await;
     proposal_versions_bind_source_and_serialize_edits().await;
@@ -151,6 +152,60 @@ async fn legacy_staging_preserves_public_funding_totals() {
     assert_eq!(before.total_grants, after.total_grants);
     assert_eq!(before.funded_grants, after.funded_grants);
     assert_eq!(before.total_awarded_usd, after.total_awarded_usd);
+}
+
+async fn web3_source_snapshots_are_private_and_idempotent() {
+    let url = std::env::var(TEST_DATABASE_URL_ENV).unwrap();
+    let db = Database::connect(&DatabaseConfig::new(url)).await.unwrap();
+    let before = db.get_funding_swarm_scoreboard().await.unwrap();
+    let checked = chrono::DateTime::parse_from_rfc3339("2026-10-18T00:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    let html = format!(
+        "<html><body><h1>Stellar Community Fund Build Awards</h1>\
+         <p>SCF #46 Submission Deadline to submit: November 8, 2026</p>\
+         <!-- test:{} --></body></html>",
+        uuid::Uuid::new_v4()
+    );
+    let first = db
+        .save_web3_source_snapshot("stellar", &html, checked)
+        .await
+        .unwrap();
+    assert!(first.new_snapshot);
+    assert_eq!(first.eligibility_status, "UNKNOWN");
+    assert!(!first.awarded_funding_verified);
+    assert_eq!(first.application_guidance_status, "SUBMISSION_ROUND_DESCRIBED");
+    let replay = db
+        .save_web3_source_snapshot("stellar", &html, checked)
+        .await
+        .unwrap();
+    assert!(!replay.new_snapshot);
+    assert_eq!(replay.snapshot_id, first.snapshot_id);
+    assert!(db
+        .save_web3_source_snapshot(
+            "stellar",
+            "<html>irrelevant advertising</html>",
+            checked
+        )
+        .await
+        .is_err());
+    assert!(db
+        .save_web3_source_snapshot("https://untrusted.example", &html, checked)
+        .await
+        .is_err());
+    let rows = db.list_web3_sources().await.unwrap();
+    let stellar = rows
+        .iter()
+        .find(|row| row.source_id == "stellar.scf.web")
+        .expect("official source persists in a private snapshot table");
+    assert_eq!(stellar.snapshot_id, first.snapshot_id);
+    assert_eq!(stellar.normalized["deadline"], "2026-11-08");
+    assert_eq!(stellar.normalized["eligibility_status"], "UNKNOWN");
+    assert_eq!(stellar.normalized["approved_for_submission"], false);
+    let after = db.get_funding_swarm_scoreboard().await.unwrap();
+    assert_eq!(after.total_grants, before.total_grants);
+    assert_eq!(after.funded_grants, before.funded_grants);
+    assert_eq!(after.total_awarded_usd, before.total_awarded_usd);
 }
 
 async fn funding_source_snapshots_are_durable_and_preserve_review() {
