@@ -159,6 +159,14 @@ fn api_routes() -> Router<AppState> {
             "/bridge/htlc/preimage-verify",
             post(post_htlc_preimage_verify),
         )
+        .route(
+            "/admin/funding-swarm/discovery/web3",
+            post(admin_discover_web3_funding_page),
+        )
+        .route(
+            "/admin/funding-swarm/discovery/web3/sources",
+            get(admin_list_web3_funding_pages),
+        )
         // Private archival leads: not official funding opportunities.
         .route(
             "/admin/funding-swarm/legacy-leads",
@@ -936,6 +944,28 @@ fn authorize_funding_token(
 }
 
 // ── Funding Swarm admin handlers ─────────────────────────────────────────────
+
+async fn admin_discover_web3_funding_page(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(request): Json<crate::funding_web3::Web3DiscoveryRequest>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    if std::env::var("X3_FUNDING_WEB3_DISCOVERY_ENABLED").as_deref() != Ok("1") {
+        return Err(GatewayError::BadRequest(
+            "official Web3 funding discovery is disabled until an operator reviews source policy and enables it".into(),
+        ));
+    }
+    Ok(Json(crate::funding_web3::discover(&state.db, request).await?))
+}
+
+async fn admin_list_web3_funding_pages(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    Ok(Json(state.db.list_web3_sources().await?))
+}
 
 async fn admin_list_legacy_leads(
     State(state): State<AppState>,
