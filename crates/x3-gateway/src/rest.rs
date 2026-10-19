@@ -943,9 +943,16 @@ async fn admin_list_legacy_leads(
     Query(query): Query<crate::funding_legacy::LegacyListQuery>,
 ) -> Result<impl IntoResponse, GatewayError> {
     authorize_funding_swarm_admin(&headers)?;
-    Ok(Json(state.db.list_legacy_leads(
-        bounded_limit(query.limit), query.offset.max(0), &query.search,
-    ).await?))
+    Ok(Json(
+        state
+            .db
+            .list_legacy_leads(
+                bounded_limit(query.limit),
+                query.offset.max(0),
+                &query.search,
+            )
+            .await?,
+    ))
 }
 
 async fn admin_import_legacy_leads(
