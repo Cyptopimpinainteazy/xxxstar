@@ -285,11 +285,7 @@ mod attestation {
         // Ledger balances are u128. Casting to i128 reinterprets balances above
         // i128::MAX as negative and can overflow when an otherwise valid swap
         // crosses the signed boundary in a non-profit asset.
-        let mut balances: BTreeMap<u32, u128> = receipt
-            .pre_balances
-            .iter()
-            .copied()
-            .collect();
+        let mut balances: BTreeMap<u32, u128> = receipt.pre_balances.iter().copied().collect();
         for intent in &receipt.intents {
             if intent.from == intent.to {
                 return Err(ReplayError::Inconsistent(

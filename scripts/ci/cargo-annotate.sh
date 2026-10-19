@@ -30,6 +30,13 @@ if [ "$status" -ne 0 ]; then
       sed -E "s/^thread '([^']*)' (\([0-9]+\) )?panicked at ([^:]+):([0-9]+):([0-9]+):?.*$/::error file=\3,line=\4,col=\5::test \1 panicked/"
     # Failures with no source location: a failed crate build, a failed test binary.
     grep -E '^error: (could not compile|test failed|failed to)' "$log" | sed -E 's/^/::error::/'
+    # Anything else cargo reported as an error (a lockfile, a toolchain or a disk problem), so a
+    # failure never reaches the checks API without saying why.
+    grep -E '^error(\[[A-Z0-9]+\])?: ' "$log" | sed -E 's/^/::error::/'
+    # The last lines, when nothing above matched at all.
+    if ! grep -qE '^(error|thread .* panicked)' "$log"; then
+      tail -n 5 "$log" | sed -E 's/^/::error::(tail) /'
+    fi
   } | awk '!seen[$0]++' | head -10
 fi
 
