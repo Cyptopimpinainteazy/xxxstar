@@ -31,17 +31,15 @@ fn valid_legacy_id(value: &str) -> bool {
     };
     let mut parts = tail.split('.');
     let first = parts.next().unwrap_or("");
-    first.len() <= 3 && !first.is_empty()
-        && first.bytes().all(|ch| ch.is_ascii_digit())
-        && {
-            let segments: Vec<_> = parts.collect();
-            !segments.is_empty()
-                && segments.iter().all(|part| {
-                    !part.is_empty()
-                        && part.len() <= 16
-                        && part.bytes().all(|ch| ch.is_ascii_alphanumeric())
-                })
-        }
+    first.len() <= 3 && !first.is_empty() && first.bytes().all(|ch| ch.is_ascii_digit()) && {
+        let segments: Vec<_> = parts.collect();
+        !segments.is_empty()
+            && segments.iter().all(|part| {
+                !part.is_empty()
+                    && part.len() <= 16
+                    && part.bytes().all(|ch| ch.is_ascii_alphanumeric())
+            })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +70,9 @@ impl LegacyLead {
             || self.source_line <= 0
             || self.source_line > i32::MAX.into()
         {
-            return Err(bad_input("invalid archived lead identifier, name or source line"));
+            return Err(bad_input(
+                "invalid archived lead identifier, name or source line",
+            ));
         }
         // Only the archived repository catalog is accepted. No arbitrary
         // filesystem paths, traversal or unverifiable source imports.
@@ -81,7 +81,9 @@ impl LegacyLead {
         };
         if !filename.ends_with(".md")
             || filename.len() < 4
-            || !filename.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
+            || !filename
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
             || filename.strip_suffix(".md") != Some(self.category.as_str())
             || self.category.len() > 128
             || self.origin != "legacy_markdown_research"
@@ -92,18 +94,31 @@ impl LegacyLead {
             || self.current_eligibility != "UNKNOWN"
             || self.application_authorized
         {
-            return Err(bad_input("archived leads must remain unverified, ineligible-for-automatic-action"));
+            return Err(bad_input(
+                "archived leads must remain unverified, ineligible-for-automatic-action",
+            ));
         }
-        if !matches!(self.historical_status.as_str(),
-            "RESEARCH" | "QUALIFIED" | "APPLIED" | "AWARDED" |
-            "REJECTED" | "NOT-A-GRANT" | "DEFUNCT" | "CLOSED" |
-            "INACTIVE" | "UNKNOWN")
-        {
+        if !matches!(
+            self.historical_status.as_str(),
+            "RESEARCH"
+                | "QUALIFIED"
+                | "APPLIED"
+                | "AWARDED"
+                | "REJECTED"
+                | "NOT-A-GRANT"
+                | "DEFUNCT"
+                | "CLOSED"
+                | "INACTIVE"
+                | "UNKNOWN"
+        ) {
             return Err(bad_input("invalid historical status"));
         }
         if self.raw_fields.is_empty()
             || self.raw_fields.len() > 20
-            || self.raw_fields.iter().any(|field| field.len() > MAX_FIELD_BYTES)
+            || self
+                .raw_fields
+                .iter()
+                .any(|field| field.len() > MAX_FIELD_BYTES)
             || self.raw_fields.iter().map(String::len).sum::<usize>() > MAX_TOTAL_FIELD_BYTES
         {
             return Err(bad_input("archived lead fields exceed bounds"));
@@ -118,17 +133,20 @@ impl LegacyLead {
             {
                 return Err(bad_input("invalid candidate source URL"));
             }
-            let parsed = reqwest::Url::parse(url)
-                .map_err(|_| bad_input("invalid candidate source URL"))?;
+            let parsed =
+                reqwest::Url::parse(url).map_err(|_| bad_input("invalid candidate source URL"))?;
             if !matches!(parsed.scheme(), "https" | "http")
                 || parsed.host_str().is_none()
                 || !parsed.username().is_empty()
                 || parsed.password().is_some()
             {
-                return Err(bad_input("candidate URLs must be anonymous HTTP(S) sources"));
+                return Err(bad_input(
+                    "candidate URLs must be anonymous HTTP(S) sources",
+                ));
             }
         }
-        let date = self.historical_verification_date
+        let date = self
+            .historical_verification_date
             .as_deref()
             .map(|value| {
                 NaiveDate::parse_from_str(value, "%Y-%m-%d")
@@ -156,12 +174,16 @@ pub struct LegacyListQuery {
     pub search: String,
 }
 
-fn default_list_limit() -> i64 { 20 }
+fn default_list_limit() -> i64 {
+    20
+}
 
 impl LegacyImport {
     fn validate(&self) -> Result<Vec<Option<NaiveDate>>> {
         if self.leads.is_empty() || self.leads.len() > MAX_BATCH {
-            return Err(bad_input("archived lead import requires 1 to 32 records per batch"));
+            return Err(bad_input(
+                "archived lead import requires 1 to 32 records per batch",
+            ));
         }
         let mut seen = HashSet::new();
         let mut dates = Vec::with_capacity(self.leads.len());
@@ -266,9 +288,16 @@ impl Database {
     }
 
     /// Private research queue only; never used in public funding totals.
-    pub async fn list_legacy_leads(&self, limit: i64, offset: i64, search: &str) -> Result<Vec<LegacyLeadRow>> {
+    pub async fn list_legacy_leads(
+        &self,
+        limit: i64,
+        offset: i64,
+        search: &str,
+    ) -> Result<Vec<LegacyLeadRow>> {
         if search.len() > 120 || search.chars().any(char::is_control) {
-            return Err(bad_input("historical lead search must be bounded plain text"));
+            return Err(bad_input(
+                "historical lead search must be bounded plain text",
+            ));
         }
         sqlx::query_as::<_, LegacyLeadRow>(
             "SELECT * FROM funding_legacy_leads
@@ -338,7 +367,11 @@ mod tests {
         item.source_file = "grants/C25-vc-accelerators.md".into();
         item.category = "C25-vc-accelerators".into();
         assert!(item.validate().is_ok());
-        assert!(LegacyImport { leads: vec![item.clone(), item] }.validate().is_err());
+        assert!(LegacyImport {
+            leads: vec![item.clone(), item]
+        }
+        .validate()
+        .is_err());
     }
     #[test]
     fn rejects_large_batches_and_malformed_dates() {
@@ -348,7 +381,11 @@ mod tests {
         let original = lead();
         assert!(LegacyImport { leads: vec![] }.validate().is_err());
         let oversize = (0..33)
-            .map(|i| { let mut r = original.clone(); r.legacy_id = format!("C27.1.{i}"); r })
+            .map(|i| {
+                let mut r = original.clone();
+                r.legacy_id = format!("C27.1.{i}");
+                r
+            })
             .collect();
         assert!(LegacyImport { leads: oversize }.validate().is_err());
     }
