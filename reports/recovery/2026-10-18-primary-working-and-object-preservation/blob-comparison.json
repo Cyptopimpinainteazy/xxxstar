@@ -1,0 +1,3153 @@
+{
+  "pinned_heads": {
+    "source_HEAD": "1beb644603a0f1b6de8bb5882e699fdc99bb2e58",
+    "captured_master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "refreshed_pr623": "2df37cf53f0baf9b5357f4a0305a95d03f3ebd0f",
+    "captured_pr562": "eb4406372db172968112b8e373a3a5d02ab7e6da"
+  },
+  "scope": "Exact bytes at identical paths only. Absence or difference does not establish semantic uniqueness. No configuration values published.",
+  "counts": {
+    "source_HEAD": {
+      "identical": 0,
+      "different": 8,
+      "absent": 122
+    },
+    "captured_master": {
+      "identical": 5,
+      "different": 9,
+      "absent": 116
+    },
+    "refreshed_pr623": {
+      "identical": 5,
+      "different": 9,
+      "absent": 116
+    },
+    "captured_pr562": {
+      "identical": 0,
+      "different": 8,
+      "absent": 122
+    }
+  },
+  "files": [
+    {
+      "path": ".proof-results/s0-security-gate.txt",
+      "status": " M",
+      "sha256": "e6de2ff99f465816a07fe4cce38729bc0150c24ff3642a8e678368b095953755",
+      "blob": "793fa56ee78f70b40e64b0616d58815d8603ebc2",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "different",
+          "blob": "3a840ffe7aae6b0dc3395c220c28e1f72509480a"
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "3a840ffe7aae6b0dc3395c220c28e1f72509480a"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "3a840ffe7aae6b0dc3395c220c28e1f72509480a"
+        },
+        "captured_pr562": {
+          "state": "different",
+          "blob": "0b8730ba6440bd6f93698430e93833094af53ad2"
+        }
+      }
+    },
+    {
+      "path": ".proof-results/s1-security-gate.txt",
+      "status": " M",
+      "sha256": "53d1f6f6a39efd6ee9501097fcc3a4f4a5530c1849d9ea6bce01370747cc8059",
+      "blob": "fe58e80f15d9b1ee7ae3dda1c51b5aa0697abac2",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "different",
+          "blob": "344f8acc237d5b57293fc2fd2649f4698a2569ed"
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "344f8acc237d5b57293fc2fd2649f4698a2569ed"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "344f8acc237d5b57293fc2fd2649f4698a2569ed"
+        },
+        "captured_pr562": {
+          "state": "different",
+          "blob": "a15c7875e4cf3753146011eac2753c30ae40cae6"
+        }
+      }
+    },
+    {
+      "path": "crates/x3-gateway/src/orchestra.rs",
+      "status": " M",
+      "sha256": "f723c6dc59f6556833659abd0e974a892df814022cafcb2d9d588d6c092c1024",
+      "blob": "19d938a80c24ff455cbe52ba09973fa773c9cd51",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "different",
+          "blob": "1d98edfdca612831ef2de8809036ef190d6698c5"
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "61333c3d854f20c8111ebd52c2c0da500f5e5ad1"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "61333c3d854f20c8111ebd52c2c0da500f5e5ad1"
+        },
+        "captured_pr562": {
+          "state": "different",
+          "blob": "1d98edfdca612831ef2de8809036ef190d6698c5"
+        }
+      }
+    },
+    {
+      "path": "reports/swarm_scan_findings.json",
+      "status": " M",
+      "sha256": "6f4b4745fecbf37c9d9be776b5be7f0614be1f23c8e6b53911208ac44f43a3b1",
+      "blob": "31cb6446b515f0b5690edae5599f7bfa24b21441",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "different",
+          "blob": "fa9b8c78ff70eb867b9c58f11b77df0346ae448b"
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "fa9b8c78ff70eb867b9c58f11b77df0346ae448b"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "fa9b8c78ff70eb867b9c58f11b77df0346ae448b"
+        },
+        "captured_pr562": {
+          "state": "different",
+          "blob": "fa9b8c78ff70eb867b9c58f11b77df0346ae448b"
+        }
+      }
+    },
+    {
+      "path": "reports/swarm_scan_report.md",
+      "status": " M",
+      "sha256": "acbfc1358e33e3ece737fb5a03a4b7b95381ac7c2596f6dcecbab1c77946baec",
+      "blob": "dcc79a7a8b7f1b319f134a9b3c1aac4b1dddb94c",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "different",
+          "blob": "94d058786e5f33cd7966fb6bbd20b4122372406e"
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "94d058786e5f33cd7966fb6bbd20b4122372406e"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "94d058786e5f33cd7966fb6bbd20b4122372406e"
+        },
+        "captured_pr562": {
+          "state": "different",
+          "blob": "94d058786e5f33cd7966fb6bbd20b4122372406e"
+        }
+      }
+    },
+    {
+      "path": "scripts/check-no-hardcoded-desktop-paths.sh",
+      "status": " M",
+      "sha256": "02888d8a9d9f66ea68762481c39d3d47b8d6d5e5982898cc2de4383df2ed8cbb",
+      "blob": "750718cac48b107933363fb025b6dedba6426840",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "different",
+          "blob": "b93f23f699a839ba9e2a6b2c5de4bf9b36ad5371"
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "b93f23f699a839ba9e2a6b2c5de4bf9b36ad5371"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "b93f23f699a839ba9e2a6b2c5de4bf9b36ad5371"
+        },
+        "captured_pr562": {
+          "state": "different",
+          "blob": "b93f23f699a839ba9e2a6b2c5de4bf9b36ad5371"
+        }
+      }
+    },
+    {
+      "path": "scripts/mainnet/rc2_internal_settlement_smoke.sh",
+      "status": " M",
+      "sha256": "ebe30072c187cd9320d59dd693a51e747f89fe942e9182411d5ebf8a934109c4",
+      "blob": "20702f79705639dcf83ea7181e2fa6ea91989273",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "different",
+          "blob": "794292d02a290f8936bf6dabd329932dcf81d72d"
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "794292d02a290f8936bf6dabd329932dcf81d72d"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "794292d02a290f8936bf6dabd329932dcf81d72d"
+        },
+        "captured_pr562": {
+          "state": "different",
+          "blob": "794292d02a290f8936bf6dabd329932dcf81d72d"
+        }
+      }
+    },
+    {
+      "path": "services/x3-ai-router/config.json",
+      "status": " M",
+      "sha256": "f57cb3d3af18c3fead9809a089b3f9847158a1bdc93c63b47ca8f864fefea81a",
+      "blob": "1b50b94c44eb1bf30563073f5048e1e8b4efab4a",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "different",
+          "blob": "fba94427fb967a18aed1fab72664fe1e7a497bcc"
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "e0fc644d6725fe37ad4d7f48db342cbd3ecda78a"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "e0fc644d6725fe37ad4d7f48db342cbd3ecda78a"
+        },
+        "captured_pr562": {
+          "state": "different",
+          "blob": "00e6b6d76ccf407cf801569924ae7e54e100a99f"
+        }
+      }
+    },
+    {
+      "path": ".ai/evidence/gateway-migrations-before/0006_funding_swarm_public_ledger.sql",
+      "status": "??",
+      "sha256": "683fb2bfe04e7a4463f658cf241ae8e57f655cbf2b90ae9b94e66e00d1abef61",
+      "blob": "b241e4b709aae25cd64339bc5ea360cf4e987e76",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/patches/1535c31380202a8b.patch",
+      "status": "??",
+      "sha256": "3d62148dd143d761fa10529ea0fe18aadf0063f45312d8386812619bbb9b0b52",
+      "blob": "cd0f1ac28f05676d2c614408122bc362ab2cf94b",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/patches/18e4879cf7778074.patch",
+      "status": "??",
+      "sha256": "3f88729ab45ec7344f95b01c811901ab40cc89d7e43cba207670312c71ea18f7",
+      "blob": "dbbbe62be6a04135b6c2dc8d345acdf7f0ae8e15",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/patches/275693779fa5e4da.patch",
+      "status": "??",
+      "sha256": "45a9ba09b4f07f90979bc6f493b900dca61f055d0948ca6da0af5312089e0338",
+      "blob": "cf6a9c96a91489e13e73bc37b50e2cc159f777de",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/patches/2aba50ac5e4e2d23.patch",
+      "status": "??",
+      "sha256": "29c8b0fc0119153d8b5a96dddd8f0ad8597da5f7e4e35150959f2c773c8b3c66",
+      "blob": "3ea56d247fa448fa15380e5a63ce0539cb10a28a",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/patches/343b07a276c84a27.patch",
+      "status": "??",
+      "sha256": "7fdedc359b2ac29ee0e4476b44e902b775621684a6c5c116757f57cc3e03407f",
+      "blob": "45db185789edf7a50312aba8d0c124278f94b23c",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/patches/37ac6f137e00f15a.patch",
+      "status": "??",
+      "sha256": "4266847f5f252d94e4c28c7c7b79fa438e02297351fe61518b7c513f39b8c98a",
+      "blob": "6b297d4321ef3ff149924037a873e8f79df700e0",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/patches/cab3617159c31da4.patch",
+      "status": "??",
+      "sha256": "9633ca05a627ae3cacc781579be172b1b50718fefe04fe4ced54fa8ca699ab2f",
+      "blob": "9c10185e4ee51b0d161482339022fcaae697eb37",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T051640Z/decoy-report.md",
+      "status": "??",
+      "sha256": "6a7e986a7f1057dc4659360e46f8018873e67a5a849d02f4b09ee948057f3867",
+      "blob": "f3393800b8f8de7688e9f6a7b79aa7298b368ad7",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T051640Z/explorer-report.md",
+      "status": "??",
+      "sha256": "5d150bf4cffb2981a7630f2f0c132a5a6d1d08c02e87637a7c68733f5ccd576a",
+      "blob": "ab6432c5603317ab30004ba7c90c67bbc66a63ed",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T051640Z/mismatch-report.md",
+      "status": "??",
+      "sha256": "a1530f45cefd2c3430b766044900c246838e17e3233de5f75425964542df8f87",
+      "blob": "9c420169b900f22c2ecade697f23e7f27670130e",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T051640Z/nochain-report.md",
+      "status": "??",
+      "sha256": "2f0b36ea6b5a27eb9d25bb1b8ed2d44dbfd6d3567bcd549582293422b4c99b06",
+      "blob": "b78333e1c53d02f699adfd53f3a8f13d7bebcb47",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T051640Z/summary.md",
+      "status": "??",
+      "sha256": "af2d4601ac4fb01bf719497f54013958e7c4fae7ce31b9edc22346888c8831ae",
+      "blob": "4edc889c1a509426679e7e1bbeb8e602a25a6aa9",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T091045Z/decoy-report.md",
+      "status": "??",
+      "sha256": "1d18c01d116fd237bfb36b6d9880dcc08761f4409ad168e1f30ed1ce4782915a",
+      "blob": "ad04d7cab8a73e84c4cd4691be1105f5ab7c0ffc",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T091045Z/explorer-report.md",
+      "status": "??",
+      "sha256": "462e9197a2cfc4ed81a8a6870d84e3081f2c8ece7874947f0901e6e1d6a62f26",
+      "blob": "e72918d98791384cbebfc0ea74db5b6cf93612f8",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T091045Z/mismatch-report.md",
+      "status": "??",
+      "sha256": "645b596cdf2c06a6735a4578d32405d27f621426144d2757275cce8a0ed62e7b",
+      "blob": "ca170e6c36864f76304e4758c54868b1a6b4de12",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T091045Z/nochain-report.md",
+      "status": "??",
+      "sha256": "32f0edbaeb1d172b6cd8d2a5853483de93e51177e9639706e82cba875c556650",
+      "blob": "a6d538de0781fb06aa91f572ebeeb657766a637e",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T091045Z/summary.md",
+      "status": "??",
+      "sha256": "fd0e72799c1ad79ea1af396a4806ef645131e70d93763abfb979045940da8a66",
+      "blob": "42b6fd6ab635b54be9c7d18a80033bd4c10a9c1f",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T154412Z/decoy-report.md",
+      "status": "??",
+      "sha256": "6497aa564450bec8e21a85c5489a0621e09ff6a353175b9e2a5c2ad05c0ca673",
+      "blob": "f76f3cfda3c2b5d1bd180752261eb74ad9f44dc6",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T154412Z/explorer-report.md",
+      "status": "??",
+      "sha256": "cd96506415720a6f23b65b83745905d15617f01749153d3f6bff2a459c5dddac",
+      "blob": "d2ac5743bffb670af8c43236629f6a6af256228c",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T154412Z/mismatch-report.md",
+      "status": "??",
+      "sha256": "f9b10c2e90ee9954ca1fd0af87242b25a5052b2b6cbe20f9b0405ec0253b5975",
+      "blob": "8980fbac57088155f9ba57d0568caa4dcda4d71e",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T154412Z/nochain-report.md",
+      "status": "??",
+      "sha256": "f98f56fc72f7b4f74c6b7d14d34e136c7b5582a5e01041717b407677832b6dba",
+      "blob": "05e296dd449bcfced446aa9302e1cb48ae7c9925",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/runlogs/explorer-gate-drill-20261001T154412Z/summary.md",
+      "status": "??",
+      "sha256": "cf0e78160f36517d667ea0df062571cf358bf782cd175f3964513549da4075a1",
+      "blob": "dfae7741e234808af7d01d6fac87c960d78b4303",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-26-round9-workstreams.md",
+      "status": "??",
+      "sha256": "adbfdedfc692f8b5ed0639cbd4aff224be374989ea37dd96f6de0eda35ed9ce2",
+      "blob": "2abd08c86c0df29842d4be865dd2d37754888131",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-night/A-panic-burndown.md",
+      "status": "??",
+      "sha256": "e0a2d1bf1028d93c2c316db34477bbe7335a6956821f1f805d0a5195d0e67bce",
+      "blob": "43cb4a70caf3b4dcd6b56eecca26859fb1374428",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-night/B-mev001.md",
+      "status": "??",
+      "sha256": "793e5865d2a03c006578cd2a009fdaa30ca661f508919fe7ae0eba669d54cc71",
+      "blob": "b072e0dac06739d6fdf52b0157ebe060e107fc34",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-night/C-bringup-paths.md",
+      "status": "??",
+      "sha256": "afdb6a89eab448a2716179f5e25e760b47f810f608bb9cb20276d33fb4a8b8a1",
+      "blob": "b1a68ca86a6efdb2e14ceb83d9597cbd9d9496d4",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-night/D-northern-swarm-reactor.md",
+      "status": "??",
+      "sha256": "6986d38f9fa20f75e0a365ac12afedeaca7828158a78cdefa2bc023b896a170f",
+      "blob": "883d1610c451633d056536acaed215dbaec37fdc",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-swarm/A-pallet-adversarial.md",
+      "status": "??",
+      "sha256": "e579addadbbb1bd334917554c7ae6dcdb7e4ad87ab54ae8e11e939b5abf4dc79",
+      "blob": "13dd05575578b4b9aec8ef330b85002ac555bdba",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-swarm/B-executor-backend.md",
+      "status": "??",
+      "sha256": "306de8d267418eaa5cae40c62ba28240be22023e4ead1c01dd6f2eb0d8a3c27d",
+      "blob": "a6fc4b6a958262fdb512cb00b288ce03a3d7366c",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-swarm/C-swarm-core-races.md",
+      "status": "??",
+      "sha256": "b1011bb67d2c65e7157bf273c0ecc123f2310de6dd7f854a2a91f5c828f36845",
+      "blob": "e1f400e00b34650651beb689ae43e7303c8c76be",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-swarm/C-swarm-core.md",
+      "status": "??",
+      "sha256": "c9a8e6ce9b2084265ec3c84a53e23afa04fa464bfa7f86b5bccce4ce78b9e87f",
+      "blob": "854c913908f41f70eb03d09377815121280843f7",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-swarm/D-reactor-benchmark-path.md",
+      "status": "??",
+      "sha256": "3da8b5260321d4fa1f1b64fb3bbcdad3e315dbb52e995e7827245e1c234f227f",
+      "blob": "4bcf147e9de4cbfe558cc79e72b539037fe7ff07",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-swarm/E-repo-scanner.md",
+      "status": "??",
+      "sha256": "d3037078a2b2ab6e8a99daaada2fc1b8042f78fc9d0e77c2c2f2df4aaa6d214e",
+      "blob": "19b5e650add1d7af873af74e18fb7240b7fb9e36",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-swarm/F-atomic-bundle-under-halt.md",
+      "status": "??",
+      "sha256": "5af809dde9e48f7530b210e4eba902e09fe31d56efdab0ebc36a6ac7d6ccbf46",
+      "blob": "b4e5264a1f587ff3a993e4bd4e9adf165cfe334c",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-swarm/F-wire-the-fake-code-detectors.md",
+      "status": "??",
+      "sha256": "42a870ecc09108eb32a3b6010cbfd3136a906560eaae5b07797a45b95871c233",
+      "blob": "a36479892eb3bc8b46127b1202bc60995886ebbe",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".ai/tasks/2026-09-27-weights/benchmark-derived-weights.md",
+      "status": "??",
+      "sha256": "eec6a7827e4cae6a9722a77582d58dcd4956ddfbf3f4d648d4559dde9dfe898e",
+      "blob": "d8ea2614ac8246b83eb57bec3934f61c89e81b1d",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-00fc3059448a54415dab4afbef71e3ba.json",
+      "status": "??",
+      "sha256": "29ec189916f6a8de687dea59311655290a8ec109fec708447c388186101c24bf",
+      "blob": "8f5c0541a417fa6ffc6c24be18b6a52972d54ffd",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-00fc3059448a54415dab4afbef71e3ba.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-15308cdbb42fdff611d9c99f3a3507f6.json",
+      "status": "??",
+      "sha256": "aa9f50d0f167388c1731d8ab231fd7fc3ad2d090f7ab2beb6a8ab76088da727d",
+      "blob": "f86623b01eb76369fd407556f4275495648da416",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-15308cdbb42fdff611d9c99f3a3507f6.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-36c4905bea6e80d25fca9db45d5526fa.json",
+      "status": "??",
+      "sha256": "ec09ba7d6073598467eab7db1315fddb2c1b0bff06735840799e7d53c592daae",
+      "blob": "34cddf74213dcfbafa071d9e3b4c7f535e6f3cf2",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-36c4905bea6e80d25fca9db45d5526fa.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-37902f61fb5f6999817356d903cf297c.json",
+      "status": "??",
+      "sha256": "be2d766dcd0aa0226e6a80158c9bac0c220bb905d487a5159f3b2d5a6d18c413",
+      "blob": "180ac3de264d9c759ad700d890bbb96b07ec6835",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-37902f61fb5f6999817356d903cf297c.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-7f2213c8eb168e4927b22c93d5a7f1a1.json",
+      "status": "??",
+      "sha256": "b8a19895011a887dae609866990edbe50a0ecc53f84ca2960df4222ecb6a0ddd",
+      "blob": "ee17e78599ebc2f33b829fe31d033157cfe32451",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-7f2213c8eb168e4927b22c93d5a7f1a1.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-a5934ba532e06eb40d2f54af69c20857.json",
+      "status": "??",
+      "sha256": "4602acef285777383db20a727d81c0eb9c545c7be4dc82ae68ee2e5fa383a000",
+      "blob": "107d144ca6fb7c9eace537ee1c0a608db266c775",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-a5934ba532e06eb40d2f54af69c20857.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-b000c2b8a00d8de7100e96dd71da2792.json",
+      "status": "??",
+      "sha256": "05fe3edcd47c2fc25bb1f76b6408b6b52c3b38c2473858318574e26709222044",
+      "blob": "53091d73b3c6742d0de67b71930382375a4273b5",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-b000c2b8a00d8de7100e96dd71da2792.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-b4651f81ac3983f6f0314afd9e204ebd.json",
+      "status": "??",
+      "sha256": "92fdc74f62d9e55e500cfc1e8333470b0adb6d3bc500805f966eb128fa0fc2dd",
+      "blob": "134e5c251507e28c5026f5892d82e22130b17a7a",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-b4651f81ac3983f6f0314afd9e204ebd.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-c014890edf2f4b494ed250aedd972ab4.json",
+      "status": "??",
+      "sha256": "86e5ceeb7e6ec663e29465d25b4adbac6b4260232e2cdb3a187fb11f343157d8",
+      "blob": "1881848176aa38efdc613151897fc7e328b8674b",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-c014890edf2f4b494ed250aedd972ab4.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-d84af7b549a81c1991757d1a203cb580.json",
+      "status": "??",
+      "sha256": "f7d8f0e038b95e8898c6607bc8114426fb0e77019b2af326cabfb8b214817256",
+      "blob": "aec3f38bc0b834c7130070a5cf0169d636d84837",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/harness-d84af7b549a81c1991757d1a203cb580.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-00fc3059448a54415dab4afbef71e3ba.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-15308cdbb42fdff611d9c99f3a3507f6.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-36c4905bea6e80d25fca9db45d5526fa.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-37902f61fb5f6999817356d903cf297c.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-7f2213c8eb168e4927b22c93d5a7f1a1.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-a5934ba532e06eb40d2f54af69c20857.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-b000c2b8a00d8de7100e96dd71da2792.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-b4651f81ac3983f6f0314afd9e204ebd.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-c014890edf2f4b494ed250aedd972ab4.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-d5d4b55b0b13973719e94a5724cf99de.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".taskplane/workflow-d84af7b549a81c1991757d1a203cb580.json.lock",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".testnet_stability_start",
+      "status": "??",
+      "sha256": "7ac73363b992ba9013e2a8b78fe3b5b1a055be16921efcda365a5123862aba06",
+      "blob": "ff58a53ef9ab51dfde8d7a66176c9dd0566beea8",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".x3-forge/index.json",
+      "status": "??",
+      "sha256": "3aded2b4ced9b5f2ff0f3382bc698a85cfa631f1c0d380b3b8e061d29960324f",
+      "blob": "e27724f3c522b46302a87e38ca9236b611e8660d",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": ".x3-forge/memory.jsonl",
+      "status": "??",
+      "sha256": "df43daab3795dbb9ed3c26f07e397ccfac83e5ba9501320d713526f0dba2d424",
+      "blob": "00181dc2c69c3cb16f15e262b49da83851644add",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "1000",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "FETCH_HEAD",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "ansible/ansible.cfg",
+      "status": "??",
+      "sha256": "bf40c5200b53fbc88c8ccc642dac208e2bd3d83908766bef4a6c30557f7151c6",
+      "blob": "c7d9d26b2c118476d0a121cd1417a01008738b08",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "ansible/inventory/group_vars/all.yml",
+      "status": "??",
+      "sha256": "822dc5a2b6afe46156b95456e241d32ccb87d95fd299e1cdc64cc369c16ef623",
+      "blob": "2f050f083c7cd2307ced690f5ee58e9db8c4149a",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "ansible/inventory/group_vars/validators.yml",
+      "status": "??",
+      "sha256": "7ffba33ce9d66540cfe3b308dfe363f12e791714063d1719636346ddce7006bf",
+      "blob": "923723de464109e2df8e13c2754e7bd6ccaeb7b5",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "ansible/inventory/hosts.example.yml",
+      "status": "??",
+      "sha256": "b0339e0f1caabe8d6f235be6df8bf0a1e7cebeb9473ae4c553f3021b711ee604",
+      "blob": "968b64da1e679ed987ad7d5a34cae3870957c950",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "ansible/inventory/hosts.test.yml",
+      "status": "??",
+      "sha256": "46493ef4334237bea34dc4add2f3859ac28a9d4801a2bf238f041ec43ecb2ddf",
+      "blob": "12e0331c8d94f45e312e82ab3df30767db615d7e",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "chain-spec.json",
+      "status": "??",
+      "sha256": "f9dd3f5eac94b19a8595f2bcd991341eb34bec1fe768dd6a3df1a70038842c6e",
+      "blob": "fde5487bbe0dde42ccd2151f0a7d527f3d6da953",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "chain-specs/x3-public-testnet-plain.json",
+      "status": "??",
+      "sha256": "dca4e16d6e17b8d528a7078f585043536271efdca4d5219d293e80d662031136",
+      "blob": "90c95a32b91a6435d2d32b956b13d55bbf672265",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/.gitignore",
+      "status": "??",
+      "sha256": "ee2d1830cc9770d3951ff7bf288d69be81e525d7a265cfaacd9878a0a067fe1e",
+      "blob": "801d76d79420746563462bf5352ad0cba68cec5d",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/HANDOFF.md",
+      "status": "??",
+      "sha256": "aeb8a5698c286edc78298944027c02bf2cfee9e3044faf61e9312cb6248bbe2d",
+      "blob": "a10f7a3ac19799a0e4e94e563cd6eb4935222977",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/MANIFEST.json",
+      "status": "??",
+      "sha256": "db429057e0e245abdce93188fa355b5b9a475151f51c3135fd0e1da4baa6e7bf",
+      "blob": "e4ae70f9b19b346d89681801e79d0adc4f181e20",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/README.md",
+      "status": "??",
+      "sha256": "86b92f369339c30d94935af82ef62b7d736b0934589a6fa28eb78c2c1aaf09d9",
+      "blob": "10bb7120863a999b0fed76e06626c109efd68529",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/README.md",
+      "status": "??",
+      "sha256": "fcc8b128610efb41e18ab5dbf1011d32bb0718279b0acfbf07b3dfa7a261e5b5",
+      "blob": "a26442e5816c68b7ae48936bac4986aca3b6f4c9",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/community.py",
+      "status": "??",
+      "sha256": "b828843f16581ca3630b78929b11766119f4375e11165835ef0a4d607ca9338d",
+      "blob": "d1d9540cd9c14551e66cd23f719f7658cf2f62cb",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/discovery.py",
+      "status": "??",
+      "sha256": "88a8748e2ae9e7251449c05f4b97773bbb3e13972e47a1274a06a759ccf27121",
+      "blob": "5e4a45e3516a0327e617fb8ce772cdd2f534f9ee",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/drafts/hf-community.md",
+      "status": "??",
+      "sha256": "6ab92f048a2441636ced804e98f93b532027ad8a6e12275725e03ba462905cdd",
+      "blob": "b070046cf53c9bbfe9d9d59ba93a73f895192c2c",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/grantops.py",
+      "status": "??",
+      "sha256": "f75779c32200c17297739e6bc2ec90430846a19a8b604dd00371b1e9a3e55b10",
+      "blob": "49ad49025b9018354a969ad567a4c89ca7604e3e",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/hunter.py",
+      "status": "??",
+      "sha256": "26493eee687c0aa3172187e1e94f174dcf96bae82862e6e71bf3727fae7878fe",
+      "blob": "2e7127ef4bb24101a6eb0b24a8b873a1ab3d4858",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/opportunities-extra.json",
+      "status": "??",
+      "sha256": "c5728a5e90a4bab8e90356fa1d012d053b4993dcd6cb166c1a8fdd3d1b1a5687",
+      "blob": "0524c48b898f59d67ce1fe190279a34f7986ea28",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/tests/test_discovery.py",
+      "status": "??",
+      "sha256": "9b9e5ca5d3adc8ad2dbd4d82a73a8e5b642a3b792bf69734dd6f3fb386b04455",
+      "blob": "7cc5db138254133f7527bb046d291c2ae36b729b",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/tests/test_grantops.py",
+      "status": "??",
+      "sha256": "428b5418d5077f9be51a0dd1f5322958f63c0ece37a968a5ae3d34bdabd7c16b",
+      "blob": "4cb9bb3af5881dc455cf04d8b3b3f7887764062d",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/grant-hunter-v3/tests/test_hunter.py",
+      "status": "??",
+      "sha256": "e8500ad5d8c5cec242ccbbd15cbec0b2f9261efa5e55fbad23eebb9847fa29c3",
+      "blob": "2da916d0c0f15587244f29952bf91c89143618e8",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/volunteer-swarm-v1/README.md",
+      "status": "??",
+      "sha256": "26d6ea87170e86bc02480a7bcd3c952e32893579fa4dc908519bbd26edadb8bb",
+      "blob": "8716815e2743bd8733d38e89eab1924dd8ae3f67",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/volunteer-swarm-v1/swarm/coordinator.py",
+      "status": "??",
+      "sha256": "9e6e063fa7b1e5503a9640829155f707ee5acbae4c5fc221aabe6850bb6d3412",
+      "blob": "c480dbdfdb12311f8cbc910d41cd23eb84b7455f",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/volunteer-swarm-v1/swarm/worker.py",
+      "status": "??",
+      "sha256": "38ce3bea6c32f36810ed3da2da8c46c1ec9fe93ae88e99b5e559a38aee6c863b",
+      "blob": "f300652d463fff65a4ffed8ae05bf011e13b60e5",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "contrib/money-swarm-imports/volunteer-swarm-v1/tests/test_swarm.py",
+      "status": "??",
+      "sha256": "b66e6c1ebfb3a5c09151361bbafb8a012cf05c5481413e6336d7d36616c75c89",
+      "blob": "c0e21f0173c18ad85eb5867110a31c86c94771d0",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "crates/x3-gateway/migrations/0001_benchmark_reports.sql",
+      "status": "??",
+      "sha256": "57bb9e54ab05474ec1ca36faa13152113170ebe42123547201f84941daf2309c",
+      "blob": "fe50774bfe0d9213d33c873d92e65281634b6c95",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "identical",
+          "blob": "fe50774bfe0d9213d33c873d92e65281634b6c95"
+        },
+        "refreshed_pr623": {
+          "state": "identical",
+          "blob": "fe50774bfe0d9213d33c873d92e65281634b6c95"
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "crates/x3-gateway/migrations/0002_benchmark_report_workload_profile.sql",
+      "status": "??",
+      "sha256": "7be20ff1e42cc805ac9b274aedb0cec7ca44b0827f27584ee2b33438fc579a1e",
+      "blob": "07a60c8504f56b869219e4a2933fbdcda77f2f8b",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "identical",
+          "blob": "07a60c8504f56b869219e4a2933fbdcda77f2f8b"
+        },
+        "refreshed_pr623": {
+          "state": "identical",
+          "blob": "07a60c8504f56b869219e4a2933fbdcda77f2f8b"
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "crates/x3-gateway/migrations/0003_benchmark_jobs.sql",
+      "status": "??",
+      "sha256": "ec51bd305c256157a1c3b45d001430c3f261b9285919bde660aa45f7e25bc7f7",
+      "blob": "d4a6999511ce96fb91fd67426a32805afcb0742e",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "identical",
+          "blob": "d4a6999511ce96fb91fd67426a32805afcb0742e"
+        },
+        "refreshed_pr623": {
+          "state": "identical",
+          "blob": "d4a6999511ce96fb91fd67426a32805afcb0742e"
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "crates/x3-gateway/migrations/0004_orchestra_workflows.sql",
+      "status": "??",
+      "sha256": "3aa204765e799c5ed0460adc6bf8ef7f8b840c2f35372533327b3b825a7d634c",
+      "blob": "d21ba85aa0da6cbdcf02d36fffb79fe634db6e74",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "identical",
+          "blob": "d21ba85aa0da6cbdcf02d36fffb79fe634db6e74"
+        },
+        "refreshed_pr623": {
+          "state": "identical",
+          "blob": "d21ba85aa0da6cbdcf02d36fffb79fe634db6e74"
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "crates/x3-gateway/migrations/0005_vote_window_tally.sql",
+      "status": "??",
+      "sha256": "0b627bebf25e062fa3e139f6ec01d8feb9d8f30b10dd5eff394620f604249e41",
+      "blob": "5d4499ef98ed7870b7e45f7e702f0d16fa08db79",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "identical",
+          "blob": "5d4499ef98ed7870b7e45f7e702f0d16fa08db79"
+        },
+        "refreshed_pr623": {
+          "state": "identical",
+          "blob": "5d4499ef98ed7870b7e45f7e702f0d16fa08db79"
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "crates/x3-gateway/tests/migrations_cover_tables.rs",
+      "status": "??",
+      "sha256": "57ef36279a34734c8718109802a2c53c420c72a99446a32f8cf54a781a092401",
+      "blob": "e30ccbcff485dfb87b90ce571e168bb03603dc7d",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "different",
+          "blob": "8213c52befe88de3979978a164185df9e1f4a932"
+        },
+        "refreshed_pr623": {
+          "state": "different",
+          "blob": "8213c52befe88de3979978a164185df9e1f4a932"
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "formal-proofs/coq/.SupplyInvariant.aux",
+      "status": "??",
+      "sha256": "1eea4037592d32e6ffaff9d394b4f5252baf46ed6c998b68db51d8f2b57551c3",
+      "blob": "21673d8edc9a2b76e3bf7be3f4e949e8fd2aaf0f",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "formal-proofs/coq/SupplyInvariant.glob",
+      "status": "??",
+      "sha256": "9595c0dc830ba3c5784b785cf19428c17f52aee0d82ed14719c5ed843be1c190",
+      "blob": "ab8cf6341417273ec0c5cd2c74de2a14569f7673",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "formal-proofs/coq/SupplyInvariant.vo",
+      "status": "??",
+      "sha256": "6543b10d3ae1ff11e3d37aa8f0d3d33d80aca439230c1084cbcfae3d993493b2",
+      "blob": "5b14a168097b538c1c0b8732b3c972d5de48d00c",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "formal-proofs/coq/SupplyInvariant.vok",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "formal-proofs/coq/SupplyInvariant.vos",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "libproto_lib/usr/share/doc/libprotobuf23",
+      "status": "??",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "prompts/X3_ENDGAME_MASTER_PROMPT.md",
+      "status": "??",
+      "sha256": "06bea3799b20fd59938caab75a4cd3afc4dbe9bb5ddfdd48e7c33e077289ee4a",
+      "blob": "ad70a92841b4864f93e9127003bc4249986a1c50",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "prompts/X3_ENGINEERING_AUTOPILOT_MASTER_PROMPT.md",
+      "status": "??",
+      "sha256": "fbdf9b46c2e78904410fd2483824d47692a2379df0cbfc6af6f4ab01e1fe4e39",
+      "blob": "66f6476cf47e3b0034312f31a9c26e4724b5a40c",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "reports/feature-matrix/X3_FEATURE_MATRIX.csv",
+      "status": "??",
+      "sha256": "cb6feb70f4fb26b059de931d514dbc6d8c443e85195351f874aa505e0a9e41d9",
+      "blob": "740f68d31a5f9439b92a7f7deda70e3f74c46fad",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "reports/feature-matrix/X3_FEATURE_MATRIX.json",
+      "status": "??",
+      "sha256": "8b6a817afb0ef8cb1825b4d461d6c1dd1e37a03cc7d2999670bfef69670673ce",
+      "blob": "ac64b333bb0e9938558942b241d289d29af4aad0",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "reports/feature-matrix/X3_FEATURE_MATRIX.md",
+      "status": "??",
+      "sha256": "4ccf91ced05a32c8b7bc7f5070ec96671c48d9d23da69292c7d32efe88172fd8",
+      "blob": "6c0849bea43d36db06bfde75cc36a9f863e48718",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "reports/feature-matrix/X3_FEATURE_SUMMARY.md",
+      "status": "??",
+      "sha256": "f9a8521e0fc50d6e683d77e9ff519f7f19ba3c5bbf298d0fba01cada3819b489",
+      "blob": "2e21fe091d2213eda84ca4186889807b79e239cd",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "services/x3-ai-router/RESPONSES-COMPATIBILITY.md",
+      "status": "??",
+      "sha256": "c6181bdfbbaffdcde0b5a038d12be419214f91d4ea99b085f21339acbaea33ce",
+      "blob": "0f6876bb8a7abcaf23b11f244c09d6b59f7b26da",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "services/x3-ai-router/config.json.backup-20261002-worker-split",
+      "status": "??",
+      "sha256": "47d15714c63bf53c4445cb611a6660ad87345ba960ba27d2aa5293aecfcb2497",
+      "blob": "fba94427fb967a18aed1fab72664fe1e7a497bcc",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "services/x3-ai-router/config.json.backup-20261012-gpu1-ip",
+      "status": "??",
+      "sha256": "b5e5158f96373a151417f13347ef9cc6470c649ab3dbbe59a4ef2593be94b891",
+      "blob": "4d2652bd8f5caef61f5472a1b981d63bc3a7db44",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "services/x3-ai-router/h1.txt",
+      "status": "??",
+      "sha256": "b0effbae3b77da3b517b8263a46878da1d02df5dbabf31712c788ae65eb856f6",
+      "blob": "e910acd6b98b3350435b2f8ff650f7661796f09a",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "services/x3-ai-router/router.py.bak-20261002-fabric",
+      "status": "??",
+      "sha256": "c632862c04506f61359a2c37e644e036c7690ff3a5e2f4d9ca4d2bfa6386dcb9",
+      "blob": "d40891150037d50879090c705a15400207e264b3",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    },
+    {
+      "path": "udo ss -ltnp | grep ':11435'",
+      "status": "??",
+      "sha256": "d6cc59a1acf1a95c2b3dbd96790805f786e7e30db82dab30d234a7dc6e631657",
+      "blob": "ca23d22cbd05819f202f9b541eeb13806f3e1a1f",
+      "compared_heads": {
+        "source_HEAD": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_master": {
+          "state": "absent",
+          "blob": null
+        },
+        "refreshed_pr623": {
+          "state": "absent",
+          "blob": null
+        },
+        "captured_pr562": {
+          "state": "absent",
+          "blob": null
+        }
+      }
+    }
+  ]
+}

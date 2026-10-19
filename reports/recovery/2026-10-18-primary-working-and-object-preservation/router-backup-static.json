@@ -1,0 +1,9 @@
+{
+  "backup_python_parse": "PASS",
+  "source_head_python_parse": "PASS",
+  "backup_symbols": 108,
+  "source_head_symbols": 108,
+  "backup_only_symbols": [],
+  "head_only_symbols": [],
+  "scope": "AST names only, not semantic equivalence or runtime validation; no historical code executed"
+}

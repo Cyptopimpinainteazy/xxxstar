@@ -1,0 +1,43 @@
+{
+  "verification_state": "PASS",
+  "host": "x3star1",
+  "source_repository": "/home/lojak/Desktop/xxxstar-main",
+  "source_head": "1beb644603a0f1b6de8bb5882e699fdc99bb2e58",
+  "archive_directory": "/home/lojak/x3-recovery-sources/preserved/primary-objects-20261019T024742Z",
+  "verification_directory": "/home/lojak/x3-recovery-sources/preserved/object-verification-20261019T024742Z",
+  "objects_preserved": 154915,
+  "object_types": {
+    "tree": 44097,
+    "blob": 106126,
+    "commit": 4682,
+    "tag": 10
+  },
+  "uncompressed_object_bytes": 11592740552,
+  "pack_bytes": 2549433452,
+  "refs_restored": 1272,
+  "raw_reflogs_preserved": 668,
+  "unreachable_commits_restored": 699,
+  "previously_audited_unreferenced_commits_present": 699,
+  "previously_audited_commits_missing": [],
+  "independent_object_inventory_identical": true,
+  "source_alternates_used_for_restore": false,
+  "shallow_history": false,
+  "full_git_fsck_exit": 0,
+  "unreachable_git_fsck_exit": 0,
+  "source_unchanged": {
+    "head": true,
+    "index": true,
+    "refs": true,
+    "status": true,
+    "raw_head": true,
+    "reflog_bytes": true
+  },
+  "working_tree_files_preserved": false,
+  "other_worktree_indexes_preserved": false,
+  "off_host_copy": false,
+  "runtime_tests": "NOT RUN",
+  "archive_manifest_sha256": "af8d5944c8c44005c090d1aff90573ab9fbdc8dc3ddc4c182f048ee5339ec257",
+  "archive_artifacts_verified": 698,
+  "archive_checksums_verified": true,
+  "archive_permissions_verified": true
+}

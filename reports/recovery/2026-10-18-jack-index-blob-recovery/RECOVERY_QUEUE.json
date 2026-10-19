@@ -1,0 +1,125 @@
+{
+  "items": [
+    {
+      "priority": "P0",
+      "state": "PRESERVED AND INDEPENDENTLY RECONSTRUCTED",
+      "host": "x3star1",
+      "source_repository": "/home/lojak/Desktop/jacktheripper",
+      "source_head": "32062ebd7384f374a3b7f4a2e6ad85d8df805b9a",
+      "staged_commit_sha": null,
+      "blob_sha": "780f6515d9fe031fbca73270c9f7302d89793f14",
+      "affected_files": [
+        ".ai/runlogs/venue-expansion-and-the-quiet-ingest.md"
+      ],
+      "recovered_from": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+      "expected_value": "Restore exact staged bytes unavailable in the damaged source object store",
+      "risk": "Original indexed version cannot be replaced by current working bytes without verification; configuration contents may be sensitive",
+      "recommended_action": "Retain private recovered payload and full raw index; inspect in isolated repository; original repair remains a separate action",
+      "validation": "Git hash-object matches exact missing blob ID; reconstructed index entries match all 190 original entries and write-tree succeeds",
+      "evidence": [
+        "RESULT.json"
+      ]
+    },
+    {
+      "priority": "P0",
+      "state": "PRESERVED AND INDEPENDENTLY RECONSTRUCTED",
+      "host": "x3star1",
+      "source_repository": "/home/lojak/Desktop/jacktheripper",
+      "source_head": "32062ebd7384f374a3b7f4a2e6ad85d8df805b9a",
+      "staged_commit_sha": null,
+      "blob_sha": "5e8466a8eca37b131a29331af5f1ff7922b3572f",
+      "affected_files": [
+        "GAP_MATRIX.md"
+      ],
+      "recovered_from": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+      "expected_value": "Restore exact staged bytes unavailable in the damaged source object store",
+      "risk": "Original indexed version cannot be replaced by current working bytes without verification; configuration contents may be sensitive",
+      "recommended_action": "Retain private recovered payload and full raw index; inspect in isolated repository; original repair remains a separate action",
+      "validation": "Git hash-object matches exact missing blob ID; reconstructed index entries match all 190 original entries and write-tree succeeds",
+      "evidence": [
+        "RESULT.json"
+      ]
+    },
+    {
+      "priority": "P0",
+      "state": "PRESERVED AND INDEPENDENTLY RECONSTRUCTED",
+      "host": "x3star1",
+      "source_repository": "/home/lojak/Desktop/jacktheripper",
+      "source_head": "32062ebd7384f374a3b7f4a2e6ad85d8df805b9a",
+      "staged_commit_sha": null,
+      "blob_sha": "b282d34e7fd245d841d49298d6e02ca44f368d64",
+      "affected_files": [
+        "config/jack.toml"
+      ],
+      "recovered_from": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+      "expected_value": "Restore exact staged bytes unavailable in the damaged source object store",
+      "risk": "Original indexed version cannot be replaced by current working bytes without verification; configuration contents may be sensitive",
+      "recommended_action": "Retain private recovered payload and full raw index; inspect in isolated repository; original repair remains a separate action",
+      "validation": "Git hash-object matches exact missing blob ID; reconstructed index entries match all 190 original entries and write-tree succeeds",
+      "evidence": [
+        "RESULT.json"
+      ]
+    },
+    {
+      "priority": "P0",
+      "state": "PRESERVED AND INDEPENDENTLY RECONSTRUCTED",
+      "host": "x3star1",
+      "source_repository": "/home/lojak/Desktop/jacktheripper",
+      "source_head": "32062ebd7384f374a3b7f4a2e6ad85d8df805b9a",
+      "staged_commit_sha": null,
+      "blob_sha": "2ad8ae3e5cea0d07c7ee70aedd94d65939932b5f",
+      "affected_files": [
+        "crates/jack_chains/tests/venue_fees.rs"
+      ],
+      "recovered_from": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+      "expected_value": "Restore exact staged bytes unavailable in the damaged source object store",
+      "risk": "Original indexed version cannot be replaced by current working bytes without verification; configuration contents may be sensitive",
+      "recommended_action": "Retain private recovered payload and full raw index; inspect in isolated repository; original repair remains a separate action",
+      "validation": "Git hash-object matches exact missing blob ID; reconstructed index entries match all 190 original entries and write-tree succeeds",
+      "evidence": [
+        "RESULT.json"
+      ]
+    },
+    {
+      "priority": "P0",
+      "state": "PRESERVED AND INDEPENDENTLY RECONSTRUCTED",
+      "host": "x3star1",
+      "source_repository": "/home/lojak/Desktop/jacktheripper",
+      "source_head": "32062ebd7384f374a3b7f4a2e6ad85d8df805b9a",
+      "staged_commit_sha": null,
+      "blob_sha": "89149ff33c6925d315a384c7a129e9bf7f42b87f",
+      "affected_files": [
+        "crates/jack_graph/src/routes.rs"
+      ],
+      "recovered_from": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+      "expected_value": "Restore exact staged bytes unavailable in the damaged source object store",
+      "risk": "Original indexed version cannot be replaced by current working bytes without verification; configuration contents may be sensitive",
+      "recommended_action": "Retain private recovered payload and full raw index; inspect in isolated repository; original repair remains a separate action",
+      "validation": "Git hash-object matches exact missing blob ID; reconstructed index entries match all 190 original entries and write-tree succeeds",
+      "evidence": [
+        "RESULT.json"
+      ]
+    },
+    {
+      "priority": "P0",
+      "state": "PRESERVED AND INDEPENDENTLY RECONSTRUCTED",
+      "host": "x3star1",
+      "source_repository": "/home/lojak/Desktop/jacktheripper",
+      "source_head": "32062ebd7384f374a3b7f4a2e6ad85d8df805b9a",
+      "staged_commit_sha": null,
+      "blob_sha": "93b73725b4db111057e9c0bf0c25460e3427cdb2",
+      "affected_files": [
+        "crates/jack_ripper/src/main.rs"
+      ],
+      "recovered_from": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+      "expected_value": "Restore exact staged bytes unavailable in the damaged source object store",
+      "risk": "Original indexed version cannot be replaced by current working bytes without verification; configuration contents may be sensitive",
+      "recommended_action": "Retain private recovered payload and full raw index; inspect in isolated repository; original repair remains a separate action",
+      "validation": "Git hash-object matches exact missing blob ID; reconstructed index entries match all 190 original entries and write-tree succeeds",
+      "evidence": [
+        "RESULT.json"
+      ]
+    }
+  ],
+  "remaining_P0": "Full baseline commit closure and staged-deleted working paths have not been preserved by this limited index recovery"
+}

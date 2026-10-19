@@ -1,0 +1,61 @@
+{
+  "verification_state": "PASS",
+  "preservation_state": "PASS for raw index, all available indexed blobs and captured working bytes",
+  "source_repository": "/home/lojak/Desktop/jacktheripper",
+  "source_head": "32062ebd7384f374a3b7f4a2e6ad85d8df805b9a",
+  "archive_directory": "/home/lojak/x3-recovery-sources/preserved/jack-index-v2-20261019T025452Z",
+  "verification_directory": "/home/lojak/x3-recovery-sources/preserved/jack-index-v2-verification-20261019T025452Z",
+  "index_entries_preserved": 190,
+  "available_unique_blobs_preserved": 184,
+  "indexed_bytes_preserved": 2869461,
+  "working_paths_preserved": 190,
+  "missing_indexed_blobs": {
+    "780f6515d9fe031fbca73270c9f7302d89793f14": [
+      ".ai/runlogs/venue-expansion-and-the-quiet-ingest.md"
+    ],
+    "5e8466a8eca37b131a29331af5f1ff7922b3572f": [
+      "GAP_MATRIX.md"
+    ],
+    "b282d34e7fd245d841d49298d6e02ca44f368d64": [
+      "config/jack.toml"
+    ],
+    "2ad8ae3e5cea0d07c7ee70aedd94d65939932b5f": [
+      "crates/jack_chains/tests/venue_fees.rs"
+    ],
+    "89149ff33c6925d315a384c7a129e9bf7f42b87f": [
+      "crates/jack_graph/src/routes.rs"
+    ],
+    "93b73725b4db111057e9c0bf0c25460e3427cdb2": [
+      "crates/jack_ripper/src/main.rs"
+    ]
+  },
+  "local_object_stores_searched": 90,
+  "search_store_failures": 0,
+  "recovered_missing_blobs": {
+    "780f6515d9fe031fbca73270c9f7302d89793f14": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+    "5e8466a8eca37b131a29331af5f1ff7922b3572f": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+    "b282d34e7fd245d841d49298d6e02ca44f368d64": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+    "2ad8ae3e5cea0d07c7ee70aedd94d65939932b5f": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+    "89149ff33c6925d315a384c7a129e9bf7f42b87f": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+    "93b73725b4db111057e9c0bf0c25460e3427cdb2": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git"
+  },
+  "unrecovered_indexed_blobs": [],
+  "source_cached_diff_exit": 128,
+  "restored_raw_index_write_tree_exit": 0,
+  "verification_rebuilt_tree": "1c518ee0a588e5f8497482c148f1261480fd7fad",
+  "restored_index_entries_identical": true,
+  "available_restored_blobs_byte_identical": true,
+  "source_unchanged": {
+    "head": true,
+    "index": true,
+    "status": true,
+    "scoped_working_files": true
+  },
+  "baseline_commit_closure_preserved": false,
+  "staged_deleted_working_paths_preserved": false,
+  "original_repository_repaired": false,
+  "runtime_tests": "NOT RUN",
+  "archive_manifest_sha256": "8cb28f0a6778a8f8b8e24ebad5e41e9539f4d8535d37850a1c6df480cdb99201",
+  "archive_checksums_verified": true,
+  "archive_permissions_verified": true
+}

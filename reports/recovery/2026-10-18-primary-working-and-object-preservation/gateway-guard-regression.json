@@ -1,0 +1,31 @@
+{
+  "verification_state": "PASS",
+  "conclusion": "The local untracked migration guard misses a table identifier ending a SQL literal; the captured master guard detects it. Recovering the old guard wholesale would regress coverage.",
+  "probe_scope": "One isolated parser regression probe appended only in private verification copies. Existing source tests and production files unchanged.",
+  "commands": [
+    {
+      "case": "preserved_local_guard",
+      "compile_exit": 0,
+      "test_command": [
+        "/home/lojak/x3-recovery-sources/preserved/working-verification-20261019T024612Z/gateway-static-proof/recovered_schema/crates/x3-gateway/preserved_local_guard_probe",
+        "recovery_probe_table_name_at_end_of_literal",
+        "--exact",
+        "--nocapture"
+      ],
+      "test_exit": 101,
+      "log_sha256": "93e07d2b2cb886335079c229fd10292b2919bf601dae66fb6eea2fd64221da1c"
+    },
+    {
+      "case": "captured_master_guard",
+      "compile_exit": 0,
+      "test_command": [
+        "/home/lojak/x3-recovery-sources/preserved/working-verification-20261019T024612Z/gateway-static-proof/recovered_schema/crates/x3-gateway/captured_master_guard_probe",
+        "recovery_probe_table_name_at_end_of_literal",
+        "--exact",
+        "--nocapture"
+      ],
+      "test_exit": 0,
+      "log_sha256": "1b15d8d548097c14a91425856455da429aadea7b9945a5f971d7250ff5d34a41"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "verification_state": "PASS",
+  "baseline_static_guard": "FAIL as expected: baseline schema lacks required migrations",
+  "recovered_static_guard": "PASS: 1 test passed",
+  "scope": "Recovered std-only migration coverage test compiled directly with rustc against isolated snapshots. Not a cargo workspace build, SQL execution, live database test, or gateway runtime proof.",
+  "source_head": "1beb644603a0f1b6de8bb5882e699fdc99bb2e58",
+  "commands": [
+    {
+      "case": "baseline_schema",
+      "step": "compile existing recovered test",
+      "command": [
+        "rustc",
+        "--edition=2021",
+        "--test",
+        "/home/lojak/x3-recovery-sources/preserved/working-verification-20261019T024612Z/gateway-static-proof/baseline_schema/crates/x3-gateway/tests/migrations_cover_tables.rs",
+        "-o",
+        "/home/lojak/x3-recovery-sources/preserved/working-verification-20261019T024612Z/gateway-static-proof/baseline_schema-test"
+      ],
+      "exit": 0
+    },
+    {
+      "case": "baseline_schema",
+      "step": "run static schema coverage guard",
+      "command": [
+        "/home/lojak/x3-recovery-sources/preserved/working-verification-20261019T024612Z/gateway-static-proof/baseline_schema-test",
+        "--nocapture"
+      ],
+      "exit": 101,
+      "log_sha256": "d661ccbf7a736628c236b6931b9a0f930f8449bee09c44b63c6e6c914bf3ce16"
+    },
+    {
+      "case": "recovered_schema",
+      "step": "compile existing recovered test",
+      "command": [
+        "rustc",
+        "--edition=2021",
+        "--test",
+        "/home/lojak/x3-recovery-sources/preserved/working-verification-20261019T024612Z/gateway-static-proof/recovered_schema/crates/x3-gateway/tests/migrations_cover_tables.rs",
+        "-o",
+        "/home/lojak/x3-recovery-sources/preserved/working-verification-20261019T024612Z/gateway-static-proof/recovered_schema-test"
+      ],
+      "exit": 0
+    },
+    {
+      "case": "recovered_schema",
+      "step": "run static schema coverage guard",
+      "command": [
+        "/home/lojak/x3-recovery-sources/preserved/working-verification-20261019T024612Z/gateway-static-proof/recovered_schema-test",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "log_sha256": "9bc136818e6767a5d7361d71b5b2ed60a80842377e099261f4e73a0fa1b0ed16"
+    }
+  ]
+}

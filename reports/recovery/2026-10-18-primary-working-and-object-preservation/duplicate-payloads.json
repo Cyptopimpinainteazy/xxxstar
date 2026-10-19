@@ -1,0 +1,33 @@
+{
+  "groups": [
+    [
+      ".taskplane/harness-00fc3059448a54415dab4afbef71e3ba.json.lock",
+      ".taskplane/harness-15308cdbb42fdff611d9c99f3a3507f6.json.lock",
+      ".taskplane/harness-36c4905bea6e80d25fca9db45d5526fa.json.lock",
+      ".taskplane/harness-37902f61fb5f6999817356d903cf297c.json.lock",
+      ".taskplane/harness-7f2213c8eb168e4927b22c93d5a7f1a1.json.lock",
+      ".taskplane/harness-a5934ba532e06eb40d2f54af69c20857.json.lock",
+      ".taskplane/harness-b000c2b8a00d8de7100e96dd71da2792.json.lock",
+      ".taskplane/harness-b4651f81ac3983f6f0314afd9e204ebd.json.lock",
+      ".taskplane/harness-c014890edf2f4b494ed250aedd972ab4.json.lock",
+      ".taskplane/harness-d84af7b549a81c1991757d1a203cb580.json.lock",
+      ".taskplane/workflow-00fc3059448a54415dab4afbef71e3ba.json.lock",
+      ".taskplane/workflow-15308cdbb42fdff611d9c99f3a3507f6.json.lock",
+      ".taskplane/workflow-36c4905bea6e80d25fca9db45d5526fa.json.lock",
+      ".taskplane/workflow-37902f61fb5f6999817356d903cf297c.json.lock",
+      ".taskplane/workflow-7f2213c8eb168e4927b22c93d5a7f1a1.json.lock",
+      ".taskplane/workflow-a5934ba532e06eb40d2f54af69c20857.json.lock",
+      ".taskplane/workflow-b000c2b8a00d8de7100e96dd71da2792.json.lock",
+      ".taskplane/workflow-b4651f81ac3983f6f0314afd9e204ebd.json.lock",
+      ".taskplane/workflow-c014890edf2f4b494ed250aedd972ab4.json.lock",
+      ".taskplane/workflow-d5d4b55b0b13973719e94a5724cf99de.json.lock",
+      ".taskplane/workflow-d84af7b549a81c1991757d1a203cb580.json.lock",
+      "1000",
+      "FETCH_HEAD",
+      "formal-proofs/coq/SupplyInvariant.vok",
+      "formal-proofs/coq/SupplyInvariant.vos",
+      "libproto_lib/usr/share/doc/libprotobuf23"
+    ]
+  ],
+  "scope": "Exact SHA256 equality among 130 archived entries; no files deleted"
+}

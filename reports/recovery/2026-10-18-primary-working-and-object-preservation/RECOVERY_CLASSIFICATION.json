@@ -1,0 +1,39 @@
+{
+  "master_live_ref_verified": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+  "master_ref_check": "git ls-remote --heads origin master completed with exit 0",
+  "classifications": [
+    {
+      "paths": [
+        "crates/x3-gateway/migrations/0001_benchmark_reports.sql",
+        "crates/x3-gateway/migrations/0002_benchmark_report_workload_profile.sql",
+        "crates/x3-gateway/migrations/0003_benchmark_jobs.sql",
+        "crates/x3-gateway/migrations/0004_orchestra_workflows.sql",
+        "crates/x3-gateway/migrations/0005_vote_window_tally.sql"
+      ],
+      "state": "integrated: exact blobs match pinned master and PR623",
+      "action": "Retain private historical snapshot; no separate port"
+    },
+    {
+      "path": "crates/x3-gateway/src/orchestra.rs",
+      "state": "integrated behavior: evidence-bundle ID comparison exists on pinned master; local diff only spaces in log literal",
+      "action": "Keep target behavior; do not replay older file wholesale"
+    },
+    {
+      "path": "crates/x3-gateway/tests/migrations_cover_tables.rs",
+      "state": "superseded: archived local test misses end-of-literal table names; target test catches them",
+      "action": "Keep improved target test; isolated regression probe recorded"
+    },
+    {
+      "path": "services/x3-ai-router/router.py.bak-20261002-fabric",
+      "state": "unverified historical implementation: AST parses and same 108 symbol names as source HEAD, semantics unverified",
+      "action": "Compare function bodies and applicable tests before any focused port"
+    }
+  ],
+  "limitations": [
+    "No live PostgreSQL test",
+    "No gateway runtime or workspace build",
+    "No semantic uniqueness claim for other 123 worktree entries",
+    "Local preservation is not off-host disaster protection",
+    "Original audit remote-host coverage remains incomplete"
+  ]
+}
