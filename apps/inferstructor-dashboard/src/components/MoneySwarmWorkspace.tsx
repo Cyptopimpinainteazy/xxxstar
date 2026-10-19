@@ -63,6 +63,7 @@ export function MoneySwarmWorkspace() {
   const [notice, setNotice] = useState('');
   const [archive, setArchive] = useState<HistoricalLead[]>([]);
   const [archiveOffset, setArchiveOffset] = useState(0);
+  const [archiveSearch, setArchiveSearch] = useState('');
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archiveError, setArchiveError] = useState('');
   const archiveRequest = useRef(0);
@@ -105,7 +106,7 @@ export function MoneySwarmWorkspace() {
     setArchiveLoading(true);
     setArchiveError('');
     try {
-      const records = await request<HistoricalLead[]>(`/api/v1/admin/funding-swarm/legacy-leads?limit=100&offset=${offset}`, token);
+      const records = await request<HistoricalLead[]>(`/api/v1/admin/funding-swarm/legacy-leads?limit=100&offset=${offset}&search=${encodeURIComponent(archiveSearch.trim())}`, token);
       if (requestId !== archiveRequest.current) return;
       if (!Array.isArray(records) || records.some(record =>
         record.current_availability !== 'UNKNOWN' || record.current_eligibility !== 'UNKNOWN' ||
@@ -185,7 +186,9 @@ export function MoneySwarmWorkspace() {
         </section>
       </>}
       {view === 'archive' && <section className="money-ledger" aria-label="Historical research leads">
-        <div className="money-section-heading"><div><h2>Historical research queue</h2><p>Private, source-labelled candidates only. They are not verified open grants, eligibility findings or awards.</p></div></div>
+        <div className="money-section-heading"><div><h2>Historical research queue</h2><p>Private source-labelled candidates, not verified opportunities or awards. Search, then select Load private research.</p></div>
+          <label className="money-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Search historical leads" maxLength={120} value={archiveSearch} placeholder="Search archive titles and categories" onChange={event => { archiveRequest.current++; setArchiveSearch(event.target.value); setArchive([]); setArchiveOffset(0); setArchiveLoading(false); setArchiveError(''); }} /></label>
+        </div>
         {!token && <div className="money-empty"><ShieldCheck size={26} aria-hidden="true" /><h3>Operator access required</h3><p>Enter the operator credential, then load the private research records.</p></div>}
         {archiveError && <div className="money-error" role="alert">{archiveError}</div>}
         {token && archive.length === 0 && !archiveLoading && !archiveError && <div className="money-empty"><Database size={26} aria-hidden="true" /><h3>No historical leads loaded</h3><p>Choose Load private research. Records are never displayed as live funding opportunities.</p></div>}
