@@ -1,0 +1,19 @@
+{
+  "verification_state": "PASS",
+  "commands_completed": 145,
+  "all_command_exit_codes_zero": true,
+  "private_command_log_sha256": "a32290348344f36dcd3025ff8f29ef6e430f3114928f780e61efb91e0433534a",
+  "preservation_script_sha256": "26317d2eb775e50c859be60e1d170ef163277af9019a54d6256bd8015bd1c283",
+  "checks": [
+    "Bundle creation and verification",
+    "Independent bundle import without source alternates",
+    "Staged blob pack import",
+    "Byte-identical complete index entries",
+    "Byte-identical cached binary patch",
+    "58 restored blob SHA256 and byte comparisons",
+    "Full git fsck exit 0",
+    "220 archive file checksums",
+    "Private archive permissions",
+    "Source HEAD, index, refs, status and scoped working bytes unchanged"
+  ]
+}
