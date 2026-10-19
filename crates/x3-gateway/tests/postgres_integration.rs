@@ -130,7 +130,7 @@ async fn legacy_staging_preserves_public_funding_totals() {
     forged["current_availability"] = serde_json::json!("OPEN");
     assert!(db.import_legacy_leads(make_request(forged)).await.is_err());
     let row = db
-        .list_legacy_leads(100, 0)
+        .list_legacy_leads(100, 0, &id)
         .await
         .unwrap()
         .into_iter()
