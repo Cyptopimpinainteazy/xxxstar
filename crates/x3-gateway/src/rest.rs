@@ -159,6 +159,11 @@ fn api_routes() -> Router<AppState> {
             "/bridge/htlc/preimage-verify",
             post(post_htlc_preimage_verify),
         )
+        // Private archival leads: not official funding opportunities.
+        .route(
+            "/admin/funding-swarm/legacy-leads",
+            get(admin_list_legacy_leads).post(admin_import_legacy_leads),
+        )
         // Funding Swarm operator actions always require X-Admin-Token.
         .route(
             "/admin/funding-swarm/grants/{grant_id}/proposals",
@@ -931,6 +936,33 @@ fn authorize_funding_token(
 }
 
 // ── Funding Swarm admin handlers ─────────────────────────────────────────────
+
+async fn admin_list_legacy_leads(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<crate::funding_legacy::LegacyListQuery>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    Ok(Json(
+        state
+            .db
+            .list_legacy_leads(
+                bounded_limit(query.limit),
+                query.offset.max(0),
+                &query.search,
+            )
+            .await?,
+    ))
+}
+
+async fn admin_import_legacy_leads(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(request): Json<crate::funding_legacy::LegacyImport>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    Ok(Json(state.db.import_legacy_leads(request).await?))
+}
 
 async fn admin_proposal_context(
     State(state): State<AppState>,

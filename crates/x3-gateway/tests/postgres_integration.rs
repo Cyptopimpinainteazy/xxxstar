@@ -8,6 +8,7 @@ const TEST_DATABASE_URL_ENV: &str = "X3_GATEWAY_TEST_DATABASE_URL";
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "requires a real Postgres instance; run via scripts/gateway-postgres-integration.sh"]
 async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
+    legacy_staging_preserves_public_funding_totals().await;
     funding_workflow_enforces_state_and_preserves_audit().await;
     funding_source_snapshots_are_durable_and_preserve_review().await;
     proposal_versions_bind_source_and_serialize_edits().await;
@@ -91,6 +92,65 @@ async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
 
     assert_eq!(after.total_grants, before.total_grants + 1);
     assert_eq!(after.open_grants, before.open_grants + 1);
+}
+
+async fn legacy_staging_preserves_public_funding_totals() {
+    use x3_gateway::funding_legacy::LegacyImport;
+    let database_url = std::env::var(TEST_DATABASE_URL_ENV).unwrap();
+    let db = Database::connect(&DatabaseConfig::new(database_url))
+        .await
+        .unwrap();
+    let before = db.get_funding_swarm_scoreboard().await.unwrap();
+    let id = format!("C27.1.{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
+    let lead = serde_json::json!({
+        "legacy_id":id,"name":"Archived research test",
+        "category":"C27-chain-grants",
+        "source_file":"grants/C27-chain-grants.md","source_line":14,
+        "raw_fields":["Historical reference only","https://example.org/archive"],
+        "candidate_urls":["https://example.org/archive"],
+        "historical_status":"AWARDED",
+        "historical_verification_date":"2026-09-05",
+        "origin":"legacy_markdown_research",
+        "current_availability":"UNKNOWN",
+        "current_eligibility":"UNKNOWN",
+        "application_authorized":false
+    });
+    let make_request = |lead: serde_json::Value| -> LegacyImport {
+        serde_json::from_value(serde_json::json!({"leads":[lead]})).unwrap()
+    };
+    let first = db
+        .import_legacy_leads(make_request(lead.clone()))
+        .await
+        .unwrap();
+    assert_eq!((first.inserted, first.unchanged), (1, 0));
+    assert_eq!(first.current_opportunities_verified, 0);
+    let replay = db
+        .import_legacy_leads(make_request(lead.clone()))
+        .await
+        .unwrap();
+    assert_eq!((replay.inserted, replay.unchanged), (0, 1));
+    let mut altered = lead.clone();
+    altered["name"] = serde_json::json!("Changed evidence");
+    assert!(db.import_legacy_leads(make_request(altered)).await.is_err());
+    let mut forged = lead.clone();
+    forged["current_availability"] = serde_json::json!("OPEN");
+    assert!(db.import_legacy_leads(make_request(forged)).await.is_err());
+    let row = db
+        .list_legacy_leads(100, 0, &id)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|r| r.legacy_id == id)
+        .expect("archived record remains private and searchable");
+    assert_eq!(row.historical_status, "AWARDED");
+    assert_eq!(row.current_availability, "UNKNOWN");
+    assert_eq!(row.current_eligibility, "UNKNOWN");
+    assert_eq!(row.review_state, "UNVERIFIED");
+    assert_eq!(row.raw_record["application_authorized"], false);
+    let after = db.get_funding_swarm_scoreboard().await.unwrap();
+    assert_eq!(before.total_grants, after.total_grants);
+    assert_eq!(before.funded_grants, after.funded_grants);
+    assert_eq!(before.total_awarded_usd, after.total_awarded_usd);
 }
 
 async fn funding_source_snapshots_are_durable_and_preserve_review() {

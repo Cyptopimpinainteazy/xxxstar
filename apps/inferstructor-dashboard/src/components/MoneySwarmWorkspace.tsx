@@ -8,6 +8,11 @@ interface Grant {
   status: string; stage: string; score: number; amount_usd: number;
   metadata: Record<string, unknown>; created_at: string; updated_at: string;
 }
+interface HistoricalLead {
+  source_file: string; legacy_id: string; name: string; category: string;
+  historical_status: string; current_availability: string;
+  current_eligibility: string; review_state: string;
+}
 interface Scoreboard {
   total_grants: number; open_grants: number; submitted_proposals: number;
   approved_grants: number; funded_grants: number; total_awarded_usd: number;
@@ -51,11 +56,17 @@ export function MoneySwarmWorkspace() {
   const [token, setToken] = useState('');
   const [sourceKeyword, setSourceKeyword] = useState('distributed computing');
   const [selected, setSelected] = useState<Grant | null>(null);
-  const [view, setView] = useState<'opportunities' | 'review' | 'activity'>('opportunities');
+  const [view, setView] = useState<'opportunities' | 'review' | 'activity' | 'archive'>('opportunities');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [archive, setArchive] = useState<HistoricalLead[]>([]);
+  const [archiveOffset, setArchiveOffset] = useState(0);
+  const [archiveSearch, setArchiveSearch] = useState('');
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
+  const archiveRequest = useRef(0);
   const detailsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -89,6 +100,30 @@ export function MoneySwarmWorkspace() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
+  const loadArchive = async (offset: number) => {
+    if (!token) return;
+    const requestId = ++archiveRequest.current;
+    setArchiveLoading(true);
+    setArchiveError('');
+    try {
+      const records = await request<HistoricalLead[]>(`/api/v1/admin/funding-swarm/legacy-leads?limit=100&offset=${offset}&search=${encodeURIComponent(archiveSearch.trim())}`, token);
+      if (requestId !== archiveRequest.current) return;
+      if (!Array.isArray(records) || records.some(record =>
+        record.current_availability !== 'UNKNOWN' || record.current_eligibility !== 'UNKNOWN' ||
+        record.review_state !== 'UNVERIFIED'
+      )) throw new Error('Archived records have an unexpected verification state. Stop and investigate.');
+      setArchive(records);
+      setArchiveOffset(offset);
+    } catch (failure) {
+      if (requestId === archiveRequest.current) {
+        setArchive([]);
+        setArchiveError(failure instanceof Error ? failure.message : 'Historical research unavailable.');
+      }
+    } finally {
+      if (requestId === archiveRequest.current) setArchiveLoading(false);
+    }
+  };
+
   const discover = async () => {
     if (!token || busy) return;
     setBusy(true); setNotice(''); setError('');
@@ -118,19 +153,19 @@ export function MoneySwarmWorkspace() {
     <aside className="money-nav" aria-label="Money Swarm navigation">
       <a className="money-wordmark" href="/money-swarm"><span aria-hidden="true">✳</span> X3 <strong>Money Swarm</strong></a>
       <p className="money-nav-label">FUNDING OPERATIONS</p>
-      <nav>{([['opportunities', 'Opportunity ledger', Search], ['review', 'Application review', ShieldCheck], ['activity', 'Audit activity', Database]] as const).map(([id, label, Icon]) =>
-        <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => setView(id)}><Icon size={17} aria-hidden="true" />{label}</button>)}</nav>
+      <nav>{([['opportunities', 'Opportunity ledger', Search], ['review', 'Application review', ShieldCheck], ['archive', 'Historical leads', Database], ['activity', 'Audit activity', Database]] as const).map(([id, label, Icon]) =>
+        <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => { setView(id); archiveRequest.current++; setArchive([]); setArchiveError(''); setArchiveLoading(false); }}><Icon size={17} aria-hidden="true" />{label}</button>)}</nav>
       <div className="money-nav-note"><ShieldCheck size={20} aria-hidden="true" /><strong>Human decisions. Verified evidence.</strong><p>External submissions, spending and outreach require separate authorization.</p></div>
       <a className="money-back" href="/">← Inferstructor</a>
     </aside>
     <div className="money-content">
-      <header className="money-header"><div><p className="money-eyebrow">X3 / INFRASTRUCTURE FUNDING</p><h1>{view === 'activity' ? 'Audit activity' : view === 'review' ? 'Application review' : 'Funding intelligence'}</h1><p>Find the next opportunity. Keep the evidence in view.</p></div>
-        <button className="money-button" disabled={loading || busy} onClick={() => void load()}><RefreshCw size={16} aria-hidden="true" />{loading ? 'Loading records…' : 'Refresh records'}</button></header>
+      <header className="money-header"><div><p className="money-eyebrow">X3 / INFRASTRUCTURE FUNDING</p><h1>{view === 'activity' ? 'Audit activity' : view === 'review' ? 'Application review' : view === 'archive' ? 'Historical research' : 'Funding intelligence'}</h1><p>Find the next opportunity. Keep the evidence in view.</p></div>
+        <button className="money-button" disabled={loading || archiveLoading || busy || (view === 'archive' && !token)} onClick={() => { if (view === 'archive') void loadArchive(archiveOffset); else void load(); }}><RefreshCw size={16} aria-hidden="true" />{loading || archiveLoading ? 'Loading records…' : view === 'archive' ? 'Load private research' : 'Refresh records'}</button></header>
 
       <div className="money-trust"><span className="money-dot" aria-hidden="true" /><span>Database records · Source timestamps shown per opportunity</span><span>Eligibility unknown until reviewed</span></div>
       {error && <div className="money-error" role="alert">{error}</div>}
       {notice && <div className="money-notice" role="status"><Check size={18} aria-hidden="true" />{notice}</div>}
-      {stats && <section className="money-summary" aria-label="Funding pipeline">
+      {stats && view !== 'archive' && <section className="money-summary" aria-label="Funding pipeline">
         <div><span>Opportunities recorded</span><strong>{stats.total_grants.toLocaleString()}</strong><small>{sourceCount} sources in this view</small></div>
         <div><span>Open opportunities</span><strong>{stats.open_grants.toLocaleString()}</strong><small>Not confirmed eligibility</small></div>
         <div><span>Approved drafts</span><strong>{stats.approved_grants.toLocaleString()}</strong><small>Submission remains a human action</small></div>
@@ -138,9 +173,9 @@ export function MoneySwarmWorkspace() {
       </section>}
 
       <section className="money-operator" aria-label="Operator access"><div><h2>Operator access</h2><p>A credential enables source discovery and review actions. It stays in memory for this session.</p></div>
-        <label>Operator credential<input type="password" autoComplete="off" value={token} onChange={event => setToken(event.target.value)} placeholder="Enter your operator credential" /></label></section>
+        <label>Operator credential<input type="password" autoComplete="off" value={token} onChange={event => { archiveRequest.current++; setArchive([]); setArchiveOffset(0); setArchiveLoading(false); setArchiveError(''); setToken(event.target.value); }} placeholder="Enter your operator credential" /></label></section>
 
-      {view !== 'activity' && <>
+      {view !== 'activity' && view !== 'archive' && <>
         <section className="money-discovery" aria-label="Official source discovery"><div><h2>Discover from Grants.gov</h2><p>Read official opportunities. No application is sent.</p></div><label>Research keyword<input maxLength={120} value={sourceKeyword} onChange={event => setSourceKeyword(event.target.value)} /></label><button className="money-button primary" onClick={() => void discover()} disabled={!token || !sourceKeyword.trim() || busy || loading}>{busy ? 'Working…' : 'Discover opportunities'}<ArrowUpRight size={16} aria-hidden="true" /></button>{!token && <small>Enter an operator credential to refresh the official source.</small>}</section>
         <section className="money-ledger" aria-label="Opportunity ledger"><div className="money-section-heading"><div><h2>{view === 'review' ? 'Review pipeline' : 'Opportunity ledger'}</h2><p>{loading ? 'Retrieving records from the gateway…' : `${filtered.length} records shown · First 100 opportunities`}</p></div><label className="money-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Search opportunities" placeholder="Search title, agency or identifier" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
           {filtered.length === 0 && !loading && !error && <div className="money-empty"><Database size={26} aria-hidden="true" /><h3>{query ? 'No opportunities match your search' : view === 'review' ? 'No applications in review' : 'No opportunities recorded yet'}</h3><p>{query ? 'Try another research term or agency.' : 'Discover from an official source, then open a record to begin research.'}</p></div>}
@@ -150,6 +185,26 @@ export function MoneySwarmWorkspace() {
           })}
         </section>
       </>}
+      {view === 'archive' && <section className="money-ledger" aria-label="Historical research leads">
+        <div className="money-section-heading"><div><h2>Historical research queue</h2><p>Private source-labelled candidates, not verified opportunities or awards. Search, then select Load private research.</p></div>
+          <label className="money-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Search historical leads" maxLength={120} value={archiveSearch} placeholder="Search archive titles and categories" onChange={event => { archiveRequest.current++; setArchiveSearch(event.target.value); setArchive([]); setArchiveOffset(0); setArchiveLoading(false); setArchiveError(''); }} /></label>
+        </div>
+        {!token && <div className="money-empty"><ShieldCheck size={26} aria-hidden="true" /><h3>Operator access required</h3><p>Enter the operator credential, then load the private research records.</p></div>}
+        {archiveError && <div className="money-error" role="alert">{archiveError}</div>}
+        {token && archive.length === 0 && !archiveLoading && !archiveError && <div className="money-empty"><Database size={26} aria-hidden="true" /><h3>No historical leads loaded</h3><p>Choose Load private research. Records are never displayed as live funding opportunities.</p></div>}
+        {token && archive.map(record => <article className="money-opportunity" key={record.source_file + ':' + record.legacy_id}>
+          <div className="money-opportunity-main"><p className="money-agency">{record.category}<span>{record.legacy_id}</span></p>
+            <strong className="money-title">{record.name}</strong>
+            <div className="money-opportunity-meta"><span>Historical label only: {record.historical_status}</span><span>Archived research</span></div>
+          </div>
+          <div className="money-evidence"><span className="money-unknown">Current availability UNKNOWN</span><small>Eligibility UNKNOWN</small><small>Source: {record.source_file}</small></div>
+        </article>)}
+        {token && <div className="money-review-actions">
+          <button className="money-button" disabled={archiveLoading || archiveOffset === 0} onClick={() => void loadArchive(Math.max(0, archiveOffset - 100))}>Previous 100</button>
+          <span>{archive.length ? `Showing ${archiveOffset + 1}–${archiveOffset + archive.length}` : 'No archived records on this page'}</span>
+          <button className="money-button" disabled={archiveLoading || archive.length < 100} onClick={() => void loadArchive(archiveOffset + 100)}>Next 100</button>
+        </div>}
+      </section>}
       {view === 'activity' && <section className="money-ledger"><div className="money-section-heading"><h2>Public audit events</h2><p>Private review notes are excluded.</p></div>{timeline.length === 0 && <div className="money-empty"><h3>No public events recorded</h3><p>Approved workflow transitions will appear here.</p></div>}{timeline.map(event => <article className="money-event" key={event.item_id}><time>{date(event.occurred_at)}</time><strong>{event.title.replaceAll('_', ' ')}</strong><code>{event.item_id}</code></article>)}</section>}
       <footer className="money-footer">X3 Money Swarm · No automatic submissions or financial commitments · GPU execution is not activated by this workspace</footer>
     </div>

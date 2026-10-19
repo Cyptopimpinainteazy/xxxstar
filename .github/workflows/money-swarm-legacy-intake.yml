@@ -1,0 +1,60 @@
+name: Money Swarm legacy intake checks
+
+# Stacked integration on the proposal packages PR. Does not use fork code on
+# private X3 runners and never receives funder/outreach secrets.
+on:
+  pull_request:
+    branches:
+      - codex/money-swarm-proposal-packages-20261018
+    paths:
+      - 'crates/x3-gateway/**'
+      - 'crates/x3-indexer/migrations/**'
+      - 'apps/inferstructor-dashboard/**'
+      - 'scripts/funding/**'
+      - 'tests/funding/**'
+      - '.github/workflows/money-swarm-legacy-intake.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: money-swarm-legacy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  intake:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 55
+    env:
+      SKIP_WASM_BUILD: '1'
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - name: Exact head checkout without persisted credentials
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Host-local developer tool PATH
+        run: |
+          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin" /home/linuxbrew/.linuxbrew/bin; do
+            [ ! -d "$dir" ] || echo "$dir" >> "$GITHUB_PATH"
+          done
+      - name: Python historical staging unit tests
+        run: |
+          python3 -m unittest discover -s tests/funding -p 'test_stage_legacy_catalog.py' -v
+          python3 -m py_compile scripts/funding/stage_legacy_catalog.py
+      - name: Rust format and backend archive tests
+        run: |
+          cargo fmt --all -- --check
+          cargo test -p x3-gateway --lib funding_legacy
+          cargo test -p x3-gateway --test migrations_cover_tables
+      - name: Dashboard private archive tests
+        working-directory: apps/inferstructor-dashboard
+        run: |
+          npm ci
+          npm test -- --run MoneySwarmWorkspace.test.tsx
+          npm run lint
+          npm run build
