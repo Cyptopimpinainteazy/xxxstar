@@ -1,0 +1,33 @@
+{
+  "repository_candidates": 177,
+  "recognized_git_paths": 161,
+  "common_object_stores": 90,
+  "dirty_successful_status_paths": 54,
+  "status_command_failures": 22,
+  "status_timeouts": 5,
+  "unborn_or_missing_head_paths": 33,
+  "no_remotes_paths": 39,
+  "commit_candidates_absent_current_github_heads": 771,
+  "master_patch_equivalents": 153,
+  "live_patch_equivalents": 1,
+  "candidate_patch_timeouts": 8,
+  "candidate_on_pr_history": 430,
+  "unreferenced_commits_distinct": 4802,
+  "unreferenced_not_on_captured_x3_github": 1258,
+  "object_check_states": {
+    "0": 88,
+    "10": 2
+  },
+  "github_branches": 138,
+  "github_pull_requests": 617,
+  "pr_classifications": {
+    "UNMERGED DIFFERENCES: recovery review required": 56,
+    "PATCH-EQUIVALENT COMMITS: behavior still requires review": 37,
+    "INTEGRATED BY ANCESTRY; behavior/test freshness separately unverified": 398,
+    "UNVERIFIED: unrelated history": 126
+  },
+  "pinned_master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+  "primary_final_head_unchanged": true,
+  "primary_final_status_unchanged": true,
+  "primary_final_refs_unchanged": true
+}

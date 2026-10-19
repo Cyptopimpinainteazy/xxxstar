@@ -1,0 +1,16 @@
+{
+  "initial_validation_exit": 1,
+  "finding": "The sk-prefix pattern matched substrings inside ordinary words in path/ref metadata. Every match was preceded by an alphanumeric character; no GitHub-token, credential-URL or private-key pattern matched.",
+  "correction": "Require a non-word boundary before the sk-prefix. Preserve the initial validation result. No repository test or production security scanner was changed.",
+  "collector_attempts": {
+    "initial_discovery_and_unrelated_homebrew_inventory": {
+      "exit": 143,
+      "reason": "Intentionally stopped unrelated toolchain enumeration; superseded by completed source-scope inventory."
+    },
+    "first_final_analysis": {
+      "exit": 1,
+      "reason": "A shallow CI snapshot yielded a huge diff with non-UTF8 bytes. Replaced that comparison with explicit shallow/merge UNVERIFIED metadata; subsequent analysis exited 0."
+    }
+  },
+  "accepted_final_analysis_exit": 0
+}

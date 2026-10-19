@@ -1,0 +1,964 @@
+{
+  "shared_object_stores": {
+    "/home/lojak/Desktop/xxxstar-main/.git": [
+      "/home/lojak/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/xxxstar-chatgpt",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/clean-stub-check",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/fix-the-x3-ai-router-so-codex-can",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/pasted-text-processing",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-audit-scope-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-reaper-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-resurrection-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-scanner-baseline",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-train-ci-repair-20261013",
+      "/home/lojak/Desktop/xxxstar-main/.kilo/worktrees/hyper-lamp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-agent",
+      "/home/lojak/Desktop/xxxstar-main/.wt-baseline",
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext",
+      "/home/lojak/Desktop/xxxstar-main/.wt-gatefix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-master",
+      "/home/lojak/Desktop/xxxstar-main/.wt-matrix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-mcp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-pr562",
+      "/home/lojak/Desktop/xxxstar-main/.wt-sim",
+      "/home/lojak/x3-ansible",
+      "/home/lojak/x3-atomic-hardening-20261018",
+      "/home/lojak/x3-base-41f",
+      "/home/lojak/x3-ci-autorun",
+      "/home/lojak/x3-cluster-control",
+      "/home/lojak/x3-dex-atomic-proof-20261018",
+      "/home/lojak/x3-forge-bisect",
+      "/home/lojak/x3-fraud-proofs",
+      "/home/lojak/x3-gate-fixture",
+      "/home/lojak/x3-gate-verify",
+      "/home/lojak/x3-grant-compute-20261018",
+      "/home/lojak/x3-guardian-int",
+      "/home/lojak/x3-gw-pg",
+      "/home/lojak/x3-gw-test",
+      "/home/lojak/x3-hashes",
+      "/home/lojak/x3-lang-hardening",
+      "/home/lojak/x3-mission",
+      "/home/lojak/x3-money-swarm-review-20261018",
+      "/home/lojak/x3-mut-settlement",
+      "/home/lojak/x3-mutants",
+      "/home/lojak/x3-mutants-ext",
+      "/home/lojak/x3-mutfix",
+      "/home/lojak/x3-npmfix",
+      "/home/lojak/x3-pr-6916e8",
+      "/home/lojak/x3-pr-6eb511",
+      "/home/lojak/x3-pr-980aea",
+      "/home/lojak/x3-pr-dde4b2",
+      "/home/lojak/x3-pr578",
+      "/home/lojak/x3-pr581",
+      "/home/lojak/x3-pr590",
+      "/home/lojak/x3-pr592",
+      "/home/lojak/x3-pr594",
+      "/home/lojak/x3-provenance",
+      "/home/lojak/x3-rc1-boot",
+      "/home/lojak/x3-red-gates",
+      "/home/lojak/x3-router-fixes",
+      "/home/lojak/x3-table-test",
+      "/home/lojak/x3-testnet-status-python3-20261018",
+      "/home/lojak/x3-tla-atomic",
+      "/home/lojak/x3-train",
+      "/home/lojak/x3-train-fix",
+      "/home/lojak/x3-vm-nostd",
+      "/home/lojak/x3-volunteer-consent-20261018",
+      "/home/lojak/x3-volunteer-local-ci-20261018"
+    ],
+    "/home/lojak/.nvm/.git": [
+      "/home/lojak/.nvm"
+    ],
+    "/home/lojak/.openclaw/workspace/.git": [
+      "/home/lojak/.openclaw/workspace"
+    ],
+    "/home/lojak/Desktop/Desktop/xxxstar-main/.git": [
+      "/home/lojak/Desktop/Desktop/xxxstar-main"
+    ],
+    "/home/lojak/Desktop/New Folder/xxxstar-main/.git": [
+      "/home/lojak/Desktop/New Folder/xxxstar-main"
+    ],
+    "/home/lojak/Desktop/Quantum AI HOTEL OS/.git": [
+      "/home/lojak/Desktop/Quantum AI HOTEL OS",
+      "/home/lojak/Desktop/Quantum AI HOTEL OS/.kilo/worktrees/jelly-seahorse"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_codegen/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_codegen"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_core/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_core"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_lsp/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_lsp"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_parser/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_parser"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_semantics/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_semantics"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_test/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_test"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3c/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3c"
+    ],
+    "/home/lojak/Desktop/jacktheripper/.git": [
+      "/home/lojak/Desktop/jacktheripper"
+    ],
+    "/home/lojak/Desktop/x3-lang/x3_codegen/.git": [
+      "/home/lojak/Desktop/x3-lang/x3_codegen"
+    ],
+    "/home/lojak/Desktop/x3-lang/x3_core/.git": [
+      "/home/lojak/Desktop/x3-lang/x3_core"
+    ],
+    "/home/lojak/Desktop/x3-lang/x3_lsp/.git": [
+      "/home/lojak/Desktop/x3-lang/x3_lsp"
+    ],
+    "/home/lojak/Desktop/x3-lang/x3_parser/.git": [
+      "/home/lojak/Desktop/x3-lang/x3_parser"
+    ],
+    "/home/lojak/Desktop/x3-lang/x3_semantics/.git": [
+      "/home/lojak/Desktop/x3-lang/x3_semantics"
+    ],
+    "/home/lojak/Desktop/x3-lang/x3_test/.git": [
+      "/home/lojak/Desktop/x3-lang/x3_test"
+    ],
+    "/home/lojak/Desktop/x3-lang/x3c/.git": [
+      "/home/lojak/Desktop/x3-lang/x3c"
+    ],
+    "/home/lojak/Desktop/xxxstar-clean/.git": [
+      "/home/lojak/Desktop/xxxstar-clean",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/codex-x3-economic-safety-kernel",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/codex-x3-trading-core-v1-hardening",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/feat-settlement-proofset-gate-20260911",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/feat-x3vm-durable-recovery-20260911",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/finish-x3vm-live-transport",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/finish-x3vm-live-transport-fix",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/test-cross-domain-refund-recovery-20260911"
+    ],
+    "/home/lojak/actions-runner/_work/xxxstar/xxxstar/.git": [
+      "/home/lojak/actions-runner/_work/xxxstar/xxxstar"
+    ],
+    "/home/lojak/quickemu/.git": [
+      "/home/lojak/quickemu"
+    ],
+    "/home/lojak/x3-recovery-sources/atlas-sphere-.git": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere-.git"
+    ],
+    "/home/lojak/x3-recovery-sources/atlas-sphere-master.git": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere-master.git"
+    ],
+    "/home/lojak/x3-recovery-sources/atlas-sphere.git": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere.git"
+    ],
+    "/home/lojak/x3-recovery-sources/atlas-sphere1.git": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere1.git"
+    ],
+    "/home/lojak/x3-recovery-sources/cryptopimpin-atlas-sphere.git": [
+      "/home/lojak/x3-recovery-sources/cryptopimpin-atlas-sphere.git"
+    ],
+    "/home/lojak/x3-recovery-sources/the-reaper.git": [
+      "/home/lojak/x3-recovery-sources/the-reaper.git"
+    ],
+    "/home/lojak/x3-recovery-sources/the-reaper2.git": [
+      "/home/lojak/x3-recovery-sources/the-reaper2.git"
+    ],
+    "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/forge-std/.git": [
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/forge-std"
+    ],
+    "/home/lojak/x3-recovery/external/polkadot-stps/.git": [
+      "/home/lojak/x3-recovery/external/polkadot-stps"
+    ],
+    "/home/lojak/x3-recovery/mirrors/Shark-Bite.git": [
+      "/home/lojak/x3-recovery/mirrors/Shark-Bite.git"
+    ],
+    "/home/lojak/x3-recovery/mirrors/atlas-sphere-.git": [
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere-.git"
+    ],
+    "/home/lojak/x3-recovery/external/substrate-runtime-fuzzer/.git": [
+      "/home/lojak/x3-recovery/external/substrate-runtime-fuzzer"
+    ],
+    "/home/lojak/x3-recovery/mirrors/atlas-sphere-master.git": [
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere-master.git"
+    ],
+    "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/openzeppelin-contracts/.git": [
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/openzeppelin-contracts"
+    ],
+    "/home/lojak/x3-recovery/mirrors/no_fear_near_wallet.git": [
+      "/home/lojak/x3-recovery/mirrors/no_fear_near_wallet.git"
+    ],
+    "/home/lojak/x3-recovery/mirrors/atlas-sphere1.git": [
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere1.git"
+    ],
+    "/home/lojak/x3-recovery/mirrors/the-reaper2.git": [
+      "/home/lojak/x3-recovery/mirrors/the-reaper2.git"
+    ],
+    "/home/lojak/x3-recovery/mirrors/the-reaper.git": [
+      "/home/lojak/x3-recovery/mirrors/the-reaper.git"
+    ],
+    "/home/lojak/x3-recovery/mirrors/x3-clipforge.git": [
+      "/home/lojak/x3-recovery/mirrors/x3-clipforge.git"
+    ],
+    "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git": [
+      "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git"
+    ],
+    "/home/lojak/x3-recovery/mirrors/atlas-sphere.git": [
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere.git"
+    ],
+    "/home/lojak/x3-recovery/mirrors/x3-atomic-star.git": [
+      "/home/lojak/x3-recovery/mirrors/x3-atomic-star.git"
+    ],
+    "/home/lojak/.copilot/chats/d7efebd9-bc27-4bc1-a3e5-2954ef0270e2/SurfSense/.git": [
+      "/home/lojak/.copilot/chats/d7efebd9-bc27-4bc1-a3e5-2954ef0270e2/SurfSense"
+    ],
+    "/home/lojak/.openclaw/workspace/x3-research/.git": [
+      "/home/lojak/.openclaw/workspace/x3-research"
+    ],
+    "/home/lojak/.openclaw/workspace/x3triplethreat/.git": [
+      "/home/lojak/.openclaw/workspace/x3triplethreat"
+    ],
+    "/home/lojak/.openclaw/workspace/x3triplethreat/repos/xxxstar/.git": [
+      "/home/lojak/.openclaw/workspace/x3triplethreat/repos/xxxstar"
+    ],
+    "/home/lojak/actions-runner-2/_work/xxxstar/xxxstar/.git": [
+      "/home/lojak/actions-runner-2/_work/xxxstar/xxxstar"
+    ],
+    "/tmp/claude-1000/bash-edit-diff/9729841349056935381-5940836654972793121-974ca2a1d0396b05": [
+      "/tmp/claude-1000/bash-edit-diff/9729841349056935381-5940836654972793121-974ca2a1d0396b05"
+    ],
+    "/tmp/x3-grant-v3-import-BSO5dXMM/repo/.git": [
+      "/tmp/x3-grant-v3-import-BSO5dXMM/repo"
+    ],
+    "/home/lojak/.codex-backup-20260930-005103/.tmp/git-TJzFts": [
+      "/home/lojak/.codex-backup-20260930-005103/.tmp/git-TJzFts"
+    ],
+    "/home/lojak/.codex-backup-20260930-005103/memories/.git": [
+      "/home/lojak/.codex-backup-20260930-005103/memories"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/Avyayalaya/agent-council/ref_v0.1.3/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/Avyayalaya/agent-council/ref_v0.1.3"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/SAP/ui-theme-designer-plugins-for-coding-agents/ref_v2.0.0/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/SAP/ui-theme-designer-plugins-for-coding-agents/ref_v2.0.0"
+    ],
+    "/home/lojak/.codex-backup-20260930-005103/vendor_imports/skills/.git": [
+      "/home/lojak/.codex-backup-20260930-005103/vendor_imports/skills"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/github/copilot-advanced-security-plugin/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/github/copilot-advanced-security-plugin"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/gsemet/copilot-goal-skill/sha_17d0452fcb08adc7cc0cdf61a174e7045f3b5586/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/gsemet/copilot-goal-skill/sha_17d0452fcb08adc7cc0cdf61a174e7045f3b5586"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/johnpapa/ai-ready/ref_v1.3.0/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/johnpapa/ai-ready/ref_v1.3.0"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/juliamuiruri4/brainmaxxing/sha_8a8a102ff3ab8736f015764207cdb7e68fcd5ecf/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/juliamuiruri4/brainmaxxing/sha_8a8a102ff3ab8736f015764207cdb7e68fcd5ecf"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/microsoft/What-I-Did-Copilot/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/microsoft/What-I-Did-Copilot"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/oliver-zehentleitner/keep-the-why/ref_v0.15.0/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/oliver-zehentleitner/keep-the-why/ref_v0.15.0"
+    ],
+    "/home/lojak/Desktop/Desktop/xxxstar-main/.git/modules/X3-contracts/evm/lib/forge-std": [
+      "/home/lojak/Desktop/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std"
+    ],
+    "/home/lojak/.vscode/agent-plugins/github.com/github/awesome-copilot/ref_marketplace/.git": [
+      "/home/lojak/.vscode/agent-plugins/github.com/github/awesome-copilot/ref_marketplace"
+    ],
+    "/home/lojak/Desktop/Desktop/xxxstar-main/.git/modules/X3-contracts/evm/lib/openzeppelin-contracts": [
+      "/home/lojak/Desktop/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts"
+    ],
+    "/home/lojak/Desktop/New Folder/xxxstar-main/.git/modules/X3-contracts/evm/lib/forge-std": [
+      "/home/lojak/Desktop/New Folder/xxxstar-main/X3-contracts/evm/lib/forge-std"
+    ],
+    "/home/lojak/Desktop/OllamaHound/.git": [
+      "/home/lojak/Desktop/OllamaHound"
+    ],
+    "/home/lojak/Desktop/Open-Ollama-Scanner/.git": [
+      "/home/lojak/Desktop/Open-Ollama-Scanner"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.git/modules/X3-contracts/evm/lib/forge-std": [
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std"
+    ],
+    "/home/lojak/Desktop/New Folder/xxxstar-main/.git/modules/X3-contracts/evm/lib/openzeppelin-contracts": [
+      "/home/lojak/Desktop/New Folder/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.git/modules/X3-contracts/evm/lib/openzeppelin-contracts": [
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts"
+    ],
+    "/home/lojak/.codex-backup-20260930-005103/.tmp/plugins/.git": [
+      "/home/lojak/.codex-backup-20260930-005103/.tmp/plugins"
+    ],
+    "/home/lojak/Desktop/audit-king/.git": [
+      "/home/lojak/Desktop/audit-king"
+    ],
+    "/home/lojak/Desktop/audit-king/.tools/fixture/.git": [
+      "/home/lojak/Desktop/audit-king/.tools/fixture"
+    ],
+    "/home/lojak/Desktop/x3-chain-master/apps/atlas-sphere-clean/.git": [
+      "/home/lojak/Desktop/x3-chain-master/apps/atlas-sphere-clean"
+    ],
+    "/home/lojak/Desktop/x3-chain-master/context-engineering-intro/.git": [
+      "/home/lojak/Desktop/x3-chain-master/context-engineering-intro"
+    ],
+    "/home/lojak/Desktop/x3-chain-master/forge-std/.git": [
+      "/home/lojak/Desktop/x3-chain-master/forge-std"
+    ],
+    "/home/lojak/Desktop/x3-chain-master/ralph/.git": [
+      "/home/lojak/Desktop/x3-chain-master/ralph"
+    ],
+    "/home/lojak/Desktop/x3-chain-master/ralph-o-matic/.git": [
+      "/home/lojak/Desktop/x3-chain-master/ralph-o-matic"
+    ],
+    "/home/lojak/Desktop/x3-chain-master/tests/security/lib/forge-std/.git": [
+      "/home/lojak/Desktop/x3-chain-master/tests/security/lib/forge-std"
+    ],
+    "/home/lojak/Desktop/x3-chain-master/tools/get-shit-done/.git": [
+      "/home/lojak/Desktop/x3-chain-master/tools/get-shit-done"
+    ],
+    "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std/.git": [
+      "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std"
+    ],
+    "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts/.git": [
+      "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts"
+    ],
+    "/home/lojak/apps/open-notebook/.git": [
+      "/home/lojak/apps/open-notebook"
+    ],
+    "/home/lojak/Desktop/Recovered-from-USB/actions-runner-x3-gpu/_work/xxxstar/xxxstar/.git": [
+      "/home/lojak/Desktop/Recovered-from-USB/actions-runner-x3-gpu/_work/xxxstar/xxxstar"
+    ],
+    "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar/.git": [
+      "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar"
+    ],
+    "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar/.git": [
+      "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar"
+    ]
+  },
+  "identical_head_groups": {
+    "84a19d5bc9ea2c33ead3f6b5524ec767af88e640": [
+      "/home/lojak/Desktop/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/New Folder/xxxstar-main",
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main"
+    ],
+    "66f7d225e8fa7033572b69b6ca84ed8757dcbbc9": [
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-train-ci-repair-20261013",
+      "/home/lojak/x3-train"
+    ],
+    "2e1cfaab30e64f8f16ac6ecb44df31c6ddf557d2": [
+      "/home/lojak/x3-cluster-control",
+      "/home/lojak/x3-pr581"
+    ],
+    "27b72462f39cb725bebb47d1bf6d5518a8147221": [
+      "/home/lojak/x3-gate-fixture",
+      "/home/lojak/x3-mutants"
+    ],
+    "acadaa00f6ae8bea89e0d1a1ebdb414bc98feb7f": [
+      "/home/lojak/x3-mut-settlement",
+      "/home/lojak/x3-recovery/mirrors/x3-atomic-star.git"
+    ],
+    "7458ab78720d18a9d1f5d816202649f89970bec3": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere-.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere-.git"
+    ],
+    "99ca18443ca923e1cf1e82cf6ab811b222034823": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere-master.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere-master.git"
+    ],
+    "d4028440fda251129c734bf971ee9039c3b7526e": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere.git"
+    ],
+    "e3f3227e148856de71b66b9d51a25217d8cee1d5": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere1.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere1.git"
+    ],
+    "73a4642cfd05c7162d59e51a9e8de8ad5f8a9b07": [
+      "/home/lojak/x3-recovery-sources/the-reaper.git",
+      "/home/lojak/x3-recovery/mirrors/the-reaper.git"
+    ],
+    "342a5bacdc3bb6b236362c3444c4696b2910d4f0": [
+      "/home/lojak/x3-recovery-sources/the-reaper2.git",
+      "/home/lojak/x3-recovery/mirrors/the-reaper2.git"
+    ],
+    "620536fa5277db4e3fd46772d5cbc1ea0696fb43": [
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/forge-std",
+      "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std"
+    ],
+    "dc44c9f1a4c3b10af99492eed84f83ed244203f6": [
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/openzeppelin-contracts",
+      "/home/lojak/Desktop/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts",
+      "/home/lojak/Desktop/New Folder/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts",
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts",
+      "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts"
+    ],
+    "257559546b763ec5fa7371fb77fef9102db86446": [
+      "/home/lojak/Desktop/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std",
+      "/home/lojak/Desktop/New Folder/xxxstar-main/X3-contracts/evm/lib/forge-std",
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std"
+    ],
+    "04ee608913e6c334973649b2b1a2976260647c1b": [
+      "/home/lojak/Desktop/x3-chain-master/forge-std",
+      "/home/lojak/Desktop/x3-chain-master/tests/security/lib/forge-std"
+    ],
+    "0624096466f73b9569aaf80add35206ff619114b": [
+      "/home/lojak/Desktop/Recovered-from-USB/actions-runner-x3-gpu/_work/xxxstar/xxxstar",
+      "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar",
+      "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar"
+    ]
+  },
+  "remote_clone_groups": {
+    "Cyptopimpinainteazy/x3-atomic-star": [
+      "/home/lojak/Desktop/xxxstar-chatgpt",
+      "/home/lojak/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/clean-stub-check",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/fix-the-x3-ai-router-so-codex-can",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/pasted-text-processing",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-audit-scope-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-reaper-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-resurrection-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-scanner-baseline",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-train-ci-repair-20261013",
+      "/home/lojak/Desktop/xxxstar-main/.kilo/worktrees/hyper-lamp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-agent",
+      "/home/lojak/Desktop/xxxstar-main/.wt-baseline",
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext",
+      "/home/lojak/Desktop/xxxstar-main/.wt-gatefix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-master",
+      "/home/lojak/Desktop/xxxstar-main/.wt-matrix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-mcp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-pr562",
+      "/home/lojak/Desktop/xxxstar-main/.wt-sim",
+      "/home/lojak/x3-ansible",
+      "/home/lojak/x3-atomic-hardening-20261018",
+      "/home/lojak/x3-base-41f",
+      "/home/lojak/x3-ci-autorun",
+      "/home/lojak/x3-cluster-control",
+      "/home/lojak/x3-dex-atomic-proof-20261018",
+      "/home/lojak/x3-forge-bisect",
+      "/home/lojak/x3-fraud-proofs",
+      "/home/lojak/x3-gate-fixture",
+      "/home/lojak/x3-gate-verify",
+      "/home/lojak/x3-grant-compute-20261018",
+      "/home/lojak/x3-guardian-int",
+      "/home/lojak/x3-gw-pg",
+      "/home/lojak/x3-gw-test",
+      "/home/lojak/x3-hashes",
+      "/home/lojak/x3-lang-hardening",
+      "/home/lojak/x3-mission",
+      "/home/lojak/x3-money-swarm-review-20261018",
+      "/home/lojak/x3-mut-settlement",
+      "/home/lojak/x3-mutants",
+      "/home/lojak/x3-mutants-ext",
+      "/home/lojak/x3-mutfix",
+      "/home/lojak/x3-npmfix",
+      "/home/lojak/x3-pr-6916e8",
+      "/home/lojak/x3-pr-6eb511",
+      "/home/lojak/x3-pr-980aea",
+      "/home/lojak/x3-pr-dde4b2",
+      "/home/lojak/x3-pr578",
+      "/home/lojak/x3-pr581",
+      "/home/lojak/x3-pr590",
+      "/home/lojak/x3-pr592",
+      "/home/lojak/x3-pr594",
+      "/home/lojak/x3-provenance",
+      "/home/lojak/x3-rc1-boot",
+      "/home/lojak/x3-recovery/mirrors/x3-atomic-star.git",
+      "/home/lojak/x3-red-gates",
+      "/home/lojak/x3-router-fixes",
+      "/home/lojak/x3-table-test",
+      "/home/lojak/x3-testnet-status-python3-20261018",
+      "/home/lojak/x3-tla-atomic",
+      "/home/lojak/x3-train",
+      "/home/lojak/x3-train-fix",
+      "/home/lojak/x3-vm-nostd",
+      "/home/lojak/x3-volunteer-consent-20261018",
+      "/home/lojak/x3-volunteer-local-ci-20261018"
+    ],
+    "Cyptopimpinainteazy/xxxstar": [
+      "/home/lojak/.openclaw/workspace/x3triplethreat/repos/xxxstar",
+      "/home/lojak/Desktop/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/New Folder/xxxstar-main",
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/Recovered-from-USB/actions-runner-x3-gpu/_work/xxxstar/xxxstar",
+      "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar",
+      "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar",
+      "/home/lojak/Desktop/xxxstar-chatgpt",
+      "/home/lojak/Desktop/xxxstar-clean",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/codex-x3-economic-safety-kernel",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/codex-x3-trading-core-v1-hardening",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/feat-settlement-proofset-gate-20260911",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/feat-x3vm-durable-recovery-20260911",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/finish-x3vm-live-transport",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/finish-x3vm-live-transport-fix",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/test-cross-domain-refund-recovery-20260911",
+      "/home/lojak/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/clean-stub-check",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/fix-the-x3-ai-router-so-codex-can",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/pasted-text-processing",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-audit-scope-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-reaper-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-resurrection-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-scanner-baseline",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-train-ci-repair-20261013",
+      "/home/lojak/Desktop/xxxstar-main/.kilo/worktrees/hyper-lamp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-agent",
+      "/home/lojak/Desktop/xxxstar-main/.wt-baseline",
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext",
+      "/home/lojak/Desktop/xxxstar-main/.wt-gatefix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-master",
+      "/home/lojak/Desktop/xxxstar-main/.wt-matrix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-mcp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-pr562",
+      "/home/lojak/Desktop/xxxstar-main/.wt-sim",
+      "/home/lojak/actions-runner-2/_work/xxxstar/xxxstar",
+      "/home/lojak/actions-runner/_work/xxxstar/xxxstar",
+      "/home/lojak/x3-ansible",
+      "/home/lojak/x3-atomic-hardening-20261018",
+      "/home/lojak/x3-base-41f",
+      "/home/lojak/x3-ci-autorun",
+      "/home/lojak/x3-cluster-control",
+      "/home/lojak/x3-dex-atomic-proof-20261018",
+      "/home/lojak/x3-forge-bisect",
+      "/home/lojak/x3-fraud-proofs",
+      "/home/lojak/x3-gate-fixture",
+      "/home/lojak/x3-gate-verify",
+      "/home/lojak/x3-grant-compute-20261018",
+      "/home/lojak/x3-guardian-int",
+      "/home/lojak/x3-gw-pg",
+      "/home/lojak/x3-gw-test",
+      "/home/lojak/x3-hashes",
+      "/home/lojak/x3-lang-hardening",
+      "/home/lojak/x3-mission",
+      "/home/lojak/x3-money-swarm-review-20261018",
+      "/home/lojak/x3-mut-settlement",
+      "/home/lojak/x3-mutants",
+      "/home/lojak/x3-mutants-ext",
+      "/home/lojak/x3-mutfix",
+      "/home/lojak/x3-npmfix",
+      "/home/lojak/x3-pr-6916e8",
+      "/home/lojak/x3-pr-6eb511",
+      "/home/lojak/x3-pr-980aea",
+      "/home/lojak/x3-pr-dde4b2",
+      "/home/lojak/x3-pr578",
+      "/home/lojak/x3-pr581",
+      "/home/lojak/x3-pr590",
+      "/home/lojak/x3-pr592",
+      "/home/lojak/x3-pr594",
+      "/home/lojak/x3-provenance",
+      "/home/lojak/x3-rc1-boot",
+      "/home/lojak/x3-red-gates",
+      "/home/lojak/x3-router-fixes",
+      "/home/lojak/x3-table-test",
+      "/home/lojak/x3-testnet-status-python3-20261018",
+      "/home/lojak/x3-tla-atomic",
+      "/home/lojak/x3-train",
+      "/home/lojak/x3-train-fix",
+      "/home/lojak/x3-vm-nostd",
+      "/home/lojak/x3-volunteer-consent-20261018",
+      "/home/lojak/x3-volunteer-local-ci-20261018",
+      "/tmp/x3-grant-v3-import-BSO5dXMM/repo"
+    ],
+    "nvm-sh/nvm": [
+      "/home/lojak/.nvm"
+    ],
+    "Cyptopimpinainteazy/quantum-hotel-os": [
+      "/home/lojak/Desktop/Quantum AI HOTEL OS",
+      "/home/lojak/Desktop/Quantum AI HOTEL OS/.kilo/worktrees/jelly-seahorse"
+    ],
+    "Cyptopimpinainteazy/x3jacktheripper": [
+      "/home/lojak/Desktop/jacktheripper",
+      "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git"
+    ],
+    "quickemu-project/quickemu": [
+      "/home/lojak/quickemu"
+    ],
+    "Cyptopimpinainteazy/atlas-sphere-": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere-.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere-.git"
+    ],
+    "Cyptopimpinainteazy/atlas-sphere-master": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere-master.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere-master.git"
+    ],
+    "Cyptopimpinainteazy/atlas-sphere": [
+      "/home/lojak/Desktop/x3-chain-master/apps/atlas-sphere-clean",
+      "/home/lojak/x3-recovery-sources/atlas-sphere.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere.git"
+    ],
+    "Cyptopimpinainteazy/atlas-sphere1": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere1.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere1.git"
+    ],
+    "cryptopimpin/atlas-sphere": [
+      "/home/lojak/x3-recovery-sources/cryptopimpin-atlas-sphere.git"
+    ],
+    "Cyptopimpinainteazy/the-reaper": [
+      "/home/lojak/x3-recovery-sources/the-reaper.git",
+      "/home/lojak/x3-recovery/mirrors/the-reaper.git"
+    ],
+    "Cyptopimpinainteazy/the-reaper2": [
+      "/home/lojak/x3-recovery-sources/the-reaper2.git",
+      "/home/lojak/x3-recovery/mirrors/the-reaper2.git"
+    ],
+    "foundry-rs/forge-std": [
+      "/home/lojak/Desktop/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std",
+      "/home/lojak/Desktop/New Folder/xxxstar-main/X3-contracts/evm/lib/forge-std",
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std",
+      "/home/lojak/Desktop/x3-chain-master/forge-std",
+      "/home/lojak/Desktop/x3-chain-master/tests/security/lib/forge-std",
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/forge-std",
+      "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std"
+    ],
+    "paritytech/polkadot-stps": [
+      "/home/lojak/x3-recovery/external/polkadot-stps"
+    ],
+    "Cyptopimpinainteazy/Shark-Bite": [
+      "/home/lojak/x3-recovery/mirrors/Shark-Bite.git"
+    ],
+    "srlabs/substrate-runtime-fuzzer": [
+      "/home/lojak/x3-recovery/external/substrate-runtime-fuzzer"
+    ],
+    "OpenZeppelin/openzeppelin-contracts": [
+      "/home/lojak/Desktop/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts",
+      "/home/lojak/Desktop/New Folder/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts",
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts",
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/openzeppelin-contracts",
+      "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts"
+    ],
+    "Cyptopimpinainteazy/no_fear_near_wallet": [
+      "/home/lojak/x3-recovery/mirrors/no_fear_near_wallet.git"
+    ],
+    "Cyptopimpinainteazy/x3-clipforge": [
+      "/home/lojak/x3-recovery/mirrors/x3-clipforge.git"
+    ],
+    "MODSetter/SurfSense": [
+      "/home/lojak/.copilot/chats/d7efebd9-bc27-4bc1-a3e5-2954ef0270e2/SurfSense"
+    ],
+    "Avyayalaya/agent-council": [
+      "/home/lojak/.vscode/agent-plugins/github.com/Avyayalaya/agent-council/ref_v0.1.3"
+    ],
+    "SAP/ui-theme-designer-plugins-for-coding-agents": [
+      "/home/lojak/.vscode/agent-plugins/github.com/SAP/ui-theme-designer-plugins-for-coding-agents/ref_v2.0.0"
+    ],
+    "openai/skills": [
+      "/home/lojak/.codex-backup-20260930-005103/vendor_imports/skills"
+    ],
+    "github/copilot-advanced-security-plugin": [
+      "/home/lojak/.vscode/agent-plugins/github.com/github/copilot-advanced-security-plugin"
+    ],
+    "gsemet/copilot-goal-skill": [
+      "/home/lojak/.vscode/agent-plugins/github.com/gsemet/copilot-goal-skill/sha_17d0452fcb08adc7cc0cdf61a174e7045f3b5586"
+    ],
+    "johnpapa/ai-ready": [
+      "/home/lojak/.vscode/agent-plugins/github.com/johnpapa/ai-ready/ref_v1.3.0"
+    ],
+    "juliamuiruri4/brainmaxxing": [
+      "/home/lojak/.vscode/agent-plugins/github.com/juliamuiruri4/brainmaxxing/sha_8a8a102ff3ab8736f015764207cdb7e68fcd5ecf"
+    ],
+    "microsoft/What-I-Did-Copilot": [
+      "/home/lojak/.vscode/agent-plugins/github.com/microsoft/What-I-Did-Copilot"
+    ],
+    "oliver-zehentleitner/keep-the-why": [
+      "/home/lojak/.vscode/agent-plugins/github.com/oliver-zehentleitner/keep-the-why/ref_v0.15.0"
+    ],
+    "github/awesome-copilot": [
+      "/home/lojak/.vscode/agent-plugins/github.com/github/awesome-copilot/ref_marketplace"
+    ],
+    "7h30th3r0n3/OllamaHound": [
+      "/home/lojak/Desktop/OllamaHound"
+    ],
+    "maxmoodycyber/Open-Ollama-Scanner": [
+      "/home/lojak/Desktop/Open-Ollama-Scanner"
+    ],
+    "coleam00/context-engineering-intro": [
+      "/home/lojak/Desktop/x3-chain-master/context-engineering-intro"
+    ],
+    "snarktank/ralph": [
+      "/home/lojak/Desktop/x3-chain-master/ralph"
+    ],
+    "dbinky/ralph-o-matic": [
+      "/home/lojak/Desktop/x3-chain-master/ralph-o-matic"
+    ],
+    "gsd-build/get-shit-done": [
+      "/home/lojak/Desktop/x3-chain-master/tools/get-shit-done"
+    ],
+    "lfnovo/open-notebook": [
+      "/home/lojak/apps/open-notebook"
+    ]
+  },
+  "source_catalogue_comparisons": [
+    {
+      "root": "/home/lojak/Desktop/x3-lang",
+      "catalogued_files": 15,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 0,
+      "same_relative_path_and_bytes_in_other_catalogues": 15,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Recovered-from-USB/x3-lang",
+      "catalogued_files": 15,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 0,
+      "same_relative_path_and_bytes_in_other_catalogues": 15,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/xxxstar",
+      "catalogued_files": 60,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 1,
+      "same_relative_path_and_bytes_in_other_catalogues": 0,
+      "file_variants_seen_in_only_this_catalogue": 60,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/from-x3gpu1",
+      "catalogued_files": 927,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 6,
+      "same_relative_path_and_bytes_in_other_catalogues": 0,
+      "file_variants_seen_in_only_this_catalogue": 927,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/x3-chain-master",
+      "catalogued_files": 5369,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 2113,
+      "same_relative_path_and_bytes_in_other_catalogues": 1851,
+      "file_variants_seen_in_only_this_catalogue": 3518,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/x3-router-backups",
+      "catalogued_files": 7,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 2,
+      "same_relative_path_and_bytes_in_other_catalogues": 0,
+      "file_variants_seen_in_only_this_catalogue": 7,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/xxxstar-main/.ai/patches",
+      "catalogued_files": 7,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 0,
+      "same_relative_path_and_bytes_in_other_catalogues": 0,
+      "file_variants_seen_in_only_this_catalogue": 7,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/New Folder/xxxstar-main",
+      "catalogued_files": 20005,
+      "catalogue_bounds": [
+        "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr4-infra-structure-hardening/infra-structure/validator/src/cross_chain_gpu_validator/evm"
+      ],
+      "exact_master_blob_matches": 16010,
+      "same_relative_path_and_bytes_in_other_catalogues": 20005,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main",
+      "catalogued_files": 20005,
+      "catalogue_bounds": [
+        "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.claude/worktrees/pr4-infra-structure-hardening/infra-structure/validator/src/cross_chain_gpu_validator/evm"
+      ],
+      "exact_master_blob_matches": 16010,
+      "same_relative_path_and_bytes_in_other_catalogues": 20005,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/tmp/claude-1000/bash-edit-diff/9729841349056935381-5940836654972793121-974ca2a1d0396b05",
+      "catalogued_files": 0,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 0,
+      "same_relative_path_and_bytes_in_other_catalogues": 0,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Desktop/xxxstar-main/.claude/worktrees/pr2-x3-lang-vm-opcode-allowlist",
+      "catalogued_files": 13602,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12069,
+      "same_relative_path_and_bytes_in_other_catalogues": 13602,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Desktop/xxxstar-main/.claude/worktrees/pr3-testnet-ssrf-guard",
+      "catalogued_files": 13602,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12070,
+      "same_relative_path_and_bytes_in_other_catalogues": 13602,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Desktop/xxxstar-main/.claude/worktrees/pr4-infra-structure-hardening",
+      "catalogued_files": 13603,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12071,
+      "same_relative_path_and_bytes_in_other_catalogues": 13603,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Desktop/xxxstar-main/.claude/worktrees/pr5-infra-hardening-parallel",
+      "catalogued_files": 13603,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12071,
+      "same_relative_path_and_bytes_in_other_catalogues": 13603,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Desktop/xxxstar-main/.claude/worktrees/pr6-production-xss-hardening",
+      "catalogued_files": 13602,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12071,
+      "same_relative_path_and_bytes_in_other_catalogues": 13602,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr2-x3-lang-vm-opcode-allowlist",
+      "catalogued_files": 13602,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12069,
+      "same_relative_path_and_bytes_in_other_catalogues": 13602,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr3-testnet-ssrf-guard",
+      "catalogued_files": 10435,
+      "catalogue_bounds": [
+        "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr3-testnet-ssrf-guard/apps/x3-desktop/src-tauri/tauri-vendor/hyper-tls/examples"
+      ],
+      "exact_master_blob_matches": 8936,
+      "same_relative_path_and_bytes_in_other_catalogues": 10435,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr4-infra-structure-hardening",
+      "catalogued_files": 13603,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12071,
+      "same_relative_path_and_bytes_in_other_catalogues": 13603,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr5-infra-hardening-parallel",
+      "catalogued_files": 13550,
+      "catalogue_bounds": [
+        "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr5-infra-hardening-parallel/packages/py-sdk/src/atlas_sphere_sdk"
+      ],
+      "exact_master_blob_matches": 12021,
+      "same_relative_path_and_bytes_in_other_catalogues": 13550,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr6-production-xss-hardening",
+      "catalogued_files": 13341,
+      "catalogue_bounds": [
+        "/home/lojak/Desktop/New Folder/xxxstar-main/.claude/worktrees/pr6-production-xss-hardening/apps/x3-desktop/src-tauri/src/social"
+      ],
+      "exact_master_blob_matches": 11832,
+      "same_relative_path_and_bytes_in_other_catalogues": 13341,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.claude/worktrees/pr2-x3-lang-vm-opcode-allowlist",
+      "catalogued_files": 11363,
+      "catalogue_bounds": [
+        "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.claude/worktrees/pr2-x3-lang-vm-opcode-allowlist/apps/x3-desktop/src-tauri/tauri-vendor/const_format/src/wrapper_types"
+      ],
+      "exact_master_blob_matches": 9863,
+      "same_relative_path_and_bytes_in_other_catalogues": 11363,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.claude/worktrees/pr3-testnet-ssrf-guard",
+      "catalogued_files": 13602,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12070,
+      "same_relative_path_and_bytes_in_other_catalogues": 13602,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.claude/worktrees/pr4-infra-structure-hardening",
+      "catalogued_files": 13603,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12071,
+      "same_relative_path_and_bytes_in_other_catalogues": 13603,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.claude/worktrees/pr5-infra-hardening-parallel",
+      "catalogued_files": 13603,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12071,
+      "same_relative_path_and_bytes_in_other_catalogues": 13603,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.claude/worktrees/pr6-production-xss-hardening",
+      "catalogued_files": 13602,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12071,
+      "same_relative_path_and_bytes_in_other_catalogues": 13602,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/Recovered-from-USB/actions-runner-x3-gpu/_work/xxxstar/xxxstar",
+      "catalogued_files": 13880,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12084,
+      "same_relative_path_and_bytes_in_other_catalogues": 13880,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar",
+      "catalogued_files": 13608,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12087,
+      "same_relative_path_and_bytes_in_other_catalogues": 13606,
+      "file_variants_seen_in_only_this_catalogue": 2,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    },
+    {
+      "root": "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar",
+      "catalogued_files": 13880,
+      "catalogue_bounds": [],
+      "exact_master_blob_matches": 12084,
+      "same_relative_path_and_bytes_in_other_catalogues": 13880,
+      "file_variants_seen_in_only_this_catalogue": 0,
+      "warning": "Catalogue uniqueness is not whole-disk uniqueness or unique behavior; bounded/excluded files remain unverified."
+    }
+  ],
+  "scope": "Same HEAD proves common commit identity, not identical worktree bytes. Shared object stores do not duplicate commits. File-variant comparisons cover only recorded source catalogues."
+}

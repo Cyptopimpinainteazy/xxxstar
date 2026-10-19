@@ -1,0 +1,17 @@
+{
+  "counts": {
+    "rc": 0,
+    "out": "411\t2\n",
+    "err": ""
+  },
+  "cherry": {
+    "rc": 0,
+    "out": "- b06d0b30af144210eb7b5557c9103e9e108e2590\n- d1ea105588ee6678e5d51791778995a92fc171c8\n",
+    "err": ""
+  },
+  "files": {
+    "rc": 0,
+    "out": "M\tdocs/local-ci.md\nM\tscripts/local-ci.sh\nM\tscripts/mainnet/build-release-artifacts.sh\nM\tscripts/mainnet/release-artifacts-gate.sh\nM\tscripts/mainnet/run_release_gates_rc6.sh\nA\ttests/test_rc6_release_sequence.py\nA\ttests/test_release_artifact_provenance.py\n",
+    "err": ""
+  }
+}

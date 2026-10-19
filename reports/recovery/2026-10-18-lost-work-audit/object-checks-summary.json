@@ -1,0 +1,542 @@
+[
+  {
+    "common_dir": "/home/lojak/.openclaw/workspace/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/.nvm/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Quantum AI HOTEL OS/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_codegen/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_core/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_lsp/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_parser/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_semantics/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3_test/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/x3-lang/x3c/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/jacktheripper/.git",
+    "rc": 10,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "error: 1c518ee0a588e5f8497482c148f1261480fd7fad: invalid sha1 pointer in cache-tree\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-lang/x3_codegen/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-lang/x3_core/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-lang/x3_lsp/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-lang/x3_parser/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-lang/x3_semantics/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-lang/x3_test/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-lang/x3c/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/New Folder/xxxstar-main/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/forge-std/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/xxxstar-main/.wt-ext/X3-contracts/evm/lib/openzeppelin-contracts/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Desktop/xxxstar-main/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/quickemu/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery-sources/atlas-sphere-.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery-sources/atlas-sphere-master.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/xxxstar-clean/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery-sources/atlas-sphere1.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery-sources/cryptopimpin-atlas-sphere.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery-sources/the-reaper.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery-sources/the-reaper2.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/external/polkadot-stps/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/external/substrate-runtime-fuzzer/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/Shark-Bite.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/atlas-sphere-.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/atlas-sphere-master.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/actions-runner/_work/xxxstar/xxxstar/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/atlas-sphere1.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/no_fear_near_wallet.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/the-reaper.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/the-reaper2.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery-sources/atlas-sphere.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/x3-clipforge.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/atlas-sphere.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/x3-recovery/mirrors/x3-atomic-star.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/xxxstar-main/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.openclaw/workspace/x3-research/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (master)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/.openclaw/workspace/x3triplethreat/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.copilot/chats/d7efebd9-bc27-4bc1-a3e5-2954ef0270e2/SurfSense/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.openclaw/workspace/x3triplethreat/repos/xxxstar/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/tmp/x3-grant-v3-import-BSO5dXMM/repo/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/actions-runner-2/_work/xxxstar/xxxstar/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/tmp/claude-1000/bash-edit-diff/9729841349056935381-5940836654972793121-974ca2a1d0396b05",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.codex-backup-20260930-005103/.tmp/git-TJzFts",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "notice: HEAD points to an unborn branch (main)\nnotice: No default references\n"
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/Avyayalaya/agent-council/ref_v0.1.3/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.codex-backup-20260930-005103/.tmp/plugins/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/SAP/ui-theme-designer-plugins-for-coding-agents/ref_v2.0.0/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/github/copilot-advanced-security-plugin/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.codex-backup-20260930-005103/memories/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/gsemet/copilot-goal-skill/sha_17d0452fcb08adc7cc0cdf61a174e7045f3b5586/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.codex-backup-20260930-005103/vendor_imports/skills/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/juliamuiruri4/brainmaxxing/sha_8a8a102ff3ab8736f015764207cdb7e68fcd5ecf/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/microsoft/What-I-Did-Copilot/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/johnpapa/ai-ready/ref_v1.3.0/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/oliver-zehentleitner/keep-the-why/ref_v0.15.0/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Desktop/xxxstar-main/.git/modules/X3-contracts/evm/lib/forge-std",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/New Folder/xxxstar-main/.git/modules/X3-contracts/evm/lib/forge-std",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/OllamaHound/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Open-Ollama-Scanner/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.git/modules/X3-contracts/evm/lib/forge-std",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/New Folder/xxxstar-main/.git/modules/X3-contracts/evm/lib/openzeppelin-contracts",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main/.git/modules/X3-contracts/evm/lib/openzeppelin-contracts",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Desktop/xxxstar-main/.git/modules/X3-contracts/evm/lib/openzeppelin-contracts",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/.vscode/agent-plugins/github.com/github/awesome-copilot/ref_marketplace/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/audit-king/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/audit-king/.tools/fixture/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-chain-master/apps/atlas-sphere-clean/.git",
+    "rc": 10,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": "error: refs/remotes/origin/copilot-worktree-2026-03-12T03-45-32: invalid sha1 pointer fbd6167a7d35dc5f845455a8ac267a26617c68c7\nerror: refs/remotes/origin/feat/p4-gpu-accelerator: invalid sha1 pointer b8f50057011662689a9caf763dd991f1cf2cff31\nerror: refs/remotes/origin/kilo-change: invalid sha1 pointer 05727e52bdc4fd319f94e53d4e95a4aab7eb89e6\nerror: refs/remotes/origin/main: invalid sha1 pointer 9738a19487ebc7a9af54d14e7b16623264ec060a\nerror: refs/remotes/origin/prod-gpu-validation: invalid sha1 pointer fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96\nerror: refs/remotes/origin/tell-me-what-you-think-of-my-atomic-swaps-1772435451471: invalid sha1 pointer f52e44459f0b73437df55051af8f716ae7f72bef\nerror: refs/remotes/origin/update-configs: invalid sha1 pointer 96e2e27a3bf41498fc8542ed5eb2708ed2f98531\nerror: refs/tags/blockchain-site-v1: invalid sha1 pointer 96e2e27a3bf41498fc8542ed5eb2708ed2f98531\nnotice: HEAD points to an unborn branch (feature/rebuild-push)\nnotice: No default references\nerror: 82c69dbc19f3ad7f35dce973312efd858130846a: invalid sha1 pointer in cache-tree\n"
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-chain-master/context-engineering-intro/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-chain-master/forge-std/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-chain-master/ralph/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-chain-master/ralph-o-matic/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-chain-master/tests/security/lib/forge-std/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/x3-chain-master/tools/get-shit-done/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/forge-std/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/xxxstar-main/X3-contracts/evm/lib/openzeppelin-contracts/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/apps/open-notebook/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/Recovered-from-USB/actions-runner-x3-gpu/_work/xxxstar/xxxstar/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  },
+  {
+    "common_dir": "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar/.git",
+    "rc": 0,
+    "mode": "connectivity-only, no reflogs, unreachable; blob integrity NOT verified",
+    "stderr": ""
+  }
+]

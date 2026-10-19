@@ -1,0 +1,284 @@
+[
+  {
+    "file": "/home/lojak/x3-cluster-control/scripts/x3-cluster/x3-join.sh",
+    "identifiers": [
+      "192.168.0.0",
+      "192.168.0.70",
+      "x3gpu1",
+      "x3gpu2",
+      "x3star1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-cluster-control/scripts/x3-cluster/inventory.json",
+    "identifiers": [
+      "192.168.0.0",
+      "192.168.0.23",
+      "192.168.0.30",
+      "192.168.0.70",
+      "x3gpu1",
+      "x3gpu2",
+      "x3star1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-cluster-control/services/x3-ai-router/README.md",
+    "identifiers": [
+      "x3gpu1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-cluster-control/.github/workflows/x3vm-evm-live-lifecycle.yml",
+    "identifiers": [
+      "x3star1",
+      "x3star2"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-cluster-control/docs/local-ci.md",
+    "identifiers": [
+      "x3star1",
+      "x3star2"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-ansible/scripts/x3-cluster/x3-join.sh",
+    "identifiers": [
+      "192.168.0.0",
+      "192.168.0.70",
+      "x3gpu1",
+      "x3gpu2",
+      "x3star1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-ansible/scripts/x3-cluster/inventory.json",
+    "identifiers": [
+      "192.168.0.0",
+      "192.168.0.23",
+      "192.168.0.30",
+      "192.168.0.70",
+      "x3gpu1",
+      "x3gpu2",
+      "x3star1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-ansible/services/x3-ai-router/README.md",
+    "identifiers": [
+      "x3gpu1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-ansible/.github/workflows/x3vm-evm-live-lifecycle.yml",
+    "identifiers": [
+      "x3star1",
+      "x3star2"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-ansible/docs/REMOTE_CI_WORKER.md",
+    "identifiers": [
+      "192.168.0.55",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-ansible/docs/local-ci.md",
+    "identifiers": [
+      "x3star1",
+      "x3star2"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/live-inventory.md",
+    "identifiers": [
+      "192.168.0.0",
+      "192.168.0.1",
+      "192.168.0.29",
+      "192.168.0.55",
+      "192.168.0.68",
+      "x3gpu1",
+      "x3gpu2",
+      "x3star1",
+      "x3star2",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/testnet-readiness.md",
+    "identifiers": [
+      "192.168.0.1",
+      "192.168.0.65",
+      "192.168.0.68",
+      "x3gpu1",
+      "x3star1",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/hp-kvm-setup.md",
+    "identifiers": [
+      "192.168.0.55",
+      "192.168.115.99",
+      "x3star1",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/x3star3-readiness.md",
+    "identifiers": [
+      "192.168.0.1",
+      "192.168.0.55",
+      "X3STAR3",
+      "x3star1",
+      "x3star2",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/force10-preparation.md",
+    "identifiers": [
+      "192.168.0.250",
+      "192.168.0.55",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/force10-reset-report.md",
+    "identifiers": [
+      "192.168.0.250",
+      "192.168.0.55",
+      "X3STAR2",
+      "X3STAR3",
+      "x3star1",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/x3star2-readiness.md",
+    "identifiers": [
+      "192.168.0.0",
+      "192.168.0.1",
+      "192.168.0.29",
+      "192.168.0.65",
+      "192.168.0.73",
+      "x3gpu1",
+      "x3star1",
+      "x3star2",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/recovery-20261014/sha256-manifest.json",
+    "identifiers": [
+      "192.168.0.1",
+      "192.168.0.29",
+      "192.168.0.4",
+      "192.168.0.55",
+      "x3gpu1",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/recovery-20261014/verified-inventory-ping.txt",
+    "identifiers": [
+      "x3gpu1",
+      "x3star1",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/reports/storage/x3star3.md",
+    "identifiers": [
+      "192.168.0.55",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/ansible/inventory.verified-20261014.ini",
+    "identifiers": [
+      "192.168.0.29",
+      "192.168.0.55",
+      "x3gpu1",
+      "x3star1",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-infrastructure/ansible/inventory.ini",
+    "identifiers": [
+      "192.168.0.55",
+      "x3star1",
+      "x3star3"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/scripts/x3-cluster/x3-join.sh",
+    "identifiers": [
+      "192.168.0.0",
+      "192.168.0.70",
+      "x3gpu1",
+      "x3gpu2",
+      "x3star1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/scripts/x3-cluster/inventory.json",
+    "identifiers": [
+      "192.168.0.0",
+      "192.168.0.23",
+      "192.168.0.30",
+      "192.168.0.70",
+      "x3gpu1",
+      "x3gpu2",
+      "x3star1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/services/x3-ai-router/README.md",
+    "identifiers": [
+      "x3gpu1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/.github/workflows/x3vm-evm-live-lifecycle.yml",
+    "identifiers": [
+      "x3star1",
+      "x3star2"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/reports/recovery/local-repository-inventory.json",
+    "identifiers": [
+      "x3gpu1",
+      "x3star1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/reports/recovery/pull-request-inventory.md",
+    "identifiers": [
+      "x3gpu1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/reports/recovery/local-repository-inventory.md",
+    "identifiers": [
+      "x3gpu1",
+      "x3star1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/reports/recovery/branch-inventory.md",
+    "identifiers": [
+      "x3gpu1"
+    ]
+  },
+  {
+    "file": "/home/lojak/x3-mission/docs/REMOTE_CI_WORKER.md",
+    "identifiers": [
+      "192.168.0.55",
+      "x3star3"
+    ]
+  }
+]

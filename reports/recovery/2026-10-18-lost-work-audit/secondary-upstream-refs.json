@@ -1,0 +1,1169 @@
+[
+  {
+    "requested_repo": "Cyptopimpinainteazy/x3-atomic-star",
+    "local_paths": [
+      "/home/lojak/Desktop/xxxstar-chatgpt",
+      "/home/lojak/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/clean-stub-check",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/fix-the-x3-ai-router-so-codex-can",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/pasted-text-processing",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-audit-scope-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-reaper-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-resurrection-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-scanner-baseline",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-train-ci-repair-20261013",
+      "/home/lojak/Desktop/xxxstar-main/.kilo/worktrees/hyper-lamp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-agent",
+      "/home/lojak/Desktop/xxxstar-main/.wt-baseline",
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext",
+      "/home/lojak/Desktop/xxxstar-main/.wt-gatefix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-master",
+      "/home/lojak/Desktop/xxxstar-main/.wt-matrix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-mcp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-pr562",
+      "/home/lojak/Desktop/xxxstar-main/.wt-sim",
+      "/home/lojak/x3-ansible",
+      "/home/lojak/x3-atomic-hardening-20261018",
+      "/home/lojak/x3-base-41f",
+      "/home/lojak/x3-ci-autorun",
+      "/home/lojak/x3-cluster-control",
+      "/home/lojak/x3-dex-atomic-proof-20261018",
+      "/home/lojak/x3-forge-bisect",
+      "/home/lojak/x3-fraud-proofs",
+      "/home/lojak/x3-gate-fixture",
+      "/home/lojak/x3-gate-verify",
+      "/home/lojak/x3-grant-compute-20261018",
+      "/home/lojak/x3-guardian-int",
+      "/home/lojak/x3-gw-pg",
+      "/home/lojak/x3-gw-test",
+      "/home/lojak/x3-hashes",
+      "/home/lojak/x3-lang-hardening",
+      "/home/lojak/x3-mission",
+      "/home/lojak/x3-money-swarm-review-20261018",
+      "/home/lojak/x3-mut-settlement",
+      "/home/lojak/x3-mutants",
+      "/home/lojak/x3-mutants-ext",
+      "/home/lojak/x3-mutfix",
+      "/home/lojak/x3-npmfix",
+      "/home/lojak/x3-pr-6916e8",
+      "/home/lojak/x3-pr-6eb511",
+      "/home/lojak/x3-pr-980aea",
+      "/home/lojak/x3-pr-dde4b2",
+      "/home/lojak/x3-pr578",
+      "/home/lojak/x3-pr581",
+      "/home/lojak/x3-pr590",
+      "/home/lojak/x3-pr592",
+      "/home/lojak/x3-pr594",
+      "/home/lojak/x3-provenance",
+      "/home/lojak/x3-rc1-boot",
+      "/home/lojak/x3-recovery/mirrors/x3-atomic-star.git",
+      "/home/lojak/x3-red-gates",
+      "/home/lojak/x3-router-fixes",
+      "/home/lojak/x3-table-test",
+      "/home/lojak/x3-testnet-status-python3-20261018",
+      "/home/lojak/x3-tla-atomic",
+      "/home/lojak/x3-train",
+      "/home/lojak/x3-train-fix",
+      "/home/lojak/x3-vm-nostd",
+      "/home/lojak/x3-volunteer-consent-20261018",
+      "/home/lojak/x3-volunteer-local-ci-20261018"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/x3-atomic-star",
+    "default_branch": "main",
+    "branches": [
+      {
+        "name": "Cyptopimpinainteazy-patch-1",
+        "sha": "ab16af13ad018f6afc89eee0719cd4e277379b66"
+      },
+      {
+        "name": "agents/feature-prioritization-and-execution-plan",
+        "sha": "9c7c80863719e74774cf0b45824f7b93be52ca13"
+      },
+      {
+        "name": "autoprove-yolo-v0",
+        "sha": "feadc05249cb9cad17ae1fd1f8b050f93d2b07af"
+      },
+      {
+        "name": "dependabot/cargo/axum-0.8.9",
+        "sha": "e93aad494f78c1fc2e44cf392e8e7b7b6f56fe2c"
+      },
+      {
+        "name": "dependabot/cargo/cargo-2dfe81512a",
+        "sha": "63b5d04f6bd5dc1ba8e72bf28b385488ff2598f4"
+      },
+      {
+        "name": "dependabot/cargo/config-0.14.1",
+        "sha": "37553651c4fd24577f782ed226bff3c2d79c25ba"
+      },
+      {
+        "name": "dependabot/cargo/curve25519-dalek-5.0.0",
+        "sha": "146d2457637076da88c388c1e2eaac118cc3f424"
+      },
+      {
+        "name": "dependabot/cargo/dashmap-6.2.1",
+        "sha": "0db61e1f8ee9eaf264cb911809cc378abad25f38"
+      },
+      {
+        "name": "dependabot/cargo/ed25519-zebra-4.2.0",
+        "sha": "d69c4320ed55aa159afe9a321141276aec151726"
+      },
+      {
+        "name": "dependabot/cargo/hex-literal-1.1.0",
+        "sha": "89ebcc39a50da5cce9c7d81a4cd95e249e713dda"
+      },
+      {
+        "name": "dependabot/cargo/jsonrpsee-0.26.0",
+        "sha": "e1fdc3d9f70a63c374c48d6011c18dd263d4db35"
+      },
+      {
+        "name": "dependabot/cargo/k256-0.14.0",
+        "sha": "9d7ab8a892c9d507ba3ca9c65f6d21c3576b70d0"
+      },
+      {
+        "name": "dependabot/cargo/keccak-hash-0.12.0",
+        "sha": "1947643253de837afa57ef61715d8978ed812b81"
+      },
+      {
+        "name": "dependabot/cargo/libp2p-0.54.1",
+        "sha": "f78adc3be5af88fc31b4a9ed9f10d965342aece4"
+      },
+      {
+        "name": "dependabot/cargo/lsp-types-0.97.0",
+        "sha": "1f036003bf52ce05ad6915b3d82133d325756ef2"
+      },
+      {
+        "name": "dependabot/cargo/ndarray-0.17.2",
+        "sha": "713fbc587b54a01c2352a5a5a285b31d65846f62"
+      },
+      {
+        "name": "dependabot/cargo/petgraph-0.8.3",
+        "sha": "45f633ed937ec53a654375ef29b89e58caa10e91"
+      },
+      {
+        "name": "dependabot/cargo/priority-queue-2.7.0",
+        "sha": "60762c807fe64646dd26e34da9f6b4bac99eab0c"
+      },
+      {
+        "name": "dependabot/cargo/rand_chacha-0.9.0",
+        "sha": "9ec2adff9e1730c4aa59de409d2343d5969499e0"
+      },
+      {
+        "name": "dependabot/cargo/solana-program-5.0.0",
+        "sha": "de8899f426659fd66f85ee72568ece7991513f6d"
+      },
+      {
+        "name": "dependabot/cargo/thiserror-2.0.20",
+        "sha": "eae83ab2197b8d3f79294361c6b184482f08ba96"
+      },
+      {
+        "name": "dependabot/cargo/tokio-tungstenite-0.30.0",
+        "sha": "29241907e83ece03a7d6820fb20e21d9a224d483"
+      },
+      {
+        "name": "dependabot/cargo/tower-0.5.3",
+        "sha": "77decda08d2ecc494820987796aed4757fbcc89e"
+      },
+      {
+        "name": "dependabot/github_actions/actions/configure-pages-6",
+        "sha": "583a4f4415156cd1c57c2de3a7ed6d3ae3d1d76d"
+      },
+      {
+        "name": "dependabot/github_actions/actions/setup-java-6",
+        "sha": "b06225135879614e1e8f2fe2ef07cf8c1b8c3c3e"
+      },
+      {
+        "name": "dependabot/github_actions/actions-nonmajor-b300d6d0aa",
+        "sha": "c0c45ef853b47b50177a07ffb296c29b1ac7de6a"
+      },
+      {
+        "name": "dependabot/npm_and_yarn/apps/inferstructor-dashboard/npm_and_yarn-fa0e04ea13",
+        "sha": "bcc10afff880fca6f86be6801d58380f41f7510d"
+      },
+      {
+        "name": "dependabot/npm_and_yarn/infra-structure/services/chain-db/npm_and_yarn-261303d76f",
+        "sha": "fb8bf77b3fba116f3780361005a64fde153a066a"
+      },
+      {
+        "name": "dependabot/npm_and_yarn/packages/polkawallet-bridge-adapter/handlebars-4.7.10",
+        "sha": "e44b474dd310cced2dfeb4daed9ac47a878b4999"
+      },
+      {
+        "name": "dependabot/npm_and_yarn/packages/polkawallet-bridge-adapter/multi-b0ec9e4250",
+        "sha": "404bca20d0edaf3b1c66ce134e374c6933172923"
+      },
+      {
+        "name": "dependabot/npm_and_yarn/packages/polkawallet-bridge-adapter/npm-nonmajor-676ed2b016",
+        "sha": "3fffe454218f54e503ba0f35d478392e4f9d9abe"
+      },
+      {
+        "name": "dependabot/npm_and_yarn/packages/polkawallet-bridge-adapter/polkadot/util-14.0.3",
+        "sha": "a13beec78cfb6cd1143187cc18ad9629d056d988"
+      },
+      {
+        "name": "dependabot/pip/pydantic-gte-2.13.5",
+        "sha": "7e6c66a5dbd22529dec97d6797f6b46c0d68cfe2"
+      },
+      {
+        "name": "dependabot/pip/pytest-asyncio-gte-1.4.0",
+        "sha": "99165ed5ffee47cc8514ae05939188f88ed453dd"
+      },
+      {
+        "name": "dependabot/pip/pytest-gte-9.1.1",
+        "sha": "c542a9789d3213360a069726ae65bf98002b15c5"
+      },
+      {
+        "name": "develop",
+        "sha": "9f1f1d9f89bb1c6db2f5280fc45a3ebb6182b4fe"
+      },
+      {
+        "name": "gh-pages",
+        "sha": "8f8ed20aa0486358c2cf484cdcc787d5ff1e812a"
+      },
+      {
+        "name": "main",
+        "sha": "acadaa00f6ae8bea89e0d1a1ebdb414bc98feb7f"
+      },
+      {
+        "name": "rc1-clean-foundation",
+        "sha": "b325d9d7c41116eecb6d34f3f072539e0d4bae32"
+      },
+      {
+        "name": "sprint-0/foundation/kernel-audit",
+        "sha": "416821f8ca4fbb1a6891f00f1af6f5b367f3a2d0"
+      },
+      {
+        "name": "substrate-upgrade-stable2603",
+        "sha": "fa40b2432d430bb1d07076ad0ab7b2d735b2b029"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/xxxstar",
+    "local_paths": [
+      "/home/lojak/.openclaw/workspace/x3triplethreat/repos/xxxstar",
+      "/home/lojak/Desktop/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/New Folder/xxxstar-main",
+      "/home/lojak/Desktop/Recovered-from-USB/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/Recovered-from-USB/actions-runner-x3-gpu/_work/xxxstar/xxxstar",
+      "/home/lojak/Desktop/actions-runner-x3-gpu-2.disabled/_work/xxxstar/xxxstar",
+      "/home/lojak/Desktop/actions-runner-x3-gpu/_work/xxxstar/xxxstar",
+      "/home/lojak/Desktop/xxxstar-chatgpt",
+      "/home/lojak/Desktop/xxxstar-clean",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/codex-x3-economic-safety-kernel",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/codex-x3-trading-core-v1-hardening",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/feat-settlement-proofset-gate-20260911",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/feat-x3vm-durable-recovery-20260911",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/finish-x3vm-live-transport",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/finish-x3vm-live-transport-fix",
+      "/home/lojak/Desktop/xxxstar-clean.worktrees/test-cross-domain-refund-recovery-20260911",
+      "/home/lojak/Desktop/xxxstar-main",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/clean-stub-check",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/fix-the-x3-ai-router-so-codex-can",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/pasted-text-processing",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-audit-scope-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-reaper-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-resurrection-20261013",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-scanner-baseline",
+      "/home/lojak/Desktop/xxxstar-main.worktrees/x3-train-ci-repair-20261013",
+      "/home/lojak/Desktop/xxxstar-main/.kilo/worktrees/hyper-lamp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-agent",
+      "/home/lojak/Desktop/xxxstar-main/.wt-baseline",
+      "/home/lojak/Desktop/xxxstar-main/.wt-ext",
+      "/home/lojak/Desktop/xxxstar-main/.wt-gatefix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-master",
+      "/home/lojak/Desktop/xxxstar-main/.wt-matrix",
+      "/home/lojak/Desktop/xxxstar-main/.wt-mcp",
+      "/home/lojak/Desktop/xxxstar-main/.wt-pr562",
+      "/home/lojak/Desktop/xxxstar-main/.wt-sim",
+      "/home/lojak/actions-runner-2/_work/xxxstar/xxxstar",
+      "/home/lojak/actions-runner/_work/xxxstar/xxxstar",
+      "/home/lojak/x3-ansible",
+      "/home/lojak/x3-atomic-hardening-20261018",
+      "/home/lojak/x3-base-41f",
+      "/home/lojak/x3-ci-autorun",
+      "/home/lojak/x3-cluster-control",
+      "/home/lojak/x3-dex-atomic-proof-20261018",
+      "/home/lojak/x3-forge-bisect",
+      "/home/lojak/x3-fraud-proofs",
+      "/home/lojak/x3-gate-fixture",
+      "/home/lojak/x3-gate-verify",
+      "/home/lojak/x3-grant-compute-20261018",
+      "/home/lojak/x3-guardian-int",
+      "/home/lojak/x3-gw-pg",
+      "/home/lojak/x3-gw-test",
+      "/home/lojak/x3-hashes",
+      "/home/lojak/x3-lang-hardening",
+      "/home/lojak/x3-mission",
+      "/home/lojak/x3-money-swarm-review-20261018",
+      "/home/lojak/x3-mut-settlement",
+      "/home/lojak/x3-mutants",
+      "/home/lojak/x3-mutants-ext",
+      "/home/lojak/x3-mutfix",
+      "/home/lojak/x3-npmfix",
+      "/home/lojak/x3-pr-6916e8",
+      "/home/lojak/x3-pr-6eb511",
+      "/home/lojak/x3-pr-980aea",
+      "/home/lojak/x3-pr-dde4b2",
+      "/home/lojak/x3-pr578",
+      "/home/lojak/x3-pr581",
+      "/home/lojak/x3-pr590",
+      "/home/lojak/x3-pr592",
+      "/home/lojak/x3-pr594",
+      "/home/lojak/x3-provenance",
+      "/home/lojak/x3-rc1-boot",
+      "/home/lojak/x3-red-gates",
+      "/home/lojak/x3-router-fixes",
+      "/home/lojak/x3-table-test",
+      "/home/lojak/x3-testnet-status-python3-20261018",
+      "/home/lojak/x3-tla-atomic",
+      "/home/lojak/x3-train",
+      "/home/lojak/x3-train-fix",
+      "/home/lojak/x3-vm-nostd",
+      "/home/lojak/x3-volunteer-consent-20261018",
+      "/home/lojak/x3-volunteer-local-ci-20261018",
+      "/tmp/x3-grant-v3-import-BSO5dXMM/repo"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/xxxstar",
+    "default_branch": "master",
+    "branches": [
+      {
+        "name": "ci/local-ci-on-push-and-pr",
+        "sha": "eaa8f5a198ba2aebb38c532fd2b98851c6021fba"
+      },
+      {
+        "name": "codex/atomic-trade-evidence-20261018",
+        "sha": "324a9871decf9469d7db1927f327bac752e6b67a"
+      },
+      {
+        "name": "codex/dex-atomic-rollback-proof-20261018",
+        "sha": "218f44d58ea7b268c43cbdbd85c2a8442ea4acf2"
+      },
+      {
+        "name": "codex/grant-compute-audit-20261018",
+        "sha": "6c2eec195e2068a49065f60b7dae7e4f2d474f6a"
+      },
+      {
+        "name": "codex/money-swarm-live-workspace-20261018",
+        "sha": "886090015eacc38ae66befebba22ddeb7bf23887"
+      },
+      {
+        "name": "codex/money-swarm-proposal-packages-20261018",
+        "sha": "3afc3a6a7fbaa5adada8bf200faef16d62540253"
+      },
+      {
+        "name": "codex/money-swarm-reviewed-workspace-20261018",
+        "sha": "e394823a33fcbe4ed1106cb09ca45f401538a37f"
+      },
+      {
+        "name": "codex/testnet-status-python3-20261018",
+        "sha": "d5bde264dd9de3c73141404841f6e5f25d1a319d"
+      },
+      {
+        "name": "codex/volunteer-local-ci-20261018",
+        "sha": "eff2ec8b98ea133125bd9d081ab5d1d0668c0a5a"
+      },
+      {
+        "name": "codex/volunteer-strict-consent-20261018",
+        "sha": "53fd11bb584c12524ace858b22801775a5686bc7"
+      },
+      {
+        "name": "codex/x3-economic-safety-kernel",
+        "sha": "4aa67b8cc307adbb66cdbede1de7d93842ff8a41"
+      },
+      {
+        "name": "codex/x3-gateway-postgres-integration",
+        "sha": "811f53a0637ce90a839e05fc151856cbade2dce2"
+      },
+      {
+        "name": "codex/x3-grant-hunter-v3",
+        "sha": "3ddedd61df18aca449b3aff9751e8020a8f32a90"
+      },
+      {
+        "name": "codex/x3-lang-nested-workspace-gate-20261008",
+        "sha": "5f0179c84479cf4a03ed04d241ad4fec12b8d541"
+      },
+      {
+        "name": "codex/x3-volunteer-compute-integration",
+        "sha": "9094f71e297323ef000c6c4e47945f79af17735a"
+      },
+      {
+        "name": "codex/x3lang-canonical-compiler-phase2",
+        "sha": "4da42f7c8e0c0ea4ac9609e4d0e13349389426d8"
+      },
+      {
+        "name": "codex/x3lang-compiled-storage-regression-20261008",
+        "sha": "fadd0dba72ebeedb054fc884b768272318b4f581"
+      },
+      {
+        "name": "codex/x3lang-control-flow-parity-20261008",
+        "sha": "838e753a20204a0108f52eef7f3810e7ae468997"
+      },
+      {
+        "name": "codex/x3lang-onchain-wip",
+        "sha": "5673b41db7676f9fefbde82233a1fe01dd054e89"
+      },
+      {
+        "name": "codex/x3lang-production-unification",
+        "sha": "2df37cf53f0baf9b5357f4a0305a95d03f3ebd0f"
+      },
+      {
+        "name": "design/onchain-evm",
+        "sha": "46101ae22e7c1386e372d4901b098c34d256f103"
+      },
+      {
+        "name": "docs/integrated-blockers-20260924",
+        "sha": "07b6e3151d81df2bbf579062fbadf418402d01eb"
+      },
+      {
+        "name": "docs/matrix-third-pass",
+        "sha": "6cc986b5d8247574b7e5d9c8eb90bd18ca8ddf00"
+      },
+      {
+        "name": "docs/public-testnet-alpha-execution-plan",
+        "sha": "0815d2c9f17f47c48776dda5eeaa94557ba75f9d"
+      },
+      {
+        "name": "docs/x3-lang-honest-status",
+        "sha": "9cc1ab11ffb0f95da7c093898e8d8cd806faeeb3"
+      },
+      {
+        "name": "econsafety-kernel",
+        "sha": "4aa67b8cc307adbb66cdbede1de7d93842ff8a41"
+      },
+      {
+        "name": "feat/btc-spv-soundness",
+        "sha": "ca480db1e701c49b6c2826e69b1ebcbf33ea12e6"
+      },
+      {
+        "name": "feat/compiler-aggregates-context",
+        "sha": "b34a7a5d5ced318028d5e40df8b2210b6c6cb856"
+      },
+      {
+        "name": "feat/disk-economics-measurement",
+        "sha": "775d6c2d113f34dcbe9955b6af88b3aea60bb829"
+      },
+      {
+        "name": "feat/disk-pressure-authoring-stop",
+        "sha": "8f8e6f85cf9a891c3a84641ca9097349f8fdae66"
+      },
+      {
+        "name": "feat/gpu-cpu-reference-20261011",
+        "sha": "285ed11b6d2fcf52aca35c355d91d041759a0193"
+      },
+      {
+        "name": "feat/mutants-gate",
+        "sha": "6823afa771ff9e8bd71e2894f02de0b06691b664"
+      },
+      {
+        "name": "feat/mutants-gate-atomic-kernel",
+        "sha": "aa060f1320d07e98985d59e29e2fc7e00b5dafc0"
+      },
+      {
+        "name": "feat/per-block-storage-metrics",
+        "sha": "0a5cd4cdad07ac55f23c4e09c68e8f11ea2c4795"
+      },
+      {
+        "name": "feat/reactor-placement-attested",
+        "sha": "2e292dde42b4f67f83672af6d96951e8dd62fc7a"
+      },
+      {
+        "name": "feat/receipt-key-registry",
+        "sha": "584228c56bec1c628848d6775b14f4271053856c"
+      },
+      {
+        "name": "feat/receipt-replays-gas-and-oracle",
+        "sha": "e6366467f0090581e32f919f42eb186351e35a69"
+      },
+      {
+        "name": "feat/receipt-signing-registry",
+        "sha": "157b049ceeb6b90cab16b3dd2dda6421f5e726c2"
+      },
+      {
+        "name": "feat/rehearsal-runs-x3-after-upgrade",
+        "sha": "27922d7c6bde22f847050b58341839ae4b331625"
+      },
+      {
+        "name": "feat/remote-ci-worker-20261013",
+        "sha": "8501a2de636a57f9e94ce855657b1f7ec2f3eeb2"
+      },
+      {
+        "name": "feat/runtime-attribution-metrics",
+        "sha": "d67afd13c2fa4683950961baf354941be4f695c3"
+      },
+      {
+        "name": "feat/runtime-runs-x3vm",
+        "sha": "e7629b67b12dc1c133090aa62701f4f163cceb0c"
+      },
+      {
+        "name": "feat/signed-key-registries",
+        "sha": "de31b0f7ea6c6ba738c61a7b8a446f39eba86e93"
+      },
+      {
+        "name": "feat/snapshot-restore",
+        "sha": "3883b803fdd8b1106643d7ad9915242938176be7"
+      },
+      {
+        "name": "feat/state-snapshot-and-audit-gates",
+        "sha": "037cad1ad8e84f8ec6951fa17c238f89d5105877"
+      },
+      {
+        "name": "feat/structs",
+        "sha": "7a108defdaf63301537baafd5e53a0155ee3c1a5"
+      },
+      {
+        "name": "feat/swarm-replica-reconciler",
+        "sha": "c517973882d89559053e2f69a4bf3ff082ec5227"
+      },
+      {
+        "name": "feat/testnet-ansible",
+        "sha": "7fa5383aa10c14372c3c70da06b4cb102ac9ea2f"
+      },
+      {
+        "name": "feat/throughput-attribution",
+        "sha": "ff7f49caabb40a567c333aadcd76b7e0944e4ef2"
+      },
+      {
+        "name": "feat/tla-atomic-settlement",
+        "sha": "3b61c427edb9bb6beb9cd1d6bda954e53667d50d"
+      },
+      {
+        "name": "feat/trading-rules-reference",
+        "sha": "19651a4d68a8e8ae457b1dde23df2b78992dfb23"
+      },
+      {
+        "name": "feat/txpool-metrics",
+        "sha": "b7241e8f2ac392636cf20585919ef9eb0d53414d"
+      },
+      {
+        "name": "feat/x3-ai-router",
+        "sha": "762037b4f33310ce62cb084b6894ca70e426a934"
+      },
+      {
+        "name": "feat/x3-ai-router-budget-hardening",
+        "sha": "81f21b752536c329b996cf5eca0c86dc84a68cd4"
+      },
+      {
+        "name": "feat/x3-ai-router-hardening",
+        "sha": "82c7617d0df1b3c9536e3ef7e3137b5a701f5c9e"
+      },
+      {
+        "name": "feat/x3-ai-router-observability",
+        "sha": "6dadae4fe3b1e0c9fccc31e742ceb12f3cf7c673"
+      },
+      {
+        "name": "feat/x3-ai-router-pricing",
+        "sha": "422b47f887eda6652db2beab296bab89f2ba517f"
+      },
+      {
+        "name": "feat/x3-ai-router-responses-api",
+        "sha": "929d41ec8720af96977c938aba5d23a83c96fe40"
+      },
+      {
+        "name": "feat/x3-ai-router-streaming",
+        "sha": "5a4b171ae2285f831c63fae1cd509a818ed3fe1c"
+      },
+      {
+        "name": "feat/x3-ai-router-verification-feedback",
+        "sha": "ae1f337358d396c8c6e8a8f83f0d5a32e036b47e"
+      },
+      {
+        "name": "feat/x3-cluster-control",
+        "sha": "2e1cfaab30e64f8f16ac6ecb44df31c6ddf557d2"
+      },
+      {
+        "name": "feat/x3-forge-bisect-packet-input",
+        "sha": "93810604787f2f2b925a731ecec72a94ed1fb0df"
+      },
+      {
+        "name": "feat/x3-forge-bisect-runner",
+        "sha": "7e2515415f58ee97da7dbdb8d117b984856a09f9"
+      },
+      {
+        "name": "feat/x3-guardian",
+        "sha": "75eaaa8900b29058c5c9a16e60fbfb431a0fb7a6"
+      },
+      {
+        "name": "feat/x3-htlc-onchain",
+        "sha": "d2f585bceb68407336aafe72ff8c5883cfdd4f62"
+      },
+      {
+        "name": "feat/x3-prelaunch-economics-x3lang-cutover",
+        "sha": "d1ea105588ee6678e5d51791778995a92fc171c8"
+      },
+      {
+        "name": "feat/x3-sim-deterministic-simulator",
+        "sha": "e6e7b334b3369e4a1c9967762634ee899408be89"
+      },
+      {
+        "name": "feat/x3-sim-failure-packet",
+        "sha": "b84576718c72e21d48195e2ca75ecec1de83515a"
+      },
+      {
+        "name": "feat/x3bc-artifact-attestation",
+        "sha": "8642fd2551cd113f3259346734b7c482ffaa2528"
+      },
+      {
+        "name": "feat/x3gpu1-dual-gpu-accel",
+        "sha": "51d9f11e7150c8d8fa0ae9aa24e383fd5f1389bb"
+      },
+      {
+        "name": "feat/x3lang-cross-vm-calls",
+        "sha": "111440bcf7b761b048efec1f12b1e1d9858678b9"
+      },
+      {
+        "name": "feat/x3lang-emit",
+        "sha": "2b7dcfe221be5833841f659196e51e320692eb64"
+      },
+      {
+        "name": "feat/x3lang-hardening-x3gpu1",
+        "sha": "66a7ffd150715b7fadcfb0521f2f6bbdfd3ca222"
+      },
+      {
+        "name": "feat/x3lang-network-state-source",
+        "sha": "e4d9276bd328dbc223dde4058532448d83c1946b"
+      },
+      {
+        "name": "feat/x3vm-aggregates",
+        "sha": "073e26edfabc5c0ecad02450bd05ab7a0ca5cc38"
+      },
+      {
+        "name": "feat/x3vm-block-context",
+        "sha": "d83828f5b2041f0bd2b03b21248585eb468a961d"
+      },
+      {
+        "name": "feat/x3vm-no-std",
+        "sha": "9d4fe45d81ce32664147e284fff78619bddb4e98"
+      },
+      {
+        "name": "feat/x3vm-no-std-bytecode-split",
+        "sha": "10d13c9e44e34091030258e18fd4416fc2803ee1"
+      },
+      {
+        "name": "feat/x3vm-one-gas-table",
+        "sha": "c23a8d0f14e894e3264d8a2f464f4bffc16abd9d"
+      },
+      {
+        "name": "fix/app-store-live-server",
+        "sha": "a433b010139fcb54627f5ee3c99204d7862858e2"
+      },
+      {
+        "name": "fix/app-store-native-watch-20261013",
+        "sha": "40d71a6298e3fda3275d1fc52054b9734c8ddfdd"
+      },
+      {
+        "name": "fix/bytecode-envelope",
+        "sha": "eafa93112f302e6df11e7047627f5e1be6ab4416"
+      },
+      {
+        "name": "fix/compiler-never-panics",
+        "sha": "65fdcba3f6a3a36d02fdd59879ccc7cae161bec8"
+      },
+      {
+        "name": "fix/gate-tool-validation-fixture",
+        "sha": "eb027c1c0888106ba0dec54f57db835b342de535"
+      },
+      {
+        "name": "fix/kernel-comit-benchmark-fixtures",
+        "sha": "9ed1920dda37dc82d26c5c0151852250713a31b2"
+      },
+      {
+        "name": "fix/master-gate-reds",
+        "sha": "99581bee8894298c39ef72751ee13770cad72f8c"
+      },
+      {
+        "name": "fix/master-red-gates",
+        "sha": "eea28b858a22cd52d426ca98fba05aaee2f546c1"
+      },
+      {
+        "name": "fix/matrix-evidence-prose",
+        "sha": "fb77f633d285633635501412a1a19d720024ec0d"
+      },
+      {
+        "name": "fix/npm-audit-all-dependencies-20261013",
+        "sha": "6906d37daf16b2d4e55c25361fc0b02491015aef"
+      },
+      {
+        "name": "fix/npm-audit-braces",
+        "sha": "e520f7ddb80182bdeb31390e583d6ba742cd8845"
+      },
+      {
+        "name": "fix/release-provenance-rc6-rebased",
+        "sha": "69ce03eab103df3ef894baf561745a01b803edad"
+      },
+      {
+        "name": "fix/router-database-startup",
+        "sha": "f1190280ec8ba7ba77edf32761f860e8e3ae8d62"
+      },
+      {
+        "name": "fix/runtime-hashes-supply-ledger",
+        "sha": "08af8fb4283a74b98f92ee0a20cb337ce94b242f"
+      },
+      {
+        "name": "fix/snapshot-archive-restore",
+        "sha": "dcb45a7387f1a8816a75378dbe4f6198eee7097f"
+      },
+      {
+        "name": "fix/snapshot-rpc-validation",
+        "sha": "648333c9c74bbe9c0e2aa7eb9133b49ed790de8d"
+      },
+      {
+        "name": "fix/studio-typecheck-20261013",
+        "sha": "8470548c6fe7e952b4907113badf85559f5df3de"
+      },
+      {
+        "name": "fix/swarm-core-import-cycle-20261013",
+        "sha": "044a5e192b128357232561dd93d058469ed0f0c1"
+      },
+      {
+        "name": "fix/testnet-finality-evidence-20261013",
+        "sha": "0b0c477c220377e098a7ac675053e7da0717a980"
+      },
+      {
+        "name": "fix/tla-specs-run",
+        "sha": "82587c05c973c913429919562270daaeac9cd9be"
+      },
+      {
+        "name": "fix/trading-vm-verifies-peer-ir",
+        "sha": "a8d1a068ed23b9676326f7e4b95bfa1107b7b587"
+      },
+      {
+        "name": "fix/verification-harness-exit-codes",
+        "sha": "62c09e8c334e9b3c9d6fa4b0ebed46d5249ec244"
+      },
+      {
+        "name": "fix/workspace-membership-python310",
+        "sha": "80bda42818fb787e70f40a6fb3c1e8e85a246b78"
+      },
+      {
+        "name": "fix/x3-ai-router-budget-fallback",
+        "sha": "a5e37bd62889e1321c2e1af0c390700c7b9edd4f"
+      },
+      {
+        "name": "fix/x3-ai-router-native-responses-stability",
+        "sha": "eb4406372db172968112b8e373a3a5d02ab7e6da"
+      },
+      {
+        "name": "fix/x3-common-artifact-fmt",
+        "sha": "9372f1c47db5fa72696139abe14e86afed34e40b"
+      },
+      {
+        "name": "fix/x3-compile-writes-artifact",
+        "sha": "4ef58687dcbf3deaf1bc27fd2ea70582df343e60"
+      },
+      {
+        "name": "fix/x3-forge-failure-memory-in-ci",
+        "sha": "93cce8e715c23e4d0edc748c796287efb9307b2b"
+      },
+      {
+        "name": "fix/x3-htlc-registry-native",
+        "sha": "d004fe4e417e56c3570c019be2c53f4734002f76"
+      },
+      {
+        "name": "fix/x3lang-finish",
+        "sha": "5b4fc4a69424493f135025c3b11a90d0cd4d29b5"
+      },
+      {
+        "name": "fix/x3lang-optimizer-order",
+        "sha": "33ce1207f07597e9ab938b2180c6441cf1a26e74"
+      },
+      {
+        "name": "fix/x3vm-engine-agreement",
+        "sha": "a57c42e7312ac8ec87a77d176fc5b15cdb0f1230"
+      },
+      {
+        "name": "integrate/merge-train-20261013",
+        "sha": "e1f504a3c52a4b6f3615ffbf66a4634ef4826eab"
+      },
+      {
+        "name": "integrate/x3-guardian",
+        "sha": "1c2709c81efbb2aee1f13709203476132802b1ab"
+      },
+      {
+        "name": "master",
+        "sha": "70423054e2d9560a212ab763d4f265f9cdc448d9"
+      },
+      {
+        "name": "merge/pr502-onto-master",
+        "sha": "a882c78f4ba9c86adbba50cb9ad08308937b599e"
+      },
+      {
+        "name": "merge/x3-mcp-server",
+        "sha": "a2ea0e9bde81f827d44453522f497952c9eb0aa3"
+      },
+      {
+        "name": "mission/resurrection-phase-a",
+        "sha": "1dddb5432c761d44ba6ed5ab93a8ed90d06a4efe"
+      },
+      {
+        "name": "release-gate/swarm-reactor-onchain-v1",
+        "sha": "1ec7cb7f23796ccec0920d786076a6542cdcb222"
+      },
+      {
+        "name": "runtime/evm-persistence-and-fraud-proof-pins",
+        "sha": "d749e0d564490e89f3e8a104256d407e9d169458"
+      },
+      {
+        "name": "test/coordinator-transition-table",
+        "sha": "0567465bbb8b20ba9866472ecd5cf35ccbe5047f"
+      },
+      {
+        "name": "test/gateway-migrations-cover-tables",
+        "sha": "1d07a8bd66f66bad0430a3be6d33be1e3639feb9"
+      },
+      {
+        "name": "test/gateway-postgres-control-plane",
+        "sha": "43be3bbb7238d090c45b5e0b893d85defe4d22b1"
+      },
+      {
+        "name": "test/rc1-three-validator-boot-gate",
+        "sha": "38e6dfbb02bd0ced37aa197914ac0332e06d01e5"
+      },
+      {
+        "name": "test/supply-ledger-proof-pruning",
+        "sha": "80cf5541de17b00fb37223b445026dd459a89fc6"
+      },
+      {
+        "name": "test/x3vm-robustness",
+        "sha": "082cf6bb4e0eee247993944c93d4ec040c8dfc13"
+      },
+      {
+        "name": "testnet/physical-seven-preflight-20261014",
+        "sha": "e01adae8bd6501cded6115f97965e3a2a147f001"
+      },
+      {
+        "name": "wip/chatgpt-mainnet-attestation-20260918",
+        "sha": "e83d3918ee43b10ccd6b819044f817c9dd3c29f3"
+      },
+      {
+        "name": "wip/prompts-to-skills-20260918",
+        "sha": "4a6ffa6f1a86804548a1bba34320c0a1ec1aeb0b"
+      },
+      {
+        "name": "wip/x3lang-arb-graph-filter-20260919",
+        "sha": "bdc83ba7ffb48407e3cb14d003c6eb274c1b6ac4"
+      },
+      {
+        "name": "wip/x3lang-preserve-packets-and-arbitrage-20260919",
+        "sha": "1bfaa52434885f37dfbafd557cf9d2e8f9299f2e"
+      },
+      {
+        "name": "wip-backup/candidate-d1ea10558-20260928",
+        "sha": "d1ea105588ee6678e5d51791778995a92fc171c8"
+      },
+      {
+        "name": "wip-backup/freshness-control-3763659-20260928",
+        "sha": "4bfe9a391f461b4442e95aea9a9fc2f71d97ae79"
+      },
+      {
+        "name": "wip-backup/main-checkout-20260928",
+        "sha": "b3e894d2cc8e010f432ab7944db5fe6e78199b3f"
+      },
+      {
+        "name": "wip-backup/panic-516-20260928",
+        "sha": "bd0adfcc0ff4c04465da71c55def43a096686b21"
+      },
+      {
+        "name": "wip-backup/rt2-20260928",
+        "sha": "ff12889bfbbec0dbc697204e0931a9dd5c3ce30c"
+      },
+      {
+        "name": "wip-backup/rt-rebuild-20260928",
+        "sha": "b83a7a0cd12009f9f680d66ede3e830ed2810f8b"
+      },
+      {
+        "name": "wip-backup/upg-artifact-src-20260928",
+        "sha": "e95475a6df4c6131a19a29d7f3a60e14a17f6f86"
+      },
+      {
+        "name": "wip-backup/x3lang-finish-20260928",
+        "sha": "68f982e7c1c5e64c5f633a9345a50bb8ba100b0f"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/x3jacktheripper",
+    "local_paths": [
+      "/home/lojak/Desktop/jacktheripper",
+      "/home/lojak/x3-recovery/mirrors/x3jacktheripper.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/x3jacktheripper",
+    "default_branch": "master",
+    "branches": [
+      {
+        "name": "master",
+        "sha": "4c404c9e4993d0f9b6caf0269a8181dfc8bc5819"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/atlas-sphere-",
+    "local_paths": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere-.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere-.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/atlas-sphere-",
+    "default_branch": "main",
+    "branches": [
+      {
+        "name": "copilot/fix-issues-before-release",
+        "sha": "06c7e7897dbb2f75d3228cea4e814d8ee2c43ad2"
+      },
+      {
+        "name": "dependabot/cargo/cargo-5eefeb9384",
+        "sha": "86e287ddb953078a5e9135e52fc141e233bdf3ad"
+      },
+      {
+        "name": "main",
+        "sha": "7458ab78720d18a9d1f5d816202649f89970bec3"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/atlas-sphere-master",
+    "local_paths": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere-master.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere-master.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/atlas-sphere-master",
+    "default_branch": "test/ollama-generate-md",
+    "branches": [
+      {
+        "name": "codex/conduct-comprehensive-code-review-and-launch-plan",
+        "sha": "d4f1e367d6457a6b2468077edd01facd908d86bb"
+      },
+      {
+        "name": "fix/workspace-ci",
+        "sha": "58386bc94681de4b8831946a80a2b849c69a659d"
+      },
+      {
+        "name": "master",
+        "sha": "5395c8eb0fbf0f510c053ae303f66875692d249e"
+      },
+      {
+        "name": "test/ollama-generate-md",
+        "sha": "99ca18443ca923e1cf1e82cf6ab811b222034823"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/atlas-sphere",
+    "local_paths": [
+      "/home/lojak/Desktop/x3-chain-master/apps/atlas-sphere-clean",
+      "/home/lojak/x3-recovery-sources/atlas-sphere.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/atlas-sphere",
+    "default_branch": "main",
+    "branches": [
+      {
+        "name": "audit/release-docs-metadata",
+        "sha": "ddd88f5123b97c495113c8e3f7edf39bc7434f87"
+      },
+      {
+        "name": "copilot/vscode-mnh9dryi-tqv6",
+        "sha": "bf2b8e2261a9c2b65b48f34e97dc8192222fd012"
+      },
+      {
+        "name": "copilot-worktree-2026-03-12T03-45-32",
+        "sha": "fbd6167a7d35dc5f845455a8ac267a26617c68c7"
+      },
+      {
+        "name": "dependabot/npm_and_yarn/npm_and_yarn-182df79fae",
+        "sha": "8e75f2127de9825de21dd712b50b6de59df8f910"
+      },
+      {
+        "name": "feat/p4-gpu-accelerator",
+        "sha": "b8f50057011662689a9caf763dd991f1cf2cff31"
+      },
+      {
+        "name": "feature/rebuild-push",
+        "sha": "9738a19487ebc7a9af54d14e7b16623264ec060a"
+      },
+      {
+        "name": "kilo-change",
+        "sha": "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6"
+      },
+      {
+        "name": "main",
+        "sha": "d4028440fda251129c734bf971ee9039c3b7526e"
+      },
+      {
+        "name": "prod-gpu-validation",
+        "sha": "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96"
+      },
+      {
+        "name": "push-clean-20260402-222452",
+        "sha": "4aa4d92d01c612e3e71969f1a7c7a73a24b2a6ea"
+      },
+      {
+        "name": "rc0-cleanup",
+        "sha": "ddf10e54b09e553010d6a59a4a0f99beeceb34b0"
+      },
+      {
+        "name": "rc0-gates-clean",
+        "sha": "a313d237500c85342683ed123666f04357d582c0"
+      },
+      {
+        "name": "tell-me-what-you-think-of-my-atomic-swaps-1772435451471",
+        "sha": "f52e44459f0b73437df55051af8f716ae7f72bef"
+      },
+      {
+        "name": "update-configs",
+        "sha": "96e2e27a3bf41498fc8542ed5eb2708ed2f98531"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/atlas-sphere1",
+    "local_paths": [
+      "/home/lojak/x3-recovery-sources/atlas-sphere1.git",
+      "/home/lojak/x3-recovery/mirrors/atlas-sphere1.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/atlas-sphere1",
+    "default_branch": "feature/x3vm-metadata-snapshot",
+    "branches": [
+      {
+        "name": "feature/x3vm-metadata-snapshot",
+        "sha": "e3f3227e148856de71b66b9d51a25217d8cee1d5"
+      },
+      {
+        "name": "lets-go",
+        "sha": "699d2a86067fbf8546d5f35da556dac8385e9229"
+      },
+      {
+        "name": "main",
+        "sha": "e2199bf40f81f26b683572f88e48c6428fbac51c"
+      }
+    ]
+  },
+  {
+    "requested_repo": "cryptopimpin/atlas-sphere",
+    "local_paths": [
+      "/home/lojak/x3-recovery-sources/cryptopimpin-atlas-sphere.git"
+    ],
+    "resolved_repo": "cryptopimpin/atlas-sphere",
+    "default_branch": "main",
+    "branches": [
+      {
+        "name": "copilot/optimize-blockchain-project",
+        "sha": "a0083fe9ecb6ec2eb46a7809406c4718d5bb134f"
+      },
+      {
+        "name": "copilot/real-scorecard-for-all-features",
+        "sha": "abf4ecd60a7bf279f85f8c3ac62bc5bc591edd17"
+      },
+      {
+        "name": "copilot/sub-pr-1",
+        "sha": "488d3c911f510e9325bc87e0afe55d71af01f529"
+      },
+      {
+        "name": "main",
+        "sha": "abf4ecd60a7bf279f85f8c3ac62bc5bc591edd17"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/the-reaper",
+    "local_paths": [
+      "/home/lojak/x3-recovery-sources/the-reaper.git",
+      "/home/lojak/x3-recovery/mirrors/the-reaper.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/the-reaper",
+    "default_branch": "master",
+    "branches": [
+      {
+        "name": "master",
+        "sha": "73a4642cfd05c7162d59e51a9e8de8ad5f8a9b07"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/the-reaper2",
+    "local_paths": [
+      "/home/lojak/x3-recovery-sources/the-reaper2.git",
+      "/home/lojak/x3-recovery/mirrors/the-reaper2.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/the-reaper2",
+    "default_branch": "kustomize-field-updates",
+    "branches": [
+      {
+        "name": "008-ultimate-divine-trading",
+        "sha": "d09fe17bcb758eea5e9aa50f686549cd2a420465"
+      },
+      {
+        "name": "009-quantum-crypto",
+        "sha": "82ef51bdbafb2651d2c58486358a8f2fd23da901"
+      },
+      {
+        "name": "123",
+        "sha": "d09fe17bcb758eea5e9aa50f686549cd2a420465"
+      },
+      {
+        "name": "audit-freeze",
+        "sha": "82ef51bdbafb2651d2c58486358a8f2fd23da901"
+      },
+      {
+        "name": "fuckoff",
+        "sha": "a092750f1109c34108c6aeb62917b715cec7c752"
+      },
+      {
+        "name": "kustomize-field-updates",
+        "sha": "342a5bacdc3bb6b236362c3444c4696b2910d4f0"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/Shark-Bite",
+    "local_paths": [
+      "/home/lojak/x3-recovery/mirrors/Shark-Bite.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/Shark-Bite",
+    "default_branch": "feature/ci-gpu-parity",
+    "branches": [
+      {
+        "name": "copilot/setup-miner-with-pool",
+        "sha": "1b877427dcfb225915163eeee0e4a85557214246"
+      },
+      {
+        "name": "feature/ci-gpu-parity",
+        "sha": "97f425d824442ee436b52aa782b609ea3de95289"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/no_fear_near_wallet",
+    "local_paths": [
+      "/home/lojak/x3-recovery/mirrors/no_fear_near_wallet.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/no_fear_near_wallet",
+    "default_branch": "main",
+    "branches": [
+      {
+        "name": "dependabot/npm_and_yarn/npm_and_yarn-9f9e7816eb",
+        "sha": "f2f6df8f2d088f786fd46a3f43cc4519e8925a34"
+      },
+      {
+        "name": "main",
+        "sha": "a9b888931e32a48c7a627513afe4269ddfc95ed3"
+      },
+      {
+        "name": "new",
+        "sha": "a9b888931e32a48c7a627513afe4269ddfc95ed3"
+      }
+    ]
+  },
+  {
+    "requested_repo": "Cyptopimpinainteazy/x3-clipforge",
+    "local_paths": [
+      "/home/lojak/x3-recovery/mirrors/x3-clipforge.git"
+    ],
+    "resolved_repo": "Cyptopimpinainteazy/x3-clipforge",
+    "default_branch": "master",
+    "branches": [
+      {
+        "name": "master",
+        "sha": "e84120b690842bf24fb5b274eb8f71d2d159f724"
+      }
+    ]
+  }
+]

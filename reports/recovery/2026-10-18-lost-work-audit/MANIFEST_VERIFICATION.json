@@ -1,0 +1,6 @@
+{
+  "state": "PASS",
+  "verified_artifacts": 429,
+  "mismatches": [],
+  "scope": "Checksums of report/evidence artifacts only; not original repository integrity or feature behavior."
+}

@@ -1,0 +1,22 @@
+{
+  "candidate": {
+    "rc": 0,
+    "out": "1b6be1bccf142f93c5c360cb1c0dbec55c27680d 3afc3a6a7fbaa5adada8bf200faef16d62540253 feat: add X3 Grant Hunter v3 discovery and grant operations\n\n tools/x3-grant-hunter/.gitignore               |   6 ++\n tools/x3-grant-hunter/README.md                |  58 +++++++++++++\n tools/x3-grant-hunter/community.py             |  21 +++++\n tools/x3-grant-hunter/discovery.py             | 116 +++++++++++++++++++++++++\n tools/x3-grant-hunter/grantops.py              |  87 +++++++++++++++++++\n tools/x3-grant-hunter/hunter.py                |  34 ++++++++\n tools/x3-grant-hunter/opportunities-extra.json |   8 ++\n tools/x3-grant-hunter/tests/test_discovery.py  |  58 +++++++++++++\n tools/x3-grant-hunter/tests/test_grantops.py   |  27 ++++++\n tools/x3-grant-hunter/tests/test_hunter.py     |  11 +++\n 10 files changed, 426 insertions(+)\n",
+    "err": ""
+  },
+  "published": {
+    "rc": 0,
+    "out": "3ddedd61df18aca449b3aff9751e8020a8f32a90 70423054e2d9560a212ab763d4f265f9cdc448d9 feat: add X3 Grant Hunter v3 discovery and grant operations\n\n tools/x3-grant-hunter/.gitignore               |   6 ++\n tools/x3-grant-hunter/README.md                |  58 +++++++++++++\n tools/x3-grant-hunter/community.py             |  21 +++++\n tools/x3-grant-hunter/discovery.py             | 116 +++++++++++++++++++++++++\n tools/x3-grant-hunter/grantops.py              |  87 +++++++++++++++++++\n tools/x3-grant-hunter/hunter.py                |  34 ++++++++\n tools/x3-grant-hunter/opportunities-extra.json |   8 ++\n tools/x3-grant-hunter/tests/test_discovery.py  |  58 +++++++++++++\n tools/x3-grant-hunter/tests/test_grantops.py   |  27 ++++++\n tools/x3-grant-hunter/tests/test_hunter.py     |  11 +++\n 10 files changed, 426 insertions(+)\n",
+    "err": ""
+  },
+  "tool_diff": {
+    "rc": 0,
+    "out": "",
+    "err": ""
+  },
+  "cherry": {
+    "rc": 0,
+    "out": "+ 6c2eec195e2068a49065f60b7dae7e4f2d474f6a\n+ e394823a33fcbe4ed1106cb09ca45f401538a37f\n+ 3afc3a6a7fbaa5adada8bf200faef16d62540253\n- 1b6be1bccf142f93c5c360cb1c0dbec55c27680d\n",
+    "err": ""
+  }
+}

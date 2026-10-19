@@ -1,0 +1,434 @@
+{
+  "561": {
+    "pr_files": [
+      "crates/x3-gateway/tests/postgres_integration.rs",
+      "scripts/gateway-postgres-integration.sh",
+      "scripts/local-ci.sh"
+    ],
+    "source_markers": [
+      {
+        "path": "crates/x3-gateway/tests/postgres_integration.rs",
+        "exists_at_master": true,
+        "marker_lines": [
+          6,
+          9,
+          10,
+          16,
+          18,
+          22,
+          24,
+          26,
+          42,
+          45,
+          76,
+          206,
+          288,
+          384,
+          433
+        ]
+      },
+      {
+        "path": "scripts/gateway-postgres-integration.sh",
+        "exists_at_master": true,
+        "marker_lines": [
+          2,
+          4,
+          12,
+          13,
+          26,
+          31,
+          39,
+          47,
+          50,
+          51,
+          52,
+          66,
+          70,
+          72,
+          74
+        ]
+      },
+      {
+        "path": "scripts/local-ci.sh",
+        "exists_at_master": true,
+        "marker_lines": [
+          37,
+          45,
+          89,
+          143,
+          220,
+          221,
+          229,
+          236,
+          237,
+          266,
+          326,
+          383,
+          391,
+          392,
+          399,
+          400,
+          401,
+          411,
+          416,
+          417,
+          422,
+          423,
+          441,
+          452,
+          468,
+          472,
+          473,
+          476,
+          483,
+          485,
+          491,
+          492,
+          530,
+          542,
+          546
+        ]
+      }
+    ]
+  },
+  "562": {
+    "pr_files": [
+      "services/x3-ai-router/README.md",
+      "services/x3-ai-router/config.json",
+      "services/x3-ai-router/router.py",
+      "services/x3-ai-router/test_router.py"
+    ],
+    "source_markers": [
+      {
+        "path": "services/x3-ai-router/README.md",
+        "exists_at_master": true,
+        "marker_lines": [
+          11,
+          22,
+          103,
+          105,
+          121,
+          129,
+          171,
+          239,
+          242,
+          302,
+          303,
+          307,
+          351,
+          352
+        ]
+      },
+      {
+        "path": "services/x3-ai-router/router.py",
+        "exists_at_master": true,
+        "marker_lines": [
+          31,
+          40,
+          41,
+          43,
+          44,
+          88,
+          117,
+          121,
+          163,
+          190,
+          248,
+          265,
+          266,
+          268,
+          287,
+          297,
+          365,
+          375,
+          406,
+          475,
+          479,
+          542,
+          543,
+          545,
+          554,
+          602,
+          604,
+          624,
+          625,
+          626,
+          656,
+          682,
+          694,
+          696,
+          703
+        ]
+      },
+      {
+        "path": "services/x3-ai-router/test_router.py",
+        "exists_at_master": true,
+        "marker_lines": [
+          506,
+          508,
+          511,
+          528,
+          530,
+          543,
+          544,
+          571,
+          580,
+          583,
+          586,
+          603,
+          604,
+          608,
+          611,
+          625,
+          628,
+          629,
+          638,
+          641,
+          642,
+          690,
+          721,
+          747,
+          812,
+          819,
+          838,
+          851,
+          862,
+          875,
+          885,
+          893,
+          916,
+          925,
+          951
+        ]
+      }
+    ]
+  },
+  "585": {
+    "pr_files": [
+      ".github/workflows/x3-lang-nested-workspace.yml"
+    ],
+    "source_markers": [
+      {
+        "path": ".github/workflows/x3-lang-nested-workspace.yml",
+        "exists_at_master": true,
+        "marker_lines": [
+          23,
+          49,
+          50
+        ]
+      }
+    ]
+  },
+  "586": {
+    "pr_files": [
+      ".github/workflows/x3-compiled-storage-build.yml",
+      "pallets/x3-kernel/tests/x3_storage_channel.rs"
+    ],
+    "source_markers": [
+      {
+        "path": ".github/workflows/x3-compiled-storage-build.yml",
+        "exists_at_master": true,
+        "marker_lines": [
+          1,
+          7,
+          12,
+          16,
+          21,
+          28,
+          46,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          55
+        ]
+      },
+      {
+        "path": "pallets/x3-kernel/tests/x3_storage_channel.rs",
+        "exists_at_master": true,
+        "marker_lines": [
+          1,
+          4,
+          11,
+          12,
+          13,
+          32,
+          37,
+          41,
+          44,
+          58,
+          91,
+          98,
+          145,
+          169,
+          195,
+          196,
+          198,
+          206,
+          208,
+          215,
+          217,
+          344,
+          353,
+          357,
+          358,
+          360,
+          369,
+          373,
+          377,
+          380,
+          381,
+          383,
+          389,
+          391,
+          397
+        ]
+      }
+    ]
+  },
+  "587": {
+    "pr_files": [
+      ".github/workflows/x3lang-control-flow-parity.yml",
+      "crates/x3-integration/tests/source_language.rs"
+    ],
+    "source_markers": [
+      {
+        "path": ".github/workflows/x3lang-control-flow-parity.yml",
+        "exists_at_master": true,
+        "marker_lines": [
+          7,
+          14,
+          46,
+          48
+        ]
+      },
+      {
+        "path": "crates/x3-integration/tests/source_language.rs",
+        "exists_at_master": true,
+        "marker_lines": [
+          1,
+          7,
+          10,
+          18,
+          99,
+          110,
+          116,
+          131,
+          144,
+          236,
+          237,
+          240,
+          256,
+          259,
+          264,
+          356,
+          359,
+          376,
+          379,
+          381,
+          470,
+          474,
+          545
+        ]
+      }
+    ]
+  },
+  "590": {
+    "pr_files": [
+      "Cargo.lock",
+      "crates/gpu-sig-verifier/Cargo.toml",
+      "crates/gpu-sig-verifier/src/cpu_reference.rs",
+      "crates/gpu-sig-verifier/src/lib.rs"
+    ],
+    "source_markers": [
+      {
+        "path": "crates/gpu-sig-verifier/Cargo.toml",
+        "exists_at_master": true,
+        "marker_lines": [
+          5,
+          8
+        ]
+      },
+      {
+        "path": "crates/gpu-sig-verifier/src/cpu_reference.rs",
+        "exists_at_master": true,
+        "marker_lines": [
+          1,
+          4,
+          5,
+          6,
+          8,
+          11,
+          12,
+          15,
+          17,
+          23,
+          26,
+          32,
+          35,
+          39,
+          40,
+          43,
+          48,
+          51,
+          53,
+          56,
+          58,
+          61,
+          63,
+          66,
+          69,
+          72,
+          75,
+          79,
+          80,
+          81,
+          84
+        ]
+      },
+      {
+        "path": "crates/gpu-sig-verifier/src/lib.rs",
+        "exists_at_master": true,
+        "marker_lines": [
+          1,
+          3,
+          4,
+          7,
+          21,
+          43,
+          46,
+          57,
+          64,
+          65,
+          71,
+          72,
+          83,
+          84,
+          86,
+          90,
+          91,
+          98,
+          99,
+          101,
+          103,
+          104,
+          106,
+          108,
+          109,
+          134,
+          145,
+          150,
+          162,
+          207,
+          216,
+          235,
+          236,
+          290,
+          324
+        ]
+      }
+    ]
+  }
+}

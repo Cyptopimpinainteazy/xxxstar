@@ -1,0 +1,722 @@
+[
+  {
+    "feature": "X3Lang compiler, VM, bytecode, automation and AI programming",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 305,
+    "test_or_workflow_file_count": 146,
+    "representative_sources": [
+      "crates/voice-to-x3/src/error.rs",
+      "crates/voice-to-x3/src/generator.rs",
+      "crates/voice-to-x3/src/intent.rs",
+      "crates/voice-to-x3/src/lib.rs",
+      "crates/voice-to-x3/src/templates.rs",
+      "crates/x3-integration/fuzz/corpus/compile_and_run/branch_fold.x3",
+      "crates/x3-integration/fuzz/corpus/compile_and_run/fib.x3",
+      "crates/x3-integration/fuzz/corpus/compile_and_run/float_math.x3",
+      "crates/x3-integration/fuzz/corpus/compile_and_run/loop_break.x3",
+      "crates/x3-integration/fuzz/corpus/compile_and_run/loop_continue.x3",
+      "crates/x3-integration/fuzz/corpus/compile_and_run/loop_ops.x3",
+      "crates/x3-integration/fuzz/corpus/compile_and_run/loop_sum.x3",
+      "crates/x3-integration/fuzz/corpus/compile_and_run/match_cond.x3",
+      "crates/x3-integration/fuzz/fuzz_targets/compile_and_run.rs",
+      "crates/x3-integration/fuzz/fuzz_targets/x3bc_engines.rs",
+      "crates/x3-integration/src/compiler_bridge.rs",
+      "crates/x3-integration/src/error.rs",
+      "crates/x3-integration/src/executor.rs",
+      "crates/x3-integration/src/hostcalls.rs",
+      "crates/x3-integration/src/lib.rs"
+    ],
+    "test_or_workflow_paths": [
+      "crates/x3-integration/tests/artifact_attestation.rs",
+      "crates/x3-integration/tests/bc_const_pool_parity.rs",
+      "crates/x3-integration/tests/bytecode_robustness.rs",
+      "crates/x3-integration/tests/bytecode_version_compat.rs",
+      "crates/x3-integration/tests/chain_engine.rs",
+      "crates/x3-integration/tests/compiler_bridge.rs",
+      "crates/x3-integration/tests/differential.rs",
+      "crates/x3-integration/tests/engine_hardening.rs",
+      "crates/x3-integration/tests/events.rs",
+      "crates/x3-integration/tests/gas_accounting.rs",
+      "crates/x3-integration/tests/interpreter_agreement.rs",
+      "crates/x3-integration/tests/mini_x3_fail_closed.rs",
+      "crates/x3-integration/tests/source_language.rs",
+      "pallets/x3-kernel/src/chaos_tests.rs",
+      "pallets/x3-kernel/src/packet_integration_tests.rs",
+      "pallets/x3-kernel/src/replay_tests.rs",
+      "pallets/x3-kernel/src/test_helpers.rs",
+      "pallets/x3-kernel/src/tests.rs",
+      "pallets/x3-kernel/src/tests/property_tests.rs",
+      "pallets/x3-kernel/tests/x3_adapter_route.rs",
+      "pallets/x3-kernel/tests/x3_storage_channel.rs",
+      "tools/x3-forge/test_bisect_runner.py",
+      "tools/x3-forge/test_completion.py",
+      "tools/x3-forge/test_context.py",
+      "tools/x3-forge/test_failure_memory.py"
+    ],
+    "related_prs": [
+      {
+        "number": 623,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "2ae185d7e0f2ff19da48744a4acc425d9f67ec08"
+      },
+      {
+        "number": 628,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "218f44d58ea7b268c43cbdbd85c2a8442ea4acf2"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "Atomic trading, DEX, MEV and execution receipts",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 126,
+    "test_or_workflow_file_count": 31,
+    "representative_sources": [
+      "X3-contracts/evm/contracts/EvmReceiptVerifier.sol",
+      "X3-contracts/svm/programs/x3_receipt_verifier/src/lib.rs",
+      "crates/cross-vm-coordinator/src/abi.rs",
+      "crates/cross-vm-coordinator/src/attempt_ledger.rs",
+      "crates/cross-vm-coordinator/src/concurrent.rs",
+      "crates/cross-vm-coordinator/src/config.rs",
+      "crates/cross-vm-coordinator/src/flashloan_adapter.rs",
+      "crates/cross-vm-coordinator/src/htlc.rs",
+      "crates/cross-vm-coordinator/src/intent_binding.rs",
+      "crates/cross-vm-coordinator/src/lease.rs",
+      "crates/cross-vm-coordinator/src/lib.rs",
+      "crates/cross-vm-coordinator/src/merkle_settlement.rs",
+      "crates/cross-vm-coordinator/src/persistence.rs",
+      "crates/cross-vm-coordinator/src/proof_binding.rs",
+      "crates/cross-vm-coordinator/src/proof_vault.rs",
+      "crates/cross-vm-coordinator/src/recovery.rs",
+      "crates/cross-vm-coordinator/src/relayer.rs",
+      "crates/cross-vm-coordinator/src/rpc_client.rs",
+      "crates/cross-vm-coordinator/src/settlement_finality.rs",
+      "crates/cross-vm-coordinator/src/settlement_outbox.rs"
+    ],
+    "test_or_workflow_paths": [
+      "X3-contracts/evm/test/EvmReceiptVerifier.t.sol",
+      "crates/cross-vm-coordinator/src/bridge_integration_tests.rs",
+      "crates/cross-vm-coordinator/src/tests.rs",
+      "crates/cross-vm-coordinator/tests/distributed_chaos.rs",
+      "crates/cross-vm-coordinator/tests/security_regression.rs",
+      "crates/cross-vm-coordinator/tests/valkey_live.rs",
+      "crates/x3-dex/src/tests/attack_liquidation_frontrun.rs",
+      "crates/x3-dex/src/tests/attack_oracle_frontrun.rs",
+      "crates/x3-dex/src/tests/attack_sandwich.rs",
+      "crates/x3-dex/src/tests/attack_twap_manipulation.rs",
+      "crates/x3-verification-router/tests/real_block_receipt_trie.rs",
+      "launch-gates/sources/pack-04-invariant/atomic-trade-engine/tests.rs",
+      "launch-gates/sources/pack-04-invariant/x3-settlement-engine/bridge_tests.rs",
+      "launch-gates/sources/pack-04-invariant/x3-settlement-engine/property_tests.rs",
+      "launch-gates/sources/pack-04-invariant/x3-settlement-engine/tests.rs",
+      "launch-gates/sources/pack-05-test-gap/pallets/atomic-trade-engine-excerpt.rs",
+      "launch-gates/sources/pack-05-test-gap/pallets/atomic-trade-engine-tests.rs",
+      "launch-gates/sources/pack-05-test-gap/pallets/x3-settlement-engine-excerpt.rs",
+      "launch-gates/sources/pack-05-test-gap/pallets/x3-settlement-engine-tests.rs",
+      "node/tests/x3lang_network_receipt.rs",
+      "pallets/atomic-trade-engine/src/tests.rs",
+      "pallets/x3-dex/src/tests.rs",
+      "pallets/x3-dex/src/tests_amm_math.rs",
+      "pallets/x3-dex/src/tests_liquidity_provision.rs",
+      "pallets/x3-dex/src/tests_swapping.rs"
+    ],
+    "related_prs": [
+      {
+        "number": 623,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "2ae185d7e0f2ff19da48744a4acc425d9f67ec08"
+      },
+      {
+        "number": 624,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "324a9871decf9469d7db1927f327bac752e6b67a"
+      },
+      {
+        "number": 628,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "218f44d58ea7b268c43cbdbd85c2a8442ea4acf2"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "EVM and SVM compatibility",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 133,
+    "test_or_workflow_file_count": 34,
+    "representative_sources": [
+      ".pre-edit-snapshot/svm-client-live/client/src/bin/x3-svm-broadcast.rs",
+      ".pre-edit-snapshot/svm-client-live/client/src/lib.rs",
+      "X3-contracts/evm/certora/run_certora.sh",
+      "X3-contracts/evm/contracts/AtlasHTLC.sol",
+      "X3-contracts/evm/contracts/AtlasSphereX3.sol",
+      "X3-contracts/evm/contracts/EvmReceiptVerifier.sol",
+      "X3-contracts/evm/contracts/WrappedX3.sol",
+      "X3-contracts/evm/contracts/X3ExternalGateway.sol",
+      "X3-contracts/evm/contracts/X3KernelBridge.sol",
+      "X3-contracts/evm/contracts/X3VmERC20.sol",
+      "X3-contracts/evm/contracts/flashloan/X3Flashloan.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryAppFactory.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryCreatorVault.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryDisputeResolver.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryFeeConfig.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryForkRemix.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryGovernance.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryMarketplace.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryReferralRouter.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryRegistry.sol"
+    ],
+    "test_or_workflow_paths": [
+      ".github/workflows/x3vm-evm-live-lifecycle.yml",
+      "X3-contracts/evm/test-live-lifecycle.sh",
+      "X3-contracts/evm/test/AtlasHTLC.t.sol",
+      "X3-contracts/evm/test/AtlasSphereX3.t.sol",
+      "X3-contracts/evm/test/CrossChainGovernance.t.sol",
+      "X3-contracts/evm/test/EvmReceiptVerifier.t.sol",
+      "X3-contracts/evm/test/StakingPool.t.sol",
+      "X3-contracts/evm/test/Treasury.t.sol",
+      "X3-contracts/evm/test/WrappedX3.t.sol",
+      "X3-contracts/evm/test/X3ExternalGateway.t.sol",
+      "X3-contracts/evm/test/X3KernelBridge.t.sol",
+      "X3-contracts/evm/test/X3VmERC20.t.sol",
+      "X3-contracts/evm/test/echidna/EchidnaX3.sol",
+      "X3-contracts/evm/test/parity/FlashloanParity.t.sol",
+      "X3-contracts/evm/test/unit/X3Flashloan.t.sol",
+      "X3-contracts/shared/gpu-parity-core/tests/parity_vectors.rs",
+      "X3-contracts/shared/parity-core/tests/parity_vectors.rs",
+      "X3-contracts/svm/programs/x3_htlc/run-expiry-test.sh",
+      "X3-contracts/svm/programs/x3_htlc/test-live-lifecycle.sh",
+      "X3-contracts/svm/programs/x3_htlc/tests-live/tests/expiry_lifecycle.rs",
+      "X3-contracts/svm/tests/integration.ts",
+      "crates/evm-integration/tests/erc20_integration.rs",
+      "crates/evm-integration/tests/integration.rs",
+      "crates/x3-atomic-swap/tests/evm_tx_minimal_integers.rs",
+      "crates/x3-finality-oracle/src/test_only_evm.rs"
+    ],
+    "related_prs": [
+      {
+        "number": 555,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "46101ae22e7c1386e372d4901b098c34d256f103"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "Consensus, validators and testnet",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 422,
+    "test_or_workflow_file_count": 183,
+    "representative_sources": [
+      ".pre-edit-snapshot/finality-feed-seam/finality_feed.rs",
+      ".pre-edit-snapshot/staking-fix/validator_stats.rs",
+      "apps/dashboard/src/panels/docs/ValidatorHealthPanel.tsx",
+      "apps/dashboard/src/panels/tools/ValidatorAutomationPanel.tsx",
+      "apps/inferstructor-dashboard/src/components/ValidatorControls.tsx",
+      "apps/validators/postcss.config.js",
+      "apps/validators/src/App.tsx",
+      "apps/validators/src/components/ValidatorGlobe.tsx",
+      "apps/validators/src/main.tsx",
+      "apps/validators/src/vite-env.d.ts",
+      "apps/validators/tailwind.config.js",
+      "apps/validators/vite.config.ts",
+      "apps/x3-desktop/dist/assets/ValidatorGlobePanel-COyPESA3.js",
+      "apps/x3-desktop/src/ui/panels/ValidatorGlobePanel.tsx",
+      "apps/x3-studio/src/components/panels/ValidatorPanel.tsx",
+      "crates/cross-chain-gpu-validator/benches/gpu_kernels.rs",
+      "crates/cross-chain-gpu-validator/src/dashboard.rs",
+      "crates/cross-chain-gpu-validator/src/error.rs",
+      "crates/cross-chain-gpu-validator/src/evm_validator.rs",
+      "crates/cross-chain-gpu-validator/src/failover.rs"
+    ],
+    "test_or_workflow_paths": [
+      ".github/workflows/four-validator-mesh.yml",
+      "crates/cross-chain-gpu-validator/deployment/deploy_testnet.sh",
+      "crates/cross-chain-gpu-validator/tests/integration_tests.rs",
+      "crates/x3-compiler/tests/schema_validator.rs",
+      "crates/x3-finality-oracle/src/test_only_evm.rs",
+      "crates/x3-finality-oracle/src/test_only_solana.rs",
+      "crates/x3-gateway/tests/shuttle_validator_async.rs",
+      "crates/x3-gpu-validator-swarm/tests/chaos_stress_test.rs",
+      "crates/x3-gpu-validator-swarm/tests/metrics_sliding_window_integration.rs",
+      "crates/x3-gpu-validator-swarm/tests/stress_harness.rs",
+      "crates/x3-gpu-validator-swarm/tests/stress_with_real_time_metrics.rs",
+      "crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs",
+      "crates/x3-gpu-validator-swarm/tests/tps_sliding_window_test.rs",
+      "crates/x3-validator-attestation/src/lib.rs",
+      "infra-structure/validator/deployment/run_testnet.sh",
+      "infra-structure/validator/docker-compose.testnet.yml",
+      "infra-structure/validator/scripts/run-e2e-tests.sh",
+      "infra-structure/validator/scripts/run-local-tests.sh",
+      "infra-structure/validator/tests/adversarial/test_determinism_attack.py",
+      "infra-structure/validator/tests/adversarial/test_gpu_crash.py",
+      "infra-structure/validator/tests/adversarial/test_lane_flood.py",
+      "infra-structure/validator/tests/adversarial/test_network_chaos.py",
+      "infra-structure/validator/tests/inferstructor/admin_api.py",
+      "infra-structure/validator/tests/inferstructor/configs/orchestrator.yaml",
+      "infra-structure/validator/tests/inferstructor/configs/primary_lane.yaml"
+    ],
+    "related_prs": [
+      {
+        "number": 592,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "0b0c477c220377e098a7ac675053e7da0717a980"
+      },
+      {
+        "number": 607,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "7fa5383aa10c14372c3c70da06b4cb102ac9ea2f"
+      },
+      {
+        "number": 625,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "d5bde264dd9de3c73141404841f6e5f25d1a319d"
+      },
+      {
+        "number": 634,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "e01adae8bd6501cded6115f97965e3a2a147f001"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "GPU swarm and distributed compute",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 596,
+    "test_or_workflow_file_count": 142,
+    "representative_sources": [
+      ".ai/runlogs/swarm-reactor-reconcile-20260927/weights-regenerated-by-primary.rs",
+      ".scripts/x3_level10_swarm.sh",
+      ".scripts/x3_swarm_loop.sh",
+      ".x3/context/X3_SWARM_CONFIG.yaml",
+      "X3-contracts/shared/gpu-parity-core/src/lib.rs",
+      "apps/inferstructor-dashboard/src/components/dashboard/GPULanesSection.tsx",
+      "apps/tauri-os/src-tauri/src/swarm.rs",
+      "apps/tauri-os/src/apps/SwarmCommand/SwarmCommand.tsx",
+      "apps/x3-desktop/dist/assets/SwarmActivityPanel-BXX9htd8.js",
+      "apps/x3-desktop/src/ui/panels/SwarmActivityPanel.tsx",
+      "apps/x3-intelligence/src/views/SwarmActivity.tsx",
+      "crates/confidential-gpu/src/enclave.rs",
+      "crates/confidential-gpu/src/lib.rs",
+      "crates/confidential-gpu/src/threshold.rs",
+      "crates/cross-chain-gpu-validator/benches/gpu_kernels.rs",
+      "crates/cross-chain-gpu-validator/src/dashboard.rs",
+      "crates/cross-chain-gpu-validator/src/error.rs",
+      "crates/cross-chain-gpu-validator/src/evm_validator.rs",
+      "crates/cross-chain-gpu-validator/src/failover.rs",
+      "crates/cross-chain-gpu-validator/src/kernels.rs"
+    ],
+    "test_or_workflow_paths": [
+      ".github/workflows/swarm-reactor-pr519-verify.yml",
+      ".github/workflows/swarm-tps-gpu-soak.yml",
+      ".github/workflows/x3fronend-gpu-swarm.yml",
+      "X3-contracts/shared/gpu-parity-core/tests/parity_vectors.rs",
+      "crates/confidential-gpu/src/attestation.rs",
+      "crates/cross-chain-gpu-validator/deployment/deploy_testnet.sh",
+      "crates/cross-chain-gpu-validator/tests/integration_tests.rs",
+      "crates/gpu-swarm/src/test_gpu_integration.py",
+      "crates/gpu-swarm/tests/admin_api.rs",
+      "crates/gpu-swarm/tests/bip39_vectors.rs",
+      "crates/gpu-swarm/tests/blockchain_tests.rs",
+      "crates/gpu-swarm/tests/gpu_cache_analysis.rs",
+      "crates/gpu-swarm/tests/gpu_tps_benchmark.rs",
+      "crates/gpu-swarm/tests/integration_tests.rs",
+      "crates/gpu-swarm/tests/network_tests.rs",
+      "crates/gpu-swarm/tests/wallet_derivation.rs",
+      "crates/x3-accel/tests/secp256k1_gpu_parity.rs",
+      "crates/x3-gpu-validator-swarm/tests/chaos_stress_test.rs",
+      "crates/x3-gpu-validator-swarm/tests/metrics_sliding_window_integration.rs",
+      "crates/x3-gpu-validator-swarm/tests/stress_harness.rs",
+      "crates/x3-gpu-validator-swarm/tests/stress_with_real_time_metrics.rs",
+      "crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs",
+      "crates/x3-gpu-validator-swarm/tests/tps_sliding_window_test.rs",
+      "crates/x3-swarm-core/tests/agent_lifecycle.rs",
+      "crates/x3-swarm-core/tests/guard_tests.rs"
+    ],
+    "related_prs": [
+      {
+        "number": 590,
+        "state": "closed",
+        "merged_at": "2026-10-14T03:16:12Z",
+        "head_sha": "285ed11b6d2fcf52aca35c355d91d041759a0193"
+      },
+      {
+        "number": 594,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "044a5e192b128357232561dd93d058469ed0f0c1"
+      },
+      {
+        "number": 608,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "1dddb5432c761d44ba6ed5ab93a8ed90d06a4efe"
+      },
+      {
+        "number": 626,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "9094f71e297323ef000c6c4e47945f79af17735a"
+      },
+      {
+        "number": 627,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "eff2ec8b98ea133125bd9d081ab5d1d0668c0a5a"
+      },
+      {
+        "number": 629,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "53fd11bb584c12524ace858b22801775a5686bc7"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "Confidential execution",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 12,
+    "test_or_workflow_file_count": 2,
+    "representative_sources": [
+      "apps/x3-desktop/src-tauri/tauri-vendor/itertools-0.10.5/src/tee.rs",
+      "apps/x3-desktop/src-tauri/tauri-vendor/itertools/src/tee.rs",
+      "apps/x3-desktop/src-tauri/tauri-vendor/libc/src/new/teeos/mod.rs",
+      "apps/x3-desktop/src-tauri/tauri-vendor/libc/src/teeos/mod.rs",
+      "crates/confidential-gpu/src/enclave.rs",
+      "crates/confidential-gpu/src/lib.rs",
+      "crates/confidential-gpu/src/threshold.rs",
+      "crates/private-mempool/src/lib.rs",
+      "crates/private-mempool/src/queue.rs",
+      "pallets/x3-kernel/src/private_submission_intake.rs"
+    ],
+    "test_or_workflow_paths": [
+      "crates/confidential-gpu/src/attestation.rs",
+      "x3-lang/vm/tests/private_submission.rs"
+    ],
+    "related_prs": [
+      {
+        "number": 623,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "2ae185d7e0f2ff19da48744a4acc425d9f67ec08"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "AI Router, gateway and orchestration",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 104,
+    "test_or_workflow_file_count": 20,
+    "representative_sources": [
+      "apps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.tsx",
+      "apps/inferstructor-dashboard/src/components/orchestra-incidents.ts",
+      "crates/atomic-swap-orchestrator/src/atomic_lock.rs",
+      "crates/atomic-swap-orchestrator/src/lib.rs",
+      "crates/cross-chain-gpu-validator/src/orchestrator.rs",
+      "crates/gpu-swarm/src/funding/orchestrator.rs",
+      "crates/orchestra/src/agent/identity.rs",
+      "crates/orchestra/src/agent/lifecycle.rs",
+      "crates/orchestra/src/agent/mod.rs",
+      "crates/orchestra/src/agent/off_chain.rs",
+      "crates/orchestra/src/agent/on_chain.rs",
+      "crates/orchestra/src/audit.rs",
+      "crates/orchestra/src/jury/aggregation.rs",
+      "crates/orchestra/src/jury/mod.rs",
+      "crates/orchestra/src/jury/rotation.rs",
+      "crates/orchestra/src/jury/session.rs",
+      "crates/orchestra/src/jury/voting.rs",
+      "crates/orchestra/src/lib.rs",
+      "crates/orchestra/src/rotation.rs",
+      "crates/orchestra/src/score.rs"
+    ],
+    "test_or_workflow_paths": [
+      "apps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.test.ts",
+      "apps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.ui.test.tsx",
+      "crates/orchestra/src/task/spec.rs",
+      "crates/x3-gateway/tests/loom_mempool_concurrency.rs",
+      "crates/x3-gateway/tests/migrations_cover_tables.rs",
+      "crates/x3-gateway/tests/postgres_integration.rs",
+      "crates/x3-gateway/tests/shuttle_validator_async.rs",
+      "crates/x3-orchestrator/tests/orchestrator_smoke.rs",
+      "infra-structure/validator/tests/inferstructor/configs/orchestrator.yaml",
+      "infra-structure/validator/tests/inferstructor/lane_orchestrator.py",
+      "packages/atomic-swap-sdk/dist/swap/__tests__/orchestrator.test.d.ts",
+      "packages/atomic-swap-sdk/dist/swap/__tests__/orchestrator.test.js",
+      "packages/atomic-swap-sdk/src/swap/__tests__/orchestrator.test.ts",
+      "scripts/x3-cluster/test_x3cluster.py",
+      "scripts/x3-cluster/test_x3jobs.py",
+      "services/x3-ai-router/test_durability.py",
+      "services/x3-ai-router/test_router.py",
+      "tools/cross-chain-gpu-validator/tests/inferstructor/configs/orchestrator.yaml",
+      "tools/cross-chain-gpu-validator/tests/inferstructor/lane_orchestrator.py",
+      "x3-swarm-orchestra/tests/e2e_user_test.py"
+    ],
+    "related_prs": [
+      {
+        "number": 561,
+        "state": "closed",
+        "merged_at": "2026-10-01T15:31:28Z",
+        "head_sha": "811f53a0637ce90a839e05fc151856cbade2dce2"
+      },
+      {
+        "number": 562,
+        "state": "closed",
+        "merged_at": "2026-10-01T15:31:21Z",
+        "head_sha": "eb4406372db172968112b8e373a3a5d02ab7e6da"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "X3 Studio and natural-language app creation",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 148,
+    "test_or_workflow_file_count": 15,
+    "representative_sources": [
+      "X3-contracts/evm/contracts/foundry/FoundryAppFactory.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryCreatorVault.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryDisputeResolver.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryFeeConfig.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryForkRemix.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryGovernance.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryMarketplace.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryReferralRouter.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryRegistry.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryRevenueRouter.sol",
+      "X3-contracts/evm/contracts/foundry/FoundrySubscriptionManager.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryTemplateRegistry.sol",
+      "X3-contracts/evm/contracts/foundry/FoundryTreasurySplitter.sol",
+      "apps/x3-desktop/src-tauri/src/foundry.rs",
+      "apps/x3-desktop/src/ui/FoundryPanel.tsx",
+      "apps/x3-studio/electron/main.ts",
+      "apps/x3-studio/electron/preload.ts",
+      "apps/x3-studio/pnpm-lock.yaml",
+      "apps/x3-studio/pnpm-workspace.yaml",
+      "apps/x3-studio/src/App.tsx"
+    ],
+    "test_or_workflow_paths": [
+      "apps/x3-studio/src/components/panels/TestRunnerPanel.tsx",
+      "apps/x3-studio/tests/fake-code-scanner.test.ts",
+      "apps/x3-studio/tests/new-features.test.ts",
+      "apps/x3-studio/tests/proof-report.test.ts",
+      "apps/x3-studio/tests/renderer-inputs.test.ts",
+      "apps/x3-studio/tests/scoreboard.test.ts",
+      "apps/x3-studio/tests/x3-tokenizer.test.ts",
+      "apps/x3-studio/vitest.config.ts",
+      "packages/x3-foundry-sdk/src/__tests__/smoke.test.ts",
+      "tests/foundry/app_factory.test.ts",
+      "tests/foundry/fee_config.test.ts",
+      "tests/foundry/fork_remix.test.ts",
+      "tests/foundry/revenue_router.test.ts",
+      "tests/foundry/security_pipeline.test.ts",
+      "x3-app-store/backend/test.sh"
+    ],
+    "related_prs": [
+      {
+        "number": 608,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "1dddb5432c761d44ba6ed5ab93a8ed90d06a4efe"
+      },
+      {
+        "number": 609,
+        "state": "closed",
+        "merged_at": null,
+        "head_sha": "a433b010139fcb54627f5ee3c99204d7862858e2"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "Grants, volunteers and infrastructure funding",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 21,
+    "test_or_workflow_file_count": 0,
+    "representative_sources": [
+      "apps/wallet/src/components/crm/FundingDashboard.tsx",
+      "apps/x3-desktop/src-tauri/src/crm/funding.rs",
+      "apps/x3-desktop/src-tauri/src/crm/funding_war_plan.rs",
+      "apps/x3-desktop/src-tauri/src/crm/funding_war_plan_commands.rs",
+      "apps/x3-funding/dist/assets/index-Doc6m2u0.js",
+      "apps/x3-funding/src/App.tsx",
+      "apps/x3-funding/src/FundingStrategyPage.tsx",
+      "apps/x3-funding/src/ThreeBg.tsx",
+      "apps/x3-funding/src/WalletModal.tsx",
+      "apps/x3-funding/src/data.ts",
+      "apps/x3-funding/src/data_angles.ts",
+      "apps/x3-funding/src/hooks/useWallet.ts",
+      "apps/x3-funding/src/main.tsx",
+      "apps/x3-funding/vite.config.ts",
+      "crates/gpu-swarm/src/funding/mod.rs",
+      "crates/gpu-swarm/src/funding/novaflux.rs",
+      "crates/gpu-swarm/src/funding/orchestrator.rs",
+      "crates/gpu-swarm/src/funding/webhook.rs",
+      "crates/gpu-swarm/src/jobs/funding_campaign.rs",
+      "proof/funding/milestone-receipt-map.yml"
+    ],
+    "test_or_workflow_paths": [],
+    "related_prs": [
+      {
+        "number": 626,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "9094f71e297323ef000c6c4e47945f79af17735a"
+      },
+      {
+        "number": 627,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "eff2ec8b98ea133125bd9d081ab5d1d0668c0a5a"
+      },
+      {
+        "number": 629,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "53fd11bb584c12524ace858b22801775a5686bc7"
+      },
+      {
+        "number": 630,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "6c2eec195e2068a49065f60b7dae7e4f2d474f6a"
+      },
+      {
+        "number": 631,
+        "state": "closed",
+        "merged_at": null,
+        "head_sha": "886090015eacc38ae66befebba22ddeb7bf23887"
+      },
+      {
+        "number": 632,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "e394823a33fcbe4ed1106cb09ca45f401538a37f"
+      },
+      {
+        "number": 633,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "3afc3a6a7fbaa5adada8bf200faef16d62540253"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  },
+  {
+    "feature": "CI/CD, security, observability and release engineering",
+    "classification": "integrated source present; unmerged and/or locally modified candidates; behavior UNVERIFIED",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "source_file_count": 98,
+    "test_or_workflow_file_count": 51,
+    "representative_sources": [
+      "monitoring/alertmanager.yml",
+      "monitoring/config/prometheus.yml",
+      "monitoring/local3/prometheus-local3.yml",
+      "monitoring/prometheus-rules.yml",
+      "proof/policies/release_gates.yml",
+      "scripts/gpu-production-gate.sh",
+      "scripts/local-ci.sh",
+      "scripts/mainnet/boot_local3.sh",
+      "scripts/mainnet/build-release-artifacts.sh",
+      "scripts/mainnet/build_runtime_upgrade_artifact.sh",
+      "scripts/mainnet/fresh_build_check.sh",
+      "scripts/mainnet/genesis_ceremony.sh",
+      "scripts/mainnet/genesis_lint.sh",
+      "scripts/mainnet/harden_validator_gate.sh",
+      "scripts/mainnet/launch_record.py",
+      "scripts/mainnet/local3_lib.sh",
+      "scripts/mainnet/mainnet_rc_gate.sh",
+      "scripts/mainnet/panic_unwrap_audit.sh",
+      "scripts/mainnet/peer-id-from-ed25519-pubkey.py",
+      "scripts/mainnet/phase10_ai_swarm_gate.sh"
+    ],
+    "test_or_workflow_paths": [
+      ".github/workflows/benchmark-regression.yml",
+      ".github/workflows/codeql.yml",
+      ".github/workflows/deploy-dashboard.yml",
+      ".github/workflows/deploy-transparency.yml",
+      ".github/workflows/distributed-atomic-chaos.yml",
+      ".github/workflows/docs-consistency.yml",
+      ".github/workflows/economic-attack-tests.yml",
+      ".github/workflows/feature-matrix.yml",
+      ".github/workflows/formal-verification.yml",
+      ".github/workflows/four-validator-mesh.yml",
+      ".github/workflows/frame-benchmarking.yml",
+      ".github/workflows/local-ci.yml",
+      ".github/workflows/mainnet-readiness.yml",
+      ".github/workflows/markdown-autodocs.yml",
+      ".github/workflows/osv-scan.yml",
+      ".github/workflows/production-gate.yml",
+      ".github/workflows/proof-gates.yml",
+      ".github/workflows/queue-drain.yml",
+      ".github/workflows/release-candidate-rehearsal.yml",
+      ".github/workflows/release-hardening.yml",
+      ".github/workflows/release-provenance.yml",
+      ".github/workflows/repo-scanner.yml",
+      ".github/workflows/security-audit.yml",
+      ".github/workflows/security-dashboard.yml",
+      ".github/workflows/semgrep.yml"
+    ],
+    "related_prs": [
+      {
+        "number": 585,
+        "state": "closed",
+        "merged_at": "2026-10-14T03:16:12Z",
+        "head_sha": "5f0179c84479cf4a03ed04d241ad4fec12b8d541"
+      },
+      {
+        "number": 586,
+        "state": "closed",
+        "merged_at": "2026-10-14T03:16:12Z",
+        "head_sha": "fadd0dba72ebeedb054fc884b768272318b4f581"
+      },
+      {
+        "number": 587,
+        "state": "closed",
+        "merged_at": "2026-10-14T03:16:12Z",
+        "head_sha": "838e753a20204a0108f52eef7f3810e7ae468997"
+      },
+      {
+        "number": 603,
+        "state": "closed",
+        "merged_at": "2026-10-14T03:14:50Z",
+        "head_sha": "6906d37daf16b2d4e55c25361fc0b02491015aef"
+      },
+      {
+        "number": 611,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "e520f7ddb80182bdeb31390e583d6ba742cd8845"
+      },
+      {
+        "number": 634,
+        "state": "open",
+        "merged_at": null,
+        "head_sha": "e01adae8bd6501cded6115f97965e3a2a147f001"
+      }
+    ],
+    "validation_status": "NOT RUN: compilation, unit, integration, live-node, adversarial and recovery execution are outside this read-only audit"
+  }
+]

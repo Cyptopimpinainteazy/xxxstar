@@ -1,0 +1,2355 @@
+[
+  {
+    "name": "ci/local-ci-on-push-and-pr",
+    "commit": {
+      "sha": "eaa8f5a198ba2aebb38c532fd2b98851c6021fba",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/eaa8f5a198ba2aebb38c532fd2b98851c6021fba"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/ci/local-ci-on-push-and-pr/protection"
+  },
+  {
+    "name": "codex/atomic-trade-evidence-20261018",
+    "commit": {
+      "sha": "324a9871decf9469d7db1927f327bac752e6b67a",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/324a9871decf9469d7db1927f327bac752e6b67a"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/atomic-trade-evidence-20261018/protection"
+  },
+  {
+    "name": "codex/dex-atomic-rollback-proof-20261018",
+    "commit": {
+      "sha": "218f44d58ea7b268c43cbdbd85c2a8442ea4acf2",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/218f44d58ea7b268c43cbdbd85c2a8442ea4acf2"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/dex-atomic-rollback-proof-20261018/protection"
+  },
+  {
+    "name": "codex/grant-compute-audit-20261018",
+    "commit": {
+      "sha": "6c2eec195e2068a49065f60b7dae7e4f2d474f6a",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/6c2eec195e2068a49065f60b7dae7e4f2d474f6a"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/grant-compute-audit-20261018/protection"
+  },
+  {
+    "name": "codex/money-swarm-live-workspace-20261018",
+    "commit": {
+      "sha": "886090015eacc38ae66befebba22ddeb7bf23887",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/886090015eacc38ae66befebba22ddeb7bf23887"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/money-swarm-live-workspace-20261018/protection"
+  },
+  {
+    "name": "codex/money-swarm-proposal-packages-20261018",
+    "commit": {
+      "sha": "3afc3a6a7fbaa5adada8bf200faef16d62540253",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/3afc3a6a7fbaa5adada8bf200faef16d62540253"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/money-swarm-proposal-packages-20261018/protection"
+  },
+  {
+    "name": "codex/money-swarm-reviewed-workspace-20261018",
+    "commit": {
+      "sha": "e394823a33fcbe4ed1106cb09ca45f401538a37f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e394823a33fcbe4ed1106cb09ca45f401538a37f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/money-swarm-reviewed-workspace-20261018/protection"
+  },
+  {
+    "name": "codex/testnet-status-python3-20261018",
+    "commit": {
+      "sha": "d5bde264dd9de3c73141404841f6e5f25d1a319d",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/d5bde264dd9de3c73141404841f6e5f25d1a319d"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/testnet-status-python3-20261018/protection"
+  },
+  {
+    "name": "codex/volunteer-local-ci-20261018",
+    "commit": {
+      "sha": "eff2ec8b98ea133125bd9d081ab5d1d0668c0a5a",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/eff2ec8b98ea133125bd9d081ab5d1d0668c0a5a"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/volunteer-local-ci-20261018/protection"
+  },
+  {
+    "name": "codex/volunteer-strict-consent-20261018",
+    "commit": {
+      "sha": "53fd11bb584c12524ace858b22801775a5686bc7",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/53fd11bb584c12524ace858b22801775a5686bc7"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/volunteer-strict-consent-20261018/protection"
+  },
+  {
+    "name": "codex/x3-economic-safety-kernel",
+    "commit": {
+      "sha": "4aa67b8cc307adbb66cdbede1de7d93842ff8a41",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/4aa67b8cc307adbb66cdbede1de7d93842ff8a41"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3-economic-safety-kernel/protection"
+  },
+  {
+    "name": "codex/x3-gateway-postgres-integration",
+    "commit": {
+      "sha": "811f53a0637ce90a839e05fc151856cbade2dce2",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/811f53a0637ce90a839e05fc151856cbade2dce2"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3-gateway-postgres-integration/protection"
+  },
+  {
+    "name": "codex/x3-grant-hunter-v3",
+    "commit": {
+      "sha": "3ddedd61df18aca449b3aff9751e8020a8f32a90",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/3ddedd61df18aca449b3aff9751e8020a8f32a90"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3-grant-hunter-v3/protection"
+  },
+  {
+    "name": "codex/x3-lang-nested-workspace-gate-20261008",
+    "commit": {
+      "sha": "5f0179c84479cf4a03ed04d241ad4fec12b8d541",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/5f0179c84479cf4a03ed04d241ad4fec12b8d541"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3-lang-nested-workspace-gate-20261008/protection"
+  },
+  {
+    "name": "codex/x3-volunteer-compute-integration",
+    "commit": {
+      "sha": "9094f71e297323ef000c6c4e47945f79af17735a",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/9094f71e297323ef000c6c4e47945f79af17735a"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3-volunteer-compute-integration/protection"
+  },
+  {
+    "name": "codex/x3lang-canonical-compiler-phase2",
+    "commit": {
+      "sha": "4da42f7c8e0c0ea4ac9609e4d0e13349389426d8",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/4da42f7c8e0c0ea4ac9609e4d0e13349389426d8"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3lang-canonical-compiler-phase2/protection"
+  },
+  {
+    "name": "codex/x3lang-compiled-storage-regression-20261008",
+    "commit": {
+      "sha": "fadd0dba72ebeedb054fc884b768272318b4f581",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/fadd0dba72ebeedb054fc884b768272318b4f581"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3lang-compiled-storage-regression-20261008/protection"
+  },
+  {
+    "name": "codex/x3lang-control-flow-parity-20261008",
+    "commit": {
+      "sha": "838e753a20204a0108f52eef7f3810e7ae468997",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/838e753a20204a0108f52eef7f3810e7ae468997"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3lang-control-flow-parity-20261008/protection"
+  },
+  {
+    "name": "codex/x3lang-onchain-wip",
+    "commit": {
+      "sha": "5673b41db7676f9fefbde82233a1fe01dd054e89",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/5673b41db7676f9fefbde82233a1fe01dd054e89"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3lang-onchain-wip/protection"
+  },
+  {
+    "name": "codex/x3lang-production-unification",
+    "commit": {
+      "sha": "2ae185d7e0f2ff19da48744a4acc425d9f67ec08",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/2ae185d7e0f2ff19da48744a4acc425d9f67ec08"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/codex/x3lang-production-unification/protection"
+  },
+  {
+    "name": "design/onchain-evm",
+    "commit": {
+      "sha": "46101ae22e7c1386e372d4901b098c34d256f103",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/46101ae22e7c1386e372d4901b098c34d256f103"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/design/onchain-evm/protection"
+  },
+  {
+    "name": "docs/integrated-blockers-20260924",
+    "commit": {
+      "sha": "07b6e3151d81df2bbf579062fbadf418402d01eb",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/07b6e3151d81df2bbf579062fbadf418402d01eb"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/docs/integrated-blockers-20260924/protection"
+  },
+  {
+    "name": "docs/matrix-third-pass",
+    "commit": {
+      "sha": "6cc986b5d8247574b7e5d9c8eb90bd18ca8ddf00",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/6cc986b5d8247574b7e5d9c8eb90bd18ca8ddf00"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/docs/matrix-third-pass/protection"
+  },
+  {
+    "name": "docs/public-testnet-alpha-execution-plan",
+    "commit": {
+      "sha": "0815d2c9f17f47c48776dda5eeaa94557ba75f9d",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/0815d2c9f17f47c48776dda5eeaa94557ba75f9d"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/docs/public-testnet-alpha-execution-plan/protection"
+  },
+  {
+    "name": "docs/x3-lang-honest-status",
+    "commit": {
+      "sha": "9cc1ab11ffb0f95da7c093898e8d8cd806faeeb3",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/9cc1ab11ffb0f95da7c093898e8d8cd806faeeb3"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/docs/x3-lang-honest-status/protection"
+  },
+  {
+    "name": "econsafety-kernel",
+    "commit": {
+      "sha": "4aa67b8cc307adbb66cdbede1de7d93842ff8a41",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/4aa67b8cc307adbb66cdbede1de7d93842ff8a41"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/econsafety-kernel/protection"
+  },
+  {
+    "name": "feat/btc-spv-soundness",
+    "commit": {
+      "sha": "ca480db1e701c49b6c2826e69b1ebcbf33ea12e6",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/ca480db1e701c49b6c2826e69b1ebcbf33ea12e6"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/btc-spv-soundness/protection"
+  },
+  {
+    "name": "feat/compiler-aggregates-context",
+    "commit": {
+      "sha": "b34a7a5d5ced318028d5e40df8b2210b6c6cb856",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/b34a7a5d5ced318028d5e40df8b2210b6c6cb856"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/compiler-aggregates-context/protection"
+  },
+  {
+    "name": "feat/disk-economics-measurement",
+    "commit": {
+      "sha": "775d6c2d113f34dcbe9955b6af88b3aea60bb829",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/775d6c2d113f34dcbe9955b6af88b3aea60bb829"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/disk-economics-measurement/protection"
+  },
+  {
+    "name": "feat/disk-pressure-authoring-stop",
+    "commit": {
+      "sha": "8f8e6f85cf9a891c3a84641ca9097349f8fdae66",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/8f8e6f85cf9a891c3a84641ca9097349f8fdae66"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/disk-pressure-authoring-stop/protection"
+  },
+  {
+    "name": "feat/gpu-cpu-reference-20261011",
+    "commit": {
+      "sha": "285ed11b6d2fcf52aca35c355d91d041759a0193",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/285ed11b6d2fcf52aca35c355d91d041759a0193"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/gpu-cpu-reference-20261011/protection"
+  },
+  {
+    "name": "feat/mutants-gate",
+    "commit": {
+      "sha": "6823afa771ff9e8bd71e2894f02de0b06691b664",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/6823afa771ff9e8bd71e2894f02de0b06691b664"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/mutants-gate/protection"
+  },
+  {
+    "name": "feat/mutants-gate-atomic-kernel",
+    "commit": {
+      "sha": "aa060f1320d07e98985d59e29e2fc7e00b5dafc0",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/aa060f1320d07e98985d59e29e2fc7e00b5dafc0"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/mutants-gate-atomic-kernel/protection"
+  },
+  {
+    "name": "feat/per-block-storage-metrics",
+    "commit": {
+      "sha": "0a5cd4cdad07ac55f23c4e09c68e8f11ea2c4795",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/0a5cd4cdad07ac55f23c4e09c68e8f11ea2c4795"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/per-block-storage-metrics/protection"
+  },
+  {
+    "name": "feat/reactor-placement-attested",
+    "commit": {
+      "sha": "2e292dde42b4f67f83672af6d96951e8dd62fc7a",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/2e292dde42b4f67f83672af6d96951e8dd62fc7a"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/reactor-placement-attested/protection"
+  },
+  {
+    "name": "feat/receipt-key-registry",
+    "commit": {
+      "sha": "584228c56bec1c628848d6775b14f4271053856c",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/584228c56bec1c628848d6775b14f4271053856c"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/receipt-key-registry/protection"
+  },
+  {
+    "name": "feat/receipt-replays-gas-and-oracle",
+    "commit": {
+      "sha": "e6366467f0090581e32f919f42eb186351e35a69",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e6366467f0090581e32f919f42eb186351e35a69"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/receipt-replays-gas-and-oracle/protection"
+  },
+  {
+    "name": "feat/receipt-signing-registry",
+    "commit": {
+      "sha": "157b049ceeb6b90cab16b3dd2dda6421f5e726c2",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/157b049ceeb6b90cab16b3dd2dda6421f5e726c2"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/receipt-signing-registry/protection"
+  },
+  {
+    "name": "feat/rehearsal-runs-x3-after-upgrade",
+    "commit": {
+      "sha": "27922d7c6bde22f847050b58341839ae4b331625",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/27922d7c6bde22f847050b58341839ae4b331625"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/rehearsal-runs-x3-after-upgrade/protection"
+  },
+  {
+    "name": "feat/remote-ci-worker-20261013",
+    "commit": {
+      "sha": "8501a2de636a57f9e94ce855657b1f7ec2f3eeb2",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/8501a2de636a57f9e94ce855657b1f7ec2f3eeb2"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/remote-ci-worker-20261013/protection"
+  },
+  {
+    "name": "feat/runtime-attribution-metrics",
+    "commit": {
+      "sha": "d67afd13c2fa4683950961baf354941be4f695c3",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/d67afd13c2fa4683950961baf354941be4f695c3"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/runtime-attribution-metrics/protection"
+  },
+  {
+    "name": "feat/runtime-runs-x3vm",
+    "commit": {
+      "sha": "e7629b67b12dc1c133090aa62701f4f163cceb0c",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e7629b67b12dc1c133090aa62701f4f163cceb0c"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/runtime-runs-x3vm/protection"
+  },
+  {
+    "name": "feat/signed-key-registries",
+    "commit": {
+      "sha": "de31b0f7ea6c6ba738c61a7b8a446f39eba86e93",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/de31b0f7ea6c6ba738c61a7b8a446f39eba86e93"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/signed-key-registries/protection"
+  },
+  {
+    "name": "feat/snapshot-restore",
+    "commit": {
+      "sha": "3883b803fdd8b1106643d7ad9915242938176be7",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/3883b803fdd8b1106643d7ad9915242938176be7"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/snapshot-restore/protection"
+  },
+  {
+    "name": "feat/state-snapshot-and-audit-gates",
+    "commit": {
+      "sha": "037cad1ad8e84f8ec6951fa17c238f89d5105877",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/037cad1ad8e84f8ec6951fa17c238f89d5105877"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/state-snapshot-and-audit-gates/protection"
+  },
+  {
+    "name": "feat/structs",
+    "commit": {
+      "sha": "7a108defdaf63301537baafd5e53a0155ee3c1a5",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/7a108defdaf63301537baafd5e53a0155ee3c1a5"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/structs/protection"
+  },
+  {
+    "name": "feat/swarm-replica-reconciler",
+    "commit": {
+      "sha": "c517973882d89559053e2f69a4bf3ff082ec5227",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/c517973882d89559053e2f69a4bf3ff082ec5227"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/swarm-replica-reconciler/protection"
+  },
+  {
+    "name": "feat/testnet-ansible",
+    "commit": {
+      "sha": "7fa5383aa10c14372c3c70da06b4cb102ac9ea2f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/7fa5383aa10c14372c3c70da06b4cb102ac9ea2f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/testnet-ansible/protection"
+  },
+  {
+    "name": "feat/throughput-attribution",
+    "commit": {
+      "sha": "ff7f49caabb40a567c333aadcd76b7e0944e4ef2",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/ff7f49caabb40a567c333aadcd76b7e0944e4ef2"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/throughput-attribution/protection"
+  },
+  {
+    "name": "feat/tla-atomic-settlement",
+    "commit": {
+      "sha": "3b61c427edb9bb6beb9cd1d6bda954e53667d50d",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/3b61c427edb9bb6beb9cd1d6bda954e53667d50d"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/tla-atomic-settlement/protection"
+  },
+  {
+    "name": "feat/trading-rules-reference",
+    "commit": {
+      "sha": "19651a4d68a8e8ae457b1dde23df2b78992dfb23",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/19651a4d68a8e8ae457b1dde23df2b78992dfb23"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/trading-rules-reference/protection"
+  },
+  {
+    "name": "feat/txpool-metrics",
+    "commit": {
+      "sha": "b7241e8f2ac392636cf20585919ef9eb0d53414d",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/b7241e8f2ac392636cf20585919ef9eb0d53414d"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/txpool-metrics/protection"
+  },
+  {
+    "name": "feat/x3-ai-router",
+    "commit": {
+      "sha": "762037b4f33310ce62cb084b6894ca70e426a934",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/762037b4f33310ce62cb084b6894ca70e426a934"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-ai-router/protection"
+  },
+  {
+    "name": "feat/x3-ai-router-budget-hardening",
+    "commit": {
+      "sha": "81f21b752536c329b996cf5eca0c86dc84a68cd4",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/81f21b752536c329b996cf5eca0c86dc84a68cd4"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-ai-router-budget-hardening/protection"
+  },
+  {
+    "name": "feat/x3-ai-router-hardening",
+    "commit": {
+      "sha": "82c7617d0df1b3c9536e3ef7e3137b5a701f5c9e",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/82c7617d0df1b3c9536e3ef7e3137b5a701f5c9e"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-ai-router-hardening/protection"
+  },
+  {
+    "name": "feat/x3-ai-router-observability",
+    "commit": {
+      "sha": "6dadae4fe3b1e0c9fccc31e742ceb12f3cf7c673",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/6dadae4fe3b1e0c9fccc31e742ceb12f3cf7c673"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-ai-router-observability/protection"
+  },
+  {
+    "name": "feat/x3-ai-router-pricing",
+    "commit": {
+      "sha": "422b47f887eda6652db2beab296bab89f2ba517f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/422b47f887eda6652db2beab296bab89f2ba517f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-ai-router-pricing/protection"
+  },
+  {
+    "name": "feat/x3-ai-router-responses-api",
+    "commit": {
+      "sha": "929d41ec8720af96977c938aba5d23a83c96fe40",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/929d41ec8720af96977c938aba5d23a83c96fe40"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-ai-router-responses-api/protection"
+  },
+  {
+    "name": "feat/x3-ai-router-streaming",
+    "commit": {
+      "sha": "5a4b171ae2285f831c63fae1cd509a818ed3fe1c",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/5a4b171ae2285f831c63fae1cd509a818ed3fe1c"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-ai-router-streaming/protection"
+  },
+  {
+    "name": "feat/x3-ai-router-verification-feedback",
+    "commit": {
+      "sha": "ae1f337358d396c8c6e8a8f83f0d5a32e036b47e",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/ae1f337358d396c8c6e8a8f83f0d5a32e036b47e"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-ai-router-verification-feedback/protection"
+  },
+  {
+    "name": "feat/x3-cluster-control",
+    "commit": {
+      "sha": "2e1cfaab30e64f8f16ac6ecb44df31c6ddf557d2",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/2e1cfaab30e64f8f16ac6ecb44df31c6ddf557d2"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-cluster-control/protection"
+  },
+  {
+    "name": "feat/x3-forge-bisect-packet-input",
+    "commit": {
+      "sha": "93810604787f2f2b925a731ecec72a94ed1fb0df",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/93810604787f2f2b925a731ecec72a94ed1fb0df"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-forge-bisect-packet-input/protection"
+  },
+  {
+    "name": "feat/x3-forge-bisect-runner",
+    "commit": {
+      "sha": "7e2515415f58ee97da7dbdb8d117b984856a09f9",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/7e2515415f58ee97da7dbdb8d117b984856a09f9"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-forge-bisect-runner/protection"
+  },
+  {
+    "name": "feat/x3-guardian",
+    "commit": {
+      "sha": "75eaaa8900b29058c5c9a16e60fbfb431a0fb7a6",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/75eaaa8900b29058c5c9a16e60fbfb431a0fb7a6"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-guardian/protection"
+  },
+  {
+    "name": "feat/x3-htlc-onchain",
+    "commit": {
+      "sha": "d2f585bceb68407336aafe72ff8c5883cfdd4f62",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/d2f585bceb68407336aafe72ff8c5883cfdd4f62"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-htlc-onchain/protection"
+  },
+  {
+    "name": "feat/x3-prelaunch-economics-x3lang-cutover",
+    "commit": {
+      "sha": "d1ea105588ee6678e5d51791778995a92fc171c8",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/d1ea105588ee6678e5d51791778995a92fc171c8"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-prelaunch-economics-x3lang-cutover/protection"
+  },
+  {
+    "name": "feat/x3-sim-deterministic-simulator",
+    "commit": {
+      "sha": "e6e7b334b3369e4a1c9967762634ee899408be89",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e6e7b334b3369e4a1c9967762634ee899408be89"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-sim-deterministic-simulator/protection"
+  },
+  {
+    "name": "feat/x3-sim-failure-packet",
+    "commit": {
+      "sha": "b84576718c72e21d48195e2ca75ecec1de83515a",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/b84576718c72e21d48195e2ca75ecec1de83515a"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3-sim-failure-packet/protection"
+  },
+  {
+    "name": "feat/x3bc-artifact-attestation",
+    "commit": {
+      "sha": "8642fd2551cd113f3259346734b7c482ffaa2528",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/8642fd2551cd113f3259346734b7c482ffaa2528"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3bc-artifact-attestation/protection"
+  },
+  {
+    "name": "feat/x3gpu1-dual-gpu-accel",
+    "commit": {
+      "sha": "51d9f11e7150c8d8fa0ae9aa24e383fd5f1389bb",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/51d9f11e7150c8d8fa0ae9aa24e383fd5f1389bb"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3gpu1-dual-gpu-accel/protection"
+  },
+  {
+    "name": "feat/x3lang-cross-vm-calls",
+    "commit": {
+      "sha": "111440bcf7b761b048efec1f12b1e1d9858678b9",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/111440bcf7b761b048efec1f12b1e1d9858678b9"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3lang-cross-vm-calls/protection"
+  },
+  {
+    "name": "feat/x3lang-emit",
+    "commit": {
+      "sha": "2b7dcfe221be5833841f659196e51e320692eb64",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/2b7dcfe221be5833841f659196e51e320692eb64"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3lang-emit/protection"
+  },
+  {
+    "name": "feat/x3lang-hardening-x3gpu1",
+    "commit": {
+      "sha": "66a7ffd150715b7fadcfb0521f2f6bbdfd3ca222",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/66a7ffd150715b7fadcfb0521f2f6bbdfd3ca222"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3lang-hardening-x3gpu1/protection"
+  },
+  {
+    "name": "feat/x3lang-network-state-source",
+    "commit": {
+      "sha": "e4d9276bd328dbc223dde4058532448d83c1946b",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e4d9276bd328dbc223dde4058532448d83c1946b"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3lang-network-state-source/protection"
+  },
+  {
+    "name": "feat/x3vm-aggregates",
+    "commit": {
+      "sha": "073e26edfabc5c0ecad02450bd05ab7a0ca5cc38",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/073e26edfabc5c0ecad02450bd05ab7a0ca5cc38"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3vm-aggregates/protection"
+  },
+  {
+    "name": "feat/x3vm-block-context",
+    "commit": {
+      "sha": "d83828f5b2041f0bd2b03b21248585eb468a961d",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/d83828f5b2041f0bd2b03b21248585eb468a961d"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3vm-block-context/protection"
+  },
+  {
+    "name": "feat/x3vm-no-std",
+    "commit": {
+      "sha": "9d4fe45d81ce32664147e284fff78619bddb4e98",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/9d4fe45d81ce32664147e284fff78619bddb4e98"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3vm-no-std/protection"
+  },
+  {
+    "name": "feat/x3vm-no-std-bytecode-split",
+    "commit": {
+      "sha": "10d13c9e44e34091030258e18fd4416fc2803ee1",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/10d13c9e44e34091030258e18fd4416fc2803ee1"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3vm-no-std-bytecode-split/protection"
+  },
+  {
+    "name": "feat/x3vm-one-gas-table",
+    "commit": {
+      "sha": "c23a8d0f14e894e3264d8a2f464f4bffc16abd9d",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/c23a8d0f14e894e3264d8a2f464f4bffc16abd9d"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/feat/x3vm-one-gas-table/protection"
+  },
+  {
+    "name": "fix/app-store-live-server",
+    "commit": {
+      "sha": "a433b010139fcb54627f5ee3c99204d7862858e2",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/a433b010139fcb54627f5ee3c99204d7862858e2"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/app-store-live-server/protection"
+  },
+  {
+    "name": "fix/app-store-native-watch-20261013",
+    "commit": {
+      "sha": "40d71a6298e3fda3275d1fc52054b9734c8ddfdd",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/40d71a6298e3fda3275d1fc52054b9734c8ddfdd"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/app-store-native-watch-20261013/protection"
+  },
+  {
+    "name": "fix/bytecode-envelope",
+    "commit": {
+      "sha": "eafa93112f302e6df11e7047627f5e1be6ab4416",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/eafa93112f302e6df11e7047627f5e1be6ab4416"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/bytecode-envelope/protection"
+  },
+  {
+    "name": "fix/compiler-never-panics",
+    "commit": {
+      "sha": "65fdcba3f6a3a36d02fdd59879ccc7cae161bec8",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/65fdcba3f6a3a36d02fdd59879ccc7cae161bec8"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/compiler-never-panics/protection"
+  },
+  {
+    "name": "fix/gate-tool-validation-fixture",
+    "commit": {
+      "sha": "eb027c1c0888106ba0dec54f57db835b342de535",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/eb027c1c0888106ba0dec54f57db835b342de535"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/gate-tool-validation-fixture/protection"
+  },
+  {
+    "name": "fix/kernel-comit-benchmark-fixtures",
+    "commit": {
+      "sha": "9ed1920dda37dc82d26c5c0151852250713a31b2",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/9ed1920dda37dc82d26c5c0151852250713a31b2"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/kernel-comit-benchmark-fixtures/protection"
+  },
+  {
+    "name": "fix/master-gate-reds",
+    "commit": {
+      "sha": "99581bee8894298c39ef72751ee13770cad72f8c",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/99581bee8894298c39ef72751ee13770cad72f8c"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/master-gate-reds/protection"
+  },
+  {
+    "name": "fix/master-red-gates",
+    "commit": {
+      "sha": "eea28b858a22cd52d426ca98fba05aaee2f546c1",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/eea28b858a22cd52d426ca98fba05aaee2f546c1"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/master-red-gates/protection"
+  },
+  {
+    "name": "fix/matrix-evidence-prose",
+    "commit": {
+      "sha": "fb77f633d285633635501412a1a19d720024ec0d",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/fb77f633d285633635501412a1a19d720024ec0d"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/matrix-evidence-prose/protection"
+  },
+  {
+    "name": "fix/npm-audit-all-dependencies-20261013",
+    "commit": {
+      "sha": "6906d37daf16b2d4e55c25361fc0b02491015aef",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/6906d37daf16b2d4e55c25361fc0b02491015aef"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/npm-audit-all-dependencies-20261013/protection"
+  },
+  {
+    "name": "fix/npm-audit-braces",
+    "commit": {
+      "sha": "e520f7ddb80182bdeb31390e583d6ba742cd8845",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e520f7ddb80182bdeb31390e583d6ba742cd8845"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/npm-audit-braces/protection"
+  },
+  {
+    "name": "fix/release-provenance-rc6-rebased",
+    "commit": {
+      "sha": "69ce03eab103df3ef894baf561745a01b803edad",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/69ce03eab103df3ef894baf561745a01b803edad"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/release-provenance-rc6-rebased/protection"
+  },
+  {
+    "name": "fix/router-database-startup",
+    "commit": {
+      "sha": "f1190280ec8ba7ba77edf32761f860e8e3ae8d62",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/f1190280ec8ba7ba77edf32761f860e8e3ae8d62"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/router-database-startup/protection"
+  },
+  {
+    "name": "fix/runtime-hashes-supply-ledger",
+    "commit": {
+      "sha": "08af8fb4283a74b98f92ee0a20cb337ce94b242f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/08af8fb4283a74b98f92ee0a20cb337ce94b242f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/runtime-hashes-supply-ledger/protection"
+  },
+  {
+    "name": "fix/snapshot-archive-restore",
+    "commit": {
+      "sha": "dcb45a7387f1a8816a75378dbe4f6198eee7097f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/dcb45a7387f1a8816a75378dbe4f6198eee7097f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/snapshot-archive-restore/protection"
+  },
+  {
+    "name": "fix/snapshot-rpc-validation",
+    "commit": {
+      "sha": "648333c9c74bbe9c0e2aa7eb9133b49ed790de8d",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/648333c9c74bbe9c0e2aa7eb9133b49ed790de8d"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/snapshot-rpc-validation/protection"
+  },
+  {
+    "name": "fix/studio-typecheck-20261013",
+    "commit": {
+      "sha": "8470548c6fe7e952b4907113badf85559f5df3de",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/8470548c6fe7e952b4907113badf85559f5df3de"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/studio-typecheck-20261013/protection"
+  },
+  {
+    "name": "fix/swarm-core-import-cycle-20261013",
+    "commit": {
+      "sha": "044a5e192b128357232561dd93d058469ed0f0c1",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/044a5e192b128357232561dd93d058469ed0f0c1"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/swarm-core-import-cycle-20261013/protection"
+  },
+  {
+    "name": "fix/testnet-finality-evidence-20261013",
+    "commit": {
+      "sha": "0b0c477c220377e098a7ac675053e7da0717a980",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/0b0c477c220377e098a7ac675053e7da0717a980"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/testnet-finality-evidence-20261013/protection"
+  },
+  {
+    "name": "fix/tla-specs-run",
+    "commit": {
+      "sha": "82587c05c973c913429919562270daaeac9cd9be",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/82587c05c973c913429919562270daaeac9cd9be"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/tla-specs-run/protection"
+  },
+  {
+    "name": "fix/trading-vm-verifies-peer-ir",
+    "commit": {
+      "sha": "a8d1a068ed23b9676326f7e4b95bfa1107b7b587",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/a8d1a068ed23b9676326f7e4b95bfa1107b7b587"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/trading-vm-verifies-peer-ir/protection"
+  },
+  {
+    "name": "fix/verification-harness-exit-codes",
+    "commit": {
+      "sha": "62c09e8c334e9b3c9d6fa4b0ebed46d5249ec244",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/62c09e8c334e9b3c9d6fa4b0ebed46d5249ec244"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/verification-harness-exit-codes/protection"
+  },
+  {
+    "name": "fix/workspace-membership-python310",
+    "commit": {
+      "sha": "80bda42818fb787e70f40a6fb3c1e8e85a246b78",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/80bda42818fb787e70f40a6fb3c1e8e85a246b78"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/workspace-membership-python310/protection"
+  },
+  {
+    "name": "fix/x3-ai-router-budget-fallback",
+    "commit": {
+      "sha": "a5e37bd62889e1321c2e1af0c390700c7b9edd4f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/a5e37bd62889e1321c2e1af0c390700c7b9edd4f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3-ai-router-budget-fallback/protection"
+  },
+  {
+    "name": "fix/x3-ai-router-native-responses-stability",
+    "commit": {
+      "sha": "eb4406372db172968112b8e373a3a5d02ab7e6da",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/eb4406372db172968112b8e373a3a5d02ab7e6da"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3-ai-router-native-responses-stability/protection"
+  },
+  {
+    "name": "fix/x3-common-artifact-fmt",
+    "commit": {
+      "sha": "9372f1c47db5fa72696139abe14e86afed34e40b",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/9372f1c47db5fa72696139abe14e86afed34e40b"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3-common-artifact-fmt/protection"
+  },
+  {
+    "name": "fix/x3-compile-writes-artifact",
+    "commit": {
+      "sha": "4ef58687dcbf3deaf1bc27fd2ea70582df343e60",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/4ef58687dcbf3deaf1bc27fd2ea70582df343e60"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3-compile-writes-artifact/protection"
+  },
+  {
+    "name": "fix/x3-forge-failure-memory-in-ci",
+    "commit": {
+      "sha": "93cce8e715c23e4d0edc748c796287efb9307b2b",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/93cce8e715c23e4d0edc748c796287efb9307b2b"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3-forge-failure-memory-in-ci/protection"
+  },
+  {
+    "name": "fix/x3-htlc-registry-native",
+    "commit": {
+      "sha": "d004fe4e417e56c3570c019be2c53f4734002f76",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/d004fe4e417e56c3570c019be2c53f4734002f76"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3-htlc-registry-native/protection"
+  },
+  {
+    "name": "fix/x3lang-finish",
+    "commit": {
+      "sha": "5b4fc4a69424493f135025c3b11a90d0cd4d29b5",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/5b4fc4a69424493f135025c3b11a90d0cd4d29b5"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3lang-finish/protection"
+  },
+  {
+    "name": "fix/x3lang-optimizer-order",
+    "commit": {
+      "sha": "33ce1207f07597e9ab938b2180c6441cf1a26e74",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/33ce1207f07597e9ab938b2180c6441cf1a26e74"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3lang-optimizer-order/protection"
+  },
+  {
+    "name": "fix/x3vm-engine-agreement",
+    "commit": {
+      "sha": "a57c42e7312ac8ec87a77d176fc5b15cdb0f1230",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/a57c42e7312ac8ec87a77d176fc5b15cdb0f1230"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/fix/x3vm-engine-agreement/protection"
+  },
+  {
+    "name": "integrate/merge-train-20261013",
+    "commit": {
+      "sha": "e1f504a3c52a4b6f3615ffbf66a4634ef4826eab",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e1f504a3c52a4b6f3615ffbf66a4634ef4826eab"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/integrate/merge-train-20261013/protection"
+  },
+  {
+    "name": "integrate/x3-guardian",
+    "commit": {
+      "sha": "1c2709c81efbb2aee1f13709203476132802b1ab",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/1c2709c81efbb2aee1f13709203476132802b1ab"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/integrate/x3-guardian/protection"
+  },
+  {
+    "name": "master",
+    "commit": {
+      "sha": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/70423054e2d9560a212ab763d4f265f9cdc448d9"
+    },
+    "protected": true,
+    "protection": {
+      "enabled": true,
+      "required_status_checks": {
+        "enforcement_level": "non_admins",
+        "contexts": [
+          "x3/local-ci"
+        ],
+        "checks": [
+          {
+            "context": "x3/local-ci",
+            "app_id": null
+          }
+        ]
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/master/protection"
+  },
+  {
+    "name": "merge/pr502-onto-master",
+    "commit": {
+      "sha": "a882c78f4ba9c86adbba50cb9ad08308937b599e",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/a882c78f4ba9c86adbba50cb9ad08308937b599e"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/merge/pr502-onto-master/protection"
+  },
+  {
+    "name": "merge/x3-mcp-server",
+    "commit": {
+      "sha": "a2ea0e9bde81f827d44453522f497952c9eb0aa3",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/a2ea0e9bde81f827d44453522f497952c9eb0aa3"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/merge/x3-mcp-server/protection"
+  },
+  {
+    "name": "mission/resurrection-phase-a",
+    "commit": {
+      "sha": "1dddb5432c761d44ba6ed5ab93a8ed90d06a4efe",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/1dddb5432c761d44ba6ed5ab93a8ed90d06a4efe"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/mission/resurrection-phase-a/protection"
+  },
+  {
+    "name": "release-gate/swarm-reactor-onchain-v1",
+    "commit": {
+      "sha": "1ec7cb7f23796ccec0920d786076a6542cdcb222",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/1ec7cb7f23796ccec0920d786076a6542cdcb222"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/release-gate/swarm-reactor-onchain-v1/protection"
+  },
+  {
+    "name": "runtime/evm-persistence-and-fraud-proof-pins",
+    "commit": {
+      "sha": "d749e0d564490e89f3e8a104256d407e9d169458",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/d749e0d564490e89f3e8a104256d407e9d169458"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/runtime/evm-persistence-and-fraud-proof-pins/protection"
+  },
+  {
+    "name": "test/coordinator-transition-table",
+    "commit": {
+      "sha": "0567465bbb8b20ba9866472ecd5cf35ccbe5047f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/0567465bbb8b20ba9866472ecd5cf35ccbe5047f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/test/coordinator-transition-table/protection"
+  },
+  {
+    "name": "test/gateway-migrations-cover-tables",
+    "commit": {
+      "sha": "1d07a8bd66f66bad0430a3be6d33be1e3639feb9",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/1d07a8bd66f66bad0430a3be6d33be1e3639feb9"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/test/gateway-migrations-cover-tables/protection"
+  },
+  {
+    "name": "test/gateway-postgres-control-plane",
+    "commit": {
+      "sha": "43be3bbb7238d090c45b5e0b893d85defe4d22b1",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/43be3bbb7238d090c45b5e0b893d85defe4d22b1"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/test/gateway-postgres-control-plane/protection"
+  },
+  {
+    "name": "test/rc1-three-validator-boot-gate",
+    "commit": {
+      "sha": "38e6dfbb02bd0ced37aa197914ac0332e06d01e5",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/38e6dfbb02bd0ced37aa197914ac0332e06d01e5"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/test/rc1-three-validator-boot-gate/protection"
+  },
+  {
+    "name": "test/supply-ledger-proof-pruning",
+    "commit": {
+      "sha": "80cf5541de17b00fb37223b445026dd459a89fc6",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/80cf5541de17b00fb37223b445026dd459a89fc6"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/test/supply-ledger-proof-pruning/protection"
+  },
+  {
+    "name": "test/x3vm-robustness",
+    "commit": {
+      "sha": "082cf6bb4e0eee247993944c93d4ec040c8dfc13",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/082cf6bb4e0eee247993944c93d4ec040c8dfc13"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/test/x3vm-robustness/protection"
+  },
+  {
+    "name": "testnet/physical-seven-preflight-20261014",
+    "commit": {
+      "sha": "e01adae8bd6501cded6115f97965e3a2a147f001",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e01adae8bd6501cded6115f97965e3a2a147f001"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/testnet/physical-seven-preflight-20261014/protection"
+  },
+  {
+    "name": "wip/chatgpt-mainnet-attestation-20260918",
+    "commit": {
+      "sha": "e83d3918ee43b10ccd6b819044f817c9dd3c29f3",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e83d3918ee43b10ccd6b819044f817c9dd3c29f3"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip/chatgpt-mainnet-attestation-20260918/protection"
+  },
+  {
+    "name": "wip/prompts-to-skills-20260918",
+    "commit": {
+      "sha": "4a6ffa6f1a86804548a1bba34320c0a1ec1aeb0b",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/4a6ffa6f1a86804548a1bba34320c0a1ec1aeb0b"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip/prompts-to-skills-20260918/protection"
+  },
+  {
+    "name": "wip/x3lang-arb-graph-filter-20260919",
+    "commit": {
+      "sha": "bdc83ba7ffb48407e3cb14d003c6eb274c1b6ac4",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/bdc83ba7ffb48407e3cb14d003c6eb274c1b6ac4"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip/x3lang-arb-graph-filter-20260919/protection"
+  },
+  {
+    "name": "wip/x3lang-preserve-packets-and-arbitrage-20260919",
+    "commit": {
+      "sha": "1bfaa52434885f37dfbafd557cf9d2e8f9299f2e",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/1bfaa52434885f37dfbafd557cf9d2e8f9299f2e"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip/x3lang-preserve-packets-and-arbitrage-20260919/protection"
+  },
+  {
+    "name": "wip-backup/candidate-d1ea10558-20260928",
+    "commit": {
+      "sha": "d1ea105588ee6678e5d51791778995a92fc171c8",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/d1ea105588ee6678e5d51791778995a92fc171c8"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip-backup/candidate-d1ea10558-20260928/protection"
+  },
+  {
+    "name": "wip-backup/freshness-control-3763659-20260928",
+    "commit": {
+      "sha": "4bfe9a391f461b4442e95aea9a9fc2f71d97ae79",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/4bfe9a391f461b4442e95aea9a9fc2f71d97ae79"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip-backup/freshness-control-3763659-20260928/protection"
+  },
+  {
+    "name": "wip-backup/main-checkout-20260928",
+    "commit": {
+      "sha": "b3e894d2cc8e010f432ab7944db5fe6e78199b3f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/b3e894d2cc8e010f432ab7944db5fe6e78199b3f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip-backup/main-checkout-20260928/protection"
+  },
+  {
+    "name": "wip-backup/panic-516-20260928",
+    "commit": {
+      "sha": "bd0adfcc0ff4c04465da71c55def43a096686b21",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/bd0adfcc0ff4c04465da71c55def43a096686b21"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip-backup/panic-516-20260928/protection"
+  },
+  {
+    "name": "wip-backup/rt2-20260928",
+    "commit": {
+      "sha": "ff12889bfbbec0dbc697204e0931a9dd5c3ce30c",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/ff12889bfbbec0dbc697204e0931a9dd5c3ce30c"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip-backup/rt2-20260928/protection"
+  },
+  {
+    "name": "wip-backup/rt-rebuild-20260928",
+    "commit": {
+      "sha": "b83a7a0cd12009f9f680d66ede3e830ed2810f8b",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/b83a7a0cd12009f9f680d66ede3e830ed2810f8b"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip-backup/rt-rebuild-20260928/protection"
+  },
+  {
+    "name": "wip-backup/upg-artifact-src-20260928",
+    "commit": {
+      "sha": "e95475a6df4c6131a19a29d7f3a60e14a17f6f86",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/e95475a6df4c6131a19a29d7f3a60e14a17f6f86"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip-backup/upg-artifact-src-20260928/protection"
+  },
+  {
+    "name": "wip-backup/x3lang-finish-20260928",
+    "commit": {
+      "sha": "68f982e7c1c5e64c5f633a9345a50bb8ba100b0f",
+      "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/commits/68f982e7c1c5e64c5f633a9345a50bb8ba100b0f"
+    },
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    },
+    "protection_url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/branches/wip-backup/x3lang-finish-20260928/protection"
+  }
+]

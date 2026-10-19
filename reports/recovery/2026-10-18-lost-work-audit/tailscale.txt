@@ -1,0 +1,34 @@
+{
+  "Self": {
+    "HostName": "x3star1",
+    "DNSName": "x3star1.tailf75155.ts.net.",
+    "TailscaleIPs": [
+      "100.89.236.89",
+      "fd7a:115c:a1e0::fe01:eccd"
+    ],
+    "Online": true
+  },
+  "Peers": [
+    {
+      "HostName": "x3star",
+      "DNSName": "x3star.tailf75155.ts.net.",
+      "TailscaleIPs": [
+        "100.69.96.9",
+        "fd7a:115c:a1e0::4c3b:600a"
+      ],
+      "Online": true,
+      "OS": "linux"
+    },
+    {
+      "HostName": "moto g - 2025",
+      "DNSName": "moto-g---2025.tailf75155.ts.net.",
+      "TailscaleIPs": [
+        "100.65.130.103",
+        "fd7a:115c:a1e0::d43b:8268"
+      ],
+      "Online": false,
+      "OS": "android"
+    }
+  ]
+}
+exit=0

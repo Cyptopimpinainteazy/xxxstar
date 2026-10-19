@@ -1,0 +1,52 @@
+[
+  {
+    "parent_pr": 623,
+    "child_pr": 628,
+    "ancestor_rc": 0
+  },
+  {
+    "parent_pr": 624,
+    "child_pr": 628,
+    "ancestor_rc": 1
+  },
+  {
+    "parent_pr": 626,
+    "child_pr": 627,
+    "ancestor_rc": 0
+  },
+  {
+    "parent_pr": 626,
+    "child_pr": 629,
+    "ancestor_rc": 0
+  },
+  {
+    "parent_pr": 627,
+    "child_pr": 629,
+    "ancestor_rc": 0
+  },
+  {
+    "parent_pr": 630,
+    "child_pr": 632,
+    "ancestor_rc": 0
+  },
+  {
+    "parent_pr": 631,
+    "child_pr": 632,
+    "ancestor_rc": 1
+  },
+  {
+    "parent_pr": 632,
+    "child_pr": 633,
+    "ancestor_rc": 0
+  },
+  {
+    "parent_pr": 625,
+    "child_pr": 634,
+    "ancestor_rc": 1
+  },
+  {
+    "parent_pr": 592,
+    "child_pr": 634,
+    "ancestor_rc": 1
+  }
+]

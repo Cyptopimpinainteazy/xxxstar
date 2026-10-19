@@ -1,0 +1,140 @@
+{
+  "broken_store": "/home/lojak/Desktop/x3-chain-master/apps/atlas-sphere-clean/.git",
+  "invalid_shas": [
+    "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6",
+    "96e2e27a3bf41498fc8542ed5eb2708ed2f98531",
+    "9738a19487ebc7a9af54d14e7b16623264ec060a",
+    "b8f50057011662689a9caf763dd991f1cf2cff31",
+    "f52e44459f0b73437df55051af8f716ae7f72bef",
+    "fbd6167a7d35dc5f845455a8ac267a26617c68c7",
+    "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96"
+  ],
+  "object_locations": [
+    {
+      "path": "/home/lojak/x3-recovery-sources/cryptopimpin-atlas-sphere.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 missing",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 missing",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a missing",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 missing",
+        "f52e44459f0b73437df55051af8f716ae7f72bef missing",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 missing",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 missing"
+      ],
+      "err": ""
+    },
+    {
+      "path": "/home/lojak/x3-recovery-sources/atlas-sphere-master.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 missing",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 missing",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a missing",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 missing",
+        "f52e44459f0b73437df55051af8f716ae7f72bef missing",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 missing",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 missing"
+      ],
+      "err": ""
+    },
+    {
+      "path": "/home/lojak/x3-recovery-sources/atlas-sphere.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 commit",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 commit",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a commit",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 commit",
+        "f52e44459f0b73437df55051af8f716ae7f72bef commit",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 commit",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 commit"
+      ],
+      "err": ""
+    },
+    {
+      "path": "/home/lojak/x3-recovery-sources/atlas-sphere-.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 missing",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 missing",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a missing",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 missing",
+        "f52e44459f0b73437df55051af8f716ae7f72bef missing",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 missing",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 missing"
+      ],
+      "err": ""
+    },
+    {
+      "path": "/home/lojak/x3-recovery-sources/atlas-sphere1.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 missing",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 missing",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a missing",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 missing",
+        "f52e44459f0b73437df55051af8f716ae7f72bef missing",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 missing",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 missing"
+      ],
+      "err": ""
+    },
+    {
+      "path": "/home/lojak/x3-recovery/mirrors/atlas-sphere-master.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 missing",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 missing",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a missing",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 missing",
+        "f52e44459f0b73437df55051af8f716ae7f72bef missing",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 missing",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 missing"
+      ],
+      "err": ""
+    },
+    {
+      "path": "/home/lojak/x3-recovery/mirrors/atlas-sphere.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 commit",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 commit",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a commit",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 commit",
+        "f52e44459f0b73437df55051af8f716ae7f72bef commit",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 commit",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 commit"
+      ],
+      "err": ""
+    },
+    {
+      "path": "/home/lojak/x3-recovery/mirrors/atlas-sphere-.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 missing",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 missing",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a missing",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 missing",
+        "f52e44459f0b73437df55051af8f716ae7f72bef missing",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 missing",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 missing"
+      ],
+      "err": ""
+    },
+    {
+      "path": "/home/lojak/x3-recovery/mirrors/atlas-sphere1.git",
+      "rc": 0,
+      "objects": [
+        "05727e52bdc4fd319f94e53d4e95a4aab7eb89e6 missing",
+        "96e2e27a3bf41498fc8542ed5eb2708ed2f98531 missing",
+        "9738a19487ebc7a9af54d14e7b16623264ec060a missing",
+        "b8f50057011662689a9caf763dd991f1cf2cff31 missing",
+        "f52e44459f0b73437df55051af8f716ae7f72bef missing",
+        "fbd6167a7d35dc5f845455a8ac267a26617c68c7 missing",
+        "fcdcf4f561c4fdf4c7443a9685edc7f626f9fa96 missing"
+      ],
+      "err": ""
+    }
+  ]
+}

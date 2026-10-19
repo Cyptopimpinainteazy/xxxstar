@@ -1,0 +1,51 @@
+[
+  {
+    "label": "x3gpu1-alias",
+    "target": "x3gpu1",
+    "rc": 255,
+    "stdout": "",
+    "stderr": "2026/10/18 19:43:26 socat[1656935] E connect(5, AF=2 192.168.0.30:22, 16): No route to host\nkex_exchange_identification: Connection closed by remote host\nConnection closed by UNKNOWN port 65535\n"
+  },
+  {
+    "label": "x3gpu1-current",
+    "target": "lojak@192.168.0.29",
+    "rc": 255,
+    "stdout": "",
+    "stderr": "ssh: connect to host 192.168.0.29 port 22: No route to host\n"
+  },
+  {
+    "label": "x3gpu1-historical",
+    "target": "lojak@192.168.0.30",
+    "rc": 255,
+    "stdout": "",
+    "stderr": "ssh: connect to host 192.168.0.30 port 22: No route to host\n"
+  },
+  {
+    "label": "x3star3",
+    "target": "lojak@192.168.0.55",
+    "rc": 255,
+    "stdout": "",
+    "stderr": "ssh: connect to host 192.168.0.55 port 22: No route to host\n"
+  },
+  {
+    "label": "x3gpu2",
+    "target": "lojak@192.168.0.23",
+    "rc": 255,
+    "stdout": "",
+    "stderr": "ssh: connect to host 192.168.0.23 port 22: No route to host\n"
+  },
+  {
+    "label": "x3star2-historical-unverified",
+    "target": "lojak@192.168.0.73",
+    "rc": 255,
+    "stdout": "",
+    "stderr": "ssh: connect to host 192.168.0.73 port 22: No route to host\n"
+  },
+  {
+    "label": "tailscale-x3star",
+    "target": "lojak@100.69.96.9",
+    "rc": 255,
+    "stdout": "",
+    "stderr": "ssh: connect to host 100.69.96.9 port 22: Connection refused\n"
+  }
+]

@@ -1,0 +1,1 @@
+{"log": 0, "patch_id": 0, "command": ["git", "-C", "/home/lojak/x3-recovery-sources/reports/audit-20261018/github-objects.git", "log", "--no-merges", "--no-ext-diff", "--no-textconv", "--format=commit %H", "-p", "70423054e2d9560a212ab763d4f265f9cdc448d9"]}

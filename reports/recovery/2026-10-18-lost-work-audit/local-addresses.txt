@@ -1,0 +1,15 @@
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eno1             DOWN
+eno2             UP             192.168.0.70/24 fe80::647b:e980:e28f:69fb/64
+eno3             DOWN
+eno4             DOWN
+ens1f0           DOWN
+ens1f1           DOWN
+enx0a94ef3768c9  UP             192.168.0.68/24 fe80::b7b:41f7:cc03:a01f/64
+docker0          UP             172.17.0.1/16 fe80::10b9:ceff:fe10:7d5c/64
+br-a20f91832862  DOWN           172.18.0.1/16
+vethb928bed@if2  UP             fe80::341b:ffff:fe2d:3b53/64
+tailscale0       UNKNOWN        100.89.236.89/32 fd7a:115c:a1e0::fe01:eccd/128 fe80::f553:ab3b:53c5:be0a/64
+vethf8da386@if2  UP             fe80::429:fbff:fec6:7f2c/64
+
+exit=0

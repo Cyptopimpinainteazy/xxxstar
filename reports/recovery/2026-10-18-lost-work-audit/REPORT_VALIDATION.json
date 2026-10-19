@@ -1,0 +1,26 @@
+{
+  "validation_state": "PASS",
+  "scope": "Report structure, source-discovery path coverage, pinned graph metadata, queue evidence references, full SHA syntax and metadata credential-pattern scan. Not feature/runtime/integration verification.",
+  "problems": [],
+  "repository_paths": 177,
+  "pull_requests": 617,
+  "queue_records": 2845,
+  "queue_counts": {
+    "P0": 1045,
+    "P1": 494,
+    "P2": 701,
+    "P3": 21,
+    "P4": 584
+  },
+  "secret_pattern_match_files": [],
+  "audit_state": "PARTIAL/BLOCKED",
+  "remaining_audit_failures": {
+    "status_command_failures": 22,
+    "object_check_states": {
+      "0": 88,
+      "10": 2
+    },
+    "remote_hosts": "unverified: host-probes.json"
+  },
+  "completion_percentage": null
+}

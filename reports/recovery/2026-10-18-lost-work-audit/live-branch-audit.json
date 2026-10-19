@@ -1,0 +1,3172 @@
+[
+  {
+    "name": "ci/local-ci-on-push-and-pr",
+    "sha": "eaa8f5a198ba2aebb38c532fd2b98851c6021fba",
+    "matching_prs": [
+      591
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "231\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "codex/atomic-trade-evidence-20261018",
+    "sha": "324a9871decf9469d7db1927f327bac752e6b67a",
+    "matching_prs": [
+      624
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t15\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ d6c3919d4f55d4e373339ecc47b863d80b7f9e2b\n+ 778840ea88cf07c31e9db2ccfb0081d75267e81c\n+ c9dda14d6df45feb77d94d8e259d14f992caccd3\n+ 68f7dc824c2555080926688d4c34aa2309b0cb20\n+ ba838ab7d9fedaf6cc6f1dbc28de7a1604bec94c\n+ fa7829cc12bf500a8a2b12d37b921e85bdb70ead\n+ 717f58c433e73e26cf585dfcc43277b5806cc20a\n+ 875d8a3d821f40150a18c83e4ff4965422d273ba\n+ d3783944c52883b16e86760f1fe410ad5e834a2c\n+ b446ec83f3c8c46fbe331b72dfec1121e8727ac8\n+ 0f397a3167b83ddb96e659c325c61b3a39bbcada\n+ ae81308ee3a16c7938257880ed25d8f2df620c24\n+ bda3c2731ad242f080b1c00c13e98ae2a2d5e1f3\n+ 66f18927dce387f7d987a9e3e0d7b96776b7e49c\n+ 324a9871decf9469d7db1927f327bac752e6b67a\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tpallets/atomic-trade-engine/src/lib.rs\nM\tpallets/atomic-trade-engine/src/mock.rs\nM\tpallets/atomic-trade-engine/src/tests.rs\nM\tpallets/x3-dex/src/tests_swapping.rs\nM\tscripts/local-ci.sh\nA\tscripts/testnet/atomic-trade-evidence.sh\nA\ttests/test_atomic_evidence_runner.py\nM\tx3-lang/vm/tests/trading_execution.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/dex-atomic-rollback-proof-20261018",
+    "sha": "218f44d58ea7b268c43cbdbd85c2a8442ea4acf2",
+    "matching_prs": [
+      628
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t36\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 043cdeb4f3ea2172047b8a85fc027ce55142d82a\n+ c6eec385376d43ce40291664350ef2f09c30a765\n+ c0dc9113cbbd03c18db7e7db5d12aa7d1fbb6910\n+ 121a55a40024104fa9834fa4307dca0b1f795612\n+ e585742f9d5181ea04bdf3d65f04f6b391279ef7\n+ 28eb85ff017c4c6ed77a82e90082a832a1588443\n+ f71973e79391c9bae1353faec56fc711b1774e16\n+ 1ebd3851e59baa1231f9aca72a09ec258dcc790c\n+ 755b39a70fc165a06053b4627ca99df816c20bb4\n+ 794680dc2a1a9de47410245ed50ce5081580ee8c\n+ f84cb9378d8ec2d14b92a88d3c06db7636d35777\n+ 5673b41db7676f9fefbde82233a1fe01dd054e89\n+ e6b43cc059e932e147013f206271ae01c894fc3d\n+ 791f555dcb21e06c6e12e8f26e96bca97c1c8e09\n+ a7fe66f400a5f143b8755c7459c2d900351d54e4\n+ c5548ae4601d9e761747a571b25c4748f254a9b2\n+ 3024ec05e2cd52fd418baf09003275d2cfe262f7\n+ 2e09a15e6137e57f98199273c7af0a486c5b58eb\n+ d59fbc32375a3405d557a34f1ed0da6cea5423ce\n+ 9fc6fbd44f84662e78f4cbbeb701adee98e9d241\n+ 23c7c472a0e688807cff17603be3e7df889b5a34\n+ f5b32811c48db5cb1cd511b04ee32d3273dca52f\n+ f8d904b582a7971cdcfb6d4d9855144768816586\n+ 0c8500526d6467f70d3ced63f64d8a72a172e348\n+ 83dd4e36e9e91f675bbc422d882a028e70f55609\n+ c875ed4d54eceb78618f4090b47f697e024d2d73\n+ aa58a951da5b5c4bcd6b45bfb81361d3f2753951\n+ 24e20e521a4b936e74ae9c2b6dd8982408b7be71\n+ 6bf1a23cf4685a7c23053f63e7a6dcb4c3af2715\n+ 377c89ead485d6f136a17891d0509bf289957a77\n+ b26f1ec1de8de45a611d24ac891e8983b0808e2e\n+ c19d0db1f8ed2cc3d6b0fe4b120e568ce710e66a\n+ b72e0182814cf4240e09b5de314640ead9ab72ee\n+ f2a175b9fe7bf827303e17bc5f7f69431fead148\n+ 2ae185d7e0f2ff19da48744a4acc425d9f67ec08\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.github/workflows/x3lang-production-unification.yml\nM\tCargo.lock\nM\tCargo.toml\nM\taudit-artifacts/current/feature-status.json\nM\tcrates/x3-asset-kernel-types/src/lib.rs\nM\tcrates/x3-backend/Cargo.toml\nM\tcrates/x3-backend/src/bc_format.rs\nM\tcrates/x3-backend/src/bc_format_helpers.rs\nM\tcrates/x3-backend/src/lower.rs\nM\tcrates/x3-backend/src/opcode.rs\nM\tcrates/x3-bench/Cargo.toml\nM\tcrates/x3-bench/src/pipeline.rs\nM\tcrates/x3-common/Cargo.toml\nM\tcrates/x3-common/src/lib.rs\nM\tcrates/x3-gpu-validator-swarm/src/gpu_bytecode.rs\nM\tcrates/x3-integration/Cargo.toml\nM\tcrates/x3-integration/src/error.rs\nM\tcrates/x3-integration/src/executor.rs\nM\tcrates/x3-integration/src/lib.rs\nM\tcrates/x3-integration/src/mini_x3.rs\nA\tcrates/x3-integration/src/trading.rs\nM\tcrates/x3-integration/tests/bc_const_pool_parity.rs\nM\tcrates/x3-integration/tests/bytecode_robustness.rs\nM\tcrates/x3-integration/tests/bytecode_version_compat.rs\nM\tcrates/x3-integration/tests/events.rs\nA\tcrates/x3-integration/tests/opcode_differential.rs\nA\tcrates/x3-integration/tests/trading_support/mod.rs\nA\tcrates/x3-integration/tests/x3lang_trading_differential.rs\nA\tcrates/x3-integration/tests/x3lang_trading_negative.rs\nA\tcrates/x3-integration/tests/x3lang_trading_production_e2e.rs\nA\tcrates/x3-integration/tests/x3lang_trading_receipt_replay.rs\nA\tcrates/x3-integration/tests/x3lang_trading_rollback.rs\nM\tcrates/x3-opt/src/rule_miner.rs\nM\tcrates/x3-verifier/src/verifier.rs\nM\tcrates/x3-vm/Cargo.toml\nD\tcrates/x3-vm/src/bytecode.rs\nM\tcrates/x3-vm/src/error.rs\nD\tcrates/x3-vm/src/gas.rs\nM\tcrates/x3-vm/src/lib.rs\nD\tcrates/x3-vm/src/revert.rs\nA\tcrates/x3-vm/src/trading.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\nM\tcrates/x3-vm/tests/gpu_integration.rs\nA\tcrates/x3-vm/tests/opcode_spec_exhaustive.rs\nA\tcrates/x3bc-core/Cargo.toml\nA\tcrates/x3bc-core/src/amm.rs\nA\tcrates/x3bc-core/src/bytecode.rs\nA\tcrates/x3bc-core/src/codec.rs\nA\tcrates/x3bc-core/src/error.rs\nA\tcrates/x3bc-core/src/format.rs\nA\tcrates/x3bc-core/src/format_helpers.rs\nA\tcrates/x3bc-core/src/hash.rs\nA\tcrates/x3bc-core/src/lib.rs\nA\tcrates/x3bc-core/src/opcode.rs\nA\tcrates/x3bc-core/src/receipt.rs\nA\tcrates/x3bc-core/src/spec.rs\nA\tcrates/x3bc-core/src/state.rs\nA\tcrates/x3bc-core/src/trading.rs\nA\tcrates/x3bc-core/src/trap.rs\nM\tdocs/audit/X3_AGENT_QUEUE.md\nM\tdocs/audit/X3_FEATURE_COMPLETION_MATRIX.md\nM\tdocs/reports/runtime-identity.baseline.json\nA\tdocs/roadmap/X3LANG_PRODUCTION_UNIFICATION.md\nM\tdocs/x3-lang/architecture-authority.md\nM\tfeature-matrix/cross-chain.toml\nM\tfeature-matrix/runtime-core.toml\nM\tnode/src/atomic_gateway.rs\nM\tnode/src/atomic_service.rs\nM\tnode/src/chain_spec.rs\nM\tpallets/atomic-trade-engine/src/mock.rs\nM\tpallets/x3-atomic-kernel/src/benchmarking.rs\nA\tpallets/x3-atomic-kernel/src/chain_legs.rs\nM\tpallets/x3-atomic-kernel/src/lib.rs\nM\tpallets/x3-atomic-kernel/src/mock.rs\nM\tpallets/x3-atomic-kernel/src/tests.rs\nM\tpallets/x3-atomic-kernel/src/tests_gate_pins.rs\nM\tpallets/x3-atomic-kernel/src/tests_vm_revert_hardening.rs\nM\tpallets/x3-atomic-kernel/src/vm_revert.rs\nM\tpallets/x3-coin/src/mock.rs\nM\tpallets/x3-dex/src/benchmarking.rs\nM\tpallets/x3-dex/src/lib.rs\nM\tpallets/x3-dex/src/mock.rs\nM\tpallets/x3-dex/src/tests.rs\nA\tpallets/x3-dex/src/tests_custody.rs\nM\tpallets/x3-dex/src/tests_liquidity_provision.rs\nM\tpallets/x3-dex/src/tests_swapping.rs\nM\tpallets/x3-flashloan/Cargo.toml\nM\tpallets/x3-flashloan/src/benchmarking.rs\nM\tpallets/x3-flashloan/src/lib.rs\nM\tpallets/x3-flashloan/src/mock.rs\nM\tpallets/x3-flashloan/src/tests.rs\nM\tpallets/x3-kernel/Cargo.toml\nA\tpallets/x3-kernel/src/benchmark_trade.x3bc\nM\tpallets/x3-kernel/src/benchmarking.rs\nM\tpallets/x3-kernel/src/lib.rs\nM\tpallets/x3-kernel/src/mock.rs\nM\tpallets/x3-kernel/src/test_helpers.rs\nM\tpallets/x3-kernel/src/tests.rs\nA\tpallets/x3-kernel/src/tests_trading.rs\nA\tpallets/x3-kernel/src/trading.rs\nM\tpallets/x3-kernel/src/wasm_adapters.rs\nM\tpallets/x3-kernel/tests/x3_storage_channel.rs\nM\tpallets/x3-launchpad/Cargo.toml\nM\tpallets/x3-launchpad/src/lib.rs\nM\tpallets/x3-launchpad/src/mock.rs\nM\tpallets/x3-launchpad/src/tests.rs\nM\tpallets/x3-settlement-engine/src/mock.rs\nM\tpallets/x3-token-factory/src/lib.rs\nM\tpallets/x3-token-factory/src/tests.rs\nM\truntime/Cargo.toml\nM\truntime/src/lib.rs\nM\truntime/src/tests.rs\nA\truntime/src/tests_launchpad.rs\nA\truntime/src/tests_trading.rs\nA\truntime/tests/dex_atomic_rollback.rs\nA\tscripts/ci/cargo-annotate.sh\nM\ttests/e2e_settlement_atomic_kernel.rs\nM\tx3-lang/Cargo.lock\nM\tx3-lang/compiler/Cargo.toml\nM\tx3-lang/compiler/src/fusion.rs\nM\tx3-lang/compiler/src/lib.rs\nM\tx3-lang/compiler/src/parser.rs\nM\tx3-lang/compiler/src/risk.rs\nM\tx3-lang/compiler/src/semantic.rs\nM\tx3-lang/compiler/src/trading_semantic.rs\nA\tx3-lang/compiler/src/x3bc.rs\nA\tx3-lang/compiler/tests/test_x3bc_lowering.rs\nM\tx3-lang/crates/x3-tools/tests/cli_integration.rs\nA\tx3-lang/examples/x3chain_flash_arb.x3\nM\tx3-lang/tests/test_surface_drift.py\nM\tx3-lang/vm/src/trading.rs\nM\tx3-lang/vm/src/verifier.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/grant-compute-audit-20261018",
+    "sha": "6c2eec195e2068a49065f60b7dae7e4f2d474f6a",
+    "matching_prs": [
+      630
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 6c2eec195e2068a49065f60b7dae7e4f2d474f6a\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.ai/runlogs/grant-compute-20261018/before-postgres.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-clippy.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-unit.log\nA\t.ai/runlogs/grant-compute-20261018/grants-gov-search.json\nA\t.ai/runlogs/grant-compute-20261018/master-ci.json\nA\t.ai/runlogs/grant-compute-20261018/master-protection.json\nA\t.ai/runlogs/grant-compute-20261018/pr626.json\nA\t.ai/runlogs/grant-compute-20261018/pr627.json\nA\t.ai/runlogs/grant-compute-20261018/refs.txt\nA\t.ai/runlogs/grant-compute-20261018/sql-before.log\nA\tcrates/x3-gateway/migrations/0008_funding_provenance.sql\nM\tcrates/x3-gateway/src/db.rs\nM\tcrates/x3-gateway/tests/postgres_integration.rs\nA\tcrates/x3-indexer/migrations/0008_funding_provenance.sql\nA\tdocs/grant-compute/CURRENT_STATE.md\nA\tdocs/grant-compute/V2_FORENSIC_AUDIT.md\nA\tdocs/grant-compute/V2_TEST_REPORT.md\nA\tdocs/grant-compute/V3_TEST_REPORT.md\nA\tdocs/money-swarm/FEATURE_MATRIX.md\nA\tdocs/money-swarm/FORENSIC_AUDIT.md\nA\tdocs/money-swarm/INTEGRATION_PLAN.md\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/money-swarm-live-workspace-20261018",
+    "sha": "886090015eacc38ae66befebba22ddeb7bf23887",
+    "matching_prs": [
+      631
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t4\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 6c2eec195e2068a49065f60b7dae7e4f2d474f6a\n+ 1960fe0d1d364ac8e57cd3924e9d66bf58dd1655\n+ 1f0d70c3e6820ec4e978a92913f8c2f5565fb44d\n+ 886090015eacc38ae66befebba22ddeb7bf23887\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.ai/runlogs/grant-compute-20261018/before-postgres.log\nA\t.ai/runlogs/grant-compute-20261018/browser-final.jsonl\nA\t.ai/runlogs/grant-compute-20261018/dashboard-build-current.log\nA\t.ai/runlogs/grant-compute-20261018/dashboard-lint-final.log\nA\t.ai/runlogs/grant-compute-20261018/dashboard-tests-current.log\nA\t.ai/runlogs/grant-compute-20261018/deadline-before.log\nA\t.ai/runlogs/grant-compute-20261018/expiry-clock-before.log\nA\t.ai/runlogs/grant-compute-20261018/expiry-red.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-clippy.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-final-tests.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-unit.log\nA\t.ai/runlogs/grant-compute-20261018/grants-gov-search.json\nA\t.ai/runlogs/grant-compute-20261018/logout-before.log\nA\t.ai/runlogs/grant-compute-20261018/master-ci.json\nA\t.ai/runlogs/grant-compute-20261018/master-protection.json\nA\t.ai/runlogs/grant-compute-20261018/pilot-final-build.log\nA\t.ai/runlogs/grant-compute-20261018/pr626.json\nA\t.ai/runlogs/grant-compute-20261018/pr627.json\nA\t.ai/runlogs/grant-compute-20261018/refs.txt\nA\t.ai/runlogs/grant-compute-20261018/source-final-clippy.log\nA\t.ai/runlogs/grant-compute-20261018/source-final-postgres.log\nA\t.ai/runlogs/grant-compute-20261018/sql-before.log\nA\t.ai/runlogs/grant-compute-20261018/workspace-proof.json\nM\t.gitignore\nM\tapps/inferstructor-dashboard/src/App.tsx\nM\tapps/inferstructor-dashboard/src/components/AdminControls.tsx\nM\tapps/inferstructor-dashboard/src/components/AdminDashboard.tsx\nM\tapps/inferstructor-dashboard/src/components/LeaderboardAndMetrics.tsx\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.css\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.test.tsx\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.tsx\nM\tapps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.tsx\nM\tapps/inferstructor-dashboard/src/components/TpsLeaderboard.tsx\nM\tapps/inferstructor-dashboard/src/hooks/useTokenRefresh.test.ts\nM\tapps/inferstructor-dashboard/src/hooks/useTokenRefresh.ts\nM\tapps/inferstructor-dashboard/vite.config.ts\nM\tcrates/x3-gateway/Cargo.toml\nA\tcrates/x3-gateway/migrations/0008_funding_provenance.sql\nA\tcrates/x3-gateway/migrations/0009_funding_source_snapshots.sql\nA\tcrates/x3-gateway/migrations/0010_funding_normalization_versions.sql\nM\tcrates/x3-gateway/src/db.rs\nM\tcrates/x3-gateway/src/error.rs\nA\tcrates/x3-gateway/src/funding_discovery.rs\nM\tcrates/x3-gateway/src/lib.rs\nM\tcrates/x3-gateway/src/rest.rs\nA\tcrates/x3-gateway/tests/funding_discovery_contract.rs\nM\tcrates/x3-gateway/tests/migrations_cover_tables.rs\nM\tcrates/x3-gateway/tests/postgres_integration.rs\nA\tcrates/x3-indexer/migrations/0008_funding_provenance.sql\nA\tcrates/x3-indexer/migrations/0009_funding_source_snapshots.sql\nA\tcrates/x3-indexer/migrations/0010_funding_normalization_versions.sql\nA\tdeploy/money-swarm/compose.yml\nA\tdocs/grant-compute/CURRENT_STATE.md\nA\tdocs/grant-compute/V2_FORENSIC_AUDIT.md\nA\tdocs/grant-compute/V2_TEST_REPORT.md\nA\tdocs/grant-compute/V3_TEST_REPORT.md\nA\tdocs/money-swarm/FEATURE_MATRIX.md\nA\tdocs/money-swarm/FORENSIC_AUDIT.md\nA\tdocs/money-swarm/INTEGRATION_PLAN.md\nA\tdocs/money-swarm/LOCAL_WORKSPACE.md\nA\tdocs/money-swarm/WORKSPACE_VERIFICATION.md\nA\tscripts/money-swarm/local.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/money-swarm-proposal-packages-20261018",
+    "sha": "3afc3a6a7fbaa5adada8bf200faef16d62540253",
+    "matching_prs": [
+      633
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t3\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 6c2eec195e2068a49065f60b7dae7e4f2d474f6a\n+ e394823a33fcbe4ed1106cb09ca45f401538a37f\n+ 3afc3a6a7fbaa5adada8bf200faef16d62540253\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.ai/runlogs/grant-compute-20261018/before-postgres.log\nA\t.ai/runlogs/grant-compute-20261018/browser-final.jsonl\nA\t.ai/runlogs/grant-compute-20261018/dashboard-build-current.log\nA\t.ai/runlogs/grant-compute-20261018/dashboard-lint-final.log\nA\t.ai/runlogs/grant-compute-20261018/dashboard-tests-current.log\nA\t.ai/runlogs/grant-compute-20261018/deadline-before.log\nA\t.ai/runlogs/grant-compute-20261018/expiry-clock-before.log\nA\t.ai/runlogs/grant-compute-20261018/expiry-red.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-clippy.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-final-tests.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-unit.log\nA\t.ai/runlogs/grant-compute-20261018/grants-gov-search.json\nA\t.ai/runlogs/grant-compute-20261018/logout-before.log\nA\t.ai/runlogs/grant-compute-20261018/master-ci.json\nA\t.ai/runlogs/grant-compute-20261018/master-protection.json\nA\t.ai/runlogs/grant-compute-20261018/pilot-final-build.log\nA\t.ai/runlogs/grant-compute-20261018/pr626.json\nA\t.ai/runlogs/grant-compute-20261018/pr627.json\nA\t.ai/runlogs/grant-compute-20261018/refs.txt\nA\t.ai/runlogs/grant-compute-20261018/source-final-clippy.log\nA\t.ai/runlogs/grant-compute-20261018/source-final-postgres.log\nA\t.ai/runlogs/grant-compute-20261018/sql-before.log\nA\t.ai/runlogs/grant-compute-20261018/workspace-proof.json\nA\t.ai/runlogs/proposal-packages-20261018/browser-actions.jsonl\nA\t.ai/runlogs/proposal-packages-20261018/build-dashboard-final.log\nA\t.ai/runlogs/proposal-packages-20261018/build-final.log\nA\t.ai/runlogs/proposal-packages-20261018/clippy-final.log\nA\t.ai/runlogs/proposal-packages-20261018/contract-before.log\nA\t.ai/runlogs/proposal-packages-20261018/dashboard-tests-final.log\nA\t.ai/runlogs/proposal-packages-20261018/gateway-tests-final.log\nA\t.ai/runlogs/proposal-packages-20261018/lint-final.log\nA\t.ai/runlogs/proposal-packages-20261018/live-source-refresh.log\nA\t.ai/runlogs/proposal-packages-20261018/pilot-restart.log\nA\t.ai/runlogs/proposal-packages-20261018/receipt-verify.json\nA\t.ai/runlogs/proposal-packages-20261018/reverted-source-after.log\nA\t.ai/runlogs/proposal-packages-20261018/reverted-source-before.log\nA\t.ai/runlogs/proposal-packages-20261018/validation-evidence.txt\nA\t.ai/runlogs/proposal-packages-20261018/validation-receipt.json\nM\t.gitignore\nM\tapps/inferstructor-dashboard/src/App.tsx\nM\tapps/inferstructor-dashboard/src/components/AdminControls.tsx\nM\tapps/inferstructor-dashboard/src/components/AdminDashboard.tsx\nA\tapps/inferstructor-dashboard/src/components/FundingProposalEditor.test.tsx\nA\tapps/inferstructor-dashboard/src/components/FundingProposalEditor.tsx\nM\tapps/inferstructor-dashboard/src/components/LeaderboardAndMetrics.tsx\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.css\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.test.tsx\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.tsx\nM\tapps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.tsx\nM\tapps/inferstructor-dashboard/src/components/TpsLeaderboard.tsx\nM\tapps/inferstructor-dashboard/src/hooks/useTokenRefresh.test.ts\nM\tapps/inferstructor-dashboard/src/hooks/useTokenRefresh.ts\nM\tapps/inferstructor-dashboard/vite.config.ts\nM\tcrates/x3-gateway/Cargo.toml\nA\tcrates/x3-gateway/migrations/0008_funding_provenance.sql\nA\tcrates/x3-gateway/migrations/0009_funding_source_snapshots.sql\nA\tcrates/x3-gateway/migrations/0010_funding_normalization_versions.sql\nA\tcrates/x3-gateway/migrations/0011_funding_proposal_versions.sql\nM\tcrates/x3-gateway/src/db.rs\nM\tcrates/x3-gateway/src/error.rs\nA\tcrates/x3-gateway/src/funding_discovery.rs\nA\tcrates/x3-gateway/src/funding_proposals.rs\nM\tcrates/x3-gateway/src/lib.rs\nM\tcrates/x3-gateway/src/rest.rs\nA\tcrates/x3-gateway/tests/funding_discovery_contract.rs\nA\tcrates/x3-gateway/tests/funding_proposals_contract.rs\nM\tcrates/x3-gateway/tests/migrations_cover_tables.rs\nM\tcrates/x3-gateway/tests/postgres_integration.rs\nA\tcrates/x3-indexer/migrations/0008_funding_provenance.sql\nA\tcrates/x3-indexer/migrations/0009_funding_source_snapshots.sql\nA\tcrates/x3-indexer/migrations/0010_funding_normalization_versions.sql\nA\tcrates/x3-indexer/migrations/0011_funding_proposal_versions.sql\nA\tdeploy/money-swarm/compose.yml\nA\tdocs/grant-compute/CURRENT_STATE.md\nA\tdocs/grant-compute/V2_FORENSIC_AUDIT.md\nA\tdocs/grant-compute/V2_TEST_REPORT.md\nA\tdocs/grant-compute/V3_TEST_REPORT.md\nA\tdocs/money-swarm/FEATURE_MATRIX.md\nA\tdocs/money-swarm/FORENSIC_AUDIT.md\nA\tdocs/money-swarm/INTEGRATION_PLAN.md\nA\tdocs/money-swarm/LOCAL_WORKSPACE.md\nA\tdocs/money-swarm/PROPOSAL_PACKAGES.md\nA\tdocs/money-swarm/WORKSPACE_VERIFICATION.md\nA\tscripts/money-swarm/local.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/money-swarm-reviewed-workspace-20261018",
+    "sha": "e394823a33fcbe4ed1106cb09ca45f401538a37f",
+    "matching_prs": [
+      632
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t2\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 6c2eec195e2068a49065f60b7dae7e4f2d474f6a\n+ e394823a33fcbe4ed1106cb09ca45f401538a37f\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.ai/runlogs/grant-compute-20261018/before-postgres.log\nA\t.ai/runlogs/grant-compute-20261018/browser-final.jsonl\nA\t.ai/runlogs/grant-compute-20261018/dashboard-build-current.log\nA\t.ai/runlogs/grant-compute-20261018/dashboard-lint-final.log\nA\t.ai/runlogs/grant-compute-20261018/dashboard-tests-current.log\nA\t.ai/runlogs/grant-compute-20261018/deadline-before.log\nA\t.ai/runlogs/grant-compute-20261018/expiry-clock-before.log\nA\t.ai/runlogs/grant-compute-20261018/expiry-red.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-clippy.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-final-tests.log\nA\t.ai/runlogs/grant-compute-20261018/gateway-unit.log\nA\t.ai/runlogs/grant-compute-20261018/grants-gov-search.json\nA\t.ai/runlogs/grant-compute-20261018/logout-before.log\nA\t.ai/runlogs/grant-compute-20261018/master-ci.json\nA\t.ai/runlogs/grant-compute-20261018/master-protection.json\nA\t.ai/runlogs/grant-compute-20261018/pilot-final-build.log\nA\t.ai/runlogs/grant-compute-20261018/pr626.json\nA\t.ai/runlogs/grant-compute-20261018/pr627.json\nA\t.ai/runlogs/grant-compute-20261018/refs.txt\nA\t.ai/runlogs/grant-compute-20261018/source-final-clippy.log\nA\t.ai/runlogs/grant-compute-20261018/source-final-postgres.log\nA\t.ai/runlogs/grant-compute-20261018/sql-before.log\nA\t.ai/runlogs/grant-compute-20261018/workspace-proof.json\nM\t.gitignore\nM\tapps/inferstructor-dashboard/src/App.tsx\nM\tapps/inferstructor-dashboard/src/components/AdminControls.tsx\nM\tapps/inferstructor-dashboard/src/components/AdminDashboard.tsx\nM\tapps/inferstructor-dashboard/src/components/LeaderboardAndMetrics.tsx\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.css\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.test.tsx\nA\tapps/inferstructor-dashboard/src/components/MoneySwarmWorkspace.tsx\nM\tapps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.tsx\nM\tapps/inferstructor-dashboard/src/components/TpsLeaderboard.tsx\nM\tapps/inferstructor-dashboard/src/hooks/useTokenRefresh.test.ts\nM\tapps/inferstructor-dashboard/src/hooks/useTokenRefresh.ts\nM\tapps/inferstructor-dashboard/vite.config.ts\nM\tcrates/x3-gateway/Cargo.toml\nA\tcrates/x3-gateway/migrations/0008_funding_provenance.sql\nA\tcrates/x3-gateway/migrations/0009_funding_source_snapshots.sql\nA\tcrates/x3-gateway/migrations/0010_funding_normalization_versions.sql\nM\tcrates/x3-gateway/src/db.rs\nM\tcrates/x3-gateway/src/error.rs\nA\tcrates/x3-gateway/src/funding_discovery.rs\nM\tcrates/x3-gateway/src/lib.rs\nM\tcrates/x3-gateway/src/rest.rs\nA\tcrates/x3-gateway/tests/funding_discovery_contract.rs\nM\tcrates/x3-gateway/tests/migrations_cover_tables.rs\nM\tcrates/x3-gateway/tests/postgres_integration.rs\nA\tcrates/x3-indexer/migrations/0008_funding_provenance.sql\nA\tcrates/x3-indexer/migrations/0009_funding_source_snapshots.sql\nA\tcrates/x3-indexer/migrations/0010_funding_normalization_versions.sql\nA\tdeploy/money-swarm/compose.yml\nA\tdocs/grant-compute/CURRENT_STATE.md\nA\tdocs/grant-compute/V2_FORENSIC_AUDIT.md\nA\tdocs/grant-compute/V2_TEST_REPORT.md\nA\tdocs/grant-compute/V3_TEST_REPORT.md\nA\tdocs/money-swarm/FEATURE_MATRIX.md\nA\tdocs/money-swarm/FORENSIC_AUDIT.md\nA\tdocs/money-swarm/INTEGRATION_PLAN.md\nA\tdocs/money-swarm/LOCAL_WORKSPACE.md\nA\tdocs/money-swarm/WORKSPACE_VERIFICATION.md\nA\tscripts/money-swarm/local.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/testnet-status-python3-20261018",
+    "sha": "d5bde264dd9de3c73141404841f6e5f25d1a319d",
+    "matching_prs": [
+      625
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ d5bde264dd9de3c73141404841f6e5f25d1a319d\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tscripts/testnet/status-7-validators.sh\nM\ttests/test_validator_launcher.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/volunteer-local-ci-20261018",
+    "sha": "eff2ec8b98ea133125bd9d081ab5d1d0668c0a5a",
+    "matching_prs": [
+      627
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t15\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 6004e222ddd97717d912b359f41d221819976975\n+ 0d864b45098840dd23d9642a9129b27bab7c0fe9\n+ f844a161a4830e793392af75e1e20064da2c6610\n+ 8a55b3f07cb3c91b29d4a9ad3779c15858ed723c\n+ 96f7991657026a13557ca119cf5f4010a4870520\n+ 9451597912ce35f4ba6d6b15e82793518ab26f86\n+ c24b77e7289ae2e9e5b0c51f9c185e579c8804e8\n+ 206a4d48f6fbf2dc8fd7528caf9f89a53322e944\n+ 403b7c4bc6a82e41905655468d653f14bbcd2f80\n+ 49695991a11284167774df1fd1c862da28103eee\n+ 7438e15a705d06034f90a4b83df182b6f94765fb\n+ 3162f7566726fcb007944ea9b722a673f73e323e\n+ a62ed57733f6c861624c90c7eaf3337133bd1fa7\n+ 9094f71e297323ef000c6c4e47945f79af17735a\n+ eff2ec8b98ea133125bd9d081ab5d1d0668c0a5a\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.github/workflows/x3-volunteer-lease.yml\nA\tdocs/current/VOLUNTEER_COMPUTE_INTEGRATION.md\nM\tservices/x3-swarm-worker/src/main.rs\nA\tservices/x3-swarm-worker/src/volunteer_lease.rs\nA\tservices/x3-swarm-worker/src/volunteer_policy.rs\nA\tservices/x3-volunteer-worker/dispatch.py\nA\tservices/x3-volunteer-worker/gpu_discovery.py\nA\tservices/x3-volunteer-worker/lease_auth.py\nA\tservices/x3-volunteer-worker/safe_benchmark.py\nA\tservices/x3-volunteer-worker/test_dispatch.py\nA\tservices/x3-volunteer-worker/test_gpu_discovery.py\nA\tservices/x3-volunteer-worker/test_lease_auth.py\nA\tservices/x3-volunteer-worker/test_safe_benchmark.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/volunteer-strict-consent-20261018",
+    "sha": "53fd11bb584c12524ace858b22801775a5686bc7",
+    "matching_prs": [
+      629
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t16\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 6004e222ddd97717d912b359f41d221819976975\n+ 0d864b45098840dd23d9642a9129b27bab7c0fe9\n+ f844a161a4830e793392af75e1e20064da2c6610\n+ 8a55b3f07cb3c91b29d4a9ad3779c15858ed723c\n+ 96f7991657026a13557ca119cf5f4010a4870520\n+ 9451597912ce35f4ba6d6b15e82793518ab26f86\n+ c24b77e7289ae2e9e5b0c51f9c185e579c8804e8\n+ 206a4d48f6fbf2dc8fd7528caf9f89a53322e944\n+ 403b7c4bc6a82e41905655468d653f14bbcd2f80\n+ 49695991a11284167774df1fd1c862da28103eee\n+ 7438e15a705d06034f90a4b83df182b6f94765fb\n+ 3162f7566726fcb007944ea9b722a673f73e323e\n+ a62ed57733f6c861624c90c7eaf3337133bd1fa7\n+ 9094f71e297323ef000c6c4e47945f79af17735a\n+ eff2ec8b98ea133125bd9d081ab5d1d0668c0a5a\n+ 53fd11bb584c12524ace858b22801775a5686bc7\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.ai/runlogs/volunteer-strict-20261018/after.log\nA\t.ai/runlogs/volunteer-strict-20261018/before.log\nA\t.github/workflows/x3-volunteer-lease.yml\nA\tdocs/current/VOLUNTEER_COMPUTE_INTEGRATION.md\nA\tdocs/current/VOLUNTEER_STRICT_INPUT_PROOF.md\nM\tservices/x3-swarm-worker/src/main.rs\nA\tservices/x3-swarm-worker/src/volunteer_lease.rs\nA\tservices/x3-swarm-worker/src/volunteer_policy.rs\nA\tservices/x3-volunteer-worker/dispatch.py\nA\tservices/x3-volunteer-worker/gpu_discovery.py\nA\tservices/x3-volunteer-worker/lease_auth.py\nA\tservices/x3-volunteer-worker/safe_benchmark.py\nA\tservices/x3-volunteer-worker/test_dispatch.py\nA\tservices/x3-volunteer-worker/test_gpu_discovery.py\nA\tservices/x3-volunteer-worker/test_lease_auth.py\nA\tservices/x3-volunteer-worker/test_safe_benchmark.py\nA\tservices/x3-volunteer-worker/test_strict_inputs.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/x3-economic-safety-kernel",
+    "sha": "4aa67b8cc307adbb66cdbede1de7d93842ff8a41",
+    "matching_prs": [
+      185
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "2254\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "codex/x3-gateway-postgres-integration",
+    "sha": "811f53a0637ce90a839e05fc151856cbade2dce2",
+    "matching_prs": [
+      561
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "334\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "codex/x3-grant-hunter-v3",
+    "sha": "3ddedd61df18aca449b3aff9751e8020a8f32a90",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 3ddedd61df18aca449b3aff9751e8020a8f32a90\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\ttools/x3-grant-hunter/.gitignore\nA\ttools/x3-grant-hunter/README.md\nA\ttools/x3-grant-hunter/community.py\nA\ttools/x3-grant-hunter/discovery.py\nA\ttools/x3-grant-hunter/grantops.py\nA\ttools/x3-grant-hunter/hunter.py\nA\ttools/x3-grant-hunter/opportunities-extra.json\nA\ttools/x3-grant-hunter/tests/test_discovery.py\nA\ttools/x3-grant-hunter/tests/test_grantops.py\nA\ttools/x3-grant-hunter/tests/test_hunter.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/x3-lang-nested-workspace-gate-20261008",
+    "sha": "5f0179c84479cf4a03ed04d241ad4fec12b8d541",
+    "matching_prs": [
+      585
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "229\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "codex/x3-volunteer-compute-integration",
+    "sha": "9094f71e297323ef000c6c4e47945f79af17735a",
+    "matching_prs": [
+      626
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t14\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 6004e222ddd97717d912b359f41d221819976975\n+ 0d864b45098840dd23d9642a9129b27bab7c0fe9\n+ f844a161a4830e793392af75e1e20064da2c6610\n+ 8a55b3f07cb3c91b29d4a9ad3779c15858ed723c\n+ 96f7991657026a13557ca119cf5f4010a4870520\n+ 9451597912ce35f4ba6d6b15e82793518ab26f86\n+ c24b77e7289ae2e9e5b0c51f9c185e579c8804e8\n+ 206a4d48f6fbf2dc8fd7528caf9f89a53322e944\n+ 403b7c4bc6a82e41905655468d653f14bbcd2f80\n+ 49695991a11284167774df1fd1c862da28103eee\n+ 7438e15a705d06034f90a4b83df182b6f94765fb\n+ 3162f7566726fcb007944ea9b722a673f73e323e\n+ a62ed57733f6c861624c90c7eaf3337133bd1fa7\n+ 9094f71e297323ef000c6c4e47945f79af17735a\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.github/workflows/x3-volunteer-lease.yml\nA\tdocs/current/VOLUNTEER_COMPUTE_INTEGRATION.md\nM\tservices/x3-swarm-worker/src/main.rs\nA\tservices/x3-swarm-worker/src/volunteer_lease.rs\nA\tservices/x3-swarm-worker/src/volunteer_policy.rs\nA\tservices/x3-volunteer-worker/dispatch.py\nA\tservices/x3-volunteer-worker/gpu_discovery.py\nA\tservices/x3-volunteer-worker/lease_auth.py\nA\tservices/x3-volunteer-worker/safe_benchmark.py\nA\tservices/x3-volunteer-worker/test_dispatch.py\nA\tservices/x3-volunteer-worker/test_gpu_discovery.py\nA\tservices/x3-volunteer-worker/test_lease_auth.py\nA\tservices/x3-volunteer-worker/test_safe_benchmark.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/x3lang-canonical-compiler-phase2",
+    "sha": "4da42f7c8e0c0ea4ac9609e4d0e13349389426d8",
+    "matching_prs": [
+      588
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "230\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "codex/x3lang-compiled-storage-regression-20261008",
+    "sha": "fadd0dba72ebeedb054fc884b768272318b4f581",
+    "matching_prs": [
+      586
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "228\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "codex/x3lang-control-flow-parity-20261008",
+    "sha": "838e753a20204a0108f52eef7f3810e7ae468997",
+    "matching_prs": [
+      587
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "231\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "codex/x3lang-onchain-wip",
+    "sha": "5673b41db7676f9fefbde82233a1fe01dd054e89",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t12\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 043cdeb4f3ea2172047b8a85fc027ce55142d82a\n+ c6eec385376d43ce40291664350ef2f09c30a765\n+ c0dc9113cbbd03c18db7e7db5d12aa7d1fbb6910\n+ 121a55a40024104fa9834fa4307dca0b1f795612\n+ e585742f9d5181ea04bdf3d65f04f6b391279ef7\n+ 28eb85ff017c4c6ed77a82e90082a832a1588443\n+ f71973e79391c9bae1353faec56fc711b1774e16\n+ 1ebd3851e59baa1231f9aca72a09ec258dcc790c\n+ 755b39a70fc165a06053b4627ca99df816c20bb4\n+ 794680dc2a1a9de47410245ed50ce5081580ee8c\n+ f84cb9378d8ec2d14b92a88d3c06db7636d35777\n+ 5673b41db7676f9fefbde82233a1fe01dd054e89\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.github/workflows/x3lang-production-unification.yml\nM\tCargo.lock\nM\tCargo.toml\nM\tcrates/x3-asset-kernel-types/src/lib.rs\nM\tcrates/x3-backend/Cargo.toml\nM\tcrates/x3-backend/src/bc_format.rs\nM\tcrates/x3-backend/src/bc_format_helpers.rs\nM\tcrates/x3-backend/src/lower.rs\nM\tcrates/x3-backend/src/opcode.rs\nM\tcrates/x3-bench/Cargo.toml\nM\tcrates/x3-bench/src/pipeline.rs\nM\tcrates/x3-common/Cargo.toml\nM\tcrates/x3-common/src/lib.rs\nM\tcrates/x3-gpu-validator-swarm/src/gpu_bytecode.rs\nM\tcrates/x3-integration/Cargo.toml\nM\tcrates/x3-integration/src/error.rs\nM\tcrates/x3-integration/src/lib.rs\nM\tcrates/x3-integration/src/mini_x3.rs\nA\tcrates/x3-integration/src/trading.rs\nM\tcrates/x3-integration/tests/bc_const_pool_parity.rs\nM\tcrates/x3-integration/tests/bytecode_robustness.rs\nM\tcrates/x3-integration/tests/bytecode_version_compat.rs\nA\tcrates/x3-integration/tests/opcode_differential.rs\nA\tcrates/x3-integration/tests/trading_support/mod.rs\nA\tcrates/x3-integration/tests/x3lang_trading_differential.rs\nA\tcrates/x3-integration/tests/x3lang_trading_negative.rs\nA\tcrates/x3-integration/tests/x3lang_trading_production_e2e.rs\nA\tcrates/x3-integration/tests/x3lang_trading_receipt_replay.rs\nA\tcrates/x3-integration/tests/x3lang_trading_rollback.rs\nM\tcrates/x3-opt/src/rule_miner.rs\nM\tcrates/x3-vm/Cargo.toml\nD\tcrates/x3-vm/src/bytecode.rs\nM\tcrates/x3-vm/src/error.rs\nD\tcrates/x3-vm/src/gas.rs\nM\tcrates/x3-vm/src/lib.rs\nD\tcrates/x3-vm/src/revert.rs\nA\tcrates/x3-vm/src/trading.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\nM\tcrates/x3-vm/tests/gpu_integration.rs\nA\tcrates/x3-vm/tests/opcode_spec_exhaustive.rs\nA\tcrates/x3bc-core/Cargo.toml\nA\tcrates/x3bc-core/src/amm.rs\nA\tcrates/x3bc-core/src/bytecode.rs\nA\tcrates/x3bc-core/src/codec.rs\nA\tcrates/x3bc-core/src/error.rs\nA\tcrates/x3bc-core/src/format.rs\nA\tcrates/x3bc-core/src/format_helpers.rs\nA\tcrates/x3bc-core/src/hash.rs\nA\tcrates/x3bc-core/src/lib.rs\nA\tcrates/x3bc-core/src/opcode.rs\nA\tcrates/x3bc-core/src/receipt.rs\nA\tcrates/x3bc-core/src/spec.rs\nA\tcrates/x3bc-core/src/state.rs\nA\tcrates/x3bc-core/src/trading.rs\nA\tcrates/x3bc-core/src/trap.rs\nA\tdocs/roadmap/X3LANG_PRODUCTION_UNIFICATION.md\nM\tdocs/x3-lang/architecture-authority.md\nM\tpallets/atomic-trade-engine/src/mock.rs\nM\tpallets/x3-coin/src/mock.rs\nM\tpallets/x3-dex/src/benchmarking.rs\nM\tpallets/x3-dex/src/lib.rs\nM\tpallets/x3-dex/src/mock.rs\nM\tpallets/x3-dex/src/tests.rs\nA\tpallets/x3-dex/src/tests_custody.rs\nM\tpallets/x3-dex/src/tests_liquidity_provision.rs\nM\tpallets/x3-dex/src/tests_swapping.rs\nM\tpallets/x3-flashloan/Cargo.toml\nM\tpallets/x3-flashloan/src/benchmarking.rs\nM\tpallets/x3-flashloan/src/lib.rs\nM\tpallets/x3-flashloan/src/mock.rs\nM\tpallets/x3-flashloan/src/tests.rs\nM\tpallets/x3-kernel/Cargo.toml\nM\tpallets/x3-kernel/src/lib.rs\nM\tpallets/x3-kernel/src/mock.rs\nA\tpallets/x3-kernel/src/tests_trading.rs\nA\tpallets/x3-kernel/src/trading.rs\nM\tpallets/x3-kernel/tests/x3_storage_channel.rs\nM\tpallets/x3-settlement-engine/src/mock.rs\nM\truntime/Cargo.toml\nM\truntime/src/lib.rs\nA\truntime/src/tests_trading.rs\nA\tscripts/ci/cargo-annotate.sh\nM\tx3-lang/Cargo.lock\nM\tx3-lang/compiler/Cargo.toml\nM\tx3-lang/compiler/src/fusion.rs\nM\tx3-lang/compiler/src/lib.rs\nM\tx3-lang/compiler/src/parser.rs\nM\tx3-lang/compiler/src/risk.rs\nM\tx3-lang/compiler/src/semantic.rs\nM\tx3-lang/compiler/src/trading_semantic.rs\nA\tx3-lang/compiler/src/x3bc.rs\nA\tx3-lang/compiler/tests/test_x3bc_lowering.rs\nM\tx3-lang/crates/x3-tools/tests/cli_integration.rs\nA\tx3-lang/examples/x3chain_flash_arb.x3\nM\tx3-lang/tests/test_surface_drift.py\nM\tx3-lang/vm/src/trading.rs\nM\tx3-lang/vm/src/verifier.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "codex/x3lang-production-unification",
+    "sha": "2ae185d7e0f2ff19da48744a4acc425d9f67ec08",
+    "matching_prs": [
+      623
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t33\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 043cdeb4f3ea2172047b8a85fc027ce55142d82a\n+ c6eec385376d43ce40291664350ef2f09c30a765\n+ c0dc9113cbbd03c18db7e7db5d12aa7d1fbb6910\n+ 121a55a40024104fa9834fa4307dca0b1f795612\n+ e585742f9d5181ea04bdf3d65f04f6b391279ef7\n+ 28eb85ff017c4c6ed77a82e90082a832a1588443\n+ f71973e79391c9bae1353faec56fc711b1774e16\n+ 1ebd3851e59baa1231f9aca72a09ec258dcc790c\n+ 755b39a70fc165a06053b4627ca99df816c20bb4\n+ 794680dc2a1a9de47410245ed50ce5081580ee8c\n+ f84cb9378d8ec2d14b92a88d3c06db7636d35777\n+ 5673b41db7676f9fefbde82233a1fe01dd054e89\n+ e6b43cc059e932e147013f206271ae01c894fc3d\n+ 791f555dcb21e06c6e12e8f26e96bca97c1c8e09\n+ a7fe66f400a5f143b8755c7459c2d900351d54e4\n+ c5548ae4601d9e761747a571b25c4748f254a9b2\n+ 3024ec05e2cd52fd418baf09003275d2cfe262f7\n+ 2e09a15e6137e57f98199273c7af0a486c5b58eb\n+ d59fbc32375a3405d557a34f1ed0da6cea5423ce\n+ 9fc6fbd44f84662e78f4cbbeb701adee98e9d241\n+ 23c7c472a0e688807cff17603be3e7df889b5a34\n+ f5b32811c48db5cb1cd511b04ee32d3273dca52f\n+ f8d904b582a7971cdcfb6d4d9855144768816586\n+ 0c8500526d6467f70d3ced63f64d8a72a172e348\n+ 83dd4e36e9e91f675bbc422d882a028e70f55609\n+ c875ed4d54eceb78618f4090b47f697e024d2d73\n+ aa58a951da5b5c4bcd6b45bfb81361d3f2753951\n+ 24e20e521a4b936e74ae9c2b6dd8982408b7be71\n+ 6bf1a23cf4685a7c23053f63e7a6dcb4c3af2715\n+ 377c89ead485d6f136a17891d0509bf289957a77\n+ b72e0182814cf4240e09b5de314640ead9ab72ee\n+ f2a175b9fe7bf827303e17bc5f7f69431fead148\n+ 2ae185d7e0f2ff19da48744a4acc425d9f67ec08\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.github/workflows/x3lang-production-unification.yml\nM\tCargo.lock\nM\tCargo.toml\nM\taudit-artifacts/current/feature-status.json\nM\tcrates/x3-asset-kernel-types/src/lib.rs\nM\tcrates/x3-backend/Cargo.toml\nM\tcrates/x3-backend/src/bc_format.rs\nM\tcrates/x3-backend/src/bc_format_helpers.rs\nM\tcrates/x3-backend/src/lower.rs\nM\tcrates/x3-backend/src/opcode.rs\nM\tcrates/x3-bench/Cargo.toml\nM\tcrates/x3-bench/src/pipeline.rs\nM\tcrates/x3-common/Cargo.toml\nM\tcrates/x3-common/src/lib.rs\nM\tcrates/x3-gpu-validator-swarm/src/gpu_bytecode.rs\nM\tcrates/x3-integration/Cargo.toml\nM\tcrates/x3-integration/src/error.rs\nM\tcrates/x3-integration/src/executor.rs\nM\tcrates/x3-integration/src/lib.rs\nM\tcrates/x3-integration/src/mini_x3.rs\nA\tcrates/x3-integration/src/trading.rs\nM\tcrates/x3-integration/tests/bc_const_pool_parity.rs\nM\tcrates/x3-integration/tests/bytecode_robustness.rs\nM\tcrates/x3-integration/tests/bytecode_version_compat.rs\nM\tcrates/x3-integration/tests/events.rs\nA\tcrates/x3-integration/tests/opcode_differential.rs\nA\tcrates/x3-integration/tests/trading_support/mod.rs\nA\tcrates/x3-integration/tests/x3lang_trading_differential.rs\nA\tcrates/x3-integration/tests/x3lang_trading_negative.rs\nA\tcrates/x3-integration/tests/x3lang_trading_production_e2e.rs\nA\tcrates/x3-integration/tests/x3lang_trading_receipt_replay.rs\nA\tcrates/x3-integration/tests/x3lang_trading_rollback.rs\nM\tcrates/x3-opt/src/rule_miner.rs\nM\tcrates/x3-verifier/src/verifier.rs\nM\tcrates/x3-vm/Cargo.toml\nD\tcrates/x3-vm/src/bytecode.rs\nM\tcrates/x3-vm/src/error.rs\nD\tcrates/x3-vm/src/gas.rs\nM\tcrates/x3-vm/src/lib.rs\nD\tcrates/x3-vm/src/revert.rs\nA\tcrates/x3-vm/src/trading.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\nM\tcrates/x3-vm/tests/gpu_integration.rs\nA\tcrates/x3-vm/tests/opcode_spec_exhaustive.rs\nA\tcrates/x3bc-core/Cargo.toml\nA\tcrates/x3bc-core/src/amm.rs\nA\tcrates/x3bc-core/src/bytecode.rs\nA\tcrates/x3bc-core/src/codec.rs\nA\tcrates/x3bc-core/src/error.rs\nA\tcrates/x3bc-core/src/format.rs\nA\tcrates/x3bc-core/src/format_helpers.rs\nA\tcrates/x3bc-core/src/hash.rs\nA\tcrates/x3bc-core/src/lib.rs\nA\tcrates/x3bc-core/src/opcode.rs\nA\tcrates/x3bc-core/src/receipt.rs\nA\tcrates/x3bc-core/src/spec.rs\nA\tcrates/x3bc-core/src/state.rs\nA\tcrates/x3bc-core/src/trading.rs\nA\tcrates/x3bc-core/src/trap.rs\nM\tdocs/audit/X3_AGENT_QUEUE.md\nM\tdocs/audit/X3_FEATURE_COMPLETION_MATRIX.md\nM\tdocs/reports/runtime-identity.baseline.json\nA\tdocs/roadmap/X3LANG_PRODUCTION_UNIFICATION.md\nM\tdocs/x3-lang/architecture-authority.md\nM\tfeature-matrix/cross-chain.toml\nM\tfeature-matrix/runtime-core.toml\nM\tnode/src/atomic_gateway.rs\nM\tnode/src/atomic_service.rs\nM\tnode/src/chain_spec.rs\nM\tpallets/atomic-trade-engine/src/mock.rs\nM\tpallets/x3-atomic-kernel/src/benchmarking.rs\nA\tpallets/x3-atomic-kernel/src/chain_legs.rs\nM\tpallets/x3-atomic-kernel/src/lib.rs\nM\tpallets/x3-atomic-kernel/src/mock.rs\nM\tpallets/x3-atomic-kernel/src/tests.rs\nM\tpallets/x3-atomic-kernel/src/tests_gate_pins.rs\nM\tpallets/x3-atomic-kernel/src/tests_vm_revert_hardening.rs\nM\tpallets/x3-atomic-kernel/src/vm_revert.rs\nM\tpallets/x3-coin/src/mock.rs\nM\tpallets/x3-dex/src/benchmarking.rs\nM\tpallets/x3-dex/src/lib.rs\nM\tpallets/x3-dex/src/mock.rs\nM\tpallets/x3-dex/src/tests.rs\nA\tpallets/x3-dex/src/tests_custody.rs\nM\tpallets/x3-dex/src/tests_liquidity_provision.rs\nM\tpallets/x3-dex/src/tests_swapping.rs\nM\tpallets/x3-flashloan/Cargo.toml\nM\tpallets/x3-flashloan/src/benchmarking.rs\nM\tpallets/x3-flashloan/src/lib.rs\nM\tpallets/x3-flashloan/src/mock.rs\nM\tpallets/x3-flashloan/src/tests.rs\nM\tpallets/x3-kernel/Cargo.toml\nA\tpallets/x3-kernel/src/benchmark_trade.x3bc\nM\tpallets/x3-kernel/src/benchmarking.rs\nM\tpallets/x3-kernel/src/lib.rs\nM\tpallets/x3-kernel/src/mock.rs\nM\tpallets/x3-kernel/src/test_helpers.rs\nM\tpallets/x3-kernel/src/tests.rs\nA\tpallets/x3-kernel/src/tests_trading.rs\nA\tpallets/x3-kernel/src/trading.rs\nM\tpallets/x3-kernel/src/wasm_adapters.rs\nM\tpallets/x3-kernel/tests/x3_storage_channel.rs\nM\tpallets/x3-launchpad/Cargo.toml\nM\tpallets/x3-launchpad/src/lib.rs\nM\tpallets/x3-launchpad/src/mock.rs\nM\tpallets/x3-launchpad/src/tests.rs\nM\tpallets/x3-settlement-engine/src/mock.rs\nM\tpallets/x3-token-factory/src/lib.rs\nM\tpallets/x3-token-factory/src/tests.rs\nM\truntime/Cargo.toml\nM\truntime/src/lib.rs\nM\truntime/src/tests.rs\nA\truntime/src/tests_launchpad.rs\nA\truntime/src/tests_trading.rs\nA\tscripts/ci/cargo-annotate.sh\nM\ttests/e2e_settlement_atomic_kernel.rs\nM\tx3-lang/Cargo.lock\nM\tx3-lang/compiler/Cargo.toml\nM\tx3-lang/compiler/src/fusion.rs\nM\tx3-lang/compiler/src/lib.rs\nM\tx3-lang/compiler/src/parser.rs\nM\tx3-lang/compiler/src/risk.rs\nM\tx3-lang/compiler/src/semantic.rs\nM\tx3-lang/compiler/src/trading_semantic.rs\nA\tx3-lang/compiler/src/x3bc.rs\nA\tx3-lang/compiler/tests/test_x3bc_lowering.rs\nM\tx3-lang/crates/x3-tools/tests/cli_integration.rs\nA\tx3-lang/examples/x3chain_flash_arb.x3\nM\tx3-lang/tests/test_surface_drift.py\nM\tx3-lang/vm/src/trading.rs\nM\tx3-lang/vm/src/verifier.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "design/onchain-evm",
+    "sha": "46101ae22e7c1386e372d4901b098c34d256f103",
+    "matching_prs": [
+      555
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "349\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "264b3166aff3a29d1c28e95ef8ac788bbde263c6\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 46101ae22e7c1386e372d4901b098c34d256f103\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\tdocs/design/onchain-evm.md\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "docs/integrated-blockers-20260924",
+    "sha": "07b6e3151d81df2bbf579062fbadf418402d01eb",
+    "matching_prs": [
+      506
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "935\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "docs/matrix-third-pass",
+    "sha": "6cc986b5d8247574b7e5d9c8eb90bd18ca8ddf00",
+    "matching_prs": [
+      495
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "1428\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "docs/public-testnet-alpha-execution-plan",
+    "sha": "0815d2c9f17f47c48776dda5eeaa94557ba75f9d",
+    "matching_prs": [
+      502
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "954\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "docs/x3-lang-honest-status",
+    "sha": "9cc1ab11ffb0f95da7c093898e8d8cd806faeeb3",
+    "matching_prs": [
+      617
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "6\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "91e707745c82e250fc0b731db868f9eed4cf5e49\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- 9cc1ab11ffb0f95da7c093898e8d8cd806faeeb3\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tx3-lang/README.md\nM\tx3-lang/spec/INDEX.md\nM\tx3-lang/spec/x3-profit-primitives.md\nM\tx3-lang/spec/x3-unique-capabilities.md\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "econsafety-kernel",
+    "sha": "4aa67b8cc307adbb66cdbede1de7d93842ff8a41",
+    "matching_prs": [
+      185
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "2254\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/btc-spv-soundness",
+    "sha": "ca480db1e701c49b6c2826e69b1ebcbf33ea12e6",
+    "matching_prs": [
+      620
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "3\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "503903c478edf99cce0f52e0d6ae11a592293d15\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- ca480db1e701c49b6c2826e69b1ebcbf33ea12e6\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tCargo.lock\nM\tCargo.toml\nM\taudit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/audit-harness/proof/src/lib.rs\nM\tcrates/x3-bridge/Cargo.toml\nD\tcrates/x3-bridge/src/btc_spv.rs\nM\tcrates/x3-bridge/src/lib.rs\nA\tcrates/x3-btc-spv/Cargo.toml\nA\tcrates/x3-btc-spv/src/client.rs\nA\tcrates/x3-btc-spv/src/lib.rs\nA\tcrates/x3-btc-spv/src/tx.rs\nA\tcrates/x3-btc-spv/src/u256.rs\nA\tcrates/x3-btc-spv/tests/consensus.rs\nM\tcrates/x3-crosschain-intent/Cargo.toml\nM\tcrates/x3-crosschain-intent/src/proof/btc.rs\nM\tcrates/x3-relayer/src/relayer.rs\nM\tcrates/x3-verification-router/Cargo.toml\nA\tcrates/x3-verification-router/src/bitcoin_spv.rs\nM\tcrates/x3-verification-router/src/evm_receipt.rs\nM\tcrates/x3-verification-router/src/lib.rs\nA\tcrates/x3-verification-router/tests/bitcoin_deposit.rs\nM\tpallets/x3-crosschain-gateway/Cargo.toml\nM\tpallets/x3-crosschain-gateway/src/lib.rs\nM\tpallets/x3-crosschain-gateway/src/mock.rs\nM\tpallets/x3-crosschain-gateway/src/tests.rs\nM\tpallets/x3-settlement-engine/Cargo.toml\nM\tpallets/x3-settlement-engine/src/lib.rs\nM\tpallets/x3-settlement-engine/src/tests.rs\nM\truntime/Cargo.toml\nM\truntime/src/lib.rs\nM\ttests/e2e/gateway_integration_test.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/compiler-aggregates-context",
+    "sha": "b34a7a5d5ced318028d5e40df8b2210b6c6cb856",
+    "matching_prs": [
+      619,
+      618
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "4\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "53cc62bc288c7097149df06cd5d840249745fb6f\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- b34a7a5d5ced318028d5e40df8b2210b6c6cb856\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tcrates/x3-ast/src/lib.rs\nM\tcrates/x3-backend/src/mir_lower.rs\nM\tcrates/x3-common/src/lib.rs\nM\tcrates/x3-compiler/src/gateway.rs\nM\tcrates/x3-hir/src/lower.rs\nM\tcrates/x3-integration/tests/differential.rs\nM\tcrates/x3-integration/tests/source_language.rs\nM\tcrates/x3-mir/src/lower.rs\nM\tcrates/x3-parser/src/parser.rs\nM\tcrates/x3-parser/src/validator.rs\nM\tcrates/x3-semantics/src/resolver.rs\nM\tcrates/x3-typeck/src/checker.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/disk-economics-measurement",
+    "sha": "775d6c2d113f34dcbe9955b6af88b3aea60bb829",
+    "matching_prs": [
+      516
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "873\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/disk-pressure-authoring-stop",
+    "sha": "8f8e6f85cf9a891c3a84641ca9097349f8fdae66",
+    "matching_prs": [
+      514
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "924\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/gpu-cpu-reference-20261011",
+    "sha": "285ed11b6d2fcf52aca35c355d91d041759a0193",
+    "matching_prs": [
+      590
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "229\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/mutants-gate",
+    "sha": "6823afa771ff9e8bd71e2894f02de0b06691b664",
+    "matching_prs": [
+      577
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "244\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/mutants-gate-atomic-kernel",
+    "sha": "aa060f1320d07e98985d59e29e2fc7e00b5dafc0",
+    "matching_prs": [
+      582
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "237\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/per-block-storage-metrics",
+    "sha": "0a5cd4cdad07ac55f23c4e09c68e8f11ea2c4795",
+    "matching_prs": [
+      504
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "943\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/reactor-placement-attested",
+    "sha": "2e292dde42b4f67f83672af6d96951e8dd62fc7a",
+    "matching_prs": [
+      532
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "404\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/receipt-key-registry",
+    "sha": "584228c56bec1c628848d6775b14f4271053856c",
+    "matching_prs": [
+      536
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "387\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/receipt-replays-gas-and-oracle",
+    "sha": "e6366467f0090581e32f919f42eb186351e35a69",
+    "matching_prs": [
+      548
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "365\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/receipt-signing-registry",
+    "sha": "157b049ceeb6b90cab16b3dd2dda6421f5e726c2",
+    "matching_prs": [
+      546
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "370\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/rehearsal-runs-x3-after-upgrade",
+    "sha": "27922d7c6bde22f847050b58341839ae4b331625",
+    "matching_prs": [
+      551
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "358\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/remote-ci-worker-20261013",
+    "sha": "8501a2de636a57f9e94ce855657b1f7ec2f3eeb2",
+    "matching_prs": [
+      602
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "230\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/runtime-attribution-metrics",
+    "sha": "d67afd13c2fa4683950961baf354941be4f695c3",
+    "matching_prs": [
+      513
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "925\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/runtime-runs-x3vm",
+    "sha": "e7629b67b12dc1c133090aa62701f4f163cceb0c",
+    "matching_prs": [
+      612
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "11\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "4c480cf350d56ce49a15403882e9a304c9da9629\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- e7629b67b12dc1c133090aa62701f4f163cceb0c\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tcrates/x3-integration/Cargo.toml\nM\tcrates/x3-integration/src/executor.rs\nM\tcrates/x3-integration/src/lib.rs\nA\tcrates/x3-integration/tests/chain_engine.rs\nM\tcrates/x3-integration/tests/differential.rs\nM\tcrates/x3-integration/tests/interpreter_agreement.rs\nM\tcrates/x3-integration/tests/mini_x3_fail_closed.rs\nM\tcrates/x3-vm/src/error.rs\nM\tcrates/x3-vm/src/events.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\nM\tpallets/x3-kernel/src/adapters.rs\nM\tpallets/x3-kernel/src/wasm_adapters.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/signed-key-registries",
+    "sha": "de31b0f7ea6c6ba738c61a7b8a446f39eba86e93",
+    "matching_prs": [
+      554
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "350\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/snapshot-restore",
+    "sha": "3883b803fdd8b1106643d7ad9915242938176be7",
+    "matching_prs": [
+      509
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "927\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/state-snapshot-and-audit-gates",
+    "sha": "037cad1ad8e84f8ec6951fa17c238f89d5105877",
+    "matching_prs": [
+      503,
+      501
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "950\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/structs",
+    "sha": "7a108defdaf63301537baafd5e53a0155ee3c1a5",
+    "matching_prs": [
+      622
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "1\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "3da89de3ec9b4c4dd60f99cd206ca9813b235190\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- 7a108defdaf63301537baafd5e53a0155ee3c1a5\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tcrates/x3-ast/src/lib.rs\nM\tcrates/x3-backend/src/layout.rs\nM\tcrates/x3-backend/src/mir_lower.rs\nM\tcrates/x3-common/src/lib.rs\nM\tcrates/x3-compiler/tests/never_panics.rs\nM\tcrates/x3-hir/src/lower.rs\nM\tcrates/x3-integration/tests/source_language.rs\nM\tcrates/x3-mir/src/lower.rs\nM\tcrates/x3-parser/src/parser.rs\nM\tcrates/x3-parser/src/validator.rs\nM\tcrates/x3-semantics/src/resolver.rs\nM\tcrates/x3-typeck/src/checker.rs\nM\tcrates/x3-typeck/src/infer.rs\nM\tcrates/x3-typeck/src/lib.rs\nM\tcrates/x3-typeck/src/types.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/swarm-replica-reconciler",
+    "sha": "c517973882d89559053e2f69a4bf3ff082ec5227",
+    "matching_prs": [
+      530
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "410\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/testnet-ansible",
+    "sha": "7fa5383aa10c14372c3c70da06b4cb102ac9ea2f",
+    "matching_prs": [
+      607
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "12\t3\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "cb1f15009a8b21557ddc69f13944fdd3da9980d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 04218b29b1fd9cc256071c9d0ad6815b480d0ddf\n+ 4d4f6340fc83a8e1e41b231f6ff98c0dafad9187\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\tansible/README.md\nA\tansible/ansible.cfg\nA\tansible/inventory/group_vars/all.yml\nA\tansible/inventory/hosts.yml\nA\tansible/playbooks/00-genesis.yml\nA\tansible/playbooks/10-preflight.yml\nA\tansible/playbooks/20-deploy.yml\nA\tansible/playbooks/30-verify.yml\nA\tansible/playbooks/90-stop.yml\nA\tansible/templates/x3-validator.service.j2\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/throughput-attribution",
+    "sha": "ff7f49caabb40a567c333aadcd76b7e0944e4ef2",
+    "matching_prs": [
+      515
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "874\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/tla-atomic-settlement",
+    "sha": "3b61c427edb9bb6beb9cd1d6bda954e53667d50d",
+    "matching_prs": [
+      573
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "254\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/trading-rules-reference",
+    "sha": "19651a4d68a8e8ae457b1dde23df2b78992dfb23",
+    "matching_prs": [
+      545
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "373\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/txpool-metrics",
+    "sha": "b7241e8f2ac392636cf20585919ef9eb0d53414d",
+    "matching_prs": [
+      508
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "929\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-ai-router",
+    "sha": "762037b4f33310ce62cb084b6894ca70e426a934",
+    "matching_prs": [
+      540
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "379\t6\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "ccf801952a39bc7507acd16d197f1fb2c8405f7a\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ d7f577b49a2c8b26c06a847fb60229eccd034f88\n+ 2927c8ed9c7ca35700cc4b10d35540324437ef2a\n+ fb9195d5d346becfcea5910925396a6e52a228e6\n+ 04c61e0c35338562aaa0773e006d58c4f947f5d9\n+ 0fc8f3ead9e9e12f2dc7c760b1b4c49bf67164e0\n+ 762037b4f33310ce62cb084b6894ca70e426a934\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\tservices/x3-ai-router/README.md\nA\tservices/x3-ai-router/config.json\nA\tservices/x3-ai-router/router.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3-ai-router-budget-hardening",
+    "sha": "81f21b752536c329b996cf5eca0c86dc84a68cd4",
+    "matching_prs": [
+      541
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "378\t3\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "80accf49dfd97006b10ad898441cc9f3100b17b5\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 61b848885ab5e3419eacd7dc3dadaab9692cfe5f\n+ a05032ef52e1615cde33304127de723e4edd3caf\n+ 81f21b752536c329b996cf5eca0c86dc84a68cd4\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tservices/x3-ai-router/README.md\nM\tservices/x3-ai-router/router.py\nA\tservices/x3-ai-router/test_router.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3-ai-router-hardening",
+    "sha": "82c7617d0df1b3c9536e3ef7e3137b5a701f5c9e",
+    "matching_prs": [
+      557
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "344\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-ai-router-observability",
+    "sha": "6dadae4fe3b1e0c9fccc31e742ceb12f3cf7c673",
+    "matching_prs": [
+      543
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "376\t3\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "e5bc50210d5fff7189cc9171f0aab8dcf30b0f71\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ c442e019055b761b8e177996cab491865d3b5ce6\n+ e8868dfea2371bebf647d973956de288666223c5\n+ 6dadae4fe3b1e0c9fccc31e742ceb12f3cf7c673\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tservices/x3-ai-router/README.md\nM\tservices/x3-ai-router/router.py\nM\tservices/x3-ai-router/test_router.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3-ai-router-pricing",
+    "sha": "422b47f887eda6652db2beab296bab89f2ba517f",
+    "matching_prs": [
+      544
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "375\t4\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "aa50e1da567d94ca7a8148f4eeeb18370e1df211\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 213c480e0ec5d806516854339001ee4c2e465b89\n+ b85463b4cf267210a7cdcdcdb48ee45896881a96\n+ 6f387a5aca89523563d59fdac9e2d7c8d3b391d6\n+ 422b47f887eda6652db2beab296bab89f2ba517f\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tservices/x3-ai-router/README.md\nM\tservices/x3-ai-router/config.json\nM\tservices/x3-ai-router/router.py\nM\tservices/x3-ai-router/test_router.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3-ai-router-responses-api",
+    "sha": "929d41ec8720af96977c938aba5d23a83c96fe40",
+    "matching_prs": [
+      559
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "338\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-ai-router-streaming",
+    "sha": "5a4b171ae2285f831c63fae1cd509a818ed3fe1c",
+    "matching_prs": [
+      542
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "377\t3\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "363622f66ce0e544809c7681cdf5b844bb123d91\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 3de7dbff257c29e461fa462e3b6976145de006de\n+ e119e68d16bbf8042cd0a40fdc792b0888a9992f\n+ 5a4b171ae2285f831c63fae1cd509a818ed3fe1c\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tservices/x3-ai-router/README.md\nM\tservices/x3-ai-router/router.py\nM\tservices/x3-ai-router/test_router.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3-ai-router-verification-feedback",
+    "sha": "ae1f337358d396c8c6e8a8f83f0d5a32e036b47e",
+    "matching_prs": [
+      556
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "345\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-cluster-control",
+    "sha": "2e1cfaab30e64f8f16ac6ecb44df31c6ddf557d2",
+    "matching_prs": [
+      581
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "207\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-forge-bisect-packet-input",
+    "sha": "93810604787f2f2b925a731ecec72a94ed1fb0df",
+    "matching_prs": [
+      570
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "260\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-forge-bisect-runner",
+    "sha": "7e2515415f58ee97da7dbdb8d117b984856a09f9",
+    "matching_prs": [
+      569
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "262\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-guardian",
+    "sha": "75eaaa8900b29058c5c9a16e60fbfb431a0fb7a6",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "283\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-htlc-onchain",
+    "sha": "d2f585bceb68407336aafe72ff8c5883cfdd4f62",
+    "matching_prs": [
+      520
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "463\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-prelaunch-economics-x3lang-cutover",
+    "sha": "d1ea105588ee6678e5d51791778995a92fc171c8",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "411\t2\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "0ef4affc5aff66ff6207646e5e6ad3005250a77a\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- b06d0b30af144210eb7b5557c9103e9e108e2590\n- d1ea105588ee6678e5d51791778995a92fc171c8\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tdocs/local-ci.md\nM\tscripts/local-ci.sh\nM\tscripts/mainnet/build-release-artifacts.sh\nM\tscripts/mainnet/release-artifacts-gate.sh\nM\tscripts/mainnet/run_release_gates_rc6.sh\nA\ttests/test_rc6_release_sequence.py\nA\ttests/test_release_artifact_provenance.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3-sim-deterministic-simulator",
+    "sha": "e6e7b334b3369e4a1c9967762634ee899408be89",
+    "matching_prs": [
+      558
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "340\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3-sim-failure-packet",
+    "sha": "b84576718c72e21d48195e2ca75ecec1de83515a",
+    "matching_prs": [
+      564
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "296\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3bc-artifact-attestation",
+    "sha": "8642fd2551cd113f3259346734b7c482ffaa2528",
+    "matching_prs": [
+      537
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "384\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3gpu1-dual-gpu-accel",
+    "sha": "51d9f11e7150c8d8fa0ae9aa24e383fd5f1389bb",
+    "matching_prs": [
+      578
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "206\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3lang-cross-vm-calls",
+    "sha": "111440bcf7b761b048efec1f12b1e1d9858678b9",
+    "matching_prs": [
+      553
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "353\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3lang-emit",
+    "sha": "2b7dcfe221be5833841f659196e51e320692eb64",
+    "matching_prs": [
+      539
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "380\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3lang-hardening-x3gpu1",
+    "sha": "66a7ffd150715b7fadcfb0521f2f6bbdfd3ca222",
+    "matching_prs": [
+      596
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "233\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3lang-network-state-source",
+    "sha": "e4d9276bd328dbc223dde4058532448d83c1946b",
+    "matching_prs": [
+      549
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "363\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "feat/x3vm-aggregates",
+    "sha": "073e26edfabc5c0ecad02450bd05ab7a0ca5cc38",
+    "matching_prs": [
+      614
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "9\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "ca78bc4e61b5453dba805044fa774c1c0361c46b\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- 073e26edfabc5c0ecad02450bd05ab7a0ca5cc38\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tcrates/x3-backend/src/lower.rs\nM\tcrates/x3-common/src/lib.rs\nM\tcrates/x3-integration/src/executor.rs\nM\tcrates/x3-integration/tests/chain_engine.rs\nM\tcrates/x3-integration/tests/interpreter_agreement.rs\nM\tcrates/x3-vm/src/error.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3vm-block-context",
+    "sha": "d83828f5b2041f0bd2b03b21248585eb468a961d",
+    "matching_prs": [
+      613
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "10\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "df6e5ba7f5464c30840d249a4391ac40a7866c11\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- d83828f5b2041f0bd2b03b21248585eb468a961d\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tcrates/x3-integration/src/executor.rs\nM\tcrates/x3-integration/src/lib.rs\nM\tcrates/x3-integration/tests/chain_engine.rs\nM\tcrates/x3-integration/tests/interpreter_agreement.rs\nA\tcrates/x3-vm/src/context.rs\nM\tcrates/x3-vm/src/error.rs\nM\tcrates/x3-vm/src/lib.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\nM\tpallets/atomic-trade-engine/src/mock.rs\nM\tpallets/x3-coin/src/mock.rs\nM\tpallets/x3-kernel/src/adapters.rs\nM\tpallets/x3-kernel/src/lib.rs\nM\tpallets/x3-kernel/src/mock.rs\nM\tpallets/x3-kernel/src/wasm_adapters.rs\nM\tpallets/x3-kernel/tests/x3_storage_channel.rs\nM\tpallets/x3-settlement-engine/src/mock.rs\nM\truntime/src/lib.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3vm-no-std",
+    "sha": "9d4fe45d81ce32664147e284fff78619bddb4e98",
+    "matching_prs": [
+      610
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "12\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "cb1f15009a8b21557ddc69f13944fdd3da9980d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- 9d4fe45d81ce32664147e284fff78619bddb4e98\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tCargo.lock\nM\tcrates/x3-backend/Cargo.toml\nM\tcrates/x3-backend/src/bc_format.rs\nM\tcrates/x3-backend/src/bc_format_helpers.rs\nM\tcrates/x3-backend/src/error.rs\nM\tcrates/x3-backend/src/lib.rs\nM\tcrates/x3-backend/src/opcode.rs\nM\tcrates/x3-vm/Cargo.toml\nM\tcrates/x3-vm/src/bytecode.rs\nM\tcrates/x3-vm/src/error.rs\nM\tcrates/x3-vm/src/events.rs\nM\tcrates/x3-vm/src/execution_guards.rs\nM\tcrates/x3-vm/src/hostcall.rs\nM\tcrates/x3-vm/src/isolation.rs\nM\tcrates/x3-vm/src/lib.rs\nM\tcrates/x3-vm/src/revert.rs\nM\tcrates/x3-vm/src/state.rs\nM\tcrates/x3-vm/src/storage.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\nM\tscripts/local-ci.sh\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3vm-no-std-bytecode-split",
+    "sha": "10d13c9e44e34091030258e18fd4416fc2803ee1",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "12\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "cb1f15009a8b21557ddc69f13944fdd3da9980d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 10d13c9e44e34091030258e18fd4416fc2803ee1\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tCargo.lock\nM\tCargo.toml\nM\tcrates/x3-backend/Cargo.toml\nM\tcrates/x3-backend/src/error.rs\nM\tcrates/x3-backend/src/lib.rs\nM\tcrates/x3-backend/src/lower.rs\nA\tcrates/x3-bytecode/Cargo.toml\nR089\tcrates/x3-backend/src/bc_format.rs\tcrates/x3-bytecode/src/bc_format.rs\nR099\tcrates/x3-backend/src/bc_format_helpers.rs\tcrates/x3-bytecode/src/bc_format_helpers.rs\nA\tcrates/x3-bytecode/src/error.rs\nA\tcrates/x3-bytecode/src/lib.rs\nR099\tcrates/x3-backend/src/opcode.rs\tcrates/x3-bytecode/src/opcode.rs\nM\tcrates/x3-vm/Cargo.toml\nM\tcrates/x3-vm/src/bridge.rs\nM\tcrates/x3-vm/src/bytecode.rs\nM\tcrates/x3-vm/src/error.rs\nM\tcrates/x3-vm/src/events.rs\nM\tcrates/x3-vm/src/execution_guards.rs\nM\tcrates/x3-vm/src/gas.rs\nM\tcrates/x3-vm/src/gpu.rs\nM\tcrates/x3-vm/src/hostcall.rs\nM\tcrates/x3-vm/src/isolation.rs\nM\tcrates/x3-vm/src/lib.rs\nM\tcrates/x3-vm/src/revert.rs\nM\tcrates/x3-vm/src/state.rs\nM\tcrates/x3-vm/src/storage.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\nM\tcrates/x3-vm/tests/gpu_integration.rs\nM\tscripts/local-ci.sh\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "feat/x3vm-one-gas-table",
+    "sha": "c23a8d0f14e894e3264d8a2f464f4bffc16abd9d",
+    "matching_prs": [
+      615
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "8\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "9546eda02ab9a615fc540ac4a77e2344544597d2\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- c23a8d0f14e894e3264d8a2f464f4bffc16abd9d\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tcrates/gpu-swarm/src/x3_vm.rs\nM\tcrates/x3-bridge-adapters/src/lib.rs\nM\tcrates/x3-cli/src/commands/repl.rs\nM\tcrates/x3-vm/src/verifier.rs\nM\tcrates/x3-vm/src/vm.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "fix/app-store-live-server",
+    "sha": "a433b010139fcb54627f5ee3c99204d7862858e2",
+    "matching_prs": [
+      609
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "12\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "cb1f15009a8b21557ddc69f13944fdd3da9980d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ a433b010139fcb54627f5ee3c99204d7862858e2\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tx3-app-store/frontend/package-lock.json\nM\tx3-app-store/frontend/package.json\nA\tx3-app-store/frontend/serve.mjs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "fix/app-store-native-watch-20261013",
+    "sha": "40d71a6298e3fda3275d1fc52054b9734c8ddfdd",
+    "matching_prs": [
+      606
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "17\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/bytecode-envelope",
+    "sha": "eafa93112f302e6df11e7047627f5e1be6ab4416",
+    "matching_prs": [
+      499
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "964\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/compiler-never-panics",
+    "sha": "65fdcba3f6a3a36d02fdd59879ccc7cae161bec8",
+    "matching_prs": [
+      621
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "2\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "7bb251492a156f7c76ab396b80df29681f487613\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- 65fdcba3f6a3a36d02fdd59879ccc7cae161bec8\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tCargo.lock\nM\tcrates/x3-compiler/Cargo.toml\nA\tcrates/x3-compiler/tests/never_panics.rs\nM\tcrates/x3-parser/src/parser.rs\nM\tcrates/x3-parser/src/tokens.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "fix/gate-tool-validation-fixture",
+    "sha": "eb027c1c0888106ba0dec54f57db835b342de535",
+    "matching_prs": [
+      575
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "252\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/kernel-comit-benchmark-fixtures",
+    "sha": "9ed1920dda37dc82d26c5c0151852250713a31b2",
+    "matching_prs": [
+      552
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "356\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/master-gate-reds",
+    "sha": "99581bee8894298c39ef72751ee13770cad72f8c",
+    "matching_prs": [
+      565
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "264\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/master-red-gates",
+    "sha": "eea28b858a22cd52d426ca98fba05aaee2f546c1",
+    "matching_prs": [
+      589
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "229\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/matrix-evidence-prose",
+    "sha": "fb77f633d285633635501412a1a19d720024ec0d",
+    "matching_prs": [
+      489
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "1442\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/npm-audit-all-dependencies-20261013",
+    "sha": "6906d37daf16b2d4e55c25361fc0b02491015aef",
+    "matching_prs": [
+      603
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "25\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/npm-audit-braces",
+    "sha": "e520f7ddb80182bdeb31390e583d6ba742cd8845",
+    "matching_prs": [
+      611
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "12\t2\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "cb1f15009a8b21557ddc69f13944fdd3da9980d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 186e0bad42454bd22545317e56bf887d0d1cef0f\n+ e520f7ddb80182bdeb31390e583d6ba742cd8845\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "D\tapps/dex/.eslintrc.json\nM\tapps/dex/package-lock.json\nM\tapps/dex/package.json\nM\tapps/explorer/package-lock.json\nM\tapps/explorer/package.json\nM\tapps/shared/package-lock.json\nM\tapps/shared/package.json\nD\tapps/wallet/.eslintrc.json\nM\tapps/wallet/package-lock.json\nM\tapps/wallet/package.json\nM\tpackages/polkawallet-bridge-adapter/package-lock.json\nM\tpackages/polkawallet-bridge-adapter/package.json\nM\tpackages/polkawallet-plugin/package-lock.json\nM\tpackages/polkawallet-plugin/package.json\nM\tpackages/ts-sdk/package-lock.json\nM\tpackages/ts-sdk/package.json\nM\tpackages/x3-foundry-sdk/package-lock.json\nM\tpackages/x3-foundry-sdk/package.json\nM\ttests/wallet-integration/package-lock.json\nM\ttests/wallet-integration/package.json\nM\ttests_core/wallet-integration/package-lock.json\nM\ttests_core/wallet-integration/package.json\nD\ttests_phase4/wallet-integration/package-lock.json\nD\ttests_phase4/wallet-integration/package.json\nD\ttests_phase4/wallet-integration/playwright.config.ts\nM\tx3-app-store/frontend/package-lock.json\nM\tx3-app-store/frontend/package.json\nA\tx3-app-store/frontend/serve.mjs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "fix/release-provenance-rc6-rebased",
+    "sha": "69ce03eab103df3ef894baf561745a01b803edad",
+    "matching_prs": [
+      593
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "232\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/router-database-startup",
+    "sha": "f1190280ec8ba7ba77edf32761f860e8e3ae8d62",
+    "matching_prs": [
+      566
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "287\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/runtime-hashes-supply-ledger",
+    "sha": "08af8fb4283a74b98f92ee0a20cb337ce94b242f",
+    "matching_prs": [
+      580
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "240\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/snapshot-archive-restore",
+    "sha": "dcb45a7387f1a8816a75378dbe4f6198eee7097f",
+    "matching_prs": [
+      568
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "281\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/snapshot-rpc-validation",
+    "sha": "648333c9c74bbe9c0e2aa7eb9133b49ed790de8d",
+    "matching_prs": [
+      567
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "285\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/studio-typecheck-20261013",
+    "sha": "8470548c6fe7e952b4907113badf85559f5df3de",
+    "matching_prs": [
+      605
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "17\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/swarm-core-import-cycle-20261013",
+    "sha": "044a5e192b128357232561dd93d058469ed0f0c1",
+    "matching_prs": [
+      594
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "12\t2\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "cb1f15009a8b21557ddc69f13944fdd3da9980d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ e7a47c33f5b3d3bd5b5735bc2018fcd3ec391615\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tscripts/local-ci.sh\nM\tswarm_infrastructure/core/__init__.py\nA\ttests/test_swarm_imports.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "fix/testnet-finality-evidence-20261013",
+    "sha": "0b0c477c220377e098a7ac675053e7da0717a980",
+    "matching_prs": [
+      592
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "12\t2\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "cb1f15009a8b21557ddc69f13944fdd3da9980d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ ceb32ce71f95e880a1a2fb37baf154cd8a53c438\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tdocs/testnet-config/TESTNET-VERIFICATION.md\nM\tscripts/local-ci.sh\nM\tscripts/testnet/status-7-validators.sh\nA\ttests/test_testnet_finality_status.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "fix/tla-specs-run",
+    "sha": "82587c05c973c913429919562270daaeac9cd9be",
+    "matching_prs": [
+      572
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "256\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/trading-vm-verifies-peer-ir",
+    "sha": "a8d1a068ed23b9676326f7e4b95bfa1107b7b587",
+    "matching_prs": [
+      534
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "394\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/verification-harness-exit-codes",
+    "sha": "62c09e8c334e9b3c9d6fa4b0ebed46d5249ec244",
+    "matching_prs": [
+      571
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "258\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/workspace-membership-python310",
+    "sha": "80bda42818fb787e70f40a6fb3c1e8e85a246b78",
+    "matching_prs": [
+      505
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "943\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3-ai-router-budget-fallback",
+    "sha": "a5e37bd62889e1321c2e1af0c390700c7b9edd4f",
+    "matching_prs": [
+      560
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "336\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3-ai-router-native-responses-stability",
+    "sha": "eb4406372db172968112b8e373a3a5d02ab7e6da",
+    "matching_prs": [
+      562
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "322\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3-common-artifact-fmt",
+    "sha": "9372f1c47db5fa72696139abe14e86afed34e40b",
+    "matching_prs": [
+      550
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "360\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3-compile-writes-artifact",
+    "sha": "4ef58687dcbf3deaf1bc27fd2ea70582df343e60",
+    "matching_prs": [
+      547
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "367\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3-forge-failure-memory-in-ci",
+    "sha": "93cce8e715c23e4d0edc748c796287efb9307b2b",
+    "matching_prs": [
+      563
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "314\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3-htlc-registry-native",
+    "sha": "d004fe4e417e56c3570c019be2c53f4734002f76",
+    "matching_prs": [
+      531
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "407\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3lang-finish",
+    "sha": "5b4fc4a69424493f135025c3b11a90d0cd4d29b5",
+    "matching_prs": [
+      518
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "437\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3lang-optimizer-order",
+    "sha": "33ce1207f07597e9ab938b2180c6441cf1a26e74",
+    "matching_prs": [
+      533
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "398\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "fix/x3vm-engine-agreement",
+    "sha": "a57c42e7312ac8ec87a77d176fc5b15cdb0f1230",
+    "matching_prs": [
+      535
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "390\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "integrate/merge-train-20261013",
+    "sha": "e1f504a3c52a4b6f3615ffbf66a4634ef4826eab",
+    "matching_prs": [
+      601
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "24\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "integrate/x3-guardian",
+    "sha": "1c2709c81efbb2aee1f13709203476132802b1ab",
+    "matching_prs": [
+      597
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "168\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "d749e0d564490e89f3e8a104256d407e9d169458\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    }
+  },
+  {
+    "name": "master",
+    "sha": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "merge/pr502-onto-master",
+    "sha": "a882c78f4ba9c86adbba50cb9ad08308937b599e",
+    "matching_prs": [
+      507
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "931\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "merge/x3-mcp-server",
+    "sha": "a2ea0e9bde81f827d44453522f497952c9eb0aa3",
+    "matching_prs": [
+      488
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "1444\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "mission/resurrection-phase-a",
+    "sha": "1dddb5432c761d44ba6ed5ab93a8ed90d06a4efe",
+    "matching_prs": [
+      608
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "12\t10\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "cb1f15009a8b21557ddc69f13944fdd3da9980d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 239c460ff745b68842d992d8b4abef51e5f721b3\n+ c566090635ab7423bd3a89b194ec0bc226fc7b09\n+ 3279e8d693ac6c34ce14cfbae321ab077f1de831\n+ 77faa96993c55ae7eb559a85107cec6688e11711\n+ 4699e99104235da9812f9bcf4b19fb267d30931e\n+ 48ea032f2464002a48ba2fa1fb443d53f751a365\n+ d02b0e39b3591019faa6a0af988dc9ebcf2a6448\n+ 0ff4f5d61d6eff960b6787fa1d921d703d56e90a\n+ 1dddb5432c761d44ba6ed5ab93a8ed90d06a4efe\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tCargo.lock\nM\tCargo.toml\nA\tapps/quantum-kernel-voyager/.gitignore\nA\tapps/quantum-kernel-voyager/README.md\nA\tapps/quantum-kernel-voyager/RECOVERY.md\nA\tapps/quantum-kernel-voyager/index.html\nA\tapps/quantum-kernel-voyager/package.json\nA\tapps/quantum-kernel-voyager/src-tauri/Cargo.toml\nA\tapps/quantum-kernel-voyager/src-tauri/build.rs\nA\tapps/quantum-kernel-voyager/src-tauri/gen/schemas/acl-manifests.json\nA\tapps/quantum-kernel-voyager/src-tauri/gen/schemas/capabilities.json\nA\tapps/quantum-kernel-voyager/src-tauri/gen/schemas/desktop-schema.json\nA\tapps/quantum-kernel-voyager/src-tauri/gen/schemas/linux-schema.json\nA\tapps/quantum-kernel-voyager/src-tauri/icons/128x128.png\nA\tapps/quantum-kernel-voyager/src-tauri/icons/128x128@2x.png\nA\tapps/quantum-kernel-voyager/src-tauri/icons/32x32.png\nA\tapps/quantum-kernel-voyager/src-tauri/icons/icon.png\nA\tapps/quantum-kernel-voyager/src-tauri/src/chains.rs\nA\tapps/quantum-kernel-voyager/src-tauri/src/commands.rs\nA\tapps/quantum-kernel-voyager/src-tauri/src/error.rs\nA\tapps/quantum-kernel-voyager/src-tauri/src/keystore.rs\nA\tapps/quantum-kernel-voyager/src-tauri/src/lib.rs\nA\tapps/quantum-kernel-voyager/src-tauri/src/main.rs\nA\tapps/quantum-kernel-voyager/src-tauri/src/x3_integration.rs\nA\tapps/quantum-kernel-voyager/src-tauri/tauri.conf.json\nA\tapps/quantum-kernel-voyager/src/adapters/AtlasSphereAdapter.ts\nA\tapps/quantum-kernel-voyager/src/adapters/EthereumAdapter.ts\nA\tapps/quantum-kernel-voyager/src/adapters/LocalDevAdapter.ts\nA\tapps/quantum-kernel-voyager/src/adapters/SyncQueue.ts\nA\tapps/quantum-kernel-voyager/src/config/solar-system-config.ts\nA\tapps/quantum-kernel-voyager/src/game/ArtifactManager.ts\nA\tapps/quantum-kernel-voyager/src/game/EconomyManager.ts\nA\tapps/quantum-kernel-voyager/src/game/GameState.ts\nA\tapps/quantum-kernel-voyager/src/game/VoyagerShip.ts\nA\tapps/quantum-kernel-voyager/src/game/WorldManager.ts\nA\tapps/quantum-kernel-voyager/src/ipc/events.ts\nA\tapps/quantum-kernel-voyager/src/ipc/tauri.ts\nA\tapps/quantum-kernel-voyager/src/main.ts\nA\tapps/quantum-kernel-voyager/src/scene/Animations.ts\nA\tapps/quantum-kernel-voyager/src/scene/AtlasSphereEmblem.ts\nA\tapps/quantum-kernel-voyager/src/scene/CameraController.ts\nA\tapps/quantum-kernel-voyager/src/scene/CentralSunGlobe.ts\nA\tapps/quantum-kernel-voyager/src/scene/EntityFactory.ts\nA\tapps/quantum-kernel-voyager/src/scene/GoldRays.ts\nA\tapps/quantum-kernel-voyager/src/scene/InteractionManager.ts\nA\tapps/quantum-kernel-voyager/src/scene/KingsCrown.ts\nA\tapps/quantum-kernel-voyager/src/scene/LODManager.ts\nA\tapps/quantum-kernel-voyager/src/scene/ParticleSystem.ts\nA\tapps/quantum-kernel-voyager/src/scene/PostProcessing.ts\nA\tapps/quantum-kernel-voyager/src/scene/ProceduralGenerator.ts\nA\tapps/quantum-kernel-voyager/src/scene/SaturnChainRing.ts\nA\tapps/quantum-kernel-voyager/src/scene/SceneManager.ts\nA\tapps/quantum-kernel-voyager/src/scene/SolarSystemBuilder.ts\nA\tapps/quantum-kernel-voyager/src/services/OrbitCalculator.ts\nA\tapps/quantum-kernel-voyager/src/services/PlanetRegistry.ts\nA\tapps/quantum-kernel-voyager/src/shaders/gold-flow.frag\nA\tapps/quantum-kernel-voyager/src/shaders/gold-flow.vert\nA\tapps/quantum-kernel-voyager/src/shaders/hologram.frag\nA\tapps/quantum-kernel-voyager/src/shaders/nebula.frag\nA\tapps/quantum-kernel-voyager/src/shaders/quantum-distortion.frag\nA\tapps/quantum-kernel-voyager/src/storage/IndexedDBStore.ts\nA\tapps/quantum-kernel-voyager/src/styles/bottom-nav.css\nA\tapps/quantum-kernel-voyager/src/styles/components.css\nA\tapps/quantum-kernel-voyager/src/styles/main.css\nA\tapps/quantum-kernel-voyager/src/styles/overlay.css\nA\tapps/quantum-kernel-voyager/src/types/chain.ts\nA\tapps/quantum-kernel-voyager/src/types/game.ts\nA\tapps/quantum-kernel-voyager/src/types/scene.ts\nA\tapps/quantum-kernel-voyager/src/types/solar-system.ts\nA\tapps/quantum-kernel-voyager/src/ui/BottomNav.ts\nA\tapps/quantum-kernel-voyager/src/ui/ContextMenu.ts\nA\tapps/quantum-kernel-voyager/src/ui/LandingPrompt.ts\nA\tapps/quantum-kernel-voyager/src/ui/ModalSystem.ts\nA\tapps/quantum-kernel-voyager/src/ui/Overlay.ts\nA\tapps/quantum-kernel-voyager/src/ui/PlanetDetail.ts\nA\tapps/quantum-kernel-voyager/src/ui/SidePanel.ts\nA\tapps/quantum-kernel-voyager/src/ui/TopBar.ts\nA\tapps/quantum-kernel-voyager/tsconfig.json\nA\tapps/quantum-kernel-voyager/vite.config.ts\nA\tapps/x3-portal/.env.example\nA\tapps/x3-portal/.gitignore\nA\tapps/x3-portal/RECOVERY.md\nA\tapps/x3-portal/X3STAR_OS_SPEC.md\nA\tapps/x3-portal/app/ai-swarm/page.tsx\nA\tapps/x3-portal/app/api/ai/ask/route.ts\nA\tapps/x3-portal/app/api/blockchain/route.ts\nA\tapps/x3-portal/app/api/orderbook/route.ts\nA\tapps/x3-portal/app/api/prometheus/route.ts\nA\tapps/x3-portal/app/blog/ai-integration/page.mdx\nA\tapps/x3-portal/app/blog/commerce-solutions/page.mdx\nA\tapps/x3-portal/app/blog/defi-ecosystem/page.mdx\nA\tapps/x3-portal/app/blog/developer-tools/page.mdx\nA\tapps/x3-portal/app/blog/gaming-infrastructure/page.mdx\nA\tapps/x3-portal/app/blog/mobile-integration/page.mdx\nA\tapps/x3-portal/app/blog/page.tsx\nA\tapps/x3-portal/app/blog/payment-systems/page.mdx\nA\tapps/x3-portal/app/blog/permissioned-networks/page.mdx\nA\tapps/x3-portal/app/blog/rwa/page.mdx\nA\tapps/x3-portal/app/blog/token-extensions/page.mdx\nA\tapps/x3-portal/app/blog/wallet-solutions/page.mdx\nA\tapps/x3-portal/app/bridge/page.tsx\nA\tapps/x3-portal/app/community/ecosystem/page.tsx\nA\tapps/x3-portal/app/community/events/page.tsx\nA\tapps/x3-portal/app/community/forum/page.tsx\nA\tapps/x3-portal/app/community/grants/page.tsx\nA\tapps/x3-portal/app/community/page.tsx\nA\tapps/x3-portal/app/developers/api/page.tsx\nA\tapps/x3-portal/app/developers/cookbook/page.tsx\nA\tapps/x3-portal/app/developers/docs/anchor/page.tsx\nA\tapps/x3-portal/app/developers/docs/atlas-kernel/page.tsx\nA\tapps/x3-portal/app/developers/docs/atomic-execution/page.tsx\nA\tapps/x3-portal/app/developers/docs/authorization/page.tsx\nA\tapps/x3-portal/app/developers/docs/best-practices/page.tsx\nA\tapps/x3-portal/app/developers/docs/canonical-ledger/page.tsx\nA\tapps/x3-portal/app/developers/docs/chain-spec/page.tsx\nA\tapps/x3-portal/app/developers/docs/comits/page.tsx\nA\tapps/x3-portal/app/developers/docs/configuration/page.tsx\nA\tapps/x3-portal/app/developers/docs/creating-comits/page.tsx\nA\tapps/x3-portal/app/developers/docs/cross-vm-assets/page.tsx\nA\tapps/x3-portal/app/developers/docs/dual-vm/page.tsx\nA\tapps/x3-portal/app/developers/docs/erc-standards/page.tsx\nA\tapps/x3-portal/app/developers/docs/error-handling/page.tsx\nA\tapps/x3-portal/app/developers/docs/evm-deploy/page.tsx\nA\tapps/x3-portal/app/developers/docs/evm-interact/page.tsx\nA\tapps/x3-portal/app/developers/docs/foundry/page.tsx\nA\tapps/x3-portal/app/developers/docs/hardhat/page.tsx\nA\tapps/x3-portal/app/developers/docs/installation/page.tsx\nA\tapps/x3-portal/app/developers/docs/intro/page.tsx\nA\tapps/x3-portal/app/developers/docs/keys/page.tsx\nA\tapps/x3-portal/app/developers/docs/monitoring/page.tsx\nA\tapps/x3-portal/app/developers/docs/page.tsx\nA\tapps/x3-portal/app/developers/docs/quickstart/page.tsx\nA\tapps/x3-portal/app/developers/docs/run-node/page.tsx\nA\tapps/x3-portal/app/developers/docs/spl-tokens/page.tsx\nA\tapps/x3-portal/app/developers/docs/svm-accounts/page.tsx\nA\tapps/x3-portal/app/developers/docs/svm-deploy/page.tsx\nA\tapps/x3-portal/app/developers/docs/svm-programs/page.tsx\nA\tapps/x3-portal/app/developers/docs/validator/page.tsx\nA\tapps/x3-portal/app/developers/learning/page.tsx\nA\tapps/x3-portal/app/developers/sdks/page.tsx\nA\tapps/x3-portal/app/earn/page.tsx\nA\tapps/x3-portal/app/ecosystem/page.tsx\nA\tapps/x3-portal/app/error.tsx\nA\tapps/x3-portal/app/explorer/account/[address]/page.tsx\nA\tapps/x3-portal/app/explorer/block/[id]/page.tsx\nA\tapps/x3-portal/app/explorer/page.tsx\nA\tapps/x3-portal/app/explorer/tx/[hash]/page.tsx\nA\tapps/x3-portal/app/global-error.tsx\nA\tapps/x3-portal/app/globals.css\nA\tapps/x3-portal/app/layout.tsx\nA\tapps/x3-portal/app/learn/architecture/page.tsx\nA\tapps/x3-portal/app/learn/core-concepts/page.tsx\nA\tapps/x3-portal/app/learn/getting-started/page.tsx\nA\tapps/x3-portal/app/learn/tokenomics/page.tsx\nA\tapps/x3-portal/app/learn/tutorials/page.tsx\nA\tapps/x3-portal/app/loading.tsx\nA\tapps/x3-portal/app/metrics/page.tsx\nA\tapps/x3-portal/app/network/gpu-swarm/page.tsx\nA\tapps/x3-portal/app/network/page.tsx\nA\tapps/x3-portal/app/network/ramps/page.tsx\nA\tapps/x3-portal/app/network/rpc-providers/page.tsx\nA\tapps/x3-portal/app/network/status/page.tsx\nA\tapps/x3-portal/app/network/validators/page.tsx\nA\tapps/x3-portal/app/not-found.tsx\nA\tapps/x3-portal/app/page.tsx\nA\tapps/x3-portal/app/portfolio/page.tsx\nA\tapps/x3-portal/app/privacy/page.tsx\nA\tapps/x3-portal/app/prometheus/page.tsx\nA\tapps/x3-portal/app/quantum/enhanced/page.tsx\nA\tapps/x3-portal/app/quantum/page.tsx\nA\tapps/x3-portal/app/security/page.tsx\nA\tapps/x3-portal/app/solutions/actions/page.tsx\nA\tapps/x3-portal/app/solutions/ai/page.tsx\nA\tapps/x3-portal/app/solutions/commerce/page.tsx\nA\tapps/x3-portal/app/solutions/defi/page.tsx\nA\tapps/x3-portal/app/solutions/games/page.tsx\nA\tapps/x3-portal/app/solutions/mobile/page.tsx\nA\tapps/x3-portal/app/solutions/page.tsx\nA\tapps/x3-portal/app/solutions/payments/page.tsx\nA\tapps/x3-portal/app/solutions/permissioned/page.tsx\nA\tapps/x3-portal/app/solutions/rwa/page.tsx\nA\tapps/x3-portal/app/solutions/token-extensions/page.tsx\nA\tapps/x3-portal/app/solutions/tools/page.tsx\nA\tapps/x3-portal/app/solutions/wallets/page.tsx\nA\tapps/x3-portal/app/stake/page.tsx\nA\tapps/x3-portal/app/swap/page.tsx\nA\tapps/x3-portal/app/terms/page.tsx\nA\tapps/x3-portal/app/treasury/page.tsx\nA\tapps/x3-portal/app/x3/evolution/page.tsx\nA\tapps/x3-portal/app/x3/page.tsx\nA\tapps/x3-portal/app/x3/scripts/page.tsx\nA\tapps/x3-portal/app/x3/swarm/auctions/page.tsx\nA\tapps/x3-portal/app/x3/swarm/gpu/page.tsx\nA\tapps/x3-portal/app/x3/swarm/page.tsx\nA\tapps/x3-portal/app/x3/swarm/predictions/page.tsx\nA\tapps/x3-portal/app/x3/verifier/page.tsx\nA\tapps/x3-portal/app/x3os/page.tsx\nA\tapps/x3-portal/app/x3star/page.tsx\nA\tapps/x3-portal/next-env.d.ts\nA\tapps/x3-portal/next.config.js\nA\tapps/x3-portal/package-lock.json\nA\tapps/x3-portal/package.json\nA\tapps/x3-portal/postcss.config.js\nA\tapps/x3-portal/public/blog-pics/152195cd-2b22-4577-a46d-a1fbdec99cac.jpg\nA\tapps/x3-portal/public/blog-pics/ai-integration/152195cd-2b22-4577-a46d-a1fbdec99cac.jpg\nA\tapps/x3-portal/public/blog-pics/ai-integration/hero-landing-visual-ultra-wide-cinematic-shot-of-a-zero-gravity-cryp-heTp3mFmkc.png\nA\tapps/x3-portal/public/blog-pics/ai-integration/image.jpg\nA\tapps/x3-portal/public/blog-pics/hero-landing-visual-ultra-wide-cinematic-shot-of-a-zero-gravity-cryp-heTp3mFmkc.png\nA\tapps/x3-portal/public/blog-pics/image.jpg\nA\tapps/x3-portal/public/images/branding/152195cd-2b22-4577-a46d-a1fbdec99cac.jpg\nA\tapps/x3-portal/public/images/branding/hero-landing-visual-ultra-wide-cinematic-shot-of-a-zero-gravity-cryp-heTp3mFmkc.png\nA\tapps/x3-portal/public/images/branding/image.jpg\nA\tapps/x3-portal/scripts/test-transfer.js\nA\tapps/x3-portal/src/app/x3/swarm/api/admin/add/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/admin/approve/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/admin/kyc/verify/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/admin/list/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/admin/pending/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/admin/reject/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/admin/remove/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/claim/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/consent/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/contributors/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/kyc/list/route.ts\nA\tapps/x3-portal/src/app/x3/swarm/api/kyc/provider/notify/route.ts\nA\tapps/x3-portal/src/components/AccountSearch.tsx\nA\tapps/x3-portal/src/components/BlockList.tsx\nA\tapps/x3-portal/src/components/ChainStatusContainer.tsx\nA\tapps/x3-portal/src/components/NetworkStats.tsx\nA\tapps/x3-portal/src/components/TransactionList.tsx\nA\tapps/x3-portal/src/components/ai/FloatingNeuralTerminal.tsx\nA\tapps/x3-portal/src/components/assistant/DocAssistant.tsx\nA\tapps/x3-portal/src/components/backgrounds/ShaderBackground.tsx\nA\tapps/x3-portal/src/components/docs/DocLayout.tsx\nA\tapps/x3-portal/src/components/gpu-swarm/LeafletMap.tsx\nA\tapps/x3-portal/src/components/gpu-swarm/SwarmMap.tsx\nA\tapps/x3-portal/src/components/layout/Footer.tsx\nA\tapps/x3-portal/src/components/layout/Navigation.tsx\nA\tapps/x3-portal/src/components/prometheus/PrometheusMetrics.tsx\nA\tapps/x3-portal/src/components/prometheus/PrometheusWidget.tsx\nA\tapps/x3-portal/src/components/prometheus/index.ts\nA\tapps/x3-portal/src/components/providers.tsx\nA\tapps/x3-portal/src/components/quantum/HorizontalGallery.tsx\nA\tapps/x3-portal/src/components/quantum/KineticScroll.tsx\nA\tapps/x3-portal/src/components/quantum/NeuralThreatDetector.tsx\nA\tapps/x3-portal/src/components/quantum/ProjectShowcase.tsx\nA\tapps/x3-portal/src/components/quantum/QuantumScene.tsx\nA\tapps/x3-portal/src/components/quantum/QuantumTerminal.tsx\nA\tapps/x3-portal/src/components/quantum/ScotchVHSShowcase.tsx\nA\tapps/x3-portal/src/components/quantum/ValidatorGlobe.tsx\nA\tapps/x3-portal/src/components/quantum/index.ts\nA\tapps/x3-portal/src/components/sandbox/CodeSandbox.tsx\nA\tapps/x3-portal/src/components/swap/SwapInterface.tsx\nA\tapps/x3-portal/src/components/timemachine/TransactionTimeMachine.tsx\nA\tapps/x3-portal/src/components/ui/Logo.tsx\nA\tapps/x3-portal/src/components/webgpu/ChainExplorer3D.tsx\nA\tapps/x3-portal/src/hooks/index.ts\nA\tapps/x3-portal/src/hooks/useSubstrate.ts\nA\tapps/x3-portal/src/hooks/useTheme.ts\nA\tapps/x3-portal/src/lib/ai/openrouter.ts\nA\tapps/x3-portal/src/lib/ai/repoRoot.ts\nA\tapps/x3-portal/src/lib/ai/repoSearch.ts\nA\tapps/x3-portal/src/lib/ai/swarmIntegration.ts\nA\tapps/x3-portal/src/lib/db.ts\nA\tapps/x3-portal/src/lib/substrate/client.ts\nA\tapps/x3-portal/src/lib/substrate/index.ts\nA\tapps/x3-portal/src/lib/substrate/queries.ts\nA\tapps/x3-portal/src/lib/x3star/data-binding.ts\nA\tapps/x3-portal/src/styles/quantum.css\nA\tapps/x3-portal/tailwind.config.js\nA\tapps/x3-portal/tsconfig.json\nA\tcrates/x3-runtime-fuzz/Cargo.toml\nA\tcrates/x3-runtime-fuzz/NOTICE\nA\tcrates/x3-runtime-fuzz/src/lib.rs\nA\tcrates/x3-runtime-fuzz/tests/smoke.rs\nM\tdocs/reports/runtime-wasm-hashes.json\nA\treports/recovery/ai-civilization-inventory.md\nA\treports/recovery/atlas-sphere-recovery.md\nA\treports/recovery/atlas-sphere-screenshots/01-menu.png\nA\treports/recovery/atlas-sphere-screenshots/02-solar-system.png\nA\treports/recovery/atlas-sphere-screenshots/03-after-flying.png\nA\treports/recovery/branch-inventory.md\nA\treports/recovery/local-repository-inventory.json\nA\treports/recovery/local-repository-inventory.md\nA\treports/recovery/portal-screenshots/block-5.png\nA\treports/recovery/portal-screenshots/explorer.png\nA\treports/recovery/portal-screenshots/status.png\nA\treports/recovery/portal-screenshots/validators.png\nA\treports/recovery/pull-request-inventory.md\nA\treports/recovery/remote-repository-inventory.json\nA\treports/testnet/stps/README.md\nA\treports/testnet/stps/run-10000-transfers.json\nA\treports/testnet/stps/run-2000-transfers.json\nM\truntime/genesis-presets/dev.json\nM\truntime/genesis-presets/testnet.json\nM\truntime/src/tests.rs\nA\tscripts/recovery/local_repo_inventory.py\nA\tscripts/recovery/remote_repo_inventory.py\nA\tscripts/stps/package-lock.json\nA\tscripts/stps/package.json\nA\tscripts/stps/stps.js\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "release-gate/swarm-reactor-onchain-v1",
+    "sha": "1ec7cb7f23796ccec0920d786076a6542cdcb222",
+    "matching_prs": [
+      519
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "596\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "runtime/evm-persistence-and-fraud-proof-pins",
+    "sha": "d749e0d564490e89f3e8a104256d407e9d169458",
+    "matching_prs": [
+      599
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "168\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "test/coordinator-transition-table",
+    "sha": "0567465bbb8b20ba9866472ecd5cf35ccbe5047f",
+    "matching_prs": [
+      574
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "252\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "test/gateway-migrations-cover-tables",
+    "sha": "1d07a8bd66f66bad0430a3be6d33be1e3639feb9",
+    "matching_prs": [
+      595
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "231\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "test/gateway-postgres-control-plane",
+    "sha": "43be3bbb7238d090c45b5e0b893d85defe4d22b1",
+    "matching_prs": [
+      598
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "233\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "test/rc1-three-validator-boot-gate",
+    "sha": "38e6dfbb02bd0ced37aa197914ac0332e06d01e5",
+    "matching_prs": [
+      600
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "233\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "test/supply-ledger-proof-pruning",
+    "sha": "80cf5541de17b00fb37223b445026dd459a89fc6",
+    "matching_prs": [
+      576
+    ],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "248\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "test/x3vm-robustness",
+    "sha": "082cf6bb4e0eee247993944c93d4ec040c8dfc13",
+    "matching_prs": [
+      616
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "7\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "97e1003ead57d7b79962db182ec9299cf4e08806\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- 082cf6bb4e0eee247993944c93d4ec040c8dfc13\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tCargo.lock\nM\tcrates/x3-vm/Cargo.toml\nA\tcrates/x3-vm/tests/robustness.rs\nM\tscripts/local-ci.sh\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "testnet/physical-seven-preflight-20261014",
+    "sha": "e01adae8bd6501cded6115f97965e3a2a147f001",
+    "matching_prs": [
+      634
+    ],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "0\t5\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "70423054e2d9560a212ab763d4f265f9cdc448d9\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 9e91dda0baf1d7e4f5a5f8124d7c56cd9e544c63\n+ 5c135e73ca7b78aee95cc3d708959c6c56dd64e9\n+ d44cc33e2fce9d69adc8f41332f1cb0c199d4a33\n+ c7acc5f5f947e89d1ad6b2096bd57be6bea94295\n+ e01adae8bd6501cded6115f97965e3a2a147f001\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\tdocs/plans/2026-10-14-seven-validator-hardening.md\nA\tdocs/testnet-config/physical-seven-inventory.example.json\nM\tscripts/local-ci.sh\nA\tscripts/testnet/physical-seven-preflight.py\nA\ttests/test_physical_seven_preflight.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "wip/chatgpt-mainnet-attestation-20260918",
+    "sha": "e83d3918ee43b10ccd6b819044f817c9dd3c29f3",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "2569\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "wip/prompts-to-skills-20260918",
+    "sha": "4a6ffa6f1a86804548a1bba34320c0a1ec1aeb0b",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "2549\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "wip/x3lang-arb-graph-filter-20260919",
+    "sha": "bdc83ba7ffb48407e3cb14d003c6eb274c1b6ac4",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "1926\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "wip/x3lang-preserve-packets-and-arbitrage-20260919",
+    "sha": "1bfaa52434885f37dfbafd557cf9d2e8f9299f2e",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 0,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "1929\t0\n",
+      "err": ""
+    },
+    "classification": "integrated by ancestry"
+  },
+  {
+    "name": "wip-backup/candidate-d1ea10558-20260928",
+    "sha": "d1ea105588ee6678e5d51791778995a92fc171c8",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "411\t2\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "0ef4affc5aff66ff6207646e5e6ad3005250a77a\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- b06d0b30af144210eb7b5557c9103e9e108e2590\n- d1ea105588ee6678e5d51791778995a92fc171c8\n",
+      "err": ""
+    },
+    "classification": "patch-equivalent to master",
+    "files": {
+      "rc": 0,
+      "out": "M\tdocs/local-ci.md\nM\tscripts/local-ci.sh\nM\tscripts/mainnet/build-release-artifacts.sh\nM\tscripts/mainnet/release-artifacts-gate.sh\nM\tscripts/mainnet/run_release_gates_rc6.sh\nA\ttests/test_rc6_release_sequence.py\nA\ttests/test_release_artifact_provenance.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "wip-backup/freshness-control-3763659-20260928",
+    "sha": "4bfe9a391f461b4442e95aea9a9fc2f71d97ae79",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "673\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "7f5ba9aaf388895e87b040aeb74b73c4667c961b\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 4bfe9a391f461b4442e95aea9a9fc2f71d97ae79\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\truntime/src/tests.rs\nA\tscripts/check-runtime-hash-freshness.py.new\nA\tscripts/check-runtime-hash-freshness.py.old\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "wip-backup/main-checkout-20260928",
+    "sha": "b3e894d2cc8e010f432ab7944db5fe6e78199b3f",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "411\t3\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "0ef4affc5aff66ff6207646e5e6ad3005250a77a\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "- b06d0b30af144210eb7b5557c9103e9e108e2590\n- d1ea105588ee6678e5d51791778995a92fc171c8\n+ b3e894d2cc8e010f432ab7944db5fe6e78199b3f\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\t.ai/memory/agent-memory.md\nA\t.ai/patches/1535c31380202a8b.patch\nA\t.ai/patches/18e4879cf7778074.patch\nA\t.ai/patches/275693779fa5e4da.patch\nA\t.ai/patches/2aba50ac5e4e2d23.patch\nA\t.ai/patches/343b07a276c84a27.patch\nA\t.ai/patches/37ac6f137e00f15a.patch\nA\t.ai/patches/cab3617159c31da4.patch\nA\t.ai/runlogs/explorer-gate-drill-20260926T172424Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T172424Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T172424Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T172634Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T172634Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T172634Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T174651Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T174651Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T174651Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175419Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175419Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175419Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175419Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175535Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175535Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175535Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175535Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175645Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175645Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175645Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175645Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175809Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175809Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175809Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175809Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T175809Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T190155Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T190155Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T190155Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T190155Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260926T190155Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T013122Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T013122Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T013122Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T013122Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T013122Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T081746Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T081746Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T081746Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T081746Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T081746Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T083526Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T083526Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T083526Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T083526Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T083526Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T090337Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T090337Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T090337Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T090337Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T090337Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T102834Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T102834Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T102834Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T102834Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T102834Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T120520Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T120520Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T120520Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T120520Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T120520Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T140807Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T140807Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T140807Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T140807Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T140807Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T142358Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T142358Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T142358Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T142358Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260927T142358Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T063741Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T063741Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T063741Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T063741Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T063741Z/summary.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T071823Z/decoy-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T071823Z/explorer-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T071823Z/mismatch-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T071823Z/nochain-report.md\nA\t.ai/runlogs/explorer-gate-drill-20260928T071823Z/summary.md\nA\t.ai/runlogs/finality-cert-live-20260927T010049Z/driver_report.json\nA\t.ai/runlogs/genesis-raw.json\nA\t.ai/runlogs/halt-fund-holding-check-20260927T055706Z/break-it-first.txt\nA\t.ai/runlogs/halt-fund-holding-check-20260927T055706Z/inventory.orig.toml\nA\t.ai/runlogs/halt-recovery-live-20260927T005751Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T005819Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T010259Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T010726Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T010807Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T011149Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T115115Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T115200Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T115245Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260927T143133Z/halt_recovery.json\nA\t.ai/runlogs/halt-recovery-live-20260928T121825Z/halt_recovery.json\nA\t.ai/runlogs/halt-sequence-test-20260927T060113Z/break-it-first.txt\nA\t.ai/runlogs/halt-sequence-test-20260927T060113Z/lib.rs.orig\nA\t.ai/runlogs/ordering-window-live-20260926T201559Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260926T202402Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260926T202439Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260926T202508Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260926T202549Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260926T203130Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260926T203206Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260927T000430Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260927T011041Z/ordering_window.json\nA\t.ai/runlogs/ordering-window-live-20260928T125108Z/ordering_window.json\nA\t.ai/runlogs/round8-finality-cert-20260927T001407Z/green-unit.txt\nA\t.ai/runlogs/round8-finality-cert-20260927T001407Z/red-01-count-check-removed.txt\nA\t.ai/runlogs/round8-finality-cert-20260927T001407Z/red-02-rewind-check-removed.txt\nA\t.ai/runlogs/round8-finality-cert-20260927T001407Z/red-03-staleness-check-removed.txt\nA\t.ai/runlogs/round8-finality-cert-20260927T001407Z/red-04-chain-check-removed.txt\nA\t.ai/runlogs/round9-finality-cert-producer-20260927T010057Z/backups/error.rs.orig\nA\t.ai/runlogs/round9-finality-cert-producer-20260927T010057Z/backups/finality.rs.orig\nA\t.ai/runlogs/round9-finality-cert-producer-20260927T010057Z/backups/finality_producer.rs.orig\nA\t.ai/runlogs/sentinel-privileged-origin-20260927T141045Z/sentinel_privileged_origin.json\nA\t.ai/runlogs/sentinel-privileged-origin-20260927T141110Z/sentinel_privileged_origin.json\nA\t.ai/runlogs/sentinel-privileged-origin-20260927T141141Z/sentinel_privileged_origin.json\nA\t.ai/runlogs/sentinel-privileged-origin-20260927T141212Z/sentinel_privileged_origin.json\nA\t.ai/runlogs/sentinel-privileged-origin-20260927T141303Z/sentinel_privileged_origin.json\nA\t.ai/runlogs/sentinel-privileged-origin-20260927T141333Z/sentinel_privileged_origin.json\nA\t.ai/runlogs/sentinel-privileged-origin-20260927T141535Z/sentinel_privileged_origin.json\nA\t.ai/runlogs/swarm-disputed-refund-20260927/lib.rs.restore-point\nA\t.ai/runlogs/swarm-reactor-reconcile-20260927/verification.md\nA\t.ai/runlogs/swarm-reactor-reconcile-20260927/weights-regenerated-by-primary.rs\nA\t.ai/runlogs/tauri-os-console-20260927T135044Z/chain.rs.baseline.sha256\nA\t.ai/runlogs/tauri-os-console-20260927T135044Z/chain.rs.final.sha256\nA\t.ai/runlogs/tauri-os-console-20260927T135044Z/local-ci-fast-summary.json\nA\t.ai/runlogs/tauri-os-console-20260927T135044Z/local-ci-live-summary.json\nA\t.ai/runlogs/wallet-recovery-live-20260927T001840Z/wallet_recovery.json\nA\t.ai/runlogs/wallet-recovery-live-20260927T001907Z/wallet_recovery.json\nA\t.ai/runlogs/wallet-recovery-live-20260927T002138Z/wallet_recovery.json\nA\t.ai/runlogs/wallet-recovery-live-20260927T011118Z/wallet_recovery.json\nA\t.ai/runlogs/wallet-recovery-live-20260928T125152Z/wallet_recovery.json\nA\t.ai/runlogs/x3-htlc-live-20260927T120340Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T120349Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T120705Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T120755Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T121730Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T122120Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T122425Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T122723Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T123820Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T124504Z/report.txt\nA\t.ai/runlogs/x3-htlc-live-20260927T124949Z/report.txt\nA\t.ai/tasks/2026-09-26-round9-workstreams.md\nA\t.ai/tasks/2026-09-27-night/A-panic-burndown.md\nA\t.ai/tasks/2026-09-27-night/B-mev001.md\nA\t.ai/tasks/2026-09-27-night/C-bringup-paths.md\nA\t.ai/tasks/2026-09-27-night/D-northern-swarm-reactor.md\nA\t.ai/tasks/2026-09-27-swarm/A-pallet-adversarial.md\nA\t.ai/tasks/2026-09-27-swarm/B-executor-backend.md\nA\t.ai/tasks/2026-09-27-swarm/C-swarm-core-races.md\nA\t.ai/tasks/2026-09-27-swarm/C-swarm-core.md\nA\t.ai/tasks/2026-09-27-swarm/D-reactor-benchmark-path.md\nA\t.ai/tasks/2026-09-27-swarm/E-repo-scanner.md\nA\t.ai/tasks/2026-09-27-swarm/F-atomic-bundle-under-halt.md\nA\t.ai/tasks/2026-09-27-swarm/F-wire-the-fake-code-detectors.md\nA\t.ai/tasks/2026-09-27-weights/benchmark-derived-weights.md\nM\t.proof-results/s0-security-gate.txt\nM\t.proof-results/s1-security-gate.txt\nA\t.testnet_stability_start\nA\tFETCH_HEAD\nA\tchain-spec.json\nA\tchain-specs/x3-public-testnet-plain.json\nM\tdocs/local-ci.md\nA\tformal-proofs/coq/.SupplyInvariant.aux\nA\tformal-proofs/coq/SupplyInvariant.glob\nA\tformal-proofs/coq/SupplyInvariant.vo\nA\tformal-proofs/coq/SupplyInvariant.vok\nA\tformal-proofs/coq/SupplyInvariant.vos\nA\tlibproto_lib/usr/share/doc/libprotobuf23\nA\treports/feature-matrix/X3_FEATURE_MATRIX.csv\nA\treports/feature-matrix/X3_FEATURE_MATRIX.json\nA\treports/feature-matrix/X3_FEATURE_MATRIX.md\nA\treports/feature-matrix/X3_FEATURE_SUMMARY.md\nM\treports/panic_unwrap_audit.md\nM\tscripts/drills/node_restart_drill.sh\nM\tscripts/local-ci.sh\nM\tscripts/mainnet/build-release-artifacts.sh\nM\tscripts/mainnet/public_testnet_gate.sh\nM\tscripts/mainnet/release-artifacts-gate.sh\nM\tscripts/mainnet/run_release_gates_rc6.sh\nM\tscripts/testnet/public-testnet-gate-drill.sh\nA\ttests/test_rc6_release_sequence.py\nA\ttests/test_release_artifact_provenance.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "wip-backup/panic-516-20260928",
+    "sha": "bd0adfcc0ff4c04465da71c55def43a096686b21",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "1707\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "b6520e7d35b789cb5a8b4adb7727454d5327f2d0\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ bd0adfcc0ff4c04465da71c55def43a096686b21\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tscripts/audit/panic_unwrap_scan.py\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "wip-backup/rt2-20260928",
+    "sha": "ff12889bfbbec0dbc697204e0931a9dd5c3ce30c",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "770\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "a3d918abbecf3e49f02777956d6728215d849e6f\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ ff12889bfbbec0dbc697204e0931a9dd5c3ce30c\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tdocs/reports/runtime-wasm-hashes.json\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "wip-backup/rt-rebuild-20260928",
+    "sha": "b83a7a0cd12009f9f680d66ede3e830ed2810f8b",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "777\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "aaece429d5e326e7beb5b7447be9fa19c5d7b65e\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ b83a7a0cd12009f9f680d66ede3e830ed2810f8b\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\tdocs/reports/runtime-wasm-hashes.json\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "wip-backup/upg-artifact-src-20260928",
+    "sha": "e95475a6df4c6131a19a29d7f3a60e14a17f6f86",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "763\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "b82dfeb2c5deaaa013bb29d54915b99fa3b9091f\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ e95475a6df4c6131a19a29d7f3a60e14a17f6f86\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "M\truntime/src/lib.rs\n",
+      "err": ""
+    }
+  },
+  {
+    "name": "wip-backup/x3lang-finish-20260928",
+    "sha": "68f982e7c1c5e64c5f633a9345a50bb8ba100b0f",
+    "matching_prs": [],
+    "ancestor": {
+      "rc": 1,
+      "out": "",
+      "err": ""
+    },
+    "counts": {
+      "rc": 0,
+      "out": "437\t1\n",
+      "err": ""
+    },
+    "merge_base": {
+      "rc": 0,
+      "out": "5b4fc4a69424493f135025c3b11a90d0cd4d29b5\n",
+      "err": ""
+    },
+    "cherry": {
+      "rc": 0,
+      "out": "+ 68f982e7c1c5e64c5f633a9345a50bb8ba100b0f\n",
+      "err": ""
+    },
+    "classification": "unmerged differences; review required",
+    "files": {
+      "rc": 0,
+      "out": "A\t.ai/runlogs/halt-recovery-live-20260928T043239Z/halt_recovery.json\nA\t.ai/runlogs/ordering-window-live-20260928T043117Z/ordering_window.json\nA\t.ai/runlogs/sentinel-privileged-origin-20260928T043217Z/sentinel_privileged_origin.json\nA\t.ai/runlogs/wallet-recovery-live-20260928T043149Z/wallet_recovery.json\nA\t.ai/runlogs/x3-htlc-live-20260928T043634Z/report.txt\nM\t.proof-results/s0-security-gate.txt\nM\t.proof-results/s1-security-gate.txt\nM\treports/swarm_scan_findings.json\nM\treports/swarm_scan_report.md\n",
+      "err": ""
+    }
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "state": "PASS",
+  "scope": "publication byte hashes, accepted verification reuse for unchanged artifacts, new evidence roundtrips, exact original retention, credential-pattern checks and Markdown links; not runtime verification",
+  "source_evidence_entries": 51,
+  "queue_records": 2845,
+  "reused_accepted_artifacts": 49,
+  "newly_verified_artifacts": 2,
+  "errors": [],
+  "runtime_tests": "NOT RUN: documents/evidence only",
+  "original_audit_state": "PARTIAL/BLOCKED"
+}
