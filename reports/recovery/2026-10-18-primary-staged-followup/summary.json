@@ -1,0 +1,18 @@
+{
+  "pinned_heads": {
+    "primary_head": "1beb644603a0f1b6de8bb5882e699fdc99bb2e58",
+    "master": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "pr623": "2df37cf53f0baf9b5357f4a0305a95d03f3ebd0f"
+  },
+  "staged_paths": 58,
+  "classifications": {
+    "different from compared heads; uniqueness UNVERIFIED": 58
+  },
+  "all_staged_worktree_bytes_equal_index": true,
+  "index_unchanged": true,
+  "head_unchanged": true,
+  "status_unchanged": true,
+  "runtime_tests": "NOT RUN: read-only blob/metadata comparison only",
+  "publication_commit": "23a91f96e00ab7c4dbaf1312f35e8805a065dace",
+  "audit_snapshot_pr623_head": "2ae185d7e0f2ff19da48744a4acc425d9f67ec08"
+}

@@ -1,0 +1,11 @@
+{
+  "state": "PASS",
+  "staged_paths": 58,
+  "new_paths_absent_from_both_tips": 14,
+  "public_head_count": 635,
+  "recovery_actions_executed": false,
+  "original_index_sha256": "4fef03840867b8e4574442f7fd7fe73c3445342c5e4da3b604cbb90d9426ed6c",
+  "source_hashes_rechecked": 58,
+  "errors": [],
+  "runtime_tests": "NOT RUN: read-only review"
+}

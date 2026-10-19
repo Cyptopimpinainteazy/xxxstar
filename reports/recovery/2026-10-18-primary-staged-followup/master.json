@@ -1,0 +1,10 @@
+{
+  "ref": "refs/heads/master",
+  "node_id": "REF_kwDOSiTSMLFyZWZzL2hlYWRzL21hc3Rlcg",
+  "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/git/refs/heads/master",
+  "object": {
+    "sha": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+    "type": "commit",
+    "url": "https://api.github.com/repos/Cyptopimpinainteazy/xxxstar/git/commits/70423054e2d9560a212ab763d4f265f9cdc448d9"
+  }
+}

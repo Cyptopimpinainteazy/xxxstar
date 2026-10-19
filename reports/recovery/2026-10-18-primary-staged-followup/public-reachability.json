@@ -1,0 +1,11 @@
+{
+  "state": "PASS",
+  "exit": 0,
+  "head_count": 635,
+  "path_count": 58,
+  "walk_object_count": 5515,
+  "staged_blobs_reachable": [],
+  "staged_blob_matches": [],
+  "error": "",
+  "scope": "Objects reachable from captured primary GitHub branches and PR heads plus refreshed PR #623, restricted to the 58 staged paths. Not a global proof of absence or semantic uniqueness."
+}
