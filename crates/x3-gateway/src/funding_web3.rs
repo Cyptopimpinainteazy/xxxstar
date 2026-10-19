@@ -282,23 +282,17 @@ impl Database {
     .execute(&mut *tx)
     .await?;
     let id = Uuid::new_v4().to_string();
-    let snapshot: (String, bool) = sqlx::query_as(
-        "WITH saved AS (
-            INSERT INTO funding_web3_source_snapshots
-            (snapshot_id,source_id,official_url,content_sha256,source_document,
-             normalized,retrieved_at,last_observed_at)
-            VALUES($1,$2,$3,$4,$5,$6,$7,$7)
-            ON CONFLICT(source_id,content_sha256) DO NOTHING
-            RETURNING snapshot_id
-         )
-         SELECT snapshot_id,TRUE FROM saved
-         UNION ALL
-         SELECT snapshot_id,FALSE FROM funding_web3_source_snapshots
-          WHERE source_id=$2 AND content_sha256=$4
-          AND NOT EXISTS (SELECT 1 FROM saved)
-         LIMIT 1",
+    let snapshot_id: String = sqlx::query_scalar(
+        "INSERT INTO funding_web3_source_snapshots
+         (snapshot_id,source_id,official_url,content_sha256,source_document,
+          normalized,retrieved_at,last_observed_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$7)
+         ON CONFLICT(source_id,content_sha256)
+         DO UPDATE SET last_observed_at=GREATEST(
+             funding_web3_source_snapshots.last_observed_at,EXCLUDED.last_observed_at)
+         RETURNING snapshot_id",
     )
-    .bind(id)
+    .bind(&id)
     .bind(src.id)
     .bind(src.url)
     .bind(&digest)
@@ -307,22 +301,16 @@ impl Database {
     .bind(retrieved)
     .fetch_one(&mut *tx)
     .await?;
-    sqlx::query(
-        "UPDATE funding_web3_source_snapshots SET last_observed_at=$3
-         WHERE source_id=$1 AND content_sha256=$2",
-    )
-    .bind(src.id)
-    .bind(&digest)
-    .bind(retrieved)
-    .execute(&mut *tx)
-    .await?;
-    if snapshot.1 {
+    // The conflict path always returns its ORIGINAL ID, including when
+    // two gateway processes observe identical content concurrently.
+    let new_snapshot = snapshot_id == id;
+    if new_snapshot {
         sqlx::query(
             "INSERT INTO funding_swarm_events(event_id,grant_id,event_type,visibility,detail)
              VALUES($1,NULL,'web3_official_page_observed','private',$2)",
         )
         .bind(Uuid::new_v4().to_string())
-        .bind(json!({"source":src.id,"snapshot_id":snapshot.0,
+        .bind(json!({"source":src.id,"snapshot_id":snapshot_id,
             "content_sha256":digest,"funding_awarded":false}))
         .execute(&mut *tx)
         .await?;
@@ -337,8 +325,8 @@ impl Database {
     Ok(Web3DiscoveryResult {
         source_id: src.id.into(),
         official_url: src.url.into(),
-        snapshot_id: snapshot.0,
-        new_snapshot: snapshot.1,
+        snapshot_id,
+        new_snapshot,
         application_guidance_status: normalized["application_guidance_status"]
             .as_str()
             .unwrap_or("UNKNOWN")
