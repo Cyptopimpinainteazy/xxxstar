@@ -8,6 +8,18 @@ interface Grant {
   status: string; stage: string; score: number; amount_usd: number;
   metadata: Record<string, unknown>; created_at: string; updated_at: string;
 }
+interface OfficialPortalSnapshot {
+  snapshot_id: string; source_id: string; official_url: string; content_sha256: string;
+  retrieved_at: string; last_observed_at: string;
+  normalized: { program_name?: string; source_verification?: string;
+    application_guidance_status?: string; eligibility_status?: string;
+    approved_for_submission?: boolean; round?: string | null; deadline?: string | null; };
+}
+interface OfficialPortalResult {
+  new_snapshot: boolean; source_id: string; official_url: string; snapshot_id: string;
+  application_guidance_status: string; eligibility_status: string;
+  awarded_funding_verified: boolean;
+}
 interface HistoricalLead {
   source_file: string; legacy_id: string; name: string; category: string;
   historical_status: string; current_availability: string;
@@ -56,11 +68,16 @@ export function MoneySwarmWorkspace() {
   const [token, setToken] = useState('');
   const [sourceKeyword, setSourceKeyword] = useState('distributed computing');
   const [selected, setSelected] = useState<Grant | null>(null);
-  const [view, setView] = useState<'opportunities' | 'review' | 'activity' | 'archive'>('opportunities');
+  const [view, setView] = useState<'opportunities' | 'review' | 'activity' | 'archive' | 'web3'>('opportunities');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [officialSources, setOfficialSources] = useState<OfficialPortalSnapshot[]>([]);
+  const [portalProvider, setPortalProvider] = useState<'solana' | 'stellar'>('stellar');
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalError, setPortalError] = useState('');
+  const portalRequest = useRef(0);
   const [archive, setArchive] = useState<HistoricalLead[]>([]);
   const [archiveOffset, setArchiveOffset] = useState(0);
   const [archiveSearch, setArchiveSearch] = useState('');
@@ -99,6 +116,48 @@ export function MoneySwarmWorkspace() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  const loadOfficialSources = async () => {
+    if (!token) return;
+    const requestId = ++portalRequest.current;
+    setPortalBusy(true); setPortalError('');
+    try {
+      const records = await request<OfficialPortalSnapshot[]>(
+        '/api/v1/admin/funding-swarm/discovery/web3/sources', token
+      );
+      if (requestId !== portalRequest.current) return;
+      if (!Array.isArray(records) || records.some(row =>
+        row.normalized?.eligibility_status !== 'UNKNOWN' ||
+        row.normalized?.approved_for_submission !== false ||
+        row.normalized?.source_verification !== 'OFFICIAL_PAGE_OBSERVED'
+      )) throw new Error('Official portal records have unexpected verification or approval state.');
+      setOfficialSources(records);
+    } catch (failure) {
+      if (requestId === portalRequest.current) {
+        setOfficialSources([]);
+        setPortalError(failure instanceof Error ? failure.message : 'Official portal research unavailable.');
+      }
+    } finally {
+      if (requestId === portalRequest.current) setPortalBusy(false);
+    }
+  };
+
+  const refreshOfficialSource = async () => {
+    if (!token || busy || portalBusy) return;
+    setBusy(true); setPortalError(''); setNotice('');
+    try {
+      const result = await request<OfficialPortalResult>(
+        '/api/v1/admin/funding-swarm/discovery/web3', token, { provider: portalProvider }
+      );
+      if (result.eligibility_status !== 'UNKNOWN' || result.awarded_funding_verified) {
+        throw new Error('Official portal probe returned an unauthorized eligibility or award claim.');
+      }
+      setNotice(`Official ${portalProvider} page observed (${result.new_snapshot ? 'new source snapshot' : 'unchanged evidence'}). Application availability and eligibility require review.`);
+      await loadOfficialSources();
+    } catch (failure) {
+      setPortalError(failure instanceof Error ? failure.message : 'Official portal refresh unavailable.');
+    } finally { setBusy(false); }
+  };
 
   const loadArchive = async (offset: number) => {
     if (!token) return;
@@ -153,19 +212,20 @@ export function MoneySwarmWorkspace() {
     <aside className="money-nav" aria-label="Money Swarm navigation">
       <a className="money-wordmark" href="/money-swarm"><span aria-hidden="true">✳</span> X3 <strong>Money Swarm</strong></a>
       <p className="money-nav-label">FUNDING OPERATIONS</p>
-      <nav>{([['opportunities', 'Opportunity ledger', Search], ['review', 'Application review', ShieldCheck], ['archive', 'Historical leads', Database], ['activity', 'Audit activity', Database]] as const).map(([id, label, Icon]) =>
-        <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => { setView(id); archiveRequest.current++; setArchive([]); setArchiveError(''); setArchiveLoading(false); }}><Icon size={17} aria-hidden="true" />{label}</button>)}</nav>
+      <nav>{([['opportunities', 'Opportunity ledger', Search], ['review', 'Application review', ShieldCheck], ['web3', 'Official Web3 portals', Search], ['archive', 'Historical leads', Database], ['activity', 'Audit activity', Database]] as const).map(([id, label, Icon]) =>
+        <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => { setView(id); archiveRequest.current++; setArchive([]); setArchiveError(''); setArchiveLoading(false);
+          portalRequest.current++; setOfficialSources([]); setPortalError(''); setPortalBusy(false); }}><Icon size={17} aria-hidden="true" />{label}</button>)}</nav>
       <div className="money-nav-note"><ShieldCheck size={20} aria-hidden="true" /><strong>Human decisions. Verified evidence.</strong><p>External submissions, spending and outreach require separate authorization.</p></div>
       <a className="money-back" href="/">← Inferstructor</a>
     </aside>
     <div className="money-content">
-      <header className="money-header"><div><p className="money-eyebrow">X3 / INFRASTRUCTURE FUNDING</p><h1>{view === 'activity' ? 'Audit activity' : view === 'review' ? 'Application review' : view === 'archive' ? 'Historical research' : 'Funding intelligence'}</h1><p>Find the next opportunity. Keep the evidence in view.</p></div>
-        <button className="money-button" disabled={loading || archiveLoading || busy || (view === 'archive' && !token)} onClick={() => { if (view === 'archive') void loadArchive(archiveOffset); else void load(); }}><RefreshCw size={16} aria-hidden="true" />{loading || archiveLoading ? 'Loading records…' : view === 'archive' ? 'Load private research' : 'Refresh records'}</button></header>
+      <header className="money-header"><div><p className="money-eyebrow">X3 / INFRASTRUCTURE FUNDING</p><h1>{view === 'activity' ? 'Audit activity' : view === 'review' ? 'Application review' : view === 'archive' ? 'Historical research' : view === 'web3' ? 'Official Web3 sources' : 'Funding intelligence'}</h1><p>Find the next opportunity. Keep the evidence in view.</p></div>
+        <button className="money-button" disabled={loading || archiveLoading || portalBusy || busy || ((view === 'archive' || view === 'web3') && !token)} onClick={() => { if (view === 'archive') void loadArchive(archiveOffset); else if (view === 'web3') void loadOfficialSources(); else void load(); }}><RefreshCw size={16} aria-hidden="true" />{loading || archiveLoading ? 'Loading records…' : view === 'archive' ? 'Load private research' : view === 'web3' ? 'Load official source records' : 'Refresh records'}</button></header>
 
       <div className="money-trust"><span className="money-dot" aria-hidden="true" /><span>Database records · Source timestamps shown per opportunity</span><span>Eligibility unknown until reviewed</span></div>
       {error && <div className="money-error" role="alert">{error}</div>}
       {notice && <div className="money-notice" role="status"><Check size={18} aria-hidden="true" />{notice}</div>}
-      {stats && view !== 'archive' && <section className="money-summary" aria-label="Funding pipeline">
+      {stats && view !== 'archive' && view !== 'web3' && <section className="money-summary" aria-label="Funding pipeline">
         <div><span>Opportunities recorded</span><strong>{stats.total_grants.toLocaleString()}</strong><small>{sourceCount} sources in this view</small></div>
         <div><span>Open opportunities</span><strong>{stats.open_grants.toLocaleString()}</strong><small>Not confirmed eligibility</small></div>
         <div><span>Approved drafts</span><strong>{stats.approved_grants.toLocaleString()}</strong><small>Submission remains a human action</small></div>
@@ -173,9 +233,9 @@ export function MoneySwarmWorkspace() {
       </section>}
 
       <section className="money-operator" aria-label="Operator access"><div><h2>Operator access</h2><p>A credential enables source discovery and review actions. It stays in memory for this session.</p></div>
-        <label>Operator credential<input type="password" autoComplete="off" value={token} onChange={event => { archiveRequest.current++; setArchive([]); setArchiveOffset(0); setArchiveLoading(false); setArchiveError(''); setToken(event.target.value); }} placeholder="Enter your operator credential" /></label></section>
+        <label>Operator credential<input type="password" autoComplete="off" value={token} onChange={event => { archiveRequest.current++; setArchive([]); setArchiveOffset(0); setArchiveLoading(false); setArchiveError(''); portalRequest.current++; setOfficialSources([]); setPortalBusy(false); setPortalError(''); setToken(event.target.value); }} placeholder="Enter your operator credential" /></label></section>
 
-      {view !== 'activity' && view !== 'archive' && <>
+      {view !== 'activity' && view !== 'archive' && view !== 'web3' && <>
         <section className="money-discovery" aria-label="Official source discovery"><div><h2>Discover from Grants.gov</h2><p>Read official opportunities. No application is sent.</p></div><label>Research keyword<input maxLength={120} value={sourceKeyword} onChange={event => setSourceKeyword(event.target.value)} /></label><button className="money-button primary" onClick={() => void discover()} disabled={!token || !sourceKeyword.trim() || busy || loading}>{busy ? 'Working…' : 'Discover opportunities'}<ArrowUpRight size={16} aria-hidden="true" /></button>{!token && <small>Enter an operator credential to refresh the official source.</small>}</section>
         <section className="money-ledger" aria-label="Opportunity ledger"><div className="money-section-heading"><div><h2>{view === 'review' ? 'Review pipeline' : 'Opportunity ledger'}</h2><p>{loading ? 'Retrieving records from the gateway…' : `${filtered.length} records shown · First 100 opportunities`}</p></div><label className="money-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Search opportunities" placeholder="Search title, agency or identifier" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
           {filtered.length === 0 && !loading && !error && <div className="money-empty"><Database size={26} aria-hidden="true" /><h3>{query ? 'No opportunities match your search' : view === 'review' ? 'No applications in review' : 'No opportunities recorded yet'}</h3><p>{query ? 'Try another research term or agency.' : 'Discover from an official source, then open a record to begin research.'}</p></div>}
@@ -185,6 +245,36 @@ export function MoneySwarmWorkspace() {
           })}
         </section>
       </>}
+      {view === 'web3' && <section className="money-ledger" aria-label="Official Web3 funding portals">
+        <div className="money-section-heading"><div><h2>Official ecosystem funding sources</h2><p>Live page observations are source evidence, not verified open opportunities, eligibility or awards. Discovery requires an operator-enabled backend.</p></div></div>
+        {!token && <div className="money-empty"><ShieldCheck size={26} aria-hidden="true" /><h3>Operator credential required</h3><p>These records are private research. Enter a credential before requesting official source pages.</p></div>}
+        {portalError && <div className="money-error" role="alert">{portalError}</div>}
+        {token && <div className="money-discovery">
+          <div><h2>Inspect an official source</h2><p>Only fixed, reviewed Solana and Stellar pages. Never sends applications or messages.</p></div>
+          <label>Funding portal
+            <select aria-label="Funding portal" value={portalProvider} onChange={event => setPortalProvider(event.target.value as 'solana' | 'stellar')}>
+              <option value="stellar">Stellar Community Fund</option>
+              <option value="solana">Solana Foundation</option>
+            </select>
+          </label>
+          <button className="money-button primary" disabled={busy || portalBusy} onClick={() => void refreshOfficialSource()}>Inspect official funding page</button>
+        </div>}
+        {officialSources.map(record => {
+          const link = officialUrl(record.official_url);
+          return <article className="money-opportunity" key={record.source_id}>
+            <div className="money-opportunity-main">
+              <p className="money-agency">{record.source_id}</p>
+              <strong className="money-title">{text(record.normalized.program_name)}</strong>
+              <div className="money-opportunity-meta"><span>{text(record.normalized.application_guidance_status, 'UNKNOWN')}</span>
+                {record.normalized.round && <span>{record.normalized.round}</span>}
+                {record.normalized.deadline && <span>Source deadline {record.normalized.deadline}</span>}</div>
+            </div>
+            <div className="money-evidence"><span className="money-unknown">Eligibility UNKNOWN</span><small>Page observed {date(record.last_observed_at)}</small>
+              {link ? <a href={link} target="_blank" rel="noopener noreferrer">Official source <ArrowUpRight size={14} aria-hidden="true" /></a> : <small>Invalid source URL</small>}</div>
+          </article>;
+        })}
+        {token && !portalBusy && !portalError && officialSources.length === 0 && <div className="money-empty"><Database size={26} aria-hidden="true" /><h3>No official pages loaded</h3><p>Choose Load official source records to inspect stored snapshots.</p></div>}
+      </section>}
       {view === 'archive' && <section className="money-ledger" aria-label="Historical research leads">
         <div className="money-section-heading"><div><h2>Historical research queue</h2><p>Private source-labelled candidates, not verified opportunities or awards. Search, then select Load private research.</p></div>
           <label className="money-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Search historical leads" maxLength={120} value={archiveSearch} placeholder="Search archive titles and categories" onChange={event => { archiveRequest.current++; setArchiveSearch(event.target.value); setArchive([]); setArchiveOffset(0); setArchiveLoading(false); setArchiveError(''); }} /></label>
