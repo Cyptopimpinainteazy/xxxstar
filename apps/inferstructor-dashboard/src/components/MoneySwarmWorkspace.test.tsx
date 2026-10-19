@@ -132,4 +132,68 @@ describe('Money Swarm workspace', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/unexpected verification state/i);
     expect(screen.queryByText('Bad archived lead')).not.toBeInTheDocument();
   });
+
+  it('reads real official-portal observations only after credential and preserves UNKNOWN eligibility', async () => {
+    const official = [{
+      snapshot_id: 'snap-scf-46', source_id: 'stellar.scf.web',
+      official_url: 'https://communityfund.stellar.org/awards',
+      content_sha256: 'a'.repeat(64), retrieved_at: '2026-10-18T18:00:00Z',
+      last_observed_at: '2026-10-18T18:00:00Z',
+      normalized: { program_name: 'Stellar Community Fund Build Awards',
+        source_verification: 'OFFICIAL_PAGE_OBSERVED',
+        application_guidance_status: 'SUBMISSION_ROUND_DESCRIBED',
+        eligibility_status: 'UNKNOWN', approved_for_submission: false,
+        round: 'SCF #46', deadline: '2026-11-08' },
+    }];
+    const mocked = vi.fn(async (url: string, options?: RequestInit) => new Response(JSON.stringify(
+      url.includes('/discovery/web3/sources') ? official
+        : url.endsWith('/discovery/web3') ? {
+          new_snapshot: true, source_id: 'stellar.scf.web',
+          official_url: 'https://communityfund.stellar.org/awards',
+          snapshot_id: 'snap-scf-46', eligibility_status: 'UNKNOWN',
+          application_guidance_status: 'SUBMISSION_ROUND_DESCRIBED',
+          awarded_funding_verified: false,
+        } : url.includes('scoreboard') ?
+          { total_grants: 0, open_grants: 0, approved_grants: 0, funded_grants: 0, total_awarded_usd: 0 }
+          : [],
+    ), { status: 200 }));
+    vi.stubGlobal('fetch', mocked);
+    render(<MoneySwarmWorkspace />);
+    await screen.findByText(/no verified awards/i);
+    fireEvent.click(screen.getByRole('button', { name: /Official Web3 portals/i }));
+    expect(screen.getByRole('button', { name: /Load official source records/i })).toBeDisabled();
+    expect(mocked.mock.calls.some(([url]) => url.includes('/discovery/web3/sources'))).toBe(false);
+    fireEvent.change(screen.getByLabelText('Operator credential'), { target: { value: 'test-private-token' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load official source records' }));
+    expect(await screen.findByText('Stellar Community Fund Build Awards')).toBeInTheDocument();
+    expect(screen.getByText('SCF #46')).toBeInTheDocument();
+    expect(screen.getByText(/Eligibility UNKNOWN/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Official source/i })).toHaveAttribute('href', 'https://communityfund.stellar.org/awards');
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect official funding page' }));
+    expect(await screen.findByText(/Official stellar page observed/i)).toBeInTheDocument();
+    expect(mocked.mock.calls.some(([url, options]) =>
+      url.endsWith('/discovery/web3') && options?.method === 'POST'
+      && (options.headers as Record<string, string>)['x-admin-token'] === 'test-private-token'
+      && JSON.parse(options.body as string).provider === 'stellar'
+    )).toBe(true);
+  });
+
+  it('rejects forged awards and approval state from the private official portal backend', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(
+      url.includes('/discovery/web3/sources') ? [{
+        snapshot_id: 'fake', source_id: 'stellar.scf.web', official_url: 'https://communityfund.stellar.org/awards',
+        normalized: { source_verification: 'OFFICIAL_PAGE_OBSERVED',
+          eligibility_status: 'ELIGIBLE', approved_for_submission: true },
+      }] : url.includes('scoreboard') ?
+        { total_grants: 0, open_grants: 0, approved_grants: 0,
+          funded_grants: 0, total_awarded_usd: 0 } : [],
+    ), { status: 200 })));
+    render(<MoneySwarmWorkspace />);
+    await screen.findByText(/no verified awards/i);
+    fireEvent.click(screen.getByRole('button', { name: /Official Web3 portals/i }));
+    fireEvent.change(screen.getByLabelText('Operator credential'), { target: { value: 'test-private-token' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load official source records' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/unexpected verification or approval state/i);
+    expect(screen.queryByText('fake')).not.toBeInTheDocument();
+  });
 });
