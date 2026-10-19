@@ -316,7 +316,7 @@ fn a_bundle_finalizes_once_with_the_receipt_root_the_chain_requires() {
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
-            runtime_committed(&[leg.clone()]),
+            runtime_committed(std::slice::from_ref(&leg)),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,
@@ -1351,7 +1351,7 @@ fn a_chain_leg_cannot_spend_more_than_the_executor_holds() {
         assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
             RuntimeOrigin::signed(gateway.clone()),
             BoundedVec::try_from(vec![atomic_leg()]).expect("one leg"),
-            runtime_committed(&[leg.clone()]),
+            runtime_committed(std::slice::from_ref(&leg)),
             100,
             ATOMIC_CHAIN_ID,
             ATOMIC_NONCE,

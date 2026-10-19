@@ -18,6 +18,8 @@ fi
 log="$(mktemp "${RUNNER_TEMP:-/tmp}/cargo-annotate.XXXXXX")"
 "$@" 2>&1 | tee "$log"
 status=${PIPESTATUS[0]}
+# Cargo colours its output on a terminal-like runner; the patterns below match plain text.
+sed -i -E 's/\x1b\[[0-9;]*m//g' "$log"
 
 if [ "$status" -ne 0 ]; then
   # GitHub keeps at most 10 error annotations per step; the first ones are the actionable ones.
