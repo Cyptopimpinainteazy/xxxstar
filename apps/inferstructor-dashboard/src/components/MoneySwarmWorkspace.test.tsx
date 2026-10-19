@@ -102,6 +102,11 @@ describe('Money Swarm workspace', () => {
     expect(screen.getByText(/Historical label only: AWARDED/i)).toBeInTheDocument();
     expect(screen.getByText(/Current availability UNKNOWN/i)).toBeInTheDocument();
     expect(screen.getByText(/Eligibility UNKNOWN/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: /search historical leads/i }), { target: { value: 'treasury' } });
+    expect(screen.queryByText('Historical protocol treasury lead')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /load private research/i }));
+    expect(await screen.findByText('Historical protocol treasury lead')).toBeInTheDocument();
+    expect(fetchStub.mock.calls.some(([url]) => url.includes('search=treasury'))).toBe(true);
     expect(fetchStub.mock.calls.some(([url, options]) =>
       url.includes('/legacy-leads') && (options?.headers as Record<string, string>)?.['x-admin-token'] === 'private-operator-test-token'
     )).toBe(true);
