@@ -53,7 +53,7 @@ jobs:
         # hard-linked copy of both homes (seconds to create, no extra disk until written).
         run: |
           set -euo pipefail
-          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin" /home/linuxbrew/.linuxbrew/bin; do
+          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin" /home/linuxbrew/.linuxbrew/bin "$HOME/.foundry/bin"; do
             [ -d "$dir" ] && echo "$dir" >> "$GITHUB_PATH"
           done
           iso="$HOME/.x3ci-runner-${RUNNER_NAME}"
@@ -70,7 +70,7 @@ jobs:
 
       - name: Show the resolved toolchain
         run: |
-          for tool in python3 pytest node npm cargo rustc cargo-deny cargo-audit docker; do
+          for tool in python3 pytest node npm cargo rustc cargo-deny cargo-audit docker anvil forge; do
             printf '%-12s %s\n' "$tool" "$(command -v "$tool" || echo MISSING)"
           done
           python3 --version; cargo --version
