@@ -41,6 +41,13 @@ if [ -z "$push_ref" ]; then
   exit 0
 fi
 
+# Gates create disposable repositories. Hook-local Git variables otherwise make
+# their Git commands operate on the sending repository, including fixture commits.
+# Git documents this list for hooks that invoke Git in another repository.
+while IFS= read -r git_local_name; do
+  unset "$git_local_name"
+done < <(git rev-parse --local-env-vars)
+
 echo "[pre-push] verifying push to $push_ref via scripts/local-ci.sh --pre-push"
 if [ -n "${X3_LOCAL_CI_PREPUSH_MODE:-}" ]; then
   # shellcheck disable=SC2086

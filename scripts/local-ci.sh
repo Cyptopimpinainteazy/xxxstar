@@ -200,6 +200,7 @@ GATES_FAST=(
   "RC6 release sequence:python3 tests/test_rc6_release_sequence.py"
   "release artifact provenance:python3 tests/test_release_artifact_provenance.py"
   "local CI evidence directory:python3 tests/test_local_ci_evidence_directory.py"
+  "push gate Git isolation:python3 tests/test_pre_push_environment.py"
   "script syntax:bash scripts/check-script-syntax.sh"
   # A script or unit on the bring-up path that hardcodes /home/<user>/Desktop/ only works on the
   # machine it was written on — one such script mkdir'd the missing root and then reported a
