@@ -2874,9 +2874,54 @@ parameter_types! {
     pub const TradeProtocolFeeBps: u32 = 5;
 }
 
+/// The router's supply-only interface cannot debit or credit factory token
+/// account balances. Refuse new movements until it can reconcile both ledgers.
+/// Keep refunds available for supply-only transfers persisted by older runtimes.
+pub struct RouterSupplyLedger;
+
+impl x3_asset_kernel_types::traits::SupplyLedgerWrite for RouterSupplyLedger {
+    fn debit_source_to_pending(
+        asset_id: &x3_asset_kernel_types::AssetId,
+        source_domain: x3_asset_kernel_types::DomainId,
+        amount: x3_asset_kernel_types::Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        frame_support::ensure!(
+            !pallet_x3_token_factory::Tokens::<Runtime>::contains_key(asset_id),
+            sp_runtime::DispatchError::Other("FactoryTokenCrossVmAccountingUnavailable")
+        );
+        <X3SupplyLedger as x3_asset_kernel_types::traits::SupplyLedgerWrite>::debit_source_to_pending(asset_id, source_domain, amount)
+    }
+
+    fn credit_destination_from_pending(
+        asset_id: &x3_asset_kernel_types::AssetId,
+        destination_domain: x3_asset_kernel_types::DomainId,
+        amount: x3_asset_kernel_types::Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        frame_support::ensure!(
+            !pallet_x3_token_factory::Tokens::<Runtime>::contains_key(asset_id),
+            sp_runtime::DispatchError::Other("FactoryTokenCrossVmAccountingUnavailable")
+        );
+        <X3SupplyLedger as x3_asset_kernel_types::traits::SupplyLedgerWrite>::credit_destination_from_pending(asset_id, destination_domain, amount)
+    }
+
+    fn refund_pending_to_source(
+        asset_id: &x3_asset_kernel_types::AssetId,
+        source_domain: x3_asset_kernel_types::DomainId,
+        amount: x3_asset_kernel_types::Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        <X3SupplyLedger as x3_asset_kernel_types::traits::SupplyLedgerWrite>::refund_pending_to_source(asset_id, source_domain, amount)
+    }
+
+    fn ledger(
+        asset_id: &x3_asset_kernel_types::AssetId,
+    ) -> Option<x3_asset_kernel_types::SupplyLedger> {
+        <X3SupplyLedger as x3_asset_kernel_types::traits::SupplyLedgerWrite>::ledger(asset_id)
+    }
+}
+
 impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
-    type Ledger = X3SupplyLedger;
+    type Ledger = RouterSupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
     // Refuses every external root: nothing in this runtime can bind a foreign chain's block
     // root to that chain's consensus, and `register_external_root` writes a value the bridge
