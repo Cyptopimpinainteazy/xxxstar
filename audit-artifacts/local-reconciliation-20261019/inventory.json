@@ -472,5 +472,6 @@
     "202b4ca19": "snapshot reconciled file by file; exclude harness state",
     "99bb10d08": "superseded; do not reintroduce high-severity advisory exemptions"
   },
-  "historical_evidence_warning": "Recovered JSON describes dirty October 8-10 checkout, not verification of current master."
+  "historical_evidence_warning": "Recovered JSON describes dirty October 8-10 checkout, not verification of current master.",
+  "warning": "Historical reconciliation inventory, not independently verified against the current master. Dispositions such as identical_to_master are historical assertions; local_sha256 values are not proof of equality with current master."
 }
