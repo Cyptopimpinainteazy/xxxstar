@@ -5,15 +5,16 @@
     "pytest": "23 passed, 19 subtests passed",
     "historical_pre_fix_scanner": "Recovered tests fail against 3f4a3a0ba as expected",
     "scanner_self_test": "PASS",
-    "stubs": "PASS: 1600 findings versus baseline 1602; baseline unchanged",
+    "stubs": "Historical PASS: 1600 findings versus stored baseline 1602; this is not a refreshed baseline or evidence of a current passing gate.",
     "cheats": "PASS: 147 findings at baseline",
     "compileall": "PASS",
     "bash_n": "PASS",
     "diff_check": "PASS",
     "artifact_json_and_credential_patterns": "PASS",
     "push_environment_regression": "RED: fixture changes sending HEAD with old hook; GREEN: clears Git-local environment and preserves sending HEAD/index",
-    "full_prepush_attempt": "Interrupted before publication after detecting fixture Git environment contamination; isolated branch base restored; full workspace not certified",
+    "full_prepush_attempt": "Historical full pre-push attempt interrupted; scoped pre-push publication is described in PR but command and exit code are not captured here. No complete pre-push certification.",
     "raw_marker_scan": "187390 matching lines, exit 0, no read errors; disposable 77 MiB log removed"
   },
-  "not_run": "Rust workspace builds/tests and JS builds/tests are not applicable to this test/evidence-only change."
+  "not_run": "Rust workspace builds/tests and JS builds/tests are not applicable to this test/evidence-only change.",
+  "warning": "Historical locally reported results, not current-head CI certification. Individual check strings lack complete command, exit-code and commit provenance; no new execution is claimed by this record."
 }
