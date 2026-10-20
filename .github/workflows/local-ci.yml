@@ -35,7 +35,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       GH_TOKEN: ${{ github.token }}
-      X3_LOCAL_CI_LOG_DIR: ${{ runner.temp }}/x3-local-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      X3_LOCAL_CI_LOG_DIR: ${{ github.workspace }}/.ai/runlogs/${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -89,5 +89,6 @@ jobs:
         with:
           name: local-ci-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.X3_LOCAL_CI_LOG_DIR }}/local-ci-*
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
