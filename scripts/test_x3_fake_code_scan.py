@@ -1,6 +1,7 @@
 """Regression tests for scanner scope and classification vocabulary."""
 
 import importlib.util
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -17,6 +18,8 @@ spec.loader.exec_module(scanner)
 # Assemble detector tokens at runtime so fixture text is not counted as repository findings.
 class ScopeTests(unittest.TestCase):
     def test_rg_and_python_prune_same_sources(self):
+        if shutil.which("rg") is None:
+            self.skipTest("ripgrep unavailable; scanner Python fallback remains supported")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name in ("src/real.rs", "src/.hidden.rs", "apps/demo/node_modules/dependency.rs", "dist/generated.rs"):
