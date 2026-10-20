@@ -47,8 +47,8 @@ jobs:
           done
       - name: Python historical staging unit tests
         run: |
-          python3 -m unittest discover -s tests/funding -p 'test_stage_legacy_catalog.py' -v
-          python3 -m py_compile scripts/funding/stage_legacy_catalog.py
+          python3 -m unittest discover -s tests/funding -v
+          python3 -m py_compile scripts/funding/stage_legacy_catalog.py scripts/funding/legacy_catalog.py
       - name: Rust format and backend archive tests
         run: |
           cargo fmt --all -- --check
