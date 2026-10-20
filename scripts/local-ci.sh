@@ -1756,6 +1756,17 @@ fi
 
 if [ "$FAILED" = 1 ]; then
   echo ""
+  # Artifact upload can fail independently (for example, account quota). Keep
+  # bounded diagnostics in the job console after parallel gates have finished.
+  for spec in "${SELECTED[@]}"; do
+    name="${spec%%:*}"
+    slug="$(slugify "$name")"
+    status="$(cat "$LOG_DIR/local-ci-$STAMP-$slug.status" 2>/dev/null || echo FAIL)"
+    if [ "$status" != PASS ]; then
+      printf '\n--- %s: last 80 diagnostic lines ---\n' "$name"
+      tail -n 80 "$LOG_DIR/local-ci-$STAMP-$slug.log" 2>/dev/null || true
+    fi
+  done
   echo "local-ci: FAILED — see the per-gate logs listed above"
   exit 1
 fi
