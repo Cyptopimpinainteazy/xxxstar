@@ -326,7 +326,7 @@ def main(argv=None):
     parser.add_argument('--expected-spec-sha256')
     args = parser.parse_args(argv)
     errors, snapshots, canonical, shared_height = [], {}, {}, None
-    initial = {}
+    initial, previous_canonical = {}, {}
     try:
         if not re.fullmatch(r'[0-9a-fA-F]{40}', args.commit):
             raise PreflightError('--commit must be a 40-digit SHA-1 git commit')
@@ -361,6 +361,22 @@ def main(argv=None):
                 except PreflightError as exc:
                     errors.append(str(exc))
         errors.extend(assess_progress(initial, snapshots))
+        # Increasing heights can still hide a rewrite of an already-finalized block.
+        # Query each original height again after the second sample, on that node.
+        if len(initial) == 7 and len(snapshots) == 7:
+            for node in nodes:
+                first = initial[node.name]
+                height, expected = first.get('finalized_height'), first.get('finalized_hash')
+                if type(height) is not int or height <= 0 or not _hex_hash(expected, True):
+                    errors.append(f'{node.name}: invalid previous finalized block evidence')
+                    continue
+                try:
+                    actual = run_remote(node, mode='hash', height=height).get('canonical_hash')
+                    previous_canonical[node.name] = actual
+                    if not _hex_hash(actual, True) or actual.lower() != expected.lower():
+                        errors.append(f'{node.name}: previous finalized block changed or is unavailable')
+                except PreflightError as exc:
+                    errors.append(f'{node.name}: previous finalized block query failed: {exc}')
         if len(snapshots) == 7:
             heights = [v.get('finalized_height') for v in snapshots.values()]
             if all(type(h) is int and h > 0 for h in heights):
@@ -388,6 +404,7 @@ def main(argv=None):
         'initial_snapshots': initial,
         'snapshots': snapshots,
         'canonical_hashes_at_shared_height': canonical,
+        'canonical_hashes_at_initial_finalized_heights': previous_canonical,
         'errors': errors,
         'limits': {'observation_seconds': args.observation_seconds, 'min_peers': args.min_peers, 'min_free_gib': args.min_free_gib,
                    'max_clock_skew_sec': args.max_clock_skew_sec},

@@ -7,6 +7,9 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
+import sys
+import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import unittest
@@ -92,6 +95,22 @@ class FinalityStatusTests(unittest.TestCase):
                        FINALITY_WINDOW_SEC='0', MAX_FINALITY_LAG_MULT='2')
             return subprocess.run(['bash', str(SCRIPT), '--check-finality'],
                                   env=env, capture_output=True, text=True, timeout=15)
+
+    def test_status_and_both_checks_work_without_python_alias(self):
+        with rpc_nodes(('a',)) as port, tempfile.TemporaryDirectory() as directory:
+            for tool in ('bash', 'curl', 'seq', 'date', 'sleep'):
+                executable = shutil.which(tool)
+                self.assertIsNotNone(executable)
+                (Path(directory) / tool).symlink_to(executable)
+            (Path(directory) / 'python3').symlink_to(sys.executable)
+            result = subprocess.run([str(Path(directory) / 'bash'), str(SCRIPT),
+                '--check-peers', '--timeout-sec', '1', '--check-finality', '--finality-window-sec', '0'],
+                env={**os.environ, 'PATH': directory, 'COUNT': '1',
+                     'BASE_RPC_PORT': str(port), 'NO_PROXY': '127.0.0.1'},
+                capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn('Peer check OK', result.stdout)
+            self.assertIn('Finality check OK', result.stdout)
 
     def test_compact_json_progress_passes(self):
         result = self.monitor()

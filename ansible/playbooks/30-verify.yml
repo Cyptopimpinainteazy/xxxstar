@@ -7,6 +7,13 @@
   # Report every host's reachability before failing, not just the first.
   any_errors_fatal: false
   tasks:
+    # A limited play can omit the controller's final cluster-wide assertions.
+    - name: Require verification of the complete inventory
+      ansible.builtin.assert:
+        that: ansible_limit is not defined
+        fail_msg: "--limit cannot certify the complete validator inventory; run without --limit"
+        quiet: true
+
     # A host that accepts no inbound p2p still shows a few peers (its own outbound dials),
     # so a peer count alone hides a firewall that splits the network. Dial every other
     # host's p2p ports from here.
@@ -67,6 +74,7 @@
         health.stdout.split() | length == 3
         and health.stdout.split()[0] | int >= x3_min_peers
         and health.stdout.split()[1] | int > item.1.stdout | int
+        and health.stdout.split()[1] | int <= health.stdout.split()[2] | int
       retries: "{{ (x3_verify_timeout_sec / 6) | int }}"
       delay: 6
       loop: "{{ x3_validators | zip(fin0.results) | list }}"

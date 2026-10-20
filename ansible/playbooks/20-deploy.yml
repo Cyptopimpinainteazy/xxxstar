@@ -18,6 +18,35 @@
         fail_msg: "--limit skips this controller play; use -e x3_hosts=<host>[,<host>] instead"
         quiet: true
 
+    - name: Validate the complete validator inventory before any host access
+      vars:
+        inventory_problems: >-
+          {%- set errors = [] -%}
+          {%- set indices = [] -%}
+          {%- set addresses = [] -%}
+          {%- for host in groups['validators'] -%}
+          {%- set address = hostvars[host].ansible_host | default(host) | string | lower -%}
+          {%- if address in addresses -%}
+          {%- set _ = errors.append('duplicate host address ' ~ address) -%}
+          {%- endif -%}
+          {%- set _ = addresses.append(address) -%}
+          {%- for validator in hostvars[host].x3_validators | default([]) -%}
+          {%- if validator.index is not defined or validator.index is not integer -%}
+          {%- set _ = errors.append('invalid validator index on ' ~ host) -%}
+          {%- else -%}
+          {%- set _ = indices.append(validator.index) -%}
+          {%- endif -%}
+          {%- endfor -%}
+          {%- endfor -%}
+          {%- if indices | sort != range(1, x3_validator_count + 1) | list -%}
+          {%- set _ = errors.append('every validator index must occur exactly once') -%}
+          {%- endif -%}
+          {{ errors }}
+      ansible.builtin.assert:
+        that: inventory_problems | length == 0
+        fail_msg: "refusing to deploy invalid inventory: {{ inventory_problems | join('; ') }}"
+        quiet: true
+
     # Two nodes signing with one authority key equivocate, and Aura/GRANDPA equivocation
     # is the one mistake a testnet cannot undo. Moving a validator is 90-stop first.
     # Every inventory host is asked, whichever hosts this run deploys to, and in --check too.

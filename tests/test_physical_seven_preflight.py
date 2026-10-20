@@ -263,6 +263,33 @@ class RemoteProbeIntegration(unittest.TestCase):
 
 
 class CLIContract(unittest.TestCase):
+    def test_cli_rejects_rewritten_or_unavailable_previous_finality(self):
+        for previous in (H3, H1, None, 'unavailable'):
+            with self.subTest(previous=previous), tempfile.TemporaryDirectory() as temp:
+                base = pathlib.Path(temp)
+                inp, out = base / 'inventory.json', base / 'report.json'
+                inp.write_text(json.dumps(inventory()))
+                facts, calls = evidence(), {}
+                def remote(node, *, mode='inspect', height=0):
+                    if mode == 'inspect':
+                        calls[node.name] = calls.get(node.name, 0) + 1
+                        state = dict(facts[node.name])
+                        if calls[node.name] == 2:
+                            state['finalized_height'] += 2
+                            state['finalized_hash'] = H2
+                        return state
+                    if height == facts[node.name]['finalized_height']:
+                        if previous == 'unavailable':
+                            raise pre.PreflightError('previous finalized hash unavailable')
+                        return {'canonical_hash': previous}
+                    return {'canonical_hash': H2}
+                with mock.patch.object(pre, 'run_remote', side_effect=remote), mock.patch.object(pre.time, 'sleep'):
+                    rc = pre.main(['--inventory', str(inp), '--out', str(out), '--commit', 'b' * 40])
+                self.assertEqual(rc, 0 if previous == H3 else 1)
+                report = json.loads(out.read_text())
+                if previous != H3:
+                    self.assertIn('previous finalized', str(report['errors']))
+
     def test_stalled_network_writes_both_samples_and_fails(self):
         with tempfile.TemporaryDirectory() as temp:
             base = pathlib.Path(temp)
@@ -306,7 +333,7 @@ class CLIContract(unittest.TestCase):
                         value['finalized_height'] -= 2
                         value['finalized_hash'] = H2
                     return value
-                return {'canonical_hash': H3}
+                return {'canonical_hash': H2 if height == facts[node.name]['finalized_height'] - 2 else H3}
             with mock.patch.object(pre, 'run_remote', side_effect=fake_remote), mock.patch.object(pre.time, 'sleep'):
                 rc = pre.main(['--inventory', str(inp), '--out', str(out), '--commit', 'b'*40,
                                '--expected-genesis', H1, '--expected-binary-sha256', F1,
@@ -315,8 +342,11 @@ class CLIContract(unittest.TestCase):
             report = json.loads(out.read_text())
             self.assertEqual(report['status'], 'PASS')
             self.assertEqual(report['shared_finalized_height'], 148)
-            self.assertEqual(len(seen), 21)
-            self.assertTrue(all(mode == 'hash' and height == 148 for _, mode, height in seen[14:]))
+            self.assertEqual(len(report['canonical_hashes_at_initial_finalized_heights']), 7)
+            self.assertEqual(len(seen), 28)
+            self.assertTrue(all(mode == 'hash' and height == facts[name]['finalized_height'] - 2
+                                for name, mode, height in seen[14:21]))
+            self.assertTrue(all(mode == 'hash' and height == 148 for _, mode, height in seen[21:]))
 
     def test_cli_fails_if_any_common_height_query_fails(self):
         with tempfile.TemporaryDirectory() as temp:
