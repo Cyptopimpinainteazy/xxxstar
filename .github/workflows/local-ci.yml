@@ -35,6 +35,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       GH_TOKEN: ${{ github.token }}
+      X3_LOCAL_CI_LOG_DIR: ${{ runner.temp }}/x3-local-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -79,3 +80,14 @@ jobs:
           MODE: ${{ github.event.inputs.mode }}
         # Full gate set: a scoped run (--changed-from/--only) publishes no verdict.
         run: bash scripts/local-ci.sh ${MODE} --publish-status
+
+      # Gate output is redirected to per-gate files. Preserve it even when the
+      # gate fails, before the next checkout cleans this runner's workspace.
+      - name: Preserve Local CI evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-ci-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.X3_LOCAL_CI_LOG_DIR }}/local-ci-*
+          if-no-files-found: warn
+          retention-days: 14

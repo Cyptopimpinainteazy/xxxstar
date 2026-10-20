@@ -181,7 +181,7 @@ if [ "${X3_LOCAL_CI_SKIP_ALL:-0}" = "1" ]; then
 fi
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-LOG_DIR="$ROOT/.ai/runlogs"
+LOG_DIR="${X3_LOCAL_CI_LOG_DIR:-$ROOT/.ai/runlogs}"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/local-ci-$STAMP.log"
 PROGRESS="$LOG_DIR/local-ci-$STAMP-progress.log"
@@ -199,6 +199,7 @@ GATES_FAST=(
   "make gate exit codes:make check-make-gates"
   "RC6 release sequence:python3 tests/test_rc6_release_sequence.py"
   "release artifact provenance:python3 tests/test_release_artifact_provenance.py"
+  "local CI evidence directory:python3 tests/test_local_ci_evidence_directory.py"
   "script syntax:bash scripts/check-script-syntax.sh"
   # A script or unit on the bring-up path that hardcodes /home/<user>/Desktop/ only works on the
   # machine it was written on — one such script mkdir'd the missing root and then reported a
@@ -1711,7 +1712,7 @@ fi
   printf '  ]\n}\n'
 } >"$LOG_DIR/local-ci-$STAMP-summary.json"
 
-echo "local-ci: summary json -> .ai/runlogs/local-ci-$STAMP-summary.json"
+echo "local-ci: summary json -> $LOG_DIR/local-ci-$STAMP-summary.json"
 
 # Opt-in: post the verdict for the exact commit this run tested. `success` means
 # "the gate of record passed for this SHA", so it is only posted when every gate
