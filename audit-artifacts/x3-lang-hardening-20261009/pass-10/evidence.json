@@ -19,17 +19,17 @@
       "passed": 1396,
       "failed": 0,
       "suites": 99,
-      "log": "workspace-final.log"
+      "historical_log_reference": "workspace-final.log"
     },
     {
       "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
       "exit_code": 0,
-      "log": "clippy.log"
+      "historical_log_reference": "clippy.log"
     },
     {
       "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
       "exit_code": 0,
-      "log": "check.log"
+      "historical_log_reference": "check.log"
     },
     {
       "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all --check",
@@ -43,7 +43,7 @@
       "command": "python3 -m pytest x3-lang/tests -q",
       "exit_code": 0,
       "passed": 23,
-      "log": "python.log"
+      "historical_log_reference": "python.log"
     },
     {
       "command": "python3 -m compileall -q x3-lang/tests",
@@ -64,5 +64,6 @@
     "Other legacy parser and semantic error spans remain",
     "Runtime local binding support outside the prior constant-binding scope remains unproven"
   ],
-  "completion": "This parser hardening pass is complete; overall language readiness is not certified"
+  "completion": "This parser hardening pass is complete; overall language readiness is not certified",
+  "warning": "Historical dirty-checkout verification; referenced logs were not committed. historical_log_reference names are unverified local references, not downloadable evidence. This record does not certify the current PR or master."
 }
