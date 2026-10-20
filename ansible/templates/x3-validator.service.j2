@@ -1,0 +1,27 @@
+# Managed by ansible/playbooks/20-deploy.yml — X3 testnet validator {{ v.index }}.
+[Unit]
+Description=X3 testnet validator {{ v.index }}
+After=network-online.target
+# A crash loop must not hammer the network or the disk (these belong in [Unit]).
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart={{ x3_bin }} \
+  --chain {{ x3_spec }} \
+  --base-path {{ x3_home }}/data/validator-{{ v.index }} \
+  --validator \
+  --name {{ inventory_hostname }}-v{{ v.index }} \
+  --node-key-file {{ x3_home }}/keys/validator-{{ v.index }}.nodekey \
+  --port {{ x3_p2p_base + v.index }} \
+  --rpc-port {{ x3_rpc_base + v.index }} \
+  --rpc-methods {{ x3_rpc_methods }} \
+  --prometheus-port {{ x3_prometheus_base + v.index }} \
+  --no-mdns \
+  --allow-private-ip
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

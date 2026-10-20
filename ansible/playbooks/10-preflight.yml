@@ -1,0 +1,70 @@
+---
+# Read-only checks on every validator host. Nothing here needs root; anything that
+# does is printed as the exact command for the operator to run.
+- name: Preflight
+  hosts: validators
+  gather_facts: true
+  any_errors_fatal: false
+  vars:
+    min_free_gb: 20
+  tasks:
+    - name: Linger (user units survive logout and reboot)
+      ansible.builtin.command: loginctl show-user {{ ansible_user_id }} -p Linger --value
+      register: linger
+      changed_when: false
+      check_mode: false
+
+    - name: Clock synchronised
+      ansible.builtin.command: timedatectl show -p NTPSynchronized --value
+      register: ntp
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: Listening TCP sockets
+      ansible.builtin.command: ss -Hltn
+      register: listening
+      changed_when: false
+      check_mode: false
+
+    - name: Our own validator units already running here
+      ansible.builtin.shell: systemctl --user list-units --state=active --plain --no-legend 'x3-validator-*.service' | awk '{print $1}'
+      register: ours
+      changed_when: false
+      check_mode: false
+
+    - name: Collect findings
+      vars:
+        ours_idx: "{{ ours.stdout_lines | map('regex_replace', '^x3-validator-(\\d+)\\.service$', '\\1') | map('int') | list }}"
+        root_free_gb: "{{ ((ansible_mounts | selectattr('mount', 'equalto', '/') | first).size_available / 1024**3) | int }}"
+        busy: >-
+          {%- set b = [] -%}
+          {%- for v in x3_validators if v.index not in ours_idx -%}
+          {%- for p in [x3_p2p_base + v.index, x3_rpc_base + v.index, x3_prometheus_base + v.index] -%}
+          {%- if listening.stdout is search(':' ~ p ~ '\s') -%}{%- set _ = b.append(p) -%}{%- endif -%}
+          {%- endfor -%}
+          {%- endfor -%}
+          {{ b }}
+      ansible.builtin.set_fact:
+        preflight_problems: >-
+          {{ ([] if linger.stdout == 'yes' else ['linger off: sudo loginctl enable-linger ' ~ ansible_user_id])
+           + ([] if ntp.stdout == 'yes' else ['clock not NTP-synchronised: sudo timedatectl set-ntp true'])
+           + ([] if root_free_gb | int >= min_free_gb else ['only ' ~ root_free_gb ~ 'G free on /, need ' ~ min_free_gb ~ 'G'])
+           + ([] if busy | length == 0 else ['ports already in use by something else: ' ~ (busy | join(','))])
+           + ([] if ansible_architecture == 'x86_64' else ['architecture ' ~ ansible_architecture ~ ' cannot run the x86_64 node binary']) }}
+      changed_when: false
+
+    - name: Firewall rule the operator should have in place (p2p only; RPC stays loopback)
+      ansible.builtin.debug:
+        msg: >-
+          {% for v in x3_validators %}sudo ufw allow from 192.168.0.0/24 to any port {{ x3_p2p_base + v.index }} proto tcp{{ '; ' if not loop.last }}{% endfor %}
+
+    - name: Report
+      ansible.builtin.debug:
+        msg: "{{ preflight_problems if preflight_problems else 'ok' }}"
+
+    - name: Fail on any problem
+      ansible.builtin.assert:
+        that: preflight_problems | length == 0
+        fail_msg: "{{ inventory_hostname }}: {{ preflight_problems | join(' | ') }}"
+        success_msg: "{{ inventory_hostname }} ready"

@@ -1,0 +1,90 @@
+---
+# Build the testnet genesis once, on the controller, and point its bootNodes at the
+# hosts in the inventory. Generates validator seeds and node keys into the gitignored
+# x3_genesis_outdir. Re-running is safe: an existing spec is reused unless
+# -e x3_genesis_force=true (which mints NEW keys: only for a network that never ran).
+- name: Genesis
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    builder: "{{ x3_repo_root }}/scripts/testnet/build-x3-testnet-spec.py"
+    # Validator index -> LAN address of the host that runs it.
+    validator_hosts: >-
+      {%- set m = {} -%}
+      {%- for h in groups['validators'] -%}
+      {%- for v in hostvars[h].x3_validators -%}
+      {%- set _ = m.update({v.index | string: hostvars[h].ansible_host}) -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ m }}
+  tasks:
+    - name: Every validator index 1..N is placed exactly once
+      vars:
+        placed: "{{ groups['validators'] | map('extract', hostvars, 'x3_validators') | flatten | map(attribute='index') | list }}"
+      ansible.builtin.assert:
+        that:
+          - placed | length == x3_validator_count
+          - placed | unique | length == placed | length
+          - placed | sort == range(1, x3_validator_count + 1) | list
+        fail_msg: "inventory places validators {{ placed | sort }}; need each of 1..{{ x3_validator_count }} exactly once"
+
+    - name: The release node binary exists
+      ansible.builtin.stat:
+        path: "{{ x3_binary_src }}"
+      register: bin
+      failed_when: not bin.stat.exists
+
+    - name: Look for an existing genesis
+      ansible.builtin.stat:
+        path: "{{ x3_spec_src }}"
+      register: spec
+
+    - name: Build the spec (fresh seeds and node keys)
+      when: not spec.stat.exists or x3_genesis_force | bool
+      ansible.builtin.command:
+        argv: [python3, "{{ builder }}", "{{ x3_validator_count }}"]
+      environment:
+        X3_NODE_BIN: "{{ x3_binary_src }}"
+        OUT_DIR: "{{ x3_genesis_outdir }}"
+        # Validator i is written as port P2P_BASE + i - 1 = x3_p2p_base + i.
+        P2P_BASE: "{{ x3_p2p_base + 1 }}"
+      changed_when: true
+
+    - name: Point every bootNodes entry at the host that runs that validator
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - |
+            import json, sys
+            path, hosts, base = sys.argv[1], json.loads(sys.argv[2]), int(sys.argv[3])
+            spec = json.load(open(path))
+            out = []
+            for entry in spec["bootNodes"]:
+                parts = entry.split("/")  # ['', 'ip4', ip, 'tcp', port, 'p2p', peer]
+                index = str(int(parts[4]) - base)
+                if index not in hosts:
+                    sys.exit(f"bootnode {entry} maps to validator {index}, which no host runs")
+                parts[2] = hosts[index]
+                out.append("/".join(parts))
+            changed = out != spec["bootNodes"]
+            spec["bootNodes"] = out
+            if changed:
+                open(path, "w").write(json.dumps(spec, indent=2))
+            print("changed" if changed else "unchanged")
+            print("\n".join(out))
+          - "{{ x3_spec_src }}"
+          - "{{ validator_hosts | to_json }}"
+          - "{{ x3_p2p_base }}"
+      register: retarget
+      changed_when: retarget.stdout_lines[0] == 'changed'
+
+    - name: The node still loads the retargeted spec
+      ansible.builtin.command:
+        argv: ["{{ x3_binary_src }}", build-spec, --chain, "{{ x3_spec_src }}", --disable-log-color]
+      changed_when: false
+
+    - name: Bootnodes
+      ansible.builtin.debug:
+        var: retarget.stdout_lines[1:]

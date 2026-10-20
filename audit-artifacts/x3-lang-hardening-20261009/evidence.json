@@ -1,0 +1,201 @@
+{
+  "scope": "Integer literal range checking and concurrent CLI capability-test fixture isolation",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files": [
+      "x3-lang/compiler/src/numeric.rs",
+      "x3-lang/compiler/tests/test_numeric_policy.rs",
+      "x3-lang/crates/x3-tools/Cargo.toml",
+      "x3-lang/crates/x3-tools/tests/cli.rs",
+      "x3-lang/Cargo.lock"
+    ],
+    "source_sha256": {
+      "x3-lang/compiler/src/numeric.rs": "2c289a82f180d2efdc4c9c10c28bf03c2684cd493055b04b803b5fada5b4d8fc",
+      "x3-lang/compiler/tests/test_numeric_policy.rs": "412a310ccb74c7d81b6a025a84fcf38840c4165732ad7a5d6a60f2e9f8aef3f2",
+      "x3-lang/crates/x3-tools/Cargo.toml": "064dab51109c34df6e12967ec3ac695d95811fdd6c871c755f543d53cd722bfb",
+      "x3-lang/crates/x3-tools/tests/cli.rs": "57a7f1c3e9597b1b940cd8f4e13753fb5a494b335ca0e1017a684752a78a0c46",
+      "x3-lang/Cargo.lock": "b4e0013a4c3a954035679e35dc086a88710c490225e34953dde94feb6020564a"
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-146-generic-x86_64-with-glibc2.39"
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0,
+      "passed": 1367
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "passed": null
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --workspace",
+      "exit_code": 0,
+      "passed": null
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0,
+      "passed": null
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0,
+      "passed": null
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0,
+      "passed": 23
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang",
+      "exit_code": 0,
+      "passed": null
+    }
+  ],
+  "rust_suites": 98,
+  "rust_failed": 0,
+  "rust_ignored": 0,
+  "regressions": {
+    "numeric_before": "7 passed; 2 failed: u128::MAX and i128::MIN rejected",
+    "numeric_after": "11 passed in full suite",
+    "cli_before": "78 passed; 2 failed in parallel; four capability tests pass serially",
+    "cli_after": "80 CLI tests passed; 20 additional parallel capability runs passed"
+  },
+  "concurrency_stress": [
+    {
+      "iteration": 1,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 2,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 3,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 4,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 5,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 6,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 7,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 8,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 9,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 10,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 11,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 12,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 13,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 14,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 15,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 16,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 17,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 18,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 19,
+      "passed": 4,
+      "exit_code": 0
+    },
+    {
+      "iteration": 20,
+      "passed": 4,
+      "exit_code": 0
+    }
+  ],
+  "scan": {
+    "language_matches": 71,
+    "clean_claim": false,
+    "repository_scan": "Started as requested; terminated after 15 minutes traversing unrelated archived .kilo worktrees and vendored dependencies; language-scoped scan completed"
+  },
+  "limitations": [
+    "No live external venue or cross-chain execution certification",
+    "No whole blockchain workspace or frontend readiness certification",
+    "No throughput benchmark; correctness change"
+  ],
+  "check_note": "Workspace check preceded test-only tempfile addition; final all-target Clippy checks final sources",
+  "cli_smoke": [
+    {
+      "command": "x3-lang/target/debug/x3c check x3-lang/examples/trading_core_v1.x3",
+      "exit_code": 0
+    },
+    {
+      "command": "x3-lang/target/debug/x3c build x3-lang/examples/trading_core_v1.x3 --out /tmp/x3-trading-hardening.x3bc",
+      "exit_code": 0
+    },
+    {
+      "command": "x3-lang/target/debug/x3c explain /tmp/x3-trading-hardening.x3bc",
+      "exit_code": 0
+    }
+  ]
+}

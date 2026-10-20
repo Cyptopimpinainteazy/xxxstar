@@ -1,0 +1,69 @@
+{
+  "scope": "Compact subtraction after numeric tokens; preserve hyphenated identifiers and arrows",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files_changed_this_pass": [
+      "x3-lang/crates/x3-lexer/src/lexer.rs",
+      "x3-lang/crates/x3-lexer/tests/trading_tokens.rs",
+      "x3-lang/compiler/tests/test_constant_bindings.rs"
+    ],
+    "source_sha256": {
+      "x3-lang/crates/x3-lexer/src/lexer.rs": "47a8b25be324666eeccab94fd9339139b00057fd10db8f9d109532630b8fcd58",
+      "x3-lang/crates/x3-lexer/tests/trading_tokens.rs": "65759cf80931f74a1198eaf7c4ecd3d4d3681acb54787fec11653fc52caf580a",
+      "x3-lang/compiler/tests/test_constant_bindings.rs": "4272f19d7aa4469443e4e280249a997e8b3a715d4a27cd4f57a8326bd4065282"
+    }
+  },
+  "status": "PASS for compact numeric subtraction",
+  "boundaries": [
+    "Hyphenated names retain their existing lexical syntax",
+    "General runtime arithmetic and dynamic bindings remain unsupported"
+  ],
+  "rust_tests": {
+    "passed": 1385,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 99
+  },
+  "python_tests": {
+    "passed": 23,
+    "failed": 0
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang/tests",
+      "exit_code": 0
+    }
+  ],
+  "cancelled_runs": "Two scoped compiler runs stopped after triggering a redundant dependency rebuild; final workspace run exercises the compiler regression.",
+  "scan": {
+    "scope": "x3-lang excluding build and dependency directories",
+    "matches": 71,
+    "result": "Historical comments, tests and simulation paths remain; no clean-code certification claimed."
+  }
+}
