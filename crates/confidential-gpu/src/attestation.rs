@@ -71,10 +71,8 @@ impl AttestationManager {
                 secret_key,
             });
 
-            // A header that does NOT share the real `NVIDIA-CC-ATTESTATION-V1`
-            // prefix: `verify_report` compares the first 24 bytes exactly, so
-            // this is rejected as an invalid header rather than accepted as a
-            // genuine report — a simulated report must never verify as real.
+            // Keep test evidence visibly distinct from vendor evidence.
+            // Simulation does not enable a hardware attestation verifier.
             let mut report = Vec::new();
             report.extend_from_slice(b"X3-SIMULATED-ATTESTATION-TEST-ONLY-V1");
             report.extend_from_slice(&self.gpu_model.as_bytes()[..self.gpu_model.len().min(64)]);
@@ -140,49 +138,18 @@ impl AttestationManager {
         now.saturating_sub(self.last_refresh) >= self.refresh_interval_secs
     }
 
-    /// Verify an attestation report (static — used by verifiers).
+    /// Refuse reports until a hardware-vendor verifier and trust roots are configured.
     ///
-    /// KNOWN GAP (tracked in issue #358): this only checks that `report`
-    /// starts with the literal 24-byte header `NVIDIA-CC-ATTESTATION-V1` —
-    /// there is no cryptographic check of a signature, enclave key, or
-    /// timestamp. Any byte string with that prefix returns `valid: true`.
-    /// It is currently only exercised by this module's own tests (no
-    /// production caller); `pallets/private-execution`'s on-chain
-    /// `verify_attestation` does not call it at all and has its own,
-    /// independent, even more permissive check (`!report.is_empty()`). Do
-    /// not wire either into a real trust decision until #358 lands a real
-    /// signature check here.
-    pub fn verify_report(report: &[u8]) -> Result<AttestationInfo, ConfidentialGpuError> {
-        if report.len() < 24 {
-            return Err(ConfidentialGpuError::AttestationFailed(
-                "Report too short".into(),
-            ));
-        }
-
-        let header = &report[..24];
-        if header != b"NVIDIA-CC-ATTESTATION-V1" {
-            return Err(ConfidentialGpuError::AttestationFailed(
-                "Invalid report header".into(),
-            ));
-        }
-
-        // Extract GPU model (varies in length)
-        let body = &report[24..];
-        // Simplified: in production, parse structured report
-
-        Ok(AttestationInfo {
-            valid: true,
-            gpu_model: "NVIDIA H100".to_string(),
-            enclave_public_key: if body.len() >= 32 {
-                let mut key = [0u8; 32];
-                key.copy_from_slice(
-                    &body[body.len().saturating_sub(40)..body.len().saturating_sub(8)],
-                );
-                key
-            } else {
-                [0u8; 32]
-            },
-        })
+    /// A header, embedded key, or self-signed payload is not proof of hardware
+    /// identity. Neither the production nor simulation feature has a verifier
+    /// for a supported vendor report format. Keep this boundary closed until
+    /// signatures, trust chains, measurements, binding and freshness can all
+    /// be checked. The runtime independently uses RefuseAllAttestations.
+    pub fn verify_report(_report: &[u8]) -> Result<AttestationInfo, ConfidentialGpuError> {
+        Err(ConfidentialGpuError::AttestationFailed(
+            "Hardware attestation verification unavailable: no vendor verifier or trust roots configured"
+                .into(),
+        ))
     }
 }
 
@@ -198,6 +165,29 @@ pub struct AttestationInfo {
 mod tests {
     use super::*;
     use crate::enclave::EnclaveManager;
+
+    #[test]
+    fn vendor_shaped_reports_without_a_trust_chain_are_rejected() {
+        for body_len in [0, 1, 31, 40, 64, 4096] {
+            let mut report = b"NVIDIA-CC-ATTESTATION-V1".to_vec();
+            report.resize(report.len() + body_len, 0);
+            assert!(
+                AttestationManager::verify_report(&report).is_err(),
+                "unverified report with {body_len} body bytes was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_vendor_shaped_reports_do_not_panic() {
+        for body_len in 32..40 {
+            let mut report = b"NVIDIA-CC-ATTESTATION-V1".to_vec();
+            report.resize(report.len() + body_len, 0);
+            let result = std::panic::catch_unwind(|| AttestationManager::verify_report(&report));
+            assert!(result.is_ok(), "report with {body_len} body bytes panicked");
+            assert!(result.unwrap().is_err());
+        }
+    }
 
     #[test]
     #[cfg(feature = "simulated-attestation")]
