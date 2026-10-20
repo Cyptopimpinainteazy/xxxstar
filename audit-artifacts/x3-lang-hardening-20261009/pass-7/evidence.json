@@ -73,5 +73,6 @@
     "scope": "x3-lang excluding build and dependency directories",
     "matches": 71,
     "result": "Historical comments, test mocks and simulation paths remain; no repository-wide clean-code certification."
-  }
+  },
+  "warning": "Historical dirty-checkout evidence only. The recorded PASS and source hashes are not verified against this PR head or current master and must not be used as current release certification."
 }
