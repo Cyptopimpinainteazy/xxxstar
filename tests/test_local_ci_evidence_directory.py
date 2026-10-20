@@ -3,6 +3,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -59,6 +60,8 @@ class EvidenceDirectory(unittest.TestCase):
 
 
     def test_guard_gate_uses_installed_pytest_without_python_module(self):
+        pytest_entrypoint = shutil.which("pytest")
+        self.assertIsNotNone(pytest_entrypoint, "pytest executable is required for this gate")
         with tempfile.TemporaryDirectory(prefix="x3-pytest-entrypoint-") as directory:
             tools = Path(directory) / "bin"
             tools.mkdir()
@@ -70,8 +73,8 @@ class EvidenceDirectory(unittest.TestCase):
             )
             wrapper.chmod(0o755)
             pytest_wrapper = tools / "pytest"
-            pytest_wrapper.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable)
-                                      + ' -m pytest "$@"\n')
+            pytest_wrapper.write_text("#!/bin/sh\nexec " + shlex.quote(pytest_entrypoint)
+                                      + ' "$@"\n')
             pytest_wrapper.chmod(0o755)
             result = subprocess.run(
                 ["bash", "scripts/local-ci.sh", "--only", "guard-pattern-regressions",
