@@ -1,0 +1,51 @@
+{
+  "base_commit": "5da9cbd8a2f278874349f4f1ad2c68e9d0b791d9",
+  "scope": "Internal testnet deploy/verification tooling; no Rust runtime changes and no physical deployment",
+  "implementation_sources": [
+    "origin/feat/testnet-ansible",
+    "origin/testnet/physical-seven-preflight-20261014",
+    "origin/fix/testnet-finality-evidence-20261013"
+  ],
+  "source_sha256": {
+    "scripts/testnet/physical-seven-preflight.py": "6bfbaffbeae2aed704b4ad6fe82487695a9d683f4cf903fcf1e36650342140e4",
+    "scripts/testnet/status-7-validators.sh": "411fb7c576c86b4815abf4156d9734c6ed51f0f79aedf5d3e05bd630e0c3bd2b",
+    "scripts/testnet/check-ansible-syntax.sh": "b4c0e3c1256d2874b412d68c0038a2052cefc0a2675fc7c9ed6832fd8b4592fd",
+    "ansible/playbooks/30-verify.yml": "836f261ad6171d64773cae1ffec1cbaddd30ff07d9a2f3aead98fc569aef68e5",
+    "ansible/playbooks/20-deploy.yml": "1aa08206fd2387b18bedc9935fa5425573199cdfe0c66b9e47504272040e3142",
+    "ansible/ansible.cfg": "5e71a0971a2e24d47fa2989d86a3cd686233a66661d303576e22db94dce78748",
+    "tests/test_physical_seven_preflight.py": "09472003d71d14abf6f633bce07c729641a755f72d81f695c71da0357d81cc9e",
+    "tests/test_testnet_ansible_verify.py": "7149c2aac9d4b357230d5e5e0e3c9525d4ae719886b991494b315ebfa303327d",
+    "tests/test_testnet_finality_status.py": "ef5b8d2fb485617a695442f4dbed91c5f5d3550940c129c47f11bd49fe475176"
+  },
+  "regressions": {
+    "stalled_finality": "reproduced missing progress contract; two samples now required",
+    "fork_or_null_genesis": "old Ansible verifier fails negative regression; shared finalized-height hash check added",
+    "missing_inventory": "old config returns exit 0; current config returns nonzero"
+  },
+  "verification": {
+    "pytest_command": "python3 -m pytest -q tests/test_physical_seven_preflight.py tests/test_testnet_ansible_verify.py tests/test_validator_launcher.py tests/test_restart_proof_verdict.py tests/test_pre_push_environment.py tests/test_testnet_finality_status.py",
+    "ansible_syntax": "all five playbooks pass",
+    "scanner_stubs": "1600 vs baseline 1602; baseline unchanged",
+    "scanner_cheats": "147 at baseline; baseline unchanged",
+    "compileall": "PASS",
+    "shell_syntax": "PASS",
+    "diff_check": "PASS",
+    "pytest_result": "72 passed, 49 subtests passed"
+  },
+  "environment": {
+    "ansible": "ansible-playbook [core 2.21.4]",
+    "python": "Python 3.12.3"
+  },
+  "live_blocker": {
+    "attempts": [
+      "SSH x3star1 resolves via existing config to 192.168.0.70:22: connection timed out",
+      "SSH lojak@192.168.0.68:22: connection timed out"
+    ],
+    "required": "Reachable x3star1 SSH/VPN endpoint or route"
+  },
+  "limits": [
+    "Controlled RPC/Ansible integration tests are not seven-machine consensus proof",
+    "No validator keys or genesis generated; no remote services or firewall rules changed",
+    "Release binary build, runtime atomicity integration, five/four-voter fault tests and physical soak remain outstanding"
+  ]
+}

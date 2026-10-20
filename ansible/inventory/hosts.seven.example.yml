@@ -1,0 +1,35 @@
+# Documentation addresses: replace every address with an actual LAN/VPN address.
+all:
+  vars:
+    ansible_user: lojak
+  children:
+    validators:
+      hosts:
+        validator1:
+          ansible_host: 192.0.2.1
+          x3_validators:
+          - index: 1
+        validator2:
+          ansible_host: 192.0.2.2
+          x3_validators:
+          - index: 2
+        validator3:
+          ansible_host: 192.0.2.3
+          x3_validators:
+          - index: 3
+        validator4:
+          ansible_host: 192.0.2.4
+          x3_validators:
+          - index: 4
+        validator5:
+          ansible_host: 192.0.2.5
+          x3_validators:
+          - index: 5
+        validator6:
+          ansible_host: 192.0.2.6
+          x3_validators:
+          - index: 6
+        validator7:
+          ansible_host: 192.0.2.7
+          x3_validators:
+          - index: 7
