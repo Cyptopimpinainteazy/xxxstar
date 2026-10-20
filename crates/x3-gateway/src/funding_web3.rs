@@ -114,7 +114,10 @@ fn stellar_round(text: &str) -> (Option<String>, Option<NaiveDate>) {
         return (None, None);
     };
     let suffix = &text[begin + 5..];
-    let digits: String = suffix.chars().take_while(|ch| ch.is_ascii_digit()).collect();
+    let digits: String = suffix
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect();
     if digits.is_empty() || digits.len() > 4 {
         return (None, None);
     }
@@ -152,7 +155,9 @@ fn normalize_page(src: OfficialSource, html: &str, checked: DateTime<Utc>) -> Re
         .iter()
         .all(|phrase| lower.contains(phrase))
     {
-        return Err(source_error("official page did not expose required program identity"));
+        return Err(source_error(
+            "official page did not expose required program identity",
+        ));
     }
     let (round, deadline) = if src.id == STELLAR.id {
         stellar_round(&plain)
@@ -201,7 +206,9 @@ async fn retrieve_public_page(src: OfficialSource) -> Result<String> {
         .await
         .map_err(|_| source_error("official source request failed"))?;
     if !response.status().is_success() {
-        return Err(source_error("official source returned unsuccessful HTTP status"));
+        return Err(source_error(
+            "official source returned unsuccessful HTTP status",
+        ));
     }
     if !response
         .headers()
@@ -211,7 +218,10 @@ async fn retrieve_public_page(src: OfficialSource) -> Result<String> {
     {
         return Err(source_error("unexpected official source content type"));
     }
-    if response.content_length().is_some_and(|size| size > MAX_DOCUMENT as u64) {
+    if response
+        .content_length()
+        .is_some_and(|size| size > MAX_DOCUMENT as u64)
+    {
         return Err(source_error("official page exceeded size budget"));
     }
     let mut bytes = Vec::new();
@@ -258,7 +268,8 @@ pub async fn discover(db: &Database, request: Web3DiscoveryRequest) -> Result<We
     // Only two manually selected official public pages. Operators must review
     // site policies before enabling this separate, disabled-by-default feature.
     let html = retrieve_public_page(src).await?;
-    db.save_web3_source_snapshot(&request.provider, &html, Utc::now()).await
+    db.save_web3_source_snapshot(&request.provider, &html, Utc::now())
+        .await
 }
 
 impl Database {
@@ -271,19 +282,19 @@ impl Database {
         retrieved: DateTime<Utc>,
     ) -> Result<Web3DiscoveryResult> {
         let src = source(provider)?;
-    let normalized = normalize_page(src, html, retrieved)?;
-    let digest = hex::encode(Sha256::digest(html.as_bytes()));
-    let mut tx = self.pool().begin().await?;
-    sqlx::query(
+        let normalized = normalize_page(src, html, retrieved)?;
+        let digest = hex::encode(Sha256::digest(html.as_bytes()));
+        let mut tx = self.pool().begin().await?;
+        sqlx::query(
         "INSERT INTO funding_sources(source_id,official_url) VALUES($1,$2) ON CONFLICT DO NOTHING",
     )
     .bind(src.id)
     .bind(src.url)
     .execute(&mut *tx)
     .await?;
-    let id = Uuid::new_v4().to_string();
-    let snapshot_id: String = sqlx::query_scalar(
-        "INSERT INTO funding_web3_source_snapshots
+        let id = Uuid::new_v4().to_string();
+        let snapshot_id: String = sqlx::query_scalar(
+            "INSERT INTO funding_web3_source_snapshots
          (snapshot_id,source_id,official_url,content_sha256,source_document,
           normalized,retrieved_at,last_observed_at)
          VALUES($1,$2,$3,$4,$5,$6,$7,$7)
@@ -291,52 +302,51 @@ impl Database {
          DO UPDATE SET last_observed_at=GREATEST(
              funding_web3_source_snapshots.last_observed_at,EXCLUDED.last_observed_at)
          RETURNING snapshot_id",
-    )
-    .bind(&id)
-    .bind(src.id)
-    .bind(src.url)
-    .bind(&digest)
-    .bind(html)
-    .bind(&normalized)
-    .bind(retrieved)
-    .fetch_one(&mut *tx)
-    .await?;
-    // The conflict path always returns its ORIGINAL ID, including when
-    // two gateway processes observe identical content concurrently.
-    let new_snapshot = snapshot_id == id;
-    if new_snapshot {
-        sqlx::query(
-            "INSERT INTO funding_swarm_events(event_id,grant_id,event_type,visibility,detail)
-             VALUES($1,NULL,'web3_official_page_observed','private',$2)",
         )
-        .bind(Uuid::new_v4().to_string())
-        .bind(json!({"source":src.id,"snapshot_id":snapshot_id,
-            "content_sha256":digest,"funding_awarded":false}))
-        .execute(&mut *tx)
+        .bind(&id)
+        .bind(src.id)
+        .bind(src.url)
+        .bind(&digest)
+        .bind(html)
+        .bind(&normalized)
+        .bind(retrieved)
+        .fetch_one(&mut *tx)
         .await?;
-    }
-    sqlx::query(
+        // The conflict path always returns its ORIGINAL ID, including when
+        // two gateway processes observe identical content concurrently.
+        let new_snapshot = snapshot_id == id;
+        if new_snapshot {
+            sqlx::query(
+                "INSERT INTO funding_swarm_events(event_id,grant_id,event_type,visibility,detail)
+             VALUES($1,NULL,'web3_official_page_observed','private',$2)",
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(json!({"source":src.id,"snapshot_id":snapshot_id,
+            "content_sha256":digest,"funding_awarded":false}))
+            .execute(&mut *tx)
+            .await?;
+        }
+        sqlx::query(
         "UPDATE funding_sources SET last_success_at=NOW(),last_error_code=NULL WHERE source_id=$1",
     )
     .bind(src.id)
     .execute(&mut *tx)
     .await?;
-    tx.commit().await?;
-    Ok(Web3DiscoveryResult {
-        source_id: src.id.into(),
-        official_url: src.url.into(),
-        snapshot_id,
-        new_snapshot,
-        application_guidance_status: normalized["application_guidance_status"]
-            .as_str()
-            .unwrap_or("UNKNOWN")
-            .into(),
-        eligibility_status: "UNKNOWN",
-        awarded_funding_verified: false,
-    })
+        tx.commit().await?;
+        Ok(Web3DiscoveryResult {
+            source_id: src.id.into(),
+            official_url: src.url.into(),
+            snapshot_id,
+            new_snapshot,
+            application_guidance_status: normalized["application_guidance_status"]
+                .as_str()
+                .unwrap_or("UNKNOWN")
+                .into(),
+            eligibility_status: "UNKNOWN",
+            awarded_funding_verified: false,
+        })
     }
 }
-
 
 impl Database {
     pub async fn list_web3_sources(&self) -> Result<Vec<Web3SourceRow>> {
@@ -370,10 +380,16 @@ mod tests {
             includes milestone-based grants. All applications reviewed on a rolling basis.</p>\
             <script>AWARDED MILLIONS TO X3</script></body></html>";
         let n = normalize_page(SOLANA, html, Utc::now()).unwrap();
-        assert_eq!(n["application_guidance_status"], "ROLLING_APPLICATION_GUIDANCE");
+        assert_eq!(
+            n["application_guidance_status"],
+            "ROLLING_APPLICATION_GUIDANCE"
+        );
         assert_eq!(n["eligibility_status"], "UNKNOWN");
         assert_eq!(n["approved_for_submission"], false);
-        assert!(!n["plain_text_excerpt"].as_str().unwrap().contains("AWARDED MILLIONS"));
+        assert!(!n["plain_text_excerpt"]
+            .as_str()
+            .unwrap()
+            .contains("AWARDED MILLIONS"));
     }
 
     #[test]
@@ -386,7 +402,10 @@ mod tests {
         let n = normalize_page(STELLAR, html, now).unwrap();
         assert_eq!(n["round"], "SCF #46");
         assert_eq!(n["deadline"], "2026-11-08");
-        assert_eq!(n["application_guidance_status"], "SUBMISSION_ROUND_DESCRIBED");
+        assert_eq!(
+            n["application_guidance_status"],
+            "SUBMISSION_ROUND_DESCRIBED"
+        );
         assert_eq!(n["award_status"], "UNKNOWN");
     }
 
@@ -402,7 +421,10 @@ mod tests {
             "HISTORICAL_DEADLINE"
         );
         let html = "<h1>Stellar Community Fund Build Awards</h1><p>SCF #47 details coming soon</p>";
-        assert_eq!(normalize_page(STELLAR, html, now).unwrap()["deadline"], Value::Null);
+        assert_eq!(
+            normalize_page(STELLAR, html, now).unwrap()["deadline"],
+            Value::Null
+        );
     }
 
     #[test]

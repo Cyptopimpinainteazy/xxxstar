@@ -5,8 +5,10 @@ name: Money Swarm legacy intake checks
 on:
   pull_request:
     branches:
+      - master
       - codex/money-swarm-proposal-packages-20261018
       - codex/funding-os-legacy-intake-20261018
+      - codex/funding-official-web3-source-monitor-20261018
     paths:
       - 'crates/x3-gateway/**'
       - 'crates/x3-indexer/migrations/**'
@@ -45,14 +47,16 @@ jobs:
           done
       - name: Python historical staging unit tests
         run: |
-          python3 -m unittest discover -s tests/funding -p 'test_stage_legacy_catalog.py' -v
-          python3 -m py_compile scripts/funding/stage_legacy_catalog.py
+          python3 -m unittest discover -s tests/funding -v
+          python3 -m py_compile scripts/funding/stage_legacy_catalog.py scripts/funding/legacy_catalog.py
       - name: Rust format and backend archive tests
         run: |
           cargo fmt --all -- --check
-          cargo test -p x3-gateway --lib funding_legacy
-          cargo test -p x3-gateway --lib funding_web3
-          cargo test -p x3-gateway --test migrations_cover_tables
+          cargo test --locked -p x3-gateway --lib funding_legacy
+          cargo test --locked -p x3-gateway --lib funding_web3
+          cargo test --locked -p x3-gateway --test migrations_cover_tables
+      - name: Real PostgreSQL persistence and transaction regressions
+        run: bash scripts/gateway-postgres-integration.sh
       - name: Dashboard private archive tests
         working-directory: apps/inferstructor-dashboard
         run: |

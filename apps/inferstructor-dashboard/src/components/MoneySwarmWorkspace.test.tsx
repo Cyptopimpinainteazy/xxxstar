@@ -85,7 +85,7 @@ describe('Money Swarm workspace', () => {
       historical_status: 'AWARDED', current_availability: 'UNKNOWN',
       current_eligibility: 'UNKNOWN', review_state: 'UNVERIFIED',
     }];
-    const fetchStub = vi.fn(async (url: string, options?: RequestInit) =>
+    const fetchStub = vi.fn(async (url: string, _options?: RequestInit) =>
       new Response(JSON.stringify(url.includes('/legacy-leads') ? archived
         : url.includes('scoreboard') ? { total_grants: 0, open_grants: 0, approved_grants: 0,
           funded_grants: 0, total_awarded_usd: 0 }
@@ -101,7 +101,7 @@ describe('Money Swarm workspace', () => {
     expect(await screen.findByText('Historical protocol treasury lead')).toBeInTheDocument();
     expect(screen.getByText(/Historical label only: AWARDED/i)).toBeInTheDocument();
     expect(screen.getByText(/Current availability UNKNOWN/i)).toBeInTheDocument();
-    expect(screen.getByText(/Eligibility UNKNOWN/i)).toBeInTheDocument();
+    expect(screen.getByText('Eligibility UNKNOWN', { exact: true })).toBeInTheDocument();
     fireEvent.change(screen.getByRole('searchbox', { name: /search historical leads/i }), { target: { value: 'treasury' } });
     expect(screen.queryByText('Historical protocol treasury lead')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /load private research/i }));
@@ -145,7 +145,7 @@ describe('Money Swarm workspace', () => {
         eligibility_status: 'UNKNOWN', approved_for_submission: false,
         round: 'SCF #46', deadline: '2026-11-08' },
     }];
-    const mocked = vi.fn(async (url: string, options?: RequestInit) => new Response(JSON.stringify(
+    const mocked = vi.fn(async (url: string, _options?: RequestInit) => new Response(JSON.stringify(
       url.includes('/discovery/web3/sources') ? official
         : url.endsWith('/discovery/web3') ? {
           new_snapshot: true, source_id: 'stellar.scf.web',
@@ -167,7 +167,7 @@ describe('Money Swarm workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load official source records' }));
     expect(await screen.findByText('Stellar Community Fund Build Awards')).toBeInTheDocument();
     expect(screen.getByText('SCF #46')).toBeInTheDocument();
-    expect(screen.getByText(/Eligibility UNKNOWN/i)).toBeInTheDocument();
+    expect(screen.getByText('Eligibility UNKNOWN', { exact: true })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Official source/i })).toHaveAttribute('href', 'https://communityfund.stellar.org/awards');
     fireEvent.click(screen.getByRole('button', { name: 'Inspect official funding page' }));
     expect(await screen.findByText(/Official stellar page observed/i)).toBeInTheDocument();

@@ -174,7 +174,10 @@ async fn web3_source_snapshots_are_private_and_idempotent() {
     assert!(first.new_snapshot);
     assert_eq!(first.eligibility_status, "UNKNOWN");
     assert!(!first.awarded_funding_verified);
-    assert_eq!(first.application_guidance_status, "SUBMISSION_ROUND_DESCRIBED");
+    assert_eq!(
+        first.application_guidance_status,
+        "SUBMISSION_ROUND_DESCRIBED"
+    );
     let replay = db
         .save_web3_source_snapshot("stellar", &html, checked)
         .await
@@ -182,11 +185,7 @@ async fn web3_source_snapshots_are_private_and_idempotent() {
     assert!(!replay.new_snapshot);
     assert_eq!(replay.snapshot_id, first.snapshot_id);
     assert!(db
-        .save_web3_source_snapshot(
-            "stellar",
-            "<html>irrelevant advertising</html>",
-            checked
-        )
+        .save_web3_source_snapshot("stellar", "<html>irrelevant advertising</html>", checked)
         .await
         .is_err());
     assert!(db
