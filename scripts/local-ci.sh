@@ -196,6 +196,7 @@ declare -A SEEN_SLUG=()
 GATES_FAST=(
   "format check:cargo fmt --all -- --check"
   "agent guards:make guard"
+  "guard pattern regressions:python3 -m pytest -q tests/test_agent_guard.py tests/test_cheat_guard_patterns.py"
   "make gate exit codes:make check-make-gates"
   "RC6 release sequence:python3 tests/test_rc6_release_sequence.py"
   "release artifact provenance:python3 tests/test_release_artifact_provenance.py"
