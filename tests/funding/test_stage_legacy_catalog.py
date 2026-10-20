@@ -3,6 +3,9 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.error import HTTPError
 import unittest
 from unittest.mock import patch
 
@@ -31,6 +34,71 @@ def row(identifier="C27.1.1"):
 
 
 class StageCatalogTests(unittest.TestCase):
+    def test_redirects_never_forward_operator_credentials(self):
+        received = []
+        target_received = []
+        response_body = json.dumps({
+            "inserted": 1, "unchanged": 0, "total": 1,
+            "current_opportunities_verified": 0,
+        }).encode()
+
+        class Target(BaseHTTPRequestHandler):
+            def do_GET(self):
+                target_received.append(self.headers.get("X-Admin-Token"))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(response_body)
+
+            do_POST = do_GET
+
+            def log_message(self, *args):
+                pass
+
+        target = ThreadingHTTPServer(("127.0.0.1", 0), Target)
+
+        class Gateway(BaseHTTPRequestHandler):
+            redirect_status = 302
+            redirect_path = ""
+
+            def do_POST(self):
+                received.append(self.headers.get("X-Admin-Token"))
+                if self.path == "/accepted":
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(response_body)
+                    return
+                self.send_response(self.redirect_status)
+                self.send_header("Location", self.redirect_path)
+                self.end_headers()
+
+            do_GET = do_POST
+
+            def log_message(self, *args):
+                pass
+
+        gateway = ThreadingHTTPServer(("127.0.0.1", 0), Gateway)
+        for server in (target, gateway):
+            worker = threading.Thread(target=server.serve_forever, daemon=True)
+            worker.start()
+            self.addCleanup(worker.join)
+            self.addCleanup(server.server_close)
+            self.addCleanup(server.shutdown)
+        endpoint = f"http://127.0.0.1:{gateway.server_port}/api/v1/admin/funding-swarm/legacy-leads"
+        token = "synthetic-redirect-regression-credential"
+        self.assertEqual(stage_module.stage([row()], endpoint.replace(
+            "/api/v1/admin/funding-swarm/legacy-leads", "/accepted"), token)["inserted"], 1)
+        received.clear()
+        for status in (301, 302, 303, 307, 308):
+            for location in (f"http://127.0.0.1:{target.server_port}/capture", "/accepted"):
+                with self.subTest(status=status, location=location):
+                    Gateway.redirect_status = status
+                    Gateway.redirect_path = location
+                    with self.assertRaises(HTTPError) as failure:
+                        stage_module.stage([row()], endpoint, token)
+                    self.assertEqual(failure.exception.code, status)
+                    self.assertEqual(target_received, [])
+        self.assertEqual(received, [token] * 10)
+
     def test_requires_unknown_and_unapproved(self):
         self.assertEqual(stage_module.validate_record(row())["legacy_id"], "C27.1.1")
         forged = row()
@@ -80,7 +148,9 @@ class StageCatalogTests(unittest.TestCase):
             "inserted": 1, "unchanged": 0, "total": 1,
             "current_opportunities_verified": 0,
         }).encode("utf-8"))
-        with patch.object(stage_module, "urlopen", return_value=response) as send:
+        with patch.object(stage_module, "build_opener") as opener:
+            send = opener.return_value.open
+            send.return_value = response
             result = stage_module.stage([row()], endpoint, "dummy-token")
         self.assertEqual(result["inserted"], 1)
         request = send.call_args.args[0]
@@ -92,7 +162,8 @@ class StageCatalogTests(unittest.TestCase):
             "inserted": 1, "unchanged": 0, "total": 1,
             "current_opportunities_verified": 1,
         }).encode("utf-8"))
-        with patch.object(stage_module, "urlopen", return_value=response):
+        with patch.object(stage_module, "build_opener") as opener:
+            opener.return_value.open.return_value = response
             with self.assertRaisesRegex(ValueError, "inconsistent"):
                 stage_module.stage([row()],
                     "http://localhost:3000/api/v1/admin/funding-swarm/legacy-leads", "dummy")

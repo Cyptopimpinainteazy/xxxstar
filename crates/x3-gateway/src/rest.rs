@@ -956,7 +956,9 @@ async fn admin_discover_web3_funding_page(
             "official Web3 funding discovery is disabled until an operator reviews source policy and enables it".into(),
         ));
     }
-    Ok(Json(crate::funding_web3::discover(&state.db, request).await?))
+    Ok(Json(
+        crate::funding_web3::discover(&state.db, request).await?,
+    ))
 }
 
 async fn admin_list_web3_funding_pages(

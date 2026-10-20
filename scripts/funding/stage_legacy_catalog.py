@@ -15,7 +15,7 @@ import json
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 MAX_RECORD_BYTES = 64 * 1024
 DEFAULT_BATCH = 32
@@ -82,6 +82,13 @@ def batches(records, batch_size: int):
         yield batch
 
 
+class RejectRedirects(HTTPRedirectHandler):
+    """Never forward operator credentials or change an ingestion request's method."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def stage(batch: list[dict], endpoint: str, token: str) -> dict:
     payload = json.dumps({"leads": batch}, ensure_ascii=False).encode("utf-8")
     request = Request(
@@ -90,7 +97,7 @@ def stage(batch: list[dict], endpoint: str, token: str) -> dict:
         method="POST",
         headers={"Content-Type": "application/json", "X-Admin-Token": token},
     )
-    with urlopen(request, timeout=30) as response:
+    with build_opener(RejectRedirects()).open(request, timeout=30) as response:
         result = json.load(response)
     if (result.get("current_opportunities_verified") != 0
             or result.get("total") != len(batch)
