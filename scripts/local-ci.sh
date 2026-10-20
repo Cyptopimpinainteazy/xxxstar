@@ -760,6 +760,7 @@ GATES_FAST=(
   "test x3-ai-router:python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'"
   "test validator launcher:python3 tests/test_validator_launcher.py"
   "test source scan:python3 tests/test_fake_code_scan.py"
+  "test atomic evidence runner:python3 -m unittest discover -s tests -p test_atomic_evidence_runner.py"
   # x3-gateway is Postgres-backed in production, but its normal unit/concurrency tests never
   # connect to a server. This gate owns a disposable Postgres container, runs the crate's
   # migrations through Database::connect(), and proves a Funding Swarm write/read/scoreboard

@@ -2,6 +2,7 @@
 
 use super::*;
 use crate as pallet_x3_dex;
+use codec::Encode;
 use frame_support::{derive_impl, parameter_types, traits::Everything};
 use frame_system as system;
 use sp_core::H256;
@@ -60,20 +61,21 @@ parameter_types! {
     pub const LedgerChainId: u32 = 1;
 }
 
-thread_local! {
-    /// The test ledger: (asset, account) -> balance.
-    static LEDGER: core::cell::RefCell<std::collections::BTreeMap<(u32, u64), u128>> =
-        Default::default();
-}
-
-/// A test-only canonical ledger: checked transfers over an in-memory map.
+/// Test-only ledger stored in FRAME, like the runtime's CanonicalLedger.
+/// Thread-local balances would survive with_transaction rollback and could not
+/// test atomic DEX custody transfers.
 pub struct TestLedger;
 
 impl TestLedger {
+    fn key(asset: u32, who: u64) -> Vec<u8> {
+        (b"dex-test-ledger", asset, who).encode()
+    }
+
     pub fn fund(asset: u32, who: u64, amount: u128) {
-        LEDGER.with(|ledger| {
-            *ledger.borrow_mut().entry((asset, who)).or_insert(0) += amount;
-        });
+        let key = Self::key(asset, who);
+        let balance: u128 = frame_support::storage::unhashed::get_or_default(&key);
+        let funded = balance.checked_add(amount).expect("test funding fits u128");
+        frame_support::storage::unhashed::put(&key, &funded);
     }
 }
 
@@ -84,27 +86,25 @@ impl x3_asset_kernel_types::traits::CanonicalLedgerTransfer<u64> for TestLedger 
         to: &u64,
         amount: u128,
     ) -> Result<(), sp_runtime::DispatchError> {
-        LEDGER.with(|ledger| {
-            let mut ledger = ledger.borrow_mut();
-            let from_balance = ledger.get(&(asset, *from)).copied().unwrap_or(0);
-            let remaining =
-                from_balance
-                    .checked_sub(amount)
-                    .ok_or(sp_runtime::DispatchError::Other(
-                        "insufficient ledger balance",
-                    ))?;
-            let to_balance = ledger.get(&(asset, *to)).copied().unwrap_or(0);
-            let credited = to_balance
-                .checked_add(amount)
-                .ok_or(sp_runtime::DispatchError::Other("ledger overflow"))?;
-            ledger.insert((asset, *from), remaining);
-            ledger.insert((asset, *to), credited);
-            Ok(())
-        })
+        // Match the canonical ledger's zero/self-transfer behavior.
+        if amount == 0 || from == to {
+            return Ok(());
+        }
+        let remaining = Self::ledger_balance(asset, from)
+            .checked_sub(amount)
+            .ok_or(sp_runtime::DispatchError::Other(
+                "insufficient ledger balance",
+            ))?;
+        let credited = Self::ledger_balance(asset, to)
+            .checked_add(amount)
+            .ok_or(sp_runtime::DispatchError::Other("ledger overflow"))?;
+        frame_support::storage::unhashed::put(&Self::key(asset, *from), &remaining);
+        frame_support::storage::unhashed::put(&Self::key(asset, *to), &credited);
+        Ok(())
     }
 
     fn ledger_balance(asset: u32, who: &u64) -> u128 {
-        LEDGER.with(|ledger| ledger.borrow().get(&(asset, *who)).copied().unwrap_or(0))
+        frame_support::storage::unhashed::get_or_default(&Self::key(asset, *who))
     }
 }
 
@@ -137,12 +137,11 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .into();
     ext.execute_with(|| {
         System::set_block_number(1);
-    });
-    LEDGER.with(|ledger| ledger.borrow_mut().clear());
-    for asset in 0..4u32 {
-        for who in 1..=5u64 {
-            TestLedger::fund(asset, who, STARTING_BALANCE);
+        for asset in 0..4u32 {
+            for who in 1..=5u64 {
+                TestLedger::fund(asset, who, STARTING_BALANCE);
+            }
         }
-    }
+    });
     ext
 }
