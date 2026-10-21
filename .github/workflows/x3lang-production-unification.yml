@@ -52,6 +52,8 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Use this machine's toolchain, isolated per runner
         run: |
           set -euo pipefail
@@ -102,6 +104,8 @@ jobs:
         working-directory: x3-lang
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -125,6 +129,8 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Use this machine's toolchain, isolated per runner
         run: |
           set -euo pipefail
