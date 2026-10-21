@@ -1,0 +1,319 @@
+warning: /home/lojak/Desktop/x3lang-receipt-01a15f00/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/Desktop/x3lang-receipt-01a15f00/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+   Compiling syn v3.0.5
+    Checking cfg-if v1.0.4
+    Checking typenum v1.20.1
+    Checking zeroize v1.9.0
+   Compiling equivalent v1.0.2
+    Checking serde_core v1.0.229
+    Checking subtle v2.6.1
+    Checking libc v0.2.189
+    Checking const-oid v0.9.6
+    Checking getrandom v0.2.17 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/getrandom)
+   Compiling indexmap v2.14.2
+    Checking rand_core v0.6.4
+    Checking arrayvec v0.7.8
+    Checking bytes v1.12.1
+    Checking zerocopy v0.8.56
+    Checking generic-array v0.14.7
+    Checking konst_macro_rules v0.2.19
+    Checking crypto-common v0.1.7 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/crypto-common)
+    Checking block-buffer v0.10.4
+    Checking byte-slice-cast v1.2.3
+   Compiling toml_edit v0.25.13+spec-1.1.0
+    Checking digest v0.10.7 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/digest)
+    Checking konst v0.2.20
+    Checking num-traits v0.2.19
+    Checking memchr v2.8.3
+    Checking byteorder v1.5.0
+    Checking ppv-lite86 v0.2.21
+    Checking static_assertions v1.1.0
+   Compiling aho-corasick v1.1.5
+   Compiling regex-syntax v0.8.11
+    Checking rand_chacha v0.3.1
+   Compiling serde_derive v1.0.229
+    Checking const_format v0.2.36
+   Compiling proc-macro-crate v3.5.0
+    Checking rand v0.8.8
+    Checking derive_more v1.0.0
+    Checking crunchy v0.2.4
+    Checking log v0.4.34
+    Checking cpufeatures v0.2.17
+   Compiling parity-scale-codec-derive v3.7.5
+   Compiling scale-info-derive v2.11.6
+    Checking once_cell v1.21.4
+    Checking rustc-hex v2.1.0
+    Checking pin-project-lite v0.2.17
+    Checking smallvec v1.16.1
+    Checking integer-sqrt v0.1.5
+    Checking allocator-api2 v0.2.21
+   Compiling regex-automata v0.4.18
+    Checking rlp v0.6.1
+    Checking sha2 v0.10.9
+    Checking keccak v0.1.6
+    Checking hex v0.4.3
+    Checking fixed-hash v0.8.0
+    Checking uint v0.10.1
+    Checking impl-rlp v0.4.0
+    Checking der v0.7.10
+    Checking itoa v1.0.18
+   Compiling lazy_static v1.5.0
+    Checking impl-num-traits v0.2.0
+    Checking tracing-core v0.1.36
+    Checking signature v2.2.0
+    Checking base16ct v0.2.0
+    Checking serde v1.0.229
+    Checking hmac v0.12.1
+   Compiling digest v0.9.0
+    Checking spki v0.7.3
+   Compiling regex v1.13.1
+    Checking impl-serde v0.5.0
+    Checking serdect v0.2.0
+    Checking ff v0.13.1
+   Compiling Inflector v0.11.4
+    Checking scopeguard v1.2.0
+    Checking hash-db v0.16.0
+    Checking either v1.18.0
+    Checking futures-core v0.3.34
+    Checking futures-sink v0.3.34
+    Checking lock_api v0.4.14
+    Checking parity-scale-codec v3.7.5
+    Checking sec1 v0.7.3
+    Checking tracing v0.1.44
+    Checking group v0.13.0
+    Checking pkcs8 v0.10.2
+   Compiling libsecp256k1-core v0.3.0
+    Checking futures-channel v0.3.34
+    Checking parking_lot_core v0.9.12
+    Checking sha3 v0.10.9
+   Compiling futures-macro v0.3.34
+    Checking crypto-bigint v0.5.5
+    Checking futures-io v0.3.34
+    Checking environmental v1.1.4 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/environmental)
+    Checking futures-task v0.3.34
+    Checking slab v0.4.12
+    Checking curve25519-dalek v4.1.3
+    Checking parking_lot v0.12.5
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+    Checking rfc6979 v0.4.0
+    Checking futures-util v0.3.34
+   Compiling zmij v1.0.23
+    Checking scale-info v2.11.6
+    Checking impl-codec v0.7.1
+   Compiling ref-cast-impl v1.0.27
+   Compiling serde_json v1.0.151
+   Compiling toml_edit v0.22.27
+    Checking ref-cast v1.0.27
+    Checking thiserror v1.0.69
+    Checking elliptic-curve v0.13.8
+   Compiling libsecp256k1-gen-ecmult v0.3.0
+   Compiling libsecp256k1-gen-genmult v0.3.0
+   Compiling jam-codec-derive v0.1.1
+    Checking ecdsa v0.16.9
+    Checking zerocopy v0.7.35
+    Checking base64ct v1.8.3
+    Checking tinyvec_macros v0.1.1
+    Checking fnv v1.0.7
+    Checking primitive-types v0.13.1
+    Checking arrayref v0.3.9
+    Checking tinyvec v1.13.2
+   Compiling toml v0.8.23
+    Checking k256 v0.13.4
+    Checking password-hash v0.5.0
+    Checking ahash v0.8.12 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/ahash)
+   Compiling ss58-registry v1.51.0
+    Checking jam-codec v0.1.1
+   Compiling libsecp256k1 v0.7.2
+    Checking sp-storage v22.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking ed25519 v2.2.3
+    Checking merlin v3.0.0
+    Checking getrandom_or_panic v0.0.3
+    Checking hash256-std-hasher v0.15.2
+    Checking serde_bytes v0.11.19
+    Checking block-buffer v0.9.0
+    Checking hex-conservative v0.2.3
+    Checking foldhash v0.2.0
+    Checking opaque-debug v0.3.1
+   Compiling termcolor v1.4.1
+    Checking constant_time_eq v0.4.2
+    Checking schnorrkel v0.11.5
+    Checking bitcoin_hashes v0.14.101
+    Checking sha2 v0.9.9
+    Checking hashbrown v0.16.1
+    Checking blake2b_simd v1.0.5
+   Compiling docify_macros v0.2.9
+    Checking bounded-collections v0.3.2
+    Checking secp256k1-sys v0.9.2
+    Checking pbkdf2 v0.12.2
+    Checking unicode-normalization v0.1.25
+    Checking futures-executor v0.3.34
+    Checking http v0.2.12
+   Compiling file-guard v0.2.0
+   Compiling blake2 v0.10.6
+    Checking num-format v0.4.4
+    Checking twox-hash v1.6.3
+    Checking mio v1.2.3
+    Checking socket2 v0.6.5
+    Checking sp-std v14.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking try-lock v0.2.5
+    Checking base64 v0.22.1
+    Checking rand_core v0.5.1
+    Checking http-body v0.4.6
+    Checking want v0.3.1
+   Compiling expander v2.2.1 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/expander)
+    Checking bip39 v2.2.2
+    Checking sp-crypto-hashing v0.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking futures v0.3.34
+    Checking secp256k1 v0.28.2
+    Checking substrate-bip39 v0.6.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking ed25519-zebra v4.2.0
+    Checking httparse v1.10.1
+    Checking tokio v1.53.1
+    Checking itertools v0.11.0
+    Checking trie-root v0.18.0
+    Checking socket2 v0.5.10
+    Checking secrecy v0.8.0
+    Checking bitflags v1.3.2
+    Checking foldhash v0.1.5
+    Checking rustc-demangle v0.1.28
+    Checking num-conv v0.2.2
+    Checking bs58 v0.5.1
+    Checking gimli v0.32.3
+    Checking httpdate v1.0.3
+    Checking dyn-clone v1.0.20
+    Checking adler2 v2.0.1
+    Checking time-core v0.1.9
+    Checking deranged v0.5.8 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/deranged)
+    Checking powerfmt v0.2.0
+    Checking tower-service v0.3.3
+    Checking array-bytes v6.2.3
+    Checking miniz_oxide v0.8.9
+    Checking hashbrown v0.15.5
+    Checking object v0.37.3
+    Checking prometheus v0.13.4
+    Checking matchers v0.2.0
+    Checking sharded-slab v0.1.7
+    Checking tracing-log v0.2.0
+    Checking time v0.3.55
+    Checking addr2line v0.25.1
+    Checking thread_local v1.1.10
+    Checking nu-ansi-term v0.50.3
+    Checking hashbrown v0.13.2
+    Checking memory-db v0.34.0
+    Checking docify v0.2.9
+    Checking trie-db v0.30.1
+    Checking nohash-hasher v0.2.0
+   Compiling sp-runtime-interface-proc-macro v20.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-wasm-interface v24.0.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/sp-wasm-interface)
+    Checking schnellru v0.2.4
+    Checking backtrace v0.3.76
+    Checking ed25519-dalek v2.2.0
+    Checking sp-arithmetic v28.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking tracing-subscriber v0.3.23
+    Checking strum v0.26.3
+    Checking sp-panic-handler v13.0.2 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking binary-merkle-tree v16.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking hyper v0.14.32
+    Checking simple-mermaid v0.1.1
+    Checking tuplex v0.1.2
+    Checking sp-externalities v0.31.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3bc-core v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3bc-core)
+    Checking sp-weights v33.2.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-tracing v19.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+   Compiling num-integer v0.1.47
+    Checking sp-core v39.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking substrate-prometheus-endpoint v0.10.0-dev (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/substrate-prometheus-endpoint)
+    Checking hashbrown v0.17.1
+   Compiling enum-ordinalize-derive v4.4.2
+    Checking num-bigint v0.4.8
+    Checking ark-std v0.6.0
+   Compiling enum-ordinalize v4.4.2
+   Compiling educe v0.6.0
+    Checking tiny-keccak v2.0.2
+    Checking sp-runtime-interface v33.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-trie v42.0.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-keystore v0.45.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking ark-serialize v0.6.0
+    Checking ethbloom v0.14.1
+   Compiling ark-ff-macros v0.6.0
+   Compiling const-random-macro v0.1.16
+    Checking evm-core v0.43.0 (https://github.com/rust-ethereum/evm.git?branch=v0.x#a656db90)
+    Checking sp-state-machine v0.49.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking void v1.0.2
+   Compiling const-random v0.1.18
+    Checking unreachable v1.0.0
+    Checking ethereum-types v0.15.1
+    Checking itertools v0.14.0
+    Checking sp-io v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking evm-runtime v0.43.0 (https://github.com/rust-ethereum/evm.git?branch=v0.x#a656db90)
+   Compiling thiserror-impl v2.0.20
+    Checking ascii v0.9.3
+   Compiling macro_magic_core v0.5.1
+    Checking combine v3.8.1
+    Checking evm-gasometer v0.43.0 (https://github.com/rust-ethereum/evm.git?branch=v0.x#a656db90)
+    Checking ethereum v0.18.2
+    Checking hash32 v0.2.1
+    Checking scroll v0.11.0
+   Compiling sp-version-proc-macro v15.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-application-crypto v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+   Compiling macro_magic_macros v0.5.1
+    Checking thiserror v2.0.20
+    Checking evm v0.43.4 (https://github.com/rust-ethereum/evm.git?branch=v0.x#a656db90)
+    Checking ark-ff v0.6.0
+   Compiling sp-crypto-hashing-proc-macro v0.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking frame-metadata v23.0.1
+    Checking ripemd v0.1.3
+    Checking parity-wasm v0.45.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/parity-wasm)
+   Compiling sp-api-proc-macro v26.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking solana_rbpf v0.8.5
+    Checking libloading v0.9.0
+    Checking sp-metadata-ir v0.12.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-runtime v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking iana-time-zone v0.1.65
+    Checking ryu v1.0.23
+    Checking unsafe-libyaml v0.2.11
+    Checking chrono v0.4.45
+   Compiling frame-support-procedural-tools v13.0.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+   Compiling macro_magic v0.5.1
+   Compiling itertools v0.10.5
+   Compiling async-trait v0.1.92
+    Checking serde_yaml v0.9.34+deprecated
+    Checking tt-call v1.0.9
+   Compiling frame-support-procedural v36.0.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/frame-support-procedural)
+    Checking ark-poly v0.6.0
+    Checking ark-ec v0.6.0
+   Compiling aquamarine v0.5.0
+    Checking ark-bn254 v0.6.0
+    Checking x3-common v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-common)
+    Checking sp-version v43.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-svm-integration v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/svm-integration)
+    Checking sp-inherents v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-staking v42.2.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-ast v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-ast)
+    Checking sp-api v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-evm-integration v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/evm-integration)
+    Checking x3-lexer v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-lexer)
+    Checking x3-semantics v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-semantics)
+    Checking x3-parser v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-parser)
+    Checking sp-genesis-builder v0.21.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-typeck v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-typeck)
+    Checking x3-hir v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-hir)
+    Checking x3-mir v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-mir)
+    Checking x3-backend v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-backend)
+    Checking x3-vm v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-vm)
+    Checking x3-verifier v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-verifier)
+    Checking x3-opt v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-opt)
+    Checking frame-support v45.1.3 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-compiler v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-compiler)
+    Checking x3-x3-integration v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-integration)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17m 30s

@@ -1,0 +1,12 @@
+{
+  "base": "b04d9e1210f037a2f8c171808b91594d68111e6d",
+  "branch": "codex/x3lang-production-unification",
+  "worktree": "/home/lojak/Desktop/x3lang-receipt-01a15f00",
+  "red_session": 51978,
+  "red_remote_run": 39625154680,
+  "state": "GREEN local verification passed; committed354da22bac9b80e8fd06b28fe7d16beff50269b5; remote RED still pending",
+  "review": "Both anchor/prestate height equality and optional finality/execution height equality confirmed against existing schema; provisional None must remain accepted",
+  "other_session": "Recovery clone switched to baseline branch by another session. Preserve its changes; do not use that working tree.",
+  "next": "Observe remote RED39625154680; capture required failures; push GREEN only after RED proof; require exact-head remote gates; full attached master scope remains open",
+  "original_scope": "Both attachments remain the full long-term requirements; this receipt correction is incremental, not completion."
+}

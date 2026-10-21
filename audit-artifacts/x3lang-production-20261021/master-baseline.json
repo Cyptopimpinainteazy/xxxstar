@@ -1,0 +1,21 @@
+{
+  "head": "70423054e2d9560a212ab763d4f265f9cdc448d9",
+  "run": 39623913764,
+  "url": "https://github.com/Cyptopimpinainteazy/xxxstar/actions/runs/39623913764",
+  "status": "FAIL",
+  "failed_gates": [
+    "dependency audit",
+    "feature matrix check",
+    "audit matrix freshness",
+    "runtime hash freshness",
+    "npm audit",
+    "test x3-sidecar"
+  ],
+  "gate_logs_prefix": ".ai/runlogs/local-ci-20261021T152119Z-",
+  "scope": "Untouched origin/master; failures are not receipt-correction GREEN evidence",
+  "prior_baselines_passed": {
+    "nested": 39623616691,
+    "canonical_compiler_identity": 39623621453,
+    "trading_core": 39623626057
+  }
+}
