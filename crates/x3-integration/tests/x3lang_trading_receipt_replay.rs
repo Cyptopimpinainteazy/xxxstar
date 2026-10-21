@@ -29,6 +29,56 @@ fn an_honest_receipt_replays() {
 }
 
 #[test]
+fn a_provisional_receipt_without_finality_replays() {
+    let (bytes, signed) = honest();
+    let mut receipt = signed.receipt;
+    receipt.anchor.finality = None;
+    let provisional = sign_receipt(&receipt, &attestor());
+
+    replay_receipt(&bytes, &provisional, &registry())
+        .expect("a provisional receipt need not include finality");
+}
+
+#[test]
+fn a_resigned_execution_height_mismatch_is_refused() {
+    let (bytes, signed) = honest();
+    let mut receipt = signed.receipt;
+    // Keep finality consistent with the anchor, isolating the contradiction
+    // between the claimed execution block and the VM's actual pre-state block.
+    receipt.anchor.block_number += 1;
+    receipt
+        .anchor
+        .finality
+        .as_mut()
+        .expect("finalized fixture")
+        .block_number = receipt.anchor.block_number;
+    let forged = sign_receipt(&receipt, &attestor());
+
+    assert!(matches!(
+        replay_receipt(&bytes, &forged, &registry()),
+        Err(ReplayError::Inconsistent("anchor block number"))
+    ));
+}
+
+#[test]
+fn a_resigned_finality_height_mismatch_is_refused() {
+    let (bytes, signed) = honest();
+    let mut receipt = signed.receipt;
+    receipt
+        .anchor
+        .finality
+        .as_mut()
+        .expect("finalized fixture")
+        .block_number += 1;
+    let forged = sign_receipt(&receipt, &attestor());
+
+    assert!(matches!(
+        replay_receipt(&bytes, &forged, &registry()),
+        Err(ReplayError::Inconsistent("finality block number"))
+    ));
+}
+
+#[test]
 fn a_large_non_profit_asset_balance_replays_without_signed_overflow() {
     // WETX is not the profit asset. Its opening balance fits u128 but approaches
     // i128::MAX; the first swap credits it past that boundary before the second
