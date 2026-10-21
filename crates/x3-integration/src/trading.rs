@@ -386,6 +386,9 @@ mod attestation {
     /// canonical digest; the artifact's hash must match; the receipt's economics must be internally
     /// consistent; and re-executing the artifact from the receipt's pre-state and anchor must
     /// produce the identical receipt.
+    /// Execution and optional finalized-header heights must agree. These consistency checks
+    /// do not authenticate the header against an external finality source; provisional receipts
+    /// without a finalized header remain replayable.
     pub fn replay_receipt(
         bytecode: &[u8],
         signed: &SignedTradingReceipt,
@@ -408,6 +411,14 @@ mod attestation {
         let claimed = &signed.receipt;
         if x3bc_core::hash::sha256(bytecode) != claimed.bytecode_hash {
             return Err(ReplayError::ArtifactMismatch);
+        }
+        if claimed.anchor.block_number != claimed.pre_state.block_number {
+            return Err(ReplayError::Inconsistent("anchor block number"));
+        }
+        if let Some(finality) = &claimed.anchor.finality {
+            if finality.block_number != claimed.anchor.block_number {
+                return Err(ReplayError::Inconsistent("finality block number"));
+            }
         }
         let run = execute_trade(
             bytecode,
