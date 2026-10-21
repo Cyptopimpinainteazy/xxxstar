@@ -1,13 +1,19 @@
 # X3 OmniSwitch deployment
 
-Status: first isolated unit identified and reset: OS6860E-P24, serial U3581156,
-AOS 8.1.1.497.R01. Administrator access recovered, old custom accounts removed,
-generated administrator password stored privately, defaults saved and certified.
-Final reboot-persistence validation PASSED: the generated credential, account
-cleanup and clean startup settings survived restart; chassis is Master/Running. The other two units have not been inspected. X3 topology and
-production VLAN deployment remain pending operator review. Management SSH at
-10.30.10.11 through x3star1 eno3 is verified after reboot; see
-[SSH management](docs/ssh-management.md).
+Status: two isolated units reset and verified after reboot:
+
+- U3581156: generated administrator credential and saved state verified; SSH
+  10.30.10.11 through x3star1 eno3 verified after reboot.
+- U3581140: generated administrator credential, clean startup configuration and
+  Master/Running with both modules UP verified after reboot. SSH/IP settings saved
+  at 10.30.10.12; live SSH testing and management reboot
+  persistence await the rear EMP-to-eno4 cable. See
+  [switch 2 management](docs/ssh-management-switch2.md).
+
+Both retain AOS 8.1.1.497.R01; firmware review remains necessary. The third unit
+is uninspected. Production VLAN deployment is pending approval and live testing.
+See [deployment status](reports/deployment-status.md) and
+[SSH management for U3581156](docs/ssh-management.md).
 
 Run from the repository root:
 

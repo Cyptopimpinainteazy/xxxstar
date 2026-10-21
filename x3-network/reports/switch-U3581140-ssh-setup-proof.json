@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-21",
+  "serial": "U3581140",
+  "state": "BLOCKED: live management link missing",
+  "checks": {
+    "emp_address": "PASS: configured 10.30.10.12/24",
+    "ssh_local_aaa": "PASS",
+    "unused_ftp_telnet_http_https_snmp_disabled": "PASS",
+    "saved_certified_synchronized": "PASS",
+    "console_host_keys_pinned": "PASS: distinct from U3581156",
+    "host_profile": "PASS: eno4, 10.30.10.2/32, target-only 10.30.10.12/32 route, no gateway",
+    "live_ssh": "BLOCKED: eno4 has no carrier; no credential sent",
+    "management_reboot_persistence": "NOT RUN"
+  },
+  "host_key_fingerprints": {
+    "ecdsa-sha2-nistp256": "256 SHA256:5F48Wsi6JF96wsp6LYUNivf81VNsJKC4pjfwIiMUER0 no comment (ECDSA)",
+    "ssh-rsa": "2048 SHA256:Pyc0uLF4m2o0YewGpP0irDtbR1Dig0QlndVq/RyzejI no comment (RSA)"
+  },
+  "private_config_capture": "/home/lojak/.local/state/x3-network/ssh-U3581140-configuration/capture.json",
+  "private_config_capture_sha256": "9035f6d2e3e30dc2b2d32d2debfce83a9a776cecbf8d9c3bfbaaca2ce220efa6",
+  "private_live_check": "/home/lojak/.local/state/x3-network/ssh-U3581140/live-check-summary.json",
+  "next_action": "Connect rear EMP of U3581140 to x3star1 eno4 while keeping switch1 EMP on eno3 and console on switch2; verify specific routes before SSH, then test management reboot persistence.",
+  "routing_note": "Specific /32 addressing/target route on eno4 avoids adding a second competing 10.30.10.0/24 route; existing switch1 route uses eno3 and default remains eno2. No host firewall isolation or forwarding change is claimed."
+}

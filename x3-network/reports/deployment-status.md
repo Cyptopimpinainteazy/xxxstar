@@ -30,18 +30,28 @@ are UP. Full proof is in switch-U3581156-reset-proof.json; raw account and boot
 responses remain private. The initial checker timed out amid startup messages;
 its completion was explicitly rechecked, not treated as a password rejection.
 
-Three-switch deployment acceptance: 0/3 (0%). Startup reset verified on 1/3 units;
-this does not imply live network or production acceptance. No configuration change
-or reset has been made on the other two units.
+Second switch U3581140: separately approved startup reset PASS. Private saved
+and running exports and on-switch four-file archive retained. Generated admin
+credential, admin/default account set, clean startup settings, retained firmware,
+CERTIFIED/SYNCHRONIZED, Master/Running and both modules UP verified after final
+reboot. SSH/IP settings are now saved/certified at 10.30.10.12. Live SSH is BLOCKED by
+missing eno4 carrier; host profile uses 10.30.10.2/32 with a target-only route.
+Management-specific reboot persistence is NOT RUN. Both host keys are pinned and
+differ from switch 1. See switch-U3581140-ssh-setup-proof.json. Raw responses and
+credentials remain outside Git. See switch-U3581140-reset-proof.json.
+
+Three-switch deployment acceptance: 0/3 (0%). Startup reset verified on 2/3 units;
+this does not imply production acceptance. The third unit has not been inspected.
 
 Files changed: x3-network only. Commands run and exact check states are recorded
-in switch-U3581156-reset-proof.json and utility-verification.json; raw exports,
+in switch-U3581156-reset-proof.json, switch-U3581140-reset-proof.json,
+switch-U3581140-ssh-setup-proof.json and utility-verification.json; raw exports,
 boot captures, account details and credentials remain in private host state.
 No Rust/JS code changed; workspace application builds are outside this task's scope.
 Utility verification: 8 unittest tests PASS, shell syntax PASS, inventory/report
 parsing PASS, whitespace PASS and generated-credential exclusion PASS. Pytest is
 not installed in the selected Python; unittest ran the same utility tests.
-SSH login and management reboot persistence: PASS, with strict pinned host key,
+For U3581156 only: SSH login and management reboot persistence PASS, with pinned host key,
 generated credential, serial U3581156, reset count 13 to 14, EMP UP,
 CERTIFIED/SYNCHRONIZED, Master/Running and both modules UP. Evidence:
 switch-U3581156-ssh-reboot-proof.json. Initial watcher interruption was resumed
@@ -50,17 +60,17 @@ server service connectivity: NOT RUN. Mainnet or production readiness is not cla
 
 Next 10 tasks:
 
-1. PASS: final reboot-persistence and readiness verification for U3581156.
-2. PASS: saved-state/security/console evidence and hashes recorded.
-3. Connect and identify second physical switch without resetting an unknown unit.
-4. Back up and obtain that second unit's isolated-reset approval; recover/reset it.
-5. Identify, back up and obtain separate approval to recover/reset the third unit.
-6. Reconcile actual server NICs, roles and all physical link endpoints.
-7. Review supported firmware and upgrade path with vendor images and recovery proof.
-8. Approve VLAN/IPAM/firewall/management/DNS topology after wider conflict checks.
-9. Apply approved secure configuration sequentially and preserve console/SSH recovery.
-10. Validate live forwarding, isolation, monitoring, authorized service paths and
-    saved-config persistence across all three before deployment acceptance.
+1. Establish an approved second-unit Ethernet management path while preserving switch 1.
+2. Verify the active second-unit host route, ICMP and pinned-key SSH identity.
+3. Verify second-unit SSH authentication and management reboot persistence.
+4. Attach console to the third unit and identify it without resetting an unknown unit.
+5. Inspect and privately back up the third unit and verify its recovery procedure.
+6. Obtain separate third-unit isolated-reset approval, then reset and verify it.
+7. Establish third-unit secure management with generated credentials and pinned SSH.
+8. Review supported firmware, upgrade/recovery path and host-key uniqueness.
+9. Approve production VLAN/IPAM/firewall/management/DNS and inter-switch topology.
+10. Apply approved topology sequentially and validate forwarding, isolation,
+    monitoring, authorized service paths and reboot persistence across all three.
 
 Historical checkpoints follow. Current observations above supersede earlier
 statements about missing serial access, unknown identity, default passwords or no reset.
