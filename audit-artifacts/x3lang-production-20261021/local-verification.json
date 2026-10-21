@@ -1,0 +1,52 @@
+{
+  "base_commit": "b04d9e1210f037a2f8c171808b91594d68111e6d",
+  "candidate_state": "receipt correction committed; source hashes bind the tested candidate",
+  "source_sha256": {
+    "crates/x3-integration/src/trading.rs": "526c1ba466d38e64a450e078cf6dbe539ad1df68193b24159a755e5834a27e28",
+    "crates/x3-integration/tests/x3lang_trading_receipt_replay.rs": "9737559005baf96f1f6fd5330a251857ad8473c1606bec010bb888d1d75043f3"
+  },
+  "rustc": "1.90.0",
+  "results": {
+    "receipt_replay": {
+      "status": "PASS",
+      "passed": 14,
+      "log": "replay-green.log"
+    },
+    "related_trading_suites": {
+      "status": "PASS",
+      "passed": 37,
+      "log": "related-suites.log"
+    },
+    "clippy": {
+      "status": "PASS",
+      "exit_code": 0,
+      "command": "cargo clippy --locked -p x3-x3-integration --lib --features 'std compile' -- -D warnings",
+      "log": "clippy.log"
+    },
+    "format": "PASS: rustfmt --edition 2021 --check on both changed files",
+    "diff_check": "PASS",
+    "guards": {
+      "status": "PASS",
+      "commands": [
+        "python3 scripts/agent_guard.py",
+        "python3 scripts/no_stub_guard.py",
+        "python3 scripts/test_cheat_guard.py"
+      ]
+    }
+  },
+  "review": {
+    "agent": "receipt_review",
+    "status": "no actionable findings; source/test inspection only"
+  },
+  "remote_red": {
+    "run": 39625154680,
+    "status": "unverified pending"
+  },
+  "limitations": [
+    "No finalized-header authentication added",
+    "No live-chain or seven-validator proof",
+    "No exact-head GREEN CI yet",
+    "Full master language completion scope remains open"
+  ],
+  "source_commit": "354da22bac9b80e8fd06b28fe7d16beff50269b5"
+}
