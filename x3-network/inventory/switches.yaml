@@ -4,16 +4,16 @@
     {
       "proposed_name": "x3-switch1",
       "reported_model": "OS6860E-P24",
-      "evidence": "operator inventory; hardware not inspected",
+      "evidence": "Operator inventory reconciled with authenticated console chassis/firmware queries and reboot verification",
       "serial": "U3581156",
       "aos_release": "8.1.1.497.R01 GA, May 29 2014",
-      "management_ip": null,
+      "management_ip": "10.30.10.11/24",
       "console_device": "/dev/ttyUSB0",
       "proposed_role": "core",
       "inspection": "PASS: console identity and firmware observed",
       "reset": "PASS: startup config and chassis setup reset, verified after software reload",
       "configuration": "NOT RUN: proposed X3 topology not approved/applied",
-      "validation": "PASS for console recovery, startup reset, account cleanup, saved-state persistence and standalone chassis readiness; live X3 networking NOT RUN",
+      "validation": "PASS: console recovery, startup reset, account cleanup, saved-state persistence, live SSH management reboot persistence and chassis readiness; production VLAN deployment NOT RUN",
       "observed_model": "OS6860E-P24",
       "part_number": "903717-90",
       "hardware_revision": "21",
@@ -35,8 +35,30 @@
       "credential_file": "/home/lojak/.local/state/x3-network/credentials-U3581156-r1n0kf1e/credentials.json",
       "startup_configuration": "PASS: saved to working and copied to certified; CERTIFIED/SYNCHRONIZED observed",
       "restart_persistence": "PASS: generated admin credential and account cleanup verified after final reboot",
-      "management_access": "Console only; remote AAA denied for SSH/Telnet/FTP/HTTP/SNMP",
-      "firmware_review": "2014 firmware retained; upgrade/support review required before production deployment"
+      "management_access": "PASS: live SSH with strict console-pinned host key and generated administrator credential; chassis serial verified",
+      "firmware_review": "2014 firmware retained; upgrade/support review required before production deployment",
+      "ssh_setup": {
+        "state": "PASS: pinned SSH, management addressing and security settings verified after reboot; Master/Running and both modules UP",
+        "existing_ssh_service": "enabled TCP 22; local AAA",
+        "management_ip": "10.30.10.11/24",
+        "ethernet_links_up": 1,
+        "proposed_direct_host_interface": "eno3",
+        "proposed_host_address": "10.30.10.1/24",
+        "proposed_switch_address": "10.30.10.11/24",
+        "host_key_fingerprints": {
+          "ecdsa_256": "SHA256:cUeKdAQ7xncHe3XYV3ANNtiPfowBtOw0Dly28Og/OGo",
+          "rsa_2048": "SHA256:Pq12DSv9/r80G59yES86Prey2sQ8gzBBNzM0/y95cI0"
+        },
+        "host_interface": "eno3",
+        "host_address": "10.30.10.1/24",
+        "host_mac": "08:94:ef:37:68:c4",
+        "icmp": "PASS: 3/3 replies",
+        "ssh_identity": "PASS: SSH exit 0; returned chassis serial U3581156",
+        "saved_configuration": "PASS: write memory and copy running certified",
+        "restart_persistence": "PASS",
+        "private_live_proof": "/home/lojak/.local/state/x3-network/ssh-U3581156/live-ssh-check.txt",
+        "reboot_proof": "x3-network/reports/switch-U3581156-ssh-reboot-proof.json"
+      }
     },
     {
       "proposed_name": "x3-switch2",

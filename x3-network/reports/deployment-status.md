@@ -14,9 +14,11 @@ login and is stored ONLY outside Git:
 /home/lojak/.local/state/x3-network/credentials-U3581156-r1n0kf1e/credentials.json
 (mode 0600 in a 0700 directory). Never paste its content into chat or Git.
 
-Defaults were saved and certified using the release-matched commands. Remote
-management authentication is denied; console authentication is local. No X3
-management IP, VLAN plan or inter-switch topology has been applied. The 2014
+Defaults were saved and certified using the release-matched commands.
+SSH management is now configured and reboot-verified on rear EMP 10.30.10.11/24
+through x3star1 eno3 10.30.10.1/24. SSH and console authentication are local; other
+remote AAA remains denied. FTP/Telnet/HTTP/HTTPS/SNMP services are disabled. No X3
+production VLAN plan or inter-switch topology has been applied. The 2014
 firmware is retained; supported firmware/security review remains necessary before
 production deployment. Temperatures are 35°C, fan functional, PSU1 UP, PSU2 UNPLUG.
 Master/Running and both modules UP were observed before the final reboot.
@@ -39,8 +41,12 @@ No Rust/JS code changed; workspace application builds are outside this task's sc
 Utility verification: 8 unittest tests PASS, shell syntax PASS, inventory/report
 parsing PASS, whitespace PASS and generated-credential exclusion PASS. Pytest is
 not installed in the selected Python; unittest ran the same utility tests.
-Live VLAN forwarding/isolation, SSH login, inter-switch links and server service
-connectivity: NOT RUN. Mainnet or production readiness is not claimed.
+SSH login and management reboot persistence: PASS, with strict pinned host key,
+generated credential, serial U3581156, reset count 13 to 14, EMP UP,
+CERTIFIED/SYNCHRONIZED, Master/Running and both modules UP. Evidence:
+switch-U3581156-ssh-reboot-proof.json. Initial watcher interruption was resumed
+without another reboot. Live VLAN forwarding/isolation, inter-switch links and
+server service connectivity: NOT RUN. Mainnet or production readiness is not claimed.
 
 Next 10 tasks:
 

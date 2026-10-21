@@ -4,8 +4,10 @@ Status: first isolated unit identified and reset: OS6860E-P24, serial U3581156,
 AOS 8.1.1.497.R01. Administrator access recovered, old custom accounts removed,
 generated administrator password stored privately, defaults saved and certified.
 Final reboot-persistence validation PASSED: the generated credential, account
-cleanup and clean startup settings survived restart; chassis is Master/Running. The other two units have not been inspected. X3 topology,
-management addressing and VLAN deployment remain pending operator review.
+cleanup and clean startup settings survived restart; chassis is Master/Running. The other two units have not been inspected. X3 topology and
+production VLAN deployment remain pending operator review. Management SSH at
+10.30.10.11 through x3star1 eno3 is verified after reboot; see
+[SSH management](docs/ssh-management.md).
 
 Run from the repository root:
 
@@ -41,7 +43,8 @@ against installed AOS help. It requires an existing trusted host key and key/age
 authentication; it neither enrolls keys nor prompts for credentials. No credentials
 are accepted on the command line. Output stays private. AOS command rejection may
 arrive with SSH exit 0: review each response before drawing conclusions.
-No switch addresses or credentials are currently established, so this has NOT RUN.
+This collector has NOT RUN; the separate pinned-key/password SSH test and reboot
+verification are recorded in reports/switch-U3581156-ssh-reboot-proof.json.
 
 See [deployment status](reports/deployment-status.md), [console and recovery](docs/recovery-procedure.md),
 [reset gates](docs/reset-procedure.md), and [VLAN proposal](docs/vlan-plan.md).

@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-21",
+  "serial": "U3581156",
+  "state": "PASS",
+  "reset_count_before": 13,
+  "reset_count_after": 14,
+  "management_host": "10.30.10.1/24 on eno3",
+  "management_switch": "10.30.10.11/24 on rear EMP",
+  "checks": {
+    "actual_reboot": "PASS",
+    "strict_pinned_host_key": "PASS",
+    "generated_admin_password": "PASS",
+    "chassis_identity": "PASS",
+    "management_address_up": "PASS",
+    "ssh_local_authentication": "PASS",
+    "unused_management_services_disabled": "PASS",
+    "certified_synchronized": "PASS",
+    "master_running": "PASS",
+    "both_modules_up": "PASS",
+    "management_route_eno3": "PASS",
+    "post_reboot_icmp": "PASS: 3/3 replies, 0% packet loss"
+  },
+  "private_evidence": {
+    "/home/lojak/.local/state/x3-network/ssh-reboot-test-5led8219": "9ab3f501e253c03267f463bbaa96559712ff6e91086fe5368174d14f6874290c",
+    "/home/lojak/.local/state/x3-network/ssh-reboot-test-4gc7jqah": "55214b9ad456306f0255ec7e820f8719ee4f07e6c57734057d7e45d836591d24",
+    "/home/lojak/.local/state/x3-network/ssh-reboot-test-hlw292dj": "6999de950a0566eeac3457274d5cb6c696e85f1e53a41906cb2e5b7d7a450106"
+  },
+  "interruption": "Initial watcher interrupted after captured shutdown. Verification resumed without another reboot; actual new uptime and incremented reset count independently checked.",
+  "limits": [
+    "Production VLAN deployment not tested",
+    "2014 firmware support/security review pending",
+    "Existing SSH key uniqueness across units not established",
+    "Device clock observed at 2014 default; time synchronization not configured",
+    "Other two switches not inspected"
+  ],
+  "commands_run": [
+    "show chassis (before and after reboot)",
+    "show system (before and after reboot)",
+    "reload all; confirmed y through identity-verified console",
+    "show virtual-chassis topology (bounded readiness polling)",
+    "show module status",
+    "show ip interface",
+    "show aaa authentication",
+    "show ip service",
+    "show running-directory",
+    "ip -4 route get 10.30.10.11",
+    "ip -4 route show default",
+    "ping -I eno3 -c 3 -W 2 10.30.10.11",
+    "git diff --check -- x3-network",
+    "JSON inventory/report parsing and generated-secret exclusion check"
+  ],
+  "files_changed": [
+    "x3-network/README.md",
+    "x3-network/docs/ssh-management.md",
+    "x3-network/inventory/physical-links.yaml",
+    "x3-network/inventory/switches.yaml",
+    "x3-network/reports/deployment-status.md",
+    "x3-network/reports/switch-U3581156-ssh-reboot-proof.json"
+  ],
+  "completion": "Reboot persistence test PASS; three-switch deployment acceptance remains 0/3 (0%)."
+}
