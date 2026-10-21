@@ -1,0 +1,13 @@
+{
+  "source_commit": "462318f2770878ce6d50c5f47f8289f69a0c68cf",
+  "files": [
+    "x3lang-production-unification.yml",
+    "x3-lang-nested-workspace.yml",
+    "x3lang-canonical-compiler-bridge.yml",
+    "x3lang-control-flow-parity.yml",
+    "x3-compiled-storage-build.yml"
+  ],
+  "validation": "PASS: Python yaml.safe_load; checkout ref asserted for every checkout; all old/new job run command lists identical; git diff --check passed",
+  "review": "receipt_review: no actionable findings; fork guards, permissions, working directories and all gate commands retained",
+  "claim_boundary": "Pins execution to PR head or event SHA. Does not establish merge compatibility or successful remote GREEN execution."
+}
