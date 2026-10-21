@@ -7630,6 +7630,7 @@ dependencies = [
  "scale-info",
  "sp-runtime",
  "sp-std",
+ "x3-asset-kernel-types",
 ]
 
 [[package]]
@@ -7707,7 +7708,9 @@ dependencies = [
  "x3-evm-integration",
  "x3-packet-schema",
  "x3-svm-integration",
+ "x3-vm",
  "x3-x3-integration",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -7720,6 +7723,7 @@ dependencies = [
  "scale-info",
  "sp-runtime",
  "sp-std",
+ "x3-asset-kernel-types",
 ]
 
 [[package]]
@@ -13872,6 +13876,7 @@ dependencies = [
  "x3-hir",
  "x3-mir",
  "x3-typeck",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -14011,6 +14016,7 @@ dependencies = [
  "x3-security-events",
  "x3-svm-integration",
  "x3-verification-router",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -14024,6 +14030,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -14486,6 +14493,7 @@ dependencies = [
  "x3-common",
  "x3-evm-integration",
  "x3-svm-integration",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -14520,6 +14528,7 @@ dependencies = [
 name = "x3-x3-integration"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
  "frame-support",
  "log",
  "parity-scale-codec",
@@ -14534,8 +14543,16 @@ dependencies = [
  "x3-common",
  "x3-compiler",
  "x3-evm-integration",
- "x3-verifier",
  "x3-vm",
+ "x3bc-core",
+]
+
+[[package]]
+name = "x3bc-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
 ]
 
 [[package]]
