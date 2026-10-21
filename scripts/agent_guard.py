@@ -143,9 +143,10 @@ def main() -> int:
             continue
         txt = p.read_text(encoding="utf-8", errors="ignore")
         for i, line in enumerate(txt.splitlines(), 1):
-            if is_allowed_line(line):
-                continue
-            if any(re.search(rx, line) for rx in SECRET_PATTERNS):
+            # Most lines are not candidates. Apply the unchanged exception
+            # policy only after a secret pattern matches, rather than running
+            # every exception regex over every tracked line.
+            if any(re.search(rx, line) for rx in SECRET_PATTERNS) and not is_allowed_line(line):
                 issues.append(f"{p.relative_to(ROOT)}:{i}: {line.strip()}")
     if issues:
         print("[agent_guard] blocked: secret-like material detected")
