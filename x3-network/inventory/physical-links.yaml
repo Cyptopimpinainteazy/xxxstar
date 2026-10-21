@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "links": [
+    {
+      "endpoint_a": "x3star1:eno2",
+      "endpoint_b": null,
+      "observed_link": "UP 1000Mb/s Full",
+      "evidence": "local ethtool; remote switch/port unknown"
+    }
+  ],
+  "switch_uplinks": [],
+  "lldp_discovery": "BLOCKED: lldpd not installed/running",
+  "fibre_channel": "OUT OF SCOPE"
+}

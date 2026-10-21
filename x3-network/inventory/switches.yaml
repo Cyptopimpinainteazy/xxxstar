@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "switches": [
+    {
+      "proposed_name": "x3-switch1",
+      "reported_model": "OS6860E-P24",
+      "evidence": "operator inventory; hardware not inspected",
+      "serial": "U3581156",
+      "aos_release": "8.1.1.497.R01 GA, May 29 2014",
+      "management_ip": null,
+      "console_device": "/dev/ttyUSB0",
+      "proposed_role": "core",
+      "inspection": "PASS: console identity and firmware observed",
+      "reset": "PASS: startup config and chassis setup reset, verified after software reload",
+      "configuration": "NOT RUN: proposed X3 topology not approved/applied",
+      "validation": "PASS for console recovery, startup reset, account cleanup, saved-state persistence and standalone chassis readiness; live X3 networking NOT RUN",
+      "observed_model": "OS6860E-P24",
+      "part_number": "903717-90",
+      "hardware_revision": "21",
+      "manufacture_date": "2016-09-29",
+      "mac": "2c:fa:a2:5c:8d:07",
+      "on_switch_backup": "/flash/x3-pre-reset-U3581156-20261021",
+      "account_cleanup": "PASS: dtryc and management removed; only admin and non-login default template remain",
+      "administrator_password": "PASS: generated secret verified by fresh login and post-reboot login; private credential file outside Git",
+      "health": {
+        "temperature_celsius": [
+          35,
+          35
+        ],
+        "fan_functional": true,
+        "power_supply_1": "UP 600 W AC",
+        "power_supply_2": "UNPLUG 600 W AC",
+        "startup_state_last_observed": "PASS: Master/Running after final reboot; both modules UP"
+      },
+      "credential_file": "/home/lojak/.local/state/x3-network/credentials-U3581156-r1n0kf1e/credentials.json",
+      "startup_configuration": "PASS: saved to working and copied to certified; CERTIFIED/SYNCHRONIZED observed",
+      "restart_persistence": "PASS: generated admin credential and account cleanup verified after final reboot",
+      "management_access": "Console only; remote AAA denied for SSH/Telnet/FTP/HTTP/SNMP",
+      "firmware_review": "2014 firmware retained; upgrade/support review required before production deployment"
+    },
+    {
+      "proposed_name": "x3-switch2",
+      "reported_model": "OS6860E-P24",
+      "evidence": "operator inventory; hardware not inspected",
+      "serial": null,
+      "aos_release": null,
+      "management_ip": null,
+      "console_device": null,
+      "proposed_role": "validator and development",
+      "inspection": "BLOCKED",
+      "reset": "NOT RUN",
+      "configuration": "NOT RUN",
+      "validation": "NOT RUN"
+    },
+    {
+      "proposed_name": "x3-switch3",
+      "reported_model": "OS6860E-P24",
+      "evidence": "operator inventory; hardware not inspected",
+      "serial": null,
+      "aos_release": null,
+      "management_ip": null,
+      "console_device": null,
+      "proposed_role": "GPU and infrastructure",
+      "inspection": "BLOCKED",
+      "reset": "NOT RUN",
+      "configuration": "NOT RUN",
+      "validation": "NOT RUN"
+    }
+  ],
+  "console_observation": {
+    "device": "/dev/ttyUSB0",
+    "adapter_model": "Silicon Labs CP2104 USB to UART",
+    "vid_pid": "10c4:ea60",
+    "adapter_serial": "011C3902",
+    "driver": "cp210x",
+    "stable_path": "/dev/serial/by-id/usb-Silicon_Labs_CP2104_USB_to_UART_Bridge_Controller_011C3902-if00-port0",
+    "device_access": "PASS: dialout membership plus temporary ACL",
+    "attached_switch_identity": null,
+    "terminal_tool": "picocom 3.1",
+    "uart_open": "PASS: 9600 baud, received OS6860 login prompt",
+    "kernel_failure": "cp210x failed set request 0x0 status -71 (EPROTO); Unable to enable UART",
+    "private_diagnostic_evidence": "/home/lojak/.local/state/x3-network/console-attempt-20261021T060335Z-uz7m2bre/result.json",
+    "baud": 9600,
+    "serial_format": "8N1, no flow control",
+    "observed_banner": "OS6860 login:",
+    "authentication": "PASS: default admin login verified after vendor bootloader recovery",
+    "latest_cable_check": {
+      "status": "BLOCKED: no USB serial device enumerated",
+      "serial_devices": [],
+      "evidence": "/home/lojak/.local/state/x3-network/new-cable-check-20261021T060532Z-0z05akfr/evidence.json"
+    },
+    "observed_boot_model": "OS6860E-P24M (bootloader board string; AOS chassis reports OS6860E-P24)",
+    "uboot_version": "2012.10 8.1.1.R01.70 armv7, Jan 13 2014",
+    "boot_image": "certified/Uos.img",
+    "running_aos_version": "8.1.1.497.R01",
+    "reboot_observation": "PASS: image CRC checks reported OK, returned to login",
+    "boot_evidence": "/home/lojak/.local/state/x3-network/boot-20261021T061925Z-xf_ozeky/boot.raw",
+    "boot_sha256": "17f09399325a415116a7ad26a5d3d449bc484487ab422e163233b6afab53d2e3",
+    "reset_authorization": "Operator confirms isolated spare and accepts losing prior configuration; approval recorded"
+  }
+}
