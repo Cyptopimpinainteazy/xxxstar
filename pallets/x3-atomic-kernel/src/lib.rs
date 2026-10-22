@@ -87,6 +87,9 @@ pub mod proof;
 // VM reversion interface for bundle rollback
 pub mod vm_revert;
 
+/// Legs executed on chain and the journals that undo them.
+pub mod chain_legs;
+
 // Re-export weights for runtime integration
 pub mod weights;
 pub use weights::WeightInfo;
@@ -116,6 +119,7 @@ pub fn finality_cert_from_block_hash(block_hash: &[u8]) -> sp_core::H256 {
 #[frame_support::pallet]
 pub mod pallet {
     use super::proof::{BundleLeg, PoaeProof, VmType};
+    use crate::chain_legs::LegExecutor;
     use crate::vm_revert::{StateDiff, VmReverter};
     use crate::weights::WeightInfo;
     use frame_support::{
@@ -132,7 +136,7 @@ pub mod pallet {
     use sp_io::hashing::blake2_256;
     use sp_io::hashing::sha2_256;
     use sp_runtime::offchain::StorageKind;
-    use sp_runtime::traits::{AccountIdConversion, SaturatedConversion, Saturating};
+    use sp_runtime::traits::{AccountIdConversion, One, SaturatedConversion, Saturating};
     use sp_runtime::transaction_validity::{
         InvalidTransaction, TransactionPriority, TransactionSource, TransactionValidity,
         ValidTransaction,
@@ -201,6 +205,10 @@ pub mod pallet {
         /// and will log a warning. Production runtimes MUST set this to a real
         /// implementation that can revert EVM/SVM/X3VM state diffs.
         type VmReverter: crate::vm_revert::VmReverter;
+
+        /// Executes bundle legs against chain state and undoes them from the journals it returns
+        /// (`execute_bundle_leg`). `()` executes nothing.
+        type LegExecutor: crate::chain_legs::LegExecutor<Self::AccountId>;
     }
 
     // ── Storage ───────────────────────────────────────────────────────────────
@@ -276,6 +284,29 @@ pub mod pallet {
         BoundedVec<crate::vm_revert::LegReceipt, T::MaxLegsPerBundle>,
         ValueQuery,
     >;
+
+    /// Most expired bundles `on_initialize` undoes in one block; the rest wait for the next.
+    pub const MAX_EXPIRIES_PER_BLOCK: u32 = 4;
+
+    /// The hash of each executed leg's chain journal, written only by `execute_bundle_leg`. A
+    /// rollback applies a leg receipt's diff only when it hashes to this.
+    #[pallet::storage]
+    pub type ChainJournal<T: Config> =
+        StorageDoubleMap<_, Blake2_128Concat, H256, Twox64Concat, u32, H256, OptionQuery>;
+
+    /// What each leg of a bundle will execute, committed at submission:
+    /// `chain_legs::execution_commitment` of the `LegExecution`, one per declared leg. A leg runs
+    /// only the execution its commitment names, so the bundle the submitter declared is the bundle
+    /// the chain executes.
+    #[pallet::storage]
+    pub type LegExecutionCommitments<T: Config> =
+        StorageMap<_, Blake2_128Concat, H256, BoundedVec<H256, T::MaxLegsPerBundle>, ValueQuery>;
+
+    /// How many journal entries a bundle's executed legs hold together, bounded by
+    /// `chain_legs::MAX_BUNDLE_JOURNAL_ENTRIES`: what finishing the bundle costs.
+    #[pallet::storage]
+    pub type BundleJournalEntries<T: Config> =
+        StorageMap<_, Blake2_128Concat, H256, u32, ValueQuery>;
 
     // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -423,6 +454,12 @@ pub mod pallet {
             leg_index: u32,
             vm_type: VmType,
         },
+        /// A leg ran on chain and its journal was recorded.
+        LegExecutedOnChain {
+            bundle_id: H256,
+            leg_index: u32,
+            journal: H256,
+        },
         /// A bond was slashed during bundle rollback.
         BondSlashed {
             submitter: T::AccountId,
@@ -499,6 +536,30 @@ pub mod pallet {
         /// The off-chain executor should not re-submit receipts for legs that
         /// have already been persisted.
         LegAlreadyExecuted,
+        /// Leg receipts are produced by the chain (`execute_bundle_leg`); a submitted state diff is
+        /// not accepted.
+        LegReceiptsAreChainProduced,
+        /// Only the bundle's assigned executor may execute its legs.
+        NotBundleExecutor,
+        /// The leg's execution does not match its VM: only X3 legs (an X3 program or a ledger
+        /// transfer) execute on chain; EVM and SVM keep no persistent state here.
+        UnsupportedLegExecution,
+        /// The leg's journal exceeds the receipt's state-diff bound, or the bundle's legs would
+        /// hold more than `MAX_BUNDLE_JOURNAL_ENTRIES` entries together.
+        JournalTooLarge,
+        /// A bundle finalizes only when every leg it declared has executed on chain.
+        LegNotExecuted,
+        /// A leg could not be undone, so the rollback changed nothing; the bundle is unchanged
+        /// and the rollback can be retried.
+        LegRevertFailed,
+        /// A leg's effects could not be made final, so the finalization changed nothing.
+        LegCommitFailed,
+        /// A bundle commits to exactly one execution per declared leg.
+        ExecutionCommitmentMismatch,
+        /// The execution is not the one the bundle committed to for this leg.
+        ExecutionNotCommitted,
+        /// Too many bundles already expire at this deadline block; choose another deadline.
+        DeadlineSlotFull,
     }
 
     // ── Hooks ─────────────────────────────────────────────────────────────────
@@ -559,138 +620,80 @@ pub mod pallet {
                 let _ = SubmitTransaction::<T, Call<T>>::submit_transaction(xt);
             }
 
-            // ── Single-pass scan: finalization + leg receipts per bundle ──
-            for (bundle_id, record) in Bundles::<T>::iter() {
-                if record.status != BundleStatus::Executing {
-                    continue;
-                }
-
-                // --- Leg execution receipts (x3leg:) ---
-                let leg_count = record.leg_count;
-                for leg_index in 0..leg_count {
-                    let mut leg_key = b"x3leg:".to_vec();
-                    leg_key.extend_from_slice(bundle_id.as_bytes());
-                    leg_key.extend_from_slice(&leg_index.to_le_bytes());
-
-                    let data =
-                        match sp_io::offchain::local_storage_get(StorageKind::PERSISTENT, &leg_key)
-                        {
-                            Some(v) if !v.is_empty() => v,
-                            _ => continue,
-                        };
-
-                    let state_diff = match StateDiff::decode(&mut &data[..]) {
-                        Ok(diff) => diff,
-                        Err(e) => {
-                            log::warn!(
-                                target: "x3-atomic-kernel",
-                                "[OCW] bundle {:?} leg {}: corrupt StateDiff, clearing: {:?}",
-                                bundle_id, leg_index, e
-                            );
-                            sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &leg_key);
-                            continue;
-                        }
-                    };
-
-                    let call = Call::record_leg_execution_receipt {
-                        bundle_id,
-                        leg_index,
-                        state_diff,
-                    };
-
-                    match SubmitTransaction::<T, Call<T>>::submit_transaction(T::create_bare(
-                        call.into(),
-                    )) {
-                        Ok(()) => {
-                            sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &leg_key);
-                            log::debug!(
-                                target: "x3-atomic-kernel",
-                                "[OCW] submitted leg receipt for bundle {:?} leg {}/{}",
-                                bundle_id, leg_index, leg_count
-                            );
-                        }
-                        Err(()) => {
-                            log::error!(
-                                target: "x3-atomic-kernel",
-                                "[OCW] failed to submit leg receipt for bundle {:?} leg {}",
-                                bundle_id, leg_index
-                            );
-                        }
-                    }
-                }
-            }
+            // Leg receipts are no longer posted from here: a leg is executed on chain by
+            // `execute_bundle_leg`, which records its own journal (see `chain_legs`).
         }
 
         /// On each block, expire bundles that have passed their deadline.
         fn on_initialize(now: BlockNumberFor<T>) -> Weight {
-            // Use DeadlineIndex for O(1) lookup of bundles expiring at this block
-            // instead of iterating all pending bundles (O(n))
+            let expired_bundle_ids = DeadlineIndex::<T>::take(now);
+            let db = T::DbWeight::get();
+            let mut weight = db.reads_writes(1, 1);
+            if expired_bundle_ids.is_empty() {
+                return weight;
+            }
 
-            // Get all bundle IDs that have deadlines at or before current block
-            let expired_bundle_ids = DeadlineIndex::<T>::get(now);
-
-            let mut processed_count: u32 = 0;
-
-            // Process each expired bundle
-            for bundle_id in expired_bundle_ids.iter() {
-                if let Some(record) = Bundles::<T>::get(bundle_id) {
-                    if record.status == BundleStatus::Pending
-                        || record.status == BundleStatus::Executing
-                    {
-                        // Attempt to revert VM side effects before marking rolled back
-                        let revert_failures = Self::do_revert_bundle_legs(*bundle_id);
-
-                        // Bundle has expired - trigger rollback
-                        let mut updated_record = record.clone();
-                        updated_record.status = BundleStatus::RolledBack;
-                        Bundles::<T>::insert(bundle_id, updated_record);
-
-                        // Release the expired bond before slashing it.
-                        //
-                        // `Currency::slash` consumes free balance first, and a
-                        // `RolledBack` bundle is terminal — no path may ever
-                        // unreserve again — so slashing first would leave
-                        // everything except the 5% penalty stranded in reserve
-                        // forever. Mirrors `do_rollback_atomic_bundle`.
-                        T::Currency::unreserve(&record.submitter, record.bond);
-
-                        // Slash for deadline exceeded (5%). `!= 0` and `> 0` are
-                        // the same predicate for an unsigned balance; the `!=`
-                        // spelling has no `>=`-shaped surface that a bond of
-                        // exactly zero would be needed to distinguish.
-                        let bond = T::MinBond::get();
-                        let slash_amount = bond.saturating_div(20);
-                        if slash_amount != 0 {
-                            let slash: BalanceOf<T> = slash_amount.saturated_into();
-                            let _ = T::Currency::slash(&record.submitter, slash);
-                        }
-
-                        // Clean up leg receipts storage
-                        BundleLegReceipts::<T>::remove(bundle_id);
-
-                        Self::deposit_event(Event::BundleRolledBack {
-                            bundle_id: *bundle_id,
-                            reason: BundleRollbackReason::DeadlineExceeded,
-                        });
-
-                        log::warn!(
-                            target: "x3-atomic-kernel",
-                            "Bundle {:?} expired at block {:?}, slashed {} ({} legs failed VM revert)",
-                            bundle_id, now, slash_amount, revert_failures
-                        );
-
-                        processed_count += 1;
-                    }
+            // At most `MAX_EXPIRIES_PER_BLOCK` bundles are undone per block, so a block of
+            // expiries cannot exceed its weight; the rest move to the next block's index.
+            let mut carried = Vec::new();
+            let mut processed: u32 = 0;
+            for bundle_id in expired_bundle_ids.into_iter() {
+                if processed >= MAX_EXPIRIES_PER_BLOCK {
+                    carried.push(bundle_id);
+                    continue;
                 }
+                weight = weight.saturating_add(db.reads(1));
+                let Some(mut record) = Bundles::<T>::get(bundle_id) else {
+                    continue;
+                };
+                if record.status != BundleStatus::Pending
+                    && record.status != BundleStatus::Executing
+                {
+                    continue;
+                }
+                processed += 1;
+                weight = weight
+                    .saturating_add(Self::finish_legs_weight())
+                    .saturating_add(db.reads_writes(3, 4));
+
+                // Every executed leg is undone, or none is; a bundle whose legs cannot be undone
+                // keeps its journals and is retried next block instead of being marked rolled
+                // back with effects still in place.
+                if Self::revert_bundle_legs(bundle_id).is_err() {
+                    carried.push(bundle_id);
+                    continue;
+                }
+
+                record.status = BundleStatus::RolledBack;
+                Bundles::<T>::insert(bundle_id, &record);
+
+                // Release the expired bond before slashing it: `Currency::slash` consumes free
+                // balance first, and a `RolledBack` bundle is terminal, so slashing first would
+                // strand everything but the penalty in reserve. Mirrors `do_rollback_atomic_bundle`.
+                T::Currency::unreserve(&record.submitter, record.bond);
+                let slash_amount = T::MinBond::get().saturating_div(20);
+                if slash_amount != 0 {
+                    let slash: BalanceOf<T> = slash_amount.saturated_into();
+                    let _ = T::Currency::slash(&record.submitter, slash);
+                }
+
+                Self::clear_bundle_legs(bundle_id);
+                Self::deposit_event(Event::BundleRolledBack {
+                    bundle_id,
+                    reason: BundleRollbackReason::DeadlineExceeded,
+                });
+                log::warn!(
+                    target: "x3-atomic-kernel",
+                    "Bundle {:?} expired at block {:?}, slashed {}",
+                    bundle_id, now, slash_amount
+                );
             }
 
-            // Clean up the deadline index for this block
-            if !expired_bundle_ids.is_empty() {
-                DeadlineIndex::<T>::remove(now);
+            if !carried.is_empty() {
+                Self::reschedule_expiries(now, carried);
+                weight = weight.saturating_add(db.reads_writes(1, 1));
             }
-
-            // Return weight based on processed bundles
-            Weight::from_parts((processed_count as u64) * 10_000, 0)
+            weight
         }
     }
 
@@ -717,10 +720,12 @@ pub mod pallet {
         /// - Bond reserved on submission, slashed on rollback.
         /// - Nonce-based replay protection
         #[pallet::call_index(0)]
-        #[pallet::weight(T::WeightInfo::submit_atomic_bundle(legs.len() as u32))]
+        #[pallet::weight(T::WeightInfo::submit_atomic_bundle(legs.len() as u32)
+            .saturating_add(T::DbWeight::get().writes(1)))]
         pub fn submit_atomic_bundle(
             origin: OriginFor<T>,
             legs: BoundedVec<BundleLeg, T::MaxLegsPerBundle>,
+            execution_commitments: BoundedVec<H256, T::MaxLegsPerBundle>,
             deadline_blocks: BlockNumberFor<T>,
             chain_id: u32, // New parameter for chain ID
             nonce: u64,    // New parameter for nonce
@@ -751,6 +756,10 @@ pub mod pallet {
             ensure!(
                 legs.len() as u32 <= T::MaxLegsPerBundle::get(),
                 Error::<T>::TooManyLegs
+            );
+            ensure!(
+                execution_commitments.len() == legs.len(),
+                Error::<T>::ExecutionCommitmentMismatch
             );
 
             let now = <frame_system::Pallet<T>>::block_number();
@@ -796,10 +805,14 @@ pub mod pallet {
             BundleLegReceipts::<T>::insert(bundle_id, leg_receipts);
 
             // Add to deadline index for O(1) expiry lookup
+            LegExecutionCommitments::<T>::insert(bundle_id, execution_commitments);
+            // A bundle that is not in the deadline index would never expire, so a full slot
+            // refuses the submission instead of dropping the expiry.
             let mut deadline_bundles = DeadlineIndex::<T>::get(deadline);
-            if deadline_bundles.try_push(bundle_id).is_ok() {
-                DeadlineIndex::<T>::insert(deadline, deadline_bundles);
-            }
+            deadline_bundles
+                .try_push(bundle_id)
+                .map_err(|_| Error::<T>::DeadlineSlotFull)?;
+            DeadlineIndex::<T>::insert(deadline, deadline_bundles);
 
             Self::deposit_event(Event::BundleSubmitted {
                 bundle_id,
@@ -833,7 +846,7 @@ pub mod pallet {
         /// 2. `finality_cert` is a valid justification for `finalized_block`.
         /// 3. Bundle inclusion proof links `bundle_id` to that block.
         #[pallet::call_index(1)]
-        #[pallet::weight(T::WeightInfo::finalize_atomic_bundle())]
+        #[pallet::weight(T::WeightInfo::finalize_atomic_bundle().saturating_add(Pallet::<T>::finish_legs_weight()))]
         pub fn finalize_atomic_bundle(
             origin: OriginFor<T>,
             bundle_id: H256,
@@ -942,7 +955,7 @@ pub mod pallet {
         /// was NOT reverted — the runtime does not silently advertise stronger
         /// atomicity than it can enforce.
         #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::rollback_atomic_bundle())]
+        #[pallet::weight(T::WeightInfo::rollback_atomic_bundle().saturating_add(Pallet::<T>::finish_legs_weight()))]
         pub fn rollback_atomic_bundle(
             origin: OriginFor<T>,
             bundle_id: H256,
@@ -969,7 +982,7 @@ pub mod pallet {
         /// # Events
         /// Emits `BundleFinalized` with PoAE proof stored on-chain for external verifiers.
         #[pallet::call_index(6)]
-        #[pallet::weight(T::WeightInfo::finalize_atomic_bundle())]
+        #[pallet::weight(T::WeightInfo::finalize_atomic_bundle().saturating_add(Pallet::<T>::finish_legs_weight()))]
         pub fn finalize_with_settlement(
             origin: OriginFor<T>,
             bundle_id: H256,
@@ -998,57 +1011,105 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Record a single leg's execution receipt on-chain.
+        /// Retired: a leg's receipt is produced by the chain when `execute_bundle_leg` runs it.
         ///
-        /// Called by the off-chain executor (via unsigned transaction)
-        /// after each leg completes execution.  Stores the VM-specific
-        /// `state_diff` so that [`crate::vm_revert::VmReverter`] can
-        /// restore pre-execution VM state if the bundle is rolled back
-        /// before finalisation.
-        ///
-        /// # Security
-        ///
-        /// - Unsigned only — the validate_unsigned guard ensures the
-        ///   bundle is `Executing` and the leg index is in-range.
-        /// - Each leg may be recorded at most once per bundle.
+        /// This call took a state diff from an unsigned, gossiped transaction whose only checks
+        /// were the bundle state and the leg index, and a rollback then wrote that diff's "old
+        /// values" into storage. It refuses every call; the index stays so that no other call can
+        /// ever take its meaning.
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::record_leg_execution_receipt())]
         pub fn record_leg_execution_receipt(
             origin: OriginFor<T>,
-            bundle_id: H256,
-            leg_index: u32,
-            state_diff: StateDiff,
+            _bundle_id: H256,
+            _leg_index: u32,
+            _state_diff: StateDiff,
         ) -> DispatchResult {
             ensure_none(origin)?;
+            Err(Error::<T>::LegReceiptsAreChainProduced.into())
+        }
 
+        /// Execute leg `leg_index` of an executing bundle on chain and record its journal.
+        ///
+        /// Only the bundle's assigned executor, and the leg runs as that executor: the runtime's
+        /// `LegExecutor` runs it against chain state (an X3 program on the kernel's engine, or a
+        /// ledger transfer of the executor's own funds) and returns the journal of every write; the pallet stores it as the
+        /// leg's receipt and its hash in `ChainJournal`, which is what a rollback checks before it
+        /// applies anything. A leg that fails writes nothing (one storage transaction).
+        #[pallet::call_index(9)]
+        #[pallet::weight(T::WeightInfo::record_leg_execution_receipt()
+            .saturating_add(T::LegExecutor::max_weight())
+            .saturating_add(T::DbWeight::get().reads_writes(3, 2)))]
+        pub fn execute_bundle_leg(
+            origin: OriginFor<T>,
+            bundle_id: H256,
+            leg_index: u32,
+            execution: crate::chain_legs::LegExecution<T::AccountId>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            // A leg moves assets, so a halt stops it (rollback stays open: it returns them).
+            ensure!(
+                !T::EconomicHalt::is_halted(),
+                Error::<T>::EconomicHaltActive
+            );
+            let record = Bundles::<T>::get(bundle_id).ok_or(Error::<T>::BundleNotFound)?;
+            ensure!(
+                record.status == BundleStatus::Executing,
+                Error::<T>::InvalidBundleState
+            );
+            ensure!(
+                record.executor.as_ref() == Some(&who),
+                Error::<T>::NotBundleExecutor
+            );
+            ensure!(
+                <frame_system::Pallet<T>>::block_number() <= record.deadline_block,
+                Error::<T>::DeadlineExpired
+            );
             let mut receipts = BundleLegReceipts::<T>::get(bundle_id);
             let idx = leg_index as usize;
             ensure!(idx < receipts.len(), Error::<T>::InvalidBundleState);
-
-            // Check leg not already executed before taking mutable reference.
             ensure!(!receipts[idx].executed, Error::<T>::LegAlreadyExecuted);
-
-            // Mutate and write back — scoped so the immutable borrow for the
-            // vm_type clone below doesn't conflict.
-            {
-                let receipt = &mut receipts[idx];
-                receipt.executed = true;
-                receipt.state_diff = state_diff;
-            }
-            let vm_type = receipts[idx].vm_type.clone();
-            BundleLegReceipts::<T>::insert(bundle_id, receipts);
-            Self::deposit_event(Event::LegExecutionRecorded {
-                bundle_id,
-                leg_index,
-                vm_type,
-            });
-
-            log::debug!(
-                target: "x3-atomic-kernel",
-                "Bundle {:?} leg {} executed and receipt stored",
-                bundle_id, leg_index
+            // EVM and SVM keep no persistent state on this chain, so there is nothing for such a
+            // leg to execute against or journal.
+            ensure!(
+                receipts[idx].vm_type == VmType::X3,
+                Error::<T>::UnsupportedLegExecution
             );
 
+            ensure!(
+                LegExecutionCommitments::<T>::get(bundle_id)
+                    .get(idx)
+                    .copied()
+                    == Some(crate::chain_legs::execution_commitment(&execution)),
+                Error::<T>::ExecutionNotCommitted
+            );
+
+            let mut context = bundle_id.as_bytes().to_vec();
+            context.extend_from_slice(&leg_index.to_le_bytes());
+            let context = H256(sp_io::hashing::blake2_256(&context));
+            // As the executor, never the submitter: the executor chooses what a leg does, so a leg
+            // may only spend what the executor itself holds.
+            let entries = T::LegExecutor::execute(bundle_id, context, &who, &execution)?;
+            let held = BundleJournalEntries::<T>::get(bundle_id)
+                .saturating_add(entries.len().try_into().unwrap_or(u32::MAX));
+            ensure!(
+                held <= crate::chain_legs::MAX_BUNDLE_JOURNAL_ENTRIES,
+                Error::<T>::JournalTooLarge
+            );
+            BundleJournalEntries::<T>::insert(bundle_id, held);
+            let diff =
+                crate::chain_legs::encode_journal(&entries).ok_or(Error::<T>::JournalTooLarge)?;
+            let journal = crate::chain_legs::journal_hash(&diff);
+
+            receipts[idx].executed = true;
+            receipts[idx].state_diff = diff;
+            BundleLegReceipts::<T>::insert(bundle_id, receipts);
+            ChainJournal::<T>::insert(bundle_id, leg_index, journal);
+            Self::deposit_event(Event::LegExecutedOnChain {
+                bundle_id,
+                leg_index,
+                journal,
+            });
             Ok(())
         }
     }
@@ -1092,40 +1153,10 @@ pub mod pallet {
                     .longevity(10)
                     .propagate(true)
                     .build()
-            } else if let Call::record_leg_execution_receipt {
-                bundle_id,
-                leg_index,
-                state_diff: _,
-            } = call
-            {
-                // Guard: state diffs must be non-trivial.
-                // An empty diff signals a read-only leg — no revert needed,
-                // so recording it is wasteful but not harmful.
-
-                // Bundle must be Executing and have an assigned executor.
-                match Bundles::<T>::get(bundle_id) {
-                    Some(record)
-                        if record.status == BundleStatus::Executing
-                            && record.executor.is_some() =>
-                    {
-                        let receipts = BundleLegReceipts::<T>::get(bundle_id);
-                        if (*leg_index as usize) >= receipts.len() {
-                            return InvalidTransaction::Stale.into();
-                        }
-                        if receipts[*leg_index as usize].executed {
-                            return InvalidTransaction::Stale.into();
-                        }
-                        let mut tag = bundle_id.as_bytes().to_vec();
-                        tag.extend_from_slice(&leg_index.to_le_bytes());
-                        ValidTransaction::with_tag_prefix("X3AtomicLegReceipt")
-                            .priority(TransactionPriority::MAX / 2)
-                            .and_provides([tag.as_slice()])
-                            .longevity(5)
-                            .propagate(true)
-                            .build()
-                    }
-                    _ => InvalidTransaction::Stale.into(),
-                }
+            } else if let Call::record_leg_execution_receipt { .. } = call {
+                // Retired: leg receipts are produced on chain by `execute_bundle_leg`. Refused at
+                // the pool so the call is never gossiped.
+                InvalidTransaction::Call.into()
             } else {
                 InvalidTransaction::Call.into()
             }
@@ -1135,53 +1166,122 @@ pub mod pallet {
     // ── Internal Helpers ──────────────────────────────────────────────────────
 
     impl<T: Config> Pallet<T> {
-        /// Attempt to revert VM side effects for all executed legs of a bundle.
-        ///
-        /// Reads `BundleLegReceipts` and calls `T::VmReverter::revert_leg()`
-        /// for each leg that has `executed == true` and a non-empty state diff.
-        /// Returns the number of legs that failed to revert.
-        ///
-        /// This is a best-effort operation: even if some legs fail to revert,
-        /// the pallet-level rollback (status, bond, event) still proceeds.
-        /// Failures are logged so monitoring/alerting can catch them.
-        fn do_revert_bundle_legs(bundle_id: H256) -> u32 {
-            let receipts = BundleLegReceipts::<T>::get(bundle_id);
-            let mut revert_failures: u32 = 0;
-            let leg_count = receipts.len() as u32;
+        /// The journal `execute_bundle_leg` recorded for a leg receipt, if the receipt's diff is
+        /// that journal.
+        fn recorded_journal(
+            bundle_id: H256,
+            receipt: &crate::vm_revert::LegReceipt,
+        ) -> Option<Vec<crate::chain_legs::JournalEntry>> {
+            ChainJournal::<T>::get(bundle_id, receipt.leg_index)
+                .filter(|recorded| {
+                    *recorded == crate::chain_legs::journal_hash(&receipt.state_diff)
+                })
+                .and_then(|_| crate::chain_legs::decode_journal(&receipt.state_diff))
+        }
 
-            for receipt in receipts.iter() {
-                if receipt.executed && !receipt.state_diff.is_empty() {
-                    match T::VmReverter::revert_leg(receipt.vm_type.clone(), &receipt.state_diff) {
-                        Ok(crate::vm_revert::RevertOutcome::Reverted)
-                        | Ok(crate::vm_revert::RevertOutcome::NoSideEffects) => {}
-                        Err(err) => {
-                            revert_failures += 1;
-                            log::warn!(
-                                target: "x3-atomic-kernel",
-                                "Failed to revert leg {} (vm_type: {:?}) for bundle {:?}: {:?}",
-                                receipt.leg_index, receipt.vm_type, bundle_id, err
-                            );
+        /// Undo every executed leg of a bundle, newest first, in one storage transaction: all
+        /// legs or none. A leg with a chain journal is undone by the `LegExecutor`; any other
+        /// non-empty diff goes to the configured `VmReverter` (which, in the runtime, refuses
+        /// it). On failure nothing changed, `IncompleteVmRevert` is emitted, and the error is the
+        /// first leg that could not be undone.
+        fn revert_bundle_legs(bundle_id: H256) -> Result<(), u32> {
+            use frame_support::storage::{with_transaction, TransactionOutcome};
+            let receipts = BundleLegReceipts::<T>::get(bundle_id);
+            let leg_count = receipts.len() as u32;
+            let mut failed_leg = None;
+            let _ = with_transaction(|| {
+                for receipt in receipts.iter().rev() {
+                    if !receipt.executed || receipt.state_diff.is_empty() {
+                        continue;
+                    }
+                    let outcome = match Self::recorded_journal(bundle_id, receipt) {
+                        Some(entries) => T::LegExecutor::revert(bundle_id, &entries)
+                            .map(|()| crate::vm_revert::RevertOutcome::Reverted),
+                        None => {
+                            T::VmReverter::revert_leg(receipt.vm_type.clone(), &receipt.state_diff)
                         }
+                    };
+                    if let Err(err) = outcome {
+                        log::error!(
+                            target: "x3-atomic-kernel",
+                            "Bundle {:?}: leg {} (vm_type: {:?}) could not be undone: {:?}",
+                            bundle_id, receipt.leg_index, receipt.vm_type, err
+                        );
+                        failed_leg = Some(receipt.leg_index);
+                        return TransactionOutcome::Rollback(Err::<(), DispatchError>(
+                            Error::<T>::LegRevertFailed.into(),
+                        ));
                     }
                 }
+                TransactionOutcome::Commit(Ok(()))
+            });
+            match failed_leg {
+                None => Ok(()),
+                Some(leg) => {
+                    // Monitoring sees which bundle could not be rolled back; nothing was undone.
+                    Self::deposit_event(Event::IncompleteVmRevert {
+                        bundle_id,
+                        leg_count,
+                        failed_count: 1,
+                    });
+                    Err(leg)
+                }
             }
+        }
 
-            if revert_failures > 0 {
-                log::error!(
-                    target: "x3-atomic-kernel",
-                    "Bundle {:?}: {}/{} legs failed VM revert",
-                    bundle_id, revert_failures, leg_count
-                );
-                // Emit event so runtime monitoring/alerting can react to stale
-                // VM side effects that break the advertised atomicity guarantee.
-                Self::deposit_event(Event::IncompleteVmRevert {
-                    bundle_id,
-                    leg_count,
-                    failed_count: revert_failures,
+        /// Make every executed leg of a finalizing bundle final (escrow paid, slots released),
+        /// oldest first, then drop its receipts and journals. Runs inside finalization's storage
+        /// layer, so a failure leaves the bundle as it was.
+        fn commit_bundle_legs(bundle_id: H256) -> DispatchResult {
+            let receipts = BundleLegReceipts::<T>::get(bundle_id);
+            for receipt in receipts.iter() {
+                ensure!(receipt.executed, Error::<T>::LegNotExecuted);
+                let entries =
+                    Self::recorded_journal(bundle_id, receipt).ok_or(Error::<T>::LegNotExecuted)?;
+                T::LegExecutor::commit(bundle_id, &entries)
+                    .map_err(|_| Error::<T>::LegCommitFailed)?;
+            }
+            Self::clear_bundle_legs(bundle_id);
+            Ok(())
+        }
+
+        /// Put expiries this block could not finish into the next block's index (or the first
+        /// later one with room). They are already past their deadline, so a later slot only delays
+        /// the refund; it never extends what the bundle may do (legs and finalization check the
+        /// deadline themselves).
+        fn reschedule_expiries(now: BlockNumberFor<T>, bundles: Vec<H256>) {
+            let mut at = now;
+            let mut pending = bundles.into_iter().peekable();
+            while pending.peek().is_some() {
+                at = at.saturating_add(One::one());
+                DeadlineIndex::<T>::mutate(at, |index| {
+                    while let Some(bundle) = pending.peek() {
+                        if index.try_push(*bundle).is_err() {
+                            break;
+                        }
+                        pending.next();
+                    }
                 });
             }
+        }
 
-            revert_failures
+        /// Drop a finished bundle's leg receipts, journals and journal count.
+        fn clear_bundle_legs(bundle_id: H256) {
+            BundleLegReceipts::<T>::remove(bundle_id);
+            let _ = ChainJournal::<T>::clear_prefix(bundle_id, u32::MAX, None);
+            BundleJournalEntries::<T>::remove(bundle_id);
+            LegExecutionCommitments::<T>::remove(bundle_id);
+        }
+
+        /// The most weight finishing (finalizing or rolling back) one bundle's legs takes: every
+        /// journal entry the bundle may hold, plus reading and clearing its receipts and journals.
+        pub fn finish_legs_weight() -> Weight {
+            let legs = u64::from(T::MaxLegsPerBundle::get());
+            T::LegExecutor::max_entry_weight()
+                .saturating_mul(u64::from(crate::chain_legs::MAX_BUNDLE_JOURNAL_ENTRIES))
+                .saturating_add(
+                    T::DbWeight::get().reads_writes(legs.saturating_add(2), legs.saturating_add(2)),
+                )
         }
 
         /// Roll back an atomic bundle: verify authorization, revert VM side effects,
@@ -1235,8 +1335,9 @@ pub mod pallet {
                     }
                 }
 
-                // Attempt to revert VM side effects for each executed leg.
-                let revert_failures = Self::do_revert_bundle_legs(bundle_id);
+                // Undo every executed leg, or nothing: a rollback that cannot undo a leg fails and
+                // leaves the bundle (and its journals) in place to be retried.
+                Self::revert_bundle_legs(bundle_id).map_err(|_| Error::<T>::LegRevertFailed)?;
 
                 // ── Bond slashing ────────────────────────────────────────────
                 // Use the bond stored on the record (set at submission time).
@@ -1287,15 +1388,14 @@ pub mod pallet {
                 record.status = BundleStatus::RolledBack;
                 Bundles::<T>::insert(bundle_id, &record);
 
-                // Clean up leg receipts storage after rollback
-                BundleLegReceipts::<T>::remove(bundle_id);
+                Self::clear_bundle_legs(bundle_id);
 
                 Self::deposit_event(Event::BundleRolledBack { bundle_id, reason });
 
                 log::warn!(
                     target: "x3-atomic-kernel",
-                    "Bundle {:?} rolled back (slashed {:?}, {} legs failed VM revert)",
-                    bundle_id, slash_amount, revert_failures
+                    "Bundle {:?} rolled back (slashed {:?}), every executed leg undone",
+                    bundle_id, slash_amount
                 );
 
                 Ok(())
@@ -1445,6 +1545,10 @@ pub mod pallet {
                     legs_hash: record.legs_hash,
                     leg_count: record.leg_count,
                 };
+
+                // Every declared leg ran on chain, and its held effects become final here: a bundle
+                // whose legs did not all execute is not a success to attest to.
+                Self::commit_bundle_legs(bundle_id)?;
 
                 // S0-005: All storage operations now atomic - any failure rolls back everything
                 PoaeProofs::<T>::insert(bundle_id, proof);

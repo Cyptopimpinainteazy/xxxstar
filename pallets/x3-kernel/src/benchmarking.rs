@@ -439,5 +439,56 @@ mod benchmarks {
         Ok(())
     }
 
+    /// Benchmark `submit_trade`: the compiled flagship arbitrage (flash borrow, two swaps, repay,
+    /// oracle-checked) committed against the market `TradingHost::benchmark_market` builds.
+    ///
+    /// The call is charged `trade_weight()`, a model: the measured `x3_execute` at the gas limit
+    /// plus database weight per structure the section can name (`TradeMeter::upper_bound`). This
+    /// measures what the model does not, the section verification and settlement compute, so the
+    /// figure it produces is the one to compare against the model.
+    #[benchmark]
+    fn submit_trade() -> Result<(), BenchmarkError> {
+        use crate::trading::{
+            KernelTradingHost, TradingConfig, BENCHMARK_EXECUTED_AT, BENCHMARK_SUBMITTED_AT,
+            BENCHMARK_TRADE_MODULE, BENCHMARK_USDX,
+        };
+        let trader: T::AccountId = whitelisted_caller();
+        let collector: T::AccountId = account("fee-collector", 0, 0);
+        frame_system::Pallet::<T>::set_block_number(BENCHMARK_EXECUTED_AT.into());
+        T::TradingHost::benchmark_market(&trader).map_err(BenchmarkError::Stop)?;
+        TradingConfiguration::<T>::put(TradingConfig {
+            fee_asset: BENCHMARK_USDX,
+            gas_price: 10,
+            settlement_fee: 200_000,
+            relay_fee: 300_000,
+            protocol_fee: 100_000,
+            oracle_fee: 10_000,
+            solver_fee: 0,
+            cross_domain_fee: 0,
+            fee_collector: collector,
+        });
+        let module: BoundedVec<u8, ConstU32<{ crate::trading::MAX_TRADE_MODULE_BYTES }>> =
+            BENCHMARK_TRADE_MODULE
+                .to_vec()
+                .try_into()
+                .map_err(|_| BenchmarkError::Stop("the benchmark module exceeds the bound"))?;
+
+        #[extrinsic_call]
+        submit_trade(
+            RawOrigin::Signed(trader),
+            module,
+            BENCHMARK_SUBMITTED_AT.into(),
+        );
+
+        // Committed, not rolled back: a rolled-back trade would measure the cheap path.
+        let (_, record) = TradeReceipts::<T>::iter()
+            .next()
+            .ok_or(BenchmarkError::Stop("the trade left no receipt"))?;
+        if !record.committed {
+            return Err(BenchmarkError::Stop("the benchmark trade rolled back"));
+        }
+        Ok(())
+    }
+
     impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(), crate::mock::Test);
 }

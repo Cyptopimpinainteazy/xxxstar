@@ -543,21 +543,16 @@ impl X3Executor {
         Self::verify_on_chain(bytecode)
     }
 
-    /// Estimate gas for bytecode execution
+    /// Estimate gas for bytecode execution: the chain's own estimate, for a module the chain's
+    /// verifier admits.
+    ///
+    /// This used to ask `x3_verifier::Verifier::verify_bytecode`, which verified nothing and
+    /// reported no gas, so every module passed and the estimate fell back to `len * 10`: a
+    /// native caller and the chain (`estimate_gas_on_chain`) priced the same bytes differently.
     #[cfg(feature = "std")]
     pub fn estimate_gas(bytecode: &[u8]) -> X3Result<u64> {
-        // Use verifier's gas estimation
-        let report = x3_verifier::Verifier::new(x3_verifier::SafetyRules::default())
-            .verify_bytecode(bytecode)
-            .map_err(|e| X3IntegrationError::VerificationFailed(format!("{:?}", e)))?;
-
-        // Get gas estimate from report, or use conservative fallback
-        let gas_estimate = report
-            .gas_report
-            .map(|gr| gr.total_gas)
-            .unwrap_or_else(|| (bytecode.len() as u64) * 10);
-
-        Ok(gas_estimate)
+        Self::verify(bytecode, false)?;
+        Ok(Self::estimate_gas_on_chain(bytecode))
     }
 
     /// Estimate gas (no_std: the chain's estimate, see `estimate_gas_on_chain`)
@@ -575,6 +570,33 @@ impl X3Executor {
 #[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_native_estimate_is_the_chains_and_refuses_what_the_chain_refuses() {
+        // `fn main() -> i64 { 1 }`: `r0 = 1; ret r0`.
+        let mut module = x3_backend::BytecodeModule::new();
+        module.functions = vec![x3_backend::FunctionEntry {
+            name: "main".into(),
+            entry_point: 0,
+            param_count: 0,
+            local_count: 1,
+            max_stack: 1,
+            return_type_tag: 1,
+        }];
+        module.code = vec![
+            x3_backend::opcode::Opcode::LoadImm as u8,
+            0,
+            1,
+            x3_backend::opcode::Opcode::Ret as u8,
+            0,
+        ];
+        let module = module.to_bytes();
+        assert_eq!(
+            X3Executor::estimate_gas(&module).expect("a valid module verifies"),
+            X3Executor::estimate_gas_on_chain(&module)
+        );
+        assert!(X3Executor::estimate_gas(b"not a module").is_err());
+    }
 
     #[test]
     fn test_executor_config_defaults() {

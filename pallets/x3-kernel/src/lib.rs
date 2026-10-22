@@ -67,6 +67,13 @@ pub mod mint_burn;
 pub mod pending_transfer;
 pub mod registry;
 pub mod supply;
+pub mod trading;
+
+/// Largest X3 event payload the kernel delivers: the engine's own bound
+/// (`x3_vm::events::MAX_DATA_SIZE`), held equal at compile time.
+pub const MAX_X3_LOG_BYTES: u32 = 4_096;
+const _: () = assert!(MAX_X3_LOG_BYTES as usize == x3_vm::events::MAX_DATA_SIZE);
+pub use trading::{KernelTradingHost, TradingConfig};
 
 pub use adapters::{
     EvmExecutorAdapter, FailingMockEvmAdapter, FailingMockSvmAdapter, FailingMockX3Adapter,
@@ -484,7 +491,10 @@ pub mod pallet {
             + MaxEncodedLen
             + CheckedAdd
             + From<<Self::Currency as frame_support::traits::Currency<Self::AccountId>>::Balance>
-            + Into<<Self::Currency as frame_support::traits::Currency<Self::AccountId>>::Balance>;
+            + Into<<Self::Currency as frame_support::traits::Currency<Self::AccountId>>::Balance>
+            // The trading engine's amounts are `u128`; conversions are checked both ways.
+            + TryFrom<u128>
+            + Into<u128>;
 
         /// Identifier type for registered assets.
         type AssetId: Parameter
@@ -493,7 +503,9 @@ pub mod pallet {
             + Default
             + Copy
             + MaxEncodedLen
-            + MaybeSerializeDeserialize;
+            + MaybeSerializeDeserialize
+            // Trading artifacts name assets by `u32` ledger id (checked conversion).
+            + TryFrom<u32>;
 
         /// Identifier type used to map substrate accounts to X3 IDs.
         type AtlasId: Parameter + Member + Default + Copy + MaxEncodedLen;
@@ -629,6 +641,10 @@ pub mod pallet {
         /// Concrete halt hook used by `emergency_halt` to flip the runtime's
         /// production halt state.
         type EmergencyHaltController: EmergencyHaltController;
+
+        /// The venues, flash pools and oracle prices `submit_trade` runs against. `()` offers
+        /// none, so every trade that needs one is refused by the engine.
+        type TradingHost: crate::trading::KernelTradingHost<Self::AccountId>;
     }
 
     type AssetSymbolOf<T> = BoundedVec<u8, <T as Config>::MaxAssetSymbolLength>;
@@ -674,6 +690,31 @@ pub mod pallet {
         T::Balance,
         ValueQuery,
     >;
+
+    /// The trade cost schedule and fee collector (`set_trading_config`). `None` refuses every
+    /// trade: the chain does not run trades against costs nobody set.
+    #[pallet::storage]
+    pub type TradingConfiguration<T: Config> =
+        StorageValue<_, crate::trading::TradingConfig<T::AccountId>, OptionQuery>;
+
+    /// Every trade `submit_trade` ran, committed or rolled back, by receipt digest.
+    #[pallet::storage]
+    pub type TradeReceipts<T: Config> = StorageMap<
+        _,
+        Identity,
+        H256,
+        crate::trading::TradeRecord<T::AccountId, BlockNumberFor<T>>,
+        OptionQuery,
+    >;
+
+    /// The next ledger asset id `issue_ledger_asset` tries (from `trading::ISSUED_ASSET_BASE`).
+    #[pallet::storage]
+    pub type NextIssuedAssetId<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+    /// Committed trades per trader.
+    #[pallet::storage]
+    pub type TradeNonces<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
 
     /// Maps accounts to their X3 identifiers.
     #[pallet::storage]
@@ -751,6 +792,13 @@ pub mod pallet {
     #[pallet::getter(fn x3_contract_slot)]
     pub type X3ContractStorage<T: Config> =
         StorageMap<_, Blake2_128Concat, H256, [u8; 32], OptionQuery>;
+
+    /// Contract slots held by an unfinished atomic bundle, and the bundle that holds each. Only the
+    /// holder may write a held slot until it releases it (`release_x3_slot`), so a bundle's
+    /// rollback can always put back the value it replaced. Written only through
+    /// `execute_x3_program`'s `holder`.
+    #[pallet::storage]
+    pub type X3SlotHolds<T: Config> = StorageMap<_, Blake2_128Concat, H256, H256, OptionQuery>;
 
     /// EVM transactions keyed by transaction hash (keccak256 of raw tx).
     /// Stores full transaction data (including gas and input) for RPC compatibility.
@@ -875,6 +923,9 @@ pub mod pallet {
         pub evm_escrow: sp_core::H160,
         /// Bridge escrow address for SVM cross-chain operations.
         pub svm_escrow: [u8; 32],
+        /// The trade cost schedule a development or test network starts with. `None` (every
+        /// production chain) leaves trading refused until governance calls `set_trading_config`.
+        pub trading_config: Option<crate::trading::TradingConfig<T::AccountId>>,
     }
 
     #[pallet::genesis_build]
@@ -909,6 +960,17 @@ pub mod pallet {
                     decimals: *decimals,
                 };
                 AssetRegistry::<T>::insert(asset_id, metadata);
+            }
+
+            // After the registry: the fee asset must be one this genesis registered.
+            if let Some(config) = &self.trading_config {
+                let fee_asset = T::AssetId::try_from(config.fee_asset)
+                    .unwrap_or_else(|_| panic!("trading fee asset does not fit the asset id type"));
+                assert!(
+                    AssetRegistry::<T>::contains_key(fee_asset),
+                    "Trading fee asset is not registered in genesis"
+                );
+                TradingConfiguration::<T>::put(config.clone());
             }
 
             // Set escrow addresses
@@ -1021,6 +1083,33 @@ pub mod pallet {
         ProtocolUnpaused,
         /// Emergency halt activated — all asset movement frozen due to invariant violation.
         EmergencyHalted,
+        /// A trade committed and its ledger movements were applied.
+        /// `receipt_bytes` is the canonical receipt; `receipt` is its digest, as recorded in
+        /// `TradeReceipts`.
+        TradeCommitted {
+            trader: T::AccountId,
+            receipt: H256,
+            gas_used: u64,
+            receipt_bytes: crate::trading::ReceiptBytes,
+        },
+        /// A trade rolled back: nothing moved. `trap` is the receipt's `TrapId`.
+        TradeRolledBack {
+            trader: T::AccountId,
+            receipt: H256,
+            trap: u8,
+            op_index: u16,
+            receipt_bytes: crate::trading::ReceiptBytes,
+        },
+        /// Governance set the trade cost schedule and fee collector.
+        TradingConfigured,
+        /// An accepted comit's X3 program emitted an event: `topic` is the sha-256 of the event's
+        /// name, `data` its encoded arguments, `index` its position among the program's events.
+        X3LogEmitted {
+            comit_id: H256,
+            index: u32,
+            topic: H256,
+            data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>>,
+        },
     }
 
     #[pallet::error]
@@ -1139,6 +1228,32 @@ pub mod pallet {
         /// An X3 call asked for more gas than `DefaultX3GasLimit`, the most one extrinsic's weight
         /// pays for.
         X3GasBudgetExceedsLimit,
+        /// A ledger transfer would leave the sender below zero.
+        InsufficientLedgerBalance,
+        /// A ledger amount does not fit the ledger's balance type, or a sum overflowed.
+        LedgerOverflow,
+        /// Governance has not set the trade cost schedule (`set_trading_config`).
+        TradingNotConfigured,
+        /// The trading module exceeds `MAX_TRADE_MODULE_BYTES`.
+        TradeModuleTooLarge,
+        /// The trading module was refused before it ran: not decodable, not a trading module, not
+        /// for this chain, refused by the verifier, or demanding a private channel.
+        TradeRefused,
+        /// The trade's receipt exceeds `MAX_TRADE_RECEIPT_BYTES`.
+        TradeReceiptTooLarge,
+        /// A receipt with this digest is already recorded.
+        DuplicateTradeReceipt,
+        /// The chain's state after settlement disagrees with the engine's.
+        TradeSettlementInconsistent,
+        /// The trading module declares an asset's decimals differently from the asset registry.
+        TradeAssetMismatch,
+        /// The chain's economic halt freezes asset movement.
+        TradingHalted,
+        /// An X3 log exceeds `MAX_X3_LOG_BYTES` (the engine's own bound; an adapter that exceeds
+        /// it is refused rather than truncated).
+        X3LogTooLarge,
+        /// The program writes a contract slot an unfinished atomic bundle holds.
+        X3SlotHeld,
     }
 
     /// Storage for atomic settlement roots (per transaction ID).
@@ -1227,6 +1342,65 @@ pub mod pallet {
             T::EmergencyHaltController::trigger();
 
             Self::deposit_event(Event::EmergencyHalted);
+            Ok(())
+        }
+
+        /// Run a compiled X3 Lang trading module (X3BC format 1.1) on the production engine and
+        /// settle it on `CanonicalLedger` (see [`crate::trading`]).
+        ///
+        /// `submitted_at_block` is the block the trader signed against; the module's compiled
+        /// deadline counts from it, and it may not be in the future. A trade the engine rolls back
+        /// still succeeds as an extrinsic: nothing moves, and its receipt and `TradeRolledBack` are
+        /// recorded. A module refused before it runs (`TradeRefused`), or a settlement the chain's
+        /// state disagrees with (`TradeSettlementInconsistent`), fails the extrinsic and writes
+        /// nothing.
+        #[pallet::call_index(44)]
+        #[pallet::weight(Pallet::<T>::trade_weight())]
+        pub fn submit_trade(
+            origin: OriginFor<T>,
+            module: BoundedVec<u8, ConstU32<{ crate::trading::MAX_TRADE_MODULE_BYTES }>>,
+            submitted_at_block: BlockNumberFor<T>,
+        ) -> DispatchResultWithPostInfo {
+            let who = ensure_signed(origin)?;
+            ensure!(
+                submitted_at_block <= frame_system::Pallet::<T>::block_number(),
+                Error::<T>::TradeRefused
+            );
+            // Charged for the largest trade up front; refunded down to what this one did, refused
+            // ones included, so a block is not filled by the upper bound of every trade.
+            let mut meter = crate::trading::TradeMeter::default();
+            let result = Self::do_submit_trade(
+                &mut meter,
+                who,
+                &module,
+                submitted_at_block.saturated_into::<u64>(),
+            );
+            let post_info = frame_support::dispatch::PostDispatchInfo {
+                actual_weight: Some(meter.weight::<T>().min(Self::trade_weight())),
+                pays_fee: frame_support::dispatch::Pays::Yes,
+            };
+            result.map(|()| post_info).map_err(|error| {
+                frame_support::dispatch::DispatchErrorWithPostInfo { post_info, error }
+            })
+        }
+
+        /// Set the trade cost schedule and fee collector. Until this is called, every trade is
+        /// refused (`TradingNotConfigured`).
+        #[pallet::call_index(45)]
+        #[pallet::weight(<T as Config>::WeightInfo::set_trading_config())]
+        pub fn set_trading_config(
+            origin: OriginFor<T>,
+            config: crate::trading::TradingConfig<T::AccountId>,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            let id =
+                T::AssetId::try_from(config.fee_asset).map_err(|_| Error::<T>::UnknownAsset)?;
+            ensure!(
+                AssetRegistry::<T>::contains_key(id),
+                Error::<T>::UnknownAsset
+            );
+            TradingConfiguration::<T>::put(config);
+            Self::deposit_event(Event::TradingConfigured);
             Ok(())
         }
 
@@ -2031,8 +2205,24 @@ pub mod pallet {
 
             // Only comits that passed every check above reach this point, so a stored receipt is
             // always a receipt for an accepted comit.
+            //
+            // Its logs are delivered as events, not stored: `Emit` is priced per event, not per
+            // byte, so keeping them in state would let a program write up to
+            // `MAX_EVENTS * MAX_X3_LOG_BYTES` of permanent state for a few fee units.
             if let Some(ref receipt) = x3_receipt {
-                X3ExecutionReceipts::<T>::insert(comit_id, receipt.clone());
+                let mut stored = receipt.clone();
+                let logs = core::mem::take(&mut stored.logs);
+                X3ExecutionReceipts::<T>::insert(comit_id, stored);
+                for (index, log) in logs.into_iter().enumerate() {
+                    let data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>> =
+                        log.data.try_into().map_err(|_| Error::<T>::X3LogTooLarge)?;
+                    Self::deposit_event(Event::X3LogEmitted {
+                        comit_id,
+                        index: index as u32,
+                        topic: log.topics.first().copied().unwrap_or_default(),
+                        data,
+                    });
+                }
             }
 
             SubmittedComits::<T>::insert(comit_id, current_block);
@@ -2085,7 +2275,8 @@ pub mod pallet {
 
             // The X3VM slots are a separate channel from the balance-shaped ledger update above:
             // applied here so `DecodeFailureCount` stays untouched by a storage-writing comit.
-            let writes_applied = Self::apply_x3_storage_writes(comit_id, x3_receipt.as_ref())?;
+            let writes_applied =
+                Self::apply_x3_storage_writes(comit_id, x3_receipt.as_ref(), None)?;
 
             if writes_applied > 0 {
                 Self::deposit_event(Event::X3StorageUpdated {
@@ -2655,6 +2846,13 @@ pub mod pallet {
         /// (`DefaultX3GasLimit`). Every extrinsic that executes X3 charges this: it used to charge
         /// nothing for the execution, while the measured cost of the old 6,000,000-gas limit was
         /// 137 ms against a 150 ms block.
+        /// What `submit_trade` is charged: one engine run at the gas limit, plus the ledger,
+        /// registry, venue, flash-pool and oracle reads and writes a module bounded by the
+        /// section limits (`x3bc_core::trading::MAX_*`) can make.
+        pub fn trade_weight() -> Weight {
+            crate::trading::TradeMeter::upper_bound(T::DefaultX3GasLimit::get()).weight::<T>()
+        }
+
         pub fn x3_execution_weight() -> Weight {
             let gas = T::DefaultX3GasLimit::get().min(u32::MAX as u64) as u32;
             <T as Config>::WeightInfo::x3_execute(gas)
@@ -3673,9 +3871,75 @@ pub mod pallet {
         // `pub(crate)` only so the pallet's own tests can drive the refusal paths that a
         // well-behaved adapter never produces. It is not part of the pallet's public API; the only
         // production caller is `submit_comit_v2`.
+        /// Run an X3 program for `who` against the chain's contract slots, persist its slot writes
+        /// and deliver its events, exactly as an accepted comit's X3 leg does; returns the writes
+        /// (each with the value it replaced) for a caller that journals them (the atomic kernel's
+        /// on-chain bundle legs). `context` identifies the execution in `X3LogEmitted`. A program
+        /// that fails, or that the verifier refuses, writes nothing.
+        ///
+        /// Every slot it writes is held for `holder` (see `X3SlotHolds`) until `release_x3_slot`.
+        pub fn execute_x3_program(
+            context: H256,
+            who: &T::AccountId,
+            program: &[u8],
+            holder: H256,
+        ) -> Result<Vec<StorageWrite>, DispatchError> {
+            ensure!(!ProtocolPaused::<T>::get(), Error::<T>::ProtocolIsPaused);
+            let slots = Self::x3_storage_view()?;
+            let receipt = T::X3Adapter::execute_with_context(
+                program,
+                T::DefaultX3GasLimit::get(),
+                &slots,
+                T::PrivateSubmissionChannel::get(),
+                &Self::x3_call_context(Some(who)),
+            )?;
+            ensure!(receipt.success, DispatchError::Other("X3 program failed"));
+            Self::apply_x3_storage_writes(context, Some(&receipt), Some(holder))?;
+            for (index, log) in receipt.logs.into_iter().enumerate() {
+                let data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>> =
+                    log.data.try_into().map_err(|_| Error::<T>::X3LogTooLarge)?;
+                Self::deposit_event(Event::X3LogEmitted {
+                    comit_id: context,
+                    index: index as u32,
+                    topic: log.topics.first().copied().unwrap_or_default(),
+                    data,
+                });
+            }
+            Ok(receipt.storage_writes)
+        }
+
+        /// The most weight `execute_x3_program` can take: one engine run at the gas limit, the
+        /// slot view, and the writes `apply_x3_storage_writes` allows.
+        pub fn x3_program_weight() -> Weight {
+            // Per write: the hold check (a read), the slot and its hold (two writes).
+            Self::x3_execution_weight().saturating_add(
+                T::DbWeight::get().reads_writes(
+                    u64::from(T::MaxX3StorageSlots::get())
+                        .saturating_add(2)
+                        .saturating_add(Self::MAX_STATE_CHANGES as u64),
+                    (Self::MAX_STATE_CHANGES as u64).saturating_mul(2),
+                ),
+            )
+        }
+
+        /// Release a slot `holder` holds. Only the atomic kernel calls this, when the bundle that
+        /// holds the slot ends (after restoring it, on rollback).
+        pub fn release_x3_slot(holder: H256, key: H256) -> DispatchResult {
+            ensure!(
+                X3SlotHolds::<T>::get(key) == Some(holder),
+                Error::<T>::X3SlotHeld
+            );
+            X3SlotHolds::<T>::remove(key);
+            Ok(())
+        }
+
+        /// Persist an X3 receipt's slot writes. A slot an unfinished bundle holds is written only
+        /// by that bundle (`holder`); a write by anyone else refuses the whole receipt. With a
+        /// `holder`, every slot written becomes held for it.
         pub(crate) fn apply_x3_storage_writes(
             _comit_id: H256,
             x3_receipt: Option<&ExecutionReceipt>,
+            holder: Option<H256>,
         ) -> Result<u32, DispatchError> {
             let receipt = match x3_receipt {
                 Some(receipt) => receipt,
@@ -3693,8 +3957,17 @@ pub mod pallet {
                 return Err(Error::<T>::TooManyStorageWrites.into());
             }
 
+            for write in receipt.storage_writes.iter() {
+                if let Some(held_by) = X3SlotHolds::<T>::get(write.key) {
+                    ensure!(Some(held_by) == holder, Error::<T>::X3SlotHeld);
+                }
+            }
+
             let mut writes_applied = 0u32;
             for write in receipt.storage_writes.iter() {
+                if let Some(holder) = holder {
+                    X3SlotHolds::<T>::insert(write.key, holder);
+                }
                 match write.new_value {
                     Some(value) => {
                         X3ContractStorage::<T>::insert(write.key, value);
@@ -4826,6 +5099,10 @@ mod test_helpers;
 
 #[cfg(test)]
 mod tests;
+
+// `submit_trade`: compiled X3 Lang trading programs run and settled on `CanonicalLedger`.
+#[cfg(test)]
+mod tests_trading;
 
 #[cfg(test)]
 mod chaos_tests;

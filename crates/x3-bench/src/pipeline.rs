@@ -131,143 +131,13 @@ fn count_instructions_in_code(code: &[u8]) -> usize {
     count
 }
 
-/// Get the size of an instruction (opcode + operands).
-fn get_instruction_size(opcode: x3_backend::opcode::Opcode, _code: &[u8]) -> usize {
-    use x3_backend::opcode::Opcode;
-
-    match opcode {
-        // No operands (1 byte)
-        Opcode::Nop | Opcode::Halt | Opcode::RetVoid | Opcode::Breakpoint => 1,
-
-        // Single register (1 + 2 = 3 bytes)
-        Opcode::Ret
-        | Opcode::LoadZero
-        | Opcode::LoadTrue
-        | Opcode::LoadFalse
-        | Opcode::CtxSender
-        | Opcode::CtxBlockHeight
-        | Opcode::CtxTimestamp
-        | Opcode::CtxValue
-        | Opcode::CtxGas
-        | Opcode::CtxChainId
-        | Opcode::AtomicCheck
-        | Opcode::AgentSelf
-        | Opcode::DebugPrint => 3,
-
-        // Two registers (1 + 2 + 2 = 5 bytes)
-        Opcode::Mov
-        | Opcode::NegI
-        | Opcode::NegF
-        | Opcode::Inc
-        | Opcode::Dec
-        | Opcode::Not
-        | Opcode::LNot
-        | Opcode::ArrayLen
-        | Opcode::ArrayPush
-        | Opcode::ArrayPop
-        | Opcode::I32ToI64
-        | Opcode::I64ToI32
-        | Opcode::I32ToF32
-        | Opcode::I64ToF64
-        | Opcode::F32ToI32
-        | Opcode::F64ToI64
-        | Opcode::F32ToF64
-        | Opcode::F64ToF32
-        | Opcode::ToBool
-        | Opcode::EvmSload
-        | Opcode::EvmSstore
-        | Opcode::EvmBalance
-        | Opcode::EvmCodeSize => 5,
-
-        // Three registers (1 + 2 + 2 + 2 = 7 bytes)
-        Opcode::AddI
-        | Opcode::SubI
-        | Opcode::MulI
-        | Opcode::DivI
-        | Opcode::ModI
-        | Opcode::AddF
-        | Opcode::SubF
-        | Opcode::MulF
-        | Opcode::DivF
-        | Opcode::ModF
-        | Opcode::EqI
-        | Opcode::NeI
-        | Opcode::LtI
-        | Opcode::LeI
-        | Opcode::GtI
-        | Opcode::GeI
-        | Opcode::EqF
-        | Opcode::NeF
-        | Opcode::LtF
-        | Opcode::LeF
-        | Opcode::GtF
-        | Opcode::GeF
-        | Opcode::And
-        | Opcode::Or
-        | Opcode::Xor
-        | Opcode::Shl
-        | Opcode::Shr
-        | Opcode::UShr
-        | Opcode::LAnd
-        | Opcode::LOr
-        | Opcode::LoadIndex
-        | Opcode::StoreIndex
-        | Opcode::SvmTransfer => 7,
-
-        // Jump target (1 + 4 = 5 bytes)
-        Opcode::Jump => 5,
-
-        // Cond + target (1 + 2 + 4 = 7 bytes)
-        Opcode::JumpIf | Opcode::JumpUnless => 7,
-
-        // Register + const idx (1 + 2 + 4 = 7 bytes)
-        Opcode::LoadConst | Opcode::LoadGlobal | Opcode::Assert => 7,
-
-        // Const idx alone (1 + 4 = 5 bytes)
-        Opcode::StoreGlobal | Opcode::Panic => 5,
-
-        // Register + u16 (1 + 2 + 2 = 5 bytes)
-        Opcode::NewArray | Opcode::AtomicBegin | Opcode::AtomicCommit | Opcode::AtomicRollback => 5,
-
-        // Register + register + u16 (1 + 2 + 2 + 2 = 7 bytes)
-        Opcode::LoadField | Opcode::TupleGet => 7,
-
-        // Register + u16 + register (1 + 2 + 2 + 2 = 7 bytes)
-        Opcode::StoreField => 7,
-
-        // Register + i8 (1 + 2 + 1 = 4 bytes)
-        Opcode::LoadImm => 4,
-
-        // Variable-length - estimate conservatively
-        Opcode::Call => 9,      // dst + func + argc + at least one arg
-        Opcode::NewTuple => 7,  // dst + count + elements
-        Opcode::Emit => 9,      // event_id + argc + args
-        Opcode::AgentInit => 9, // agent + field_count + fields
-
-        // EVM ops (various sizes, estimate)
-        Opcode::EvmCall => 11, // dst + gas + addr + value + data
-        Opcode::EvmStaticCall | Opcode::EvmDelegateCall => 9,
-        Opcode::EvmCreate => 7,
-        Opcode::EvmCreate2 => 9,
-        Opcode::EvmLog => 7, // topic_count + topics + data
-
-        // SVM ops
-        Opcode::SvmInvoke => 9,
-        Opcode::SvmInvokeSigned => 11,
-        Opcode::SvmCreateAccount => 9,
-        Opcode::SvmGetData | Opcode::SvmSetData => 5,
-        Opcode::SvmGetRent | Opcode::SvmGetClock => 3,
-
-        // GPU host-call ops
-        Opcode::GpuSha256Batch => 7,
-        Opcode::GpuEd25519Verify => 7,
-        Opcode::GpuPohChain => 7,
-        Opcode::GpuSha256Streamed => 7,
-        Opcode::GpuDeviceCount => 3,
-        Opcode::GpuBenchmark => 5,
-        Opcode::GpuKeccak256Batch => 7,
-        Opcode::GpuSecp256k1Verify => 7,
-    }
+/// Encoded size of the instruction at the start of `code`, from the canonical opcode spec
+/// (`x3bc_core::spec`), so this walker cannot drift from the decoder. A truncated instruction
+/// consumes the rest of the code.
+fn get_instruction_size(opcode: x3_backend::opcode::Opcode, code: &[u8]) -> usize {
+    x3bc_core::spec::of(opcode)
+        .encoded_len(code)
+        .unwrap_or(code.len().max(1))
 }
 
 /// Simulate gas by summing instruction gas costs.
@@ -399,6 +269,24 @@ fn main() -> i64 {
     return x;
 }
 "#;
+
+    /// The measured instruction count is the production decoder's count: the walker reads widths
+    /// from the canonical spec, not from a table of its own.
+    #[test]
+    fn the_instruction_count_matches_the_production_decoder() {
+        for source in [
+            SIMPLE_SOURCE,
+            "fn f(a: i64, b: i64) -> i64 { if a > b { return a - b; } return f(b, a); }",
+        ] {
+            let compiled = compile_unoptimized(source).expect("compiles");
+            let decoded = Verifier::decode_all_instructions(&compiled.bytecode_module.code)
+                .expect("the production decoder reads it");
+            assert_eq!(
+                bridge_count_instructions(&compiled.bytecode_bytes).expect("counts"),
+                decoded.len()
+            );
+        }
+    }
 
     #[test]
     fn test_parse_to_hir() {

@@ -28,7 +28,11 @@ use crate::{
     PoaeProofs,
 };
 use frame_support::{
-    assert_ok, pallet_prelude::ValidateUnsigned, traits::Hooks, weights::Weight, BoundedVec,
+    assert_noop, assert_ok,
+    pallet_prelude::ValidateUnsigned,
+    traits::{Get, Hooks},
+    weights::Weight,
+    BoundedVec,
 };
 use parity_scale_codec::{Decode, Encode};
 use sp_core::offchain::StorageKind;
@@ -68,6 +72,7 @@ fn submit_one(amount_in: u128, deadline_blocks: u64, nonce: u64) -> H256 {
     assert_ok!(AtomicKernel::submit_atomic_bundle(
         RuntimeOrigin::signed(ALICE),
         legs,
+        BoundedVec::try_from(vec![H256::zero()]).expect("one leg"),
         deadline_blocks,
         1,
         nonce,
@@ -162,8 +167,10 @@ fn is_leg_receipt(call: &RuntimeCall, bundle_id: H256, leg_index: u32) -> bool {
     )
 }
 
+/// The offchain worker anchors finality certs and no longer posts leg receipts: a leg's receipt
+/// is produced on chain by `execute_bundle_leg`, so an `x3leg:` value in local storage is ignored.
 #[test]
-fn ocw_anchors_a_flash_cert_and_submits_leg_receipts() {
+fn ocw_anchors_a_flash_cert_and_posts_no_leg_receipts() {
     let (mut ext, submitted) = new_test_ext_offchain();
     ext.execute_with(|| {
         System::set_block_number(7);
@@ -178,31 +185,22 @@ fn ocw_anchors_a_flash_cert_and_submits_leg_receipts() {
         assert_eq!(submitted().len(), 0);
         assert_eq!(get_persistent(&key), Some(encoded.clone()));
 
-        // Cert for this block + Executing bundle: one anchor, one receipt.
+        // Cert for this block + Executing bundle: one anchor, and no leg receipt.
         let cert = H256::repeat_byte(0x5A);
         set_persistent(&ff_key(7), cert.as_bytes());
         mark_executing(bundle_id);
         AtomicKernel::offchain_worker(7);
 
         let transactions = submitted();
-        assert_eq!(
-            transactions.len(),
-            2,
-            "one finality anchor + one leg receipt"
-        );
+        assert_eq!(transactions.len(), 1, "one finality anchor, nothing else");
         let calls: Vec<RuntimeCall> = transactions.iter().map(|tx| decode_call(tx)).collect();
         assert!(
             calls.iter().any(|call| is_anchor(call, 7, cert)),
             "the 32-byte cert must be anchored"
         );
         assert!(
-            calls.iter().any(|call| is_leg_receipt(call, bundle_id, 0)),
-            "the Executing bundle's leg receipt must be submitted"
-        );
-        assert_eq!(
-            get_persistent(&key),
-            None,
-            "an accepted leg value is cleared"
+            !calls.iter().any(|call| is_leg_receipt(call, bundle_id, 0)),
+            "no leg receipt is posted from local storage"
         );
     });
 }
@@ -235,8 +233,10 @@ fn ocw_accepts_only_exactly_32_byte_nonzero_certs() {
     });
 }
 
+/// Leg values in local storage are no longer read at all (leg receipts are produced on chain):
+/// with good, empty and corrupt values present, nothing is submitted and nothing is cleared.
 #[test]
-fn ocw_skips_empty_leg_values_and_clears_corrupt_diffs() {
+fn ocw_reads_no_leg_values() {
     let (mut ext, submitted) = new_test_ext_offchain();
     ext.execute_with(|| {
         System::set_block_number(2);
@@ -253,33 +253,14 @@ fn ocw_skips_empty_leg_values_and_clears_corrupt_diffs() {
         let encoded = StateDiff::from(vec![0x01]).encode();
         set_persistent(&good_key, &encoded);
         set_persistent(&empty_key, b"");
-        // 0xFF starts a four-byte SCALE compact length with only one byte left.
         set_persistent(&corrupt_key, &[0xFF, 0x01]);
 
         AtomicKernel::offchain_worker(2);
 
-        let transactions = submitted();
-        assert_eq!(
-            transactions.len(),
-            1,
-            "only the decodable non-empty diff is submitted"
-        );
-        assert!(is_leg_receipt(&decode_call(&transactions[0]), good, 0));
-        assert_eq!(
-            get_persistent(&good_key),
-            None,
-            "the accepted key is cleared"
-        );
-        assert_eq!(
-            get_persistent(&empty_key),
-            Some(Vec::new()),
-            "an empty value is skipped, not cleared"
-        );
-        assert_eq!(
-            get_persistent(&corrupt_key),
-            None,
-            "a corrupt diff is cleared so the OCW does not retry it forever"
-        );
+        assert!(submitted().is_empty(), "no leg receipt is submitted");
+        assert_eq!(get_persistent(&good_key), Some(encoded));
+        assert_eq!(get_persistent(&empty_key), Some(Vec::new()));
+        assert_eq!(get_persistent(&corrupt_key), Some(vec![0xFF, 0x01]));
     });
 }
 
@@ -335,8 +316,10 @@ fn validate_unsigned_pins_anchor_zero_cert_window_and_priority() {
     });
 }
 
+/// The retired unsigned leg-receipt call is refused at the pool in every bundle state, so it is
+/// never gossiped: leg receipts come from `execute_bundle_leg`.
 #[test]
-fn validate_unsigned_pins_leg_receipt_guards_and_priority() {
+fn validate_unsigned_refuses_every_leg_receipt() {
     new_test_ext().execute_with(|| {
         System::set_block_number(10);
         let bundle_id = submit_one(1_000, 50, 1);
@@ -348,47 +331,15 @@ fn validate_unsigned_pins_leg_receipt_guards_and_priority() {
         let validate =
             |call: &Call<Test>| AtomicKernel::validate_unsigned(TransactionSource::External, call);
 
-        // Pending without an executor: refused.
-        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Stale);
-
-        // Pending *with* an executor assigned: the conjunction must still refuse.
-        Bundles::<Test>::mutate(bundle_id, |maybe| {
-            maybe.as_mut().expect("stored").executor = Some(ALICE);
-        });
-        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Stale);
-
-        // Executing without an executor: refused.
+        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Call);
+        // Even the state that used to be valid: Executing with an executor assigned.
         Bundles::<Test>::mutate(bundle_id, |maybe| {
             let record = maybe.as_mut().expect("stored");
             record.status = BundleStatus::Executing;
-            record.executor = None;
+            record.executor = Some(ALICE);
         });
-        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Stale);
-
-        // Executing with an executor: valid, at the leg-receipt priority.
-        Bundles::<Test>::mutate(bundle_id, |maybe| {
-            maybe.as_mut().expect("stored").executor = Some(ALICE);
-        });
-        let valid = expect_valid(validate(&leg_receipt(0)));
-        assert_eq!(valid.priority, TransactionPriority::MAX / 2);
-
-        // receipts.len() == 1 here, so index 1 is one past the end.
-        expect_invalid(validate(&leg_receipt(1)), InvalidTransaction::Stale);
-        expect_invalid(validate(&leg_receipt(999)), InvalidTransaction::Stale);
-
-        // An already-executed leg cannot be recorded twice.
-        let mut receipts = BundleLegReceipts::<Test>::get(bundle_id).to_vec();
-        receipts[0].executed = true;
-        set_receipts(bundle_id, receipts);
-        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Stale);
-
-        // Unknown bundles are refused.
-        let missing = Call::<Test>::record_leg_execution_receipt {
-            bundle_id: H256::repeat_byte(0xEE),
-            leg_index: 0,
-            state_diff: StateDiff::from(Vec::new()),
-        };
-        expect_invalid(validate(&missing), InvalidTransaction::Stale);
+        expect_invalid(validate(&leg_receipt(0)), InvalidTransaction::Call);
+        expect_invalid(validate(&leg_receipt(999)), InvalidTransaction::Call);
     });
 }
 
@@ -409,7 +360,7 @@ fn incomplete_revert_alerts(bundle_id: H256) -> Vec<(u32, u32)> {
 }
 
 #[test]
-fn rollback_counts_only_executed_nonempty_revert_failures() {
+fn a_rollback_with_a_leg_that_cannot_be_undone_is_refused_whole() {
     new_test_ext().execute_with(|| {
         let _failing = vm_revert_failing();
         System::set_block_number(5);
@@ -424,17 +375,26 @@ fn rollback_counts_only_executed_nonempty_revert_failures() {
             ],
         );
 
+        // A leg that cannot be undone refuses the whole rollback: nothing is undone, the bundle
+        // is untouched, and (the refusal being one storage transaction) no alert survives it.
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            crate::Error::<Test>::LegRevertFailed
+        );
+
+        // Once the reverter can undo them, the two executed legs with a diff are undone (the
+        // unexecuted and empty ones are skipped) and the rollback goes through without an alarm.
+        let _succeeding = vm_revert_ok();
         assert_ok!(AtomicKernel::rollback_atomic_bundle(
             RuntimeOrigin::signed(ALICE),
             bundle_id,
             BundleRollbackReason::SubmitterCancelled,
         ));
-
-        assert_eq!(
-            incomplete_revert_alerts(bundle_id),
-            vec![(4, 2)],
-            "exactly one alert, reporting the two real revert failures"
-        );
+        assert!(incomplete_revert_alerts(bundle_id).is_empty());
     });
 }
 
@@ -477,10 +437,17 @@ fn on_initialize_expires_bundles_and_returns_the_unslashed_bond() {
         System::set_block_number(6);
         let weight = AtomicKernel::on_initialize(6);
 
+        let db: frame_support::weights::RuntimeDbWeight =
+            <Test as frame_system::Config>::DbWeight::get();
+        let per_bundle = AtomicKernel::finish_legs_weight()
+            .saturating_add(db.reads_writes(3, 4))
+            .saturating_add(db.reads(1));
         assert_eq!(
             weight,
-            Weight::from_parts(20_000, 0),
-            "10_000 weight units per processed bundle"
+            db.reads_writes(1, 1)
+                .saturating_add(per_bundle)
+                .saturating_add(per_bundle),
+            "each processed bundle is charged everything finishing its legs can cost"
         );
         assert_eq!(
             Bundles::<Test>::get(pending).expect("stored").status,
@@ -604,5 +571,65 @@ fn read_only_getters_report_exactly_what_is_stored() {
         PoaeProofs::<Test>::insert(bundle_id, proof.clone());
         assert_eq!(AtomicKernel::get_poae_proof(bundle_id), Some(proof));
         assert_eq!(AtomicKernel::get_poae_proof(H256::repeat_byte(0xEE)), None);
+    });
+}
+
+/// Expiry work per block is bounded: at most `MAX_EXPIRIES_PER_BLOCK` bundles are undone in one
+/// `on_initialize`, and the rest are carried into the next block's index rather than dropped.
+#[test]
+fn on_initialize_undoes_a_bounded_number_of_expiries_and_carries_the_rest() {
+    new_test_ext().execute_with(|| {
+        let _succeeding = vm_revert_ok();
+        System::set_block_number(1);
+        let bundles: Vec<H256> = (0..5u64)
+            .map(|i| submit_one(1_000 + i as u128, 5, 10 + i))
+            .collect();
+        assert_eq!(DeadlineIndex::<Test>::get(6).len(), 5);
+
+        System::set_block_number(6);
+        AtomicKernel::on_initialize(6);
+        let rolled_back = |ids: &[H256]| {
+            ids.iter()
+                .filter(|id| {
+                    Bundles::<Test>::get(**id).expect("stored").status == BundleStatus::RolledBack
+                })
+                .count()
+        };
+        assert_eq!(
+            rolled_back(&bundles),
+            crate::MAX_EXPIRIES_PER_BLOCK as usize
+        );
+        assert!(DeadlineIndex::<Test>::get(6).is_empty());
+        assert_eq!(
+            DeadlineIndex::<Test>::get(7).len(),
+            1,
+            "the fifth waits one block"
+        );
+
+        System::set_block_number(7);
+        AtomicKernel::on_initialize(7);
+        assert_eq!(rolled_back(&bundles), 5);
+    });
+}
+
+/// An expired bundle whose legs cannot be undone is not marked rolled back with its effects in
+/// place: it keeps its journals and is retried in the next block.
+#[test]
+fn an_expiry_that_cannot_undo_its_legs_is_retried_not_marked_rolled_back() {
+    new_test_ext().execute_with(|| {
+        let _failing = vm_revert_failing();
+        System::set_block_number(1);
+        let bundle_id = submit_one(1_000, 5, 40);
+        mark_executing(bundle_id);
+        set_receipts(bundle_id, vec![receipt(0, true, vec![0x01])]);
+
+        System::set_block_number(6);
+        AtomicKernel::on_initialize(6);
+        assert_eq!(
+            Bundles::<Test>::get(bundle_id).expect("stored").status,
+            BundleStatus::Executing
+        );
+        assert_eq!(incomplete_revert_alerts(bundle_id).len(), 1);
+        assert_eq!(DeadlineIndex::<Test>::get(7).to_vec(), vec![bundle_id]);
     });
 }

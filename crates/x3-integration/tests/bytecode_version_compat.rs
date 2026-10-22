@@ -66,7 +66,7 @@ fn a_patch_bump_stays_readable() {
 /// A newer minor is not readable, and the refusal names the version it found.
 #[test]
 fn a_newer_minor_is_refused_by_name() {
-    let future = bc::VERSION + 0x100; // 1.1.0
+    let future = bc::READER_VERSION + 0x100; // one minor past what this loader reads
     let artifact = with_u32_at(&compiled_now(), VERSION_OFFSET, future);
     assert_eq!(
         execute_x3bc(&artifact, 1_000_000).unwrap_err(),
@@ -92,7 +92,7 @@ fn the_next_major_is_refused_by_name() {
 /// `min_version` and answers "I am not new enough", rather than executing a format it predates.
 #[test]
 fn an_artifact_that_demands_a_newer_loader_is_refused_by_name() {
-    let demanded = bc::VERSION + 0x100;
+    let demanded = bc::READER_VERSION + 0x100;
     let artifact = with_u32_at(&compiled_now(), MIN_VERSION_OFFSET, demanded);
     assert_eq!(
         execute_x3bc(&artifact, 1_000_000).unwrap_err(),

@@ -83,6 +83,7 @@ impl FoundryEngine {
     /// Takes a user prompt and creator wallet address, and returns the complete
     /// deployment receipt if successful.
     pub fn run(&self, prompt: &str, creator_wallet: &str) -> Result<PipelineResult, FoundryError> {
+        self.deployer.ensure_publication_backends()?;
         info!(
             "FoundryEngine: starting full pipeline for prompt: {}",
             prompt
@@ -197,7 +198,7 @@ impl FoundryEngine {
             Some(marketplace_listing_id.clone()),
             Some(analytics_endpoint.clone()),
             &target_chain,
-        );
+        )?;
 
         // Build deployment receipt
         let mut contract_addresses = HashMap::new();
@@ -222,7 +223,7 @@ impl FoundryEngine {
             marketplace_listing_id: Some(marketplace_listing_id),
             analytics_endpoint: Some(analytics_endpoint),
             deployed_at: Utc::now(),
-            deployer_address: self.deployer.deployer_key.clone(),
+            deployer_address: manifest.deployer_address.clone(),
             signature: String::new(),
             signed_at: Utc::now(),
             manifest_hash: manifest.manifest_hash.clone(),
@@ -233,7 +234,7 @@ impl FoundryEngine {
             gas_used: total_gas,
         };
 
-        self.deployer.sign_receipt(&mut receipt);
+        self.deployer.sign_receipt(&mut receipt)?;
 
         info!("Pipeline complete! dApp deployed successfully.");
         info!("  Name: {}", receipt.app_name);
@@ -375,21 +376,10 @@ mod tests {
     }
 
     #[test]
-    fn test_full_pipeline() {
-        // Deployment is real now (x3-foundry-core/src/evm_deploy.rs), so a
-        // full successful pipeline run needs a real chain to deploy to.
-        // Point the "x3-mainnet"/"x3-testnet" chain names -- whichever the
-        // generated plan picks as its first target_chain -- at a local
-        // anvil node via the same X3_NODE_RPC override
-        // evm_deploy::resolve_rpc_url reads in production. This is the only
-        // test in the crate that both resolves a named chain (rather than a
-        // literal http(s):// URL) and needs the deployment to actually
-        // succeed with a valid key, so mutating this process-wide env var
-        // for its duration doesn't race any other test: every other test
-        // that touches deploy_contracts either uses a literal anvil URL
-        // directly (unaffected by this var) or an intentionally invalid key
-        // that fails during key parsing, before any RPC call is made (so it
-        // fails the same way regardless of which URL X3_NODE_RPC points at).
+    fn test_full_pipeline_refuses_missing_publishers_before_chain_writes() {
+        // Direct contract deployment has its own real-Anvil acceptance tests.
+        // The complete pipeline must refuse missing publishers before making
+        // any chain writes, even when a valid signer and node are available.
         if !forge_available() || !anvil_available() {
             eprintln!("skipping: forge/anvil not on PATH in this environment");
             return;
@@ -414,15 +404,23 @@ mod tests {
             std::env::remove_var("X3_NODE_RPC");
         }
 
-        let pipeline = result.expect("full pipeline against a real local anvil node must succeed");
-        assert!(pipeline.receipt.signature.len() == 64);
-        assert!(!pipeline.receipt.contract_addresses.is_empty());
-        for address in pipeline.receipt.contract_addresses.values() {
-            assert!(
-                address.starts_with("0x") && address.len() == 42,
-                "{address}"
-            );
-        }
+        assert!(
+            matches!(result, Err(FoundryError::DeploymentFailed(ref reason))
+            if reason.contains("publishing backend")),
+            "missing publishers must stop the complete pipeline"
+        );
+        use ethers::providers::{Middleware, Provider};
+        let provider = Provider::try_from(anvil.endpoint()).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let height = runtime.block_on(provider.get_block_number()).unwrap();
+        assert_eq!(
+            height.as_u64(),
+            0,
+            "no contracts may be deployed before publication preflight"
+        );
     }
 
     fn forge_available() -> bool {

@@ -18,7 +18,7 @@ use sp_core::{H160, H256, U256};
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
-use x3_external_chains::adapter::{ChainAdapter, ChainConfig, ChainMessage};
+use x3_external_chains::adapter::{ChainAdapter, ChainConfig, ChainMessage, TransactionReceipt};
 use x3_external_chains::chains::arbitrum::{
     send_tx_to_l1_selector, ArbitrumAdapter, ARBSYS_ADDRESS,
 };
@@ -115,6 +115,29 @@ async fn pending_nonce(url: &str, address: H160) -> u64 {
     .await;
     let raw = answer["result"].as_str().expect("a nonce string");
     u64::from_str_radix(raw.trim_start_matches("0x"), 16).expect("a hex nonce")
+}
+
+/// A broadcast returns as soon as the node accepts the transaction, which is
+/// before the node has mined it. Reading the receipt once made this test fail
+/// whenever the send lost that race; the assertion we want is "it was mined",
+/// so wait for the block instead of for the scheduler.
+async fn mined_receipt(adapter: &ArbitrumAdapter, hash: H256) -> TransactionReceipt {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        if let Some(receipt) = adapter
+            .get_transaction_receipt(hash)
+            .await
+            .expect("receipt query")
+        {
+            return receipt;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "0x{} was broadcast but never mined within 15s",
+            hex::encode(hash.as_bytes())
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 }
 
 fn message(payload: &[u8]) -> ChainMessage {
@@ -233,11 +256,7 @@ async fn send_message_calls_arbsys_and_broadcasts_a_signed_transaction() {
         "the calldata decodes as sendTxToL1(recipient, payload)"
     );
 
-    let receipt = adapter
-        .get_transaction_receipt(first)
-        .await
-        .expect("receipt query")
-        .expect("a mined transaction");
+    let receipt = mined_receipt(&adapter, first).await;
     assert!(receipt.success, "the broadcast transaction succeeded");
     assert!(receipt.block_number > 0, "it landed in a block");
     assert!(
@@ -255,12 +274,8 @@ async fn send_message_calls_arbsys_and_broadcasts_a_signed_transaction() {
         .expect("a second send is broadcast");
     assert_ne!(second, first, "each send has its own hash");
     assert!(
-        adapter
-            .get_transaction_receipt(second)
-            .await
-            .expect("receipt query")
-            .expect("a mined transaction")
-            .success
+        mined_receipt(&adapter, second).await.success,
+        "the second broadcast transaction succeeded"
     );
     assert_eq!(pending_nonce(&url, H160(ANVIL_ADDRESS)).await, 2);
 }

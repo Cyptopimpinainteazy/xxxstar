@@ -1,4 +1,4 @@
-//! Unit tests for pallet-x3-launchpad (20 tests).
+//! Unit tests for pallet-x3-launchpad.
 
 use crate::mock::*;
 use crate::{Contributions, Error, Event, LaunchStatus, Launches};
@@ -282,7 +282,14 @@ fn claim_allocation_on_successful_launch() {
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_noop!(
+            Launchpad::claim_allocation(RuntimeOrigin::signed(10), id),
+            Error::<Test>::NotGraduated
+        );
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
         assert_ok!(Launchpad::claim_allocation(RuntimeOrigin::signed(10), id));
+        // 600 raised at 10 per token: the sole contributor's 60 tokens, paid from custody.
+        assert_eq!(TestLedger::balance(TOKEN, 10), 60);
     });
 }
 
@@ -293,6 +300,7 @@ fn claim_allocation_double_claim_fails() {
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
         assert_ok!(Launchpad::claim_allocation(RuntimeOrigin::signed(10), id));
         assert_noop!(
             Launchpad::claim_allocation(RuntimeOrigin::signed(10), id),
@@ -336,6 +344,12 @@ fn withdraw_raised_funds_by_creator() {
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        // The pool's share is set aside at graduation, so there is nothing to withdraw before it.
+        assert_noop!(
+            Launchpad::withdraw_raised_funds(RuntimeOrigin::signed(1), id),
+            Error::<Test>::NotGraduated
+        );
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
         // creator was set to account 1 in create_default_launch.
         assert_ok!(Launchpad::withdraw_raised_funds(
             RuntimeOrigin::signed(1),
@@ -343,15 +357,15 @@ fn withdraw_raised_funds_by_creator() {
         ));
         let state = Launches::<Test>::get(id).unwrap();
         assert_eq!(state.status, LaunchStatus::Completed);
+        // 600 raised, 50% to the pool: the creator receives the other 300.
+        assert_eq!(TestLedger::balance(QUOTE, 1), STARTING_QUOTE + 300);
     });
 }
 
 // ── graduate_launch ───────────────────────────────────────────────────────────
 //
-// Closes the gap identified in the deep-research assessment: the launchpad had a
-// full `fn graduate_launch` implementation but no unit test exercising it. The
-// flow runs three external trait calls (TokenFactory::create_token, Dex::create_pool,
-// LpLocker::lock_lp_for) — all stubbed in mock.rs.
+// The mock's token factory mints into the test ledger and its DEX takes real deposits and tracks
+// position owners, so these tests see where every unit went.
 
 #[test]
 fn graduate_launch_happy_path() {
@@ -361,36 +375,76 @@ fn graduate_launch_happy_path() {
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
-        assert_ok!(Launchpad::withdraw_raised_funds(
-            RuntimeOrigin::signed(1),
-            id
-        ));
 
         // Creator graduates the launch.
         assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
 
-        // Graduation recorded.
+        // Graduation recorded, and the pool seeded from custody: 800 raised at 10 per token,
+        // 50% (400) of the quote asset and 40 tokens into the pool; 80 tokens kept for the
+        // contributors; custody owns the LP position.
         assert!(crate::GraduatedLaunches::<Test>::contains_key(id));
-        let _ = id;
+        let custody = Launchpad::launch_account(id);
+        assert_eq!(TestLedger::balance(QUOTE, POOL_ACCOUNT), 400);
+        assert_eq!(TestLedger::balance(TOKEN, POOL_ACCOUNT), 40);
+        assert_eq!(TestLedger::balance(TOKEN, custody), 80);
+        assert_eq!(TestLedger::balance(QUOTE, custody), 400);
+        assert_eq!(TestDex::owner(POSITION), Some(custody));
     });
 }
 
 #[test]
-fn graduate_launch_fails_for_non_creator() {
+fn any_account_can_graduate_a_successful_launch() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
-        assert_ok!(Launchpad::withdraw_raised_funds(
-            RuntimeOrigin::signed(1),
-            id
+
+        // A contributor graduates it: a creator who walks away cannot strand the raise.
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(10), id));
+        assert!(crate::Graduations::<Test>::get(id).is_some());
+    });
+}
+
+/// A successful launch that cannot graduate is not a trap: governance cancels it and every
+/// contributor is refunded from custody. A graduated launch cannot be cancelled.
+#[test]
+fn governance_can_cancel_an_ungraduated_successful_launch_and_contributors_are_refunded() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        let graduated = create_default_launch();
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
+        assert_ok!(Launchpad::contribute(
+            RuntimeOrigin::signed(10),
+            graduated,
+            800
+        ));
+        jump_to(13);
+        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::finalize_launch(
+            RuntimeOrigin::signed(99),
+            graduated
         ));
 
-        // Non-creator (account 2) cannot graduate.
+        let custody = Launchpad::launch_account(id);
+        // (The mock's u64 accounts truncate every launch's custody to one account, so custody is
+        // checked by what left it.)
+        let (before, held) = (
+            TestLedger::balance(QUOTE, 10),
+            TestLedger::balance(QUOTE, custody),
+        );
+        assert_ok!(Launchpad::cancel_launch(RuntimeOrigin::signed(1), id));
+        assert_ok!(Launchpad::claim_refund(RuntimeOrigin::signed(10), id));
+        assert_eq!(TestLedger::balance(QUOTE, 10), before + 800);
+        assert_eq!(TestLedger::balance(QUOTE, custody), held - 800);
+
+        assert_ok!(Launchpad::graduate_launch(
+            RuntimeOrigin::signed(10),
+            graduated
+        ));
         assert_noop!(
-            Launchpad::graduate_launch(RuntimeOrigin::signed(2), id),
-            Error::<Test>::NotCreator
+            Launchpad::cancel_launch(RuntimeOrigin::signed(1), graduated),
+            Error::<Test>::LaunchNotActive
         );
     });
 }
@@ -415,10 +469,6 @@ fn graduate_launch_fails_when_already_graduated() {
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
-        assert_ok!(Launchpad::withdraw_raised_funds(
-            RuntimeOrigin::signed(1),
-            id
-        ));
 
         // First graduation succeeds.
         assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
@@ -426,6 +476,126 @@ fn graduate_launch_fails_when_already_graduated() {
         assert_noop!(
             Launchpad::graduate_launch(RuntimeOrigin::signed(1), id),
             Error::<Test>::AlreadyGraduated
+        );
+    });
+}
+
+// ── funds ─────────────────────────────────────────────────────────────────────
+
+#[test]
+fn a_contribution_is_paid_into_the_launchs_custody() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
+        assert_eq!(TestLedger::balance(QUOTE, 10), STARTING_QUOTE - 600);
+        assert_eq!(
+            TestLedger::balance(QUOTE, Launchpad::launch_account(id)),
+            600
+        );
+    });
+}
+
+#[test]
+fn a_contribution_the_contributor_cannot_pay_records_nothing() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        // Account 50 holds no quote asset.
+        assert!(Launchpad::contribute(RuntimeOrigin::signed(50), id, 600).is_err());
+        assert_eq!(Contributions::<Test>::get(id, 50), 0);
+        assert_eq!(Launches::<Test>::get(id).unwrap().total_raised, 0);
+    });
+}
+
+#[test]
+fn a_failed_launch_refunds_real_funds() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 200));
+        jump_to(13);
+        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::claim_refund(RuntimeOrigin::signed(10), id));
+        assert_eq!(TestLedger::balance(QUOTE, 10), STARTING_QUOTE);
+        assert_eq!(TestLedger::balance(QUOTE, Launchpad::launch_account(id)), 0);
+    });
+}
+
+/// Two contributors, graduation, both claims, the creator's withdrawal and the LP release: every
+/// unit of the quote asset and of the token is accounted for, and custody keeps only rounding
+/// dust of the contributors' tokens.
+#[test]
+fn a_full_launch_moves_every_unit_where_it_belongs() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        let quote_supply = TestLedger::supply(QUOTE);
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 333));
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(9), id, 667));
+        jump_to(13);
+        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
+        assert_ok!(Launchpad::claim_allocation(RuntimeOrigin::signed(10), id));
+        assert_ok!(Launchpad::claim_allocation(RuntimeOrigin::signed(9), id));
+        assert_ok!(Launchpad::withdraw_raised_funds(
+            RuntimeOrigin::signed(1),
+            id
+        ));
+
+        let custody = Launchpad::launch_account(id);
+        // 1 000 raised at 10: 100 tokens for contributors, 500 quote + 50 tokens to the pool.
+        assert_eq!(TestLedger::balance(TOKEN, 10), 33);
+        assert_eq!(TestLedger::balance(TOKEN, 9), 66);
+        assert_eq!(TestLedger::balance(TOKEN, POOL_ACCOUNT), 50);
+        assert_eq!(TestLedger::balance(TOKEN, custody), 1, "rounding dust only");
+        assert_eq!(TestLedger::balance(QUOTE, POOL_ACCOUNT), 500);
+        assert_eq!(TestLedger::balance(QUOTE, 1), STARTING_QUOTE + 500);
+        assert_eq!(TestLedger::balance(QUOTE, custody), 0);
+        assert_eq!(
+            TestLedger::supply(QUOTE),
+            quote_supply,
+            "no quote asset created or lost"
+        );
+        assert_eq!(
+            TestLedger::supply(TOKEN),
+            150,
+            "exactly what graduation minted"
+        );
+    });
+}
+
+#[test]
+fn the_lp_position_stays_locked_in_custody_until_the_lock_expires() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
+        jump_to(13);
+        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
+        // Graduated at block 13 with a 5-block lock.
+        assert_noop!(
+            Launchpad::claim_lp(RuntimeOrigin::signed(1), id),
+            Error::<Test>::LpStillLocked
+        );
+        jump_to(18);
+        assert_noop!(
+            Launchpad::claim_lp(RuntimeOrigin::signed(2), id),
+            Error::<Test>::NotCreator
+        );
+        assert_ok!(Launchpad::claim_lp(RuntimeOrigin::signed(1), id));
+        assert_eq!(TestDex::owner(POSITION), Some(1));
+        assert_noop!(
+            Launchpad::claim_lp(RuntimeOrigin::signed(1), id),
+            Error::<Test>::AlreadyClaimed
+        );
+    });
+}
+
+#[test]
+fn a_launch_whose_soft_cap_cannot_seed_a_pool_is_refused_at_creation() {
+    new_test_ext().execute_with(|| {
+        // A soft cap of 5 at 10 per token: 50% of the smallest successful raise (2) buys no pool
+        // token, so the launch could succeed and never graduate.
+        assert_noop!(
+            Launchpad::create_launch(RuntimeOrigin::signed(1), 1, 5, 1_000, 10, 1u64, 12u64, 5u64),
+            Error::<Test>::RaiseTooSmallForPool
         );
     });
 }

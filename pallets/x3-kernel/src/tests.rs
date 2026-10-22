@@ -2322,7 +2322,7 @@ fn x3_storage_writes_land_in_contract_storage_not_the_balance_ledger() {
         let decode_failures_before = crate::DecodeFailureCount::<Test>::get();
         let ledger_before = CanonicalLedger::<Test>::get(ALICE, 0u32);
 
-        let applied = AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt))
+        let applied = AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt), None)
             .expect("a well-formed successful receipt applies");
         assert_eq!(applied, 1);
         assert_eq!(
@@ -2353,7 +2353,7 @@ fn x3_storage_writes_are_refused_on_a_failed_receipt() {
         let receipt = x3_receipt_with_writes(false, vec![storage_write(slot, [0xCDu8; 32])]);
 
         assert_eq!(
-            AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt)),
+            AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt), None),
             Err(AtlasError::StorageWritesOnFailedExecution.into())
         );
         assert_eq!(crate::X3ContractStorage::<Test>::get(slot), None);
@@ -2374,7 +2374,7 @@ fn x3_storage_writes_are_refused_past_the_bound() {
         let receipt = x3_receipt_with_writes(true, too_many);
 
         assert_eq!(
-            AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt)),
+            AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt), None),
             Err(AtlasError::TooManyStorageWrites.into())
         );
         assert_eq!(

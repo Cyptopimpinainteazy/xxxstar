@@ -45,137 +45,20 @@ pub const MAX_REGISTERS: usize = 256;
 
 /// Whether this interpreter has an implementation for `opcode`.
 ///
-/// The match has no wildcard arm on purpose: an opcode added to the instruction set does not
-/// compile until someone decides here whether the engine runs it. The on-chain verifier refuses
-/// every opcode this returns `false` for, and `engine_executes_matches_the_interpreter` (below)
-/// checks each answer against what the interpreter actually does.
+/// Read from the canonical spec (`x3bc_core::spec`, whose `match` has no wildcard arm, so an
+/// opcode added to the instruction set does not compile until someone decides whether the engine
+/// runs it). The on-chain verifier refuses every opcode this returns `false` for, and
+/// `engine_executes_matches_the_interpreter` (below) checks each answer against what the
+/// interpreter actually does.
 ///
 /// `true` means the interpreter has an arm, not that every context may run it: GPU intrinsics,
 /// debug opcodes and floating-point arithmetic are executed off chain and refused on chain by
-/// separate verifier rules.
+/// separate verifier rules, and trading opcodes need a trading section and a seeded session.
 pub const fn engine_executes(opcode: Opcode) -> bool {
-    match opcode {
-        Opcode::Nop
-        | Opcode::Jump
-        | Opcode::JumpIf
-        | Opcode::JumpUnless
-        | Opcode::Call
-        | Opcode::Ret
-        | Opcode::RetVoid
-        | Opcode::Halt
-        | Opcode::LoadConst
-        | Opcode::Mov
-        | Opcode::LoadGlobal
-        | Opcode::StoreGlobal
-        | Opcode::LoadImm
-        | Opcode::LoadZero
-        | Opcode::LoadTrue
-        | Opcode::LoadFalse
-        | Opcode::AddI
-        | Opcode::SubI
-        | Opcode::MulI
-        | Opcode::DivI
-        | Opcode::ModI
-        | Opcode::NegI
-        | Opcode::AddF
-        | Opcode::SubF
-        | Opcode::MulF
-        | Opcode::DivF
-        | Opcode::ModF
-        | Opcode::NegF
-        | Opcode::EqI
-        | Opcode::NeI
-        | Opcode::LtI
-        | Opcode::LeI
-        | Opcode::GtI
-        | Opcode::GeI
-        | Opcode::EqF
-        | Opcode::NeF
-        | Opcode::LtF
-        | Opcode::LeF
-        | Opcode::GtF
-        | Opcode::GeF
-        | Opcode::And
-        | Opcode::Or
-        | Opcode::Xor
-        | Opcode::Not
-        | Opcode::Shl
-        | Opcode::Shr
-        | Opcode::UShr
-        | Opcode::LAnd
-        | Opcode::LOr
-        | Opcode::LNot
-        | Opcode::AtomicBegin
-        | Opcode::AtomicCommit
-        | Opcode::AtomicRollback
-        | Opcode::AtomicCheck
-        | Opcode::LoadIndex
-        | Opcode::StoreIndex
-        | Opcode::LoadField
-        | Opcode::StoreField
-        | Opcode::NewArray
-        | Opcode::ArrayLen
-        | Opcode::ArrayPush
-        | Opcode::ArrayPop
-        | Opcode::NewTuple
-        | Opcode::TupleGet
-        | Opcode::Inc
-        | Opcode::Dec
-        | Opcode::CtxSender
-        | Opcode::CtxBlockHeight
-        | Opcode::CtxTimestamp
-        | Opcode::CtxValue
-        | Opcode::CtxChainId
-        | Opcode::Emit
-        | Opcode::EvmSload
-        | Opcode::EvmSstore
-        | Opcode::GpuSha256Batch
-        | Opcode::GpuEd25519Verify
-        | Opcode::GpuPohChain
-        | Opcode::GpuSha256Streamed
-        | Opcode::GpuDeviceCount
-        | Opcode::GpuBenchmark
-        | Opcode::GpuKeccak256Batch
-        | Opcode::GpuSecp256k1Verify
-        | Opcode::DebugPrint
-        | Opcode::Breakpoint
-        | Opcode::Assert
-        | Opcode::Panic => true,
-
-        // Conversions: the value model has only i64 and f64 (TICKET-149).
-        Opcode::I32ToI64
-        | Opcode::I64ToI32
-        | Opcode::I32ToF32
-        | Opcode::I64ToF64
-        | Opcode::F32ToI32
-        | Opcode::F64ToI64
-        | Opcode::F32ToF64
-        | Opcode::F64ToF32
-        | Opcode::ToBool
-        // `ctx_gas` answers with the engine's remaining gas, so a program branching on it would
-        // change behaviour whenever a runtime upgrade reprices an opcode (TICKET-149).
-        | Opcode::CtxGas
-        // Agents: no agent registry.
-        | Opcode::AgentSelf
-        | Opcode::AgentInit
-        // Cross-VM calls: need the kernel's EVM and SVM adapters wired as hosts.
-        | Opcode::EvmCall
-        | Opcode::EvmStaticCall
-        | Opcode::EvmDelegateCall
-        | Opcode::EvmCreate
-        | Opcode::EvmCreate2
-        | Opcode::EvmLog
-        | Opcode::EvmBalance
-        | Opcode::EvmCodeSize
-        | Opcode::SvmInvoke
-        | Opcode::SvmInvokeSigned
-        | Opcode::SvmCreateAccount
-        | Opcode::SvmTransfer
-        | Opcode::SvmGetData
-        | Opcode::SvmSetData
-        | Opcode::SvmGetRent
-        | Opcode::SvmGetClock => false,
-    }
+    matches!(
+        x3bc_core::spec::of(opcode).execution,
+        x3bc_core::spec::Execution::Interpreted
+    )
 }
 
 /// Deepest nesting of atomic windows one execution may open.
@@ -425,6 +308,9 @@ pub struct VM {
     event_buffer: EventBuffer,
     /// Journaled VM storage.
     storage: VmStorage,
+    /// The trading host, when the module carries a trading section and the caller seeded it
+    /// (`set_trading`). Snapshotted with every atomic window.
+    trading: Option<crate::trading::TradingSession>,
     /// Hot-path tracker and compiled-function cache.
     // The JIT has no backend outside tests (`backend_available()` is false), and needs std.
     #[cfg(feature = "std")]
@@ -496,6 +382,7 @@ impl VM {
             isolation: IsolationContext::new([0u8; 32]).with_max_call_depth(isolation_depth),
             event_buffer: EventBuffer::new(),
             storage,
+            trading: None,
             #[cfg(feature = "std")]
             jit: JitCompiler::new(JitConfig::default()),
         })
@@ -547,6 +434,24 @@ impl VM {
     /// The context the engine is executing with.
     pub fn context(&self) -> &BlockContext {
         &self.context
+    }
+
+    /// Seed the trading host with the chain's state for this execution.
+    ///
+    /// Refused when the module has no trading section: there is nothing for the state to serve.
+    pub fn set_trading(&mut self, pre: crate::trading::TradingPreState) -> VMResult<()> {
+        let section = self.module.trading.clone().ok_or_else(|| {
+            VMError::without_ip(VMErrorKind::ModuleLoadError(
+                "the module carries no trading section".to_string(),
+            ))
+        })?;
+        self.trading = Some(crate::trading::TradingSession::new(section, pre));
+        Ok(())
+    }
+
+    /// The trading session, after (or during) an execution.
+    pub fn trading(&self) -> Option<&crate::trading::TradingSession> {
+        self.trading.as_ref()
     }
 
     /// Drain storage writes for cross-VM delta sync.
@@ -706,6 +611,18 @@ impl VM {
         self.call_function(func_idx, args)
     }
 
+    /// Charge gas an instruction owes beyond its table cost (a cost that depends on its operands),
+    /// with the same rule as the table charge: refused unless the whole amount fits the limit.
+    fn charge_extra_gas(&mut self, ip: usize, amount: u64) -> VMResult<()> {
+        let charged = self
+            .gas_used
+            .checked_add(amount)
+            .filter(|charged| *charged <= self.config.gas_limit)
+            .ok_or_else(|| self.error_at(ip, VMErrorKind::GasLimitExceeded))?;
+        self.gas_used = charged;
+        Ok(())
+    }
+
     /// Main execution loop.
     fn execute(&mut self) -> VMResult<Option<Value>> {
         loop {
@@ -732,8 +649,15 @@ impl VM {
             let opcode = Opcode::from_byte(opcode_byte)
                 .ok_or_else(|| self.error_at(ip, VMErrorKind::InvalidOpcode(opcode_byte)))?;
 
-            // Consume gas
-            self.gas_used += self.opcode_gas_cost(opcode);
+            // Consume gas. Checked before the instruction runs, so no instruction executes on
+            // gas the caller did not provide: the check above alone let the last instruction run
+            // past the limit by up to its own cost.
+            let charged = self
+                .gas_used
+                .checked_add(self.opcode_gas_cost(opcode))
+                .filter(|charged| *charged <= self.config.gas_limit)
+                .ok_or_else(|| self.error_at(ip, VMErrorKind::GasLimitExceeded))?;
+            self.gas_used = charged;
             self.instruction_count += 1;
 
             // Trace if enabled
@@ -1428,6 +1352,9 @@ impl VM {
                 self.atomic_snapshots
                     .push((self.regs.clone(), self.globals.clone()));
                 self.storage.snapshot();
+                if let Some(trading) = self.trading.as_mut() {
+                    trading.savepoint();
+                }
                 self.atomic_depth += 1;
                 Ok(StepResult::Continue(ip + 3)) // opcode + id:u16
             }
@@ -1442,6 +1369,9 @@ impl VM {
                     self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
                 })?;
                 self.event_buffer.commit();
+                if let Some(trading) = self.trading.as_mut() {
+                    trading.release();
+                }
                 self.atomic_depth -= 1;
                 Ok(StepResult::Continue(ip + 3)) // opcode + id:u16
             }
@@ -1685,6 +1615,9 @@ impl VM {
                     self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
                 })?;
                 self.event_buffer.rollback();
+                if let Some(trading) = self.trading.as_mut() {
+                    trading.rollback();
+                }
                 self.atomic_depth -= 1;
                 Err(self.error_at(ip, VMErrorKind::AtomicAborted))
             }
@@ -1771,6 +1704,12 @@ impl VM {
                     data.push(bytes.len() as u8);
                     data.extend_from_slice(&bytes);
                 }
+                // The payload is priced per byte before it is journaled, so an event the program
+                // cannot pay for is never recorded.
+                let data_gas = (data.len() as u64)
+                    .checked_mul(x3bc_core::spec::EMIT_GAS_PER_DATA_BYTE)
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::GasLimitExceeded))?;
+                self.charge_extra_gas(ip, data_gas)?;
                 let topic = sp_core::hashing::sha2_256(&name);
                 // The emitter is the contract identity, which this engine does not have: an
                 // execution here is a module, not a deployed account. It stays zero rather than
@@ -1993,6 +1932,56 @@ impl VM {
             }
 
             // ================================================================
+            // Trading extension (format 1.1)
+            // ================================================================
+            Opcode::TradeBegin => {
+                self.trade(ip, |session| session.begin())?;
+                Ok(StepResult::Continue(ip + 1))
+            }
+            Opcode::TradeCommit => {
+                self.trade(ip, |session| session.commit())?;
+                Ok(StepResult::Continue(ip + 1))
+            }
+            Opcode::TradeLoadProfit => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let profit = self.trade(ip, |session| session.load_profit())?;
+                self.regs[dst] = Value::I64(profit);
+                Ok(StepResult::Continue(ip + 2))
+            }
+            Opcode::TradeChargeCosts => {
+                let index = self.read_u16(ip + 1)?;
+                // Gas for everything through the end of the function: what has been charged so far
+                // (this instruction included) plus the straight-line tail the verifier guarantees.
+                let tail = self.tail_gas(ip + 3)?;
+                let through_end = self
+                    .gas_used
+                    .checked_add(tail)
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::IntegerOverflow))?;
+                let limit = self.config.gas_limit;
+                self.trade(ip, |session| {
+                    session.charge_costs(index, through_end, limit)
+                })?;
+                Ok(StepResult::Continue(ip + 3))
+            }
+            Opcode::TradeBorrow
+            | Opcode::TradeSwap
+            | Opcode::TradeRepay
+            | Opcode::TradeAssertProfit
+            | Opcode::TradeAssertDebtsClosed
+            | Opcode::TradeAssertSolvent => {
+                let index = self.read_u16(ip + 1)?;
+                self.trade(ip, |session| match opcode {
+                    Opcode::TradeBorrow => session.borrow(index),
+                    Opcode::TradeSwap => session.swap(index),
+                    Opcode::TradeRepay => session.repay(index),
+                    Opcode::TradeAssertProfit => session.assert_profit(index),
+                    Opcode::TradeAssertDebtsClosed => session.assert_debts_closed(index),
+                    _ => session.assert_solvent(index),
+                })?;
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            // ================================================================
             // Unimplemented opcodes return error
             // ================================================================
             _ => {
@@ -2000,6 +1989,36 @@ impl VM {
                 Err(self.error_at(ip, VMErrorKind::UnimplementedOpcode(opc)))
             }
         }
+    }
+
+    /// Run one trading step against the session, turning a trap into the error that aborts the
+    /// execution (and with it, through the atomic window, every effect of the trade).
+    fn trade<T>(
+        &mut self,
+        ip: usize,
+        step: impl FnOnce(&mut crate::trading::TradingSession) -> Result<T, x3bc_core::trap::TrapId>,
+    ) -> VMResult<T> {
+        let session = self.trading.as_mut().ok_or_else(|| {
+            VMError::at_ip(
+                ip,
+                VMErrorKind::ModuleLoadError(
+                    "a trading opcode ran with no trading state seeded".to_string(),
+                ),
+            )
+        })?;
+        step(session).map_err(|trap| VMError::at_ip(ip, VMErrorKind::Trade(trap)))
+    }
+
+    /// Static gas of every instruction from `from` to the end of the code.
+    fn tail_gas(&self, from: usize) -> VMResult<u64> {
+        let tail = self.module.code.get(from..).unwrap_or(&[]);
+        let instrs = crate::verifier::Verifier::decode_all_instructions(tail).map_err(|error| {
+            VMError::at_ip(from, VMErrorKind::VerificationFailed(format!("{error}")))
+        })?;
+        instrs.iter().try_fold(0u64, |sum, instr| {
+            sum.checked_add(instr.gas_cost)
+                .ok_or_else(|| VMError::at_ip(from, VMErrorKind::IntegerOverflow))
+        })
     }
 
     // ========================================================================
@@ -3197,7 +3216,10 @@ mod tests {
         code.push(Opcode::RetVoid as u8);
         let bytes = storage_module(code, 0, 16);
         let mut vm = VM::from_bytes(&bytes).expect("the module loads");
-        vm.config.gas_limit = 10_000;
+        // Above the dearest single opcode (32_000): gas is charged before an instruction runs, so a
+        // lower limit would refuse an opcode for its price before the interpreter could say whether
+        // it implements it.
+        vm.config.gas_limit = 100_000;
         vm.call_function(0, &[])
     }
 

@@ -1,0 +1,178 @@
+name: X3Lang Production Unification
+
+# The exact-head proof for docs/roadmap/X3LANG_PRODUCTION_UNIFICATION.md: a `.x3` trading program
+# compiled to canonical X3BC, decoded and verified by the production no_std code, executed by
+# crates/x3-vm, committed or completely rolled back, signed and independently replayed — plus the
+# root and nested workspace gates around it. No step is allowed to fail, no package is excluded,
+# and no flag is weaker than the repository's own gates.
+
+on:
+  push:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/**'
+      - 'pallets/x3-kernel/**'
+      - 'pallets/x3-dex/**'
+      - 'pallets/x3-flashloan/**'
+      - 'runtime/**'
+      - 'x3-lang/**'
+      - '.github/workflows/x3lang-production-unification.yml'
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/**'
+      - 'pallets/x3-kernel/**'
+      - 'pallets/x3-dex/**'
+      - 'pallets/x3-flashloan/**'
+      - 'runtime/**'
+      - 'x3-lang/**'
+      - '.github/workflows/x3lang-production-unification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x3lang-production-unification-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  trading-suites:
+    name: X3Lang trading production suites
+    # The repository is public and this job runs on our own machines: never run
+    # code from a fork's pull request here.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use this machine's toolchain, isolated per runner
+        run: |
+          set -euo pipefail
+          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+            [ -d "$dir" ] && echo "$dir" >> "$GITHUB_PATH"
+          done
+          iso="$HOME/.x3ci-runner-${RUNNER_NAME}"
+          mkdir -p "$iso"
+          [ -d "$iso/cargo" ] || cp -al "$HOME/.cargo" "$iso/cargo"
+          [ -d "$iso/rustup" ] || cp -al "$HOME/.rustup" "$iso/rustup"
+          ln -f "$HOME/.cargo/bin/rustup" "$iso/cargo/bin/rustup"
+          { echo "CARGO_HOME=$iso/cargo"; echo "RUSTUP_HOME=$iso/rustup"; } >> "$GITHUB_ENV"
+          echo "$iso/cargo/bin" >> "$GITHUB_PATH"
+      - name: Toolchain
+        run: cargo --version && rustc --version
+      - name: no_std semantic-core build (x3bc-core, wasm)
+        if: ${{ !cancelled() }}
+        run: cargo check --locked -p x3bc-core --no-default-features --target wasm32v1-none
+      - name: no_std engine build (x3-vm, wasm)
+        if: ${{ !cancelled() }}
+        run: cargo check --locked -p x3-vm --no-default-features --target wasm32v1-none
+      - name: Opcode spec exhaustiveness
+        if: ${{ !cancelled() }}
+        run: cargo test --locked -p x3-vm --test opcode_spec_exhaustive
+      - name: Production trading E2E
+        if: ${{ !cancelled() }}
+        run: cargo test --locked -p x3-x3-integration --features 'std compile' --test x3lang_trading_production_e2e -- --nocapture
+      - name: Trading negative cases
+        if: ${{ !cancelled() }}
+        run: cargo test --locked -p x3-x3-integration --features 'std compile' --test x3lang_trading_negative
+      - name: Receipt replay suite
+        if: ${{ !cancelled() }}
+        run: cargo test --locked -p x3-x3-integration --features 'std compile' --test x3lang_trading_receipt_replay
+      - name: Transaction / rollback suite
+        if: ${{ !cancelled() }}
+        run: cargo test --locked -p x3-x3-integration --features 'std compile' --test x3lang_trading_rollback
+      - name: Differential VM suite
+        if: ${{ !cancelled() }}
+        run: cargo test --locked -p x3-x3-integration --features 'std compile' --test x3lang_trading_differential
+
+  nested:
+    name: Nested x3-lang workspace (fmt, check, clippy, tests)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: x3-lang
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Nested x3-lang fmt
+        if: ${{ !cancelled() }}
+        run: cargo fmt --all -- --check
+      - name: Nested x3-lang check
+        if: ${{ !cancelled() }}
+        run: cargo check --locked --workspace --all-targets --all-features
+      - name: Nested x3-lang clippy (warnings denied)
+        if: ${{ !cancelled() }}
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Nested x3-lang tests
+        if: ${{ !cancelled() }}
+        run: cargo test --locked --workspace --all-targets --all-features
+
+  root:
+    name: Root workspace (fmt, check, clippy, tests)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use this machine's toolchain, isolated per runner
+        run: |
+          set -euo pipefail
+          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+            [ -d "$dir" ] && echo "$dir" >> "$GITHUB_PATH"
+          done
+          iso="$HOME/.x3ci-runner-${RUNNER_NAME}"
+          mkdir -p "$iso"
+          [ -d "$iso/cargo" ] || cp -al "$HOME/.cargo" "$iso/cargo"
+          [ -d "$iso/rustup" ] || cp -al "$HOME/.rustup" "$iso/rustup"
+          ln -f "$HOME/.cargo/bin/rustup" "$iso/cargo/bin/rustup"
+          { echo "CARGO_HOME=$iso/cargo"; echo "RUSTUP_HOME=$iso/rustup"; } >> "$GITHUB_ENV"
+          echo "$iso/cargo/bin" >> "$GITHUB_PATH"
+      # Five root tests (x3-relayer receipt proofs, external-chains sends) boot a local EVM with
+      # `anvil`. Use the runner's own if it has one; otherwise install a pinned Foundry release
+      # into this runner's isolated directory, never system-wide.
+      - name: anvil for the EVM-backed root tests
+        run: |
+          set -euo pipefail
+          if ! command -v anvil >/dev/null 2>&1; then
+            FOUNDRY_DIR="$HOME/.x3ci-runner-${RUNNER_NAME}/foundry"
+            export FOUNDRY_DIR
+            if [ ! -x "$FOUNDRY_DIR/bin/anvil" ]; then
+              mkdir -p "$FOUNDRY_DIR/bin"
+              curl -fsSL https://raw.githubusercontent.com/foundry-rs/foundry/v1.0.0/foundryup/foundryup \
+                -o "$FOUNDRY_DIR/bin/foundryup"
+              chmod +x "$FOUNDRY_DIR/bin/foundryup"
+              "$FOUNDRY_DIR/bin/foundryup" --install v1.0.0
+            fi
+            echo "$FOUNDRY_DIR/bin" >> "$GITHUB_PATH"
+            export PATH="$FOUNDRY_DIR/bin:$PATH"
+          fi
+          anvil --version
+      - name: Root fmt
+        if: ${{ !cancelled() }}
+        run: cargo fmt --all -- --check
+      - name: Root check
+        if: ${{ !cancelled() }}
+        run: bash scripts/ci/cargo-annotate.sh cargo check --locked --workspace --all-targets --message-format=short
+      - name: Root clippy (warnings denied)
+        if: ${{ !cancelled() }}
+        run: bash scripts/ci/cargo-annotate.sh cargo clippy --locked --workspace --all-targets --message-format=short -- -D warnings
+      - name: Root tests
+        if: ${{ !cancelled() }}
+        run: bash scripts/ci/cargo-annotate.sh cargo test --locked --workspace --no-fail-fast

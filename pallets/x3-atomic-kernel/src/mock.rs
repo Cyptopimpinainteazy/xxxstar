@@ -9,6 +9,7 @@ use frame_support::{
     traits::{ConstU32, EnsureOrigin},
 };
 use frame_system as system;
+use parity_scale_codec::{Decode, Encode};
 use sp_core::offchain::{
     testing::{TestOffchainExt, TestTransactionPoolExt},
     OffchainDbExt, TransactionPoolExt,
@@ -290,6 +291,175 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type X3LangOrigin = RootOrSignedAccount;
     type SettlementOrigin = SettlementOnlyOrigin;
     type VmReverter = SwitchableVmReverter;
+    type LegExecutor = TestLegExecutor;
+}
+
+// ── On-chain leg executor (test) ──────────────────────────────────────────
+//
+// A ledger of (asset, account) balances and a map of contract slots, with the runtime's rules: a
+// transfer leg moves the executor's own funds into the bundle's escrow (paid to the recipient on
+// commit, back to the executor on revert); an X3 leg's "program" here is `[slot_byte,
+// value_byte]`, writing one slot that is then held for the bundle (another bundle's program cannot
+// write it). `set_slot` writes around the holds, which is how a test stands in for state a revert
+// does not expect. Everything lives in storage so it rolls back with the extrinsic.
+
+fn ledger_key(asset: u32, who: &AccountId) -> Vec<u8> {
+    (b"test-ledger", asset, who).encode()
+}
+
+fn slot_key(key: &H256) -> Vec<u8> {
+    (b"test-slot", key).encode()
+}
+
+fn hold_key(key: &H256) -> Vec<u8> {
+    (b"test-hold", key).encode()
+}
+
+pub struct TestLegExecutor;
+
+impl TestLegExecutor {
+    pub fn balance(asset: u32, who: &AccountId) -> u128 {
+        frame_support::storage::unhashed::get(&ledger_key(asset, who)).unwrap_or(0)
+    }
+    pub fn set_balance(asset: u32, who: &AccountId, amount: u128) {
+        frame_support::storage::unhashed::put(&ledger_key(asset, who), &amount);
+    }
+    pub fn slot(key: &H256) -> Option<[u8; 32]> {
+        frame_support::storage::unhashed::get(&slot_key(key))
+    }
+    pub fn set_slot(key: &H256, value: Option<[u8; 32]>) {
+        match value {
+            Some(v) => frame_support::storage::unhashed::put(&slot_key(key), &v),
+            None => frame_support::storage::unhashed::kill(&slot_key(key)),
+        }
+    }
+    pub fn holder(key: &H256) -> Option<H256> {
+        frame_support::storage::unhashed::get(&hold_key(key))
+    }
+    /// The bundle's escrow account.
+    pub fn escrow(bundle: H256) -> AccountId {
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&bundle.as_bytes()[..8]);
+        AccountId::from_le_bytes(bytes) | (1 << 63)
+    }
+    fn transfer(asset: u32, from: &AccountId, to: &AccountId, amount: u128) -> Result<(), ()> {
+        let from_balance = Self::balance(asset, from).checked_sub(amount).ok_or(())?;
+        Self::set_balance(asset, from, from_balance);
+        Self::set_balance(asset, to, Self::balance(asset, to) + amount);
+        Ok(())
+    }
+    fn decode(bytes: &[u8]) -> Result<AccountId, ()> {
+        AccountId::decode(&mut &bytes[..]).map_err(|_| ())
+    }
+    fn all_or_nothing<'a>(
+        mut entries: impl Iterator<Item = &'a pallet_x3_atomic_kernel::chain_legs::JournalEntry>,
+        apply: impl Fn(&pallet_x3_atomic_kernel::chain_legs::JournalEntry) -> Result<(), ()>,
+    ) -> Result<(), ()> {
+        use frame_support::storage::{with_transaction, TransactionOutcome};
+        with_transaction(|| match entries.try_for_each(&apply) {
+            Ok(()) => TransactionOutcome::Commit(Ok(())),
+            Err(()) => {
+                TransactionOutcome::Rollback(Err(sp_runtime::DispatchError::Other("refused")))
+            }
+        })
+        .map_err(|_: sp_runtime::DispatchError| ())
+    }
+}
+
+impl pallet_x3_atomic_kernel::chain_legs::LegExecutor<AccountId> for TestLegExecutor {
+    fn execute(
+        bundle: H256,
+        _context: H256,
+        executor: &AccountId,
+        execution: &pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId>,
+    ) -> Result<Vec<pallet_x3_atomic_kernel::chain_legs::JournalEntry>, sp_runtime::DispatchError>
+    {
+        use pallet_x3_atomic_kernel::chain_legs::{JournalEntry, LegExecution};
+        match execution {
+            LegExecution::Transfer { asset, to, amount } => {
+                Self::transfer(*asset, executor, &Self::escrow(bundle), *amount)
+                    .map_err(|_| sp_runtime::DispatchError::Other("insufficient balance"))?;
+                Ok(vec![JournalEntry::LedgerEscrow {
+                    asset: *asset,
+                    from: executor.encode(),
+                    to: to.encode(),
+                    amount: *amount,
+                }])
+            }
+            LegExecution::X3 { program } => {
+                let [slot, value] = program.as_slice() else {
+                    return Err(sp_runtime::DispatchError::Other("program fails"));
+                };
+                let key = H256::repeat_byte(*slot);
+                if Self::holder(&key).is_some_and(|holder| holder != bundle) {
+                    return Err(sp_runtime::DispatchError::Other(
+                        "slot held by another bundle",
+                    ));
+                }
+                let old = Self::slot(&key);
+                let new = Some([*value; 32]);
+                Self::set_slot(&key, new);
+                frame_support::storage::unhashed::put(&hold_key(&key), &bundle);
+                Ok(vec![JournalEntry::X3Slot { key, old, new }])
+            }
+        }
+    }
+
+    fn revert(
+        bundle: H256,
+        entries: &[pallet_x3_atomic_kernel::chain_legs::JournalEntry],
+    ) -> Result<(), pallet_x3_atomic_kernel::vm_revert::RevertError> {
+        use pallet_x3_atomic_kernel::chain_legs::JournalEntry;
+        Self::all_or_nothing(entries.iter().rev(), |entry| match entry {
+            JournalEntry::LedgerEscrow {
+                asset,
+                from,
+                amount,
+                ..
+            } => Self::transfer(*asset, &Self::escrow(bundle), &Self::decode(from)?, *amount),
+            JournalEntry::X3Slot { key, old, new } => {
+                if Self::slot(key) != *new || Self::holder(key) != Some(bundle) {
+                    return Err(());
+                }
+                Self::set_slot(key, *old);
+                frame_support::storage::unhashed::kill(&hold_key(key));
+                Ok(())
+            }
+        })
+        .map_err(
+            |()| pallet_x3_atomic_kernel::vm_revert::RevertError::RevertFailed {
+                reason: b"conflict".to_vec(),
+            },
+        )
+    }
+
+    fn commit(
+        bundle: H256,
+        entries: &[pallet_x3_atomic_kernel::chain_legs::JournalEntry],
+    ) -> Result<(), sp_runtime::DispatchError> {
+        use pallet_x3_atomic_kernel::chain_legs::JournalEntry;
+        Self::all_or_nothing(entries.iter(), |entry| match entry {
+            JournalEntry::LedgerEscrow {
+                asset, to, amount, ..
+            } => Self::transfer(*asset, &Self::escrow(bundle), &Self::decode(to)?, *amount),
+            JournalEntry::X3Slot { key, .. } => {
+                if Self::holder(key) != Some(bundle) {
+                    return Err(());
+                }
+                frame_support::storage::unhashed::kill(&hold_key(key));
+                Ok(())
+            }
+        })
+        .map_err(|()| sp_runtime::DispatchError::Other("commit refused"))
+    }
+
+    fn max_weight() -> frame_support::weights::Weight {
+        frame_support::weights::Weight::from_parts(1_000_000, 0)
+    }
+
+    fn max_entry_weight() -> frame_support::weights::Weight {
+        frame_support::weights::Weight::from_parts(10_000, 0)
+    }
 }
 
 // ── Test Externalities Builder ────────────────────────────────────────────

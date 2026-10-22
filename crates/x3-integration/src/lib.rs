@@ -60,6 +60,8 @@ pub mod hostcalls;
 /// so the switch is checked against the behaviour it replaced; it is removed when the old engines
 /// are retired.
 pub mod mini_x3;
+/// The production trading path: execution, attestor signing and independent replay.
+pub mod trading;
 pub mod types;
 
 #[cfg(feature = "compile")]

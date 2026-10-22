@@ -1,0 +1,18 @@
+{
+  "integrated_base_pr": 654,
+  "integrated_base_sha": "aa3431b1bdb156b23b025ee71f5f1f84e78c28a3",
+  "receipt_source_commit": "50f44928",
+  "ci_merge_commit": "23fec92c",
+  "states": {
+    "remote_RED": "FAIL as intended: two height regression assertions; run39625154680",
+    "baseline_repairs": "IN PROGRESS: feature and audit gates pass; sidecar --locked metadata passes; RustSec21->11 instances; npm updates running",
+    "published_receipt_head": "bee2a73effb52889393287bddda28e2687fbaea8",
+    "receipt_exact_head_CI": "RUNNING LocalCI39655145440; other jobs queued last observed",
+    "independent_receipt_and_checkout_review": "no actionable findings",
+    "finalized_chain_proof": "NOT RUN",
+    "physical_validator_ssh": "BLOCKED: agent refused ED25519 signing; publickey authentication failed"
+  },
+  "root_lock_before_sha256": "74df6869161f3f54569b477ed55a92c45f11a633b0ac8e5f3d55b56d7d8a9fba",
+  "root_lock_after_sha256": "644b0b68cb35742aac67743163cc2e669278922d26a8e2992f7ec0117acafb95",
+  "constraint": "Previous ten milestones remain open; do not declare mission/first ten complete until exact-head and live evidence exists. No PR merged, validator reconfigured, security exemption added, or checks weakened."
+}

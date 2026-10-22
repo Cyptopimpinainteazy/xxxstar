@@ -7630,6 +7630,7 @@ dependencies = [
  "scale-info",
  "sp-runtime",
  "sp-std",
+ "x3-asset-kernel-types",
 ]
 
 [[package]]
@@ -7707,7 +7708,9 @@ dependencies = [
  "x3-evm-integration",
  "x3-packet-schema",
  "x3-svm-integration",
+ "x3-vm",
  "x3-x3-integration",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -7720,6 +7723,7 @@ dependencies = [
  "scale-info",
  "sp-runtime",
  "sp-std",
+ "x3-asset-kernel-types",
 ]
 
 [[package]]
@@ -7896,6 +7900,7 @@ dependencies = [
  "sp-runtime",
  "sp-std",
  "x3-atomic-swap",
+ "x3-btc-spv",
  "x3-crosschain-intent",
  "x3-verification-router",
 ]
@@ -13865,12 +13870,13 @@ name = "x3-backend"
 version = "0.1.0"
 dependencies = [
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "x3-ast",
  "x3-common",
  "x3-hir",
  "x3-mir",
  "x3-typeck",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -13882,6 +13888,13 @@ dependencies = [
  "parity-scale-codec",
  "ripemd",
  "scale-info",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "x3-btc-spv"
+version = "0.1.0"
+dependencies = [
  "sha2 0.10.9",
 ]
 
@@ -14002,6 +14015,8 @@ dependencies = [
  "x3-revenue-sharing",
  "x3-security-events",
  "x3-svm-integration",
+ "x3-verification-router",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -14015,6 +14030,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -14070,6 +14086,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "thiserror 2.0.21",
+ "x3-btc-spv",
  "x3-verification-router",
 ]
 
@@ -14445,6 +14462,7 @@ dependencies = [
  "sha2 0.10.9",
  "tiny-keccak",
  "x3-bitcoin-vault",
+ "x3-btc-spv",
 ]
 
 [[package]]
@@ -14469,12 +14487,13 @@ dependencies = [
  "parking_lot 0.12.5",
  "serde",
  "sp-core",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "tracing",
  "x3-backend",
  "x3-common",
  "x3-evm-integration",
  "x3-svm-integration",
+ "x3bc-core",
 ]
 
 [[package]]
@@ -14509,6 +14528,7 @@ dependencies = [
 name = "x3-x3-integration"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
  "frame-support",
  "log",
  "parity-scale-codec",
@@ -14523,8 +14543,16 @@ dependencies = [
  "x3-common",
  "x3-compiler",
  "x3-evm-integration",
- "x3-verifier",
  "x3-vm",
+ "x3bc-core",
+]
+
+[[package]]
+name = "x3bc-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
 ]
 
 [[package]]

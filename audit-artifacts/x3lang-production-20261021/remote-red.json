@@ -1,0 +1,21 @@
+{
+  "head": "b04d9e1210f037a2f8c171808b91594d68111e6d",
+  "run": 39625154680,
+  "event": "push",
+  "status": "FAIL",
+  "url": "https://github.com/Cyptopimpinainteazy/xxxstar/actions/runs/39625154680",
+  "receipt_suite": {
+    "passed": 12,
+    "failed": 2,
+    "failing_tests": [
+      "a_resigned_execution_height_mismatch_is_refused",
+      "a_resigned_finality_height_mismatch_is_refused"
+    ]
+  },
+  "jobs": {
+    "root": "FAIL",
+    "nested": "PASS",
+    "trading": "FAIL"
+  },
+  "root_failure_limit": "Root log also reports XDG_RUNTIME_DIR diagnostic; do not assume every root diagnostic was caused by the receipt regressions."
+}

@@ -640,32 +640,51 @@ fn overlay_reverter_writes_and_clears_exact_entries() {
     });
 }
 
+/// The runtime's reverter writes nothing a submitter supplied: every non-empty diff, of every VM
+/// type and the overlay format, is refused and storage is untouched, so the pallet reports
+/// `IncompleteVmRevert` rather than a revert that never happened. An empty diff (a read-only leg)
+/// still has no side effects to revert.
 #[test]
-fn composite_reverter_routes_non_overlay_diffs_to_their_vm_decoder() {
+fn composite_reverter_refuses_every_diff_the_chain_cannot_authenticate() {
     run(|| {
-        let svm = SvmStorageChange {
+        let svm_diff = encode_svm_state_diff(&[SvmStorageChange {
             account: [0x21; 32],
             key: b"data".to_vec(),
             old_value: vec![0x01],
-        };
-        let svm_diff = encode_svm_state_diff(&[svm]);
-        assert_eq!(
-            CompositeReverter::revert_leg(VmType::Svm, &svm_diff).unwrap(),
-            RevertOutcome::Reverted
-        );
-
-        let x3vm = X3VmStorageChange {
+        }]);
+        let x3vm_diff = encode_x3vm_state_diff(&[X3VmStorageChange {
             key: [0x31; 32],
             old_value: Some([0xAA; 32]),
-        };
-        let x3vm_diff = encode_x3vm_state_diff(&[x3vm]);
+        }]);
+        let overlay_diff = encode_overlay_state_diff(&[OverlayLegChange {
+            domain: OverlayDomain::X3,
+            address: vec![0x41; 32],
+            key: H256::repeat_byte(0x42),
+            old_value: Some(H256::repeat_byte(0x43)),
+            new_value: None,
+        }]);
+        let root = sp_io::storage::root(sp_runtime::StateVersion::V1);
+        for (vm, diff) in [
+            (VmType::Svm, &svm_diff),
+            (VmType::X3, &x3vm_diff),
+            (VmType::Cross, &x3vm_diff),
+            (VmType::Evm, &overlay_diff),
+        ] {
+            assert_eq!(
+                CompositeReverter::revert_leg(vm.clone(), diff),
+                Err(RevertError::UnauthenticatedStateDiff),
+                "{vm:?}"
+            );
+        }
         assert_eq!(
-            CompositeReverter::revert_leg(VmType::X3, &x3vm_diff).unwrap(),
-            RevertOutcome::Reverted
+            sp_io::storage::root(sp_runtime::StateVersion::V1),
+            root,
+            "a refused revert writes nothing"
         );
-
-        let cross = CompositeReverter::revert_leg(VmType::Cross, &x3vm_diff).unwrap();
-        assert_eq!(cross, RevertOutcome::Reverted);
+        assert_eq!(
+            CompositeReverter::revert_leg(VmType::X3, &StateDiff::from(Vec::new())),
+            Ok(RevertOutcome::NoSideEffects)
+        );
     });
 }
 
