@@ -1387,7 +1387,7 @@ pub mod pallet {
         /// Set the trade cost schedule and fee collector. Until this is called, every trade is
         /// refused (`TradingNotConfigured`).
         #[pallet::call_index(45)]
-        #[pallet::weight(T::DbWeight::get().writes(1))]
+        #[pallet::weight(<T as Config>::WeightInfo::set_trading_config())]
         pub fn set_trading_config(
             origin: OriginFor<T>,
             config: crate::trading::TradingConfig<T::AccountId>,
