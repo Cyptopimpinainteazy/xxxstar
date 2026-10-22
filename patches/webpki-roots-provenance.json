@@ -1,0 +1,13 @@
+[
+  {
+    "package": "webpki-roots",
+    "version": "0.25.4",
+    "archive_sha256": "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1",
+    "matches_root_lock": true,
+    "license_sha256": "6a70a4bf6b010016d59a64b8ae4ad8dc7f5ef16f1fb453cc2ecd771c5a341131",
+    "upstream_lib_rs_sha256": "8d0b312673e2ee78f71f576a2b36f10032368c7e505260a9339d5f3515798cb3",
+    "patched_lib_rs_sha256": "29af9a549bf186d4b339b841f0b89a5b6a2f93a1ff6574e3efa1429992de40e3",
+    "change": "src/lib.rs only: removes the 'emSign ECC Root CA - G3' trust anchor (SHA-256 86:a1:ec:ba:08:9c:4a:8d:3b:be:27:34:c6:12:ba:34:1d:81:3e:04:3c:f9:e8:a8:62:cd:5c:57:a3:6b:be:6b), the one root webpki-roots 1.0.10 removed for RUSTSEC-2026-0381; 147 -> 146 anchors, every other file byte-identical to the crates.io archive",
+    "advisory": "RUSTSEC-2026-0381"
+  }
+]

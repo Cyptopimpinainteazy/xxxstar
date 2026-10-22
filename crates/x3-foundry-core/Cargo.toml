@@ -20,7 +20,7 @@ hex = "0.4"
 tracing = "0.1"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-ethers = { version = "2.0", features = ["rustls"] }
+ethers = { version = "2.0", default-features = false, features = ["abigen", "etherscan", "openssl"] }
 x3-foundry-auditor = { path = "../x3-foundry-auditor" }
 x3-foundry-revenue = { path = "../x3-foundry-revenue" }
 x3-oracle = { path = "../x3-oracle" }

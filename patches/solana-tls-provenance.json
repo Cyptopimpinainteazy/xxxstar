@@ -1,0 +1,20 @@
+[
+  {
+    "package": "solana-pubsub-client",
+    "version": "3.0.14",
+    "upstream_commit": "f516a8927c76c07f0ebc54ca7a4ce8b2046eee86",
+    "archive_sha256": "34b9cc19d3519b7bfa80eaeb45a5ddbf5062547c3512b9714b922d3d194ee9cb",
+    "license_sha256": "048838ecab23173fe6db9b3a4f5d9e2f5480b8692dfca556fed4aa039ca06bc8",
+    "change": "both websocket dependencies select native-tls; no Rust source edits",
+    "matches_original_lock": "Cargo.lock"
+  },
+  {
+    "package": "solana-pubsub-client",
+    "version": "3.0.0",
+    "upstream_commit": "b6c96e84b10396b92912d4574dae7d03f606da26",
+    "archive_sha256": "fdf675756739fce7d5352aa87d2d2907ab700397cf7b250672f401e43a18959e",
+    "license_sha256": "048838ecab23173fe6db9b3a4f5d9e2f5480b8692dfca556fed4aa039ca06bc8",
+    "change": "both websocket dependencies select native-tls; no Rust source edits",
+    "matches_original_lock": "programs/svm/x3_atomic_swap/client/Cargo.lock"
+  }
+]

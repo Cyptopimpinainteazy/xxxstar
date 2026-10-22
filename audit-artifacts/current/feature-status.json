@@ -602,7 +602,7 @@
         "pallets/x3-settlement-engine/src/lib.rs",
         "crates/x3-bitcoin-vault/src/lib.rs",
         "crates/x3-bridge/src/bitcoin_htlc.rs",
-        "crates/x3-bridge/src/btc_spv.rs",
+        "crates/x3-btc-spv/src/lib.rs",
         "scripts/btc/push-headers.py",
         "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22; raised 45->72 on 2026-09-27 (85/90/50) when the header source (`scripts/btc/push-headers.py`, a real Esplora/`bitcoin-cli` reader that checks the run links and emits the `submitBtcHeaders` payload without needing a signer) landed with a live drill and a pallet test over its own output"
       ],
@@ -624,7 +624,7 @@
         "pallets/x3-settlement-engine/src/btc_gateway.rs",
         "crates/x3-bitcoin-vault/src/lib.rs",
         "crates/x3-bridge/src/bitcoin_htlc.rs",
-        "crates/x3-bridge/src/btc_spv.rs"
+        "crates/x3-btc-spv/src/lib.rs"
       ],
       "priority": "P0",
       "source": "master",
@@ -4953,14 +4953,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "dcae56cc0458dc234693718c7975b7e354b85f55b7dbb1837c8004b65ffaa2a0",
+    "source_digest": "f9a3eae604c8239f0336b741e9fe3b8f9ccbc3f22c5544e43ee8a27cbbd39a84",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "16f06c9e47283289afa2f5d20537c77e0075f10b83ac8162f06effe1b7b80561",
+      "feature-matrix/cross-chain.toml": "4d5713a5add61ba6626a01912289f2c3cc896eee1e5a16b6d109bf32f76aac33",
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",

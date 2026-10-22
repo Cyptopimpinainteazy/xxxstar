@@ -207,6 +207,24 @@ LOCK_ONLY_ADVISORIES = {
         "rsa 0.9.10, reached only through sqlx-mysql, which no crate in this workspace "
         "enables (stale lock entry). No target in deny.toml's [graph] builds it."
     ),
+    "RUSTSEC-2026-0098": (
+        "rustls-webpki 0.101.7, reached only through libp2p-tls <- libp2p-quic, which no "
+        "crate in this workspace enables: Cargo.lock records every optional dependency "
+        "of libp2p 0.53/0.54, so the entry stays. `cargo tree -i rustls-webpki@0.101.7 "
+        "--workspace --all-features --target all` finds no path (stale lock entry)."
+    ),
+    "RUSTSEC-2026-0099": (
+        "rustls-webpki 0.101.7, reached only through libp2p-tls <- libp2p-quic, which no "
+        "crate in this workspace enables: Cargo.lock records every optional dependency "
+        "of libp2p 0.53/0.54, so the entry stays. `cargo tree -i rustls-webpki@0.101.7 "
+        "--workspace --all-features --target all` finds no path (stale lock entry)."
+    ),
+    "RUSTSEC-2026-0104": (
+        "rustls-webpki 0.101.7, reached only through libp2p-tls <- libp2p-quic, which no "
+        "crate in this workspace enables: Cargo.lock records every optional dependency "
+        "of libp2p 0.53/0.54, so the entry stays. `cargo tree -i rustls-webpki@0.101.7 "
+        "--workspace --all-features --target all` finds no path (stale lock entry)."
+    ),
 }
 
 

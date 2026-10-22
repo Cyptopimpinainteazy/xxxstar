@@ -1,0 +1,2 @@
+# Deterministic archive security fixtures are source test inputs.
+!tests/fixtures/*.zip

@@ -49,6 +49,7 @@ exclude = [
     "tools/tool-validation",
 ]
 members = [
+    "crates/x3-executor-verification",
     "pallets/x3-kernel",
     "pallets/x3-app-registry",
     "pallets/x3-security-gate",
@@ -524,6 +525,16 @@ codegen-units = 16
 
 # Patches for Substrate dependencies - using consistent git rev
 [patch.crates-io]
+solana-pubsub-client = { path = "patches/solana-pubsub-client-3.0.14" }
+smoldot-019 = { package = "smoldot", path = "patches/smoldot-0.19.4" }
+smoldot-2 = { package = "smoldot", path = "patches/smoldot-2.2.0" }
+# Preserve the Solidity compiler installer API while patching unsafe ZIP extraction.
+svm-rs = { path = "patches/svm-rs" }
+# RUSTSEC-2026-0381: webpki-roots 0.25.4 (libp2p-websocket in sc-network) bundles the
+# distrusted emSign ECC Root CA - G3 and has no patched 0.25.x. This copy removes that
+# one anchor, as 1.0.10 did upstream; see patches/webpki-roots-provenance.json and
+# tests/test_webpki_roots_distrust.py.
+webpki-roots = { path = "patches/webpki-roots-0.25.4" }
 # Pin home to a rustc 1.85 compatible release (local patch).
 home = { path = "patches/home" }
 # Enable bulk-memory opcode parsing (0xFC prefix) so Substrate can deserialize rustc-generated WASM.

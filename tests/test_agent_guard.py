@@ -70,3 +70,23 @@ def test_known_key_shapes_are_still_secret_like():
         "-----BEGIN " + "OPENSSH PRIVATE KEY-----",
     ]:
         assert is_secret_like(line), line
+
+
+def test_main_applies_secret_detection_and_exception_policy(tmp_path, monkeypatch, capsys):
+    module = guard()
+    source = tmp_path / "source.rs"
+    source.write_text(
+        "let ordinary = 1;\n" * 1000
+        + 'api_key = os.environ.get("SERVICE_TOKEN")\n'
+        + 'let private_key = "' + "0xdeadbeef" + 'deadbeef";\n'
+    )
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "iter_tracked_files", lambda: iter([source]))
+    assert module.main() == 1
+    output = capsys.readouterr().out
+    assert "source.rs:1002:" in output
+    assert "source.rs:1001:" not in output
+
+    source.write_text('api_key = os.environ.get("SERVICE_TOKEN")\n')
+    assert module.main() == 0
+    assert capsys.readouterr().out.strip() == "[agent_guard] ok"

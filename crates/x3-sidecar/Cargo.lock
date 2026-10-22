@@ -2281,7 +2281,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 3.0.6",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4327,7 +4327,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower-service",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -7896,6 +7896,7 @@ dependencies = [
  "sp-runtime",
  "sp-std",
  "x3-atomic-swap",
+ "x3-btc-spv",
  "x3-crosschain-intent",
  "x3-verification-router",
 ]
@@ -9418,7 +9419,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
@@ -13168,14 +13169,14 @@ version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75c7f0ef91146ebfb530314f5f1d24528d7f0767efbfd31dce919275413e393e"
 dependencies = [
- "webpki-root-certs 1.0.9",
+ "webpki-root-certs 1.0.10",
 ]
 
 [[package]]
 name = "webpki-root-certs"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b96554aa2acc8ccdb7e1c9a58a7a68dd5d13bccc69cd124cb09406db612a1c9b"
+checksum = "58ec80e73fd8baf57bf0d9615554c75348bda990d6d5bbeab964dd068319fecb"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -13183,8 +13184,6 @@ dependencies = [
 [[package]]
 name = "webpki-roots"
 version = "0.25.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1"
 
 [[package]]
 name = "webpki-roots"
@@ -13192,14 +13191,14 @@ version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
 dependencies = [
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.10",
 ]
 
 [[package]]
 name = "webpki-roots"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
+checksum = "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -13865,7 +13864,7 @@ name = "x3-backend"
 version = "0.1.0"
 dependencies = [
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "x3-ast",
  "x3-common",
  "x3-hir",
@@ -13882,6 +13881,13 @@ dependencies = [
  "parity-scale-codec",
  "ripemd",
  "scale-info",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "x3-btc-spv"
+version = "0.1.0"
+dependencies = [
  "sha2 0.10.9",
 ]
 
@@ -14002,6 +14008,7 @@ dependencies = [
  "x3-revenue-sharing",
  "x3-security-events",
  "x3-svm-integration",
+ "x3-verification-router",
 ]
 
 [[package]]
@@ -14070,6 +14077,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "thiserror 2.0.21",
+ "x3-btc-spv",
  "x3-verification-router",
 ]
 
@@ -14445,6 +14453,7 @@ dependencies = [
  "sha2 0.10.9",
  "tiny-keccak",
  "x3-bitcoin-vault",
+ "x3-btc-spv",
 ]
 
 [[package]]
@@ -14469,7 +14478,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "serde",
  "sp-core",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "tracing",
  "x3-backend",
  "x3-common",

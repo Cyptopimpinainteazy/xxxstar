@@ -63,6 +63,8 @@ tempfile = "3"
 # `core2 0.4.0` (yanked from crates.io). Same local copy as the root uses.
 [patch.crates-io]
 core2 = { path = "../../patches/core2" }
+# The same distrusted-root fix the root workspace applies (RUSTSEC-2026-0381).
+webpki-roots = { path = "../../patches/webpki-roots-0.25.4" }
 
 # `x3-rpc` -> polkadot-sdk pulls sc-executor-wasmtime v0.43.0 (stable2512),
 # which pins wasmtime "^35.0.0" — within the vulnerable range for

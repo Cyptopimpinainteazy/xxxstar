@@ -41,7 +41,7 @@ export class X3DexRpcClient {
   private ws: WebSocket | null = null;
   private requestId = 0;
   private pendingRequests = new Map<number, {
-    resolve: (value: any) => void;
+    resolve: (value: unknown) => void;
     reject: (error: unknown) => void;
   }>();
 
@@ -123,8 +123,8 @@ export class X3DexRpcClient {
       params,
     };
 
-    return new Promise<any>((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve, reject });
+    return new Promise<T>((resolve, reject) => {
+      this.pendingRequests.set(id, { resolve: value => resolve(value as T), reject });
       this.ws!.send(JSON.stringify(request));
 
       // Timeout after 30 seconds

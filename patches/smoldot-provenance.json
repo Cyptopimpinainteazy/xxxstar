@@ -1,0 +1,20 @@
+[
+  {
+    "package": "smoldot",
+    "version": "0.19.4",
+    "archive_sha256": "e16e5723359f0048bf64bfdfba64e5732a56847d42c4fd3fe56f18280c813413",
+    "matches_root_lock": true,
+    "source_files_verified": 143,
+    "upstream_commit": "9446ff27f73be86fbf5ba3b3da57dabc1bff6bc2",
+    "license_sha256": "aab56b4a581fc1c50b7c782eacf2fc8be05a47cd98e4bf4d836dd9b6dd9c86f4"
+  },
+  {
+    "package": "smoldot",
+    "version": "2.2.0",
+    "archive_sha256": "7998fa4206a99d310bd288df99300724da1d7800f06b64387e431d9cd0d870f1",
+    "matches_root_lock": true,
+    "source_files_verified": 153,
+    "upstream_commit": "90e94869a7fbd617d28990da3005eaa906bc3862",
+    "license_sha256": "aab56b4a581fc1c50b7c782eacf2fc8be05a47cd98e4bf4d836dd9b6dd9c86f4"
+  }
+]

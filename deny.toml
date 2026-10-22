@@ -34,16 +34,21 @@ ignore = [
     "RUSTSEC-2024-0421",   # idna 0.1.5 via url 1.7.2 -> jsonrpc-core-client 18 -> ethers 2.x
     "RUSTSEC-2025-0009",   # ring 0.16.20 via jsonwebtoken 8 -> ethers 2.x -> x3-bot
 
-    # ---- rustls 0.21 / hyper-rustls 0.24 (reqwest 0.11) -----------------------
-    "RUSTSEC-2026-0098",
-    "RUSTSEC-2026-0099",
-    "RUSTSEC-2026-0104",   # rustls-webpki 0.101.7; 0.103.15 is also resolved and clean
-
     # ---- hickory-proto 0.24.4 / 0.25.2 ----------------------------------------
     # Reachability per consumer: docs/security/GHSA-3v94-mw7p-v465.md and
     # docs/security/GHSA-q2qq-hmj6-3wpp.md, enforced by the `advisory scope` gate.
     "RUSTSEC-2026-0118",   # NSEC3 loop - not compiled here (no dnssec feature is enabled)
     "RUSTSEC-2026-0119",   # O(n^2) encoding - accepted; nothing here encodes attacker-shaped records
+
+    # ---- webpki-roots 0.25.4 (patched) / 0.26.11 shims ------------------------
+    # The published fix is `>= 1.0.10` only, so these match although neither trusts the
+    # distrusted emSign ECC Root CA - G3: 0.25.4 is built from patches/webpki-roots-0.25.4
+    # (that anchor removed, as upstream 1.0.10 did), and the 0.26.11 shims bundle no roots
+    # and re-export 1.x, which is 1.0.10. tests/test_webpki_roots_distrust.py (the
+    # `webpki roots distrust` gate) fails if either stops being true, or if any lockfile
+    # resolves a 1.x below 1.0.10. docs/security/RUSTSEC-2026-0381.md has the evidence.
+    "RUSTSEC-2026-0381",
+    "RUSTSEC-2026-0383",
 
     # ---- h2 0.3.27 ------------------------------------------------------------
     "RUSTSEC-2026-0258",   # server-side DoS; this tree only runs the client half

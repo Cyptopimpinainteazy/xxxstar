@@ -172,7 +172,7 @@ class AtlasSphereClient {
     async getCanonicalBalance(account, assetId = constants_1.NATIVE_ASSET_ID) {
         this.ensureConnected();
         try {
-            const result = await this.api.rpc.state.call('AtlasKernelApi_get_canonical_balance', this.api.createType('(AccountId, u32)', [account, assetId]).toHex());
+            const result = await this.api.rpc.state.call('AtlasKernelRuntimeApi_get_canonical_balance', this.api.createType('(AccountId, u32)', [account, assetId]).toHex());
             return BigInt(this.api.createType('u128', result).toString());
         }
         catch (error) {

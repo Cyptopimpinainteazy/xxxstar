@@ -65,7 +65,7 @@ tonic = "0.10"
 prost = "0.12"
 
 # Chain adapters
-ethers = "2.0"
+ethers = { version = "2.0", default-features = false, features = ["abigen", "etherscan", "openssl"] }
 solana-sdk = "1.17"
 web3 = "0.19"
 

@@ -23,3 +23,6 @@ crate-type = ["lib"]
 # the deploy script, so requesting real devnet submits can never pollute the
 # no_std member/dependency graph.
 [workspace]
+
+[patch.crates-io]
+solana-pubsub-client = { path = "../../../../patches/solana-pubsub-client-3.0.0" }

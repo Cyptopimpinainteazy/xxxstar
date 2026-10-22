@@ -1,0 +1,16 @@
+[package]
+name = "x3-legacy-tls-verification"
+version = "0.1.0"
+edition = "2021"
+publish = false
+[workspace]
+[dev-dependencies]
+rcgen = "0.13.2"
+native-tls = "0.2"
+reqwest = { version = "0.11.27", default-features = false, features = ["native-tls", "blocking"] }
+tokio = { version = "1", features = ["rt", "net", "time"] }
+tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
+tungstenite = { version = "0.20.1", features = ["native-tls"] }
+futures-util = { version = "0.3", features = ["sink"] }
+
+solana-pubsub-client = { path = "../solana-pubsub-client-3.0.14" }
