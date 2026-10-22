@@ -5,7 +5,7 @@ id = "X3-XCHAIN-001"
 name = "BTC Fortress gateway"
 subsystem = "cross_chain"
 source = "master"
-paths = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs"]
+paths = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-btc-spv/src/lib.rs"]
 implemented = 85
 tested = 90
 mainnet_ready = 50
@@ -27,8 +27,8 @@ blockers = [
 # `btc_gateway` module (scripts, addresses, SPV proof, adaptor signatures), the
 # header chain and proof-of-work check beside it, `crates/x3-bitcoin-vault`
 # (deposits, withdrawals, PSBTs, header-chain verification) and the bridge's HTLC
-# and SPV modules.
-evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs", "scripts/btc/push-headers.py", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22; raised 45->72 on 2026-09-27 (85/90/50) when the header source (`scripts/btc/push-headers.py`, a real Esplora/`bitcoin-cli` reader that checks the run links and emits the `submitBtcHeaders` payload without needing a signer) landed with a live drill and a pallet test over its own output"]
+# module and the shared x3-btc-spv consensus verifier.
+evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-btc-spv/src/lib.rs", "scripts/btc/push-headers.py", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22; raised 45->72 on 2026-09-27 (85/90/50) when the header source (`scripts/btc/push-headers.py`, a real Esplora/`bitcoin-cli` reader that checks the run links and emits the `submitBtcHeaders` payload without needing a signer) landed with a live drill and a pallet test over its own output"]
 test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "pallets/x3-settlement-engine/src/tests/data/btc_relayer_testnet_headers.txt", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "scripts/testnet/btc-header-source-drill.sh", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, four tests over data a real Bitcoin Core v28.1.0 regtest node produced, the `submit_btc_headers` batch tests, and two tests that decode the relayer's own payload from a real testnet3 run and admit it on an anchored chain while refusing it with its first header dropped) plus the vault's 23 tests including header-chain linkage and tampered-signature rejection; the drill follows public testnet live and refuses a tampered answer with a non-zero exit naming the height"]
 registry_feature = "btc_fortress_gateway"
 
