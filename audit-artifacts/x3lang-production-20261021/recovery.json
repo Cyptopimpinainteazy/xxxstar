@@ -1,0 +1,12 @@
+{
+  "branch": "codex/x3lang-production-unification",
+  "head": "b04d9e1210f037a2f8c171808b91594d68111e6d",
+  "pr": 623,
+  "red_remote_run": 39625154680,
+  "cancelled_red_run": 39624825999,
+  "local_red_session": 7313,
+  "worktree": "/home/lojak/Desktop/x3lang-production-recovery",
+  "local_target": "/home/lojak/Desktop/xxxstar-master/target",
+  "state": "RED test compilation running; no production correction yet",
+  "remaining": "capture red failure, implement replay anchor consistency, GREEN tests, independent review, remote exact-head gates; full attached master scope remains open"
+}
