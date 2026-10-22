@@ -1,0 +1,72 @@
+{
+  "scope": "Fail-closed parser tokenization: reject unknown and unsupported non-trivia tokens with their exact byte span; CLI refuses artifact generation",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files_changed_this_pass": [
+      "x3-lang/compiler/src/parser.rs",
+      "x3-lang/compiler/tests/test_parser_coverage.rs",
+      "x3-lang/crates/x3-tools/tests/cli.rs"
+    ],
+    "source_sha256": {
+      "x3-lang/compiler/src/parser.rs": "330aff1460bfad1a4cb98fede74d656a3e17b75f24be3b3244e1c889ca48d7b7",
+      "x3-lang/compiler/tests/test_parser_coverage.rs": "cf4cb037d52016adbe158e6fda2f58c78df9c31c93479f86ffe66346e06e80c5",
+      "x3-lang/crates/x3-tools/tests/cli.rs": "f61002f791205a8cd41e591cdf1d30eec86d31808e075ad1ba5d14348f9bcc9c"
+    }
+  },
+  "status": "PASS for fail-closed tokenization and CLI artifact refusal",
+  "boundaries": [
+    "No runtime binding implementation",
+    "No whole-language or release certification"
+  ],
+  "rust_tests": {
+    "passed": 1389,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 99
+  },
+  "python_tests": {
+    "passed": 23,
+    "failed": 0
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-features --test cli cli_build_refuses_unknown_tokens_without_writing_bytecode",
+      "exit_code": 0
+    }
+  ],
+  "scan": {
+    "scope": "x3-lang excluding build and dependency directories",
+    "matches": 71,
+    "result": "Historical comments, test mocks and simulation paths remain; no repository-wide clean-code certification."
+  }
+}

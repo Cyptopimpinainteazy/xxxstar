@@ -1,0 +1,91 @@
+---
+# Make each validator's remote keystore exactly its staged keys: no more, no fewer.
+#
+# A node loads every key file in its keystore and signs with any that is an authority. A copy
+# alone only adds files, so a key left from an earlier deployment - a rotated genesis, or a
+# data directory that once belonged to another validator - would stay and could sign for an
+# authority this host is not meant to run. Any file the controller did not stage for this
+# validator is removed, and the result is checked.
+- name: Keystore directories
+  ansible.builtin.file:
+    path: "{{ x3_home }}/data/validator-{{ item.index }}/chains/{{ x3_chain_id }}/keystore"
+    state: directory
+    mode: "0700"
+  loop: "{{ x3_validators }}"
+  loop_control:
+    label: "validator-{{ item.index }}"
+
+- name: Session keys
+  ansible.builtin.copy:
+    src: "{{ staged }}/validator-{{ item.index }}/keystore/"
+    dest: "{{ x3_home }}/data/validator-{{ item.index }}/chains/{{ x3_chain_id }}/keystore/"
+    mode: "0600"
+  loop: "{{ x3_validators }}"
+  loop_control:
+    label: "validator-{{ item.index }}"
+  no_log: true
+  notify: Restart validators
+
+- name: Staged key files
+  ansible.builtin.find:
+    paths: "{{ staged }}/validator-{{ item.index }}/keystore"
+  delegate_to: localhost
+  register: x3_staged_keys
+  loop: "{{ x3_validators }}"
+  loop_control:
+    label: "validator-{{ item.index }}"
+
+- name: Remote key files
+  ansible.builtin.find:
+    paths: "{{ x3_home }}/data/validator-{{ item.index }}/chains/{{ x3_chain_id }}/keystore"
+    hidden: true
+    file_type: any
+  register: x3_remote_keys
+  loop: "{{ x3_validators }}"
+  loop_control:
+    label: "validator-{{ item.index }}"
+
+- name: Remove key files that were not staged for this validator
+  vars:
+    extra: >-
+      {%- set out = [] -%}
+      {%- for remote in x3_remote_keys.results -%}
+      {%- set wanted = (x3_staged_keys.results | selectattr('item.index', 'equalto', remote.item.index)
+                        | first).files | map(attribute='path') | map('basename') | list -%}
+      {%- for f in remote.files if f.path | basename not in wanted -%}
+      {%- set _ = out.append(f.path) -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ out }}
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ extra }}"
+  no_log: true
+  notify: Restart validators
+
+- name: Remote key files after cleanup
+  ansible.builtin.find:
+    paths: "{{ x3_home }}/data/validator-{{ item.index }}/chains/{{ x3_chain_id }}/keystore"
+    hidden: true
+    file_type: any
+  register: x3_remote_keys_after
+  loop: "{{ x3_validators }}"
+  loop_control:
+    label: "validator-{{ item.index }}"
+
+- name: Each remote keystore is exactly its staged keys
+  vars:
+    staged_names: >-
+      {{ (x3_staged_keys.results | selectattr('item.index', 'equalto', item.item.index) | first).files
+         | map(attribute='path') | map('basename') | sort }}
+    remote_names: "{{ item.files | map(attribute='path') | map('basename') | sort }}"
+  ansible.builtin.assert:
+    that:
+      - staged_names | length == 2
+      - remote_names == staged_names
+    fail_msg: "validator-{{ item.item.index }}: remote keystore {{ remote_names }} is not the staged {{ staged_names }}"
+    quiet: true
+  loop: "{{ x3_remote_keys_after.results }}"
+  loop_control:
+    label: "validator-{{ item.item.index }}"

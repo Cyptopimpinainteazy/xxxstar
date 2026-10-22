@@ -276,6 +276,13 @@ GATES_FAST=(
   # dirty checkout read 152 findings above a clean extraction. The self-test builds one tree
   # with every pruning shape and fails if the two enumerations disagree.
   "fake-code scanner self-test:python3 scripts/x3_fake_code_scan.py --self-test"
+  "source scanner scope regression:python3 scripts/test_x3_fake_code_scan.py"
+  "push hook environment:python3 tests/test_pre_push_environment.py"
+  "physical seven preflight:python3 tests/test_physical_seven_preflight.py"
+  "testnet deploy verifier:python3 tests/test_testnet_ansible_verify.py"
+  "testnet double-sign guard:python3 tests/test_testnet_double_sign_guard.py"
+  "testnet deploy syntax:bash scripts/testnet/check-ansible-syntax.sh"
+  "testnet finality status:python3 tests/test_testnet_finality_status.py"
   # The runtime-hash check exempts files that cannot reach the wasm target
   # (`#[cfg(test)] mod tests;`, `<package>/tests/*.rs`) so a test-only edit does
   # not demand a ten-minute double srtool rebuild. An exemption that is too wide

@@ -1,0 +1,57 @@
+---
+# Stop and disable validators. Limit to one host with -l, or one validator with
+# -e x3_only=<index>. -e x3_purge=true also deletes chain data (keys stay staged on
+# the controller); never purge a live network's only copy of a validator's database
+# without meaning to.
+- name: Stop validators
+  hosts: validators
+  gather_facts: true
+  vars:
+    x3_purge: false
+    targets: "{{ x3_validators | selectattr('index', 'equalto', x3_only | int) | list if x3_only is defined else x3_validators }}"
+  tasks:
+    # Stopping nothing must not look like success. The documented validator move is
+    # `90-stop -l <old> -e x3_only=N`, then deploy N elsewhere; if N is not on <old> (a typo,
+    # or the wrong host) the selection is empty, the old unit keeps running, and the deploy
+    # that follows would start a second signer for the same key.
+    - name: The selection names at least one validator on the targeted hosts
+      run_once: true
+      vars:
+        here: "{{ ansible_play_hosts | map('extract', hostvars, 'x3_validators') | flatten }}"
+        selected: >-
+          {{ here | selectattr('index', 'equalto', x3_only | int) | list
+             if x3_only is defined else here }}
+      ansible.builtin.assert:
+        that:
+          - x3_only is not defined or (x3_only | string) is match('^[1-9][0-9]*$')
+          - selected | length > 0
+        fail_msg: >-
+          nothing to stop: {{ ('validator ' ~ x3_only) if x3_only is defined else 'no validator' }}
+          is not placed on {{ ansible_play_hosts | join(', ') }}
+        quiet: true
+
+    - name: Stop and disable
+      ansible.builtin.systemd_service:
+        name: "x3-validator-{{ item.index }}.service"
+        scope: user
+        state: stopped
+        enabled: false
+      loop: "{{ targets }}"
+      loop_control:
+        label: "validator-{{ item.index }}"
+      register: stopped
+      # A unit that is already gone is already stopped. systemd_service reports it as
+      # "Could not find the requested service <unit>: host" (measured), which never
+      # contained the 'not found' this used to look for.
+      failed_when: >-
+        stopped.failed and
+        not (stopped.msg | default('')) is search('^Could not find the requested service ')
+
+    - name: Delete chain data
+      when: x3_purge | bool
+      ansible.builtin.file:
+        path: "{{ x3_home }}/data/validator-{{ item.index }}"
+        state: absent
+      loop: "{{ targets }}"
+      loop_control:
+        label: "validator-{{ item.index }}"

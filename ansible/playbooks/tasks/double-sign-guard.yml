@@ -1,0 +1,73 @@
+---
+# Two processes signing with one authority key equivocate, and Aura/GRANDPA equivocation is
+# the one mistake a testnet cannot undo. Every inventory host is asked, whichever hosts this
+# run deploys to, and in --check too.
+#
+# A validator still belongs to a host while its unit there can sign: running in any form
+# (active, activating - including auto-restart -, reloading, deactivating), or *enabled*, so
+# it starts again at the next boot or login. That includes a unit that is enabled but failed
+# or inactive right now - one that hit its start limit, say - which `list-units --state=active`
+# never showed. Only 90-stop's end state, stopped and disabled, releases a validator.
+#
+# The query runs through each host's own Ansible connection (delegate_to), so an inventory's
+# key file, port, user and ProxyJump apply here exactly as they do to the deploy plays.
+# `list-unit-files` exits 1 when a pattern matches nothing, so both listings are unfiltered
+# (exit 0 on a working user manager) and filtered below; any failure fails the deploy.
+- name: Validator units on every inventory host
+  ansible.builtin.shell: >-
+    systemctl --user list-units --all --plain --no-legend --type=service
+    && echo '--- x3 unit files ---'
+    && systemctl --user list-unit-files --plain --no-legend --type=service
+  delegate_to: "{{ item }}"
+  # Per-host environment for the query, e.g. XDG_RUNTIME_DIR where a non-login SSH session
+  # does not reach the user manager.
+  environment: "{{ hostvars[item].x3_remote_environment | default({}) }}"
+  register: x3_unit_report
+  changed_when: false
+  check_mode: false
+  loop: "{{ groups['validators'] }}"
+
+- name: Every host answered with both listings
+  ansible.builtin.assert:
+    that: "'--- x3 unit files ---' in item.stdout_lines"
+    fail_msg: "{{ item.item }} did not report its validator units; refusing to deploy blind"
+    quiet: true
+  loop: "{{ x3_unit_report.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: No validator is placed on a host other than one where it can still sign
+  vars:
+    held: >-
+      {%- set held = [] -%}
+      {%- for r in x3_unit_report.results -%}
+      {%- set ns = namespace(files=false) -%}
+      {%- for line in r.stdout_lines -%}
+      {%- if line == '--- x3 unit files ---' -%}
+      {%- set ns.files = true -%}
+      {%- else -%}
+      {%- set f = line.split() -%}
+      {%- if f | length >= 2 and f[0] is match('^x3-validator-\\d+\\.service$') -%}
+      {%- set i = f[0] | regex_replace('^x3-validator-(\\d+)\\.service$', '\\1') | int -%}
+      {%- if ns.files and f[1] not in ['disabled', 'masked'] -%}
+      {%- set _ = held.append({'index': i, 'host': r.item, 'why': 'unit file ' ~ f[1]}) -%}
+      {%- elif not ns.files and f | length >= 3 and f[2] not in ['inactive', 'failed'] -%}
+      {%- set _ = held.append({'index': i, 'host': r.item, 'why': f[2] ~ ' (' ~ f[3] | default('') ~ ')'}) -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ held }}
+    conflicts: >-
+      {%- set e = [] -%}
+      {%- for c in held -%}
+      {%- for h in groups['validators'] if h != c.host and c.index in (hostvars[h].x3_validators | map(attribute='index') | map('int') | list) -%}
+      {%- set _ = e.append('validator ' ~ c.index ~ ' can still sign on ' ~ c.host ~ ' (' ~ c.why ~ ') but is placed on ' ~ h) -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ e | unique | list }}
+  ansible.builtin.assert:
+    that: conflicts | length == 0
+    fail_msg: "refusing to deploy: {{ conflicts | join('; ') }}. Run 90-stop.yml on the old host first."
+    quiet: true

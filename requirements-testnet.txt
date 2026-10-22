@@ -1,0 +1,3 @@
+# Controller dependency validated by the Ansible verifier integration tests.
+# Install in the controller virtual environment, alongside requirements-dev.txt for tests.
+ansible-core==2.21.4

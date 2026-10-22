@@ -1,0 +1,188 @@
+{
+  "objective": "Execute ten requested readiness tasks preserving existing work",
+  "criteria": [
+    {
+      "name": "gateway migrations and broad real PostgreSQL integration",
+      "status": "claimed",
+      "note": "Real PostgreSQL green and scoped clippy pass; independent final evidence review still pending."
+    },
+    {
+      "name": "isolated clean baseline and full relevant gates",
+      "status": "in_progress"
+    },
+    {
+      "name": "scanner and claims regressions",
+      "status": "verified"
+    },
+    {
+      "name": "persistent EVM state and rollback",
+      "status": "claimed",
+      "note": "358 affected unit tests and scoped clippy passed; live integration and independent review pending."
+    },
+    {
+      "name": "six-route live and adversarial matrix",
+      "status": "claimed",
+      "note": "Six historical routes and adversarial cases executed; latest test adds council result and EVM persistence checks, so final full run pending."
+    },
+    {
+      "name": "RC1 live boot",
+      "status": "in_progress"
+    },
+    {
+      "name": "historical-state migration",
+      "status": "in_progress"
+    },
+    {
+      "name": "physical-validator recovery and soak",
+      "status": "failed",
+      "blocker": "No reachable authenticated deployed seven-host validator network; x3star1 SSH No route, x3gpu2 DNS unavailable/no inventory IP, only local x3-ai-router service found"
+    }
+  ],
+  "packets": {
+    "gateway": {
+      "owner": "root",
+      "paths": [
+        "crates/x3-gateway",
+        "scripts/gateway-postgres-integration.sh"
+      ],
+      "check": "bash scripts/gateway-postgres-integration.sh"
+    },
+    "guards": {
+      "owner": "guards",
+      "paths": [
+        "docs/design/x3-forge-intelligence-engine.md",
+        "docs/design/x3-monte-carlo-lab.md",
+        "single comment in pallets/x3-asset-registry/src/lib.rs"
+      ],
+      "check": "python3 scripts/x3_fake_code_scan.py stubs; python3 scripts/ci/check-claims-hygiene.py"
+    },
+    "evm": {
+      "owner": "persistent_evm",
+      "paths": [
+        "crates/evm-integration",
+        "pallets/x3-kernel",
+        "runtime"
+      ],
+      "check": "affected crate tests + default WASM compilation"
+    },
+    "routes": {
+      "owner": "routes_rc1",
+      "paths": [
+        "node/tests/supply_invariant_distributed.rs",
+        "live route/RC1/upgrade scripts"
+      ],
+      "check": "real live node matrix + RC1 boot + migration rehearsal"
+    }
+  },
+  "evidence": [
+    {
+      "command": "CARGO_BUILD_JOBS=2 bash scripts/gateway-postgres-integration.sh",
+      "result": "red",
+      "lines": [
+        "query fresh blocks: relation \"blocks\" does not exist",
+        "test result: FAILED. 1 passed; 1 failed"
+      ],
+      "log": "/tmp/x3-finish-20261008/gateway-red.log"
+    },
+    {
+      "command": "target/debug/deps/postgres_integration-925add9b21b162c9 --ignored --nocapture fresh_schema_supports_chain_queries against disposable PostgreSQL with complete SQL schema",
+      "exit_code": 101,
+      "lines": [
+        "query statistics on an empty chain: unexpected null; try decoding as an Option"
+      ],
+      "log": "/tmp/x3-finish-20261008/gateway-null-red.log"
+    },
+    {
+      "command": "python3 scripts/test_x3_fake_code_scan.py",
+      "exit_code": 0,
+      "lines": [
+        "Ran 2 tests in 0.013s",
+        "OK"
+      ]
+    },
+    {
+      "command": "bash scripts/local-ci.sh --only fake-code-scan,test-cheat-scan,external-paths-disabled,feature-matrix-check,matrix-test-evidence,migration-modules-wired,claims-hygiene,ops-artifacts --jobs 2 --cargo-jobs 2",
+      "cwd": "/tmp/x3-baseline-20261008",
+      "exit_code": 1,
+      "lines": [
+        "branch=HEAD head=a0bcf2d6d working_tree=clean",
+        "cheats: skip grew 139 -> 141"
+      ],
+      "log": "/tmp/x3-finish-20261008/baseline-guards.log"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 bash scripts/gateway-postgres-integration.sh",
+      "result": "test passed; container cleanup pending",
+      "log": "/tmp/x3-finish-20261008/gateway-green-resume.log",
+      "lines": [
+        "1 passed; 0 failed; 0 ignored",
+        "fresh and legacy schema helper suites executed"
+      ]
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_BUILD_JOBS=2 cargo test -p x3-evm-integration -p pallet-x3-kernel -p pallet-atomic-trade-engine --lib",
+      "result": "PASS",
+      "tests": 358,
+      "log": "/tmp/x3-finish-20261008/evm-kernel-trade-tests-rerun.log"
+    },
+    {
+      "command": "python3 scripts/feature_matrix.py check",
+      "result": "PASS",
+      "features": 153,
+      "warnings": 41,
+      "log": "/tmp/x3-finish-20261008/feature-matrix-rerun.log"
+    },
+    {
+      "command": "bash scripts/gateway-postgres-integration.sh",
+      "result": "PASS; disposable container removed",
+      "log": "/tmp/x3-finish-20261008/gateway-green-resume.log"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_BUILD_JOBS=2 cargo clippy -p x3-evm-integration -p pallet-x3-kernel -p pallet-atomic-trade-engine -p x3-gateway --all-targets -- -D warnings",
+      "result": "PASS",
+      "log": "/tmp/x3-finish-20261008/affected-clippy.log"
+    },
+    {
+      "result": "review unavailable",
+      "reason": "fresh independent review agent failed with usage-limit error; no independent completion verdict obtained"
+    },
+    {
+      "command": "historical live integration against frozen spec20 with live-version signer",
+      "exit_code": 101,
+      "log": "/tmp/x3-finish-20261008/history-live-signer-fixed.log",
+      "lines": [
+        "all six ordered routes finalized on all validators; negative dispatches rejected",
+        "unexpected live dispatch outcome: left false, right true; Governance UnauthorizedGovernance"
+      ],
+      "reason": "Council nested dispatch failure was not checked; corrected threshold and nested-result verification."
+    },
+    {
+      "command": "eight focused local-ci guards",
+      "exit_code": 0,
+      "log": "/tmp/x3-finish-20261008/guards-final.log",
+      "lines": [
+        "local-ci: all gates passed"
+      ]
+    }
+  ],
+  "active_commands": [
+    {
+      "session": 23244,
+      "log": "history-live-council-fixed.log",
+      "purpose": "six routes, two-member governance upgrade, persistent EVM live proof"
+    },
+    {
+      "session": 71102,
+      "log": "rc1-positive-resume.log",
+      "purpose": "fresh mainnet-rc1 release and boot"
+    },
+    {
+      "session": 3079,
+      "log": "workspace-check.log",
+      "purpose": "workspace native compile"
+    }
+  ],
+  "commit": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+  "dirty": true,
+  "note": "Partial execution evidence. Active gates are not counted as passes; independent review is pending."
+}

@@ -1,0 +1,83 @@
+{
+  "scope": "Immutable compile-time u128 amount bindings with checked arithmetic and lexical block scope; real bytecode and VM asset-operation execution",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files_changed_this_pass": [
+      "x3-lang/compiler/src/lowering.rs",
+      "x3-lang/compiler/tests/test_constant_bindings.rs",
+      "x3-lang/compiler/tests/test_refused_statements.rs",
+      "x3-lang/compiler/tests/test_control_flow_e2e.rs"
+    ],
+    "source_sha256": {
+      "x3-lang/compiler/src/lowering.rs": "67f72565c0df544f11c9fdac5df459ec59547ac38bddc263e5d2e3547114623d",
+      "x3-lang/compiler/tests/test_constant_bindings.rs": "b4fe701cffdd89e10f785518ebbbe4c64506f8917f01f3c71f609123b5f37d4f",
+      "x3-lang/compiler/tests/test_refused_statements.rs": "ca0d23ab1e4b082d0a6f17365764badf90dbf275ffc8edf6c05b64a3ee7b8f60",
+      "x3-lang/compiler/tests/test_control_flow_e2e.rs": "fdfd791d14de047522c5252c62b24d12e3b1fa262bbbb57f99ee5bbb3bedcb94"
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "python": "3.12.3"
+  },
+  "verification_status": "PASS for the scoped language change",
+  "focused_tests": {
+    "passed": 10,
+    "failed": 0
+  },
+  "python_tests": {
+    "command": "python3 -m pytest -q x3-lang/tests",
+    "exit_code": 0,
+    "passed": 23
+  },
+  "boundaries": [
+    "No general runtime locals or mutable bindings",
+    "Only untyped or explicit u128 immutable amount initializers",
+    "VM asset-operation execution does not prove an external-chain transfer",
+    "Dirty checkout evidence, no release certification"
+  ],
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang/tests",
+      "exit_code": 0
+    }
+  ],
+  "rust_tests": {
+    "passed": 1382,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 99
+  },
+  "initial_workspace_failure": "Old blanket constant-let refusal assertion; replaced with VM lock amount 30 assertion. Dynamic-binding refusal retained.",
+  "cancelled_duplicate_run": "Default-feature focused control-flow run cancelled to avoid redundant rebuild; final all-feature workspace run covers the corrected test.",
+  "scan": {
+    "scope": "x3-lang, excluding build/dependency directories",
+    "matches": 71,
+    "interpretation": "Existing historical comments, test mocks and explicit simulation paths remain; this scan is not a clean-code certification."
+  }
+}

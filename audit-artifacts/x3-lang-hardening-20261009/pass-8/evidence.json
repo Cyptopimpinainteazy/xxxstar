@@ -1,0 +1,73 @@
+{
+  "scope": "Braced Unicode scalar escapes in strings; malformed scalar rejection, formatting round trips and decoded VM asset-payload verification",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files_changed_this_pass": [
+      "x3-lang/crates/x3-lexer/src/lexer.rs",
+      "x3-lang/crates/x3-lexer/tests/trading_tokens.rs",
+      "x3-lang/compiler/tests/test_parser_coverage.rs"
+    ],
+    "source_sha256": {
+      "x3-lang/crates/x3-lexer/src/lexer.rs": "97af08ee9f60d0bc4f32564cb231c3279075f01affec7e58d8e4273ce171bb71",
+      "x3-lang/crates/x3-lexer/tests/trading_tokens.rs": "1632716aa981bf0ffbcc78a7f00323b7616c6889a22c2949cfd1a84850153289",
+      "x3-lang/compiler/tests/test_parser_coverage.rs": "21220608bb9da3c59edfe6fe6656b24a173d2d90a61c65ed3a20416fafaff5c6"
+    }
+  },
+  "status": "PASS for Unicode scalar escapes and compiled VM payload execution",
+  "syntax": "\\u{1-6 hexadecimal digits}",
+  "boundaries": [
+    "Surrogate code points and values above U+10FFFF are refused",
+    "No runtime locals or external-chain transfer certification"
+  ],
+  "rust_tests": {
+    "passed": 1394,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 99
+  },
+  "python_tests": {
+    "passed": 23,
+    "failed": 0
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked -p x3-lang-lexer --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang/tests",
+      "exit_code": 0
+    }
+  ],
+  "scan": {
+    "scope": "x3-lang excluding build and dependency directories",
+    "matches": 71,
+    "result": "Historical comments, test mocks and simulations remain; no whole-repository clean-code certification."
+  }
+}

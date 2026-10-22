@@ -5,7 +5,9 @@ Only the test harness replaces start_node/curl; these tests prove launch selecti
 not block production, connectivity, or finality.
 """
 import os
+import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import socket
@@ -20,6 +22,68 @@ SCRIPT = ROOT / "scripts/testnet/run-7-validators-local.sh"
 
 
 class ValidatorLauncherTests(unittest.TestCase):
+    def test_status_checks_work_with_python3_without_python_alias(self):
+        """A local RPC fixture checks tooling, not live chain finality."""
+        class StatusRpc(BaseHTTPRequestHandler):
+            def do_POST(self):
+                request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                method = request['method']
+                if method == 'system_health':
+                    result = {'isSyncing': False, 'peers': 6}
+                elif method == 'chain_getFinalizedHead':
+                    self.server.finalized += 1
+                    result = '0x' + format(self.server.finalized, '064x')
+                # One consistent chain: each block's hash encodes its height, so the finalized head
+                # is canonical at its own height and the best block stays ahead of it. The status
+                # script rejects a finalized head that is not canonical, and it should.
+                elif method == 'chain_getHeader':
+                    params = request.get('params', [])
+                    number = int(params[0], 16) if params else self.server.finalized + 1
+                    result = {'number': hex(number)}
+                elif method == 'chain_getBlockHash':
+                    params = request.get('params', [])
+                    number = params[0] if params else self.server.finalized + 1
+                    result = '0x' + format(number, '064x')
+                else:
+                    self.send_error(400)
+                    return
+                body = json.dumps({'jsonrpc': '2.0', 'id': request['id'], 'result': result},
+                                  separators=(',', ':')).encode()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_):
+                pass
+
+        server = ThreadingHTTPServer(('127.0.0.1', 0), StatusRpc)
+        server.finalized = 0
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                for tool in ('bash', 'curl', 'seq', 'date', 'sleep'):
+                    executable = shutil.which(tool)
+                    self.assertIsNotNone(executable, f'{tool} is required for this test')
+                    (Path(directory) / tool).symlink_to(executable)
+                (Path(directory) / 'python3').symlink_to(sys.executable)
+                result = subprocess.run(
+                    [str(Path(directory) / 'bash'), str(ROOT / 'scripts/testnet/status-7-validators.sh'),
+                     '--check-peers', '--timeout-sec', '1', '--check-finality', '--finality-window-sec', '0'],
+                    env={**os.environ, 'PATH': directory, 'COUNT': '1',
+                         'BASE_RPC_PORT': str(server.server_port), 'NO_PROXY': '127.0.0.1'},
+                    text=True, capture_output=True, timeout=10,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('Peer check OK', result.stdout)
+                self.assertIn('Finality check OK', result.stdout)
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=2)
+
     def launch_selection(self, index, multi_host=False):
         source = SCRIPT.read_text()
         marker = "# X3_LAUNCH_SELECTION_BEGIN\n"

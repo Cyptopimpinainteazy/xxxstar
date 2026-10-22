@@ -1,0 +1,44 @@
+---
+# Stage each validator's session keys on the controller, from its seed alone.
+#
+# The staged keystore is rebuilt from scratch on every run. Inserting into an existing one
+# keeps whatever was there: after `00-genesis.yml -e x3_genesis_force=true` mints new seeds,
+# the old Aura and GRANDPA files would stay beside the new ones, and the exact-two-key check
+# below would refuse every redeploy. The seeds are the source of truth; nothing else is.
+- name: Clear each staged keystore
+  ansible.builtin.file:
+    path: "{{ staged }}/validator-{{ item }}/keystore"
+    state: absent
+  loop: "{{ range(1, x3_validator_count + 1) | list }}"
+
+- name: Keystore directories
+  ansible.builtin.file:
+    path: "{{ staged }}/validator-{{ item }}/keystore"
+    state: directory
+    mode: "0700"
+  loop: "{{ range(1, x3_validator_count + 1) | list }}"
+
+- name: Insert Aura and GRANDPA keys from each validator seed
+  ansible.builtin.command:
+    argv:
+      - "{{ x3_binary_src }}"
+      - keys
+      - insert
+      - --key-type
+      - "{{ item.1 }}"
+      - --seed
+      - "{{ lookup('file', x3_keys_dir ~ '/validator-' ~ item.0 ~ '.suri').splitlines() | select('match', '^seed=') | first | regex_replace('^seed=', '') }}"
+      - --keystore-path
+      - "{{ staged }}/validator-{{ item.0 }}/keystore"
+  loop: "{{ range(1, x3_validator_count + 1) | product(['aura', 'grandpa']) | list }}"
+  loop_control:
+    label: "validator-{{ item.0 }} {{ item.1 }}"
+  no_log: true
+  changed_when: false
+
+- name: Each keystore holds exactly one Aura and one GRANDPA key
+  ansible.builtin.find:
+    paths: "{{ staged }}/validator-{{ item }}/keystore"
+  register: ks
+  loop: "{{ range(1, x3_validator_count + 1) | list }}"
+  failed_when: ks.matched != 2
