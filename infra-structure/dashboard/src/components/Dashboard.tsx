@@ -238,7 +238,7 @@ export function Dashboard({ onLogout, onAdmin, onChains }: DashboardProps) {
                     borderRadius: '8px',
                     color: '#fff',
                   }}
-                  formatter={(value: number | undefined) => [value?.toLocaleString() ?? '0', 'TPS']}
+                  formatter={(value) => [value?.toLocaleString() ?? '0', 'TPS']}
                 />
                 <Line
                   type="monotone"
@@ -319,7 +319,7 @@ export function Dashboard({ onLogout, onAdmin, onChains }: DashboardProps) {
                   <YAxis stroke="#9CA3AF" fontSize={11} tickFormatter={(v) => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : v} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }}
-                    formatter={(value: number | undefined) => [value?.toLocaleString() ?? '0']}
+                    formatter={(value) => [value?.toLocaleString() ?? '0']}
                   />
                   <Legend />
                   <Bar dataKey="txns" fill="#3B82F6" name="Total Txns" radius={[4, 4, 0, 0]} />

@@ -412,7 +412,7 @@ export function ChainExplorer({ onBack }: ChainExplorerProps) {
                     </Pie>
                     <Tooltip
                       contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }}
-                      formatter={(value: number | undefined) => [(value ?? 0).toLocaleString(), 'Chains']}
+                      formatter={(value) => [(value ?? 0).toLocaleString(), 'Chains']}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -430,7 +430,7 @@ export function ChainExplorer({ onBack }: ChainExplorerProps) {
                     <YAxis type="category" dataKey="chain_type" stroke="#9CA3AF" fontSize={11} width={80} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }}
-                      formatter={(value: number | undefined) => [(value ?? 0).toLocaleString(), 'Chains']}
+                      formatter={(value) => [(value ?? 0).toLocaleString(), 'Chains']}
                     />
                     <Bar dataKey="count" fill="#3B82F6" radius={[0, 4, 4, 0]} />
                   </BarChart>

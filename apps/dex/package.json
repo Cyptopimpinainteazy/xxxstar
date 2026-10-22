@@ -6,7 +6,8 @@
     "dev": "next dev -p 3002",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "postinstall": "node ../../scripts/ci/patch-next-eslint-glob.cjs ."
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.18",
@@ -32,8 +33,13 @@
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "eslint": "^9.20.0",
-    "eslint-config-next": "^16.1.6",
+    "eslint-config-next": "~16.4.2",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.61.0"
+  },
+  "overrides": {
+    "@next/eslint-plugin-next": {
+      "fast-glob": "npm:tinyglobby@^0.2.17"
+    }
   }
 }

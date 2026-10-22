@@ -360,6 +360,7 @@ GATES_FAST=(
   # security/npm-audit-baseline.json. critical/high can never be baselined.
   "npm audit scope:python3 -m unittest discover -s tests -p test_npm_audit_scope.py"
   "npm audit:python3 scripts/check-npm-audit.py"
+  "next eslint glob compatibility:bash scripts/ci/check-next-eslint-glob.sh"
   "feature matrix check:python3 scripts/feature_matrix.py check"
   # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
   # `audit-artifacts/current/feature-status.json` are *derived* from FEATURE_REGISTRY.toml and
@@ -871,7 +872,9 @@ GATES_FAST=(
   "test js wallet:cd apps/wallet && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
   "test js inferstructor-dashboard:cd apps/inferstructor-dashboard && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
   "test js x3-desktop:cd apps/x3-desktop && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
-  "test js wallet-integration:cd tests/wallet-integration && { [ -d node_modules ] || npm ci --no-audit --no-fund --prefer-offline; } && npm test"
+  "test js wallet-integration:cd tests/wallet-integration && npm ci --no-audit --no-fund --prefer-offline && npm test"
+  "test js polkawallet-bridge-adapter:cd packages/polkawallet-bridge-adapter && npm ci --no-audit --no-fund --prefer-offline && npm test -- --runInBand && npm run build && ./node_modules/.bin/tsc --noEmit"
+  "test js app-store watcher:cd x3-app-store/frontend && npm ci --no-audit --no-fund --prefer-offline && npm test"
   "test js x3-studio:cd apps/x3-studio && { [ -d node_modules ] || corepack pnpm install --prefer-offline; } && corepack pnpm test"
   # Two configurations of the proof-verification router, because the `--deep`
   # workspace build unifies `test-verifier` through the gateway pallet's

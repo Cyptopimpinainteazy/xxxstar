@@ -389,7 +389,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="time" stroke="#9CA3AF" fontSize={11} />
               <YAxis stroke="#9CA3AF" fontSize={11} tickFormatter={fmtK} />
-              <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }} formatter={(v: number | undefined) => [fmt(v ?? 0)]} />
+              <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }} formatter={(v) => [typeof v === 'number' ? fmt(v) : String(v ?? 0)]} />
               <Legend />
               <Line type="monotone" dataKey="tps" stroke="#3B82F6" strokeWidth={2} dot={false} name="Current TPS" isAnimationActive={false} />
               <Line type="monotone" dataKey="peak" stroke="#EF4444" strokeWidth={1} dot={false} name="Peak TPS" strokeDasharray="5 5" isAnimationActive={false} />
@@ -441,7 +441,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} />
                 <YAxis stroke="#9CA3AF" fontSize={11} tickFormatter={fmtK} />
-                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }} formatter={(v: number | undefined) => [fmt(v ?? 0)]} />
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }} formatter={(v) => [typeof v === 'number' ? fmt(v) : String(v ?? 0)]} />
                 <Legend />
                 <Bar dataKey="txns" fill="#3B82F6" name="Total Txns" radius={[4, 4, 0, 0]} />
               </BarChart>

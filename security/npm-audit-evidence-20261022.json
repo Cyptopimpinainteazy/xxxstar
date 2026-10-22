@@ -1,0 +1,332 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-22",
+  "node_version": "v22.23.2",
+  "npm_version": "10.9.8",
+  "scope": "working-tree package/lock digests, not GitHub Actions or release certification",
+  "reports": [
+    {
+      "project": "apps/explorer",
+      "package_lock_sha256": "fe20cbba11606043f76022d72d3844dba30fcec62944ebb8180570322c6bb88b",
+      "manifest_sha256": "ea4bacda47b0d2b3dea645aaf4d1a9f56829127dec65b11a27997840f6738dca",
+      "npm_audit_exit": 1,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 19,
+        "high": 0,
+        "critical": 0,
+        "total": 19
+      },
+      "advisories": [
+        {
+          "source": 1241202,
+          "name": "sprintf-js",
+          "dependency": "sprintf-js",
+          "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
+          "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<=1.1.3"
+        }
+      ],
+      "findings": {
+        "@istanbuljs/load-nyc-config": "moderate",
+        "@jest/core": "moderate",
+        "@jest/expect": "moderate",
+        "@jest/globals": "moderate",
+        "@jest/reporters": "moderate",
+        "@jest/transform": "moderate",
+        "argparse": "moderate",
+        "babel-jest": "moderate",
+        "babel-plugin-istanbul": "moderate",
+        "jest": "moderate",
+        "jest-circus": "moderate",
+        "jest-cli": "moderate",
+        "jest-config": "moderate",
+        "jest-resolve-dependencies": "moderate",
+        "jest-runner": "moderate",
+        "jest-runtime": "moderate",
+        "jest-snapshot": "moderate",
+        "js-yaml": "moderate",
+        "sprintf-js": "moderate"
+      }
+    },
+    {
+      "project": "apps/shared",
+      "package_lock_sha256": "1b263c07c353d15491c1538dec0d65dfe55687539a9fd83b0501c65d3b94acaa",
+      "manifest_sha256": "6809dfb6ee9f7b84aa3a8827d0dc64696c15e76fea8f1755efce857989f5306f",
+      "npm_audit_exit": 1,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 20,
+        "high": 0,
+        "critical": 0,
+        "total": 20
+      },
+      "advisories": [
+        {
+          "source": 1241202,
+          "name": "sprintf-js",
+          "dependency": "sprintf-js",
+          "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
+          "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<=1.1.3"
+        }
+      ],
+      "findings": {
+        "@istanbuljs/load-nyc-config": "moderate",
+        "@jest/core": "moderate",
+        "@jest/expect": "moderate",
+        "@jest/globals": "moderate",
+        "@jest/reporters": "moderate",
+        "@jest/transform": "moderate",
+        "argparse": "moderate",
+        "babel-jest": "moderate",
+        "babel-plugin-istanbul": "moderate",
+        "jest": "moderate",
+        "jest-circus": "moderate",
+        "jest-cli": "moderate",
+        "jest-config": "moderate",
+        "jest-resolve-dependencies": "moderate",
+        "jest-runner": "moderate",
+        "jest-runtime": "moderate",
+        "jest-snapshot": "moderate",
+        "js-yaml": "moderate",
+        "sprintf-js": "moderate",
+        "ts-jest": "moderate"
+      }
+    },
+    {
+      "project": "apps/wallet",
+      "package_lock_sha256": "fadad7139855432cb2e2fda2b5c18ebc8a10ccafef1b18bd5d3dacf9b68fb720",
+      "manifest_sha256": "0115618968331db288e1ded9559495a8416989a68f044fa2d3a27540e667eda3",
+      "npm_audit_exit": 1,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 20,
+        "high": 0,
+        "critical": 0,
+        "total": 20
+      },
+      "advisories": [
+        {
+          "source": 1241202,
+          "name": "sprintf-js",
+          "dependency": "sprintf-js",
+          "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
+          "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<=1.1.3"
+        }
+      ],
+      "findings": {
+        "@istanbuljs/load-nyc-config": "moderate",
+        "@jest/core": "moderate",
+        "@jest/expect": "moderate",
+        "@jest/globals": "moderate",
+        "@jest/reporters": "moderate",
+        "@jest/transform": "moderate",
+        "argparse": "moderate",
+        "babel-jest": "moderate",
+        "babel-plugin-istanbul": "moderate",
+        "jest": "moderate",
+        "jest-circus": "moderate",
+        "jest-cli": "moderate",
+        "jest-config": "moderate",
+        "jest-resolve-dependencies": "moderate",
+        "jest-runner": "moderate",
+        "jest-runtime": "moderate",
+        "jest-snapshot": "moderate",
+        "js-yaml": "moderate",
+        "sprintf-js": "moderate",
+        "ts-jest": "moderate"
+      }
+    },
+    {
+      "project": "packages/polkawallet-plugin",
+      "package_lock_sha256": "9060ac69cfdd9abfb35b3f48cf843b5a888fa7dffa476d32761da4e27c8ad775",
+      "manifest_sha256": "c8fcbe33af4fdc07c9244e8d05cc79496f10c3a0493a8bd603fa2e1834d318a4",
+      "npm_audit_exit": 1,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 20,
+        "high": 0,
+        "critical": 0,
+        "total": 20
+      },
+      "advisories": [
+        {
+          "source": 1241202,
+          "name": "sprintf-js",
+          "dependency": "sprintf-js",
+          "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
+          "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<=1.1.3"
+        }
+      ],
+      "findings": {
+        "@istanbuljs/load-nyc-config": "moderate",
+        "@jest/core": "moderate",
+        "@jest/expect": "moderate",
+        "@jest/globals": "moderate",
+        "@jest/reporters": "moderate",
+        "@jest/transform": "moderate",
+        "argparse": "moderate",
+        "babel-jest": "moderate",
+        "babel-plugin-istanbul": "moderate",
+        "jest": "moderate",
+        "jest-circus": "moderate",
+        "jest-cli": "moderate",
+        "jest-config": "moderate",
+        "jest-resolve-dependencies": "moderate",
+        "jest-runner": "moderate",
+        "jest-runtime": "moderate",
+        "jest-snapshot": "moderate",
+        "js-yaml": "moderate",
+        "sprintf-js": "moderate",
+        "ts-jest": "moderate"
+      }
+    },
+    {
+      "project": "packages/ts-sdk",
+      "package_lock_sha256": "fb58a1eb1eef98597c41c5a46ce3a4a6127b8b40e31cdeab5026ce037d24bc8a",
+      "manifest_sha256": "efec85ee8aaa5dfe1285e0489501127e61e933ac75665581ce84e17fa136ffe9",
+      "npm_audit_exit": 1,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 20,
+        "high": 0,
+        "critical": 0,
+        "total": 20
+      },
+      "advisories": [
+        {
+          "source": 1241202,
+          "name": "sprintf-js",
+          "dependency": "sprintf-js",
+          "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
+          "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<=1.1.3"
+        }
+      ],
+      "findings": {
+        "@istanbuljs/load-nyc-config": "moderate",
+        "@jest/core": "moderate",
+        "@jest/expect": "moderate",
+        "@jest/globals": "moderate",
+        "@jest/reporters": "moderate",
+        "@jest/transform": "moderate",
+        "argparse": "moderate",
+        "babel-jest": "moderate",
+        "babel-plugin-istanbul": "moderate",
+        "jest": "moderate",
+        "jest-circus": "moderate",
+        "jest-cli": "moderate",
+        "jest-config": "moderate",
+        "jest-resolve-dependencies": "moderate",
+        "jest-runner": "moderate",
+        "jest-runtime": "moderate",
+        "jest-snapshot": "moderate",
+        "js-yaml": "moderate",
+        "sprintf-js": "moderate",
+        "ts-jest": "moderate"
+      }
+    },
+    {
+      "project": "packages/x3-foundry-sdk",
+      "package_lock_sha256": "5b630444acae86975d4129acd988dd21b795e53d8db04f0beb0ccc35caf2b2f4",
+      "manifest_sha256": "a403d0bb4bb2572dff194bcfb036029838dec2e17fd44314149ea6466bda27f3",
+      "npm_audit_exit": 1,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 20,
+        "high": 0,
+        "critical": 0,
+        "total": 20
+      },
+      "advisories": [
+        {
+          "source": 1241202,
+          "name": "sprintf-js",
+          "dependency": "sprintf-js",
+          "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
+          "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1284"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<=1.1.3"
+        }
+      ],
+      "findings": {
+        "@istanbuljs/load-nyc-config": "moderate",
+        "@jest/core": "moderate",
+        "@jest/expect": "moderate",
+        "@jest/globals": "moderate",
+        "@jest/reporters": "moderate",
+        "@jest/transform": "moderate",
+        "argparse": "moderate",
+        "babel-jest": "moderate",
+        "babel-plugin-istanbul": "moderate",
+        "jest": "moderate",
+        "jest-circus": "moderate",
+        "jest-cli": "moderate",
+        "jest-config": "moderate",
+        "jest-resolve-dependencies": "moderate",
+        "jest-runner": "moderate",
+        "jest-runtime": "moderate",
+        "jest-snapshot": "moderate",
+        "js-yaml": "moderate",
+        "sprintf-js": "moderate",
+        "ts-jest": "moderate"
+      }
+    }
+  ]
+}
