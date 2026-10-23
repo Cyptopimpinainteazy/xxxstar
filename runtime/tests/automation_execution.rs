@@ -126,15 +126,19 @@ fn a_price_condition_fails_closed_when_the_oracle_has_no_median() {
 #[test]
 fn the_runtime_oracle_supplies_the_automation_price() {
     setup().execute_with(|| {
-        // Write a median directly, standing in for authorized submitters.
+        // Write a median directly, standing in for authorized submitters. The
+        // timestamp must be current: a median older than the configured maximum
+        // age is refused, and this test previously proved the opposite because
+        // no freshness check existed at all.
         let asset = 77u32;
+        let now = pallet_timestamp::Pallet::<Runtime>::get();
         pallet_x3_oracle::AssetPrices::<Runtime>::insert(
             asset,
             pallet_x3_oracle::PriceData {
                 price: 1_500,
                 submission_count: 3,
                 last_updated: 1,
-                timestamp: 0,
+                timestamp: now,
             },
         );
 
@@ -230,5 +234,93 @@ fn the_oracle_pallet_is_the_wired_source_of_truth() {
     // provider that always answers `None`, the price above would never be read.
     setup().execute_with(|| {
         assert!(Oracle::get_price(9999).is_none());
+    });
+}
+
+#[test]
+fn a_stale_median_is_refused_like_a_missing_one() {
+    // The oracle never deletes an `AssetPrices` entry; when the feed goes quiet
+    // the last median stays. A stop-loss trigger must not fire on it.
+    setup().execute_with(|| {
+        let asset = 88u32;
+        pallet_x3_oracle::AssetPrices::<Runtime>::insert(
+            asset,
+            pallet_x3_oracle::PriceData {
+                price: 1_500,
+                submission_count: 3,
+                last_updated: 1,
+                timestamp: 0, // never observed at this chain's clock
+            },
+        );
+        // Move the clock a full day past the recorded observation.
+        pallet_timestamp::Pallet::<Runtime>::set_timestamp(86_400_000);
+
+        let owner = account(12);
+        let keeper = account(13);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+        let _ = Balances::make_free_balance_be(&keeper, ENDOWED);
+
+        // "price below 1_000" would be true for the stale 1_500 only if the
+        // threshold were above it; use `above: false` with a high threshold so a
+        // stale read would fire and a correct refusal will not.
+        let task_id = register(
+            &owner,
+            Condition::PriceThreshold {
+                asset_id: asset,
+                threshold: 2_000,
+                above: false,
+            },
+            Action::Noop,
+        );
+
+        let keeper_before = free(&keeper);
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(keeper.clone()), task_id),
+            pallet_x3_automation::Error::<Runtime>::PriceUnavailable
+        );
+        assert_eq!(free(&keeper), keeper_before);
+        let task = Automation::tasks(task_id).expect("task survives");
+        assert_eq!(task.status, TaskStatus::Active);
+        assert!(Automation::receipt(task_id, 1).is_none());
+    });
+}
+
+#[test]
+fn a_fresh_median_is_usable() {
+    setup().execute_with(|| {
+        let asset = 89u32;
+        pallet_timestamp::Pallet::<Runtime>::set_timestamp(1_000_000);
+        pallet_x3_oracle::AssetPrices::<Runtime>::insert(
+            asset,
+            pallet_x3_oracle::PriceData {
+                price: 1_500,
+                submission_count: 3,
+                last_updated: 1,
+                timestamp: 1_000_000 - 60_000, // one minute old
+            },
+        );
+
+        let owner = account(14);
+        let keeper = account(15);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+        let _ = Balances::make_free_balance_be(&keeper, ENDOWED);
+
+        let task_id = register(
+            &owner,
+            Condition::PriceThreshold {
+                asset_id: asset,
+                threshold: 2_000,
+                above: false,
+            },
+            Action::Noop,
+        );
+        assert_ok!(Automation::execute_task(
+            RuntimeOrigin::signed(keeper),
+            task_id
+        ));
+        assert_eq!(
+            Automation::tasks(task_id).unwrap().status,
+            TaskStatus::Executed
+        );
     });
 }

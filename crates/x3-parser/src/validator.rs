@@ -146,6 +146,7 @@ impl StructuralValidator {
         self.validate_span(&automation.span)?;
         self.validate_identifier(&automation.name)?;
         self.validate_span(&automation.trigger.span())?;
+        reject_off_chain_connectors(&automation.name.name, "trigger", &automation.trigger)?;
 
         let mut seen: Vec<PermissionKind> = Vec::new();
         for permission in &automation.permissions {
@@ -177,38 +178,8 @@ impl StructuralValidator {
         section: &str,
     ) -> ParseResult<()> {
         self.validate_span(&block.span)?;
-        for statement in &block.statements {
-            if let Statement::Expr(expr) = statement {
-                self.reject_off_chain_connector(automation, section, expr)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Refuse a call whose callee names an off-chain connector.
-    ///
-    /// Matches both `http.get(..)` (a field access on a bare name) and
-    /// `chain.http.get(..)` (the connector as the last segment).
-    fn reject_off_chain_connector(
-        &self,
-        automation: &str,
-        section: &str,
-        expr: &Expression,
-    ) -> ParseResult<()> {
-        const OFF_CHAIN: [&str; 3] = ["http", "ai", "gpu"];
-        if let Expression::Call(call) = expr {
-            if let Some(name) = callee_root_name(&call.callee) {
-                if OFF_CHAIN.contains(&name) {
-                    return Err(ParseError::new(
-                        format!(
-                            "automation `{automation}`: `{name}.*` is an off-chain connector and \
-                             cannot appear in `{section}`; an on-chain workflow must be replayable \
-                             by every validator"
-                        ),
-                        call.span,
-                    ));
-                }
-            }
+        for expr in block_expressions(block) {
+            reject_off_chain_connectors(automation, section, expr)?;
         }
         Ok(())
     }
@@ -570,13 +541,154 @@ impl StructuralValidator {
     }
 }
 
-/// Root identifier of a call's callee: `http` for both `http.get(..)` and
-/// `http.get(..).parse()`, and `chain` for `chain.http.get(..)`.
-fn callee_root_name(callee: &Expression) -> Option<&str> {
+/// Connectors whose answer depends on an off-chain service. An automation body
+/// is a chain-side workflow, so none of them may appear in any of its sections.
+const OFF_CHAIN_CONNECTORS: [&str; 3] = ["http", "ai", "gpu"];
+
+/// Refuse any off-chain connector call reachable from `expr`.
+///
+/// Recursive on purpose: a connector wrapped in a call argument, a `let`
+/// initializer, a `return`, or an `if` branch is still a connector call. Both
+/// the callee's root (`http.get(..)`) and its last path segment
+/// (`chain.http.get(..)`) are checked, because either spelling reaches the same
+/// service.
+fn reject_off_chain_connectors(
+    automation: &str,
+    section: &str,
+    expr: &Expression,
+) -> ParseResult<()> {
+    if let Expression::Call(call) = expr {
+        for segment in callee_segments(&call.callee) {
+            if OFF_CHAIN_CONNECTORS.contains(&segment) {
+                return Err(ParseError::new(
+                    format!(
+                        "automation `{automation}`: `{segment}.*` is an off-chain connector and \
+                         cannot appear in `{section}`; an on-chain workflow must be replayable \
+                         by every validator"
+                    ),
+                    call.span,
+                ));
+            }
+        }
+    }
+    for child in child_expressions(expr) {
+        reject_off_chain_connectors(automation, section, child)?;
+    }
+    Ok(())
+}
+
+/// Identifier segments of a callee path, outermost last:
+/// `chain.http.get` yields `["chain", "http", "get"]`.
+fn callee_segments(callee: &Expression) -> Vec<&str> {
     match callee {
-        Expression::Identifier(identifier) => Some(identifier.name.as_str()),
-        Expression::FieldAccess(access) => callee_root_name(&access.object),
-        _ => None,
+        Expression::Identifier(identifier) => vec![identifier.name.as_str()],
+        Expression::FieldAccess(access) => {
+            let mut segments = callee_segments(&access.object);
+            segments.push(access.field.name.as_str());
+            segments
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Every sub-expression of `expr`, so a walk cannot miss one.
+fn child_expressions(expr: &Expression) -> Vec<&Expression> {
+    match expr {
+        Expression::Literal(_) | Expression::Identifier(_) => Vec::new(),
+        Expression::Binary(binary) => vec![&binary.left, &binary.right],
+        Expression::Unary(unary) => vec![&unary.expr],
+        Expression::Call(call) => {
+            let mut out = vec![call.callee.as_ref()];
+            out.extend(call.args.iter());
+            out
+        }
+        Expression::Assign(assign) => vec![&assign.value],
+        Expression::FieldAccess(access) => vec![&access.object],
+        Expression::Range(range) => vec![&range.start, &range.end],
+        Expression::Array(array) => array.elements.iter().collect(),
+        Expression::Tuple(tuple) => tuple.elements.iter().collect(),
+        Expression::Index(index) => vec![&index.base, &index.index],
+        Expression::IndexAssign(assign) => vec![&assign.index, &assign.value],
+        Expression::StructLiteral(literal) => literal.fields.iter().map(|f| &f.value).collect(),
+        Expression::FieldAssign(assign) => vec![&assign.value],
+    }
+}
+
+/// Every expression anywhere in `block`, nested blocks included.
+///
+/// A connector inside an `if`, a loop body or an `atomic` block is still a
+/// connector call; the walk has to reach it.
+fn block_expressions(block: &Block) -> Vec<&Expression> {
+    let mut out = Vec::new();
+    for statement in &block.statements {
+        out.extend(statement_expressions(statement));
+        for nested in nested_blocks(statement) {
+            out.extend(block_expressions(nested));
+        }
+    }
+    out
+}
+
+/// Blocks a statement owns, so the walk can descend into them.
+fn nested_blocks(statement: &Statement) -> Vec<&Block> {
+    match statement {
+        Statement::If(statement) => {
+            let mut out = vec![&statement.then_block];
+            if let Some(else_block) = &statement.else_block {
+                out.push(else_block);
+            }
+            out
+        }
+        Statement::While(statement) => vec![&statement.body],
+        Statement::Loop(statement) => vec![&statement.body],
+        Statement::For(statement) => vec![&statement.body],
+        Statement::Atomic(block) => vec![&block.body],
+        Statement::Let(_)
+        | Statement::Expr(_)
+        | Statement::Return(_, _)
+        | Statement::Emit(_)
+        | Statement::Break(_)
+        | Statement::Continue(_) => Vec::new(),
+    }
+}
+
+/// Expressions a statement can contain at its own level.
+fn statement_expressions(statement: &Statement) -> Vec<&Expression> {
+    match statement {
+        Statement::Let(statement) => vec![&statement.initializer],
+        Statement::Expr(expr) => vec![expr],
+        Statement::Return(expr, _) => expr.as_ref().into_iter().collect(),
+        Statement::If(statement) => vec![&statement.condition],
+        Statement::While(statement) => vec![&statement.condition],
+        Statement::Loop(_) | Statement::Break(_) | Statement::Continue(_) => Vec::new(),
+        Statement::For(statement) => match &statement.kind {
+            // Both loop forms carry expressions; their bodies are walked by
+            // `nested_blocks`, not here.
+            ForLoopKind::CStyle {
+                init,
+                condition,
+                update,
+            } => {
+                let mut out: Vec<&Expression> = Vec::new();
+                if let Some(condition) = condition {
+                    out.push(condition);
+                }
+                if let Some(update) = update {
+                    out.push(update);
+                }
+                if let Some(init) = init {
+                    out.extend(statement_expressions(init));
+                }
+                out
+            }
+            ForLoopKind::Range { range, .. } => vec![&range.start, &range.end],
+        },
+        Statement::Atomic(block) => block
+            .metadata
+            .as_ref()
+            .into_iter()
+            .collect(),
+        Statement::Emit(statement) => vec![&statement.value],
     }
 }
 
