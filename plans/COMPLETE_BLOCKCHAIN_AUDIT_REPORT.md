@@ -1,5 +1,11 @@
 # X3_ATOMIC_STAR - Complete Blockchain Readiness Audit Report
 
+> **CORRECTION 2026-10-23.** The "100% score" below is a ProofForge claim-audit figure from
+> 2026-05-01, not a readiness measurement. Registry-scored readiness on 2026-10-23 is 62.74% across
+> 23 entries, nothing is deployed, and credential revocation is unproven. Read that as a historical
+> audit record only — see `CURRENT_MAINNET_STATUS.md`.
+
+
 **Audit Date:** 2026-05-02  
 **Auditor:** Architect Mode (Roo)  
 **Repository:** /home/lojak/Desktop/X3_ATOMIC_STAR  

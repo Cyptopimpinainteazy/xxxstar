@@ -1,5 +1,12 @@
 # Phase 4: Settlement Engine Bridge Integration - COMPLETE ✅
 
+> **CORRECTION 2026-10-23.** The "100% readiness / ✅ Complete" status below is false and was
+> never true. Registry-scored readiness on 2026-10-23 is 62.74% across 23 entries
+> (`FEATURE_REGISTRY.toml`), nothing is deployed — no testnet hostname resolves and the 168-item
+> deployment checklist has zero boxes ticked — and credential revocation is unproven (TICKET-102).
+> This file is kept as a historical phase record only. See `CURRENT_MAINNET_STATUS.md`.
+
+
 **Status**: COMPLETED  
 **Completion Date**: April 26, 2025  
 **Total Tests Passing**: 102 (11 bridge + 67 settlement + 24 agent-memory)  

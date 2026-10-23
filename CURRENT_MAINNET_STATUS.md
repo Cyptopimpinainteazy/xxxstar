@@ -1,96 +1,98 @@
 # X3 Atomic Star — Mainnet Status
 
-**Updated: 2026-09-24 — ~55% registry-scored readiness (55.29% across 21 current entries, recalculated from `FEATURE_REGISTRY.toml`). The registry paths and cited test names resolve to real code; this is not a mainnet-ready claim.**
+**Updated: 2026-10-23 — 62.74% registry-scored readiness across 23 entries, derived from `FEATURE_REGISTRY.toml`. This is not a mainnet-ready claim, and nothing is deployed.**
 
-> `FEATURE_REGISTRY.toml` is the single canonical source. All percentages derive from it.
-> Run `scripts/check-readiness-consistency.sh` to validate (now also fails on fictional registry paths).
+> `FEATURE_REGISTRY.toml` is the single canonical source. Every number below is read from it; none is hand-maintained.
+> Validate with `scripts/check-readiness-consistency.sh`, which fails when a status document claims **more** than the registry allows.
+> That gate does not catch a document that has gone **stale downward**. If you change a `readiness_score`, update this file in the same commit — the figures here are only as current as the last edit.
+
+## Deployment reality (2026-10-23)
+
+| Check | Result |
+| --- | --- |
+| `rpc.testnet.x3-chain.io` | does not resolve |
+| `faucet.testnet.x3-chain.io` | does not resolve |
+| `bootnode.testnet.x3-chain.io` | does not resolve |
+| `docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md` | 168 boxes, 0 checked |
+| `.github/workflows/testnet-deploy.yml` | has never run |
+| `deployment/keys/bootnode-info.txt` | three `127.0.0.1` loopback addresses |
+| Running `x3-chain-node` processes | 0 |
+
+All testnet evidence in this repository is **loopback evidence**: multiple validators on one host, finalizing and agreeing. That proves the binary works. It does not prove a network.
 
 ## System Completion Scoreboard
 
 ```
-Atomic Router (pallets/x3-cross-vm-router)        ████████░░  88%  LIVE_TESTNET — All 8 invariants passing, CI gate wired
-Atomic Kernel (pallets/x3-atomic-kernel)           ███░░░░░░░  35%  LIVE_TESTNET — EconomicHalt guard is real code, but its 9 previously-claimed invariant tests were fictional (CRITICAL-TOK-1, 2026-09-06 audit) and bundle finalization is unauthorized with a self-satisfying finality gate (TICKET-097, 2026-09-22)
-AXE DEX (pallets/x3-dex)                           ███████░░░  75%  GUARDED_TESTNET — EconomicHalt runtime gate, CI wired
-X3 Forge (pallets/x3-token-factory)                ███████░░░  75%  GUARDED_TESTNET — EconomicHalt runtime gate, CI wired
-Atomic Lock (pallets/x3-atomic-kernel)             ██████░░░░  68%  LIVE_TESTNET — CI gate wired via atomic_kernel
-Atomic Gateway (crates/x3-gateway)                 ██████░░░░  65%  GUARDED_TESTNET — 4 verifier families + CI gate + code review
-Triforge Runtime (pallets/evolution-core)          ██████░░░░  65%  GUARDED_TESTNET — CI build step wired, mainnet-rc1 feature wired
-X3 Wallet Pallet (pallets/x3-wallet-pallet)        █████░░░░░  55%  LIVE_TESTNET — CI gate verified, biometric security review pending
-Launch Gate (scripts/mainnet)                      █████░░░░░  47%  LIVE_TESTNET — Both RC gates exist and fail closed (18 checks), and a promotion record binds a passing run to the genesis it promotes (10 checks); neither gate has run against 7 live validators
-State Snapshot (crates/x3-state-snapshot)          ███████░░░  70%  GUARDED_TESTNET — Content-addressed manifest, verifier, exporter and restore, 48 tests; a snapshot rebuilt into a chain spec makes a booting node recompute the chain's own state root
-X3 Sentinel (pallets/x3-sentinel)                  █████░░░░░  47%  GUARDED_TESTNET — freeze power unreachable without sudo
-X3 Reactor (crates/x3-bench)                       ████░░░░░░  40%  LIVE_TESTNET — Benchmark not in CI critical path
-X3 Swarm Core (crates/x3-swarm-core)               ██░░░░░░░░  25%  GUARDED_TESTNET — Experimental, not in CI
-BTC Fortress Gateway (crates/x3-gateway)           ██░░░░░░░░  25%  SIM_TESTNET — BTC signer quorum pending
-Repo Scanner Agent (scripts/swarm)                 ██░░░░░░░░  25%  LIVE_TESTNET — Dev-ops tooling, experimental
-Tauri OS (apps/tauri-os)                           █░░░░░░░░░  15%  GUARDED_TESTNET — Dead buttons report, Tauri wiring pending
+Atomic Router (pallets/x3-cross-vm-router)           █████████░   88%  LIVE_TESTNET — External-bridge path disabled at genesis — governance gate, not code gap
+Triforge Runtime (runtime)                           ████████░░   80%  GUARDED_TESTNET — the rehearsal starts from this runtime's genesis, not a previous runtime's exported state, so cross-version migration of historical state is unverified
+AXE DEX (pallets/x3-dex)                             ████████░░   75%  GUARDED_TESTNET — DEX uses EconomicHalt runtime governance; no compile-time feature gate removal needed
+Trading Core v1 (x3-lang)                            ████████░░   75%  GUARDED_TESTNET — No multi-validator or live-network execution of a trading-core-v1 program has been performed — all 131 passing tests are single-process compiler/VM/CLI-level
+X3 Forge (pallets/x3-token-factory)                  ████████░░   75%  GUARDED_TESTNET — Token factory uses EconomicHalt runtime governance (not compile-time gates)
+BTC Fortress Gateway (pallets/x3-settlement-engine)  ███████░░░   72%  SIM_TESTNET — A header source exists now, but a public chain does not run it: the header chain bootstraps from a checkpoint (spec_version 14/15) and `anchor_btc_checkpoint`/genesis `btc_checkpoints` pins one, yet no public network has one pinned, the relayer is a script an operator runs rather than a node feature, and nothing bonds it for withholding — TICKET-095 stays open until there is more than one
+Atomic Trade Engine (pallets/atomic-trade-engine)    ███████░░░   70%  GUARDED_TESTNET — No multi-validator or live-network run — 48 passing tests are all mock-runtime unit tests
+State Snapshot (crates/x3-state-snapshot)            ███████░░░   70%  GUARDED_TESTNET — the exporter consumes `export-state` output rather than reading the database directly
+SVM Atomic Swap HTLC (programs/svm/x3_atomic_swap)   ███████░░░   70%  LIVE_TESTNET — Deployed to a local validator only — no devnet or mainnet deployment has been performed
+Atomic Lock (pallets/x3-lp-locker)                   ███████░░░   68%  LIVE_TESTNET — Cross-pallet integration (launchpad → LP locker) not verified in CI
+Atomic Gateway (pallets/x3-cross-vm-router)          ██████░░░░   65%  GUARDED_TESTNET — Gateway is guarded — ExternalBridgesEnabled = false at genesis (governance gate)
+X3 Wrapped (pallets/x3-wrapped)                      ██████░░░░   65%  GUARDED_TESTNET — External bridge deposits are disabled at genesis (ExternalBridgesEnabled=false per LAUNCH_SCOPE.md) — wrapped assets can only be minted via governance-gated RPC for testing, not from a real external-chain deposit
+X3 HTLC (pallets/x3-settlement-engine)               ██████░░░░   60%  GUARDED_TESTNET — No external audit of the settlement engine's custody path
+Northern Swarm Reactor (crates/northern-swarm)       ██████░░░░   58%  GUARDED_TESTNET — No live-node integration test. The executor/chain contract is proven at the boundary only - encoder/decoder, signer selection, restart recovery - never against a running node. The crate cannot currently reach a live chain in CI, and the row stays below 50 for that reason
+Repo Scanner Agent (scripts/swarm/swarm_scan.sh)     ██████░░░░   58%  LIVE_TESTNET — Dev-ops tooling — not part of blockchain runtime
+Atomic Kernel (pallets/x3-atomic-kernel)             ██████░░░░   57%  LIVE_TESTNET — the unsigned finalization extrinsic was removed 2026-09-23 (TICKET-097): finalization is signed only, and `RuntimeOrigin::none()` cannot reach it. Independent audit and public-network proof remain outstanding
+X3 Wallet Pallet (pallets/x3-wallet-pallet)          ██████░░░░   55%  LIVE_TESTNET — Biometric template and recovery logic have no security review
+X3 Swarm Core (crates/x3-swarm-core)                 █████░░░░░   52%  GUARDED_TESTNET — excluded from the root workspace and absent from the runtime dependency graph: the swarm control plane is not on the deployed blockchain path
+X3 Reactor (crates/x3-bench)                         █████░░░░░   49%  LIVE_TESTNET — Benchmark infrastructure not in CI critical path
+Launch Gate (scripts/mainnet/mainnet_rc_gate.sh)     █████░░░░░   47%  LIVE_TESTNET — both RC gates fail closed, but cannot pass without the 7 physical servers, a 72-hour stability window, and a public explorer/faucet
+X3 Sentinel (pallets/x3-sentinel)                    █████░░░░░   47%  GUARDED_TESTNET — The guard is inert while nothing can be frozen, so its refusal path (`AuthorityFrozenBySentinel`) has never run on a chain; the drill takes that branch only when a privileged path exists
+SVM X3 HTLC Program (X3-contracts/svm/programs/x3_htlc) ████░░░░░░   45%  SIM_TESTNET — Not wired into any live cross-VM route — no caller in the atomic router or crates/cross-vm-coordinator; the live SVM route runs the sibling programs/svm/x3_atomic_swap program
+Tauri OS (apps/tauri-os)                             ████░░░░░░   42%  GUARDED_TESTNET — Desktop UI only — not part of blockchain runtime
 ```
 
-**Average readiness: ~55%** — 21 features are currently tracked. Eight aspirational/fictional rows were purged on 2026-09-05; `atomic_kernel` was corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 because its required tests were fictional, and to 35% on 2026-09-22 because bundle finalization is not authorized and its finality gate compares the caller's input with the caller's earlier input (TICKET-097). `state_snapshot` was added on 2026-09-24 at 55% (format, verifier and exporter exist and are unit tested; no chain-produced root has been matched yet, so it is not testnet-proven). Core consensus features are at guarded-testnet, not mainnet, maturity.
+**Average readiness: 62.74%** — 23 tracked features.
 
-### 2026-09-07 Atomic lifecycle live evidence
+## What is verified
+
+| Capability | Evidence |
+| --- | --- |
+| Multi-validator agreement | `node/tests/supply_invariant_distributed.rs`, `flash_finality_network.rs`, `x3lang_network_receipt.rs`, `x3vm_live_lifecycle.rs` — run as `local-ci.sh --cross` gates |
+| Atomic kernel finalization authorization | `RuntimeOrigin::none()` cannot reach finalization; a named regression test asserts it (TICKET-097, closed 2026-09-23) |
+| Registry integrity | `scripts/check-readiness-consistency.sh` resolves every `required_tests` name against a real `fn` |
+| Secret hygiene in tracked files | `scripts/check-no-provider-secrets.sh`, wired into `make guard` |
+| Local gate suite | `scripts/local-ci.sh` — fmt, guards, check, lint, unit |
+
+## What is NOT verified
+
+| Gap | Severity | Detail |
+| --- | --- | --- |
+| Credential revocation | 🔴 Open | TICKET-102. Four provider keys and one wallet private key were in tracked source; removal from HEAD does not revoke them. No revocation is proven. |
+| Tracked build/state artifacts | 🔴 Open | TICKET-103 names one package; **337 `dist/` files across 11 packages** are actually tracked, plus `crawler_state.json`. |
+| Real network deployment | 🔴 Not started | See deployment reality above. |
+| `mainnet-rc1` build | ⚪ BLOCKED | Cannot be compiled on this host: filesystem at 100%, 1 MB free. Not a code verdict — the gate did not run. |
+| BTC signer quorum | 🔴 Missing | Withdrawals have no production multi-signer policy. |
+| Biometric security review | 🔴 Pending | Wallet pallet biometric and recovery logic unaudited. |
+
+## Score movement since 2026-09-24
+
+The previous revision of this file recorded 55.29% across 21 entries, `atomic_kernel` at 35%, and described `mainnet-rc1` as having a pre-existing compile error. All three were stale:
+
+- **21 → 23 entries, 55.29% → 62.74%.** Two rows were added and several re-scored in the registry without this document following.
+- **`atomic_kernel` 35% → 57%.** The unauthorized-finalization hole was closed 2026-09-23 by deleting the unsigned extrinsic, not signing it.
+- **`mainnet-rc1` "pre-existing compile error"** — `get_wrapped_balance` exists at `runtime/src/lib.rs:5028`, so that specific break is gone. The current build attempt is blocked by disk, not by code.
+
+Nine fictional `atomic_kernel` invariant tests (CRITICAL-TOK-1, 2026-09-06) were removed and replaced with names that resolve to real functions.
+
+## Historical evidence
+
+### 2026-09-07 Atomic lifecycle
 
 - Dev-chain submission reached `Finalized`.
 - A held submission reached `Executing`, then forced rollback reached `RolledBack`.
 - `cargo audit`: 0 blocking Rust vulnerabilities, 33 allowed warnings.
 - Root `pytest tests`: 181 passed.
 
-## What's Actually Working
+## Open blockers, in priority order
 
-| Capability | Status | Detail |
-|---|---|---|
-| Atomic Kernel invariants | ✅ Verified | 6+ tests passing, EconomicHalt gate wired |
-| Cross-VM atomic routing | ✅ Verified | VM control-flow ops execute, CI gate wired |
-| DEX + Forge | ✅ Guarded | EconomicHalt runtime gate, not compile-time |
-| CI gates for core pallets | ✅ Wired | Wallet, DEX, token factory, LP locker, sentinel |
-| Pallet tests w/ `--features std` | ✅ Fixed | Inline unit tests pass (commit 2060ee668) |
-| mainnet-rc1 feature | ✅ Wired | node/Cargo.toml + runtime/src/lib.rs |
-| Readiness consistency | ✅ PASS | check-readiness-consistency.sh clean |
-
-## What's NOT Working (100% documented honestly)
-
-| Gap | Severity | Detail |
-|---|---|---|
-| `mainnet-rc1` feature build | 🟡 Wired, not verified | feature passes through; default build has pre-existing compile error |
-| Multi-validator network testing | 🔴 Missing | EconomicHalt never triggered in 4-validator context |
-| BTC signer quorum | 🔴 Missing | Threshold signing integration untested |
-| Biometric security review | 🔴 Pending | Wallet pallet biometric + recovery not audited |
-| Swarm agent CI gating | 🟡 Missing | 6 agents experimental, not in CI |
-| Genesis ceremony | 🔴 Not run | srtool verified release not tagged |
-| Node build w/ mainnet-rc1 | 🟡 Not verified | Pre-existing compile error in committed HEAD |
-
-## Open Blockers
-
-1. **mainnet-rc1 verification** — Feature is wired but default build has a pre-existing compile error (missing `get_wrapped_balance` etc. in AtlasKernelRuntimeApi). Resolving this will also fix the mainnet-rc1 build.
-2. **Multi-validator testing** — 4-validator Zombienet smoke tests never run. No automated testnet deployment.
-3. **BTC mainnet path** — Signer quorum, withdrawal broadcast, mainnet feature flag all untested.
-4. **Security reviews** — Biometric templates, recovery logic, swarm agents need audit.
-5. **Swarm agent production readiness** — 6 agents experimental, no CI gates, findings not auto-triaged.
-
-## Phase 2 Readiness Check Fixes Applied (2026-06-18)
-
-- **Readiness checks un-hardcoded**: Replaced 5 placeholder functions in `crates/x3-readiness` (btc_gateway, swarm_health, reactor_benchmark, marketing_audit, grant_pipeline) with real feature-registry-driven reports. `cargo check -p x3-readiness` passes, 7/7 tests pass.
-- **Phase 3 integration verification**: Confirmed all 4 product integration gaps are actually already wired:
-  - `pallet-x3-dex` present in all 4 `construct_runtime!` variants ✅
-  - Launchpad graduate() calls TokenFactory via `TokenFactoryCreate` trait + `LaunchpadTokenFactoryBridge` ✅
-  - Cross-VM Router enforces `daily_limit`, `per_wallet_daily_limit`, `pending_limit` in `initiate_transfer` ✅
-  - `pallet-x3-lp-locker` exists with full lib (331 lines), mock, and tests ✅
-- **Historical session estimate withdrawn as a canonical score** — the gap report's product integration gaps were stale. The current canonical aggregate is the ~54% registry-scored readiness above; it does not measure the entire aspirational project surface.
-- **Blockers remaining**: GRANDPA finality cert wiring (`H256::zero()` in atomic-swap-orchestrator), x3-lang BridgeAdapter 26/27 stub methods (separate workspace), relayer multi-validator quorum.
-
-## Validation
-
-## Phase 0/1 Fixes Applied (2026-06-18)
-
-- **Build unblocked**: Removed syntax error (extra `};`) in `pallets/x3-atomic-kernel/src/lib.rs:766`. `cargo check --workspace` now compiles clean.
-- **SHA-256 XOR bug fixed**: Replaced XOR pseudo-hash with real `sha2::Sha256` in SVM system call table.
-- **Keccak256 syscall added**: Added missing `Keccak256Syscall` to the std SVM syscall table.
-- **CrossVmInvoke stub hardened**: Changed from silent echo to explicit `CrossVmRejected` error.
-- **`dev-bypass` dead code removed**: Removed unreachable auth bypass `#[cfg(feature = "dev-bypass")]` block from kernel.
-- **Agent-law visibility tightened**: Changed `pub fn internal_slash`/`blacklist_agent` to private — reduced governance bypass surface.
-- **GAP report corrected**: 3 critical items marked as false positives/outdated (C-01: mocks are test-only, C-03: policy is fail-closed, C-06/07: panics not present).
-
-```bash
-cargo check --workspace   # PASS (was broken)
-cargo test -p x3-svm-integration   # 8/8 PASS
-cargo test -p pallet-x3-agent-law   # 4/4 PASS
+1. **Credential revocation** (TICKET-102) — unproven, and not fixable by code alone.
+2. **Tracked build artifacts** (TICKET-103) — 337 files; the ticket understates its own scope.
+3. **Real operator deployment** — DNS, bootnodes, a ticked checklist, and a named operator.
+4. **A written definition of "testnet accepted"** — 168 unticked boxes with no stated criterion for ticking one.
