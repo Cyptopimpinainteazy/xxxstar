@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export",
   basePath: "/dex",
   reactStrictMode: true,
   // Ensure local monorepo packages are transpiled so their imports
