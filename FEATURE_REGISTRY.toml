@@ -394,26 +394,26 @@ proof_report = ""
 #     criteria (7 validators, 72 stable hours, explorer, faucet) are all unmet.
 # 60*0.35 + 60*0.25 + 15*0.40 = 21 + 15 + 6 = 42.
 #
-# Re-measured again 2026-09-27, after the second blocker was closed. The record
-# that ties a passing run to the genesis now exists (`scripts/mainnet/launch_record.py`):
-# `build` refuses without a named operator, a clean tree, a `Live` spec whose Aura
-# authority set is exactly the expected validator count, a raw twin and an RC log
-# that carries the gate's own `PASSED` marker; `verify` re-hashes the artifacts and
-# the log and fails on the first mismatch. So:
+# Re-measured again 2026-10-23. The record that ties a passing run to the genesis
+# now compiles schema 2 (`scripts/mainnet/launch_record.py`): it binds the exact
+# commit and artifacts, feature-matrix digest and 82-row P0 snapshot, test-gate
+# logs, two independent audit scopes, bounty and public-testnet windows, bridge
+# routes and caps, seven validator identities, and commit-bound approvals.
+# `verify` recompiles every evidence class from current files and rejects drift.
+# So:
 #
 #   implemented 68 — the gate and its promotion record are real and fail closed.
 #     Still not higher: four of the eight JSON-RPC/console-side launch criteria
 #     live in `public_testnet_gate.sh`, and the approval is human by design.
 #   tested 70 — `tests/test_rc_gates.py` (18 checks) plus
-#     `tests/test_launch_record.py` (10 checks: refusal for a wrong validator set,
-#     a non-Live spec, an RC log without the marker, a missing operator, a missing
-#     artifact, a dirty tree; verification of a changed genesis and a changed log).
+#     `tests/test_launch_record.py` (25 checks covering every schema-2 evidence
+#     class, its missing/stale refusals, and record-digest tampering).
 #     Both run under `local-ci` gates. No live run has produced a record yet.
 #   mainnet_ready 15 — unchanged: nothing here has run against 7 real validators.
 # 68*0.35 + 70*0.25 + 15*0.40 = 23.8 + 17.5 + 6 = 47.3 -> 47.
 readiness_score = 47
 blockers = [
-  "The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` refuses without an operator, a clean tree, a Live spec whose Aura set is exactly the expected validator count, a raw twin, and an RC log carrying the gate's own `PASSED` marker. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (10 checks), gate `launch record`",
+  "The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` compiles schema 2 from the exact commit and artifacts, current feature-matrix digest and P0 snapshot, test-gate logs, two independent audit scopes, bounty and public-testnet windows, bridge routes and caps, seven validator identities, and commit-bound approvals. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (25 checks), gate `launch record`",
   # CLOSED 2026-09-27 — the phantom citation is gone; kept here because the *gate*
   # still cannot pass without the 7 physical servers, the 72-hour stability window
   # and a public explorer/faucet, so the row's `mainnet_ready` stays at 15.

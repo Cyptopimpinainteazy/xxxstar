@@ -251,7 +251,7 @@ built from; nothing here is inferred.
 - No external audit of the gateway, the vault or the header check
 
 ### launch_gate — 47% (LIVE_TESTNET)
-- The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` refuses without an operator, a clean tree, a Live spec whose Aura set is exactly the expected validator count, a raw twin, and an RC log carrying the gate's own `PASSED` marker. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (10 checks), gate `launch record`
+- The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` compiles schema 2 from the exact commit and artifacts, current feature-matrix digest and P0 snapshot, test-gate logs, two independent audit scopes, bounty and public-testnet windows, bridge routes and caps, seven validator identities, and commit-bound approvals. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (25 checks), gate `launch record`
 - Neither gate has run end to end: `fresh_build_check.sh` plus the 7-validator public testnet criteria in `scripts/mainnet/public_testnet_gate.sh` need hardware that does not exist yet. Evidence: `tests/test_rc_gates.py` (18 checks, gated), gate `rc gate scripts`
 
 ### northern_swarm_reactor — 58% (GUARDED_TESTNET)
