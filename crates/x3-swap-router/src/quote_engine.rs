@@ -22,17 +22,10 @@ impl QuoteEngine {
 
     pub async fn get_comprehensive_quotes(
         &self,
-        params: &SwapParams,
+        _params: &SwapParams,
     ) -> Result<Vec<QuoteResult>, SwapRouterError> {
-        Ok(vec![QuoteResult {
-            route: SwapRoute {
-                hops: Vec::new(),
-                amount_in: params.amount_in,
-                estimated_output: params.min_amount_out,
-                gas_estimate: U256::from(21_000u64),
-            },
-            estimated_output: params.min_amount_out,
-            gas_cost: U256::from(21_000u64),
-        }])
+        // A minimum output is a user constraint, not an observed market price.
+        // Refuse until a real source supplies a quote and an executable route.
+        Err(SwapRouterError::NoLiquiditySourceConfigured)
     }
 }
