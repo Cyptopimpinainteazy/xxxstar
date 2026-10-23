@@ -1180,7 +1180,9 @@ parameter_types! {
 /// `None`, and the automation pallet turns that into `PriceUnavailable` — a
 /// refusal that leaves the task active, never a zero price that would satisfy a
 /// "below threshold" trigger.
+#[cfg(not(feature = "mainnet-rc1"))]
 pub struct AutomationOracle;
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_automation::OracleProvider for AutomationOracle {
     fn get_price(asset_id: &[u8]) -> Option<u128> {
         let id = u32::from_le_bytes(asset_id.try_into().ok()?);
@@ -1189,12 +1191,15 @@ impl pallet_x3_automation::OracleProvider for AutomationOracle {
     }
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 parameter_types! {
     pub const MaxAutomationAttempts: u32 = 3;
 }
 
 /// Current wall clock for automation triggers.
+#[cfg(not(feature = "mainnet-rc1"))]
 pub struct AutomationNow;
+#[cfg(not(feature = "mainnet-rc1"))]
 impl Get<u64> for AutomationNow {
     fn get() -> u64 {
         pallet_timestamp::Pallet::<Runtime>::get()
@@ -1207,7 +1212,9 @@ impl Get<u64> for AutomationNow {
 /// variant is explicit; an unmapped action returns an error rather than a
 /// fabricated success, and `TransferNative` moves real balances with the owner's
 /// origin as the source.
+#[cfg(not(feature = "mainnet-rc1"))]
 pub struct RuntimeActionDispatcher;
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatcher {
     fn dispatch(
         owner: &AccountId,

@@ -4,7 +4,7 @@ use super::*;
 use crate as pallet_x3_automation;
 use frame_support::{
     derive_impl, parameter_types,
-    traits::{Currency, ExistenceRequirement},
+    traits::Currency,
     weights::Weight,
 };
 use sp_runtime::DispatchError;
