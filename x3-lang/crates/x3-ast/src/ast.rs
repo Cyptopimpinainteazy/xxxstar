@@ -42,6 +42,8 @@ pub enum Item {
     SimulateDecl(SimulateDecl),
     ScheduledTask(ScheduledTask),
     IntentDecl(IntentDecl),
+    /// `automation <name> { trigger .. permissions .. execute .. on_failure .. }`
+    Automation(AutomationDecl),
     SubscriptionDecl(SubscriptionDecl),
     // B-52 feature lock
     VmDecl(VmDecl),
@@ -449,6 +451,42 @@ pub struct ScheduledTask {
     pub name: Symbol,
     pub period_blocks: u64,
     pub body: Block,
+}
+
+/// An `automation` declaration: the chain-side workflow shape.
+///
+/// This is the canonical-compiler form of `pallet-x3-automation`'s task model:
+/// what wakes it up, what it may touch, what it does, and what it does when that
+/// fails. Lowering to the pallet's `Condition`/`Action` lives in
+/// `x3-lang/compiler/src/automation_lowering.rs`, and refuses anything it cannot
+/// represent rather than dropping it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutomationDecl {
+    pub name: Symbol,
+    /// The condition that triggers execution. A single expression naming a
+    /// chain-observable fact.
+    pub trigger: Expression,
+    /// Capability declarations. Not comments: the lowerer turns each into a
+    /// checked budget.
+    pub permissions: Vec<AutomationPermission>,
+    pub execute: Block,
+    pub on_failure: Option<Block>,
+}
+
+/// One capability granted to an automation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutomationPermission {
+    pub kind: AutomationPermissionKind,
+    pub value: Expression,
+}
+
+/// The capability kinds the language understands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AutomationPermissionKind {
+    Wallet,
+    MaxTrade,
+    DailyLossLimit,
+    AllowedChains,
 }
 
 /// Intent declaration with constraints and resolver body.

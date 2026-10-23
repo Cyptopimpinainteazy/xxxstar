@@ -315,6 +315,7 @@ impl<'a> Parser<'a> {
             Tok::KwIntent => self.parse_intent_item(),
             Tok::KwSubscription => self.parse_subscription_item(),
             Tok::Ident(ref s) if s == "asset" => self.parse_asset_decl().map(Item::AssetDecl),
+            Tok::Ident(ref s) if s == "automation" => self.parse_automation_item(),
             Tok::Ident(ref s) if s == "atomic_choice" => {
                 self.advance(); // consume 'atomic_choice'
                 self.parse_atomic_choice_body(Symbol::new("atomic_choice"))
@@ -2027,6 +2028,91 @@ impl<'a> Parser<'a> {
             name: Symbol::new(&name),
             period_blocks,
             body,
+        }))
+    }
+
+    /// `automation <name> { trigger <expr> permissions { <kind>: <value>, .. } execute { .. } on_failure { .. } }`
+    ///
+    /// `trigger` and `execute` are mandatory; `permissions` and `on_failure` are
+    /// optional. The name may be a quoted string so a workflow keeps the title it
+    /// was generated from.
+    fn parse_automation_item(&mut self) -> Result<Item, X3Error> {
+        self.advance(); // 'automation'
+        let name = if let Tok::String_(ref text) = self.peek() {
+            let text = text.clone();
+            self.advance();
+            text
+        } else {
+            self.expect_ident("automation name")?
+        };
+        self.expect(Tok::LBrace, "'{' after automation name")?;
+
+        // trigger
+        if !matches!(self.peek(), Tok::Ident(ref s) if s == "trigger") {
+            return Err(parse_err(
+                "automation requires a `trigger` section".into(),
+                self.peek(),
+            ));
+        }
+        self.advance();
+        self.expect(Tok::LBrace, "'{' after `trigger`")?;
+        let trigger = self.parse_expr()?;
+        self.expect(Tok::RBrace, "'}' closing `trigger`")?;
+
+        // permissions (optional)
+        let mut permissions = Vec::new();
+        if matches!(self.peek(), Tok::Ident(ref s) if s == "permissions") {
+            self.advance();
+            self.expect(Tok::LBrace, "'{' after `permissions`")?;
+            while self.peek() != Tok::RBrace && self.peek() != Tok::Eof {
+                let key = self.expect_ident("permission name")?;
+                let kind = match key.as_str() {
+                    "wallet" => AutomationPermissionKind::Wallet,
+                    "max_trade" => AutomationPermissionKind::MaxTrade,
+                    "daily_loss_limit" => AutomationPermissionKind::DailyLossLimit,
+                    "allowed_chain" => AutomationPermissionKind::AllowedChains,
+                    other => {
+                        return Err(parse_err(
+                            format!("unknown automation permission `{other}`"),
+                            self.peek(),
+                        ))
+                    }
+                };
+                self.expect(Tok::Colon, "':' after permission name")?;
+                let value = self.parse_expr()?;
+                permissions.push(AutomationPermission { kind, value });
+                if self.peek() == Tok::Comma {
+                    self.advance();
+                }
+            }
+            self.expect(Tok::RBrace, "'}' closing `permissions`")?;
+        }
+
+        // execute (mandatory)
+        if !matches!(self.peek(), Tok::Ident(ref s) if s == "execute") {
+            return Err(parse_err(
+                "automation requires an `execute` section".into(),
+                self.peek(),
+            ));
+        }
+        self.advance();
+        let execute = self.parse_block()?;
+
+        // on_failure (optional)
+        let on_failure = if matches!(self.peek(), Tok::Ident(ref s) if s == "on_failure") {
+            self.advance();
+            Some(self.parse_block()?)
+        } else {
+            None
+        };
+
+        self.expect(Tok::RBrace, "'}' closing the automation")?;
+        Ok(Item::Automation(AutomationDecl {
+            name: Symbol::new(&name),
+            trigger,
+            permissions,
+            execute,
+            on_failure,
         }))
     }
 

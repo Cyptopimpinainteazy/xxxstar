@@ -26987,6 +26987,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "x3-automation",
  "x3-lang-ast",
  "x3-lang-common",
  "x3-lang-lexer",
