@@ -23,9 +23,11 @@
 Exit 0 = PASS. Exit 1 = FAIL — do NOT cut a release.
 
 Validates the P0 release contract before doing any expensive build work: exactly 82 approved P0
-rows, each with `implemented`, `tested`, and `mainnet_ready` at 95 or above, no recorded blockers,
-resolvable named tests, and generated audit-matrix artifacts that still match their canonical
-sources. A P0 scope failure stops the gate immediately.
+rows. The 79 capability rows must each have `implemented`, `tested`, and `mainnet_ready` at 95 or
+above, no recorded blockers, and resolvable named tests. The three `claims_hygiene` rows stay
+deliberately capped below product readiness and must pass the claims-hygiene scanner instead; they
+can never be promoted into capability claims. Generated audit-matrix artifacts must still match
+their canonical sources. A P0 scope failure stops the gate immediately.
 
 After that early check, validates documentation existence, build, chain-spec, critical test suites,
 Northern Swarm/Reactor on-chain compute, reproducible builds, and secret hygiene.

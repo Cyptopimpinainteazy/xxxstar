@@ -146,6 +146,22 @@ def test_p0_capability_and_claim_hygiene_counts_cannot_drift(tmp_path):
     ]
 
 
+def test_claim_hygiene_scanner_failure_blocks_release(tmp_path, monkeypatch):
+    matrix, _ = matrix_fixture(tmp_path)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/x3_audit_matrix.py").write_text("# fixture checker\n")
+    monkeypatch.setattr(gate, "audit_artifact_errors", lambda root: [])
+    monkeypatch.setattr(
+        gate,
+        "claims_hygiene_errors",
+        lambda root: ["claims hygiene scanner failed: forbidden claim reintroduced"],
+    )
+
+    errors = gate.check_p0_scope(matrix_path=matrix, repo_root=tmp_path)
+
+    assert errors == ["claims hygiene scanner failed: forbidden claim reintroduced"]
+
+
 def test_one_p0_row_at_94_fails(tmp_path):
     matrix, _ = matrix_fixture(tmp_path)
     features = gate.load_matrix(matrix)["feature"]
