@@ -52,12 +52,11 @@ Validator signing keys, treasury multisig keys and atomic-gateway/settlement key
 
 ## Validator compensation (Alpha)
 
-Validators are **not** paid by staking rewards, because there is no staking pallet. They are intended
-to be paid from the `validators_staking` reserve above, by governance-approved periodic payouts.
-
-**Status: the reserve is frozen as a constant (`X3_VALIDATOR_SECURITY_RESERVE`) but the payout path
-is not implemented yet.** Until it is, Alpha validators are uncompensated by the runtime. That is
-stated here rather than papered over: no automatic reward is faked to make the documentation true.
+Validators are **not** paid by staking rewards, because there is no staking pallet. They are paid
+through governance-approved periodic payouts from the `validators_staking` reserve using
+`pallet_x3_coin::pay_validator_reward`, gated by the runtime's `EnsureRootOrHalfCouncil` origin. The
+payout moves already-issued reserve balance into the validator's canonical ledger account; it never
+mints and `TotalSupply` must remain unchanged.
 
 Transition path to permissionless staking (post-Alpha, requires a runtime upgrade and a governance
 motion): wire `pallet_staking` (or a purpose-built X3 staking pallet), move the reserve into it as the
