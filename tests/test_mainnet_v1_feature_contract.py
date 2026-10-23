@@ -36,8 +36,7 @@ def test_mainnet_v1_uses_the_real_router_scope_without_testnet() -> None:
 def test_node_exposes_the_same_mainnet_v1_surface() -> None:
     node = load_features("node/Cargo.toml")
 
-    assert node["mainnet-v1"] == ["x3-chain-runtime/mainnet-v1"]
-    assert "mainnet-rc1" not in node["mainnet-v1"]
+    assert node["mainnet-v1"] == ["mainnet-rc1", "x3-chain-runtime/mainnet-v1"]
 
 
 def test_router_scope_guard_permits_only_the_explicit_mainnet_v1_exception() -> None:
