@@ -1409,3 +1409,128 @@ fn an_uncollected_protocol_fee_is_recorded_as_waived() {
         assert_eq!(Balances::free_balance(ProtocolTreasury::get()), 0);
     });
 }
+
+// ============================================================================
+// Route discovery must fail closed when no real pool exists
+// ============================================================================
+
+/// A pool holding real reserves, registered on-chain.
+fn register_pool(token_a: H256, token_b: H256, reserve_a: u128, reserve_b: u128, fee_bps: u32) {
+    let pool_id = H256::from(sp_io::hashing::blake2_256(&(token_a, token_b).encode()));
+    LiquidityPools::<Test>::insert(
+        pool_id,
+        crate::types::LiquidityPool {
+            pool_id,
+            protocol: AmmProtocol::ConstantProduct,
+            vm_type: VmType::X3,
+            token_a,
+            token_b,
+            reserve_a,
+            reserve_b,
+            fee_bps,
+            address: BoundedVec::try_from(b"pool".to_vec()).unwrap_or_default(),
+        },
+    );
+}
+
+#[test]
+fn no_registered_pool_means_no_route_rather_than_an_invented_one() {
+    new_test_ext().execute_with(|| {
+        let token_a = H256::from([0xA1u8; 32]);
+        let token_b = H256::from([0xB2u8; 32]);
+
+        // Nothing is registered. This used to return a route priced against
+        // synthetic reserves derived from the *requested* amount, so the quote
+        // was a function of what the caller asked to trade.
+        assert_eq!(
+            AtomicTradeEngine::find_execution_path(token_a, token_b, 1_000_000),
+            None
+        );
+    });
+}
+
+#[test]
+fn an_enabled_adapter_alone_does_not_create_pricing_liquidity() {
+    new_test_ext().execute_with(|| {
+        let token_a = H256::from([0xA1u8; 32]);
+        let token_b = H256::from([0xB2u8; 32]);
+
+        // An adapter says "this protocol is configured". It does not say "this
+        // account holds reserves", and it must not be read as if it did.
+        assert_ok!(AtomicTradeEngine::register_amm_adapter(
+            RuntimeOrigin::root(),
+            AmmProtocol::UniswapV2,
+            AmmAdapterConfig {
+                vm_type: VmType::Evm,
+                address: BoundedVec::try_from(vec![0xab; 20]).unwrap(),
+                fee_bps: 30,
+                enabled: true,
+            },
+        ));
+
+        assert_eq!(
+            AtomicTradeEngine::find_execution_path(token_a, token_b, 1_000_000),
+            None
+        );
+    });
+}
+
+#[test]
+fn a_registered_pool_with_reserves_yields_a_real_route() {
+    new_test_ext().execute_with(|| {
+        let token_a = H256::from([0xA1u8; 32]);
+        let token_b = H256::from([0xB2u8; 32]);
+        register_pool(
+            token_a,
+            token_b,
+            1_000_000_000_000_000_000,
+            2_000_000_000_000_000_000,
+            30,
+        );
+
+        let route = AtomicTradeEngine::find_execution_path(token_a, token_b, 1_000_000_000_000)
+            .expect("a funded pool gives a route");
+
+        // The output is the pool's arithmetic, and strictly less than the
+        // proportional spot amount because of the fee and the impact.
+        let spot = 1_000_000_000_000u128 * 2_000_000_000_000_000_000 / 1_000_000_000_000_000_000;
+        assert!(route.expected_amount_out > 0);
+        assert!(route.expected_amount_out < spot);
+        assert!(!route.steps.is_empty());
+    });
+}
+
+#[test]
+fn the_same_request_does_not_change_the_price_when_reserves_are_fixed() {
+    new_test_ext().execute_with(|| {
+        let token_a = H256::from([0xA1u8; 32]);
+        let token_b = H256::from([0xB2u8; 32]);
+        register_pool(
+            token_a,
+            token_b,
+            1_000_000_000_000_000_000,
+            2_000_000_000_000_000_000,
+            30,
+        );
+
+        // Under the old fallback the reserve was `amount_in * 1_000`, so doubling
+        // the request changed the *price*, not just the size. With real reserves,
+        // the marginal price is a property of the pool.
+        let small = AtomicTradeEngine::find_execution_path(token_a, token_b, 1_000_000_000_000)
+            .expect("route");
+        let large = AtomicTradeEngine::find_execution_path(token_a, token_b, 2_000_000_000_000)
+            .expect("route");
+
+        let small_rate = small.expected_amount_out as f64 / 1_000_000_000_000f64;
+        let large_rate = large.expected_amount_out as f64 / 2_000_000_000_000f64;
+        // A larger trade pays a worse rate (impact), but not because the reserve moved.
+        assert!(
+            large_rate < small_rate,
+            "a bigger trade gets a worse rate: {large_rate} vs {small_rate}"
+        );
+        assert!(
+            large_rate > small_rate * 0.99,
+            "the rate degrades by impact, not by an order of magnitude"
+        );
+    });
+}

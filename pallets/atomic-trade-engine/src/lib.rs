@@ -2181,57 +2181,16 @@ pub mod pallet {
             }
 
             if pool_count == 0 {
-                // Fall back to synthetic pools derived from adapters until the pool
-                // registry is seeded on-chain.
-                let synthetic_reserve = amount_in.saturating_mul(1_000).max(1_000_000_000_000u128);
-                let mut adapter_count: u64 = 0;
-
-                for (protocol, config) in AmmAdapters::<T>::iter() {
-                    if !config.enabled {
-                        continue;
-                    }
-
-                    let pool_seed = (
-                        protocol,
-                        token_in,
-                        token_out,
-                        config.vm_type,
-                        config.address.clone(),
-                    )
-                        .encode();
-                    let pool_id = H256::from(blake2_256(&pool_seed));
-
-                    graph.add_pool(types::LiquidityPool {
-                        pool_id,
-                        protocol,
-                        vm_type: config.vm_type,
-                        token_a: token_in,
-                        token_b: token_out,
-                        reserve_a: synthetic_reserve,
-                        reserve_b: synthetic_reserve,
-                        fee_bps: config.fee_bps,
-                        address: config.address.clone(),
-                    });
-
-                    adapter_count = adapter_count.saturating_add(1);
-                }
-
-                if adapter_count == 0 {
-                    let pool_seed = (token_in, token_out, amount_in, b"fallback").encode();
-
-                    graph.add_pool(types::LiquidityPool {
-                        pool_id: H256::from(blake2_256(&pool_seed)),
-                        protocol: types::AmmProtocol::ConstantProduct,
-                        vm_type: types::VmType::CrossVm,
-                        token_a: token_in,
-                        token_b: token_out,
-                        reserve_a: synthetic_reserve,
-                        reserve_b: synthetic_reserve,
-                        fee_bps: 30,
-                        address: BoundedVec::try_from(b"synthetic-router".to_vec())
-                            .unwrap_or_default(),
-                    });
-                }
+                // **Fail closed.** This used to invent pools: for every enabled AMM adapter it
+                // added a pool with `reserve_a = reserve_b = amount_in * 1_000`, and if no
+                // adapter existed it added one called `synthetic-router`. The graph then priced a
+                // swap against liquidity that does not exist, and `simulate_trade` returned
+                // `success: true` with an `estimated_output` and a gas estimate for it. The DEX
+                // frontend showed that number as the amount to receive.
+                //
+                // Reserves are a fact about custody, not something derivable from the request.
+                // With no registered pool there is no route, and the caller is told so.
+                return None;
             }
 
             graph::TradeGraphResolver::find_optimal_route(&graph, token_in, token_out, amount_in)
