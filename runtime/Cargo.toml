@@ -207,15 +207,30 @@ testnet = []
 # swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
 # DePIN marketplace, private execution).
 # Use `--features mainnet-rc1` to build the RC1 runtime WASM.
-mainnet-rc1 = []
+#
+# The router pallet carries the mainnet scope lock: its `mainnet-rc1` feature is a
+# pure guard token whose only effect is to arm six `compile_error!` scope-violation
+# checks (external-gateway, parallel-executor, appzone-factory, pq-experimental,
+# advanced-dex, ai-optimizer, gpu-acceleration). Forwarding it is what makes those
+# guards live. Without this line a `mainnet-v1` runtime activated the external
+# gateway while every scope guard stayed disarmed — verified with
+# `cargo tree -e features -i pallet-x3-cross-vm-router`, which resolved the pallet to
+# `external-gateway, serde, std` and nothing else.
+mainnet-rc1 = ["pallet-x3-cross-vm-router/mainnet-rc1"]
 # The only runtime surface permitted to back a public mainnet artifact. It
 # retains the narrowed RC-1 runtime, activates the audited external gateway
 # path, and requires the native real-VM adapters. Testnet/NoOp verification and
 # experimental consensus acceleration are intentionally absent.
+#
+# `pallet-x3-cross-vm-router/mainnet-v1` is the pallet's explicit exception to the
+# scope lock: it permits `mainnet-rc1` and `external-gateway` together. Forwarding
+# both it and `mainnet-rc1` is what keeps the other six guards armed while this one
+# is satisfied.
 mainnet-v1 = [
     "mainnet-rc1",
     "external-gateway",
     "native-real-vm-adapters",
+    "pallet-x3-cross-vm-router/mainnet-v1",
 ]
 # Reserved for an audited PQC backend. The runtime fails closed while the
 # in-tree research implementation remains in use.

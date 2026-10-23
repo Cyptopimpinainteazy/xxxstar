@@ -20,10 +20,32 @@ def test_mainnet_v1_is_one_explicit_runtime_surface() -> None:
         "mainnet-rc1",
         "external-gateway",
         "native-real-vm-adapters",
+        "pallet-x3-cross-vm-router/mainnet-v1",
     ]
     assert features["external-gateway"] == [
         "pallet-x3-cross-vm-router/external-gateway",
     ]
+
+
+def test_runtime_forwards_the_router_scope_lock() -> None:
+    """The pallet's scope guards are inert unless the runtime forwards the token.
+
+    `pallet-x3-cross-vm-router`'s `mainnet-rc1` feature gates no code; its only
+    effect is to arm the `compile_error!` scope guards. The runtime used to forward
+    neither it nor `mainnet-v1`, so a `mainnet-v1` build resolved the pallet to
+    `external-gateway, serde, std` — the audited external gateway switched on with
+    every scope guard disarmed. Measured with
+    `cargo tree -e features -i pallet-x3-cross-vm-router`, and the guard was
+    confirmed live by compiling the pallet with `mainnet-rc1,external-gateway`,
+    which fails with MAINNET SCOPE VIOLATION.
+    """
+    features = load_features("runtime/Cargo.toml")
+
+    assert features["mainnet-rc1"] == ["pallet-x3-cross-vm-router/mainnet-rc1"]
+    # `mainnet-v1` reaches the lock through the runtime's own `mainnet-rc1`, which
+    # forwards it to the pallet; and it carries the pallet's explicit exception.
+    assert "mainnet-rc1" in features["mainnet-v1"]
+    assert "pallet-x3-cross-vm-router/mainnet-v1" in features["mainnet-v1"]
 
 
 def test_mainnet_v1_uses_the_real_router_scope_without_testnet() -> None:
