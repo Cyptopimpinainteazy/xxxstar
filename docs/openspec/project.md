@@ -17,7 +17,7 @@ Current reality:
 - Runtime pallets: X3 Kernel, Atomic Trade Engine, Evolution Core, X3 Verifier, governance/treasury primitives, and supporting agent/account pallets.
 - RPC: `jsonrpsee`-based HTTP JSON-RPC with runtime APIs for custom methods.
 - Frontend tooling built on Next.js 14 + React 18 + Tailwind CSS, powered by Zustand, @tanstack/react-query, SWR, and ethers for browser interactions.
-- Node.js (>=20) scripts for orchestration, the BMAD Method integration (`crates/vibe-bmad`), and Next.js builds.
+- Node.js (>=20) scripts for orchestration, the BMAD Method installation (`_bmad/`), and Next.js builds.
 - Supporting CLIs: `subkey`, `subxt`, `node`/`npm`, and OpenSpec itself for spec-driven requirements.
 
 ## Project Conventions
@@ -79,5 +79,5 @@ X3 Chain currently exposes custom JSON-RPC methods implemented in `node/src/rpc.
 - Substrate (FRAME pallets, node/cli helpers) and Polkadot primitives (Aura, GRANDPA, SCALE codec) underpin the runtime.
 - Frontier EVM adapter and Solana rBPF/SVM bridge libraries live in `crates/` and are orchestrated through adapter traits; dependencies include `evm`, `solana_rbpf`, and `parity-scale-codec`.
 - Frontend stack depends on Next.js 14, React 18, Tailwind CSS, Zustand, @tanstack/react-query, SWR, ethers, and related tooling across `apps/{wallet,explorer,dex}`.
-- Planning & automation integrate BMAD (Node.js-based) in `crates/vibe-bmad`; Node 20+ is required along with npm/yarn for scripts.
+- Planning & automation integrate BMAD (Node.js-based) in `_bmad/`; Node 20+ is required along with npm/yarn for scripts.
 - CLI/key tooling uses `subkey`, `subxt`, `openssl`, `cmake`, and standard Linux packages documented in the README prerequisites.
