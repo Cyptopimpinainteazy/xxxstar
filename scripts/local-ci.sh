@@ -200,6 +200,7 @@ GATES_FAST=(
   "format check:cargo fmt --all -- --check"
   "agent guards:make guard"
   "guard pattern regressions:pytest -q tests/test_agent_guard.py tests/test_cheat_guard_patterns.py tests/test_readiness_status_current.py"
+  "mainnet release contract tests:pytest -q tests/test_mainnet_release_gate.py tests/test_feature_matrix.py tests/test_mainnet_v1_feature_contract.py tests/test_economic_identity.py tests/test_tracked_build_output.py"
   "workflow schema:bash scripts/ci/check-local-ci-workflow.sh"
   "make gate exit codes:make check-make-gates"
   "RC6 release sequence:python3 tests/test_rc6_release_sequence.py"
