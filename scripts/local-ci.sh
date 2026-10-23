@@ -199,7 +199,7 @@ declare -A SEEN_SLUG=()
 GATES_FAST=(
   "format check:cargo fmt --all -- --check"
   "agent guards:make guard"
-  "guard pattern regressions:pytest -q tests/test_agent_guard.py tests/test_cheat_guard_patterns.py"
+  "guard pattern regressions:pytest -q tests/test_agent_guard.py tests/test_cheat_guard_patterns.py tests/test_readiness_status_current.py"
   "workflow schema:bash scripts/ci/check-local-ci-workflow.sh"
   "make gate exit codes:make check-make-gates"
   "RC6 release sequence:python3 tests/test_rc6_release_sequence.py"
@@ -253,6 +253,15 @@ GATES_FAST=(
   # script or Makefile ever compiled — so an invariant could be registered with
   # nothing checking it and the tree stayed green.
   "invariant registry:python3 scripts/check-invariant-registry.py"
+  # `check-readiness-consistency.sh` only fails when a status document claims MORE
+  # than the registry allows. Nothing caught a document that had gone stale
+  # DOWNWARD: on 2026-10-23 CURRENT_MAINNET_STATUS.md said 55.29% across 21 entries
+  # while the registry held 23 averaging 62.74%, and it called atomic_kernel 35%
+  # with its authorization broken five weeks after TICKET-097 closed. The
+  # consistency gate printed PASS on that same tree throughout. This recomputes the
+  # derivation (count, average, and every per-feature score matched by crate path)
+  # and fails on any gap, so a stored copy cannot drift from the registry again.
+  "readiness status current:python3 scripts/check-readiness-status-current.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   # The panic ratchet is only as good as the scanner's idea of what test code is:
   # it matched the literal `#[cfg(test)]`, so `#[cfg(all(test, feature = "std"))]`

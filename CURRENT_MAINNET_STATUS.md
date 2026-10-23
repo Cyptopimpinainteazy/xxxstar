@@ -3,8 +3,15 @@
 **Updated: 2026-10-23 — 62.74% registry-scored readiness across 23 entries, derived from `FEATURE_REGISTRY.toml`. This is not a mainnet-ready claim, and nothing is deployed.**
 
 > `FEATURE_REGISTRY.toml` is the single canonical source. Every number below is read from it; none is hand-maintained.
-> Validate with `scripts/check-readiness-consistency.sh`, which fails when a status document claims **more** than the registry allows.
-> That gate does not catch a document that has gone **stale downward**. If you change a `readiness_score`, update this file in the same commit — the figures here are only as current as the last edit.
+>
+> Two gates guard this file:
+> - `scripts/check-readiness-consistency.sh` fails when a document claims **more** than the registry allows.
+> - `scripts/check-readiness-status-current.py` recomputes the count, the average and every per-feature
+>   score from the registry and fails when this document disagrees — the direction the first gate never checked.
+>   It runs as the `readiness status current` gate in `scripts/local-ci.sh`.
+>
+> A stored average is a copy of a derivable value. Change a `readiness_score` and this file fails the gate
+> until it is updated in the same commit.
 
 ## Deployment reality (2026-10-23)
 
