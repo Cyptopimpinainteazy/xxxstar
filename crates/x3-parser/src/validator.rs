@@ -15,9 +15,9 @@ use crate::error::{ParseError, ParseResult};
 use x3_ast::{
     Agent, AtomicBlock, Automation, Block, Const, EmitStatement, Expression, ForLoopKind,
     ForStatement, Function, GlobalLet, Identifier, IfStatement, Item, LoopStatement, Module,
-    PermissionKind, Statement, StructDef, WhileStatement,
+    Permission, PermissionKind, Statement, StructDef, WhileStatement,
 };
-use x3_common::Span;
+use x3_common::{Literal, Span};
 
 /// Context for structural validation.
 #[derive(Clone, Copy)]
@@ -152,11 +152,15 @@ impl StructuralValidator {
             self.validate_span(&permission.span)?;
             if seen.contains(&permission.kind) {
                 return Err(ParseError::new(
-                    format!("automation `{}` declares {:?} twice", automation.name.name, permission.kind),
+                    format!(
+                        "automation `{}` declares {:?} twice",
+                        automation.name.name, permission.kind
+                    ),
                     permission.span,
                 ));
             }
             seen.push(permission.kind);
+            validate_permission_value(&automation.name.name, permission)?;
         }
 
         self.validate_automation_block(&automation.name.name, &automation.execute, "execute")?;
@@ -573,6 +577,61 @@ fn callee_root_name(callee: &Expression) -> Option<&str> {
         Expression::Identifier(identifier) => Some(identifier.name.as_str()),
         Expression::FieldAccess(access) => callee_root_name(&access.object),
         _ => None,
+    }
+}
+
+/// Check a capability's value against the shape its kind requires.
+///
+/// A capability is a budget, so a value the chain cannot enforce is a bug in the
+/// source, not something to coerce later: a negative `max_trade` or an
+/// `allowed_chains` entry that is not a chain name would silently change what
+/// the automation is permitted to do.
+fn validate_permission_value(automation: &str, permission: &Permission) -> ParseResult<()> {
+    let literal = match &permission.value {
+        Expression::Literal(literal) => Some(&literal.literal),
+        _ => None,
+    };
+    let fail = |expected: &str| {
+        Err(ParseError::new(
+            format!(
+                "automation `{automation}`: {:?} expects {expected}",
+                permission.kind
+            ),
+            permission.span,
+        ))
+    };
+    match permission.kind {
+        PermissionKind::Wallet => match literal {
+            Some(Literal::String(_)) => Ok(()),
+            _ => match &permission.value {
+                // An identifier names a wallet binding declared elsewhere.
+                Expression::Identifier(_) => Ok(()),
+                _ => fail("a wallet name or identifier"),
+            },
+        },
+        PermissionKind::MaxTrade | PermissionKind::DailyLossLimit => match literal {
+            Some(Literal::Integer(value)) if *value >= 0 => Ok(()),
+            Some(Literal::Integer(_)) => Err(ParseError::new(
+                format!(
+                    "automation `{automation}`: {:?} cannot be negative",
+                    permission.kind
+                ),
+                permission.span,
+            )),
+            _ => fail("a non-negative integer amount"),
+        },
+        PermissionKind::AllowedChains => match &permission.value {
+            Expression::Array(array) => {
+                for element in &array.elements {
+                    match element {
+                        Expression::Literal(lit) if matches!(lit.literal, Literal::String(_)) => {}
+                        _ => return fail("an array of chain names"),
+                    }
+                }
+                Ok(())
+            }
+            _ => fail("an array of chain names"),
+        },
     }
 }
 

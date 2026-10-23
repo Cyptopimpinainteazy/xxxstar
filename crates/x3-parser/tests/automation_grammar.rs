@@ -204,3 +204,97 @@ automation A {
     let module = parse_program(source).expect("a deterministic workflow is allowed");
     assert!(matches!(module.items[0], Item::Automation(_)));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Capabilities are budgets, so their values are checked, not coerced.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn a_negative_max_trade_is_refused() {
+    let source = r#"
+automation A {
+    trigger { Manual }
+    permissions { max_trade: -5 }
+    execute { settle(); }
+}
+"#;
+    let err = parse_program(source).expect_err("a negative budget is meaningless");
+    assert!(err.to_string().contains("negative"), "got: {err}");
+}
+
+#[test]
+fn a_non_integer_loss_limit_is_refused() {
+    let source = r#"
+automation A {
+    trigger { Manual }
+    permissions { daily_loss_limit: "250" }
+    execute { settle(); }
+}
+"#;
+    let err = parse_program(source).expect_err("a string is not an amount");
+    assert!(
+        err.to_string().contains("non-negative integer"),
+        "got: {err}"
+    );
+}
+
+#[test]
+fn allowed_chains_must_be_a_list_of_names() {
+    let ok = r#"
+automation A {
+    trigger { Manual }
+    permissions { allowed_chains: ["X3", "Ethereum"] }
+    execute { settle(); }
+}
+"#;
+    assert!(parse_program(ok).is_ok());
+
+    let bad = r#"
+automation A {
+    trigger { Manual }
+    permissions { allowed_chains: 42 }
+    execute { settle(); }
+}
+"#;
+    let err = parse_program(bad).expect_err("chains must be a list");
+    assert!(err.to_string().contains("array of chain names"), "got: {err}");
+
+    let non_string_element = r#"
+automation A {
+    trigger { Manual }
+    permissions { allowed_chains: ["X3", 7] }
+    execute { settle(); }
+}
+"#;
+    let err = parse_program(non_string_element).expect_err("chain names are strings");
+    assert!(err.to_string().contains("array of chain names"), "got: {err}");
+}
+
+#[test]
+fn a_wallet_may_be_a_name_or_an_identifier() {
+    for value in ["\"trading-vault\"", "vault"] {
+        let source = format!(
+            r#"
+automation A {{
+    trigger {{ Manual }}
+    permissions {{ wallet: {value} }}
+    execute {{ settle(); }}
+}}
+"#
+        );
+        assert!(
+            parse_program(&source).is_ok(),
+            "wallet `{value}` should be accepted"
+        );
+    }
+
+    let source = r#"
+automation A {
+    trigger { Manual }
+    permissions { wallet: 12 }
+    execute { settle(); }
+}
+"#;
+    let err = parse_program(source).expect_err("a number is not a wallet");
+    assert!(err.to_string().contains("wallet"), "got: {err}");
+}
