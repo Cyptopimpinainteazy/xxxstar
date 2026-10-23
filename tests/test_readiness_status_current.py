@@ -21,6 +21,7 @@ and `X3_READINESS_STATUS` hooks, so no canonical file is modified.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -168,3 +169,113 @@ def test_the_actual_2026_10_23_regression_is_caught(tmp_path: Path) -> None:
     assert "atomic_kernel" in result.stdout
     assert "tauri_os" in result.stdout
     assert "Average readiness" in result.stdout
+
+
+# --- The other documents that restate the aggregate -------------------------
+#
+# These are read from the working tree rather than a temp copy, because the claim
+# patterns are keyed to repo-relative paths. Each test edits, asserts, and restores
+# in a finally block so a failure cannot leave a stale figure behind.
+
+
+def _mutate_and_check(rel_path: str, old: str, new: str) -> subprocess.CompletedProcess:
+    target = REPO_ROOT / rel_path
+    original = target.read_text(encoding="utf-8")
+    assert old in original, f"{rel_path} does not contain the text this test mutates: {old!r}"
+    try:
+        target.write_text(original.replace(old, new, 1), encoding="utf-8")
+        return run_check(REGISTRY, STATUS)
+    finally:
+        target.write_text(original, encoding="utf-8")
+
+
+def test_docs_current_readme_is_gated() -> None:
+    result = _mutate_and_check(
+        "docs/current/README.md",
+        "Registry-scored readiness: 62.74%** across 23 entries",
+        "Registry-scored readiness: 53.74%** across 19 entries",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "docs/current/README.md" in result.stdout
+    assert "19 entries" in result.stdout
+
+
+def test_x3_lang_spec_index_is_gated() -> None:
+    result = _mutate_and_check(
+        "x3-lang/spec/INDEX.md",
+        "(average readiness 62.74%",
+        "(average readiness 36%",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "x3-lang/spec/INDEX.md" in result.stdout
+
+
+def test_release_gates_overall_claim_is_gated() -> None:
+    result = _mutate_and_check(
+        "RELEASE_GATES.md",
+        "Overall readiness: 62.74%**",
+        "Overall readiness: 58.5%**",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "overall readiness claim" in result.stdout
+
+
+def test_release_gates_second_claim_is_gated() -> None:
+    """The second figure in this file went stale independently of the first."""
+    result = _mutate_and_check(
+        "RELEASE_GATES.md",
+        "Currently: 62.74% registry-scored",
+        "Currently: 55.5% registry-scored",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "mainnet-ready-claims section" in result.stdout
+
+
+def test_registry_rescore_reaches_every_document() -> None:
+    """One score change must fail all five claims, not only the scoreboard."""
+    result = _mutate_and_check(
+        "FEATURE_REGISTRY.toml",
+        "readiness_score = 57",
+        "readiness_score = 60",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    for expected in (
+        "docs/current/README.md",
+        "x3-lang/spec/INDEX.md",
+        "RELEASE_GATES.md (overall readiness claim)",
+        "RELEASE_GATES.md (mainnet-ready-claims section)",
+    ):
+        assert expected in result.stdout, f"{expected} was not reported as stale"
+
+
+def test_a_named_document_that_vanishes_is_an_error(tmp_path: Path) -> None:
+    """The claim table naming a file means its absence is a defect, not a skip."""
+    target = REPO_ROOT / "docs/current/README.md"
+    original = target.read_text(encoding="utf-8")
+    moved = tmp_path / "README.md"
+    try:
+        target.rename(moved)
+        result = run_check(REGISTRY, STATUS)
+    finally:
+        moved.rename(target)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "does not exist" in result.stdout
+
+
+def test_every_counted_violation_is_also_printed() -> None:
+    """A violation that is counted but not shown is a defect in the check itself.
+
+    The first version of the claims loop appended to `violations` after the print
+    loop had already run, so a stale `RELEASE_GATES.md` produced `FAIL: 7
+    disagreement(s)` above three visible lines. The count and the printed list have
+    to agree.
+    """
+    result = _mutate_and_check(
+        "RELEASE_GATES.md",
+        "Currently: 62.74% registry-scored",
+        "Currently: 55.5% registry-scored",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    printed = result.stdout.count("VIOLATION:")
+    counted = int(re.search(r"FAIL: (\d+) disagreement", result.stdout).group(1))
+    assert printed == counted, f"{counted} counted but {printed} printed:\n{result.stdout}"

@@ -19,6 +19,8 @@ any gap.
 
 ## What it checks
 
+The full scoreboard in `CURRENT_MAINNET_STATUS.md`:
+
 1. The header's `<pct>% registry-scored readiness across <n> entries` matches.
 2. The `**Average readiness: <pct>%** — <n> tracked features.` line matches.
 3. Every registry entry's `readiness_score` appears on a scoreboard line carrying
@@ -27,7 +29,23 @@ any gap.
 4. No scoreboard line cites a score for a path that the registry does not hold at
    that value.
 
-Tests vary the registry or the document through `X3_READINESS_REGISTRY` and
+Plus every other document that restates the aggregate, each entry in `LIVE_CLAIMS`
+below. `RELEASE_GATES.md` carried two of them and both were stale on 2026-10-23
+(58.5% across 22 entries, and 55.5% further down), which is what widening this
+beyond a single file is for.
+
+### Dated statements are deliberately out of scope
+
+A banner reading "on 2026-10-23 the registry held 62.74%" stays true forever; a
+line reading "registry now 62.74%" rots the moment a score moves. Only the second
+kind is gated. If you want a figure to survive without maintenance, date it.
+
+`docs/audit/X3_FEATURE_COMPLETION_MATRIX.md` also quotes the mean, min and max, but
+it is generated and already gated by `scripts/x3_audit_matrix.py --check`, which
+fails on a source-digest mismatch. Two gates over one file would report the same
+cause twice.
+
+Tests vary the registry or the documents through `X3_READINESS_REGISTRY` and
 `X3_READINESS_STATUS` rather than mutating the canonical files, matching the
 existing hook in `check-readiness-consistency.sh`.
 
@@ -69,6 +87,34 @@ AVERAGE = re.compile(
 
 class RegistryError(Exception):
     pass
+
+
+# Every document that restates the aggregate as a *current* value. Each pattern
+# must carry named groups `pct` and `n`; `RELEASE_GATES.md` appears twice because it
+# states the figure in two places and both had gone stale independently.
+LIVE_CLAIMS = [
+    {
+        "path": "docs/current/README.md",
+        "what": "registry-scored readiness line",
+        "pattern": r"Registry-scored readiness: (?P<pct>\d+(?:\.\d+)?)%\*\*\s+across (?P<n>\d+) entries",
+    },
+    {
+        "path": "x3-lang/spec/INDEX.md",
+        "what": "registry line",
+        "pattern": r"(?P<n>\d+) features tracked in `FEATURE_REGISTRY\.toml` \(average readiness (?P<pct>\d+(?:\.\d+)?)%",
+    },
+    {
+        "path": "RELEASE_GATES.md",
+        "what": "overall readiness claim",
+        "pattern": r"Overall readiness: (?P<pct>\d+(?:\.\d+)?)%\*\*.*?across the (?P<n>\d+) scored entries",
+    },
+    {
+        "path": "RELEASE_GATES.md",
+        "what": "mainnet-ready-claims section",
+        "pattern": r"Currently: (?P<pct>\d+(?:\.\d+)?)% registry-scored readiness",
+        "count_optional": True,
+    },
+]
 
 
 def parse_registry(text: str) -> list[dict[str, object]]:
@@ -198,6 +244,35 @@ def main() -> int:
                 )
 
     print(f"--- Checking {STATUS.name} ---")
+
+    # Every other document that restates the aggregate.
+    for claim in LIVE_CLAIMS:
+        rel = str(claim["path"])
+        doc_path = ROOT / rel
+        if not doc_path.is_file():
+            # The claim table names this file; its absence means the guard's own
+            # configuration is wrong, which is not a pass.
+            violations.append(f"{rel} is named by the claim table but does not exist")
+            continue
+        text = doc_path.read_text(encoding="utf-8")
+        found = re.search(str(claim["pattern"]), text)
+        if not found:
+            violations.append(
+                f"{rel} no longer carries its {claim['what']} in a form this check can read"
+            )
+            continue
+        pct = float(found.group("pct"))
+        if abs(pct - average) > 0.005:
+            violations.append(
+                f"{rel} ({claim['what']}) claims {found.group('pct')}%, registry average is {average:.2f}%"
+            )
+        groups = found.groupdict()
+        if not claim.get("count_optional") and groups.get("n"):
+            if int(groups["n"]) != count:
+                violations.append(
+                    f"{rel} ({claim['what']}) claims {groups['n']} entries, registry holds {count}"
+                )
+
     for violation in violations:
         print(f"  VIOLATION: {violation}")
 
@@ -210,7 +285,7 @@ def main() -> int:
         )
         return 1
 
-    print(f"PASS: {STATUS.name} is current with FEATURE_REGISTRY.toml.")
+    print(f"PASS: {STATUS.name} and {len(LIVE_CLAIMS)} other claim(s) are current with FEATURE_REGISTRY.toml.")
     return 0
 
 
