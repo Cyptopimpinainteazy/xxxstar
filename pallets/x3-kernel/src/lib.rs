@@ -709,8 +709,12 @@ pub mod pallet {
     ///
     /// Absent means the chain takes no performance fee from this trader's trades.
     #[pallet::storage]
-    pub type RevenueAgreements<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, crate::trading::RevenueAgreement<T::AccountId>>;
+    pub type RevenueAgreements<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        crate::trading::RevenueAgreement<T::AccountId>,
+    >;
 
     /// Every trade `submit_trade` ran, committed or rolled back, by receipt digest.
     #[pallet::storage]
@@ -1488,8 +1492,8 @@ pub mod pallet {
                         agreement.performance_bps <= 10_000,
                         Error::<T>::InvalidRevenueAgreement
                     );
-                    let shares = u32::from(agreement.developer_bps)
-                        + u32::from(agreement.protocol_bps);
+                    let shares =
+                        u32::from(agreement.developer_bps) + u32::from(agreement.protocol_bps);
                     ensure!(shares <= 10_000, Error::<T>::InvalidRevenueAgreement);
                     ensure!(
                         agreement.developer_bps == 0 || agreement.developer.is_some(),

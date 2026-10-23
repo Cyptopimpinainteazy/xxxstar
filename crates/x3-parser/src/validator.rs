@@ -683,11 +683,7 @@ fn statement_expressions(statement: &Statement) -> Vec<&Expression> {
             }
             ForLoopKind::Range { range, .. } => vec![&range.start, &range.end],
         },
-        Statement::Atomic(block) => block
-            .metadata
-            .as_ref()
-            .into_iter()
-            .collect(),
+        Statement::Atomic(block) => block.metadata.as_ref().into_iter().collect(),
         Statement::Emit(statement) => vec![&statement.value],
     }
 }

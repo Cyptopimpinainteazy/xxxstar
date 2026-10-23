@@ -4,13 +4,12 @@ use crate::grammar::{binary_binding_power, symbol_to_binary_op, PREFIX_BP};
 use crate::tokens::MAX_NESTING_DEPTH;
 use x3_ast::{
     Agent, ArrayExpression, AssignExpression, AtomicBlock, Automation, BinaryExpression, Block,
-    BreakStatement, Permission, PermissionKind,
-    CallExpression, Const, ContinueStatement, EmitStatement, Expression, FieldAccessExpression,
-    FieldAssignExpression, FieldInit, ForLoopKind, ForStatement, Function, GlobalLet, Identifier,
-    IfStatement, IndexAssignExpression, IndexExpression, Item, LetStatement, LiteralExpression,
-    LoopStatement, Module, Param, RangeExpression, Statement, StructDef, StructField,
-    StructLiteralExpression, TupleExpression, TypeAnnotation, TypeShape, UnaryExpression, UnaryOp,
-    WhileStatement,
+    BreakStatement, CallExpression, Const, ContinueStatement, EmitStatement, Expression,
+    FieldAccessExpression, FieldAssignExpression, FieldInit, ForLoopKind, ForStatement, Function,
+    GlobalLet, Identifier, IfStatement, IndexAssignExpression, IndexExpression, Item, LetStatement,
+    LiteralExpression, LoopStatement, Module, Param, Permission, PermissionKind, RangeExpression,
+    Statement, StructDef, StructField, StructLiteralExpression, TupleExpression, TypeAnnotation,
+    TypeShape, UnaryExpression, UnaryOp, WhileStatement,
 };
 use x3_common::{Keyword, Literal, Span, Symbol, Token, TokenKind};
 use x3_lexer::Lexer;
@@ -305,12 +304,7 @@ impl Parser {
                     ))
                 }
             },
-            _ => {
-                return Err(ParseError::new(
-                    "expected a permission name",
-                    token.span,
-                ))
-            }
+            _ => return Err(ParseError::new("expected a permission name", token.span)),
         };
         self.cursor.bump();
         self.expect_symbol(Symbol::Colon)?;

@@ -1261,9 +1261,9 @@ impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatch
             }
             // A ledger-asset move needs an atomic account-level debit/credit the
             // kernel does not expose yet, so it is refused rather than faked.
-            Action::TransferLedgerAsset { .. } => Err(DispatchError::Other(
-                "AutomationLedgerTransferUnavailable",
-            )),
+            Action::TransferLedgerAsset { .. } => {
+                Err(DispatchError::Other("AutomationLedgerTransferUnavailable"))
+            }
             Action::Custom(_) => Err(DispatchError::Other("AutomationActionUnsupported")),
         }
     }

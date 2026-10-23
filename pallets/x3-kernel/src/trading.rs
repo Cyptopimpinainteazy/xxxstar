@@ -516,7 +516,12 @@ impl<T: Config> Pallet<T> {
                 meter.flash_checks = delta.flash_liquidity.len() as u64;
                 // ProfitLock runs before any ledger movement, so a trade that misses its limits
                 // leaves nothing behind: no transfer, no reserve update, no receipt.
-                Self::enforce_trade_constraints(&run.receipt, &config, submitted_at_block, block_number)?;
+                Self::enforce_trade_constraints(
+                    &run.receipt,
+                    &config,
+                    submitted_at_block,
+                    block_number,
+                )?;
                 Self::settle_trade(&who, &config, &pre, delta)?;
                 // The fee rides in the same transaction as the settlement it is charged on: an
                 // error here reverts the trade too, so a fee can never be collected for a trade
@@ -769,8 +774,7 @@ impl<T: Config> Pallet<T> {
         let outcome = x3bc_core::economics::outcome(receipt, config.fee_asset)
             .map_err(|_| Error::<T>::TradeConstraintsUnsatisfied)?;
 
-        let net_ok = outcome.net > 0
-            && (outcome.net as u128) >= constraints.min_net_profit;
+        let net_ok = outcome.net > 0 && (outcome.net as u128) >= constraints.min_net_profit;
         // `min_net_profit == 0` still requires the trade not to lose money: applying a losing
         // trade under a scheme that charges a share of profit would otherwise be indistinguishable
         // from charging for nothing.
@@ -803,8 +807,9 @@ impl<T: Config> Pallet<T> {
         // the only honest answer, because a conversion rate would be invented.
         let outcome = x3bc_core::economics::outcome(receipt, config.fee_asset)
             .map_err(|_| Error::<T>::TradeConstraintsUnsatisfied)?;
-        let fee = x3bc_core::economics::performance_fee(&outcome, u32::from(agreement.performance_bps))
-            .map_err(|_| Error::<T>::InvalidRevenueAgreement)?;
+        let fee =
+            x3bc_core::economics::performance_fee(&outcome, u32::from(agreement.performance_bps))
+                .map_err(|_| Error::<T>::InvalidRevenueAgreement)?;
         if fee.fee == 0 {
             return Ok(());
         }

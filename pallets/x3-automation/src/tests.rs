@@ -329,7 +329,8 @@ fn a_successful_dispatch_moves_funds_and_writes_a_receipt() {
         // Registration reservation released on terminal status.
         assert_eq!(reserved(1), 0);
 
-        let receipt = Automation::receipt(task_id, 1).expect("a dispatch that happened has a receipt");
+        let receipt =
+            Automation::receipt(task_id, 1).expect("a dispatch that happened has a receipt");
         assert_eq!(receipt.task_id, task_id);
         assert_eq!(receipt.attempt, 1);
         assert_eq!(receipt.outcome, ActionOutcome::Applied);
@@ -635,7 +636,11 @@ fn an_expired_task_never_dispatches_and_releases_the_reservation() {
         let task = Automation::tasks(task_id).unwrap();
         assert_eq!(task.status, TaskStatus::Expired);
         assert_eq!(reserved(1), 0);
-        assert_eq!(free(2), keeper_before, "an expiry is not work a keeper is paid for");
+        assert_eq!(
+            free(2),
+            keeper_before,
+            "an expiry is not work a keeper is paid for"
+        );
         assert!(Automation::receipt(task_id, 1).is_none());
     });
 }
@@ -652,7 +657,10 @@ fn cleanup_expires_stale_tasks_without_dispatching() {
         let task_id = Automation::account_tasks(1)[0];
         System::set_block_number(100);
         assert_eq!(Automation::cleanup_expired_tasks(), 1);
-        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Expired);
+        assert_eq!(
+            Automation::tasks(task_id).unwrap().status,
+            TaskStatus::Expired
+        );
         assert_eq!(reserved(1), 0);
         // Idempotent.
         assert_eq!(Automation::cleanup_expired_tasks(), 0);
@@ -689,6 +697,10 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
         assert_eq!(Automation::due_tasks(1, 10).len(), 0);
         assert_eq!(Automation::due_tasks(50, 10).len(), 1);
         assert_eq!(Automation::due_tasks(500, 10).len(), 2);
-        assert_eq!(Automation::due_tasks(500, 1).len(), 1, "batch bound is honoured");
+        assert_eq!(
+            Automation::due_tasks(500, 1).len(),
+            1,
+            "batch bound is honoured"
+        );
     });
 }

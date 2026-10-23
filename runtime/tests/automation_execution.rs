@@ -9,8 +9,8 @@
 //!   the keeper is paid only when a dispatch happened.
 
 use frame_support::{assert_noop, assert_ok, traits::Currency};
-use x3_chain_runtime::{AccountId, Balances, Runtime, RuntimeOrigin, System};
 use x3_automation::{Action, Condition, TaskStatus};
+use x3_chain_runtime::{AccountId, Balances, Runtime, RuntimeOrigin, System};
 
 type Automation = pallet_x3_automation::Pallet<Runtime>;
 type Oracle = pallet_x3_oracle::Pallet<Runtime>;
@@ -61,10 +61,7 @@ fn a_native_transfer_task_moves_real_balances_and_pays_the_keeper() {
         let task_id = register(
             &owner,
             Condition::Manual,
-            Action::TransferNative {
-                recipient,
-                amount,
-            },
+            Action::TransferNative { recipient, amount },
         );
 
         let owner_before = free(&owner);
@@ -114,7 +111,11 @@ fn a_price_condition_fails_closed_when_the_oracle_has_no_median() {
             Automation::execute_task(RuntimeOrigin::signed(keeper.clone()), task_id),
             pallet_x3_automation::Error::<Runtime>::PriceUnavailable
         );
-        assert_eq!(free(&keeper), keeper_before, "nothing ran, nothing was paid");
+        assert_eq!(
+            free(&keeper),
+            keeper_before,
+            "nothing ran, nothing was paid"
+        );
 
         let task = Automation::tasks(task_id).expect("task survives a refusal");
         assert_eq!(task.status, TaskStatus::Active);
