@@ -119,6 +119,7 @@ impl TypeChecker {
                 // Arb programs are lowered by later compilation phases.
                 Item::ArbProgram(_) => {}
                 Item::Struct(_) => {}
+                Item::Automation(_) => {}
             }
         }
     }
@@ -311,6 +312,15 @@ impl TypeChecker {
                         agent.span,
                     ));
                 }
+                Item::Automation(_) => {
+                    // Automations are module items; declaring one inside an agent
+                    // is refused the same way a struct is.
+                    self.errors.push(TypeError::invalid_operation(
+                        "declaring an automation inside an agent",
+                        Type::named(&agent.name.name),
+                        agent.span,
+                    ));
+                }
             }
         }
 
@@ -386,6 +396,7 @@ impl TypeChecker {
             Item::Const(const_item) => self.check_const(const_item, resolved),
             Item::ArbProgram(_) => {}
             Item::Struct(_) => {}
+            Item::Automation(_) => {}
         }
     }
 

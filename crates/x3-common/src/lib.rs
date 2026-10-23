@@ -76,6 +76,16 @@ pub enum Keyword {
     Context,
     Const,
     In,
+    /// `automation Name { ... }`
+    Automation,
+    /// `trigger { ... }` section of an automation
+    Trigger,
+    /// `permissions { ... }` section of an automation
+    Permissions,
+    /// `execute { ... }` section of an automation
+    Execute,
+    /// `on_failure { ... }` section of an automation
+    OnFailure,
 }
 
 impl Keyword {
@@ -103,6 +113,11 @@ impl Keyword {
             "context" => Some(Self::Context),
             "const" => Some(Self::Const),
             "in" => Some(Self::In),
+            "automation" => Some(Self::Automation),
+            "trigger" => Some(Self::Trigger),
+            "permissions" => Some(Self::Permissions),
+            "execute" => Some(Self::Execute),
+            "on_failure" => Some(Self::OnFailure),
             _ => None,
         }
     }
