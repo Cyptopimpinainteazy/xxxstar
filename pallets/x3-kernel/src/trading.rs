@@ -21,7 +21,8 @@
 
 use crate::pallet::{
     AssetRegistry, CanonicalLedger, Config, Error, Event, NextIssuedAssetId, Pallet,
-    ProtocolPaused, TradeNonces, TradeReceipts, TradingConfiguration,
+    ProtocolPaused, RevenueAgreements, TradeConstraintsOf, TradeNonces, TradeReceipts,
+    TradingConfiguration,
 };
 use alloc::collections::BTreeSet;
 use alloc::string::String;
@@ -230,7 +231,87 @@ pub struct TradingConfig<AccountId> {
     pub fee_collector: AccountId,
 }
 
-/// A trade's on-chain record, keyed by its receipt digest.
+/// The limits a committed trade must satisfy before the chain applies it.
+///
+/// ProfitLock runs on the engine's own receipt, after the module has run but before any ledger
+/// movement, so a trade that violates its limits leaves no trace: no transfer, no venue reserve
+/// update, no receipt. Only the caller's transaction fee is spent.
+///
+/// Denominated in the chain's trading fee asset — one settlement asset, so a limit never has to
+/// answer "a minimum profit in which currency".
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+)]
+pub struct TradeConstraints {
+    /// Net profit, in the fee asset, the trade must reach to be applied. `0` allows a
+    /// break-even trade; a loss is always allowed through this check only when it is `0` too.
+    pub min_net_profit: u128,
+    /// Ceiling on the costs the trade charged on its own, in the fee asset. `u128::MAX` disables
+    /// the check.
+    pub max_execution_cost: u128,
+    /// Blocks a trade may remain pending past its `submitted_at_block`. `0` disables the check;
+    /// the compiled deadline still applies independently.
+    pub deadline_blocks: u32,
+}
+
+impl TradeConstraints {
+    /// Constraints that admit every trade, used as the chain default.
+    pub fn permissive() -> Self {
+        Self {
+            min_net_profit: 0,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 0,
+        }
+    }
+}
+
+/// Who receives what share of a verified performance fee.
+///
+/// The split is over the **fee**, not the profit, and must sum to exactly 10_000 basis points so
+/// distribution neither creates nor destroys value. `performance_bps` is the fee rate itself.
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+)]
+pub struct RevenueAgreement<AccountId> {
+    /// Share of verified net profit taken as a fee, in basis points (2_000 = 20%).
+    pub performance_bps: u16,
+    /// Where the trader's share goes. `None` leaves it where it already is, in the trader's
+    /// balance, which is the honest default: a fee the chain does not take needs no transfer.
+    pub trader: Option<AccountId>,
+    /// The strategy developer's share, if any.
+    pub developer: Option<AccountId>,
+    /// The protocol's share, if any.
+    pub protocol: Option<AccountId>,
+    /// The developer's share of the fee, in basis points of the fee.
+    pub developer_bps: u16,
+    /// The protocol's share of the fee, in basis points of the fee.
+    pub protocol_bps: u16,
+}
+
+impl<AccountId> RevenueAgreement<AccountId> {
+    /// The trader keeps the remainder: `10_000 - developer - protocol`.
+    pub fn trader_bps(&self) -> u16 {
+        10_000u16.saturating_sub(self.developer_bps.saturating_add(self.protocol_bps))
+    }
+}
+
+/// A trade's on-chain record, keyed by its receipt digest./// A trade's on-chain record, keyed by its receipt digest.
 ///
 /// Only the digest is kept in state: the full receipt (up to [`MAX_TRADE_RECEIPT_BYTES`]) is in
 /// the trade's event, where an indexer or a replayer reads it and checks it against this digest.
@@ -433,7 +514,14 @@ impl<T: Config> Pallet<T> {
                 meter.intents = delta.intents.len() as u64;
                 meter.venue_updates = delta.venue_reserves.len() as u64;
                 meter.flash_checks = delta.flash_liquidity.len() as u64;
+                // ProfitLock runs before any ledger movement, so a trade that misses its limits
+                // leaves nothing behind: no transfer, no reserve update, no receipt.
+                Self::enforce_trade_constraints(&run.receipt, &config, submitted_at_block, block_number)?;
                 Self::settle_trade(&who, &config, &pre, delta)?;
+                // The fee rides in the same transaction as the settlement it is charged on: an
+                // error here reverts the trade too, so a fee can never be collected for a trade
+                // that did not apply, nor a trade applied without its agreed fee.
+                Self::distribute_revenue(&who, &config, &run.receipt)?;
                 true
             }
             (Outcome::RolledBack { .. }, false, None) => false,
@@ -652,6 +740,121 @@ impl<T: Config> Pallet<T> {
 
     /// Apply a committed trade: every intent as a ledger transfer, then the venues' reserves,
     /// then check the chain now holds exactly what the engine ended with.
+    /// Refuse a committed trade whose economic outcome misses the chain's ProfitLock limits.
+    ///
+    /// Everything here reads the engine's own receipt: the net is the settlement asset's
+    /// post-minus-pre balance, never a figure the module reported. A chain with no constraints set
+    /// admits every committed trade, which is the behaviour that predates ProfitLock.
+    fn enforce_trade_constraints(
+        receipt: &x3bc_core::receipt::TradingReceipt,
+        config: &crate::trading::TradingConfig<T::AccountId>,
+        submitted_at_block: u64,
+        block_number: u64,
+    ) -> DispatchResult {
+        let Some(constraints) = TradeConstraintsOf::<T>::get() else {
+            return Ok(());
+        };
+
+        if constraints.deadline_blocks != 0 {
+            let elapsed = block_number.saturating_sub(submitted_at_block);
+            ensure!(
+                elapsed <= u64::from(constraints.deadline_blocks),
+                Error::<T>::TradeConstraintsUnsatisfied
+            );
+        }
+
+        // A trade that did not settle in the chain's fee asset cannot be priced against a limit
+        // denominated in it, and guessing a conversion would invent a number the chain would then
+        // charge against.
+        let outcome = x3bc_core::economics::outcome(receipt, config.fee_asset)
+            .map_err(|_| Error::<T>::TradeConstraintsUnsatisfied)?;
+
+        let net_ok = outcome.net > 0
+            && (outcome.net as u128) >= constraints.min_net_profit;
+        // `min_net_profit == 0` still requires the trade not to lose money: applying a losing
+        // trade under a scheme that charges a share of profit would otherwise be indistinguishable
+        // from charging for nothing.
+        ensure!(net_ok, Error::<T>::TradeConstraintsUnsatisfied);
+        ensure!(
+            outcome.charged <= constraints.max_execution_cost,
+            Error::<T>::TradeConstraintsUnsatisfied
+        );
+        Ok(())
+    }
+
+    /// Split a verified performance fee and pay it, atomically with the trade.
+    ///
+    /// The fee rests only on the receipt's recomputed net (`x3bc_core::economics`), never on a
+    /// figure the module reported. A losing or break-even trade pays nothing. The split is
+    /// computed once and paid once; every transfer happens inside the trade's transaction, so a
+    /// failure anywhere leaves neither the trade nor the fee applied.
+    fn distribute_revenue(
+        who: &T::AccountId,
+        config: &crate::trading::TradingConfig<T::AccountId>,
+        receipt: &x3bc_core::receipt::TradingReceipt,
+    ) -> DispatchResult {
+        let Some(agreement) = RevenueAgreements::<T>::get(who) else {
+            return Ok(());
+        };
+        if agreement.performance_bps == 0 {
+            return Ok(());
+        }
+        // A trade settled in another asset cannot be charged a fee denominated here; refusing is
+        // the only honest answer, because a conversion rate would be invented.
+        let outcome = x3bc_core::economics::outcome(receipt, config.fee_asset)
+            .map_err(|_| Error::<T>::TradeConstraintsUnsatisfied)?;
+        let fee = x3bc_core::economics::performance_fee(&outcome, u32::from(agreement.performance_bps))
+            .map_err(|_| Error::<T>::InvalidRevenueAgreement)?;
+        if fee.fee == 0 {
+            return Ok(());
+        }
+
+        // Basis points of the fee. Integer division truncates; the protocol share absorbs the
+        // remainder so the parts always sum to exactly `fee.fee`.
+        let share = |bps: u16| -> Result<u128, DispatchError> {
+            fee.fee
+                .checked_mul(u128::from(bps))
+                .map(|product| product / 10_000)
+                .ok_or_else(|| Error::<T>::InvalidRevenueAgreement.into())
+        };
+        let developer = share(agreement.developer_bps)?;
+        let protocol = share(agreement.protocol_bps)?;
+        let trader_share = fee
+            .fee
+            .checked_sub(developer)
+            .and_then(|rest| rest.checked_sub(protocol))
+            .ok_or(Error::<T>::InvalidRevenueAgreement)?;
+
+        // Paid out of the trader's balance: the fee is a share of what the trade earned them.
+        if developer > 0 {
+            if let Some(recipient) = &agreement.developer {
+                Self::ledger_transfer(config.fee_asset, who, recipient, developer)?;
+            }
+        }
+        if protocol > 0 {
+            if let Some(recipient) = &agreement.protocol {
+                Self::ledger_transfer(config.fee_asset, who, recipient, protocol)?;
+            }
+        }
+        // The trader's remainder stays put; only a named destination needs a transfer.
+        if trader_share > 0 {
+            if let Some(destination) = &agreement.trader {
+                if destination != who {
+                    Self::ledger_transfer(config.fee_asset, who, destination, trader_share)?;
+                }
+            }
+        }
+
+        Self::deposit_event(Event::RevenueDistributed {
+            trader: who.clone(),
+            asset: config.fee_asset,
+            fee: fee.fee,
+            developer,
+            protocol,
+        });
+        Ok(())
+    }
+
     fn settle_trade(
         who: &T::AccountId,
         config: &crate::trading::TradingConfig<T::AccountId>,

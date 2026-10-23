@@ -697,6 +697,21 @@ pub mod pallet {
     pub type TradingConfiguration<T: Config> =
         StorageValue<_, crate::trading::TradingConfig<T::AccountId>, OptionQuery>;
 
+    /// ProfitLock limits every committed trade must satisfy (`set_trade_constraints`).
+    ///
+    /// Absent means no extra limits beyond the compiled module's own checks, which is the
+    /// behaviour every chain had before ProfitLock existed.
+    #[pallet::storage]
+    pub type TradeConstraintsOf<T: Config> =
+        StorageValue<_, crate::trading::TradeConstraints, OptionQuery>;
+
+    /// A trader's revenue agreement: how a verified performance fee is split.
+    ///
+    /// Absent means the chain takes no performance fee from this trader's trades.
+    #[pallet::storage]
+    pub type RevenueAgreements<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, crate::trading::RevenueAgreement<T::AccountId>>;
+
     /// Every trade `submit_trade` ran, committed or rolled back, by receipt digest.
     #[pallet::storage]
     pub type TradeReceipts<T: Config> = StorageMap<
@@ -1102,6 +1117,18 @@ pub mod pallet {
         },
         /// Governance set the trade cost schedule and fee collector.
         TradingConfigured,
+        /// Governance set ProfitLock limits on committed trades.
+        TradeConstraintsSet,
+        /// Governance removed ProfitLock limits.
+        TradeConstraintsCleared,
+        /// A trade's verified performance fee was split and paid.
+        RevenueDistributed {
+            trader: T::AccountId,
+            asset: u32,
+            fee: u128,
+            developer: u128,
+            protocol: u128,
+        },
         /// An accepted comit's X3 program emitted an event: `topic` is the sha-256 of the event's
         /// name, `data` its encoded arguments, `index` its position among the program's events.
         X3LogEmitted {
@@ -1245,6 +1272,14 @@ pub mod pallet {
         DuplicateTradeReceipt,
         /// The chain's state after settlement disagrees with the engine's.
         TradeSettlementInconsistent,
+        /// The trade ran and committed, but its economic outcome did not satisfy the chain's
+        /// ProfitLock limits, so nothing was applied.
+        TradeConstraintsUnsatisfied,
+        /// The constraints enable no check at all, so storing them would only mislead.
+        InvalidTradeConstraints,
+        /// A revenue agreement's shares are impossible: a rate above 100%, shares summing above
+        /// 100%, or a non-zero share with no recipient.
+        InvalidRevenueAgreement,
         /// The trading module declares an asset's decimals differently from the asset registry.
         TradeAssetMismatch,
         /// The chain's economic halt freezes asset movement.
@@ -1401,6 +1436,75 @@ pub mod pallet {
             );
             TradingConfiguration::<T>::put(config);
             Self::deposit_event(Event::TradingConfigured);
+            Ok(())
+        }
+
+        /// Set or clear the ProfitLock limits every committed trade must satisfy.
+        ///
+        /// `None` restores the pre-ProfitLock behaviour: a trade is applied whenever the engine
+        /// says it committed. Setting limits never changes what a module may execute; it only
+        /// decides whether a committed outcome is applied. A trade that misses them is refused
+        /// with `TradeConstraintsUnsatisfied` before any ledger movement.
+        #[pallet::call_index(46)]
+        #[pallet::weight(<T as Config>::WeightInfo::set_trading_config())]
+        pub fn set_trade_constraints(
+            origin: OriginFor<T>,
+            constraints: Option<crate::trading::TradeConstraints>,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            match constraints {
+                Some(constraints) => {
+                    ensure!(
+                        constraints.min_net_profit > 0
+                            || constraints.max_execution_cost < u128::MAX
+                            || constraints.deadline_blocks != 0,
+                        Error::<T>::InvalidTradeConstraints
+                    );
+                    TradeConstraintsOf::<T>::put(constraints);
+                    Self::deposit_event(Event::TradeConstraintsSet);
+                }
+                None => {
+                    TradeConstraintsOf::<T>::kill();
+                    Self::deposit_event(Event::TradeConstraintsCleared);
+                }
+            }
+            Ok(())
+        }
+
+        /// Set or clear the caller's revenue agreement.
+        ///
+        /// A trader authorises their own split; nobody else can set it. Clearing it stops future
+        /// performance fees on this account's trades; fees already distributed stay distributed.
+        #[pallet::call_index(47)]
+        #[pallet::weight(<T as Config>::WeightInfo::set_trading_config())]
+        pub fn set_revenue_agreement(
+            origin: OriginFor<T>,
+            agreement: Option<crate::trading::RevenueAgreement<T::AccountId>>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            match agreement {
+                Some(agreement) => {
+                    ensure!(
+                        agreement.performance_bps <= 10_000,
+                        Error::<T>::InvalidRevenueAgreement
+                    );
+                    let shares = u32::from(agreement.developer_bps)
+                        + u32::from(agreement.protocol_bps);
+                    ensure!(shares <= 10_000, Error::<T>::InvalidRevenueAgreement);
+                    ensure!(
+                        agreement.developer_bps == 0 || agreement.developer.is_some(),
+                        Error::<T>::InvalidRevenueAgreement
+                    );
+                    ensure!(
+                        agreement.protocol_bps == 0 || agreement.protocol.is_some(),
+                        Error::<T>::InvalidRevenueAgreement
+                    );
+                    RevenueAgreements::<T>::insert(&who, agreement);
+                }
+                None => {
+                    RevenueAgreements::<T>::remove(&who);
+                }
+            }
             Ok(())
         }
 

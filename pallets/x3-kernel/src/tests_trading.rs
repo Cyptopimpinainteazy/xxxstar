@@ -15,7 +15,7 @@ use crate::pallet::{
     CanonicalLedger, Error, Event, TradeNonces, TradeReceipts, TradingConfiguration,
 };
 use crate::trading::TradingConfig;
-use frame_support::{assert_noop, assert_ok, BoundedVec};
+use frame_support::{assert_noop, assert_ok, dispatch::DispatchResult, BoundedVec};
 use std::collections::BTreeMap;
 use x3_lang_compiler::semantic::CompilationMode;
 use x3_lang_compiler::x3bc::compile_trading_x3bc;
@@ -738,4 +738,403 @@ fn the_benchmark_trade_is_the_compiled_flagship() {
         compiled.as_slice(),
         "the benchmark module is stale"
     );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ProfitLock: the chain's own limits on a committed trade, enforced before any
+// ledger movement.
+// ─────────────────────────────────────────────────────────────────────────────
+
+use crate::trading::TradeConstraints;
+
+fn set_constraints(constraints: Option<TradeConstraints>) {
+    assert_ok!(AtlasKernel::set_trade_constraints(
+        RuntimeOrigin::root(),
+        constraints
+    ));
+}
+
+/// A trade that misses its limits must leave the chain exactly as it was: no
+/// transfer, no venue reserve update, no receipt record.
+#[test]
+fn a_trade_below_the_minimum_profit_is_refused_and_changes_nothing() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let before = balances();
+        let receipts_before = TradeReceipts::<Test>::iter().count();
+        // The flagship requires 1 USDX; demand more than any arbitrage on these
+        // pools can produce.
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: 1_000_000 * UNIT,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 0,
+        }));
+
+        assert_noop!(
+            submit_trade(RuntimeOrigin::signed(TRADER), module(&public(FLAGSHIP)), SUBMITTED_AT),
+            Error::<Test>::TradeConstraintsUnsatisfied
+        );
+
+        assert_eq!(balances(), before, "no balance moved");
+        assert_eq!(
+            TradeReceipts::<Test>::iter().count(),
+            receipts_before,
+            "no receipt was recorded for a trade the chain did not apply"
+        );
+    });
+}
+
+/// The same trade, under a limit it can meet, commits normally.
+#[test]
+fn a_trade_above_the_minimum_profit_commits() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: UNIT,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 0,
+        }));
+
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+        assert!(matches!(last_trade_event(), Event::TradeCommitted { .. }));
+    });
+}
+
+#[test]
+fn a_trade_charging_more_than_the_cost_ceiling_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let before = balances();
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: 0,
+            max_execution_cost: 1, // below any real cost
+            deadline_blocks: 0,
+        }));
+
+        assert_noop!(
+            submit_trade(RuntimeOrigin::signed(TRADER), module(&public(FLAGSHIP)), SUBMITTED_AT),
+            Error::<Test>::TradeConstraintsUnsatisfied
+        );
+        assert_eq!(balances(), before);
+    });
+}
+
+#[test]
+fn a_trade_that_missed_its_deadline_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let before = balances();
+        // The chain proceeds from SUBMITTED_AT (1000) to EXECUTED_AT (1002).
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: 0,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 1,
+        }));
+
+        assert_noop!(
+            submit_trade(RuntimeOrigin::signed(TRADER), module(&public(FLAGSHIP)), SUBMITTED_AT),
+            Error::<Test>::TradeConstraintsUnsatisfied
+        );
+        assert_eq!(balances(), before);
+    });
+}
+
+#[test]
+fn clearing_the_constraints_restores_the_previous_behaviour() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: 1_000_000 * UNIT,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 0,
+        }));
+        assert_noop!(
+            submit_trade(RuntimeOrigin::signed(TRADER), module(&public(FLAGSHIP)), SUBMITTED_AT),
+            Error::<Test>::TradeConstraintsUnsatisfied
+        );
+
+        set_constraints(None);
+        assert!(crate::pallet::TradeConstraintsOf::<Test>::get().is_none());
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+    });
+}
+
+#[test]
+fn constraints_that_enable_no_check_are_refused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        assert_noop!(
+            AtlasKernel::set_trade_constraints(
+                RuntimeOrigin::root(),
+                Some(TradeConstraints::permissive())
+            ),
+            Error::<Test>::InvalidTradeConstraints
+        );
+    });
+}
+
+#[test]
+fn only_governance_may_set_constraints() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        assert_noop!(
+            AtlasKernel::set_trade_constraints(
+                RuntimeOrigin::signed(TRADER),
+                Some(TradeConstraints {
+                    min_net_profit: UNIT,
+                    max_execution_cost: u128::MAX,
+                    deadline_blocks: 0,
+                })
+            ),
+            sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Revenue Engine: a verified performance fee, split and paid atomically with the
+// trade it was charged on.
+// ─────────────────────────────────────────────────────────────────────────────
+
+use crate::trading::RevenueAgreement;
+
+const DEVELOPER: AccountId = 1_010;
+const PROTOCOL: AccountId = 1_011;
+
+fn agree(trader: AccountId, agreement: Option<RevenueAgreement<AccountId>>) -> DispatchResult {
+    AtlasKernel::set_revenue_agreement(RuntimeOrigin::signed(trader), agreement)
+}
+
+/// 20% performance fee, split 15% developer / 5% protocol / 80% trader.
+fn standard_agreement() -> RevenueAgreement<AccountId> {
+    RevenueAgreement {
+        performance_bps: 2_000,
+        trader: None,
+        developer: Some(DEVELOPER),
+        protocol: Some(PROTOCOL),
+        developer_bps: 1_500,
+        protocol_bps: 500,
+    }
+}
+
+/// The committed trade's receipt, decoded from its event.
+fn committed_receipt() -> x3bc_core::receipt::TradingReceipt {
+    let Event::TradeCommitted { receipt_bytes, .. } = last_trade_event() else {
+        panic!("the trade must commit");
+    };
+    receipt::decode(&receipt_bytes).expect("canonical receipt")
+}
+
+#[test]
+fn a_verified_profit_pays_the_agreed_split_out_of_the_traders_balance() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        assert_ok!(agree(TRADER, Some(standard_agreement())));
+
+        let trader_before = AtlasKernel::ledger_balance_of(USDX, &TRADER);
+        let developer_before = AtlasKernel::ledger_balance_of(USDX, &DEVELOPER);
+        let protocol_before = AtlasKernel::ledger_balance_of(USDX, &PROTOCOL);
+
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+
+        // Recompute the fee from the receipt, never from the event.
+        let receipt = committed_receipt();
+        let outcome =
+            x3bc_core::economics::outcome(&receipt, USDX).expect("a committed trade prices");
+        assert!(outcome.is_profit(), "the flagship trade is profitable");
+        let expected = x3bc_core::economics::performance_fee(&outcome, 2_000).expect("fee");
+        assert!(expected.fee > 0);
+
+        let developer_paid =
+            AtlasKernel::ledger_balance_of(USDX, &DEVELOPER) - developer_before;
+        let protocol_paid = AtlasKernel::ledger_balance_of(USDX, &PROTOCOL) - protocol_before;
+        let trader_delta = AtlasKernel::ledger_balance_of(USDX, &TRADER) - trader_before;
+
+        assert_eq!(developer_paid, expected.fee * 1_500 / 10_000);
+        assert_eq!(protocol_paid, expected.fee * 500 / 10_000);
+        // The three shares are the whole fee: nothing is created or destroyed, and the trader's
+        // 80% stays in their own balance because the agreement names no destination.
+        let trader_share = expected.fee - developer_paid - protocol_paid;
+        assert_eq!(
+            developer_paid + protocol_paid + trader_share,
+            expected.fee,
+            "the shares are the fee"
+        );
+        // With no named destination the trader's share stays in their balance, so the only fee
+        // that leaves it is what the other two participants were paid.
+        assert_eq!(
+            trader_delta,
+            outcome.net as u128 - developer_paid - protocol_paid,
+            "the trader keeps the net minus everyone else's share"
+        );
+    });
+}
+
+/// The fee only redistributes value the trade produced: across the trader and
+/// the fee recipients, USDX rises by exactly the trade's verified net, no more.
+#[test]
+fn fee_distribution_creates_no_value_beyond_the_verified_net() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        assert_ok!(agree(TRADER, Some(standard_agreement())));
+        let participants = [TRADER, DEVELOPER, PROTOCOL];
+        let total = |asset: u32| -> u128 {
+            participants
+                .iter()
+                .map(|a| AtlasKernel::ledger_balance_of(asset, a))
+                .sum()
+        };
+        let usdx_before = total(USDX);
+        let wetx_before = total(WETX);
+
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+
+        let receipt = committed_receipt();
+        let outcome = x3bc_core::economics::outcome(&receipt, USDX).unwrap();
+        assert_eq!(
+            total(USDX) as i128 - usdx_before as i128,
+            outcome.net,
+            "participants gained exactly the trade's net"
+        );
+        assert_eq!(
+            total(WETX),
+            wetx_before,
+            "the settlement-asset fee moves no other asset"
+        );
+    });
+}
+
+#[test]
+fn a_trader_without_an_agreement_pays_no_performance_fee() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let developer_before = AtlasKernel::ledger_balance_of(USDX, &DEVELOPER);
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+        assert_eq!(
+            AtlasKernel::ledger_balance_of(USDX, &DEVELOPER),
+            developer_before
+        );
+    });
+}
+
+#[test]
+fn a_zero_rate_agreement_pays_nothing() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let mut agreement = standard_agreement();
+        agreement.performance_bps = 0;
+        assert_ok!(agree(TRADER, Some(agreement)));
+        let developer_before = AtlasKernel::ledger_balance_of(USDX, &DEVELOPER);
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+        assert_eq!(
+            AtlasKernel::ledger_balance_of(USDX, &DEVELOPER),
+            developer_before
+        );
+    });
+}
+
+#[test]
+fn an_impossible_agreement_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+
+        // A rate above 100%.
+        let mut agreement = standard_agreement();
+        agreement.performance_bps = 10_001;
+        assert_noop!(
+            agree(TRADER, Some(agreement)),
+            Error::<Test>::InvalidRevenueAgreement
+        );
+
+        // Shares summing above 100% of the fee.
+        let mut agreement = standard_agreement();
+        agreement.developer_bps = 8_000;
+        agreement.protocol_bps = 3_000;
+        assert_noop!(
+            agree(TRADER, Some(agreement)),
+            Error::<Test>::InvalidRevenueAgreement
+        );
+
+        // A share with no recipient.
+        let mut agreement = standard_agreement();
+        agreement.developer = None;
+        assert_noop!(
+            agree(TRADER, Some(agreement)),
+            Error::<Test>::InvalidRevenueAgreement
+        );
+
+        // A recipient with no share is harmless and accepted.
+        let mut agreement = standard_agreement();
+        agreement.protocol_bps = 0;
+        assert_ok!(agree(TRADER, Some(agreement)));
+    });
+}
+
+#[test]
+fn only_the_trader_can_set_their_own_agreement() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        // ALICE's agreement is not BOB's to set.
+        assert_ok!(agree(TRADER, Some(standard_agreement())));
+        assert_eq!(
+            crate::pallet::RevenueAgreements::<Test>::get(TRADER),
+            Some(standard_agreement())
+        );
+        assert!(crate::pallet::RevenueAgreements::<Test>::get(BOB).is_none());
+
+        // Clearing removes it, and a cleared agreement stops future fees.
+        assert_ok!(agree(TRADER, None));
+        assert!(crate::pallet::RevenueAgreements::<Test>::get(TRADER).is_none());
+    });
+}
+
+#[test]
+fn the_traders_remainder_is_sent_when_they_name_a_destination() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let destination = BOB;
+        let mut agreement = standard_agreement();
+        agreement.trader = Some(destination);
+        assert_ok!(agree(TRADER, Some(agreement)));
+        let before = AtlasKernel::ledger_balance_of(USDX, &destination);
+
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+
+        let receipt = committed_receipt();
+        let outcome = x3bc_core::economics::outcome(&receipt, USDX).unwrap();
+        let fee = x3bc_core::economics::performance_fee(&outcome, 2_000).unwrap();
+        let trader_share = fee.fee - fee.fee * 1_500 / 10_000 - fee.fee * 500 / 10_000;
+        assert_eq!(
+            AtlasKernel::ledger_balance_of(USDX, &destination) - before,
+            trader_share
+        );
+    });
 }
