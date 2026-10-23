@@ -15,6 +15,19 @@ This repository has the [BMAD Method](https://bmadcode.com/) (`bmad-method` v6) 
 | `.github/agents/bmad-agent-*.agent.md` | Five Copilot custom agent entry points for the BMAD personas. |
 | `_bmad-output/` | Generated planning and implementation artifacts. Gitignored. |
 
+## Version status
+
+Installed: **v6.12.4**, the latest stable release (tagged 2026-10-14, `_bmad/_config/manifest.yaml` confirms). Verified byte-identical to the published `bmad-method@6.12.4` tarball for every installed skill.
+
+BMad ships on two lines:
+
+| Line | Where | Install | Status |
+| --- | --- | --- | --- |
+| v6.12 | npm `bmad-method` | `npx bmad-method install` | Stable, bug fixes only. **What this repo uses.** |
+| v7 | GitHub `main` | `npx skills add bmad-code-org/BMAD-METHOD --skill '*'` | Preview alpha — breaking changes between updates |
+
+v7 is not on npm; `dist-tags.next` is `6.12.3-next.1`, which predates the stable line. Any v7 upgrade here is a `skills` CLI install, not an npm bump.
+
 ## Usage
 
 Open the repository in VS Code with GitHub Copilot and invoke the `bmad-help` skill to be guided through the workflow. Typical entry points:
@@ -51,17 +64,37 @@ Useful installer flags:
 - `--set core.user_name=<name>` — change a config answer non-interactively
 - `--action update` — refresh an existing install
 
+## Installing v7 preview instead
+
+Not done here — recorded so the decision is reversible and informed. v7 changes things this repo currently relies on:
+
+- `bmad-help` is replaced by the `bmad` hub skill (`bmad status`, `bmad setup`).
+- `bmad-spec` and `bmad-correct-course` are gone; Sofia the Product Owner (`bmad-agent-po`) replaces them.
+- `planning_artifacts` and `implementation_artifacts` are no longer read or seeded — a v6 project needs `bmad migrate method`.
+- Documents move under `<type>-<slug>/` inside an optional `initiative-<slug>/`.
+- Web bundles, the HTML review report, and translated docs are removed.
+
+```sh
+# Install the preview (asks which coding tools to target)
+npx skills add bmad-code-org/BMAD-METHOD --skill '*'
+
+# Then, in your agent: ask the `bmad` skill to run `bmad setup`
+# and, for the v6 config layout: `bmad migrate method`
+```
+
+Rolling back means reinstalling v6 (`npm run bmad:install`) — `bmad setup` offers to delete skills a v6 installer left behind, so a clean revert needs the old skills restored from git.
+
 ## Configuration
 
 Edit `_bmad/custom/config.toml` (team, committed) or `_bmad/custom/config.user.toml` (personal, gitignored) to override generated settings. Do not hand-edit `_bmad/config.toml` or `_bmad/config.user.toml`; the installer overwrites them.
 
-Resolve the merged configuration to verify values:
+Resolve the merged configuration to verify values (this is the invocation the skills themselves use):
 
 ```sh
-python3 _bmad/scripts/resolve_config.py -p . -k core.user_name -k modules.bmm.user_skill_level
+uv run _bmad/scripts/resolve_config.py --project-root . -k core.user_name -k modules.bmm.user_skill_level
 ```
 
 ## Notes
 
-- BMAD is a third-party NPM package (MIT). Follow the license and usage guidelines in the upstream repository: <https://github.com/bmad-code-org/BMAD-METHOD>.
-- Node.js >= 20 and Python 3 are required (both already used by this repo).
+- BMAD is a third-party package, MIT (Copyright (c) 2025 BMad Code, LLC). Upstream: <https://github.com/bmad-code-org/BMAD-METHOD>.
+- Requires Node.js >= 20.12, Python >= 3.10, and `uv` for setup and the Python scripts. All three are present here (`uv` at `~/.local/bin/uv`).
