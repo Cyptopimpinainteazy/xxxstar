@@ -45,6 +45,12 @@ it is generated and already gated by `scripts/x3_audit_matrix.py --check`, which
 fails on a source-digest mismatch. Two gates over one file would report the same
 cause twice.
 
+Two other files carry a percentage that is *not* this aggregate and is not gated
+here: `TESTNET_GAP_LEDGER.md` records a dated P0-matrix composite ("66 of 82 P0
+rows below 80") as a state snapshot at a named commit, and `.launchops/report.md`
+is a dated LaunchOps scan score over its own module set. Neither derives from the
+registry's mean, so checking them against it would be wrong, not merely redundant.
+
 Tests vary the registry or the documents through `X3_READINESS_REGISTRY` and
 `X3_READINESS_STATUS` rather than mutating the canonical files, matching the
 existing hook in `check-readiness-consistency.sh`.
