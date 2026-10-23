@@ -80,14 +80,15 @@ supermajority and recovery.
 | **Node Service**        | In Progress       | Provides RPC, telemetry, and networking services with hooks for future Frontier JSON-RPC and SVM execution interfaces.                         |
 | **Tooling**             | In Progress       | CLI utilities cover chain specs and key handling; Comit crafting helpers and SDK improvements are scheduled next.                              |
 ### Developer Tools: BMAD Method
-BMAD Method (v6, BMM module) is installed at the repository root and configured for GitHub Copilot. It provides planning and delivery workflows plus persona agents under `.agents/skills/bmad-*` and `.github/agents/bmad-agent-*.agent.md`.
+BMAD Method v7 (preview) is installed at the repository root as skills for GitHub Copilot and Claude Code, under `.agents/skills/bmad-*` and `.claude/skills/bmad-*`. It provides planning and delivery workflows plus persona agents.
 
 Quick usage (from the repository root):
 ```sh
 npm run bmad:install   # install or reinstall
 npm run bmad:update    # update an existing install
+npm run bmad:status    # machine-readable install state
 ```
-Then invoke the `bmad-help` skill in Copilot to get oriented. BMAD requires Node.js >= 20. See `docs/tools/bmad.md` for layout, configuration, and artifacts.
+Then invoke the `bmad` skill in Copilot to get oriented. BMAD requires Node.js >= 20.12 and `uv`. See `docs/tools/bmad.md` for layout, configuration, known defects, and artifacts.
 
 ---
 
