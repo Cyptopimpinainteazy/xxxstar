@@ -12,6 +12,7 @@
 //!    allow-lists, refund paths, explicit finality/proofs, route scores,
 //!    invariant rules, compile-mode gating, and risk scoring).
 
+pub mod automation_lowering;
 pub mod annotations;
 pub mod arb;
 pub mod cost;
