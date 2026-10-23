@@ -96,6 +96,26 @@ def test_p0_work_in_progress_can_record_80_because_release_gate_enforces_95(tmp_
     assert warnings == []
 
 
+def test_p0_rows_can_record_release_scores(tmp_path):
+    repo = repo_fixture(tmp_path)
+    errors, _ = fm.validate_matrix(
+        {
+            "feature": [
+                base_feature(
+                    priority="P0",
+                    implemented=95,
+                    tested=95,
+                    mainnet_ready=95,
+                    blockers=[],
+                )
+            ]
+        },
+        repo,
+        registry(),
+    )
+    assert errors == []
+
+
 def test_open_pr_at_80_mainnet_fails(tmp_path):
     repo = repo_fixture(tmp_path)
     errors, _ = fm.validate_matrix(

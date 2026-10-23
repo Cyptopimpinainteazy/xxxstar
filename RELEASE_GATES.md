@@ -22,7 +22,16 @@
 
 Exit 0 = PASS. Exit 1 = FAIL — do NOT cut a release.
 
-Validates: documentation existence, build, chain-spec, critical test suites, Northern Swarm/Reactor on-chain compute, reproducible builds, secret hygiene.
+Validates the P0 release contract before doing any expensive build work: exactly 82 approved P0
+rows, each with `implemented`, `tested`, and `mainnet_ready` at 95 or above, no recorded blockers,
+resolvable named tests, and generated audit-matrix artifacts that still match their canonical
+sources. A P0 scope failure stops the gate immediately.
+
+After that early check, validates documentation existence, build, chain-spec, critical test suites,
+Northern Swarm/Reactor on-chain compute, reproducible builds, and secret hygiene.
+
+The granular matrix may record a P0 row below 95 while it is being completed. `mainnet-check`
+will reject that state; the recorded score must only rise when its named evidence is current.
 
 
 ## Northern Swarm + Reactor on-chain compute hard gate
