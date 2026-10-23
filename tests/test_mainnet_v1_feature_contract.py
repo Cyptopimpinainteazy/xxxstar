@@ -71,3 +71,40 @@ def test_router_scope_guard_permits_only_the_explicit_mainnet_v1_exception() -> 
         source,
     )
 
+
+
+def test_the_bridge_kill_switch_is_never_set_at_genesis() -> None:
+    """`ExternalBridgesEnabled` cannot be baked into a chain spec by any feature.
+
+    The router pallet declares no `#[pallet::genesis_config]`/`#[pallet::genesis_build]`,
+    so the storage cannot appear in `RuntimeGenesisConfig`. It is
+    `StorageValue<_, bool, ValueQuery>` and therefore `false` on every surface —
+    mainnet-rc1, mainnet-v1, testnet and dev alike — until governance calls
+    `set_external_bridges_enabled`. Anything claiming otherwise is wrong: the
+    previous `runtime/Cargo.toml` comment said `testnet` set it true in genesis.
+    """
+    pallet = (ROOT / "pallets/x3-cross-vm-router/src/lib.rs").read_text(encoding="utf-8")
+
+    assert "#[pallet::genesis_config]" not in pallet
+    assert "#[pallet::genesis_build]" not in pallet
+    # Default-false storage, so nothing can supply an initial value.
+    assert re.search(
+        r"pub type ExternalBridgesEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;",
+        pallet,
+    )
+
+
+def test_the_runtime_testnet_feature_is_inert() -> None:
+    """`testnet` forwards no pallet feature and has no cfg site in the runtime.
+
+    Pinned because `runtime/Cargo.toml` claimed it enabled a NoOp validator, set
+    `ExternalBridgesEnabled=true` in genesis and applied "other testnet-only config".
+    All three were false. This test fails if someone makes the feature real, which is
+    the point: the change should be deliberate and the comment updated with it.
+    """
+    features = load_features("runtime/Cargo.toml")
+
+    assert features["testnet"] == [], (
+        "runtime `testnet` was made to forward features; update its comment in "
+        "runtime/Cargo.toml and delete this test only if the forwarding is intended"
+    )

@@ -197,9 +197,13 @@ x3-packet-schema = { path = "../crates/x3-packet-schema" }
 default = ["std"]
 dev = ["pallet-sudo"]
 
-# Testnet feature: enables NoOpCrossChainValidator (accepts all proofs),
-# ExternalBridgesEnabled=true in genesis, and other testnet-only config.
-# Use `--features testnet` to build the bridge-enabled testnet runtime WASM.
+# Testnet marker. Forwards nothing: no pallet feature, no genesis change, and
+# `grep -rn 'feature = "testnet"' runtime/src/` finds no cfg site. The runtime does
+# not wire `NoOpCrossChainValidator` (it appears only in
+# `pallets/x3-settlement-engine/src/bridge_tests.rs`), and no genesis field sets
+# `ExternalBridgesEnabled` — the router pallet declares no `#[pallet::genesis_config]`
+# at all, so that storage is `false` on every surface until governance calls
+# `set_external_bridges_enabled`. Kept declared because `node/Cargo.toml` forwards it.
 testnet = []
 
 # Narrow pallet set for first public testnet / mainnet-rc1 release.
