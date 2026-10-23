@@ -18,6 +18,48 @@ pub enum Item {
     Agent(Agent),
     /// `struct Name { field: Type, ... }`
     Struct(StructDef),
+    /// `automation Name { trigger {..} permissions {..} execute {..} on_failure {..} }`
+    Automation(Automation),
+}
+
+/// An automation declaration.
+///
+/// The sections mirror the pallet's task model: what wakes it up (`trigger`),
+/// what it may touch (`permissions`), what it does (`execute`), and what it does
+/// when that fails (`on_failure`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Automation {
+    pub name: Identifier,
+    /// Exactly one trigger expression; its shape decides the on-chain condition.
+    pub trigger: Expression,
+    /// Capability declarations. These are not comments: the semantic pass turns
+    /// each into a checked budget.
+    pub permissions: Vec<Permission>,
+    pub execute: Block,
+    pub on_failure: Option<Block>,
+    pub span: Span,
+}
+
+/// A capability granted to an automation.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Permission {
+    pub kind: PermissionKind,
+    /// The declared literal value, e.g. `1000` in `max_trade: 1000`.
+    pub value: Expression,
+    pub span: Span,
+}
+
+/// The capability kinds the compiler understands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PermissionKind {
+    /// Wallet the automation draws on.
+    Wallet,
+    /// Largest single amount it may move.
+    MaxTrade,
+    /// Cumulative loss it may incur per period.
+    DailyLossLimit,
+    /// Chains it may touch.
+    AllowedChains,
 }
 
 /// A struct declaration. A value of the struct is its fields, in declaration order.

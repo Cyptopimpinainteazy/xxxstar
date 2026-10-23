@@ -13,11 +13,11 @@
 
 use crate::error::{ParseError, ParseResult};
 use x3_ast::{
-    Agent, AtomicBlock, Block, Const, EmitStatement, Expression, ForLoopKind, ForStatement,
-    Function, GlobalLet, Identifier, IfStatement, Item, LoopStatement, Module, Statement,
-    StructDef, WhileStatement,
+    Agent, AtomicBlock, Automation, Block, Const, EmitStatement, Expression, ForLoopKind,
+    ForStatement, Function, GlobalLet, Identifier, IfStatement, Item, LoopStatement, Module,
+    Permission, PermissionKind, Statement, StructDef, WhileStatement,
 };
-use x3_common::Span;
+use x3_common::{Literal, Span};
 
 /// Context for structural validation.
 #[derive(Clone, Copy)]
@@ -56,6 +56,7 @@ impl StructuralValidator {
                 Item::ArbProgram(_) => {}
                 Item::Agent(agent) => self.validate_agent(agent)?,
                 Item::Struct(def) => self.validate_struct(def)?,
+                Item::Automation(automation) => self.validate_automation(automation)?,
             }
         }
 
@@ -134,6 +135,84 @@ impl StructuralValidator {
     }
 
     /// A struct names each field once.
+    /// Validate an `automation` declaration.
+    ///
+    /// Beyond structure, this enforces the determinism boundary: an automation
+    /// body is a chain-side workflow, so it may not call a connector whose answer
+    /// depends on an off-chain service. `http.*`, `ai.*` and `gpu.*` are refused
+    /// here rather than compiled into something that could never be replayed by
+    /// a validator.
+    fn validate_automation(&mut self, automation: &Automation) -> ParseResult<()> {
+        self.validate_span(&automation.span)?;
+        self.validate_identifier(&automation.name)?;
+        self.validate_span(&automation.trigger.span())?;
+
+        let mut seen: Vec<PermissionKind> = Vec::new();
+        for permission in &automation.permissions {
+            self.validate_span(&permission.span)?;
+            if seen.contains(&permission.kind) {
+                return Err(ParseError::new(
+                    format!(
+                        "automation `{}` declares {:?} twice",
+                        automation.name.name, permission.kind
+                    ),
+                    permission.span,
+                ));
+            }
+            seen.push(permission.kind);
+            validate_permission_value(&automation.name.name, permission)?;
+        }
+
+        self.validate_automation_block(&automation.name.name, &automation.execute, "execute")?;
+        if let Some(on_failure) = &automation.on_failure {
+            self.validate_automation_block(&automation.name.name, on_failure, "on_failure")?;
+        }
+        Ok(())
+    }
+
+    fn validate_automation_block(
+        &mut self,
+        automation: &str,
+        block: &Block,
+        section: &str,
+    ) -> ParseResult<()> {
+        self.validate_span(&block.span)?;
+        for statement in &block.statements {
+            if let Statement::Expr(expr) = statement {
+                self.reject_off_chain_connector(automation, section, expr)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Refuse a call whose callee names an off-chain connector.
+    ///
+    /// Matches both `http.get(..)` (a field access on a bare name) and
+    /// `chain.http.get(..)` (the connector as the last segment).
+    fn reject_off_chain_connector(
+        &self,
+        automation: &str,
+        section: &str,
+        expr: &Expression,
+    ) -> ParseResult<()> {
+        const OFF_CHAIN: [&str; 3] = ["http", "ai", "gpu"];
+        if let Expression::Call(call) = expr {
+            if let Some(name) = callee_root_name(&call.callee) {
+                if OFF_CHAIN.contains(&name) {
+                    return Err(ParseError::new(
+                        format!(
+                            "automation `{automation}`: `{name}.*` is an off-chain connector and \
+                             cannot appear in `{section}`; an on-chain workflow must be replayable \
+                             by every validator"
+                        ),
+                        call.span,
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn validate_struct(&mut self, def: &StructDef) -> ParseResult<()> {
         self.validate_span(&def.span)?;
         self.validate_identifier(&def.name)?;
@@ -169,6 +248,7 @@ impl StructuralValidator {
                 Item::ArbProgram(_) => {}
                 Item::Agent(nested_agent) => self.validate_agent(nested_agent)?,
                 Item::Struct(def) => self.validate_struct(def)?,
+                Item::Automation(automation) => self.validate_automation(automation)?,
             }
         }
 
@@ -487,6 +567,71 @@ impl StructuralValidator {
             return Err(ParseError::new("invalid span: start > end", *span));
         }
         Ok(())
+    }
+}
+
+/// Root identifier of a call's callee: `http` for both `http.get(..)` and
+/// `http.get(..).parse()`, and `chain` for `chain.http.get(..)`.
+fn callee_root_name(callee: &Expression) -> Option<&str> {
+    match callee {
+        Expression::Identifier(identifier) => Some(identifier.name.as_str()),
+        Expression::FieldAccess(access) => callee_root_name(&access.object),
+        _ => None,
+    }
+}
+
+/// Check a capability's value against the shape its kind requires.
+///
+/// A capability is a budget, so a value the chain cannot enforce is a bug in the
+/// source, not something to coerce later: a negative `max_trade` or an
+/// `allowed_chains` entry that is not a chain name would silently change what
+/// the automation is permitted to do.
+fn validate_permission_value(automation: &str, permission: &Permission) -> ParseResult<()> {
+    let literal = match &permission.value {
+        Expression::Literal(literal) => Some(&literal.literal),
+        _ => None,
+    };
+    let fail = |expected: &str| {
+        Err(ParseError::new(
+            format!(
+                "automation `{automation}`: {:?} expects {expected}",
+                permission.kind
+            ),
+            permission.span,
+        ))
+    };
+    match permission.kind {
+        PermissionKind::Wallet => match literal {
+            Some(Literal::String(_)) => Ok(()),
+            _ => match &permission.value {
+                // An identifier names a wallet binding declared elsewhere.
+                Expression::Identifier(_) => Ok(()),
+                _ => fail("a wallet name or identifier"),
+            },
+        },
+        PermissionKind::MaxTrade | PermissionKind::DailyLossLimit => match literal {
+            Some(Literal::Integer(value)) if *value >= 0 => Ok(()),
+            Some(Literal::Integer(_)) => Err(ParseError::new(
+                format!(
+                    "automation `{automation}`: {:?} cannot be negative",
+                    permission.kind
+                ),
+                permission.span,
+            )),
+            _ => fail("a non-negative integer amount"),
+        },
+        PermissionKind::AllowedChains => match &permission.value {
+            Expression::Array(array) => {
+                for element in &array.elements {
+                    match element {
+                        Expression::Literal(lit) if matches!(lit.literal, Literal::String(_)) => {}
+                        _ => return fail("an array of chain names"),
+                    }
+                }
+                Ok(())
+            }
+            _ => fail("an array of chain names"),
+        },
     }
 }
 

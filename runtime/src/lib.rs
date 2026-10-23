@@ -1173,6 +1173,85 @@ parameter_types! {
     pub const MaxTaskExpiryBlocks: u32 = 2_628_000; // ~1 year at 12s blocks
 }
 
+/// Price feed for automation conditions.
+///
+/// Reads the median that `pallet-x3-oracle` computes across authorized
+/// submitters. A missing asset, too few submissions or a stale feed all answer
+/// `None`, and the automation pallet turns that into `PriceUnavailable` — a
+/// refusal that leaves the task active, never a zero price that would satisfy a
+/// "below threshold" trigger.
+#[cfg(not(feature = "mainnet-rc1"))]
+pub struct AutomationOracle;
+#[cfg(not(feature = "mainnet-rc1"))]
+impl pallet_x3_automation::OracleProvider for AutomationOracle {
+    fn get_price(asset_id: &[u8]) -> Option<u128> {
+        let id = u32::from_le_bytes(asset_id.try_into().ok()?);
+        let price = pallet_x3_oracle::Pallet::<Runtime>::get_price(id)?;
+        Some(u128::from(price.price))
+    }
+}
+
+#[cfg(not(feature = "mainnet-rc1"))]
+parameter_types! {
+    pub const MaxAutomationAttempts: u32 = 3;
+}
+
+/// Current wall clock for automation triggers.
+#[cfg(not(feature = "mainnet-rc1"))]
+pub struct AutomationNow;
+#[cfg(not(feature = "mainnet-rc1"))]
+impl Get<u64> for AutomationNow {
+    fn get() -> u64 {
+        pallet_timestamp::Pallet::<Runtime>::get()
+    }
+}
+
+/// Perform a task's action for its owner.
+///
+/// This is the only path through which automation can change state. Every
+/// variant is explicit; an unmapped action returns an error rather than a
+/// fabricated success, and `TransferNative` moves real balances with the owner's
+/// origin as the source.
+#[cfg(not(feature = "mainnet-rc1"))]
+pub struct RuntimeActionDispatcher;
+#[cfg(not(feature = "mainnet-rc1"))]
+impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatcher {
+    fn dispatch(
+        owner: &AccountId,
+        action: &x3_automation::Action,
+    ) -> Result<(x3_automation::ActionOutcome, Weight, [u8; 64]), DispatchError> {
+        use x3_automation::{Action, ActionOutcome};
+        match action {
+            Action::Noop => Ok((ActionOutcome::Noop, Weight::zero(), [0u8; 64])),
+            Action::TransferNative { recipient, amount } => {
+                let destination = AccountId::decode(&mut &recipient[..])
+                    .map_err(|_| DispatchError::Other("AutomationRecipientUnavailable"))?;
+                let value: Balance = (*amount)
+                    .try_into()
+                    .map_err(|_| DispatchError::Other("AutomationAmountOutOfRange"))?;
+                Balances::transfer_keep_alive(
+                    RuntimeOrigin::signed(owner.clone()),
+                    sp_runtime::MultiAddress::Id(destination),
+                    value,
+                )?;
+                let mut out = [0u8; 64];
+                out[..16].copy_from_slice(&value.to_le_bytes());
+                Ok((
+                    ActionOutcome::Applied,
+                    <Runtime as frame_system::Config>::DbWeight::get().reads_writes(2, 2),
+                    out,
+                ))
+            }
+            // A ledger-asset move needs an atomic account-level debit/credit the
+            // kernel does not expose yet, so it is refused rather than faked.
+            Action::TransferLedgerAsset { .. } => Err(DispatchError::Other(
+                "AutomationLedgerTransferUnavailable",
+            )),
+            Action::Custom(_) => Err(DispatchError::Other("AutomationActionUnsupported")),
+        }
+    }
+}
+
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_automation::Config for Runtime {
     type Currency = Balances;
@@ -1180,9 +1259,12 @@ impl pallet_x3_automation::Config for Runtime {
     type BaseRegistrationFee = BaseRegistrationFee;
     type ExecutionFee = ExecutionFee;
     type MaxTaskExpiryBlocks = MaxTaskExpiryBlocks;
+    type MaxAttempts = MaxAutomationAttempts;
+    type Now = AutomationNow;
     type WeightInfo = pallet_x3_automation::weights::SubstrateWeight<Runtime>;
-    type Oracle = pallet_x3_automation::NoopOracle;
+    type Oracle = AutomationOracle;
     type CustomEvaluator = pallet_x3_automation::NoopCustomEvaluator;
+    type Dispatcher = RuntimeActionDispatcher;
 }
 
 parameter_types! {

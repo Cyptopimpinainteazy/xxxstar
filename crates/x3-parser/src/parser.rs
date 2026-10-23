@@ -3,7 +3,8 @@ use crate::error::{ParseError, ParseResult};
 use crate::grammar::{binary_binding_power, symbol_to_binary_op, PREFIX_BP};
 use crate::tokens::MAX_NESTING_DEPTH;
 use x3_ast::{
-    Agent, ArrayExpression, AssignExpression, AtomicBlock, BinaryExpression, Block, BreakStatement,
+    Agent, ArrayExpression, AssignExpression, AtomicBlock, Automation, BinaryExpression, Block,
+    BreakStatement, Permission, PermissionKind,
     CallExpression, Const, ContinueStatement, EmitStatement, Expression, FieldAccessExpression,
     FieldAssignExpression, FieldInit, ForLoopKind, ForStatement, Function, GlobalLet, Identifier,
     IfStatement, IndexAssignExpression, IndexExpression, Item, LetStatement, LiteralExpression,
@@ -50,6 +51,7 @@ impl Parser {
             TokenKind::Keyword(Keyword::Const) => self.parse_const_item(),
             TokenKind::Keyword(Keyword::Let) => self.parse_global_let(),
             TokenKind::Keyword(Keyword::Struct) => self.parse_struct_item(),
+            TokenKind::Keyword(Keyword::Automation) => self.parse_automation_item(),
             TokenKind::Eof => Err(ParseError::new("unexpected end of input", self.peek().span)),
             token => Err(ParseError::new(
                 format!("unexpected token {token:?} at top-level"),
@@ -218,6 +220,105 @@ impl Parser {
             items,
             span: Span::new(0, 0), // Span tracking requires token position propagation
         }))
+    }
+
+    /// `automation Name { trigger <expr> permissions {..} execute {..} on_failure {..} }`
+    ///
+    /// `trigger` is a single expression so it can name a chain-observable fact
+    /// (`BlockNumber(100)`, `PriceThreshold { asset_id: 1, threshold: 1000,
+    /// above: true }`); `on_failure` is optional.
+    fn parse_automation_item(&mut self) -> ParseResult<Item> {
+        let start = self.expect_keyword(Keyword::Automation)?.span;
+        // A quoted name is allowed so a workflow can carry the human-facing
+        // title it was generated from: `automation "X3 Autonomous Trading"`.
+        let name = match self.peek().kind.clone() {
+            TokenKind::Literal(Literal::String(text)) => {
+                let token = self.cursor.bump();
+                Identifier {
+                    name: text,
+                    span: token.span,
+                }
+            }
+            _ => self.expect_identifier()?,
+        };
+        self.expect_symbol(Symbol::LeftBrace)?;
+
+        let trigger = if self.accept_keyword(Keyword::Trigger) {
+            self.expect_symbol(Symbol::LeftBrace)?;
+            let expr = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
+            self.expect_symbol(Symbol::RightBrace)?;
+            expr
+        } else {
+            return Err(ParseError::new(
+                "automation requires a `trigger` section",
+                self.peek().span,
+            ));
+        };
+
+        let mut permissions = Vec::new();
+        if self.accept_keyword(Keyword::Permissions) {
+            self.expect_symbol(Symbol::LeftBrace)?;
+            while !self.peek_symbol(Symbol::RightBrace) {
+                permissions.push(self.parse_permission()?);
+            }
+            self.expect_symbol(Symbol::RightBrace)?;
+        }
+
+        if !self.accept_keyword(Keyword::Execute) {
+            return Err(ParseError::new(
+                "automation requires an `execute` section",
+                self.peek().span,
+            ));
+        }
+        let execute = self.parse_block()?;
+
+        let on_failure = if self.accept_keyword(Keyword::OnFailure) {
+            Some(self.parse_block()?)
+        } else {
+            None
+        };
+
+        let end = self.expect_symbol(Symbol::RightBrace)?.span;
+        Ok(Item::Automation(Automation {
+            name,
+            trigger,
+            permissions,
+            execute,
+            on_failure,
+            span: start.merge(end),
+        }))
+    }
+
+    /// One `kind: value` capability declaration.
+    fn parse_permission(&mut self) -> ParseResult<Permission> {
+        let token = self.peek().clone();
+        let kind = match &token.kind {
+            TokenKind::Identifier(text) => match text.as_str() {
+                "wallet" => PermissionKind::Wallet,
+                "max_trade" => PermissionKind::MaxTrade,
+                "daily_loss_limit" => PermissionKind::DailyLossLimit,
+                "allowed_chains" => PermissionKind::AllowedChains,
+                other => {
+                    return Err(ParseError::new(
+                        format!("unknown automation permission `{other}`"),
+                        token.span,
+                    ))
+                }
+            },
+            _ => {
+                return Err(ParseError::new(
+                    "expected a permission name",
+                    token.span,
+                ))
+            }
+        };
+        self.cursor.bump();
+        self.expect_symbol(Symbol::Colon)?;
+        let value = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
+        let span = token.span.merge(value.span());
+        // Optional separator, so `wallet: w` and `wallet: w,` both parse.
+        let _ = self.accept_symbol(Symbol::Comma);
+        Ok(Permission { kind, value, span })
     }
 
     fn parse_parameter_list(&mut self) -> ParseResult<Vec<Param>> {

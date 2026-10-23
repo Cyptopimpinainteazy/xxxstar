@@ -106,6 +106,10 @@ impl HirLowerer {
                 Item::ArbProgram(_) => {}
                 // A struct is a type; its values are lowered where they are built.
                 Item::Struct(_) => {}
+                // An automation is a pallet task, not a HIR function; its body
+                // is validated by the parser pass and lowered by the automation
+                // pipeline, not here.
+                Item::Automation(_) => {}
             }
         }
 
@@ -161,6 +165,7 @@ impl HirLowerer {
                 }
                 Item::ArbProgram(_) => {}
                 Item::Struct(_) => {}
+                Item::Automation(_) => {}
             }
         }
         Ok(())

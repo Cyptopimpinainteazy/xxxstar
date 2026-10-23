@@ -26304,6 +26304,7 @@ dependencies = [
  "substrate-wasm-builder",
  "x3-accounting-events",
  "x3-asset-kernel-types",
+ "x3-automation",
  "x3-cross-vm-bridge",
  "x3-dex",
  "x3-ixl",

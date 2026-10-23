@@ -22,6 +22,11 @@
 // Explicit non-responsibilities:
 //   * Does not move balances between accounts. (Account-level accounting lives
 //     outside the kernel for now — the kernel only tracks per-domain totals.)
+//   * Factory tokens therefore cannot be routed cross-VM at this layer: the
+//     router's ledger interface moves represented supply but not account
+//     balances, so a routed debit would leave spendable funds behind. See the
+//     `pallet-x3-cross-vm-router` crate docs and
+//     `runtime/tests/factory_router_accounting.rs`.
 //   * Does not verify external proofs.
 //   * Does not bypass the UAK invariant. Every state change goes through the
 //     registry/ledger traits.

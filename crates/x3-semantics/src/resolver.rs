@@ -125,6 +125,7 @@ impl Resolver {
                 }
                 // Struct names are types; the type checker resolves them.
                 Item::Struct(_) => {}
+                Item::Automation(_) => {}
             }
         }
     }
@@ -269,6 +270,7 @@ impl Resolver {
             Item::ArbProgram(_) => {}
             Item::Agent(agent) => self.resolve_agent(agent),
             Item::Struct(_) => {}
+            Item::Automation(_) => {}
         }
     }
 
@@ -359,6 +361,7 @@ impl Resolver {
                     ));
                 }
                 Item::Struct(_) => {}
+                Item::Automation(_) => {}
             }
         }
 
