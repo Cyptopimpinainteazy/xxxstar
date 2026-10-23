@@ -28,42 +28,62 @@ fn hop(amount: u64) -> Hop {
     }
 }
 
+/// Build a `QuoteResult` for the optimizer tests.
+///
+/// `net_output` is `estimated_output - gas_cost`, the figure the engine ranks on,
+/// so a test that sets it inconsistently would exercise a shape the engine can
+/// never produce.
+fn quote(route: SwapRoute, estimated_output: u64, gas_cost: u64) -> QuoteResult {
+    QuoteResult {
+        net_output: U256::from(estimated_output - gas_cost),
+        route,
+        estimated_output: U256::from(estimated_output),
+        gas_cost: U256::from(gas_cost),
+        provider: "test_pool".into(),
+        chain_id: 1,
+        vm: VmType::X3Vm,
+        source_fee: U256::zero(),
+        price_impact_bps: 0,
+        expires_at: 100,
+    }
+}
+
 #[tokio::test]
 async fn optimizer_picks_highest_output_lowest_gas() {
     let opt = RouteOptimizer::new().unwrap();
     let p = sample_params();
 
     let quotes = vec![
-        QuoteResult {
-            route: SwapRoute {
+        quote(
+            SwapRoute {
                 hops: vec![hop(500)],
                 amount_in: p.amount_in,
                 estimated_output: U256::from(950_000u64),
                 gas_estimate: U256::from(25_000u64),
             },
-            estimated_output: U256::from(950_000u64),
-            gas_cost: U256::from(25_000u64),
-        },
-        QuoteResult {
-            route: SwapRoute {
+            950_000,
+            25_000,
+        ),
+        quote(
+            SwapRoute {
                 hops: vec![hop(700)],
                 amount_in: p.amount_in,
                 estimated_output: U256::from(950_000u64),
                 gas_estimate: U256::from(30_000u64),
             },
-            estimated_output: U256::from(950_000u64),
-            gas_cost: U256::from(30_000u64),
-        },
-        QuoteResult {
-            route: SwapRoute {
+            950_000,
+            30_000,
+        ),
+        quote(
+            SwapRoute {
                 hops: vec![hop(400)],
                 amount_in: p.amount_in,
                 estimated_output: U256::from(940_000u64),
                 gas_estimate: U256::from(20_000u64),
             },
-            estimated_output: U256::from(940_000u64),
-            gas_cost: U256::from(20_000u64),
-        },
+            940_000,
+            20_000,
+        ),
     ];
 
     let route = opt.optimize_route(&quotes, &p).await.unwrap();
@@ -77,16 +97,16 @@ async fn optimizer_errors_when_no_route_meets_min_out() {
     let mut p = sample_params();
     p.min_amount_out = U256::from(1_000_000u64);
 
-    let quotes = vec![QuoteResult {
-        route: SwapRoute {
+    let quotes = vec![quote(
+        SwapRoute {
             hops: vec![hop(300)],
             amount_in: p.amount_in,
             estimated_output: U256::from(900_000u64),
             gas_estimate: U256::from(21_000u64),
         },
-        estimated_output: U256::from(900_000u64),
-        gas_cost: U256::from(21_000u64),
-    }];
+        900_000,
+        21_000,
+    )];
 
     let err = opt.optimize_route(&quotes, &p).await.unwrap_err();
     assert!(matches!(err, SwapRouterError::RouteNotFound));
