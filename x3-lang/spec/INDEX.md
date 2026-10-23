@@ -68,7 +68,7 @@ language decision rather than silently dropping a price floor (TICKET-122).
 - **10+ E2E control-flow tests**: IF, LOOP, REQUIRE, ON_FAIL, ON_TIMEOUT, ATOMIC_BEGIN/END/ROLLBACK
 - **Bridge backend**: 4 verifier families (evm-light-client, svm-light-client, evm-rpc, svm-rpc)
 - **CI gates**: 22 gates all passing
-- **Registry**: 23 features tracked in `FEATURE_REGISTRY.toml` (average readiness 62.74%, 2026-10-23)
+- **Registry**: 23 features tracked in `FEATURE_REGISTRY.toml` (average readiness 62.74%; gated by `scripts/check-readiness-status-current.py`)
 
 **X3-lang status: All opcodes execute. Production hardening in progress. 🚧**
 

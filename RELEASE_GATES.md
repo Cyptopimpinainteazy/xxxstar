@@ -2,7 +2,12 @@
 
 **Canonical source: `FEATURE_REGISTRY.toml`** — all readiness scores and blockers derive from it. Run `scripts/check-readiness-consistency.sh` to validate.
 
-**Overall readiness: ~58.5%** (58.5% arithmetic mean across the 22 currently scored entries in `FEATURE_REGISTRY.toml`, recalculated 2026-09-27 against the current registry; `northern_swarm_reactor` moved 45 → 55 across the disputed-task refund, `AutoBackend` parity/quarantine and executor-boundary landings). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
+**Overall readiness: 62.74%** (arithmetic mean across the 23 scored entries in `FEATURE_REGISTRY.toml`). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
+
+> This figure is not maintained by hand. `scripts/check-readiness-status-current.py` recomputes it from the
+> registry and fails the `readiness status current` gate when this file disagrees, so a registry edit cannot
+> leave a stale number here. The previous revision read 58.5% across 22 entries, and the section below still
+> said 55.5% — both had survived several registry changes because nothing checked downward drift.
 
 ## Gate commands
 
@@ -46,4 +51,4 @@ Enforced in `.github/workflows/mainnet-readiness.yml` on every push/PR to main.
 
 ## Mainnet-ready claims
 
-Forbidden unless all gates pass AND `FEATURE_REGISTRY.toml` scores ≥95% for every feature. Currently: ~55.5% registry-scored readiness; this is **not** a mainnet-ready score.
+Forbidden unless all gates pass AND `FEATURE_REGISTRY.toml` scores ≥95% for every feature. Currently: 62.74% registry-scored readiness; this is **not** a mainnet-ready score.

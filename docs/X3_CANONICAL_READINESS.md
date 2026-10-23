@@ -2,7 +2,7 @@
 
 > **SUPERSEDED 2026-10-23.** This file is a June 2026 snapshot and its figures are wrong: it shows
 > `atomic_kernel` at 75% (registry now 57%), lists `grant_agent` and `x3_broadcast`, which are no
-> longer registry entries, and states a 36% average (registry now 62.74% across 23 entries).
+> longer registry entries, and states a 36% average (on 2026-10-23 the registry held 62.74% across 23 entries).
 >
 > The canonical aggregate is derived from `FEATURE_REGISTRY.toml` and published in
 > [`CURRENT_MAINNET_STATUS.md`](../CURRENT_MAINNET_STATUS.md). Read that, not this.
