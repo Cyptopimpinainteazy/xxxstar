@@ -166,27 +166,74 @@ automation A {
     assert!(err.to_string().contains("on_failure"), "got: {err}");
 }
 
+/// Every spelling of an off-chain connector must be refused. An earlier version
+/// checked only a bare `Call` at statement level, so all of these passed.
 #[test]
-fn a_qualified_off_chain_connector_is_refused() {
-    // `chain.http.get()` has the same root and must be caught too.
-    let source = r#"
-automation A {
-    trigger { Manual }
-    execute { http.get(); }
+fn no_spelling_of_an_off_chain_connector_gets_through() {
+    let bodies = [
+        // wrapped in a binding
+        "let r = http.get(url);",
+        // wrapped in a call argument
+        "log(http.get(url));",
+        // returned
+        "return ai.classify(x);",
+        // inside a conditional
+        "if c { gpu.submit(job); }",
+        // inside a loop body
+        "while c { http.post(u); }",
+        // inside an atomic block
+        "atomic { http.get(u); }",
+        // qualified path, connector not the root
+        "chain.http.get(u);",
+        // nested in a binary expression
+        "let n = 1 + ai.score(x);",
+    ];
+    for body in bodies {
+        let source = format!(
+            r#"
+automation A {{
+    trigger {{ Manual }}
+    execute {{ {body} }}
+}}
+"#
+        );
+        let err = match parse_program(&source) {
+            Err(err) => err,
+            Ok(_) => panic!("`{body}` must be refused"),
+        };
+        assert!(
+            err.to_string().contains("off-chain"),
+            "expected a determinism-boundary error for `{body}`, got: {err}"
+        );
+    }
 }
-"#;
-    assert!(parse_program(source).is_err());
 
+/// The trigger decides the on-chain condition, so it is held to the same rule.
+#[test]
+fn an_off_chain_connector_in_the_trigger_is_refused() {
+    let source = r#"
+automation A {
+    trigger { http.price() }
+    execute { settle(); }
+}
+"#;
+    let err = parse_program(source).expect_err("the trigger is chain-side too");
+    assert!(err.to_string().contains("off-chain"), "got: {err}");
+}
+
+/// A refusal in `on_failure` is covered elsewhere; this pins that the walk
+/// descends into nested blocks there as well.
+#[test]
+fn an_off_chain_connector_nested_in_on_failure_is_refused() {
     let source = r#"
 automation A {
     trigger { Manual }
-    execute { chain.http.get(); }
+    execute { settle(); }
+    on_failure { if failed { gpu.retry(); } }
 }
 "#;
-    // Field access on a field access: `chain.http` is the callee's object, whose
-    // own object is `chain`, so the root is `chain`, not `http`. Only a direct
-    // `http.*` call is refused by root; a deeper path is not claimed.
-    let _ = parse_program(source);
+    let err = parse_program(source).expect_err("nested connector in on_failure");
+    assert!(err.to_string().contains("off-chain"), "got: {err}");
 }
 
 #[test]

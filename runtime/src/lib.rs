@@ -1173,13 +1173,23 @@ parameter_types! {
     pub const MaxTaskExpiryBlocks: u32 = 2_628_000; // ~1 year at 12s blocks
 }
 
+// How long a stored median stays usable by automation. The oracle never deletes
+// an `AssetPrices` entry: when submissions go stale, `update_median_price`
+// returns early and leaves the last value in place. So "an entry exists" is not
+// the same as "the market was observed recently", and a stop-loss trigger must
+// not fire on a price nobody has reported since.
+#[cfg(not(feature = "mainnet-rc1"))]
+parameter_types! {
+    pub const MaxAutomationPriceAgeMs: u64 = 3_600_000; // 1 hour
+}
+
 /// Price feed for automation conditions.
 ///
 /// Reads the median that `pallet-x3-oracle` computes across authorized
-/// submitters. A missing asset, too few submissions or a stale feed all answer
-/// `None`, and the automation pallet turns that into `PriceUnavailable` — a
-/// refusal that leaves the task active, never a zero price that would satisfy a
-/// "below threshold" trigger.
+/// submitters. A missing asset, too few submissions or a median older than
+/// `MaxAutomationPriceAgeMs` all answer `None`, and the automation pallet turns
+/// that into `PriceUnavailable` — a refusal that leaves the task active, never a
+/// zero price that would satisfy a "below threshold" trigger.
 #[cfg(not(feature = "mainnet-rc1"))]
 pub struct AutomationOracle;
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -1187,6 +1197,13 @@ impl pallet_x3_automation::OracleProvider for AutomationOracle {
     fn get_price(asset_id: &[u8]) -> Option<u128> {
         let id = u32::from_le_bytes(asset_id.try_into().ok()?);
         let price = pallet_x3_oracle::Pallet::<Runtime>::get_price(id)?;
+        let now = pallet_timestamp::Pallet::<Runtime>::get();
+        let age = now.saturating_sub(price.timestamp);
+        if age > MaxAutomationPriceAgeMs::get() {
+            // A stale median is not a price: answer `None` so the pallet raises
+            // `PriceUnavailable` instead of executing on yesterday's market.
+            return None;
+        }
         Some(u128::from(price.price))
     }
 }
