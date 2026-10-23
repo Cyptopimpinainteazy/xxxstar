@@ -771,7 +771,11 @@ fn a_trade_below_the_minimum_profit_is_refused_and_changes_nothing() {
         }));
 
         assert_noop!(
-            submit_trade(RuntimeOrigin::signed(TRADER), module(&public(FLAGSHIP)), SUBMITTED_AT),
+            submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
             Error::<Test>::TradeConstraintsUnsatisfied
         );
 
@@ -816,7 +820,11 @@ fn a_trade_charging_more_than_the_cost_ceiling_is_refused() {
         }));
 
         assert_noop!(
-            submit_trade(RuntimeOrigin::signed(TRADER), module(&public(FLAGSHIP)), SUBMITTED_AT),
+            submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
             Error::<Test>::TradeConstraintsUnsatisfied
         );
         assert_eq!(balances(), before);
@@ -836,7 +844,11 @@ fn a_trade_that_missed_its_deadline_is_refused() {
         }));
 
         assert_noop!(
-            submit_trade(RuntimeOrigin::signed(TRADER), module(&public(FLAGSHIP)), SUBMITTED_AT),
+            submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
             Error::<Test>::TradeConstraintsUnsatisfied
         );
         assert_eq!(balances(), before);
@@ -853,7 +865,11 @@ fn clearing_the_constraints_restores_the_previous_behaviour() {
             deadline_blocks: 0,
         }));
         assert_noop!(
-            submit_trade(RuntimeOrigin::signed(TRADER), module(&public(FLAGSHIP)), SUBMITTED_AT),
+            submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
             Error::<Test>::TradeConstraintsUnsatisfied
         );
 
@@ -957,8 +973,7 @@ fn a_verified_profit_pays_the_agreed_split_out_of_the_traders_balance() {
         let expected = x3bc_core::economics::performance_fee(&outcome, 2_000).expect("fee");
         assert!(expected.fee > 0);
 
-        let developer_paid =
-            AtlasKernel::ledger_balance_of(USDX, &DEVELOPER) - developer_before;
+        let developer_paid = AtlasKernel::ledger_balance_of(USDX, &DEVELOPER) - developer_before;
         let protocol_paid = AtlasKernel::ledger_balance_of(USDX, &PROTOCOL) - protocol_before;
         let trader_delta = AtlasKernel::ledger_balance_of(USDX, &TRADER) - trader_before;
 

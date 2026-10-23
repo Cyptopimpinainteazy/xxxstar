@@ -2,20 +2,16 @@
 
 use super::*;
 use crate as pallet_x3_automation;
-use frame_support::{
-    derive_impl, parameter_types,
-    traits::Currency,
-    weights::Weight,
-};
-use sp_runtime::DispatchError;
-use x3_automation::{Action, ActionOutcome};
+use frame_support::{derive_impl, parameter_types, traits::Currency, weights::Weight};
 use frame_system as system;
 use sp_core::H256;
+use sp_runtime::DispatchError;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
 use std::collections::HashMap;
+use x3_automation::{Action, ActionOutcome};
 
 /// Test oracle that returns a static price map.
 /// Use `set_price` to configure expected values before each test.
@@ -184,9 +180,11 @@ impl pallet::ActionDispatcher<u64> for TestDispatcher {
                 Err(DispatchError::Other("mock: no ledger asset backend"))
             }
             Action::Custom(_) => match DISPATCH_MODE.with(|cell| cell.get()) {
-                DispatchMode::Apply => {
-                    Ok((ActionOutcome::Applied, Weight::from_parts(5_000, 50), [0u8; 64]))
-                }
+                DispatchMode::Apply => Ok((
+                    ActionOutcome::Applied,
+                    Weight::from_parts(5_000, 50),
+                    [0u8; 64],
+                )),
                 DispatchMode::Refuse => Err(DispatchError::Other("mock: custom refused")),
             },
         }

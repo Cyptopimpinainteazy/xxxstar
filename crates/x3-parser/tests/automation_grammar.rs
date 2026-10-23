@@ -304,7 +304,10 @@ automation A {
 }
 "#;
     let err = parse_program(bad).expect_err("chains must be a list");
-    assert!(err.to_string().contains("array of chain names"), "got: {err}");
+    assert!(
+        err.to_string().contains("array of chain names"),
+        "got: {err}"
+    );
 
     let non_string_element = r#"
 automation A {
@@ -314,7 +317,10 @@ automation A {
 }
 "#;
     let err = parse_program(non_string_element).expect_err("chain names are strings");
-    assert!(err.to_string().contains("array of chain names"), "got: {err}");
+    assert!(
+        err.to_string().contains("array of chain names"),
+        "got: {err}"
+    );
 }
 
 #[test]

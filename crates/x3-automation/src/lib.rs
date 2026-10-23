@@ -141,7 +141,16 @@ pub struct Task<AccountId, Balance> {
 
 /// Task execution status.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
 )]
 pub enum TaskStatus {
     /// Waiting for its condition.
@@ -165,7 +174,16 @@ impl TaskStatus {
 
 /// What an action did when the dispatcher ran it.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
 )]
 pub enum ActionOutcome {
     /// The action changed state.

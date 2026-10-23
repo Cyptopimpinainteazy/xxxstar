@@ -251,7 +251,10 @@ pub mod pallet {
         },
         /// The task's condition could not be evaluated, so nothing ran and the
         /// keeper was paid nothing.
-        TaskConditionUnavailable { task_id: TaskId, keeper: T::AccountId },
+        TaskConditionUnavailable {
+            task_id: TaskId,
+            keeper: T::AccountId,
+        },
         /// A task was cancelled
         TaskCancelled {
             task_id: TaskId,
@@ -522,10 +525,7 @@ pub mod pallet {
 
         /// Fee for a refused dispatch: paid, but never more than the owner holds
         /// or the task budgeted. Returns whether anything was paid.
-        fn pay_attempt_fee(
-            task: &Task<T::AccountId, BalanceOf<T>>,
-            keeper: &T::AccountId,
-        ) -> bool {
+        fn pay_attempt_fee(task: &Task<T::AccountId, BalanceOf<T>>, keeper: &T::AccountId) -> bool {
             let fee = T::ExecutionFee::get().min(task.max_fee);
             if fee.is_zero() || T::Currency::free_balance(&task.owner) < fee {
                 return false;
@@ -624,11 +624,9 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
-                Condition::Event { topic } => {
-                    frame_system::Pallet::<T>::events()
-                        .iter()
-                        .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic)
-                }
+                Condition::Event { topic } => frame_system::Pallet::<T>::events()
+                    .iter()
+                    .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
                 Condition::Manual => true,
                 Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
             })
