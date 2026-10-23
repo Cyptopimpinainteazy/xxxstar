@@ -1,0 +1,51 @@
+{
+  "schema": "x3.automation.gate-evidence/v1",
+  "phase": "V1 X3 Flow Core",
+  "recorded_at": "2026-10-22",
+  "integrated_head": "15c5c6cb",
+  "audited_defects": [
+    {
+      "id": "fake-success",
+      "defect": "execute_action returned success=true without dispatching",
+      "location": "pallets/x3-automation/src/lib.rs",
+      "regression_test": "tests::a_refused_dispatch_is_not_recorded_as_executed_and_pays_no_execution_fee",
+      "fix": "Config::Dispatcher performs the effect; RuntimeActionDispatcher refuses unmapped actions"
+    },
+    {
+      "id": "zero-price",
+      "defect": "get_price(..).unwrap_or(0) let a missing price satisfy a below-threshold trigger",
+      "location": "pallets/x3-automation/src/lib.rs",
+      "regression_test": "tests::a_missing_oracle_price_is_a_refusal_not_a_zero_price",
+      "fix": "Error::PriceUnavailable; no default price exists"
+    },
+    {
+      "id": "unconditional-keeper-payment",
+      "defect": "keeper paid after a simulated action",
+      "location": "pallets/x3-automation/src/lib.rs",
+      "regression_test": "tests::a_refused_dispatch_is_not_recorded_as_executed_and_pays_no_execution_fee",
+      "fix": "execution fee paid only on a dispatch that happened; attempt fee capped by max_fee and owner balance"
+    },
+    {
+      "id": "noop-oracle",
+      "defect": "runtime wired NoopOracle",
+      "location": "runtime/src/lib.rs",
+      "regression_test": "the_runtime_oracle_supplies_the_automation_price",
+      "fix": "AutomationOracle reads pallet-x3-oracle median; cfg(not(mainnet-rc1))"
+    }
+  ],
+  "gates": [
+    { "command": "cargo test -p x3-automation", "result": "7 passed" },
+    { "command": "cargo test -p pallet-x3-automation", "result": "24 passed" },
+    { "command": "cargo test -p x3-chain-runtime --lib", "result": "91 passed" },
+    { "command": "cargo test -p x3-chain-runtime --test automation_execution", "result": "6 passed" },
+    { "command": "cargo test -p x3-chain-runtime --test factory_router_accounting", "result": "4 passed" },
+    { "command": "cargo test -p x3-parser --test automation_grammar", "result": "14 passed" },
+    { "command": "cargo check -p x3-chain-runtime --features mainnet-rc1", "result": "clean" },
+    { "command": "cargo clippy -D warnings (x3-parser, x3-ast, x3-common, pallet-x3-automation, x3-automation)", "result": "clean" }
+  ],
+  "open_limits": [
+    "TransferLedgerAsset is refused: the kernel exposes no atomic account-level debit/credit.",
+    "No off-chain worker: the scheduler ships as a bounded scan (`Pallet::due_tasks`) plus `cleanup_expired_tasks`; keepers drive execution.",
+    "Workflow-to-X3BC emission is not implemented; the language surface parses and validates but does not yet produce bytecode."
+  ]
+}
