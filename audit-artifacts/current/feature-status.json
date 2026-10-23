@@ -4955,10 +4955,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "66095a6aa1cfb2001d79c5176a6e17f1f7f41f9b075cb24b7b418e10aa21eb81",
+    "source_digest": "15ebddf099f1a85c50a498ae55ca5f18a6e7d47ec91e4d8c196cf822667ceebb",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
-      "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
+      "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -5126,7 +5126,7 @@
     },
     {
       "blockers": [
-        "The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` refuses without an operator, a clean tree, a Live spec whose Aura set is exactly the expected validator count, a raw twin, and an RC log carrying the gate's own `PASSED` marker. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (10 checks), gate `launch record`",
+        "The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` compiles schema 2 from the exact commit and artifacts, current feature-matrix digest and P0 snapshot, test-gate logs, two independent audit scopes, bounty and public-testnet windows, bridge routes and caps, seven validator identities, and commit-bound approvals. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (25 checks), gate `launch record`",
         "Neither gate has run end to end: `fresh_build_check.sh` plus the 7-validator public testnet criteria in `scripts/mainnet/public_testnet_gate.sh` need hardware that does not exist yet. Evidence: `tests/test_rc_gates.py` (18 checks, gated), gate `rc gate scripts`"
       ],
       "crate_or_service": "scripts/mainnet/mainnet_rc_gate.sh",
