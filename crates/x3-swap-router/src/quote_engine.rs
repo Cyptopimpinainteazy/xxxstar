@@ -345,7 +345,10 @@ mod tests {
     fn a_quote_is_priced_from_the_pool_not_echoed_from_the_request() {
         // The requested minimum is absurd on purpose: 999 whole units out of a
         // 1_000-in pool. The old engine returned exactly this as its estimate.
-        let engine = engine(vec![pool("x3dex_pool_1", 1_000 * UNIT, 2_000 * UNIT, 30)], 0);
+        let engine = engine(
+            vec![pool("x3dex_pool_1", 1_000 * UNIT, 2_000 * UNIT, 30)],
+            0,
+        );
         let quotes = engine
             .get_comprehensive_quotes(&params(10 * UNIT, 0), 120)
             .expect("a real pool prices this");
@@ -361,7 +364,10 @@ mod tests {
 
     #[test]
     fn a_quote_below_the_minimum_is_filtered_not_reported() {
-        let engine = engine(vec![pool("x3dex_pool_1", 1_000 * UNIT, 2_000 * UNIT, 30)], 0);
+        let engine = engine(
+            vec![pool("x3dex_pool_1", 1_000 * UNIT, 2_000 * UNIT, 30)],
+            0,
+        );
         // Demand more out than the pool can possibly pay.
         let err = engine
             .get_comprehensive_quotes(&params(10 * UNIT, 1_900 * UNIT), 120)
@@ -422,7 +428,10 @@ mod tests {
 
     #[test]
     fn gas_is_subtracted_from_the_net_the_caller_compares() {
-        let engine = engine(vec![pool("p", 1_000_000 * UNIT, 1_000_000 * UNIT, 30)], 1_000);
+        let engine = engine(
+            vec![pool("p", 1_000_000 * UNIT, 1_000_000 * UNIT, 30)],
+            1_000,
+        );
         let quotes = engine
             .get_comprehensive_quotes(&params(10 * UNIT, 0), 120)
             .unwrap();
