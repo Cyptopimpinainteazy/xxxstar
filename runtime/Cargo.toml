@@ -103,6 +103,7 @@ pallet-x3-crosschain-gateway = { path = "../pallets/x3-crosschain-gateway", defa
 x3-verification-router = { path = "../crates/x3-verification-router", default-features = false }
 pallet-cross-chain-validator = { path = "../pallets/cross-chain-validator", default-features = false }
 pallet-x3-automation = { path = "../pallets/x3-automation", default-features = false }
+x3-automation = { version = "0.1.0", default-features = false, path = "../crates/x3-automation" }
 pallet-x3-oracle = { path = "../pallets/x3-oracle", default-features = false }
 pallet-x3-vrf = { path = "../pallets/x3-vrf", default-features = false }
 pallet-x3-dex = { path = "../pallets/x3-dex", default-features = false }
@@ -299,6 +300,7 @@ std = [
 	"pallet-x3-crosschain-gateway/std",
 	"x3-verification-router/std",
 	"pallet-x3-automation/std",
+	"x3-automation/std",
 	"pallet-x3-oracle/std",
 	"pallet-x3-vrf/std",
 	"pallet-x3-dex/std",
