@@ -25,8 +25,10 @@ systemd, Prometheus/Alertmanager/Loki, and signed JSON evidence.
 
 ## Global Constraints
 
-- All 82 P0 rows at the implementation baseline must reach implemented, tested, and mainnet-ready
-  scores of at least 95, with no open blockers.
+- The P0 baseline remains 82 rows: 79 capability rows must reach implemented, tested, and
+  mainnet-ready scores of at least 95 with no open blockers; the three `claims_hygiene` rows remain
+  capped as retracted-claim records and must pass the claims-hygiene scanner. They are never
+  promoted into product capabilities.
 - Ethereum L1, Solana mainnet-beta, and Bitcoin mainnet are the only external bridge families active
   at genesis. Every other adapter remains disabled.
 - Seven authority-set genesis validators, operated independently. Permissionless staking remains

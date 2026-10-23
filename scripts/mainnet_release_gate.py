@@ -77,6 +77,7 @@ def path_exists(rel: str) -> pathlib.Path:
 
 P0_RELEASE_FLOOR = 95
 P0_BASELINE_COUNT = 82
+CLAIM_HYGIENE_SUBSYSTEM = "claims_hygiene"
 
 
 def load_matrix(path: pathlib.Path | str) -> dict:
@@ -101,7 +102,27 @@ def evaluate_p0_scope(matrix: dict, repo_root: pathlib.Path | str) -> list[str]:
             f"{P0_BASELINE_COUNT}"
         )
 
-    for feature in p0:
+    capability_rows = [
+        feature
+        for feature in p0
+        if feature.get("subsystem") != CLAIM_HYGIENE_SUBSYSTEM
+    ]
+    hygiene_rows = [
+        feature
+        for feature in p0
+        if feature.get("subsystem") == CLAIM_HYGIENE_SUBSYSTEM
+    ]
+
+    for feature in hygiene_rows:
+        label = str(feature.get("id") or feature.get("name") or "<unknown claim row>")
+        if feature.get("claim_risk") is not True:
+            errors.append(f"{label}: claim-hygiene row must set claim_risk = true")
+        if feature.get("launch_scope") != "research":
+            errors.append(
+                f"{label}: claim-hygiene row must remain research scope"
+            )
+
+    for feature in capability_rows:
         label = str(feature.get("id") or feature.get("name") or "<unknown P0 feature>")
         for field in ("implemented", "tested", "mainnet_ready"):
             score = feature.get(field)
@@ -137,6 +158,20 @@ def evaluate_p0_scope(matrix: dict, repo_root: pathlib.Path | str) -> list[str]:
             ):
                 errors.append(f"{label}: required test does not resolve: {test_name}")
     return errors
+
+
+def claims_hygiene_errors(repo_root: pathlib.Path | str) -> list[str]:
+    """The retracted-claim rows are pass/fail hygiene gates, never capabilities."""
+    root = pathlib.Path(repo_root)
+    script = root / "scripts" / "ci" / "check-claims-hygiene.py"
+    if not script.is_file():
+        return ["claims hygiene scanner is missing: scripts/ci/check-claims-hygiene.py"]
+    result = run([sys.executable, str(script)], cwd=root)
+    if result.returncode == 0:
+        return []
+    output = (result.stderr or result.stdout).strip()
+    detail = output.splitlines()[-1] if output else f"exit {result.returncode}"
+    return [f"claims hygiene scanner failed: {detail}"]
 
 
 def audit_artifact_errors(repo_root: pathlib.Path | str) -> list[str]:
@@ -183,7 +218,17 @@ def check_p0_scope(
         matrix = load_matrix(matrix_file)
     except (OSError, ValueError) as exc:
         return [f"P0 release scope cannot be loaded from {matrix_file}: {exc}"]
-    return evaluate_p0_scope(matrix, root) + audit_artifact_errors(root)
+    errors = evaluate_p0_scope(matrix, root)
+    p0 = [
+        feature
+        for feature in matrix.get("feature", [])
+        if isinstance(feature, dict)
+        and feature.get("priority") == "P0"
+        and feature.get("subsystem") == CLAIM_HYGIENE_SUBSYSTEM
+    ]
+    if p0:
+        errors += claims_hygiene_errors(root)
+    return errors + audit_artifact_errors(root)
 
 
 # ── 1. Required documentation ────────────────────────────────────────────────

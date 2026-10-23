@@ -43,38 +43,76 @@ def p0_feature(index: int, **overrides):
     return feature
 
 
-def matrix_fixture(tmp_path: Path, count: int = 82) -> tuple[Path, int]:
+def claim_feature(index: int, **overrides):
+    feature = p0_feature(index)
+    feature.update(
+        {
+            "id": f"X3-CLAIM-{index:03d}",
+            "name": f"Retracted claim {index}",
+            "subsystem": "claims_hygiene",
+            "source": "claim_risk",
+            "launch_scope": "research",
+            "claim_risk": True,
+            "implemented": 55,
+            "tested": 25,
+            "mainnet_ready": 35,
+            "blockers": ["historical claim remains capped below mainnet readiness"],
+        }
+    )
+    feature.update(overrides)
+    return feature
+
+
+def matrix_fixture(tmp_path: Path, count: int = 79) -> tuple[Path, int]:
     (tmp_path / "src").mkdir(parents=True)
     (tmp_path / "src/p0.rs").write_text(
         "\n".join(f"#[test]\nfn p0_test_{i}() {{}}" for i in range(count))
     )
     (tmp_path / "evidence.md").write_text("measured evidence\n")
     matrix = tmp_path / "FEATURE_MATRIX.toml"
-    matrix.write_text(
-        "[meta]\nversion = 1\n\n"
-        + "\n".join(
-            (
-                "[[feature]]\n"
-                f'id = "X3-P0-{i:03d}"\n'
-                f'name = "P0 feature {i}"\n'
-                'subsystem = "runtime_core"\n'
-                'paths = ["src/p0.rs"]\n'
-                'test_paths = ["src/p0.rs"]\n'
-                'source = "master"\n'
-                "implemented = 95\n"
-                "tested = 95\n"
-                "mainnet_ready = 95\n"
-                'priority = "P0"\n'
-                'confidence = "high"\n'
-                'blockers = []\n'
-                'evidence = ["evidence.md"]\n'
-                f'required_tests = ["p0_test_{i}"]\n'
-                'launch_scope = "core"\n'
-            )
-            for i in range(count)
+    capability_rows = [
+        (
+            "[[feature]]\n"
+            f'id = "X3-P0-{i:03d}"\n'
+            f'name = "P0 feature {i}"\n'
+            'subsystem = "runtime_core"\n'
+            'paths = ["src/p0.rs"]\n'
+            'test_paths = ["src/p0.rs"]\n'
+            'source = "master"\n'
+            "implemented = 95\n"
+            "tested = 95\n"
+            "mainnet_ready = 95\n"
+            'priority = "P0"\n'
+            'confidence = "high"\n'
+            'blockers = []\n'
+            'evidence = ["evidence.md"]\n'
+            f'required_tests = ["p0_test_{i}"]\n'
+            'launch_scope = "core"\n'
         )
+        for i in range(count)
+    ]
+    claim_rows = [
+        (
+            "[[feature]]\n"
+            f'id = "X3-CLAIM-{i:03d}"\n'
+            f'name = "Retracted claim {i}"\n'
+            'subsystem = "claims_hygiene"\n'
+            'source = "claim_risk"\n'
+            "implemented = 55\n"
+            "tested = 25\n"
+            "mainnet_ready = 35\n"
+            'priority = "P0"\n'
+            'confidence = "medium"\n'
+            'claim_risk = true\n'
+            'blockers = ["historical claim remains capped below mainnet readiness"]\n'
+            'launch_scope = "research"\n'
+        )
+        for i in range(3)
+    ]
+    matrix.write_text(
+        "[meta]\nversion = 1\n\n" + "\n".join(capability_rows + claim_rows)
     )
-    return matrix, count
+    return matrix, count + 3
 
 
 def scope_errors(matrix_path: Path, repo_root: Path):
@@ -82,18 +120,38 @@ def scope_errors(matrix_path: Path, repo_root: Path):
     return gate.evaluate_p0_scope(matrix, repo_root)
 
 
-def test_all_82_p0_rows_at_95_pass(tmp_path):
+def test_all_82_p0_rows_pass_capability_and_claim_hygiene_contracts(
+    tmp_path, monkeypatch
+):
     matrix, count = matrix_fixture(tmp_path)
+    monkeypatch.setattr(gate, "claims_hygiene_errors", lambda root: [])
+
     assert count == 82
     assert scope_errors(matrix, tmp_path) == []
 
 
 def test_p0_scope_count_drift_fails(tmp_path):
-    matrix, _ = matrix_fixture(tmp_path, count=83)
+    matrix, _ = matrix_fixture(tmp_path, count=80)
 
     errors = scope_errors(matrix, tmp_path)
 
     assert errors == ["P0 release scope has 83 rows; the approved baseline is 82"]
+
+
+def test_claim_hygiene_scanner_failure_blocks_release(tmp_path, monkeypatch):
+    matrix, _ = matrix_fixture(tmp_path)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/x3_audit_matrix.py").write_text("# fixture checker\n")
+    monkeypatch.setattr(gate, "audit_artifact_errors", lambda root: [])
+    monkeypatch.setattr(
+        gate,
+        "claims_hygiene_errors",
+        lambda root: ["claims hygiene scanner failed: forbidden claim reintroduced"],
+    )
+
+    errors = gate.check_p0_scope(matrix_path=matrix, repo_root=tmp_path)
+
+    assert errors == ["claims hygiene scanner failed: forbidden claim reintroduced"]
 
 
 def test_one_p0_row_at_94_fails(tmp_path):
@@ -148,6 +206,7 @@ def test_stale_generated_matrix_artifacts_fail(tmp_path, monkeypatch):
         )
 
     monkeypatch.setattr(gate, "run", stale_run)
+    monkeypatch.setattr(gate, "claims_hygiene_errors", lambda root: [])
 
     errors = gate.check_p0_scope(matrix_path=matrix, repo_root=tmp_path)
 
