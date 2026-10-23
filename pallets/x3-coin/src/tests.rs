@@ -21,6 +21,7 @@ const ECOSYSTEM_PARTNER: u64 = 3;
 const PRESALE_BUYER: u64 = 4;
 const BONUS_CLAIMER: u64 = 5;
 const CROSS_CHAIN_USER: u64 = 6;
+const VALIDATOR_OPERATOR: u64 = 7;
 
 fn finality_envelope(chain: u8, confirmations: u32, tail: &[u8]) -> Vec<u8> {
     let receipt_root = [0x11; 32];
@@ -126,6 +127,72 @@ fn genesis_config_works() {
         assert_eq!(
             pallet_x3_kernel::CanonicalLedger::<Test>::get(PRESALE_BUYER, X3_ASSET_ID),
             1_333_333_333_000_000_000_000
+        );
+    });
+}
+
+#[test]
+fn validator_payout_moves_reserve_without_changing_supply() {
+    new_test_ext().execute_with(|| {
+        let amount = 10_000_000_000_000_000u128;
+        let supply_before = X3Coin::total_supply();
+        let reserve_before = X3Coin::validator_reserve_balance();
+
+        assert_ok!(X3Coin::pay_validator_reward(
+            RuntimeOrigin::root(),
+            VALIDATOR_OPERATOR,
+            amount,
+        ));
+
+        assert_eq!(
+            pallet_x3_kernel::CanonicalLedger::<Test>::get(
+                VALIDATOR_OPERATOR,
+                X3_ASSET_ID,
+            ),
+            amount
+        );
+        assert_eq!(
+            X3Coin::validator_reserve_balance(),
+            reserve_before - amount
+        );
+        assert_eq!(X3Coin::total_supply(), supply_before);
+    });
+}
+
+#[test]
+fn validator_payout_rejects_non_governance_origin() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            X3Coin::pay_validator_reward(
+                RuntimeOrigin::signed(VALIDATOR_OPERATOR),
+                VALIDATOR_OPERATOR,
+                1,
+            ),
+            Error::<Test>::UnauthorizedValidatorPayout
+        );
+    });
+}
+
+#[test]
+fn validator_payout_cannot_overdraw_the_security_reserve() {
+    new_test_ext().execute_with(|| {
+        let reserve_before = X3Coin::validator_reserve_balance();
+
+        assert_noop!(
+            X3Coin::pay_validator_reward(
+                RuntimeOrigin::root(),
+                VALIDATOR_OPERATOR,
+                reserve_before + 1,
+            ),
+            Error::<Test>::InsufficientValidatorReserve
+        );
+        assert_eq!(X3Coin::validator_reserve_balance(), reserve_before);
+        assert_eq!(
+            pallet_x3_kernel::CanonicalLedger::<Test>::get(
+                VALIDATOR_OPERATOR,
+                X3_ASSET_ID,
+            ),
+            0
         );
     });
 }

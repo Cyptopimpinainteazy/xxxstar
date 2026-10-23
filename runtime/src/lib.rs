@@ -2185,6 +2185,7 @@ impl pallet_x3_coin::Config for Runtime {
     type MinEvmConfirmations = ConstU32<12>;
     type MinSvmConfirmations = ConstU32<32>;
     type MinBtcConfirmations = ConstU32<6>;
+    type ValidatorPayoutOrigin = EnsureRootOrHalfCouncil;
 }
 
 // ===== AtomicTradeEngine Configuration =====

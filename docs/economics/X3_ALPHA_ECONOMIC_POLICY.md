@@ -52,12 +52,11 @@ Validator signing keys, treasury multisig keys and atomic-gateway/settlement key
 
 ## Validator compensation (Alpha)
 
-Validators are **not** paid by staking rewards, because there is no staking pallet. They are intended
-to be paid from the `validators_staking` reserve above, by governance-approved periodic payouts.
-
-**Status: the reserve is frozen as a constant (`X3_VALIDATOR_SECURITY_RESERVE`) but the payout path
-is not implemented yet.** Until it is, Alpha validators are uncompensated by the runtime. That is
-stated here rather than papered over: no automatic reward is faked to make the documentation true.
+Validators are **not** paid by staking rewards, because there is no staking pallet. They are paid
+through governance-approved periodic payouts from the `validators_staking` reserve using
+`pallet_x3_coin::pay_validator_reward`, gated by the runtime's `EnsureRootOrHalfCouncil` origin. The
+payout moves already-issued reserve balance into the validator's canonical ledger account; it never
+mints and `TotalSupply` must remain unchanged.
 
 Transition path to permissionless staking (post-Alpha, requires a runtime upgrade and a governance
 motion): wire `pallet_staking` (or a purpose-built X3 staking pallet), move the reserve into it as the
@@ -76,8 +75,7 @@ update, which means updating this file, the manifest, the pallet constants and t
 
 ## Known open items (ticketed, not waived)
 
-1. Validator payout path from the security reserve (`X3_VALIDATOR_SECURITY_RESERVE`) — not implemented.
-2. Tip/priority-fee routing — not implemented; Alpha burns 100%.
-3. Dynamic fee multiplier — deliberately deferred; Alpha is static.
-4. The former token-scale and asset-id mismatches are reconciled by the economic gate: the only
+1. Tip/priority-fee routing — not implemented; Alpha burns 100%.
+2. Dynamic fee multiplier — deliberately deferred; Alpha is static.
+3. The former token-scale and asset-id mismatches are reconciled by the economic gate: the only
    accepted unit is `1 X3 = 10^12`, and the pallet and deployment manifest both use asset id `0`.

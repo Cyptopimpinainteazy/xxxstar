@@ -138,9 +138,11 @@ for p in sorted((root / "pallets").glob("*/README.md")):
         conflicts.append(str(p.relative_to(root)))
 check("no active launch document claims a 2,000,000,000 supply", not conflicts, ", ".join(conflicts))
 
-# ── 9. the open items are declared, not hidden ───────────────────────────────────────────────
-check("policy declares the unimplemented validator payout path",
-      "Validator payout path from the security reserve" in policy and "not implemented" in policy)
+# ── 9. the validator compensation path is implemented, not hidden ────────────────────────────
+check("validator payout path is implemented from the governed reserve",
+      "Validator compensation (Alpha)" in policy
+      and "governance-approved periodic payouts" in policy
+      and "not implemented" not in policy.split("## Validator compensation (Alpha)", 1)[1].split("## Accounting identity", 1)[0])
 
 for name, ok, detail in checks:
     if quiet and ok:
