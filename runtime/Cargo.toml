@@ -208,6 +208,15 @@ testnet = []
 # DePIN marketplace, private execution).
 # Use `--features mainnet-rc1` to build the RC1 runtime WASM.
 mainnet-rc1 = []
+# The only runtime surface permitted to back a public mainnet artifact. It
+# retains the narrowed RC-1 runtime, activates the audited external gateway
+# path, and requires the native real-VM adapters. Testnet/NoOp verification and
+# experimental consensus acceleration are intentionally absent.
+mainnet-v1 = [
+    "mainnet-rc1",
+    "external-gateway",
+    "native-real-vm-adapters",
+]
 # Reserved for an audited PQC backend. The runtime fails closed while the
 # in-tree research implementation remains in use.
 pq = ["quantum-crypto"]
@@ -413,6 +422,7 @@ native-real-vm-adapters = []
 # Bridge support features
 evm-bridge = []
 solana-integration = []
+external-gateway = ["pallet-x3-cross-vm-router/external-gateway"]
 
 # Real Frontier EVM execution path (post-RC1; OFF by default).
 # Enabling this pulls pallet-evm/pallet-ethereum/precompiles/fp-evm into the

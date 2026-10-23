@@ -76,7 +76,11 @@ compile_error!(
      `mainnet-rc1` is enabled. It is feature-gated for post-RC-1 audit."
 );
 
-#[cfg(all(feature = "mainnet-rc1", feature = "external-gateway"))]
+#[cfg(all(
+    feature = "mainnet-rc1",
+    feature = "external-gateway",
+    not(feature = "mainnet-v1")
+))]
 compile_error!(
     "MAINNET SCOPE VIOLATION: `external-gateway` must not be active when \
      `mainnet-rc1` is enabled. External bridge gateway is gated for post-RC-1 audit."
