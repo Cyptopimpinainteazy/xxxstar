@@ -175,6 +175,167 @@ impl LiquiditySource for NativePool {
     }
 }
 
+/// A route through two or more pools, priced hop by hop.
+///
+/// The single-pool case is [`NativePool`]; this is what makes the router a
+/// *router*: a direct pool may pay less than a path through an intermediate
+/// asset, and only pricing both lets a caller see that. Each hop consumes the
+/// previous hop's output, so the reported output is what the whole path would
+/// actually deliver, not the sum of independent quotes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MultiHopPath {
+    /// Human-readable path name, recorded on the quote.
+    pub name: String,
+    /// Pools in execution order. Each must trade the asset the previous produced.
+    pub pools: Vec<NativePool>,
+}
+
+impl MultiHopPath {
+    /// Build a path, refusing one whose pools do not chain.
+    ///
+    /// Checking the chain here rather than at quote time means a misconfigured
+    /// route cannot sit in the engine looking valid until someone uses it.
+    pub fn new(name: impl Into<String>, pools: Vec<NativePool>) -> Result<Self, QuoteError> {
+        if pools.is_empty() {
+            return Err(QuoteError::UnsupportedPair);
+        }
+        for pair in pools.windows(2) {
+            // Which side is the input depends on the direction the path is
+            // traversed, so the only structural requirement here is that
+            // consecutive pools can hand value to each other at all.
+            let (left, right) = (&pair[0], &pair[1]);
+            let shares_an_asset = left.token_a == right.token_a
+                || left.token_a == right.token_b
+                || left.token_b == right.token_a
+                || left.token_b == right.token_b;
+            if !shares_an_asset {
+                return Err(QuoteError::UnsupportedPair);
+            }
+        }
+        Ok(Self {
+            name: name.into(),
+            pools,
+        })
+    }
+
+    /// The assets this path connects, when traversed in declaration order.
+    fn ends(&self) -> (H160, H160) {
+        (
+            self.pools[0].token_a,
+            self.pools[self.pools.len() - 1].token_b,
+        )
+    }
+}
+
+impl LiquiditySource for MultiHopPath {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn chain_id(&self) -> u64 {
+        self.pools[0].chain_id
+    }
+
+    fn vm(&self) -> VmType {
+        VmType::X3Vm
+    }
+
+    fn quote_exact_in(
+        &self,
+        token_in: H160,
+        token_out: H160,
+        amount_in: U256,
+        now: u64,
+    ) -> Result<SourceQuote, QuoteError> {
+        let (first, last) = self.ends();
+        let reverse_ends = (
+            self.pools[self.pools.len() - 1].token_b,
+            self.pools[0].token_a,
+        );
+        let forward = (first, last) == (token_in, token_out);
+        // A path is usable in either direction; the pools chain either way.
+        let reverse = reverse_ends == (token_in, token_out);
+        if !forward && !reverse {
+            return Err(QuoteError::UnsupportedPair);
+        }
+
+        let hops: Vec<&NativePool> = if forward {
+            self.pools.iter().collect()
+        } else {
+            self.pools.iter().rev().collect()
+        };
+
+        let mut amount = amount_in;
+        let mut total_fee = U256::zero();
+        let mut spot_total = U256::zero();
+        let mut observed_at = 0u64;
+        let mut expires_at = u64::MAX;
+
+        // The asset moving into each hop. After the first hop it is whatever the
+        // previous pool paid out, which is the pool's "other" side.
+        let mut moving = token_in;
+        for (index, pool) in hops.iter().enumerate() {
+            if now.saturating_sub(pool.observed_at) > pool.max_age {
+                return Err(QuoteError::Stale {
+                    observed_at: pool.observed_at,
+                    now,
+                    max_age: pool.max_age,
+                });
+            }
+            let (reserve_in, reserve_out) = pool
+                .oriented_reserves(
+                    moving,
+                    if moving == pool.token_a {
+                        pool.token_b
+                    } else {
+                        pool.token_a
+                    },
+                )
+                .ok_or(QuoteError::UnsupportedPair)?;
+            let amount_u128 = u128::try_from(amount).map_err(|_| QuoteError::AmountOutOfRange)?;
+            let priced = x3bc_core::amm::swap(amount_u128, reserve_in, reserve_out, pool.fee_bps)
+                .map_err(|_| QuoteError::InsufficientLiquidity)?;
+
+            let spot_out = x3bc_core::amm::mul_div(priced.net_in, reserve_out, reserve_in)
+                .ok_or(QuoteError::AmountOutOfRange)?;
+
+            total_fee = total_fee.saturating_add(U256::from(priced.fee));
+            spot_total = spot_total.saturating_add(U256::from(spot_out));
+            observed_at = observed_at.max(pool.observed_at);
+            expires_at = expires_at.min(pool.observed_at.saturating_add(pool.max_age));
+
+            amount = U256::from(priced.amount_out);
+            // Next hop's input is this pool's output asset.
+            moving = if moving == pool.token_a {
+                pool.token_b
+            } else {
+                pool.token_a
+            };
+
+            if index + 1 == hops.len() && moving != token_out {
+                return Err(QuoteError::UnsupportedPair);
+            }
+        }
+
+        let impact_bps = x3bc_core::amm::shortfall_bps(
+            u128::try_from(spot_total).unwrap_or(u128::MAX),
+            u128::try_from(amount).unwrap_or(u128::MAX),
+        )
+        .and_then(|bps| u32::try_from(bps).ok())
+        .unwrap_or(u32::MAX);
+
+        Ok(SourceQuote {
+            provider: self.name.clone(),
+            chain_id: self.chain_id(),
+            amount_out: amount,
+            fee: total_fee,
+            price_impact_bps: impact_bps,
+            observed_at,
+            expires_at,
+        })
+    }
+}
+
 /// One route the engine is willing to offer.
 ///
 /// `PartialEq` only: a route hop carries an `f64` for legacy MEV metrics, which
@@ -494,5 +655,200 @@ mod tests {
             .unwrap();
         // 10k A into a 1000k/2000k pool pays ~19.8k B; the reverse pays ~4.9k A.
         assert!(forward.amount_out > reverse.amount_out);
+    }
+}
+
+#[cfg(test)]
+mod multi_hop_tests {
+    use super::*;
+
+    const X3: u64 = 1;
+    const A: H160 = H160([0xA1; 20]);
+    const B: H160 = H160([0xB2; 20]);
+    const C: H160 = H160([0xC3; 20]);
+    const UNIT: u128 = 1_000_000;
+
+    fn pool(name: &str, a: H160, b: H160, ra: u128, rb: u128, fee: u16) -> NativePool {
+        NativePool {
+            name: name.into(),
+            chain_id: X3,
+            token_a: a,
+            token_b: b,
+            reserve_a: ra,
+            reserve_b: rb,
+            fee_bps: fee,
+            observed_at: 100,
+            max_age: 50,
+        }
+    }
+
+    fn params(token_in: H160, token_out: H160, amount: u128) -> SwapParams {
+        SwapParams {
+            token_in,
+            token_out,
+            amount_in: U256::from(amount),
+            min_amount_out: U256::zero(),
+            chain_in: X3,
+            chain_out: X3,
+            deadline: 1_000,
+            recipient: H160::zero(),
+            slippage_tolerance_bps: 50,
+            gas_price_limit: None,
+            source_vm: VmType::X3Vm,
+            destination_vm: VmType::X3Vm,
+        }
+    }
+
+    fn engine(sources: Vec<Box<dyn LiquiditySource>>, gas: u128) -> QuoteEngine {
+        QuoteEngine::new(sources, U256::from(gas))
+    }
+
+    #[test]
+    fn a_two_hop_path_prices_each_leg_against_the_previous_output() {
+        let a_to_b = pool("a/b", A, B, 1_000 * UNIT, 1_000 * UNIT, 30);
+        let b_to_c = pool("b/c", B, C, 1_000 * UNIT, 1_000 * UNIT, 30);
+        let path = MultiHopPath::new("A->B->C", vec![a_to_b.clone(), b_to_c.clone()]).unwrap();
+
+        let quoted = path
+            .quote_exact_in(A, C, U256::from(10 * UNIT), 120)
+            .expect("the path prices");
+
+        // Hand-compute: hop 1 pays B, hop 2 consumes exactly that B.
+        let leg1 = x3bc_core::amm::swap(10 * UNIT, 1_000 * UNIT, 1_000 * UNIT, 30).unwrap();
+        let leg2 = x3bc_core::amm::swap(leg1.amount_out, 1_000 * UNIT, 1_000 * UNIT, 30).unwrap();
+        assert_eq!(quoted.amount_out, U256::from(leg2.amount_out));
+        assert_eq!(quoted.fee, U256::from(leg1.fee + leg2.fee));
+    }
+
+    #[test]
+    fn a_path_whose_pools_share_no_asset_is_refused_at_construction() {
+        let ab = pool("a/b", A, B, 1_000 * UNIT, 1_000 * UNIT, 30);
+        let disconnected = pool(
+            "x/y",
+            H160([0x11; 20]),
+            H160([0x22; 20]),
+            1_000 * UNIT,
+            1_000 * UNIT,
+            30,
+        );
+        assert_eq!(
+            MultiHopPath::new("bad", vec![ab.clone(), disconnected]).unwrap_err(),
+            QuoteError::UnsupportedPair
+        );
+
+        // A pool that shares an asset is accepted, in either orientation.
+        let bc = pool("b/c", B, C, 1_000 * UNIT, 1_000 * UNIT, 30);
+        assert!(MultiHopPath::new("a->b->c", vec![ab, bc]).is_ok());
+    }
+
+    #[test]
+    fn a_multi_hop_route_can_beat_a_thin_direct_pool() {
+        // Direct A->C pool is thin: 10k in moves the price hard.
+        let direct = pool("direct a/c", A, C, 20_000 * UNIT, 20_000 * UNIT, 30);
+        // Two deep pools through B lose less to impact despite paying two fees.
+        let a_to_b = pool("a/b", A, B, 1_000_000 * UNIT, 1_000_000 * UNIT, 30);
+        let b_to_c = pool("b/c", B, C, 1_000_000 * UNIT, 1_000_000 * UNIT, 30);
+        let path = MultiHopPath::new("A->B->C", vec![a_to_b, b_to_c]).unwrap();
+
+        let engine = engine(vec![Box::new(direct), Box::new(path)], 0);
+        let quotes = engine
+            .get_comprehensive_quotes(&params(A, C, 10_000 * UNIT), 120)
+            .unwrap();
+
+        assert_eq!(quotes.len(), 2, "both routes are priced");
+        assert_eq!(
+            quotes[0].provider, "A->B->C",
+            "the two-hop path out-pays the thin direct pool"
+        );
+        assert!(quotes[0].net_output > quotes[1].net_output);
+    }
+
+    #[test]
+    fn a_direct_route_wins_when_the_path_pays_two_fees_for_nothing() {
+        // Direct pool is deep; the path adds a fee without adding depth.
+        let direct = pool("direct a/c", A, C, 1_000_000 * UNIT, 1_000_000 * UNIT, 5);
+        let a_to_b = pool("a/b", A, B, 1_000_000 * UNIT, 1_000_000 * UNIT, 30);
+        let b_to_c = pool("b/c", B, C, 1_000_000 * UNIT, 1_000_000 * UNIT, 30);
+        let path = MultiHopPath::new("A->B->C", vec![a_to_b, b_to_c]).unwrap();
+
+        let engine = engine(vec![Box::new(direct), Box::new(path)], 0);
+        let quotes = engine
+            .get_comprehensive_quotes(&params(A, C, 100 * UNIT), 120)
+            .unwrap();
+        assert_eq!(quotes[0].provider, "direct a/c");
+    }
+
+    #[test]
+    fn a_path_is_quotable_in_reverse() {
+        // Deliberately not mirror images: had they been, the two directions would
+        // pay identically and the test would prove nothing.
+        let a_to_b = pool("a/b", A, B, 1_000 * UNIT, 3_000 * UNIT, 30);
+        let b_to_c = pool("b/c", B, C, 2_500 * UNIT, 800 * UNIT, 30);
+        let path = MultiHopPath::new("A->B->C", vec![a_to_b, b_to_c]).unwrap();
+
+        let forward = path
+            .quote_exact_in(A, C, U256::from(10 * UNIT), 120)
+            .unwrap();
+        let reverse = path
+            .quote_exact_in(C, A, U256::from(10 * UNIT), 120)
+            .expect("the path is traversable in reverse");
+        // Both directions price, and they are not the same number.
+        assert_ne!(
+            forward.amount_out, reverse.amount_out,
+            "forward {} vs reverse {}",
+            forward.amount_out, reverse.amount_out
+        );
+        assert!(forward.amount_out > U256::zero());
+        assert!(reverse.amount_out > U256::zero());
+    }
+
+    #[test]
+    fn a_path_over_an_unrelated_pair_is_refused() {
+        let a_to_b = pool("a/b", A, B, 1_000 * UNIT, 1_000 * UNIT, 30);
+        let b_to_c = pool("b/c", B, C, 1_000 * UNIT, 1_000 * UNIT, 30);
+        let path = MultiHopPath::new("A->B->C", vec![a_to_b, b_to_c]).unwrap();
+        assert_eq!(
+            path.quote_exact_in(H160([0x99; 20]), C, U256::from(UNIT), 120),
+            Err(QuoteError::UnsupportedPair)
+        );
+    }
+
+    #[test]
+    fn one_stale_hop_makes_the_whole_path_stale() {
+        let a_to_b = pool("a/b", A, B, 1_000 * UNIT, 1_000 * UNIT, 30);
+        let mut b_to_c = pool("b/c", B, C, 1_000 * UNIT, 1_000 * UNIT, 30);
+        b_to_c.observed_at = 10; // observed long before the fresh pool
+        let path = MultiHopPath::new("A->B->C", vec![a_to_b, b_to_c]).unwrap();
+        assert!(matches!(
+            path.quote_exact_in(A, C, U256::from(UNIT), 120),
+            Err(QuoteError::Stale { .. })
+        ));
+    }
+
+    #[test]
+    fn an_empty_pool_in_the_middle_is_refused_not_skipped() {
+        let a_to_b = pool("a/b", A, B, 1_000 * UNIT, 1_000 * UNIT, 30);
+        let empty = pool("empty", B, C, 0, 1_000 * UNIT, 30);
+        let path = MultiHopPath::new("A->B->C", vec![a_to_b, empty]).unwrap();
+        assert!(matches!(
+            path.quote_exact_in(A, C, U256::from(UNIT), 120),
+            Err(QuoteError::InsufficientLiquidity) | Err(QuoteError::UnsupportedPair)
+        ));
+    }
+
+    #[test]
+    fn a_path_reports_the_worst_expiry_of_its_hops() {
+        let mut a_to_b = pool("a/b", A, B, 1_000 * UNIT, 1_000 * UNIT, 30);
+        a_to_b.observed_at = 100;
+        a_to_b.max_age = 50;
+        let mut b_to_c = pool("b/c", B, C, 1_000 * UNIT, 1_000 * UNIT, 30);
+        b_to_c.observed_at = 90;
+        b_to_c.max_age = 20; // expires at 110
+        let path = MultiHopPath::new("A->B->C", vec![a_to_b, b_to_c]).unwrap();
+
+        let quoted = path
+            .quote_exact_in(A, C, U256::from(UNIT), 105)
+            .expect("both hops are fresh at 105");
+        assert_eq!(quoted.expires_at, 110, "the earliest hop's expiry governs");
     }
 }

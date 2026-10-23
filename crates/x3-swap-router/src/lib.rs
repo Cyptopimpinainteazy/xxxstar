@@ -29,9 +29,9 @@ pub use mev_protection::{
 };
 pub use optimization::{OptimizationParams, RouteOptimizer, RouteScore};
 pub use quote_engine::{
-    LiquiditySource, NativePool, QuoteEngine, QuoteError, QuoteResult, SourceQuote,
+    LiquiditySource, MultiHopPath, NativePool, QuoteEngine, QuoteError, QuoteResult, SourceQuote,
 };
-pub use routing::{HopInfo, RouteConstraints, RouteFinder, SwapRoute};
+pub use routing::{HopInfo, SwapRoute};
 pub use slippage_control::{
     ProtectionLevel, SlippageConfig, SlippageController, SlippageProtectedParams,
 };
