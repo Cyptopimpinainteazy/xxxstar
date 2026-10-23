@@ -87,12 +87,24 @@ def test_missing_registry_key_fails(tmp_path):
     assert any("registry feature 'missing' does not exist" in e for e in errors)
 
 
-def test_p0_at_80_mainnet_fails(tmp_path):
+def test_p0_rows_can_record_release_scores(tmp_path):
     repo = repo_fixture(tmp_path)
     errors, _ = fm.validate_matrix(
-        {"feature": [base_feature(priority="P0", mainnet_ready=80)]}, repo, registry()
+        {
+            "feature": [
+                base_feature(
+                    priority="P0",
+                    implemented=95,
+                    tested=95,
+                    mainnet_ready=95,
+                    blockers=[],
+                )
+            ]
+        },
+        repo,
+        registry(),
     )
-    assert any("P0 feature cannot claim mainnet_ready >= 80" in e for e in errors)
+    assert errors == []
 
 
 def test_open_pr_at_80_mainnet_fails(tmp_path):

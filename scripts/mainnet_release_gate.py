@@ -26,6 +26,10 @@ import sys
 import fcntl
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import feature_matrix  # noqa: E402
+
 FAILURES: list[str] = []
 
 
@@ -67,6 +71,119 @@ def path_exists(rel: str) -> pathlib.Path:
     else:
         ok(f"found {rel}")
     return p
+
+
+# ── 0. P0 release scope ─────────────────────────────────────────────────────
+
+P0_RELEASE_FLOOR = 95
+P0_BASELINE_COUNT = 82
+
+
+def load_matrix(path: pathlib.Path | str) -> dict:
+    return feature_matrix.load_matrix(pathlib.Path(path))
+
+
+def evaluate_p0_scope(matrix: dict, repo_root: pathlib.Path | str) -> list[str]:
+    """Return every reason the matrix does not satisfy the public-launch contract."""
+    root = pathlib.Path(repo_root)
+    features = matrix.get("feature", [])
+    p0 = [
+        feature
+        for feature in features
+        if isinstance(feature, dict) and feature.get("priority") == "P0"
+    ]
+    errors: list[str] = []
+    if not p0:
+        return ["P0 release scope is empty"]
+    if len(p0) != P0_BASELINE_COUNT:
+        errors.append(
+            f"P0 release scope has {len(p0)} rows; the approved baseline is "
+            f"{P0_BASELINE_COUNT}"
+        )
+
+    for feature in p0:
+        label = str(feature.get("id") or feature.get("name") or "<unknown P0 feature>")
+        for field in ("implemented", "tested", "mainnet_ready"):
+            score = feature.get(field)
+            if not isinstance(score, int) or isinstance(score, bool):
+                errors.append(f"{label}: {field} is not an integer")
+            elif score < P0_RELEASE_FLOOR:
+                errors.append(
+                    f"{label}: {field} is {score}; P0 release requires at least "
+                    f"{P0_RELEASE_FLOOR}"
+                )
+
+        blockers = feature.get("blockers", [])
+        if not isinstance(blockers, list):
+            errors.append(f"{label}: blockers is not an array")
+        elif blockers:
+            errors.append(
+                f"{label}: P0 release has {len(blockers)} open blocker"
+                f"{'s' if len(blockers) != 1 else ''}: {'; '.join(map(str, blockers))}"
+            )
+
+        required_tests = feature.get("required_tests", [])
+        if not isinstance(required_tests, list):
+            errors.append(f"{label}: required_tests is not an array")
+            continue
+        if not required_tests and not feature.get("test_evidence"):
+            errors.append(f"{label}: no required test evidence is recorded")
+        for test_name in required_tests:
+            if not isinstance(test_name, str) or not feature_matrix._test_exists(
+                root,
+                feature.get("paths", []),
+                feature.get("test_paths", []),
+                test_name,
+            ):
+                errors.append(f"{label}: required test does not resolve: {test_name}")
+    return errors
+
+
+def audit_artifact_errors(repo_root: pathlib.Path | str) -> list[str]:
+    """Reject generated matrix artifacts that no longer describe their sources."""
+    root = pathlib.Path(repo_root)
+    script = root / "scripts" / "x3_audit_matrix.py"
+    if not script.is_file():
+        return [
+            "generated matrix artifacts cannot be verified: "
+            "scripts/x3_audit_matrix.py is missing"
+        ]
+    result = run([sys.executable, str(script), "--check"], cwd=root)
+    if result.returncode == 0:
+        return []
+    stale = [
+        line.split("missing/stale:", 1)[1].strip()
+        for line in result.stderr.splitlines()
+        if "missing/stale:" in line
+    ]
+    if stale:
+        return [
+            "generated matrix artifacts are missing or stale: "
+            + ", ".join(sorted(stale))
+        ]
+    detail = next(
+        (line.strip() for line in result.stderr.splitlines() if line.strip()),
+        f"x3_audit_matrix.py --check exited {result.returncode}",
+    )
+    return [f"generated matrix artifacts cannot be verified: {detail}"]
+
+
+def check_p0_scope(
+    matrix_path: pathlib.Path | str | None = None,
+    repo_root: pathlib.Path | str | None = None,
+) -> list[str]:
+    """Load and validate the complete P0 release scope."""
+    root = pathlib.Path(repo_root) if repo_root is not None else ROOT
+    matrix_file = (
+        pathlib.Path(matrix_path)
+        if matrix_path is not None
+        else root / "FEATURE_MATRIX.toml"
+    )
+    try:
+        matrix = load_matrix(matrix_file)
+    except (OSError, ValueError) as exc:
+        return [f"P0 release scope cannot be loaded from {matrix_file}: {exc}"]
+    return evaluate_p0_scope(matrix, root) + audit_artifact_errors(root)
 
 
 # ── 1. Required documentation ────────────────────────────────────────────────
@@ -807,6 +924,16 @@ def main() -> int:
     print("═" * 60)
     print("  Mainnet Release Gate")
     print("═" * 60)
+
+    print("\n── 0. P0 release scope ──")
+    p0_errors = check_p0_scope()
+    if p0_errors:
+        for message in p0_errors:
+            fail(message)
+        print(f"\n  ❌ GATE FAILED — {len(p0_errors)} P0 release-contract failure(s)")
+        print(f"{'═' * 60}")
+        return 1
+    ok("all P0 rows meet the 95-point launch contract with current evidence")
 
     # This gate builds the runtime in `runtime/target/srtool` and boots nodes on fixed ports. Two
     # concurrent runs therefore share both, and the second one corrupts the first one's evidence
