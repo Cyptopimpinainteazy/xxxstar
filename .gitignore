@@ -37,6 +37,8 @@ venv/
 .codex
 
 # Local validation/build outputs
+**/dist/
+infra-structure/services/rpc-crawler/crawler_state.json
 /failure-packets/
 target_phase2_validation/
 target_phase3_test/
