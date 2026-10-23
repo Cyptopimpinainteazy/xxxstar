@@ -316,14 +316,18 @@ pub struct CreditUser<'info> {
     pub adapter_entry: Account<'info, AdapterEntry>,
     /// CHECK: adapter config PDA (validated via CPI by adapter program)
     pub adapter_config: AccountInfo<'info>,
+    /// CHECK: Opaque mint forwarded to the registered adapter CPI after kernel-authority authorization; not deserialized here.
     #[account(mut)]
     pub mint: AccountInfo<'info>,
+    /// CHECK: Opaque destination forwarded to the registered adapter CPI; this bridge never reads its token data.
     #[account(mut)]
     pub destination: AccountInfo<'info>,
+    /// CHECK: Adapter authority forwarded to the registered adapter CPI, which enforces its PDA requirements.
     #[account(mut)]
     pub mint_authority: AccountInfo<'info>,
     /// CHECK: this program's own pubkey (passes CPI source check to adapter)
     pub bridge_program: AccountInfo<'info>,
+    /// CHECK: Forwarded to the registered adapter CPI; the adapter validates the token program.
     pub token_program: AccountInfo<'info>,
     pub authority: Signer<'info>,
 }
@@ -342,14 +346,18 @@ pub struct DebitUser<'info> {
     pub adapter_entry: Account<'info, AdapterEntry>,
     /// CHECK: adapter config PDA (validated via CPI)
     pub adapter_config: AccountInfo<'info>,
+    /// CHECK: Opaque mint forwarded to the registered adapter CPI after kernel-authority authorization; not deserialized here.
     #[account(mut)]
     pub mint: AccountInfo<'info>,
+    /// CHECK: Opaque source forwarded to the registered adapter CPI; this bridge never reads its token data.
     #[account(mut)]
     pub source: AccountInfo<'info>,
+    /// CHECK: Adapter authority forwarded to the registered adapter CPI, which enforces its PDA requirements.
     #[account(mut)]
     pub mint_authority: AccountInfo<'info>,
     /// CHECK: this program's own pubkey
     pub bridge_program: AccountInfo<'info>,
+    /// CHECK: Forwarded to the registered adapter CPI; the adapter validates the token program.
     pub token_program: AccountInfo<'info>,
     pub authority: Signer<'info>,
 }

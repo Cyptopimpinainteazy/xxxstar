@@ -9,3 +9,7 @@ members = [
     "programs/x3_receipt_verifier",
 ]
 
+# Anchor 0.30.1 IDL generation needs proc-macro2 1.0.94 in Cargo.lock.
+# The source_file API was removed in proc-macro2 1.0.95.
+[profile.release]
+overflow-checks = true

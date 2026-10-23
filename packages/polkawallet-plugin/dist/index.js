@@ -14,7 +14,11 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -1651,6 +1655,13 @@ function getEnvBoolean(name, defaultValue) {
   const value = getEnv(name, defaultValue.toString());
   return value.toLowerCase() === "true" || value === "1";
 }
+function getEnvOptional(name) {
+  if (typeof process !== "undefined" && process.env) {
+    const value = process.env[name];
+    return value === void 0 || value === "" ? void 0 : value;
+  }
+  return void 0;
+}
 var NETWORK_ENDPOINTS = {
   mainnet: getEnv("X3_RPC_ENDPOINT", "wss://rpc.x3chain.io:9944"),
   testnet: getEnv("X3_RPC_ENDPOINT", "wss://testnet.x3chain.io:9944"),
@@ -1661,7 +1672,7 @@ function getSdkConfig() {
   const network = ["mainnet", "testnet", "local"].includes(networkEnv) ? networkEnv : "local";
   return {
     network,
-    endpoint: getEnv("X3_RPC_ENDPOINT", void 0),
+    endpoint: getEnvOptional("X3_RPC_ENDPOINT"),
     autoReconnect: getEnvBoolean("X3_AUTO_RECONNECT", true),
     reconnectMaxAttempts: getEnvNumber("X3_RECONNECT_MAX", 5),
     reconnectDelay: getEnvNumber("X3_RECONNECT_DELAY", 1e3),
@@ -1675,6 +1686,9 @@ function getCurrentEndpoint() {
 }
 
 // src/core/api.ts
+function toPublicNetwork(network) {
+  return `x3-${network}`;
+}
 var X3ChainApi = class extends import_index.default {
   constructor(config = {}) {
     super();
@@ -1688,7 +1702,7 @@ var X3ChainApi = class extends import_index.default {
     this._config = {
       autoConnect: true,
       timeout: 3e4,
-      network: envConfig.network,
+      network: toPublicNetwork(envConfig.network),
       endpoint: envConfig.endpoint,
       autoReconnect: envConfig.autoReconnect,
       reconnectMaxAttempts: envConfig.reconnectMaxAttempts,
@@ -1713,7 +1727,7 @@ var X3ChainApi = class extends import_index.default {
   }
   /** Get current network */
   get network() {
-    return this._config.network || "local";
+    return this._config.network || "x3-local";
   }
   /**
    * Connect to the x3chain node
@@ -1881,7 +1895,7 @@ async function createX3Api(config = {}) {
 async function createX3ApiFromEnv() {
   const config = getSdkConfig();
   return createX3Api({
-    network: config.network,
+    network: toPublicNetwork(config.network),
     endpoint: config.endpoint,
     autoReconnect: config.autoReconnect,
     reconnectMaxAttempts: config.reconnectMaxAttempts,
