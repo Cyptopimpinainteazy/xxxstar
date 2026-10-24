@@ -797,7 +797,7 @@ fn the_anchor_reports_the_attested_root_and_head() {
         let block_hash = H256::from([1u8; 32]);
         let state_root = H256::from([2u8; 32]);
         let merkle_root = H256::from([4u8; 32]);
-        crate::LastFinalizedEvmHeader::<MockRuntime>::put(crate::EvmHeaderInfo {
+        let header = crate::EvmHeaderInfo {
             block_number,
             block_hash,
             state_root,
@@ -805,7 +805,9 @@ fn the_anchor_reports_the_attested_root_and_head() {
             validator_set_hash: H256::from([3u8; 32]),
             verified_at_block: 1,
             validation_proof: Vec::new(),
-        });
+        };
+        crate::LastFinalizedEvmHeader::<MockRuntime>::put(header.clone());
+        crate::FinalizedEvmHeaders::<MockRuntime>::insert(block_number, header);
         crate::EvmHeaderFinalitySource::<MockRuntime>::put(
             crate::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
         );
@@ -826,9 +828,31 @@ fn the_anchor_reports_the_attested_root_and_head() {
             "depth is measured from the attested head"
         );
 
+        // A newer finalized header does not hide the full evidence for an older
+        // deposit.
+        let newer = crate::EvmHeaderInfo {
+            block_number: block_number + 1,
+            block_hash: H256::from([0x11u8; 32]),
+            state_root: H256::from([0x12u8; 32]),
+            merkle_root: H256::from([0x13u8; 32]),
+            validator_set_hash: H256::from([0x14u8; 32]),
+            verified_at_block: 2,
+            validation_proof: Vec::new(),
+        };
+        crate::LastFinalizedEvmHeader::<MockRuntime>::put(newer.clone());
+        crate::FinalizedEvmHeaders::<MockRuntime>::insert(block_number + 1, newer);
+        assert_eq!(
+            crate::Pallet::<MockRuntime>::attested_head(),
+            Some(block_number + 1)
+        );
+        let older = crate::Pallet::<MockRuntime>::anchored_header(block_number)
+            .expect("the older finalized header remains anchored");
+        assert_eq!(older.block_hash, block_hash.0);
+        assert_eq!(older.state_root, state_root.0);
+
         // A height nobody attested has no anchor, so a proof for it is refused
         // rather than checked against the header it carries.
-        assert!(crate::Pallet::<MockRuntime>::anchored_header(block_number + 1).is_none());
+        assert!(crate::Pallet::<MockRuntime>::anchored_header(block_number + 2).is_none());
     });
 }
 

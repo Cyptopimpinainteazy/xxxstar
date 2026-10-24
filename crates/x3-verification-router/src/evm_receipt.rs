@@ -881,6 +881,9 @@ pub struct EvmReceiptExpectations {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodedProof {
     pub header: EvmBlockHeader,
+    /// The exact consensus encoding of `header`, whose Keccak-256 is the block
+    /// hash the anchor must attest.
+    pub header_rlp: Vec<u8>,
     pub receipt: EvmReceipt,
     /// The receipt's RLP bytes, as the wire format carried them.
     ///
@@ -909,10 +912,12 @@ impl DecodedProof {
         let receipt = take_section(&mut s)?;
         let receipt_index = take_section(&mut s)?;
         let proof = take_section(&mut s)?;
-        let header = EvmBlockHeader::decode(&header)?;
+        let header_rlp = header;
+        let header = EvmBlockHeader::decode(&header_rlp)?;
         let receipt_decoded = EvmReceipt::decode(&receipt)?;
         Ok(Self {
             header,
+            header_rlp,
             receipt_rlp: receipt,
             receipt: receipt_decoded,
             receipt_index,
@@ -1041,6 +1046,11 @@ impl DecodedProof {
             return Err(EvmReceiptError::UnanchoredHeader);
         };
         if anchored.receipts_root != self.header.receipts_root {
+            return Err(EvmReceiptError::UnanchoredHeader);
+        }
+        if anchored.state_root != self.header.state_root
+            || anchored.block_hash != keccak256_32(&self.header_rlp)
+        {
             return Err(EvmReceiptError::UnanchoredHeader);
         }
         let Some(head) = anchor.head() else {
@@ -1708,12 +1718,14 @@ mod tests {
     /// The chain's view of the header a fixture built: its receipts root at its
     /// height, with `head` as the attested head.
     fn anchor_to(receipts_root: [u8; 32], number: u64, head: u64) -> EvmHeaderAnchorSource {
+        let header_rlp = header_with_receipts_root(receipts_root, number);
+        let header = EvmBlockHeader::decode(&header_rlp).expect("fixture header");
         EvmHeaderAnchorSource::Fixed {
             header: AnchoredEvmHeader {
                 number,
                 receipts_root,
-                state_root: [0u8; 32],
-                block_hash: [0u8; 32],
+                state_root: header.state_root,
+                block_hash: keccak256_32(&header_rlp),
             },
             head,
         }
@@ -1947,6 +1959,53 @@ mod tests {
             anchored.verify(&envelope).is_err(),
             "a receipt in the prover's own trie is not a receipt in the chain's block"
         );
+    }
+
+    #[test]
+    fn the_anchor_must_match_state_root_and_block_hash() {
+        let contract = [0x11u8; 20];
+        let receipt = receipt_with_one_log(contract);
+        let key = receipt_trie_key(1);
+        let (receipts_root, proof) = single_leaf_trie(&key, &receipt);
+        let header_rlp = header_with_receipts_root(receipts_root, 100);
+        let header = EvmBlockHeader::decode(&header_rlp).expect("fixture header");
+        let envelope = envelope_for(&header_rlp, &receipt, &[0x01], &proof, contract, 120);
+        let correct = AnchoredEvmHeader {
+            number: 100,
+            receipts_root,
+            state_root: header.state_root,
+            block_hash: keccak256_32(&header_rlp),
+        };
+
+        assert!(anchored_verifier(12, receipts_root, 100, 120)
+            .verify(&envelope)
+            .is_ok());
+
+        let mut wrong_state = correct;
+        wrong_state.state_root[0] ^= 1;
+        let verifier = ProductionEvmReceiptVerifier::with_anchor(
+            12,
+            EvmHeaderAnchorSource::Fixed {
+                header: wrong_state,
+                head: 120,
+            },
+        )
+        .with_source_asset(PREPROOF_TOKEN)
+        .with_expected_nonce(PREPROOF_NONCE);
+        assert!(verifier.verify(&envelope).is_err());
+
+        let mut wrong_hash = correct;
+        wrong_hash.block_hash[0] ^= 1;
+        let verifier = ProductionEvmReceiptVerifier::with_anchor(
+            12,
+            EvmHeaderAnchorSource::Fixed {
+                header: wrong_hash,
+                head: 120,
+            },
+        )
+        .with_source_asset(PREPROOF_TOKEN)
+        .with_expected_nonce(PREPROOF_NONCE);
+        assert!(verifier.verify(&envelope).is_err());
     }
 
     #[test]

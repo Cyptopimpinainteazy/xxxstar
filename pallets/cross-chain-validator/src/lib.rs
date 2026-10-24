@@ -174,6 +174,15 @@ pub mod pallet {
     pub type EvmMerkleRoots<T: Config> =
         StorageMap<_, frame_support::Blake2_128Concat, u64, H256, OptionQuery>;
 
+    /// Full finalized EVM header evidence retained per block number.
+    ///
+    /// Receipt verification binds the block hash and state root as well as the
+    /// receipts root, so retaining only the newest header would make older
+    /// deposits unprovable.
+    #[pallet::storage]
+    pub type FinalizedEvmHeaders<T: Config> =
+        StorageMap<_, frame_support::Blake2_128Concat, u64, EvmHeaderInfo, OptionQuery>;
+
     /// Validator set cache for SVM slots (slot -> validator_set_hash)
     #[pallet::storage]
     pub type SvmValidatorSets<T: Config> =
@@ -494,6 +503,15 @@ pub mod pallet {
                     break;
                 }
             }
+            loop {
+                let removed = FinalizedEvmHeaders::<T>::clear(u32::MAX, None);
+                if removed.unique == 0 && removed.loops == 0 {
+                    break;
+                }
+                if removed.maybe_cursor.is_none() {
+                    break;
+                }
+            }
             LastFinalizedEvmHeader::<T>::kill();
             EvmHeaderFinalitySource::<T>::put(EvmHeaderFinalitySourceKind::Unset);
             EthereumFinalizedCheckpoints::<T>::insert(
@@ -583,7 +601,7 @@ pub mod pallet {
                 );
             }
             let proof_bytes = proof.encode();
-            LastFinalizedEvmHeader::<T>::put(EvmHeaderInfo {
+            let header_info = EvmHeaderInfo {
                 block_number: verified.block_number,
                 block_hash: verified.block_hash,
                 state_root: verified.state_root,
@@ -592,7 +610,9 @@ pub mod pallet {
                 verified_at_block: frame_system::Pallet::<T>::block_number()
                     .saturated_into::<u32>(),
                 validation_proof: proof_bytes,
-            });
+            };
+            LastFinalizedEvmHeader::<T>::put(header_info.clone());
+            FinalizedEvmHeaders::<T>::insert(verified.block_number, header_info);
             EvmHeaderFinalitySource::<T>::put(EvmHeaderFinalitySourceKind::BeaconSyncCommittee);
             EvmMerkleRoots::<T>::insert(verified.block_number, verified.receipts_root);
             ValidationStats::<T>::mutate(|stats| {
@@ -658,7 +678,7 @@ pub mod pallet {
                     Error::<T>::NonMonotonicTimestamp
                 );
             }
-            LastFinalizedEvmHeader::<T>::put(EvmHeaderInfo {
+            let header_info = EvmHeaderInfo {
                 block_number,
                 block_hash,
                 state_root,
@@ -667,7 +687,9 @@ pub mod pallet {
                 verified_at_block: frame_system::Pallet::<T>::block_number()
                     .saturated_into::<u32>(),
                 validation_proof: certificate,
-            });
+            };
+            LastFinalizedEvmHeader::<T>::put(header_info.clone());
+            FinalizedEvmHeaders::<T>::insert(block_number, header_info);
             EvmHeaderFinalitySource::<T>::put(EvmHeaderFinalitySourceKind::AttesterQuorum);
             EvmMerkleRoots::<T>::insert(block_number, receipts_root);
             ValidationStats::<T>::mutate(|stats| {
@@ -1207,18 +1229,12 @@ pub mod pallet {
             {
                 return None;
             }
-            let receipts_root = EvmMerkleRoots::<T>::get(block_number)?;
-            // The state root and block hash are only known for the newest header
-            // this pallet stores; for an older height the receipts root is what
-            // the proof is checked against, and the other two are left zeroed
-            // rather than filled in from something unrelated.
-            let newest = LastFinalizedEvmHeader::<T>::get()
-                .filter(|header| header.block_number == block_number);
+            let finalized = FinalizedEvmHeaders::<T>::get(block_number)?;
             Some(x3_verification_router::evm_receipt::AnchoredEvmHeader {
                 number: block_number,
-                receipts_root: receipts_root.0,
-                state_root: newest.as_ref().map(|h| h.state_root.0).unwrap_or_default(),
-                block_hash: newest.as_ref().map(|h| h.block_hash.0).unwrap_or_default(),
+                receipts_root: finalized.merkle_root.0,
+                state_root: finalized.state_root.0,
+                block_hash: finalized.block_hash.0,
             })
         }
 

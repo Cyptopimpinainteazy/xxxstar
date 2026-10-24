@@ -113,13 +113,16 @@ impl x3_verification_router::evm_receipt::EvmHeaderAnchor for MockEvmAnchor {
 /// Record what this chain has attested: a receipts root at a height, and the
 /// attested head it is measured against.
 pub fn attest_header(receipts_root: [u8; 32], number: u64, head: u64) {
+    let header_rlp = evm_header_rlp(receipts_root, number);
+    let header = x3_verification_router::evm_receipt::EvmBlockHeader::decode(&header_rlp)
+        .expect("test header");
     ATTESTED.with(|cell| {
         *cell.borrow_mut() = Some((
             x3_verification_router::evm_receipt::AnchoredEvmHeader {
                 number,
                 receipts_root,
-                state_root: [0u8; 32],
-                block_hash: [0u8; 32],
+                state_root: header.state_root,
+                block_hash: x3_verification_router::evm_receipt::keccak256_32(&header_rlp),
             },
             head,
         ))
