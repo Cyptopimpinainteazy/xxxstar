@@ -1,5 +1,7 @@
 import assert from 'assert';
-import { cosineSim, normalizeThink } from '../../../../src/llm/ollama.js';
+import ollamaHelpers from '../../../../src/llm/ollama.js';
+
+const { cosineSim, normalizeThink } = ollamaHelpers;
 
 assert.strictEqual(cosineSim([1, 0], [0, 1]), 0, 'orthogonal vectors should score 0');
 assert.strictEqual(cosineSim([1, 1], [1, 1]), 1, 'identical vectors should score 1');
