@@ -222,8 +222,8 @@ bytes**:
 * `6ebdd35bd` — an external root needs a verifier, and the per-asset ledger gets a read
   surface. `register_external_root` accepted any non-empty byte string as "proof against chain
   consensus" and stored the caller's root where the bridge surface trusts it; it now calls
-  `Config::ExternalRootVerifier`, and this runtime wires `RefuseExternalRoots`, so the call
-  fails closed with `ExternalRootVerificationUnavailable` until a per-chain light client exists.
+  `Config::ExternalRootVerifier`. This historical revision wired `RefuseExternalRoots`; the current
+  runtime binds EVM/SVM roots to attested headers and Bitcoin roots to admitted best-chain headers.
   `AtlasKernelRuntimeApi::get_asset_supply_ledger(asset_id)` returns the ledger's own record, so
   the per-asset invariant has a read path over RPC. The bytes move: compact 8,512,083 bytes (was
   8,508,732), `set_code 0xfb92492d…`. Two from-scratch builds agree.
@@ -689,8 +689,8 @@ alters the runtime, so the record and the code land together.
   benchmarks for `set_external_bridge_audit_gate`, `set_external_bridges_enabled` and
   `emergency_pause_bridge`, and a new `UNMEASURABLE_CALL_WEIGHTS` record (with its own staleness
   tripwire and tests in `scripts/swarm/x3_repo_scan.py`) for the four custody-origin-gated calls plus
-  `register_external_root`, which this runtime refuses at its `RefuseExternalRoots` verifier by
-  policy. Scanner `pallet-call-without-weights` reached 4 from 5, and none of the four is high: the
+  `register_external_root`, which that revision refused at its `RefuseExternalRoots` verifier.
+  Scanner `pallet-call-without-weights` reached 4 from 5, and none of the four is high: the
   whole twelve-pallet burndown is closed, leaving only the documented
   `T::DbWeight::get().reads_writes` estimates. The bytes move: compact 8906533
   (`0x80f6336ce883c7b7602b2e14c197bd7b09e4b35258e5dda7d73ccd1848a993ca`) — was 8,905,964 — and
