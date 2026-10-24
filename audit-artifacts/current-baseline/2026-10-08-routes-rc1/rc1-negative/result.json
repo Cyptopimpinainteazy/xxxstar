@@ -1,0 +1,6 @@
+{
+  "result": "FAIL",
+  "commit": "d5b8197e66e61b0230b1d818ce6049eac6022d80",
+  "binary_sha256": "1fcc4bbcc488bc98888634b1c4b9d0b3c2f9b5060c9b9c497dd7790010899298",
+  "error": "non-RC1 pallet present: EvolutionCore (build --features mainnet-rc1)"
+}

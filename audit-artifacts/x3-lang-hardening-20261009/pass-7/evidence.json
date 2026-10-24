@@ -1,0 +1,78 @@
+{
+  "scope": "Decode common string escapes, preserve decoded values while formatting, and reject malformed strings without UTF-8 slicing panic",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files_changed_this_pass": [
+      "x3-lang/crates/x3-lexer/src/lexer.rs",
+      "x3-lang/compiler/src/formatter.rs",
+      "x3-lang/compiler/tests/test_parser_coverage.rs"
+    ],
+    "source_sha256": {
+      "x3-lang/crates/x3-lexer/src/lexer.rs": "aa7ee929fbe283b2aab359a3b30b9a948498d5c1a8108dd6f54e57dec7b07e01",
+      "x3-lang/compiler/src/formatter.rs": "37104a12d2c50459b080709fa0c01eb0f04d56c60f2a2fec9c98fbc0024c95e3",
+      "x3-lang/compiler/tests/test_parser_coverage.rs": "5fadbea20d5b84f765bc625d0727bafb8ffed001b585898b02df936f48523b14"
+    }
+  },
+  "status": "PASS for common string escapes, formatter round trips, malformed-input rejection and preserved address safety",
+  "supported_escapes": [
+    "escaped quote",
+    "escaped backslash",
+    "newline",
+    "carriage return",
+    "tab",
+    "NUL"
+  ],
+  "boundaries": [
+    "Unsupported escape spellings fail lexically",
+    "No runtime locals or external-chain execution certification"
+  ],
+  "fixture_correction": "Asset address with decoded backslash was correctly rejected; replaced invalid VM fixture with compiler regression preserving unsafe-address refusal before and after formatting.",
+  "rust_tests": {
+    "passed": 1392,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 99
+  },
+  "python_tests": {
+    "passed": 23,
+    "failed": 0
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang/tests",
+      "exit_code": 0
+    }
+  ],
+  "scan": {
+    "scope": "x3-lang excluding build and dependency directories",
+    "matches": 71,
+    "result": "Historical comments, test mocks and simulation paths remain; no repository-wide clean-code certification."
+  },
+  "warning": "Historical dirty-checkout evidence only. The recorded PASS and source hashes are not verified against this PR head or current master and must not be used as current release certification."
+}

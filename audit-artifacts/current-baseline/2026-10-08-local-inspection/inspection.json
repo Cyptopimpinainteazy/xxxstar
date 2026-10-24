@@ -1,0 +1,141 @@
+{
+  "scope": "Inspection of pasted readiness audit against the current dirty local checkout; no source fixes requested or made",
+  "head": "492a0d2bf4d77f32f7257e7900335858139ea5f9",
+  "branch": "feat/x3gpu1-dual-gpu-accel",
+  "git_status_entries": 1162,
+  "environment": {
+    "python": "3.12.3",
+    "postgres_image": "postgres:16-alpine"
+  },
+  "local_ci_command": "bash scripts/local-ci.sh --only fake-code-scan,external-paths-disabled,feature-matrix-check,matrix-test-evidence,migration-modules-wired,claims-hygiene,ops-artifacts --jobs 2 --cargo-jobs 2",
+  "local_ci": {
+    "stamp": "20261008T070048Z",
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "492a0d2bf",
+    "working_tree": "dirty",
+    "jobs": 2,
+    "cargo_jobs": 2,
+    "result": "FAIL",
+    "touched_files": 0,
+    "gates": [
+      {
+        "name": "fake-code scan",
+        "result": "FAIL",
+        "seconds": 11,
+        "reason": "",
+        "log": "local-ci-20261008T070048Z-fake-code-scan.log"
+      },
+      {
+        "name": "matrix test evidence",
+        "result": "PASS",
+        "seconds": 22,
+        "reason": "",
+        "log": "local-ci-20261008T070048Z-matrix-test-evidence.log"
+      },
+      {
+        "name": "migration modules wired",
+        "result": "PASS",
+        "seconds": 0,
+        "reason": "",
+        "log": "local-ci-20261008T070048Z-migration-modules-wired.log"
+      },
+      {
+        "name": "external paths disabled",
+        "result": "PASS",
+        "seconds": 1,
+        "reason": "",
+        "log": "local-ci-20261008T070048Z-external-paths-disabled.log"
+      },
+      {
+        "name": "feature matrix check",
+        "result": "PASS",
+        "seconds": 55,
+        "reason": "",
+        "log": "local-ci-20261008T070048Z-feature-matrix-check.log"
+      },
+      {
+        "name": "claims hygiene",
+        "result": "FAIL",
+        "seconds": 132,
+        "reason": "",
+        "log": "local-ci-20261008T070048Z-claims-hygiene.log"
+      },
+      {
+        "name": "ops artifacts",
+        "result": "PASS",
+        "seconds": 0,
+        "reason": "",
+        "log": "local-ci-20261008T070048Z-ops-artifacts.log"
+      }
+    ]
+  },
+  "postgres_probe": {
+    "method": "Fresh disposable PostgreSQL container; apply every gateway migration with psql ON_ERROR_STOP=1; compare public tables to db.rs SQL references",
+    "migration_exit_code": 0,
+    "created_tables": [
+      "funding_swarm_events",
+      "funding_swarm_grants",
+      "funding_swarm_publications"
+    ],
+    "missing_tables": [
+      "accounts",
+      "approval_cases",
+      "benchmark_reports",
+      "blocks",
+      "comit_transactions",
+      "events",
+      "evidence_bundles",
+      "extrinsics",
+      "orchestra_intents",
+      "vote_receipts",
+      "vote_windows"
+    ],
+    "container_removed": true,
+    "limitation": "Direct SQL schema check, not a Rust Database::connect integration test"
+  },
+  "findings": [
+    {
+      "priority": "P0",
+      "finding": "Default runtime EVM storage is not persistent",
+      "sources": [
+        "runtime/src/lib.rs:1813",
+        "pallets/x3-kernel/src/wasm_adapters.rs:447",
+        "crates/evm-integration/src/mini_evm.rs:102"
+      ],
+      "evidence": "Source inspection; existing regression test was read, not run"
+    },
+    {
+      "priority": "P1",
+      "finding": "Fresh gateway schema lacks eleven production API tables",
+      "evidence": "Live PostgreSQL migration probe"
+    },
+    {
+      "priority": "P1",
+      "finding": "Two selected local-CI guards fail",
+      "evidence": "fake-code marker count 1185 -> 1186; six unqualified performance claims"
+    },
+    {
+      "priority": "P1",
+      "finding": "Existing Rust distributed supply test only covers Native -> EVM, not complete six-route negative matrix",
+      "evidence": "Source inspection; TESTNET_GAP_LEDGER.md:2061"
+    },
+    {
+      "priority": "release boundary",
+      "finding": "External settlement closed by default and permissionless validator staking explicitly out of scope",
+      "evidence": "External-path guard PASS; LAUNCH_SCOPE.md:61"
+    }
+  ],
+  "mainnet_check": {
+    "command": "make mainnet-check",
+    "result": "Interrupted by this agent during node release compilation; no build or release PASS established",
+    "reason": "This inspection used a heavily dirty checkout with another agent active, not a clean exact-commit baseline"
+  },
+  "not_run": [
+    "full local-ci",
+    "runtime-variant build suite",
+    "cargo check/test/clippy workspace",
+    "frontend full tests/builds",
+    "live multi-validator/VM tests"
+  ],
+  "completion_percent": "No verified project-wide percentage established"
+}

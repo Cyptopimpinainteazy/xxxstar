@@ -1,0 +1,67 @@
+{
+  "scope": "Exact byte spans for malformed integers, unexpected primary expressions, identifiers and expected-token failures including EOF",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files_changed_this_pass": [
+      "x3-lang/compiler/src/parser.rs",
+      "x3-lang/compiler/tests/test_parser_coverage.rs"
+    ],
+    "source_sha256": {
+      "x3-lang/compiler/src/parser.rs": "d7a1b9ce9dd7504646973475cfea5783289d284230323a9fd5c35e84933b2586",
+      "x3-lang/compiler/tests/test_parser_coverage.rs": "2b54b0671a6149200a361f9561f19b352ca33cd46faa957d309369aed9078c1e"
+    }
+  },
+  "status": "PASS for common parser error byte spans",
+  "boundaries": [
+    "Other legacy parser-helper errors and semantic diagnostics still need span propagation",
+    "No runtime locals or release certification"
+  ],
+  "rust_tests": {
+    "passed": 1395,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 99
+  },
+  "python_tests": {
+    "passed": 23,
+    "failed": 0
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang/tests",
+      "exit_code": 0
+    }
+  ],
+  "scan": {
+    "scope": "x3-lang excluding build and dependency directories",
+    "matches": 71,
+    "result": "Historical comments, test mocks and simulations remain; no repository-wide clean-code certification."
+  },
+  "warning": "Historical dirty-checkout evidence only. The recorded PASS and source hashes are not verified against this PR head or current master and must not be used as current release certification."
+}
