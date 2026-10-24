@@ -26,6 +26,8 @@ first_line="${COMMENT_BODY:-}"
 first_line="${first_line%%$'\n'*}"
 first_line="${first_line%$'\r'}"
 read -r word rest <<<"$first_line" || true
+# `/Review` passes the workflow's startsWith('/') gate; match it too.
+word="${word,,}"
 
 case "$word" in
   /review|/improve|/describe)
