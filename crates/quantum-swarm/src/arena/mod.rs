@@ -22,6 +22,8 @@ pub use tournament::{MatchResult, Tournament, TournamentResult, TournamentType};
 use crate::error::{SwarmError, SwarmResult};
 use crate::evolution::{EvolutionConfig, EvolutionEngine, Genome};
 use crate::types::{StrategyId, TournamentId};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -77,20 +79,27 @@ pub struct Arena {
     tournaments_completed: u64,
     /// Total eliminations
     total_eliminations: u64,
+    /// Deterministic tournament and breeding source.
+    rng: ChaCha20Rng,
 }
 
 impl Arena {
     /// Create new arena
     pub fn new(config: ArenaConfig) -> Self {
         let evolution = EvolutionEngine::new(config.evolution_config.clone());
+        let seed = config.evolution_config.seed;
         Self {
-            scheduler: ArenaScheduler::new(config.rounds_per_tournament),
+            scheduler: ArenaScheduler::with_seed(
+                config.rounds_per_tournament,
+                seed ^ 0x9e37_79b9_7f4a_7c15,
+            ),
             archive: Archive::new(config.archive_capacity),
             evolution,
             config,
             combatants: HashMap::new(),
             tournaments_completed: 0,
             total_eliminations: 0,
+            rng: ChaCha20Rng::seed_from_u64(seed ^ 0xd1b5_4a32_d192_ed03),
         }
     }
 
@@ -128,15 +137,16 @@ impl Arena {
 
     /// Run a tournament
     pub fn run_tournament(&mut self) -> SwarmResult<TournamentResult> {
-        let tournament_id = TournamentId::new_v4();
+        let tournament_id = TournamentId::from_bytes(self.rng.gen::<[u8; 16]>());
 
         // Get active combatant IDs and count
-        let active_ids: Vec<_> = self
+        let mut active_ids: Vec<_> = self
             .combatants
             .iter()
             .filter(|(_, c)| c.is_active())
             .map(|(id, _)| *id)
             .collect();
+        active_ids.sort();
         let participants = active_ids.len();
 
         if participants < 2 {
@@ -187,6 +197,7 @@ impl Arena {
             b.elo
                 .partial_cmp(&a.elo)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
         });
 
         let ranking_map: HashMap<_, _> = rankings
@@ -306,6 +317,7 @@ impl Arena {
             a.elo
                 .partial_cmp(&b.elo)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
         });
 
         // Mark bottom for elimination
@@ -346,7 +358,11 @@ impl Arena {
             .filter(|c| c.is_active())
             .map(|c| (c.elo, c.genome.clone()))
             .collect();
-        winners.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        winners.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.1.id.cmp(&b.1.id))
+        });
 
         let parent_pool_size = (winners.len() / 2).max(2);
         let parents: Vec<Genome> = winners
@@ -362,18 +378,17 @@ impl Arena {
             }
 
             // Select two random parents
-            let p1_idx = rand::random::<usize>() % parents.len();
-            let p2_idx =
-                (p1_idx + 1 + rand::random::<usize>() % (parents.len() - 1)) % parents.len();
+            let p1_idx = self.rng.gen_range(0..parents.len());
+            let p2_idx = (p1_idx + 1 + self.rng.gen_range(0..(parents.len() - 1))) % parents.len();
 
             let parent1 = &parents[p1_idx];
             let parent2 = &parents[p2_idx];
 
             // Crossover
-            let mut child = parent1.crossover(parent2);
+            let mut child = parent1.crossover_with_rng(parent2, &mut self.rng);
 
             // Mutate
-            child.mutate(&self.config.evolution_config.mutation);
+            child.mutate_with_rng(&self.config.evolution_config.mutation, &mut self.rng);
 
             // Register child
             if self.register(child).is_ok() {
@@ -391,7 +406,9 @@ impl Arena {
 
     /// Get all active combatants
     pub fn active_combatants(&self) -> Vec<&Combatant> {
-        self.combatants.values().filter(|c| c.is_active()).collect()
+        let mut active: Vec<_> = self.combatants.values().filter(|c| c.is_active()).collect();
+        active.sort_by_key(|combatant| combatant.id);
+        active
     }
 
     /// Get leaderboard
@@ -401,6 +418,7 @@ impl Arena {
             b.elo
                 .partial_cmp(&a.elo)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
         });
         active.into_iter().take(top_n).collect()
     }
@@ -412,7 +430,8 @@ impl Arena {
 
     /// Get statistics
     pub fn stats(&self) -> ArenaStats {
-        let active_count = self.combatants.values().filter(|c| c.is_active()).count();
+        let active = self.active_combatants();
+        let active_count = active.len();
         let total_matches: usize = self
             .combatants
             .values()
@@ -421,12 +440,7 @@ impl Arena {
             / 2; // Each match counted twice
 
         let avg_elo = if active_count > 0 {
-            self.combatants
-                .values()
-                .filter(|c| c.is_active())
-                .map(|c| c.elo)
-                .sum::<f64>()
-                / active_count as f64
+            active.iter().map(|combatant| combatant.elo).sum::<f64>() / active_count as f64
         } else {
             1200.0
         };

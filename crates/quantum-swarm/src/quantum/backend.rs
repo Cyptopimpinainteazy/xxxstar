@@ -10,7 +10,8 @@ use crate::error::{SwarmError, SwarmResult};
 use crate::types::{ExternalBackend, QuantumResult};
 use async_trait::async_trait;
 use num_complex::Complex64;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use std::collections::HashMap;
 
 /// Capabilities of a quantum backend
@@ -71,13 +72,19 @@ pub trait QuantumBackend: Send + Sync {
 pub struct LocalSimulator {
     max_qubits: usize,
     name: String,
+    sample_seed: u64,
 }
 
 impl LocalSimulator {
     pub fn new(max_qubits: usize) -> Self {
+        Self::with_seed(max_qubits, 0)
+    }
+
+    pub fn with_seed(max_qubits: usize, sample_seed: u64) -> Self {
         Self {
             max_qubits,
             name: "LocalStatevectorSimulator".to_string(),
+            sample_seed,
         }
     }
 
@@ -162,7 +169,7 @@ impl LocalSimulator {
 
     /// Sample from statevector
     fn sample(&self, state: &[Complex64], shots: usize) -> HashMap<String, u64> {
-        let mut rng = rand::thread_rng();
+        let mut rng = ChaCha20Rng::seed_from_u64(self.sample_seed);
         let mut counts = HashMap::new();
         let num_qubits = (state.len() as f64).log2() as usize;
 
@@ -436,6 +443,26 @@ mod tests {
 
         assert!(count_0 > 400 && count_0 < 600);
         assert!(count_1 > 400 && count_1 < 600);
+    }
+
+    #[tokio::test]
+    async fn same_seed_produces_identical_measurements() {
+        let circuit = CircuitBuilder::new(3)
+            .h(0)
+            .cnot(0, 1)
+            .cnot(1, 2)
+            .measure_all()
+            .build();
+        let first = LocalSimulator::with_seed(20, 42)
+            .execute(&circuit, 512)
+            .await
+            .unwrap();
+        let second = LocalSimulator::with_seed(20, 42)
+            .execute(&circuit, 512)
+            .await
+            .unwrap();
+
+        assert_eq!(first.counts, second.counts);
     }
 
     #[test]

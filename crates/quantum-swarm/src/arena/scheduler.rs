@@ -7,6 +7,8 @@
 
 use super::combatant::Combatant;
 use crate::types::StrategyId;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 
 /// A scheduled match
@@ -29,14 +31,22 @@ pub struct ArenaScheduler {
     rounds: usize,
     /// Current match counter
     match_counter: usize,
+    /// Deterministic shuffle source.
+    rng: ChaCha20Rng,
 }
 
 impl ArenaScheduler {
     /// Create new scheduler
     pub fn new(rounds: usize) -> Self {
+        Self::with_seed(rounds, 0)
+    }
+
+    /// Create a scheduler with an explicit deterministic seed.
+    pub fn with_seed(rounds: usize, seed: u64) -> Self {
         Self {
             rounds,
             match_counter: 0,
+            rng: ChaCha20Rng::seed_from_u64(seed),
         }
     }
 
@@ -113,6 +123,7 @@ impl ArenaScheduler {
             b.elo
                 .partial_cmp(&a.elo)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
         });
 
         let ids: Vec<_> = sorted.iter().map(|c| c.id).collect();
@@ -143,6 +154,7 @@ impl ArenaScheduler {
             b.elo
                 .partial_cmp(&a.elo)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
         });
 
         let ids: Vec<_> = sorted.iter().map(|c| c.id).collect();
@@ -163,10 +175,10 @@ impl ArenaScheduler {
     }
 
     /// Simple Fisher-Yates shuffle
-    fn shuffle<T>(&self, slice: &mut [T]) {
+    fn shuffle<T>(&mut self, slice: &mut [T]) {
         let n = slice.len();
         for i in (1..n).rev() {
-            let j = rand::random::<usize>() % (i + 1);
+            let j = self.rng.gen_range(0..=i);
             slice.swap(i, j);
         }
     }

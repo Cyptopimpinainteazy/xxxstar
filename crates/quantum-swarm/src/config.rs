@@ -7,6 +7,9 @@ use std::time::Duration;
 /// Main configuration for the Quantum Swarm
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuantumSwarmConfig {
+    /// Deterministic seed for evolution, selection, arena, and simulation.
+    #[serde(default)]
+    pub simulation_seed: u64,
     /// Operating mode
     pub mode: OperatingMode,
     /// Logging level
@@ -30,6 +33,7 @@ pub struct QuantumSwarmConfig {
 impl Default for QuantumSwarmConfig {
     fn default() -> Self {
         Self {
+            simulation_seed: 0,
             mode: OperatingMode::SuperYolo,
             log_level: LogLevel::Full,
             quantum: QuantumConfig::default(),

@@ -116,18 +116,33 @@ impl QuantumSwarmExecutor {
         let quantum_config = config.quantum.clone();
 
         // Use defaults from the actual module types (not config module types)
-        let evolution_config = crate::evolution::EvolutionConfig::default();
-        let arena_config = crate::arena::ArenaConfig::default();
+        let evolution_config = crate::evolution::EvolutionConfig {
+            seed: config.simulation_seed,
+            ..Default::default()
+        };
+        let arena_config = crate::arena::ArenaConfig {
+            evolution_config: evolution_config.clone(),
+            ..Default::default()
+        };
 
         Self {
             mode: ExecutorMode::Hybrid,
             state: ExecutorState::Idle,
             evolution: EvolutionEngine::new(evolution_config),
             arena: Arena::new(arena_config),
-            quantum_backend: Box::new(LocalSimulator::new(quantum_config.max_qubits)),
-            qaoa: QaoaOptimizer::new(crate::quantum::QaoaConfig::default()),
-            vqe: VqeOptimizer::new(crate::quantum::VqeConfig::default()),
-            qubo: QuboSolver::new(),
+            quantum_backend: Box::new(LocalSimulator::with_seed(
+                quantum_config.max_qubits,
+                config.simulation_seed,
+            )),
+            qaoa: QaoaOptimizer::new(crate::quantum::QaoaConfig {
+                seed: config.simulation_seed,
+                ..Default::default()
+            }),
+            vqe: VqeOptimizer::new(crate::quantum::VqeConfig {
+                seed: config.simulation_seed,
+                ..Default::default()
+            }),
+            qubo: QuboSolver::new().with_seed(config.simulation_seed),
             strategies: HashMap::new(),
             strategy_builder: None,
             stats: ExecutorStats::default(),
@@ -430,6 +445,53 @@ mod tests {
     use super::*;
     use crate::strategy::{ArbitrageConfig, ArbitrageStrategy};
 
+    fn arbitrage_config() -> ArbitrageConfig {
+        ArbitrageConfig {
+            min_profit_bps: 10,
+            max_position: 100_000,
+            venues: vec!["Uniswap".into(), "Sushiswap".into()],
+            cross_chain: false,
+        }
+    }
+
+    fn market_data() -> MarketData {
+        let mut market_data = MarketData::default();
+        market_data.prices.insert("ETH".to_string(), 2000.0);
+        market_data.prices.insert("BTC".to_string(), 50000.0);
+        market_data.venue_prices.insert(
+            "Uniswap".into(),
+            [("ETH".to_string(), 2_000.0), ("BTC".to_string(), 50_000.0)]
+                .into_iter()
+                .collect(),
+        );
+        market_data.venue_prices.insert(
+            "Sushiswap".into(),
+            [("ETH".to_string(), 2_010.0), ("BTC".to_string(), 50_100.0)]
+                .into_iter()
+                .collect(),
+        );
+        market_data
+    }
+
+    fn seeded_executor(seed: u64) -> QuantumSwarmExecutor {
+        let config = QuantumSwarmConfig {
+            simulation_seed: seed,
+            ..Default::default()
+        };
+        let mut executor = QuantumSwarmExecutor::new(config);
+        let arbitrage = arbitrage_config();
+        executor.set_strategy_builder(move |genome| {
+            Ok(Box::new(ArbitrageStrategy::new(
+                genome.clone(),
+                arbitrage.clone(),
+            )))
+        });
+        executor
+            .initialize(&Genome::new_float(5, 0.0, 1.0))
+            .expect("initialize");
+        executor
+    }
+
     #[test]
     fn test_executor_creation() {
         let config = QuantumSwarmConfig::default();
@@ -451,39 +513,8 @@ mod tests {
 
     #[test]
     fn test_executor_step() {
-        let config = QuantumSwarmConfig::default();
-        let mut executor = QuantumSwarmExecutor::new(config);
-        let arbitrage = ArbitrageConfig {
-            min_profit_bps: 10,
-            max_position: 100_000,
-            venues: vec!["Uniswap".into(), "Sushiswap".into()],
-            cross_chain: false,
-        };
-        executor.set_strategy_builder(move |genome| {
-            Ok(Box::new(ArbitrageStrategy::new(
-                genome.clone(),
-                arbitrage.clone(),
-            )))
-        });
-
-        let template = Genome::new_float(5, 0.0, 1.0);
-        executor.initialize(&template).unwrap();
-
-        let mut market_data = MarketData::default();
-        market_data.prices.insert("ETH".to_string(), 2000.0);
-        market_data.prices.insert("BTC".to_string(), 50000.0);
-        market_data.venue_prices.insert(
-            "Uniswap".into(),
-            [("ETH".to_string(), 2_000.0), ("BTC".to_string(), 50_000.0)]
-                .into_iter()
-                .collect(),
-        );
-        market_data.venue_prices.insert(
-            "Sushiswap".into(),
-            [("ETH".to_string(), 2_010.0), ("BTC".to_string(), 50_100.0)]
-                .into_iter()
-                .collect(),
-        );
+        let mut executor = seeded_executor(0);
+        let market_data = market_data();
 
         let first = executor.step(&market_data).unwrap();
         let second = executor
@@ -498,6 +529,44 @@ mod tests {
             .is_some_and(|tournament| tournament.new_births > 0));
         assert_eq!(second.strategies_evaluated, first.strategies_evaluated);
         assert!(executor.stats.best_fitness > 0.0);
+    }
+
+    #[test]
+    fn same_seed_reproduces_population_tournament_and_births() {
+        let run = || {
+            let mut executor = seeded_executor(42);
+            let market_data = market_data();
+            let first = executor.step(&market_data).expect("first step");
+            let second = executor.step(&market_data).expect("second step");
+
+            let mut population: Vec<_> = executor
+                .evolution
+                .population()
+                .iter()
+                .map(|genome| (genome.id, format!("{:?}", genome.genes)))
+                .collect();
+            population.sort_by_key(|(id, _)| *id);
+            let mut active: Vec<_> = executor
+                .arena
+                .active_combatants()
+                .into_iter()
+                .map(|combatant| combatant.id)
+                .collect();
+            active.sort();
+
+            let matches = |step: &StepResult| {
+                step.tournament_result
+                    .as_ref()
+                    .expect("tournament")
+                    .matches
+                    .iter()
+                    .map(|result| (result.match_id, result.winner, result.loser))
+                    .collect::<Vec<_>>()
+            };
+            (matches(&first), matches(&second), population, active)
+        };
+
+        assert_eq!(run(), run());
     }
 
     #[test]
