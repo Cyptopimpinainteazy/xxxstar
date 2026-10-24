@@ -286,12 +286,28 @@ pub struct EthereumFinalizedCheckpoint {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct VerifiedEthereumExecutionHeader {
     pub beacon_slot: u64,
     pub block_number: u64,
     pub block_hash: H256,
     pub state_root: H256,
     pub receipts_root: H256,
+}
+
+impl VerifiedEthereumExecutionHeader {
+    pub fn matches_evm_header(
+        &self,
+        block_number: u64,
+        block_hash: [u8; 32],
+        state_root: [u8; 32],
+        receipts_root: [u8; 32],
+    ) -> bool {
+        self.block_number == block_number
+            && self.block_hash.to_fixed_bytes() == block_hash
+            && self.state_root.to_fixed_bytes() == state_root
+            && self.receipts_root.to_fixed_bytes() == receipts_root
+    }
 }
 
 pub fn initialize_ethereum_beacon(
@@ -1177,6 +1193,36 @@ mod tests {
                 "2a2c82ec07ed78ee7495aef5ee3b2c3fd4959cfd1f16bac86edff12ae03defc4"
             ))
         );
+        assert!(verified.matches_evm_header(
+            verified.block_number,
+            verified.block_hash.to_fixed_bytes(),
+            verified.state_root.to_fixed_bytes(),
+            verified.receipts_root.to_fixed_bytes(),
+        ));
+        assert!(!verified.matches_evm_header(
+            verified.block_number + 1,
+            verified.block_hash.to_fixed_bytes(),
+            verified.state_root.to_fixed_bytes(),
+            verified.receipts_root.to_fixed_bytes(),
+        ));
+        assert!(!verified.matches_evm_header(
+            verified.block_number,
+            [1u8; 32],
+            verified.state_root.to_fixed_bytes(),
+            verified.receipts_root.to_fixed_bytes(),
+        ));
+        assert!(!verified.matches_evm_header(
+            verified.block_number,
+            verified.block_hash.to_fixed_bytes(),
+            [2u8; 32],
+            verified.receipts_root.to_fixed_bytes(),
+        ));
+        assert!(!verified.matches_evm_header(
+            verified.block_number,
+            verified.block_hash.to_fixed_bytes(),
+            verified.state_root.to_fixed_bytes(),
+            [3u8; 32],
+        ));
     }
 
     #[test]

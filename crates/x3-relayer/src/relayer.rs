@@ -19,6 +19,7 @@ use x3_gateway_risk_engine::{GatewayRiskEngine, RiskPolicy, RouteRiskInput};
 use x3_proof_dispute::{DisputeStatus, DisputeTracker};
 use x3_validator_attestation::{Attestation, AttestationSet, ValidatorId};
 use x3_verification_router::{
+    ethereum_beacon::VerifiedEthereumExecutionHeader,
     evm_receipt::{AnchoredEvmHeader, EvmHeaderAnchorSource},
     ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, SolanaCluster,
     SolanaStakeWeightedVerifier, SolanaValidatorStake, VerificationRouter, VerificationStrategy,
@@ -74,6 +75,7 @@ struct RelayerInternalState {
 #[derive(Clone)]
 struct PendingEvmReceipt {
     finalized_block: u64,
+    verified_header: VerifiedEthereumExecutionHeader,
     proof_payload: Vec<u8>,
     expected_recipient: Vec<u8>,
     expected_amount: u128,
@@ -217,6 +219,7 @@ impl RelayerService {
         &self,
         domain_id: u32,
         finalized_block: u64,
+        verified_header: VerifiedEthereumExecutionHeader,
         proof_payload: Vec<u8>,
         expected_recipient: Vec<u8>,
         expected_amount: u128,
@@ -227,6 +230,9 @@ impl RelayerService {
         if expected_recipient.len() != 20 {
             anyhow::bail!("EVM deposit recipient must be 20 bytes");
         }
+        if verified_header.block_number != finalized_block {
+            anyhow::bail!("verified beacon header does not match the finalized block");
+        }
         self.state
             .write()
             .await
@@ -235,6 +241,7 @@ impl RelayerService {
             .or_default()
             .push(PendingEvmReceipt {
                 finalized_block,
+                verified_header,
                 proof_payload,
                 expected_recipient,
                 expected_amount,
@@ -546,13 +553,28 @@ impl RelayerService {
                         .await
                         .proofs_failed
                         .min(u64::from(u32::MAX)) as u32;
+                    let beacon_header = &pending.verified_header;
+                    if !beacon_header.matches_evm_header(
+                        block_number,
+                        block_hash,
+                        state_root,
+                        receipts_root,
+                    ) {
+                        warn!(
+                            "Verified beacon header for domain {} block {} disagrees with the RPC header",
+                            domain_id, block_number
+                        );
+                        let mut metrics = self.metrics.write().await;
+                        metrics.proofs_failed += 1;
+                        continue;
+                    }
                     if let Err(reason) = self.safety_pipeline.evaluate_evm_proof_against_header(
                         &proof,
                         AnchoredEvmHeader {
-                            number: block_number,
-                            receipts_root,
-                            state_root,
-                            block_hash,
+                            number: beacon_header.block_number,
+                            receipts_root: beacon_header.receipts_root.to_fixed_bytes(),
+                            state_root: beacon_header.state_root.to_fixed_bytes(),
+                            block_hash: beacon_header.block_hash.to_fixed_bytes(),
                         },
                         attested_head,
                         recent_failures,
