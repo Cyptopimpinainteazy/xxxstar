@@ -107,6 +107,7 @@ impl SvmHeaderWatcher {
                         block_number: slot,
                         block_hash: blockhash,
                         state_root: [0u8; 32], // Solana doesn't have explicit state root
+                        receipts_root: [0u8; 32],
                         timestamp,
                         chain_id: self.config.x3_domain_id, // Use domain_id as chain identifier
                     });

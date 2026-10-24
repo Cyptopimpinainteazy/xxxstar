@@ -14,6 +14,7 @@
 
 pub mod annotations;
 pub mod arb;
+pub mod automation_lowering;
 pub mod cost;
 pub mod dag;
 pub mod diagnostic;

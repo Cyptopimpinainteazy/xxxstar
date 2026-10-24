@@ -79,7 +79,5 @@ update, which means updating this file, the manifest, the pallet constants and t
 1. Validator payout path from the security reserve (`X3_VALIDATOR_SECURITY_RESERVE`) — not implemented.
 2. Tip/priority-fee routing — not implemented; Alpha burns 100%.
 3. Dynamic fee multiplier — deliberately deferred; Alpha is static.
-4. `node/src/chain_spec.rs` fee constants use a `NANO_ATLAS` ladder (1 X3 = 10^9) while the token
-   decimals above are 12; `crates/x3-rpc/src/wallet_service_rpc.rs` carries a `10^18` literal labelled
-   "1 X3". Neither is reconciled by this policy and both are launch hazards.
-5. `pallets/x3-coin` `X3_ASSET_ID = 0` while the deployment manifest says `asset_id: 1000`.
+4. The former token-scale and asset-id mismatches are reconciled by the economic gate: the only
+   accepted unit is `1 X3 = 10^12`, and the pallet and deployment manifest both use asset id `0`.

@@ -98,18 +98,18 @@ pub mod pallet {
         ) -> Result<(ActionOutcome, Weight, [u8; 64]), DispatchError>;
     }
 
-    /// Default evaluator that always returns false — safe no-op.
-    pub struct NoopCustomEvaluator;
-    impl CustomConditionEvaluator for NoopCustomEvaluator {
+    /// Default evaluator that refuses every custom condition.
+    pub struct RefuseCustomEvaluator;
+    impl CustomConditionEvaluator for RefuseCustomEvaluator {
         fn evaluate(_data: &[u8; 64]) -> bool {
             false
         }
     }
 
-    /// No-op oracle that always returns `None` — safe default when no oracle
+    /// Unavailable oracle that always returns `None` — safe default when no oracle
     /// is configured. Policy conditions depending on price will never trigger.
-    pub struct NoopOracle;
-    impl OracleProvider for NoopOracle {
+    pub struct UnavailableOracle;
+    impl OracleProvider for UnavailableOracle {
         fn get_price(_asset_id: &[u8]) -> Option<u128> {
             None
         }
@@ -173,7 +173,7 @@ pub mod pallet {
         /// Oracle provider for price-feed conditions.
         type Oracle: OracleProvider;
 
-        /// Custom condition evaluator (default: NoopCustomEvaluator).
+        /// Custom condition evaluator (default: RefuseCustomEvaluator).
         type CustomEvaluator: CustomConditionEvaluator;
 
         /// Executes task actions. Every effect a task can have goes through here.
@@ -582,7 +582,7 @@ pub mod pallet {
                 | Action::TransferLedgerAsset { amount, .. } => {
                     ensure!(*amount > 0, Error::<T>::InvalidTask);
                 }
-                Action::Noop => {}
+                Action::NoChange => {}
                 Action::Custom(data) => {
                     ensure!(!data.is_empty(), Error::<T>::InvalidTask);
                 }

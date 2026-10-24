@@ -2,6 +2,7 @@
 
 use crate::chromosome::Chromosome;
 use crate::error::{EvolutionError, Result};
+use crate::simulator::{MarketTick, SimulationConfig, SimulationResult, Simulator};
 use serde::{Deserialize, Serialize};
 
 /// Fitness score with multiple components
@@ -31,6 +32,16 @@ pub struct FitnessScore {
     pub volatility: f64,
     /// Custom score component
     pub custom: f64,
+    /// VM gas consumed by the evaluated strategy.
+    pub execution_gas: u64,
+    /// VM instructions executed by the evaluated strategy.
+    pub execution_instructions: u64,
+    /// Wall-clock time spent evaluating the strategy, in milliseconds.
+    pub execution_latency_ms: f64,
+    /// Canonical accounting-state hash produced by a simulation evaluator.
+    pub simulation_state_hash: [u8; 32],
+    /// Digest of the canonical simulation receipt.
+    pub simulation_receipt_hash: [u8; 32],
 }
 
 impl FitnessScore {
@@ -79,6 +90,11 @@ impl FitnessScore {
             avg_trade: 0.0,
             volatility: 0.0,
             custom: 0.0,
+            execution_gas: 0,
+            execution_instructions: 0,
+            execution_latency_ms: 0.0,
+            simulation_state_hash: [0u8; 32],
+            simulation_receipt_hash: [0u8; 32],
         }
     }
 
@@ -140,189 +156,58 @@ impl PnLFitness {
         self
     }
 
-    /// Simulate strategy execution
-    fn simulate(&self, _chromosome: &Chromosome) -> Result<SimulationResult> {
-        Err(EvolutionError::SimulationFailed(
-            "strategy simulation not yet implemented; X3 VM integration pending".into(),
-        ))
-    }
-
-    /// Calculate metrics from simulation result
-    fn calculate_metrics(&self, result: &SimulationResult) -> FitnessScore {
-        let pnl = result.final_capital - self.initial_capital;
-        let pnl_percent = pnl / self.initial_capital;
-
-        // Calculate returns
-        let returns: Vec<f64> = result
-            .equity_curve
-            .windows(2)
-            .map(|w| (w[1] - w[0]) / w[0])
+    /// Run the canonical fixed-point strategy simulator over the supplied closes.
+    fn simulate(&self, chromosome: &Chromosome) -> Result<SimulationResult> {
+        let market_data: Vec<MarketTick> = self
+            .price_data
+            .iter()
+            .map(|point| MarketTick {
+                timestamp: point.timestamp,
+                symbol: "ASSET".into(),
+                price: point.close,
+                volume: point.volume,
+                bid: point.close,
+                ask: point.close,
+                data: Default::default(),
+            })
             .collect();
-
-        if returns.is_empty() {
-            return FitnessScore::failure();
-        }
-
-        // Average return
-        let avg_return = returns.iter().sum::<f64>() / returns.len() as f64;
-
-        // Standard deviation
-        let variance = returns
-            .iter()
-            .map(|r| (r - avg_return).powi(2))
-            .sum::<f64>()
-            / returns.len() as f64;
-        let std_dev = variance.sqrt();
-
-        // Sharpe ratio (annualized)
-        let sharpe = if std_dev > 0.0 {
-            (avg_return - self.risk_free_rate / 252.0) / std_dev * (252.0_f64).sqrt()
-        } else {
-            0.0
-        };
-
-        // Maximum drawdown
-        let mut peak = result.equity_curve[0];
-        let mut max_dd = 0.0_f64;
-        for &equity in &result.equity_curve {
-            if equity > peak {
-                peak = equity;
-            }
-            let dd = (peak - equity) / peak;
-            if dd > max_dd {
-                max_dd = dd;
-            }
-        }
-
-        // Downside deviation (for Sortino)
-        let downside_returns: Vec<f64> = returns.iter().filter(|&&r| r < 0.0).copied().collect();
-
-        let downside_dev = if !downside_returns.is_empty() {
-            (downside_returns.iter().map(|r| r.powi(2)).sum::<f64>()
-                / downside_returns.len() as f64)
-                .sqrt()
-        } else {
-            0.001 // Small value to avoid division by zero
-        };
-
-        // Sortino ratio
-        let sortino = if downside_dev > 0.0 {
-            (avg_return - self.risk_free_rate / 252.0) / downside_dev * (252.0_f64).sqrt()
-        } else {
-            sharpe // Fall back to Sharpe if no downside
-        };
-
-        // Calmar ratio
-        let calmar = if max_dd > 0.0 {
-            pnl_percent / max_dd
-        } else {
-            pnl_percent * 10.0 // Bonus for no drawdown
-        };
-
-        // Trade statistics
-        let winning_trades = result.trades.iter().filter(|t| t.pnl > 0.0).count();
-        let total_trades = result.trades.len();
-        let win_rate = if total_trades > 0 {
-            winning_trades as f64 / total_trades as f64
-        } else {
-            0.0
-        };
-
-        // Profit factor
-        let gross_profit: f64 = result
-            .trades
-            .iter()
-            .filter(|t| t.pnl > 0.0)
-            .map(|t| t.pnl)
-            .sum();
-        let gross_loss: f64 = result
-            .trades
-            .iter()
-            .filter(|t| t.pnl < 0.0)
-            .map(|t| t.pnl.abs())
-            .sum();
-        let profit_factor = if gross_loss > 0.0 {
-            gross_profit / gross_loss
-        } else if gross_profit > 0.0 {
-            10.0 // Cap at 10
-        } else {
-            0.0
-        };
-
-        // Average trade duration
-        let avg_duration = if total_trades > 0 {
-            result.trades.iter().map(|t| t.duration as f64).sum::<f64>() / total_trades as f64
-        } else {
-            0.0
-        };
-
-        FitnessScore {
-            pnl: pnl_percent,
-            sharpe_ratio: sharpe,
-            max_drawdown: -max_dd,
-            win_rate,
-            trade_count: total_trades,
-            avg_duration,
-            profit_factor,
-            sortino_ratio: sortino,
-            calmar_ratio: calmar,
-            avg_trade: 0.0,
-            volatility: 0.0,
-            custom: 0.0,
-        }
+        Simulator::new(SimulationConfig {
+            initial_capital: self.initial_capital,
+            risk_free_rate: self.risk_free_rate,
+            ..Default::default()
+        })
+        .simulate(chromosome, &market_data)
     }
 }
 
 impl FitnessEvaluator for PnLFitness {
     fn evaluate(&self, chromosome: &Chromosome) -> Result<FitnessScore> {
-        let mut total_score = FitnessScore::default();
-
+        if self.num_simulations == 0 {
+            return Err(EvolutionError::InvalidParameters(
+                "PnLFitness simulations must be non-zero".into(),
+            ));
+        }
+        let mut score = None;
         for _ in 0..self.num_simulations {
             let result = self.simulate(chromosome)?;
-            let score = self.calculate_metrics(&result);
-
-            // Aggregate scores
-            total_score.pnl += score.pnl;
-            total_score.sharpe_ratio += score.sharpe_ratio;
-            total_score.max_drawdown += score.max_drawdown;
-            total_score.win_rate += score.win_rate;
-            total_score.trade_count += score.trade_count;
-            total_score.profit_factor += score.profit_factor;
-            total_score.sortino_ratio += score.sortino_ratio;
-            total_score.calmar_ratio += score.calmar_ratio;
+            if let Some(previous) = score.as_ref() {
+                let previous: &FitnessScore = previous;
+                if previous.simulation_state_hash != result.fitness.simulation_state_hash {
+                    return Err(EvolutionError::SimulationFailed(
+                        "deterministic PnLFitness repetitions diverged".into(),
+                    ));
+                }
+            }
+            score = Some(result.fitness);
         }
-
-        // Average
-        let n = self.num_simulations as f64;
-        total_score.pnl /= n;
-        total_score.sharpe_ratio /= n;
-        total_score.max_drawdown /= n;
-        total_score.win_rate /= n;
-        total_score.profit_factor /= n;
-        total_score.sortino_ratio /= n;
-        total_score.calmar_ratio /= n;
-
-        Ok(total_score)
+        score.ok_or_else(|| {
+            EvolutionError::InvalidParameters("PnLFitness simulations must be non-zero".into())
+        })
     }
 
     fn name(&self) -> &'static str {
         "PnLFitness"
     }
-}
-
-/// Result of a strategy simulation
-#[derive(Debug, Clone)]
-struct SimulationResult {
-    trades: Vec<Trade>,
-    equity_curve: Vec<f64>,
-    final_capital: f64,
-}
-
-/// A single trade
-#[derive(Debug, Clone)]
-struct Trade {
-    pnl: f64,
-    duration: u64,
 }
 
 /// Multi-objective fitness evaluator using Pareto ranking
@@ -380,11 +265,13 @@ impl FitnessEvaluator for ParetoFitness {
 }
 
 /// Mock fitness evaluator for testing
+#[cfg(test)]
 pub struct MockFitness {
     base_score: f64,
     variance: f64,
 }
 
+#[cfg(test)]
 impl MockFitness {
     pub fn new(base_score: f64, variance: f64) -> Self {
         Self {
@@ -394,6 +281,7 @@ impl MockFitness {
     }
 }
 
+#[cfg(test)]
 impl FitnessEvaluator for MockFitness {
     fn evaluate(&self, chromosome: &Chromosome) -> Result<FitnessScore> {
         // Generate deterministic score based on chromosome hash
@@ -418,6 +306,11 @@ impl FitnessEvaluator for MockFitness {
             avg_trade: score * 0.01,
             volatility: 0.15,
             custom: 0.0,
+            execution_gas: 0,
+            execution_instructions: 0,
+            execution_latency_ms: 0.0,
+            simulation_state_hash: [0u8; 32],
+            simulation_receipt_hash: [0u8; 32],
         })
     }
 
@@ -429,6 +322,25 @@ impl FitnessEvaluator for MockFitness {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use x3_backend::bc_format::{BytecodeModule, FunctionEntry};
+    use x3_backend::opcode::Opcode;
+
+    fn strategy_module(decision: i64) -> Vec<u8> {
+        let mut module = BytecodeModule::new();
+        let constant = module.const_pool.add_integer(decision).unwrap();
+        module.functions.push(FunctionEntry {
+            name: crate::simulator::STRATEGY_ENTRYPOINT.into(),
+            entry_point: 0,
+            param_count: crate::simulator::STRATEGY_PARAM_COUNT as u8,
+            local_count: crate::simulator::STRATEGY_PARAM_COUNT,
+            max_stack: 16,
+            return_type_tag: 1,
+        });
+        module.code = vec![Opcode::LoadConst.to_byte(), 0];
+        module.code.extend_from_slice(&constant.0.to_le_bytes());
+        module.code.extend_from_slice(&[Opcode::Ret.to_byte(), 0]);
+        module.to_bytes()
+    }
 
     #[test]
     fn test_fitness_score_total() {
@@ -445,6 +357,11 @@ mod tests {
             avg_trade: 0.05,
             volatility: 0.15,
             custom: 0.0,
+            execution_gas: 0,
+            execution_instructions: 0,
+            execution_latency_ms: 0.0,
+            simulation_state_hash: [0u8; 32],
+            simulation_receipt_hash: [0u8; 32],
         };
 
         let total = score.total_score();
@@ -468,5 +385,33 @@ mod tests {
     fn test_fitness_score_failure() {
         let score = FitnessScore::failure();
         assert!(!score.is_valid());
+    }
+
+    #[test]
+    fn pnl_fitness_uses_the_canonical_simulator_and_is_reproducible() {
+        let chromosome = Chromosome::from_bytecode(strategy_module(1)).unwrap();
+        let prices = vec![
+            PricePoint {
+                timestamp: 1,
+                open: 100.0,
+                high: 101.0,
+                low: 99.0,
+                close: 100.0,
+                volume: 10.0,
+            },
+            PricePoint {
+                timestamp: 2,
+                open: 110.0,
+                high: 111.0,
+                low: 109.0,
+                close: 110.0,
+                volume: 10.0,
+            },
+        ];
+        let evaluator = PnLFitness::new(prices, 100_000.0).with_simulations(2);
+        let score = evaluator.evaluate(&chromosome).expect("simulation");
+
+        assert!(score.is_valid());
+        assert_ne!(score.simulation_state_hash, [0u8; 32]);
     }
 }

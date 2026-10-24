@@ -186,6 +186,7 @@ impl pallet_x3_coin::Config for Test {
     type MinEvmConfirmations = ConstU32<12>;
     type MinSvmConfirmations = ConstU32<32>;
     type MinBtcConfirmations = ConstU32<6>;
+    type ValidatorPayoutOrigin = EnsureRoot<AccountId>;
 }
 
 // ─── Test externalities builder ──────────────────────────────────────────────

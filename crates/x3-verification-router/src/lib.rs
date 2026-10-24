@@ -21,8 +21,12 @@ use core::result::Result;
 use core::result::Result::{Err, Ok};
 
 pub mod bitcoin_spv;
+pub mod ethereum_beacon;
 pub mod evm_receipt;
+pub mod external_root;
 pub mod gateway_types;
+pub mod header_finality;
+pub mod solana_finality;
 
 pub use evm_receipt::{
     deposit_locked_selector, withdrawal_released_selector, ProductionEvmReceiptVerifier,
@@ -30,6 +34,12 @@ pub use evm_receipt::{
 };
 pub use gateway_types::{
     ExternalAssetRef, ExternalChainId, VerificationRequest, VerificationResult,
+};
+pub use solana_finality::{
+    encode_solana_finality_v2, solana_finality_message_v2, solana_stake_table_digest,
+    SolanaCluster, SolanaStakeWeightedVerifier, SolanaValidatorStake, SolanaVerifierConfigError,
+    MAX_SOLANA_FINALITY_VOTES, SOLANA_FINALITY_V2_HEADER_LEN, SOLANA_FINALITY_VOTE_LEN,
+    SOLANA_FINALIZED_FORMAT_V2,
 };
 
 use alloc::collections::btree_map::BTreeMap;
@@ -124,6 +134,18 @@ pub enum VerificationError {
     NoAuthorizedValidators,
     /// Fewer distinct authorized validators signed than the threshold requires.
     InsufficientValidSignatures,
+    /// A proof named a validator that is not in the configured stake table.
+    UnauthorizedSvmValidator,
+    /// The proof's stake-table digest does not match the trusted stake table.
+    StakeTableMismatch,
+    /// The signed stake was below the configured supermajority.
+    InsufficientStake,
+    /// The proof names a different Solana cluster than the verifier.
+    WrongCluster,
+    /// The signed stake could not be represented without overflow.
+    StakeWeightOverflow,
+    /// The proof's finalized slot is below the persisted finalized-slot floor.
+    StaleFinality,
     /// The proof names a block this chain's header store does not hold on its best chain.
     UnanchoredBlock,
     /// The block is not buried deep enough.
@@ -165,6 +187,24 @@ impl Display for VerificationError {
             }
             VerificationError::InsufficientValidSignatures => {
                 write!(f, "insufficient valid validator attestations")
+            }
+            VerificationError::UnauthorizedSvmValidator => {
+                write!(f, "unauthorized SVM validator in proof")
+            }
+            VerificationError::StakeTableMismatch => {
+                write!(f, "SVM stake-table digest does not match the trusted table")
+            }
+            VerificationError::InsufficientStake => {
+                write!(f, "signed SVM stake is below the required supermajority")
+            }
+            VerificationError::WrongCluster => {
+                write!(f, "SVM proof names the wrong cluster")
+            }
+            VerificationError::StakeWeightOverflow => {
+                write!(f, "SVM stake weight overflow")
+            }
+            VerificationError::StaleFinality => {
+                write!(f, "SVM finalized slot is below the persisted floor")
             }
         }
     }
@@ -245,6 +285,21 @@ impl VerificationRouter {
         verifier.verify(proof)
     }
 
+    /// Verify and atomically consume a proof ID when verification succeeds.
+    ///
+    /// [`Self::route`] remains the read-only inspection API. Consensus-facing
+    /// callers must use this method so a successful proof cannot be replayed.
+    pub fn route_once(
+        &mut self,
+        proof: &ProofEnvelope,
+    ) -> Result<VerificationOutcome, VerificationError> {
+        let outcome = self.route(proof)?;
+        if outcome.accepted {
+            self.mark_used(proof.proof_id);
+        }
+        Ok(outcome)
+    }
+
     /// Mark a proof as used (for replay protection after successful verification)
     pub fn mark_used(&mut self, proof_id: [u8; 32]) {
         self.used_proofs.insert(proof_id, true);
@@ -264,15 +319,7 @@ impl VerificationRouter {
         let proof = ProofEnvelope {
             proof_id: request.proof_id,
             strategy: request.strategy,
-            source_chain: match request.source_chain {
-                gateway_types::ExternalChainId::EthereumSepolia
-                | gateway_types::ExternalChainId::BaseSepolia
-                | gateway_types::ExternalChainId::EthereumMainnet
-                | gateway_types::ExternalChainId::BaseMainnet
-                | gateway_types::ExternalChainId::Other(_) => ChainKind::Evm { chain_id: 1 },
-                gateway_types::ExternalChainId::SolanaDevnet
-                | gateway_types::ExternalChainId::SolanaMainnet => ChainKind::Solana,
-            },
+            source_chain: gateway_chain_kind(request.source_chain),
             destination_chain: ChainKind::X3,
             payload: request.proof_payload,
             expected_asset_id: [0u8; 32],
@@ -282,7 +329,7 @@ impl VerificationRouter {
             expected_beneficiary: request.recipient.as_bytes().to_vec(),
         };
 
-        match self.route(&proof) {
+        match self.route_once(&proof) {
             Ok(outcome) => VerificationResult {
                 proof_id: request.proof_id,
                 verified: outcome.accepted,
@@ -306,6 +353,20 @@ impl VerificationRouter {
                 confidence_bps: 0,
             },
         }
+    }
+}
+
+fn gateway_chain_kind(chain: gateway_types::ExternalChainId) -> ChainKind {
+    match chain {
+        gateway_types::ExternalChainId::EthereumSepolia => ChainKind::Evm {
+            chain_id: 11_155_111,
+        },
+        gateway_types::ExternalChainId::BaseSepolia => ChainKind::Evm { chain_id: 84_532 },
+        gateway_types::ExternalChainId::EthereumMainnet => ChainKind::Evm { chain_id: 1 },
+        gateway_types::ExternalChainId::BaseMainnet => ChainKind::Evm { chain_id: 8_453 },
+        gateway_types::ExternalChainId::Other(chain_id) => ChainKind::Evm { chain_id },
+        gateway_types::ExternalChainId::SolanaDevnet
+        | gateway_types::ExternalChainId::SolanaMainnet => ChainKind::Solana,
     }
 }
 
@@ -432,12 +493,16 @@ pub const SOLANA_FINALIZED_FORMAT_V1: u8 = 1;
 pub const SOLANA_ATTESTATION_LEN: usize = 96;
 pub const SOLANA_PAYLOAD_HEADER_LEN: usize = 45;
 
-/// Verification of Solana finalized-commitment attestations.
+/// Legacy verification of Solana finalized-commitment attestations.
 ///
 /// Construct with the authorized validator set and the required threshold. There
 /// is deliberately no default constructor that trusts the payload's own key
 /// list: an empty set verifies nothing, so a caller that has not been wired to a
 /// governance-controlled set fails closed.
+///
+/// This V1 format does not carry a stake table, cluster id, parent bank hash, or
+/// the X3 transfer intent in its signed message. New mainnet integrations must
+/// use [`SolanaStakeWeightedVerifier`] with the V2 envelope instead.
 pub struct SolanaFinalizedVerifier {
     validators: Vec<[u8; 32]>,
     threshold: u32,
@@ -590,11 +655,13 @@ impl Verifier for X3InternalVerifier {
         VerificationStrategy::X3Internal
     }
 
-    /// Internal-only strategy: an X3-internal transfer is proven by the kernel
-    /// itself, so there is nothing external to verify. The router only routes
-    /// `VerificationStrategy::X3Internal` proofs here, and this verifier must
-    /// never be registered under an external-chain strategy.
-    fn verify(&self, _proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
+    /// Internal-only strategy: both endpoints must be X3. Without this check a
+    /// caller could relabel an external proof as `X3Internal` and have the
+    /// unconditional internal-kernel rule accept it without external evidence.
+    fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
+        if proof.source_chain != ChainKind::X3 || proof.destination_chain != ChainKind::X3 {
+            return Err(VerificationError::UnsupportedChain);
+        }
         Ok(VerificationOutcome {
             accepted: true,
             reason: "x3_internal_kernel_is_the_proof",
@@ -609,6 +676,22 @@ impl Verifier for X3InternalVerifier {
 mod tests {
     use super::*;
     use alloc::vec;
+
+    struct AcceptingEvmVerifier;
+
+    impl Verifier for AcceptingEvmVerifier {
+        fn verify(&self, _proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "test_acceptance",
+                verified_at_height: Some(1),
+            })
+        }
+
+        fn strategy(&self) -> VerificationStrategy {
+            VerificationStrategy::EvmReceiptProof
+        }
+    }
 
     fn dummy_proof(strategy: VerificationStrategy) -> ProofEnvelope {
         ProofEnvelope {
@@ -639,6 +722,51 @@ mod tests {
         let proof = dummy_proof(VerificationStrategy::EvmReceiptProof);
         let result = router.route(&proof);
         assert!(matches!(result, Err(VerificationError::MissingVerifier)));
+    }
+
+    #[test]
+    fn route_once_consumes_a_successful_proof() {
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(AcceptingEvmVerifier));
+        let proof = dummy_proof(VerificationStrategy::EvmReceiptProof);
+
+        assert!(router.route_once(&proof).unwrap().accepted);
+        assert_eq!(
+            router.route_once(&proof),
+            Err(VerificationError::ReplayDetected)
+        );
+    }
+
+    #[test]
+    fn gateway_verification_request_is_replay_protected() {
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(AcceptingEvmVerifier));
+        let request = gateway_types::VerificationRequest {
+            proof_id: [7u8; 32],
+            source_chain: gateway_types::ExternalChainId::EthereumMainnet,
+            source_block: 1,
+            source_tx_hash: [8u8; 32],
+            external_asset: gateway_types::ExternalAssetRef {
+                chain_id: gateway_types::ExternalChainId::EthereumMainnet,
+                token_address_or_mint: "0x01".into(),
+                decimals: 18,
+                symbol: "ETH".into(),
+            },
+            sender: "sender".into(),
+            recipient: "recipient".into(),
+            amount: 1,
+            nonce: 1,
+            proof_payload: vec![1; 96],
+            strategy: VerificationStrategy::EvmReceiptProof,
+        };
+
+        assert!(router.route_verification_request(request.clone()).verified);
+        let replay = router.route_verification_request(request);
+        assert!(!replay.verified);
+        assert_eq!(
+            replay.failure_reason.as_deref(),
+            Some("replay detected: proof already used")
+        );
     }
 
     /// The permissive path is opt-in (`test-verifier`, and never together with
@@ -731,9 +859,48 @@ mod tests {
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(X3InternalVerifier));
 
-        let proof = dummy_proof(VerificationStrategy::X3Internal);
+        let mut proof = dummy_proof(VerificationStrategy::X3Internal);
+        proof.source_chain = ChainKind::X3;
         let outcome = router.route(&proof).expect("should verify");
         assert!(outcome.accepted);
+    }
+
+    #[test]
+    fn an_external_chain_cannot_select_the_x3_internal_bypass() {
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(X3InternalVerifier));
+        let proof = dummy_proof(VerificationStrategy::X3Internal);
+
+        assert_eq!(
+            router.route(&proof),
+            Err(VerificationError::UnsupportedChain)
+        );
+    }
+
+    #[test]
+    fn gateway_chain_ids_remain_chain_specific() {
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::EthereumMainnet),
+            ChainKind::Evm { chain_id: 1 }
+        );
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::EthereumSepolia),
+            ChainKind::Evm {
+                chain_id: 11_155_111
+            }
+        );
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::BaseMainnet),
+            ChainKind::Evm { chain_id: 8_453 }
+        );
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::BaseSepolia),
+            ChainKind::Evm { chain_id: 84_532 }
+        );
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::SolanaMainnet),
+            ChainKind::Solana
+        );
     }
 
     #[test]

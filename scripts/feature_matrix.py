@@ -170,8 +170,9 @@ def validate_feature(feature: dict[str, Any], root: Path, registry: dict[str, An
     reg = feature.get("registry_feature")
     if reg and reg not in registry:
         errors.append(f"{label}: registry feature '{reg}' does not exist")
-    if feature.get("priority") == "P0" and isinstance(mainnet, int) and mainnet >= 80:
-        errors.append(f"{label}: P0 feature cannot claim mainnet_ready >= 80")
+    # The granular manifest records work-in-progress P0 scores. The launch bar
+    # (95 with no blockers and current evidence) is enforced by
+    # scripts/mainnet_release_gate.py.
     if (feature.get("source") == "open_pr" or feature.get("open_prs")) and isinstance(mainnet, int) and mainnet >= 80:
         errors.append(f"{label}: open PR feature cannot claim mainnet_ready >= 80")
     if claim_risk and isinstance(mainnet, int) and mainnet >= 40:

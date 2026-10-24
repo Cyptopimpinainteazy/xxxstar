@@ -179,6 +179,10 @@ pub fn lower_program_with_mode(
                 });
                 lower_function_body(&intent.body, &mut ir)?;
             }
+            // An `automation` is not a program: it lowers to a chain task through
+            // `automation_lowering`, not to executable X3BC. Codegen skips it so a
+            // module that declares automations still compiles its functions.
+            Item::Automation(_) => {}
             Item::SubscriptionDecl(sub) => {
                 // The cadence travels with the charge. It was read off the declaration and dropped
                 // here — `subscription keeper: 100, 30 { … }` charged `keeper` 100 with nothing

@@ -15,6 +15,9 @@ sha2 = { workspace = true }
 # The canonical X3BC semantic core (root `crates/x3bc-core`): the trading lowering writes the
 # chain's bytecode format through it rather than through a copy of its own.
 x3bc-core = { path = "../../crates/x3bc-core" }
+# The pallet's task vocabulary (`Condition`/`Action`). Lowering writes the
+# chain's own types rather than a parallel description of them.
+x3-automation = { path = "../../crates/x3-automation" }
 indexmap = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

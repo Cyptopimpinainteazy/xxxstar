@@ -11,6 +11,7 @@ target/
 *.rlib
 **/__pycache__/
 *.pyc
+*.egg-info/
 
 # Large packs
 launch-gates/packs/
@@ -22,6 +23,14 @@ repomix-output.md
 node_modules/
 *.log
 tests/wallet-integration/coverage/
+
+# Local tool state (lock/tmp files, absolute workspace paths)
+.taskplane/
+
+# BMAD Method generated artifacts, personal overrides, and one-off migration backups
+_bmad-output/
+_bmad/config.user.toml
+.v6-v7-migration-backup-*/
 
 # Assembled static site output (scripts/build-site.sh) — always regenerated,
 # never a source of truth. Serve locally with: cd site && python3 -m http.server 8080
@@ -37,6 +46,8 @@ venv/
 .codex
 
 # Local validation/build outputs
+**/dist/
+infra-structure/services/rpc-crawler/crawler_state.json
 /failure-packets/
 target_phase2_validation/
 target_phase3_test/

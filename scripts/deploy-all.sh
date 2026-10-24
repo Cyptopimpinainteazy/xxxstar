@@ -5,6 +5,7 @@ set -euo pipefail
 # Configure required values through environment variables before running.
 # Example:
 #   export TREASURY_WALLET=0x...
+#   export TREASURY_OWNER=0x...   # deployed Safe or threshold-owner contract
 #   export UNIVERSAL_ADAPTER=0x...
 #   export STAKING_TOKEN_ADDRESS=0x...
 #   export DEV_WALLET=0x...
@@ -21,11 +22,12 @@ STAKING_TOKEN="${STAKING_TOKEN_ADDRESS:-}"
 DEV_WALLET="${DEV_WALLET:-}"
 DAO_WALLET="${DAO_WALLET:-}"
 LP_WALLET="${LP_WALLET:-}"
+TREASURY_OWNER="${TREASURY_OWNER:-}"
 X3_ADDRESS="${X3_ADDRESS:-}"
 
-if [[ -z "$TREASURY" || -z "$STAKING_TOKEN" || -z "$DEV_WALLET" || -z "$DAO_WALLET" || -z "$LP_WALLET" || -z "$X3_ADDRESS" ]]; then
+if [[ -z "$TREASURY" || -z "$STAKING_TOKEN" || -z "$DEV_WALLET" || -z "$DAO_WALLET" || -z "$LP_WALLET" || -z "$TREASURY_OWNER" || -z "$X3_ADDRESS" ]]; then
   echo "Missing required environment variables."
-  echo "Required: TREASURY_WALLET, STAKING_TOKEN_ADDRESS, DEV_WALLET, DAO_WALLET, LP_WALLET, X3_ADDRESS"
+  echo "Required: TREASURY_WALLET, STAKING_TOKEN_ADDRESS, DEV_WALLET, DAO_WALLET, LP_WALLET, TREASURY_OWNER, X3_ADDRESS"
   exit 1
 fi
 
@@ -44,7 +46,7 @@ for CHAIN in "${CHAINS[@]}"; do
   forge create --rpc-url "$RPC_URL" adapters/UniversalAdapter.sol:UniversalAdapter
   forge create --rpc-url "$RPC_URL" --constructor-args "$ADAPTER" "$TREASURY" bridges/AtomicBridge.sol:AtomicBridge
   forge create --rpc-url "$RPC_URL" --constructor-args "$STAKING_TOKEN" "$TREASURY" staking/StakingPool.sol:StakingPool
-  forge create --rpc-url "$RPC_URL" --constructor-args "$DEV_WALLET" "$DAO_WALLET" "$LP_WALLET" treasury/Treasury.sol:Treasury
+  forge create --rpc-url "$RPC_URL" --constructor-args "$DEV_WALLET" "$DAO_WALLET" "$LP_WALLET" "$TREASURY_OWNER" treasury/Treasury.sol:Treasury
   forge create --rpc-url "$RPC_URL" --constructor-args "$X3_ADDRESS" "$TREASURY" governance/CrossChainGovernance.sol:CrossChainGovernance
 
   echo "Chain $CHAIN deployment complete."

@@ -130,6 +130,9 @@ pub trait Strategy: Send + Sync {
 pub struct MarketData {
     /// Asset prices
     pub prices: std::collections::HashMap<String, f64>,
+    /// Per-venue execution prices: venue -> asset -> price.
+    #[serde(default)]
+    pub venue_prices: std::collections::HashMap<String, std::collections::HashMap<String, f64>>,
     /// Order book depths
     pub depths: std::collections::HashMap<String, (f64, f64)>,
     /// 24h volumes

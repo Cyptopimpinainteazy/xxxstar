@@ -170,80 +170,10 @@ impl ZkProvingJob {
     }
 
     /// Generate proof for a single request
-    fn generate_proof(&self, request: &ProofType, witness: &Witness) -> SwarmResult<ZkProof> {
-        use std::time::Instant;
-
-        let start = Instant::now();
-
-        // In production, this would call actual ZK libraries (bellman, halo2, etc.)
-        // For now, generate mock proofs
-
-        let proof_id = match request {
-            ProofType::StrategyExecution { strategy_hash, .. } => *strategy_hash,
-            ProofType::StateTransition {
-                post_state_root, ..
-            } => *post_state_root,
-            ProofType::Aggregation { proof_hashes } => {
-                let mut hasher = blake3::Hasher::new();
-                for hash in proof_hashes {
-                    hasher.update(hash);
-                }
-                hasher.finalize().into()
-            }
-            ProofType::MerkleMembership { root, .. } => *root,
-            ProofType::Custom { circuit_id, .. } => blake3::hash(circuit_id.as_bytes()).into(),
-        };
-
-        // Mock proof generation based on system
-        let (proof_bytes, proof_size) = match self.config.proof_system {
-            ProofSystem::Groth16 => {
-                // Groth16: ~200 bytes constant size
-                let proof = vec![0u8; 192];
-                (proof.clone(), proof.len())
-            }
-            ProofSystem::Plonk => {
-                // PLONK: ~500-1000 bytes
-                let proof = vec![0u8; 768];
-                (proof.clone(), proof.len())
-            }
-            ProofSystem::Stark => {
-                // STARK: larger, ~50-100KB
-                let proof = vec![0u8; 65536];
-                (proof.clone(), proof.len())
-            }
-            ProofSystem::Halo2 => {
-                // Halo2: ~500 bytes
-                let proof = vec![0u8; 512];
-                (proof.clone(), proof.len())
-            }
-            ProofSystem::Nova => {
-                // Nova: ~1KB accumulator
-                let proof = vec![0u8; 1024];
-                (proof.clone(), proof.len())
-            }
-        };
-
-        let generation_time_ms = start.elapsed().as_millis() as u64;
-
-        // Estimate verification time based on proof system
-        let verification_time_ms = match self.config.proof_system {
-            ProofSystem::Groth16 => 5, // Constant time
-            ProofSystem::Plonk => 10,  // Linear in public inputs
-            ProofSystem::Stark => 50,  // Logarithmic in circuit
-            ProofSystem::Halo2 => 15,  // Moderate
-            ProofSystem::Nova => 20,   // Accumulator check
-        };
-
-        Ok(ZkProof {
-            id: proof_id,
-            system: self.config.proof_system,
-            proof_bytes,
-            public_inputs: witness.public_inputs.clone(),
-            proof_size,
-            generation_time_ms,
-            verification_time_ms,
-            is_valid: true,
-        })
+    fn generate_proof(&self, _request: &ProofType, _witness: &Witness) -> SwarmResult<ZkProof> {
+        Err(SwarmError::ExecutionError(
+            "ZKProvingBackendUnavailable: no proving system is wired".into(),
+        ))
     }
 
     /// Execute full ZK proving job
@@ -440,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn test_zk_proof_generation() {
+    fn zk_proving_refuses_to_fabricate_proofs_without_a_backend() {
         let config = ZkConfig::default();
         let (proof_type, witness) = StrategyProofBuilder::new(vec![0x20, 0x64])
             .with_trades(vec![])
@@ -448,16 +378,15 @@ mod tests {
 
         let job = ZkProvingJob::new(config).with_proof_request(proof_type, witness);
 
-        let result = job.execute().unwrap();
-
-        if let JobOutput::ZkProving(zk_result) = result {
-            assert_eq!(zk_result.proofs.len(), 1);
-            assert!(zk_result.proofs[0].is_valid);
-        }
+        let error = job.execute().expect_err("missing backend must fail closed");
+        assert!(
+            error.to_string().contains("ZKProvingBackendUnavailable"),
+            "{error}"
+        );
     }
 
     #[test]
-    fn test_proof_systems_sizes() {
+    fn every_proof_system_fails_closed_without_a_backend() {
         for system in [
             ProofSystem::Groth16,
             ProofSystem::Plonk,
@@ -482,10 +411,10 @@ mod tests {
                 },
             );
 
-            let result = job.execute().unwrap();
-            if let JobOutput::ZkProving(zk_result) = result {
-                assert!(zk_result.proofs[0].proof_size > 0);
-            }
+            assert!(
+                job.execute().is_err(),
+                "{system:?} must not fabricate a proof"
+            );
         }
     }
 }

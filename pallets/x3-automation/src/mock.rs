@@ -147,7 +147,7 @@ pub fn with_dispatch_mode<R>(mode: DispatchMode, f: impl FnOnce() -> R) -> R {
 
 /// Test dispatcher.
 ///
-/// `Noop` and `TransferNative` are real: the latter moves balances. `Custom`
+/// `NoChange` and `TransferNative` are real: the latter moves balances. `Custom`
 /// follows the thread-local mode so a test can assert both the applied and the
 /// refused path without a second runtime.
 pub struct TestDispatcher;
@@ -158,7 +158,11 @@ impl pallet::ActionDispatcher<u64> for TestDispatcher {
         action: &Action,
     ) -> Result<(ActionOutcome, Weight, [u8; 64]), DispatchError> {
         match action {
-            Action::Noop => Ok((ActionOutcome::Noop, Weight::from_parts(1_000, 0), [0u8; 64])),
+            Action::NoChange => Ok((
+                ActionOutcome::NoChange,
+                Weight::from_parts(1_000, 0),
+                [0u8; 64],
+            )),
             Action::TransferNative { recipient, amount } => {
                 let mut key = [0u8; 8];
                 key.copy_from_slice(&recipient[..8]);
@@ -204,7 +208,7 @@ impl Config for Test {
     type Now = MockNow;
     type WeightInfo = ();
     type Oracle = TestOracle;
-    type CustomEvaluator = NoopCustomEvaluator;
+    type CustomEvaluator = RefuseCustomEvaluator;
     type Dispatcher = TestDispatcher;
 }
 

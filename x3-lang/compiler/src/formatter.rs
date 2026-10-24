@@ -184,6 +184,10 @@ impl X3Formatter {
             Item::SimulateDecl(s) => self.format_simulate(s),
             Item::ScheduledTask(t) => self.format_scheduled(t),
             Item::SubscriptionDecl(s) => self.format_subscription(s),
+            // Automations are formatted by the automation pipeline; the generic
+            // formatter leaves them to `automation_lowering`, which is the only
+            // consumer that needs their text.
+            Item::Automation(_) => {}
             Item::Mod(m) => self.format_mod(m),
             Item::VmDecl(v) => self.format_vm(v),
             Item::SolverMarket(m) => self.format_solver_market(m),

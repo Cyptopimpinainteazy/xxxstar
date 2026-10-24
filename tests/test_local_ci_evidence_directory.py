@@ -15,6 +15,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class EvidenceDirectory(unittest.TestCase):
+    def test_gate_list_has_unique_slugs(self):
+        result = subprocess.run(
+            ["bash", "scripts/local-ci.sh", "--list"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        slugs = [
+            match.group(1)
+            for line in result.stdout.splitlines()
+            if (match := re.match(r"^  - (.+)$", line))
+        ]
+        self.assertEqual(len(slugs), len(set(slugs)), "local-ci gate slugs must be unique")
+
     def test_scoped_gate_writes_summary_and_logs_to_requested_directory(self):
         with tempfile.TemporaryDirectory(prefix="x3 CI evidence ") as directory:
             result = subprocess.run(
