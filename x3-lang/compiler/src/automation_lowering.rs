@@ -16,9 +16,7 @@
 //!   whoever happens to read it.
 
 use x3_automation::{Action, Condition};
-use x3_lang_ast::ast::{
-    AutomationDecl, AutomationPermissionKind, Block, Expression, LiteralExpr, Statement,
-};
+use x3_lang_ast::ast::{AutomationDecl, AutomationPermissionKind, Block, Expression, LiteralExpr, Statement};
 use x3_lang_common::X3Error;
 
 /// The budgets a declaration grants, in the units it wrote them.
@@ -133,8 +131,7 @@ fn lower_execute(block: &Block, automation: &str) -> Result<Action, X3Error> {
         }
     };
     let (callee, args) = call;
-    let name = callee_name(callee)
-        .ok_or_else(|| unsupported_action(automation, "a non-name callee in `execute`"))?;
+    let name = callee_name(callee).ok_or_else(|| unsupported_action(automation, "a non-name callee in `execute`"))?;
 
     match (name.as_str(), args.len()) {
         ("noop", 0) => Ok(Action::Noop),
@@ -247,11 +244,7 @@ fn oracle_asset_arg(args: &[Expression], index: usize) -> Result<u32, X3Error> {
     })
 }
 
-fn ledger_asset_arg(
-    args: &[Expression],
-    index: usize,
-    automation: &str,
-) -> Result<u32, X3Error> {
+fn ledger_asset_arg(args: &[Expression], index: usize, automation: &str) -> Result<u32, X3Error> {
     let value = int_arg(args, index)?;
     u32::try_from(value).map_err(|_| {
         unsupported_action(
@@ -284,12 +277,10 @@ fn account_arg(args: &[Expression], index: usize, automation: &str) -> Result<[u
             }
             let mut key = [0u8; 32];
             for (byte, chunk) in key.iter_mut().zip(hex.as_bytes().chunks(2)) {
-                let pair = core::str::from_utf8(chunk).map_err(|_| {
-                    unsupported_action(automation, "a recipient that is not 32 bytes of hex")
-                })?;
-                *byte = u8::from_str_radix(pair, 16).map_err(|_| {
-                    unsupported_action(automation, "a recipient that is not 32 bytes of hex")
-                })?;
+                let pair = core::str::from_utf8(chunk)
+                    .map_err(|_| unsupported_action(automation, "a recipient that is not 32 bytes of hex"))?;
+                *byte = u8::from_str_radix(pair, 16)
+                    .map_err(|_| unsupported_action(automation, "a recipient that is not 32 bytes of hex"))?;
             }
             Ok(key)
         }

@@ -2049,10 +2049,7 @@ impl<'a> Parser<'a> {
 
         // trigger
         if !matches!(self.peek(), Tok::Ident(ref s) if s == "trigger") {
-            return Err(parse_err(
-                "automation requires a `trigger` section".into(),
-                self.peek(),
-            ));
+            return Err(parse_err("automation requires a `trigger` section".into(), self.peek()));
         }
         self.advance();
         self.expect(Tok::LBrace, "'{' after `trigger`")?;
