@@ -1,115 +1,121 @@
-//! Property-Based Tests for pallet-x3-atomic-kernel
+//! Property tests for deterministic atomic-kernel value handling.
 //!
-//! Uses proptest to generate random inputs and verify:
-//! - S1-2: Governance bypass (permission boundaries)
-//! - S1-3: Unauthorized mint (supply invariants)
-//! - S0-6: Runtime panics (no panic on any input)
+//! These tests exercise production functions and wire types. They deliberately
+//! do not simulate a supply ledger or rollback engine inside the test: doing so
+//! would only prove that the simulation agrees with itself.
 
 #![cfg(test)]
 
+use pallet_x3_atomic_kernel::{
+    finality_cert_from_block_hash,
+    proof::{BundleLeg, DeclaredAccess, VmType},
+    vm_revert::{LegReceipt, StateDiff},
+};
+use parity_scale_codec::{Decode, Encode};
 use proptest::prelude::*;
+use sp_core::H256;
+use sp_runtime::traits::ConstU32;
+use sp_std::vec::Vec;
 
-// ════════════════════════════════════════════════════════════
-// PROPERTY 1: Supply Invariant (S1-3 unauthorized_mint)
-// ════════════════════════════════════════════════════════════
-
-proptest! {
-    /// Property: Total supply equals sum of all account balances
-    ///
-    /// If this fails: unauthorized_mint blocker found
-    /// (someone minted tokens without updating supply)
-    #[test]
-    fn prop_supply_invariant_maintained(
-        amounts in prop::collection::vec(1u128..1_000_000u128, 1..10)
-    ) {
-        if !amounts.is_empty() {
-            let total_supply: u128 = amounts.iter().sum();
-            let total_balances: u128 = amounts.iter().sum();
-
-            // INVARIANT: total_supply == sum of balances
-            // Failure indicates unauthorized mint or loss of tokens
-            prop_assert_eq!(total_supply, total_balances,
-                "BLOCKER FOUND (S1-3): Supply invariant violated");
-        }
-    }
-
-    /// Property: No overflow in supply calculations
-    ///
-    /// If this panics: S0-6 runtime_panic blocker found
-    #[test]
-    fn prop_supply_checked_arithmetic(
-        amounts in prop::collection::vec(1u128..u128::MAX, 1..100)
-    ) {
-        // Sum with overflow checking (no panic on MAX values)
-        let sum = amounts.iter().fold(0u128, |acc, &x| {
-            acc.saturating_add(x)
-        });
-
-        // Must not panic regardless of values
-        let _safe = sum.checked_add(1);
-
-        prop_assert!(true, "Overflow checking passed");
-    }
-
-    /// Property: State changes never cause panics
-    ///
-    /// If this panics: S0-6 runtime_panic blocker found
-    #[test]
-    fn prop_state_change_values_bounded(
-        state_val in 0u128..=u128::MAX
-    ) {
-        // State machine operations should never panic on valid input
-        let _doubled = state_val.saturating_mul(2);
-
-        prop_assert!(true, "State change handled without panic");
-    }
-
-    /// Property: Rollback reverses all changes
-    ///
-    /// If this fails: S1-1 failed_rollback blocker found
-    #[test]
-    fn prop_rollback_reverses_all_changes(
-        changes in prop::collection::vec(1u128..100_000u128, 1..20)
-    ) {
-        // Simulate a state: start at 0, apply changes, then rollback
-        let initial_state: u128 = 0;
-
-        // Apply all changes
-        let mut state = initial_state;
-        for &change in &changes {
-            state = state.saturating_add(change);
-        }
-
-        // Rollback: subtract all changes in reverse order
-        let was_reverted = true;
-        for &change in changes.iter().rev() {
-            state = state.saturating_sub(change);
-        }
-
-        // After rollback, should be back to initial
-        prop_assert!(was_reverted && state == initial_state,
-            "BLOCKER FOUND (S1-1): Rollback did not fully reverse");
-    }
-
-    /// Property: Edge case values don't panic
-    ///
-    /// If this panics: S0-6 runtime_panic blocker found
-    #[test]
-    fn prop_edge_case_values(
-        val in prop::option::of(0u128..=u128::MAX)
-    ) {
-        if let Some(v) = val {
-            let _result = v.checked_add(1);
-        }
-
-        prop_assert!(true);
-    }
+fn vm_type() -> impl Strategy<Value = VmType> {
+    prop_oneof![
+        Just(VmType::Evm),
+        Just(VmType::Svm),
+        Just(VmType::X3),
+        Just(VmType::Cross),
+    ]
 }
 
-// ════════════════════════════════════════════════════════════
-// Sanity check: proptest available
-// ════════════════════════════════════════════════════════════
+fn h256() -> impl Strategy<Value = H256> {
+    any::<[u8; 32]>().prop_map(H256::from)
+}
 
-#[test]
-#[allow(clippy::no_effect, clippy::assertions_on_constants)]
-fn test_proptest_available() {}
+fn declared_access() -> impl Strategy<Value = DeclaredAccess> {
+    (
+        prop::collection::vec(h256(), 0..=64),
+        prop::collection::vec(h256(), 0..=64),
+    )
+        .prop_map(|(reads, writes)| DeclaredAccess {
+            reads: frame_support::BoundedVec::<H256, ConstU32<64>>::try_from(reads)
+                .expect("the strategy respects the declared-access bound"),
+            writes: frame_support::BoundedVec::<H256, ConstU32<64>>::try_from(writes)
+                .expect("the strategy respects the declared-access bound"),
+        })
+}
+
+proptest! {
+    /// The finality certificate must be a pure function of the finalized block
+    /// hash, so every node derives the same anchor for the same header.
+    #[test]
+    fn finality_certificate_is_deterministic(block_hash in any::<Vec<u8>>()) {
+        let first = finality_cert_from_block_hash(&block_hash);
+        let second = finality_cert_from_block_hash(&block_hash);
+        prop_assert_eq!(first, second);
+    }
+
+    /// A one-bit header change must change the certificate. A collision here
+    /// would let two finalized blocks share one PoAE anchor.
+    #[test]
+    fn finality_certificate_commits_to_the_block_hash(block_hash in any::<[u8; 32]>()) {
+        let original = finality_cert_from_block_hash(&block_hash);
+        let mut changed = block_hash;
+        changed[31] ^= 1;
+        let changed_cert = finality_cert_from_block_hash(&changed);
+        prop_assert_ne!(original, changed_cert);
+    }
+
+    /// Every production bundle-leg field must survive SCALE encoding. A lossy
+    /// round-trip would alter the atomic operation between validation and
+    /// execution.
+    #[test]
+    fn bundle_leg_scale_roundtrip(
+        vm in vm_type(),
+        token_in in h256(),
+        token_out in h256(),
+        amount_in in any::<u128>(),
+        min_amount_out in any::<u128>(),
+        deadline in any::<u64>(),
+        access in declared_access(),
+    ) {
+        let leg = BundleLeg {
+            vm_type: vm,
+            token_in,
+            token_out,
+            amount_in,
+            min_amount_out,
+            deadline,
+            access,
+        };
+
+        let encoded = leg.encode();
+        let decoded = BundleLeg::decode(&mut &encoded[..])
+            .expect("an encoded production BundleLeg must decode");
+        prop_assert_eq!(leg, decoded);
+    }
+
+    /// Leg receipts carry the state delta used by rollback. Their SCALE form
+    /// must preserve every byte and metadata field exactly.
+    #[test]
+    fn leg_receipt_scale_roundtrip(
+        leg_index in any::<u32>(),
+        vm in vm_type(),
+        executed in any::<bool>(),
+        state_diff in any::<Vec<u8>>(),
+        receipt_root in any::<[u8; 32]>(),
+        finalized_block in any::<u64>(),
+    ) {
+        let receipt = LegReceipt {
+            leg_index,
+            vm_type: vm,
+            executed,
+            state_diff: StateDiff::from(state_diff),
+            receipt_root,
+            finalized_block,
+        };
+
+        let encoded = receipt.encode();
+        let decoded = LegReceipt::decode(&mut &encoded[..])
+            .expect("an encoded production LegReceipt must decode");
+        prop_assert_eq!(receipt, decoded);
+    }
+}
