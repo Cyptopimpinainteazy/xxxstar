@@ -85,7 +85,7 @@ static void compute_u1_u2_r(
 ) {
     // Curve order N (secp256k1)
     const BigInt N = {
-        {0xD0364141u, 0xBFD25E8D, 0xAF48A03B, 0xBAAEDCE6,
+        {0xD0364141u, 0xBFD25E8Cu, 0xAF48A03B, 0xBAAEDCE6,
          0xFFFFFFFEu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu}
     };
 

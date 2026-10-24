@@ -18,14 +18,16 @@ Lock Protocol
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Iterator
 
 if TYPE_CHECKING:
     from redis import Redis
@@ -294,20 +296,31 @@ class SignerLock:
             return False
 
     # ── Local File Lock ──────────────────────────────────────
+    #
+    # The lease is read, checked and rewritten as separate steps. Without one
+    # exclusive lock around them, two nodes could both see an expired lease and
+    # both take it (the second moving the first's fresh lease aside), or a
+    # renewal could overwrite a lease another node took in between. Every
+    # local operation therefore runs under _local_guard().
 
-    def _acquire_local(self) -> bool:
+    @contextmanager
+    def _local_guard(self) -> Iterator[None]:
+        """Hold an exclusive cross-process lock for one lease operation."""
+        fd = os.open(f"{self._local_lock_path}.guard", os.O_CREAT | os.O_RDWR, 0o600)
         try:
-            fd = os.open(
-                self._local_lock_path,
-                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                0o600,
-            )
-            payload = json.dumps(
-                {
-                    "node_id": self._node_id,
-                    "expires_at": time.time() + self._ttl,
-                }
-            ).encode()
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            os.close(fd)  # closing the descriptor releases the flock
+
+    def _write_local_state(self) -> None:
+        """Replace the lease atomically, so a reader never sees a partial one."""
+        payload = json.dumps(
+            {"node_id": self._node_id, "expires_at": time.time() + self._ttl}
+        ).encode()
+        tmp_path = f"{self._local_lock_path}.{uuid.uuid4().hex}.tmp"
+        fd = os.open(tmp_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        try:
             try:
                 written = 0
                 while written < len(payload):
@@ -318,36 +331,29 @@ class SignerLock:
                 os.fsync(fd)
             finally:
                 os.close(fd)
-            with self._lock:
-                self._fencing_token += 1
-            return True
-        except FileExistsError:
+            os.replace(tmp_path, self._local_lock_path)
+        except BaseException:
             try:
-                state = self._read_local_state()
-                expires_at = (
-                    state[1]
-                    if state is not None
-                    else os.path.getmtime(self._local_lock_path) + self._ttl
-                )
+                os.unlink(tmp_path)
             except OSError:
-                return False
+                pass
+            raise
 
-            if time.time() >= expires_at:
-                stale_path = f"{self._local_lock_path}.stale.{uuid.uuid4().hex}"
+    def _acquire_local(self) -> bool:
+        try:
+            with self._local_guard():
                 try:
-                    os.replace(self._local_lock_path, stale_path)
+                    state = self._read_local_state()
                 except FileNotFoundError:
-                    return self._acquire_local()
-                except OSError:
-                    return False
-                try:
-                    os.unlink(stale_path)
-                except OSError:
-                    pass
-                return self._acquire_local()
-            return False
+                    state = None
+                if state is not None and time.time() < state[1]:
+                    return False  # a live lease, ours or another node's
+                self._write_local_state()
         except OSError:
             return False
+        with self._lock:
+            self._fencing_token += 1
+        return True
 
     def _read_local_state(self) -> tuple[str, float] | None:
         """Read the node id and lease expiry from the local lock file."""
@@ -361,36 +367,27 @@ class SignerLock:
 
     def _release_local(self) -> None:
         try:
-            state = self._read_local_state()
-            if state is not None and state[0] == self._node_id:
-                os.unlink(self._local_lock_path)
+            with self._local_guard():
+                state = self._read_local_state()
+                if state is not None and state[0] == self._node_id:
+                    os.unlink(self._local_lock_path)
         except OSError:
             pass
 
     def _renew_local(self) -> bool:
         try:
-            state = self._read_local_state()
-            if state is None or state[0] != self._node_id:
-                with self._lock:
-                    self._authority = SignerAuthority.STANDBY
-                return False
-            payload = json.dumps(
-                {
-                    "node_id": self._node_id,
-                    "expires_at": time.time() + self._ttl,
-                }
-            ).encode()
-            with open(self._local_lock_path, "r+b") as handle:
-                handle.seek(0)
-                handle.truncate()
-                handle.write(payload)
-                handle.flush()
-                os.fsync(handle.fileno())
-            with self._lock:
-                self._renewals += 1
-            return True
+            with self._local_guard():
+                state = self._read_local_state()
+                if state is None or state[0] != self._node_id:
+                    with self._lock:
+                        self._authority = SignerAuthority.STANDBY
+                    return False
+                self._write_local_state()
         except OSError:
             return False
+        with self._lock:
+            self._renewals += 1
+        return True
 
     # ── Auto-Renewal Thread ──────────────────────────────────
 
