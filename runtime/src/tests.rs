@@ -89,6 +89,9 @@ fn external_root_verifier_binds_evm_svm_and_bitcoin_to_stored_headers() {
                 validation_proof: Vec::new(),
             },
         );
+        pallet_cross_chain_validator::EvmHeaderFinalitySource::<Runtime>::put(
+            pallet_cross_chain_validator::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
+        );
         let evm_proof = encode_root_proof(EXTERNAL_ROOT_ETHEREUM, RootKind::StateRoot, evm_block.0);
         assert_ok!(
             <RuntimeExternalRootVerifier as pallet_x3_cross_vm_router::ExternalRootVerifier<
@@ -163,6 +166,9 @@ fn register_external_root_uses_the_runtime_verifier_and_stores_only_verified_roo
                 verified_at_block: 1,
                 validation_proof: Vec::new(),
             },
+        );
+        pallet_cross_chain_validator::EvmHeaderFinalitySource::<Runtime>::put(
+            pallet_cross_chain_validator::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
         );
         assert_ok!(
             pallet_x3_cross_vm_router::Pallet::<Runtime>::set_external_bridge_audit_gate(
@@ -284,6 +290,9 @@ fn settlement_verification_uses_only_finalized_external_headers() {
                 verified_at_block: 2,
                 validation_proof: Vec::new(),
             },
+        );
+        pallet_cross_chain_validator::EvmHeaderFinalitySource::<Runtime>::put(
+            pallet_cross_chain_validator::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
         );
         pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::put(
             pallet_cross_chain_validator::SvmHeaderInfo {

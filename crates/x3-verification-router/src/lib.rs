@@ -21,6 +21,7 @@ use core::result::Result;
 use core::result::Result::{Err, Ok};
 
 pub mod bitcoin_spv;
+pub mod ethereum_beacon;
 pub mod evm_receipt;
 pub mod external_root;
 pub mod gateway_types;

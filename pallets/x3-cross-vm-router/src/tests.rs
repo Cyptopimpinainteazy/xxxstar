@@ -860,6 +860,94 @@ fn external_leg_requires_the_runtime_bridge_switch() {
     });
 }
 
+/// End-to-end: an external leg initiates once the switch is open, and the ledger
+/// moves — not merely a validation pass.
+///
+/// `external_leg_requires_the_runtime_bridge_switch` proves the gate refuses. This
+/// proves the path behind it actually runs: a registered external route
+/// (X3Native -> Ethereum) with an external proof tier, through the real
+/// `xvm_transfer` extrinsic, producing a `SourceDebited` transfer record and a
+/// pending-supply increase. Without this, "the switch opens the surface" would be an
+/// assertion about an error code rather than about settlement.
+#[cfg(feature = "external-gateway")]
+#[test]
+fn external_leg_settles_end_to_end_once_the_switch_is_open() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+
+        // An external route needs an external proof tier; TrustedInternal is
+        // reserved for routes whose both legs are X3-internal.
+        let mut route = permissive_route();
+        route.proof_tier = ProofTier::LightClient;
+        assert_ok!(Registry::configure_route(
+            RuntimeOrigin::root(),
+            asset_id,
+            DomainId::X3Native,
+            DomainId::Ethereum,
+            route,
+        ));
+
+        let recipient = AccountBytes::Evm([9u8; 20]);
+        let expires_at = System::block_number() + 50;
+
+        // Switch closed: refused, and nothing is written.
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset_id,
+                DomainId::Ethereum,
+                recipient.clone(),
+                10,
+                expires_at,
+            ),
+            pallet_x3_cross_vm_router::Error::<Test>::ExternalBridgesDisabled
+        );
+        let ledger_before = Ledger::ledgers(asset_id).expect("ledger exists");
+        assert_eq!(
+            ledger_before.pending_supply, 0,
+            "a refused leg must not move supply"
+        );
+
+        // Governance opens the surface.
+        assert_ok!(Router::set_external_bridge_audit_gate(
+            RuntimeOrigin::root(),
+            true
+        ));
+        assert_ok!(Router::set_external_bridges_enabled(
+            RuntimeOrigin::root(),
+            true
+        ));
+
+        // The same call now runs the full initiate path.
+        assert_ok!(Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::Ethereum,
+            recipient,
+            10,
+            expires_at,
+        ));
+
+        // Exactly one transfer was recorded, for Ethereum, in SourceDebited.
+        let records: Vec<_> = pallet_x3_cross_vm_router::Transfers::<Test>::iter().collect();
+        assert_eq!(records.len(), 1, "exactly one transfer should be recorded");
+        let (_id, record) = &records[0];
+        assert_eq!(record.status, TransferStatus::SourceDebited);
+        assert_eq!(record.message.destination_domain, DomainId::Ethereum);
+        assert_eq!(record.message.amount, 10);
+
+        // The ledger moved: supply left the native leg and sits in pending.
+        let ledger_after = Ledger::ledgers(asset_id).expect("ledger exists");
+        ledger_after
+            .check_invariant()
+            .expect("supply invariant holds");
+        assert_eq!(
+            ledger_after.pending_supply, 10,
+            "the debit must reach pending"
+        );
+    });
+}
+
 #[test]
 fn test_external_route_rejected_in_mvp() {
     new_test_ext().execute_with(|| {

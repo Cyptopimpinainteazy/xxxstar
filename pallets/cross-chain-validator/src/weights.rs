@@ -18,6 +18,9 @@ pub trait WeightInfo {
     fn set_header_attesters() -> Weight;
     fn validate_finalized_evm_header() -> Weight;
     fn validate_finalized_svm_header() -> Weight;
+    fn set_ethereum_beacon_checkpoint() -> Weight;
+    fn submit_ethereum_beacon_update() -> Weight;
+    fn submit_ethereum_execution_proof() -> Weight;
 }
 
 pub struct SubstrateWeight<T>(PhantomData<T>);
@@ -71,6 +74,21 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().reads(3u64))
             .saturating_add(T::DbWeight::get().writes(2u64))
     }
+
+    fn set_ethereum_beacon_checkpoint() -> Weight {
+        Weight::from_parts(1_000_000_000u64, 65_536u64)
+            .saturating_add(T::DbWeight::get().reads_writes(1, 3))
+    }
+
+    fn submit_ethereum_beacon_update() -> Weight {
+        Weight::from_parts(5_000_000_000u64, 196_608u64)
+            .saturating_add(T::DbWeight::get().reads_writes(3, 2))
+    }
+
+    fn submit_ethereum_execution_proof() -> Weight {
+        Weight::from_parts(500_000_000u64, 32_768u64)
+            .saturating_add(T::DbWeight::get().reads_writes(4, 3))
+    }
 }
 
 impl WeightInfo for () {
@@ -101,5 +119,20 @@ impl WeightInfo for () {
     fn validate_finalized_svm_header() -> Weight {
         Weight::from_parts(4_000_000_000u64, 8_192u64)
             .saturating_add(RocksDbWeight::get().reads_writes(3, 2))
+    }
+
+    fn set_ethereum_beacon_checkpoint() -> Weight {
+        Weight::from_parts(1_000_000_000u64, 65_536u64)
+            .saturating_add(RocksDbWeight::get().reads_writes(1, 3))
+    }
+
+    fn submit_ethereum_beacon_update() -> Weight {
+        Weight::from_parts(5_000_000_000u64, 196_608u64)
+            .saturating_add(RocksDbWeight::get().reads_writes(3, 2))
+    }
+
+    fn submit_ethereum_execution_proof() -> Weight {
+        Weight::from_parts(500_000_000u64, 32_768u64)
+            .saturating_add(RocksDbWeight::get().reads_writes(4, 3))
     }
 }

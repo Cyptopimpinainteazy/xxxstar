@@ -26,6 +26,14 @@ blake2 = { version = "0.10", default-features = false }
 # Ed25519 verification for Solana validator attestations. `no_std`-compatible:
 # verification needs no allocator and no RNG.
 ed25519-dalek = { version = "2.1", default-features = false }
+# Ethereum consensus SSZ roots and BLS12-381 verification. These are the
+# canonical primitive implementations used by Snowbridge, without importing
+# its EVM transaction stack into the X3 runtime graph.
+ssz_rs = { version = "0.9", default-features = false }
+ssz_rs_derive = "0.9"
+snowbridge-milagro-bls = { version = "1.5.4", default-features = false }
+primitive-types = { version = "0.13", default-features = false, features = ["scale-info"] }
+codec = { workspace = true }
 # Bitcoin vault types: threshold/multisig config + UTXO helpers used by the
 # Bitcoin SPV verifier path. Promotes `x3-bitcoin-vault` from a workspace
 # island to a real compiled consumer of production verification flow.
@@ -35,9 +43,11 @@ x3-btc-spv = { path = "../x3-btc-spv", default-features = false }
 
 [features]
 default = ["std"]
-std = ["serde"]
+std = ["serde", "codec/std", "primitive-types/std", "ssz_rs/std", "snowbridge-milagro-bls/std"]
 production = []
 test-verifier = []
 
 [dev-dependencies]
 hex-literal = "1.1"
+hex = { workspace = true }
+serde_json = "1"

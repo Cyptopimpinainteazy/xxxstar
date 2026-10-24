@@ -750,6 +750,9 @@ fn the_anchor_reports_the_attested_root_and_head() {
             verified_at_block: 1,
             validation_proof: Vec::new(),
         });
+        crate::EvmHeaderFinalitySource::<MockRuntime>::put(
+            crate::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
+        );
         crate::EvmMerkleRoots::<MockRuntime>::insert(block_number, merkle_root);
 
         let anchored = crate::Pallet::<MockRuntime>::anchored_header(block_number)
@@ -789,6 +792,9 @@ fn an_unattested_height_is_never_anchored_even_when_a_later_one_exists() {
             verified_at_block: 1,
             validation_proof: Vec::new(),
         });
+        crate::EvmHeaderFinalitySource::<MockRuntime>::put(
+            crate::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
+        );
         crate::EvmMerkleRoots::<MockRuntime>::insert(block_number, merkle_root);
 
         assert_eq!(

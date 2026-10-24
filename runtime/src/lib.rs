@@ -3122,6 +3122,13 @@ impl pallet_x3_cross_vm_router::ExternalRootVerifier<Runtime> for RuntimeExterna
 
         let result = match chain_id {
             EXTERNAL_ROOT_ETHEREUM => {
+                if pallet_cross_chain_validator::EvmHeaderFinalitySource::<Runtime>::get()
+                    != pallet_cross_chain_validator::EvmHeaderFinalitySourceKind::BeaconSyncCommittee
+                {
+                    return Err(DispatchError::Other(
+                        "ExternalRootEvmNativeFinalityUnavailable",
+                    ));
+                }
                 let header = pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::get()
                     .ok_or(DispatchError::Other("ExternalRootEvmHeaderUnavailable"))?;
                 verify_evm_root(
