@@ -30,24 +30,25 @@ logger = logging.getLogger("x3.tollbooth")
 
 class AccessTier(Enum):
     """Validator subscription tier — determines throughput and SLA."""
-    BASE = "base"             # Free tier, basic acceleration
-    PRO = "pro"               # Higher throughput, better SLA
-    ENTERPRISE = "enterprise" # Maximum throughput, full SLA
+
+    BASE = "base"  # Free tier, basic acceleration
+    PRO = "pro"  # Higher throughput, better SLA
+    ENTERPRISE = "enterprise"  # Maximum throughput, full SLA
 
 
 # Tier limits: requests per second
 # UNCAPPED — validators run at full GPU speed, no artificial throttle
 _TIER_RPS: dict[AccessTier, float] = {
-    AccessTier.BASE: float('inf'),
-    AccessTier.PRO: float('inf'),
-    AccessTier.ENTERPRISE: float('inf'),
+    AccessTier.BASE: float("inf"),
+    AccessTier.PRO: float("inf"),
+    AccessTier.ENTERPRISE: float("inf"),
 }
 
-# Tier limits: max batch size (uncapped)
+# Tier limits: max batch size (bounded to prevent allocation DoS)
 _TIER_BATCH: dict[AccessTier, int] = {
-    AccessTier.BASE: 2**31 - 1,
-    AccessTier.PRO: 2**31 - 1,
-    AccessTier.ENTERPRISE: 2**31 - 1,
+    AccessTier.BASE: 1024,
+    AccessTier.PRO: 4096,
+    AccessTier.ENTERPRISE: 16384,
 }
 
 # SLA: max latency (ms) per tier
@@ -120,8 +121,8 @@ class _TokenBucket:
     """Sliding-window token bucket for per-validator rate limiting."""
 
     def __init__(self, rate: float, capacity: float) -> None:
-        self._rate = rate            # Tokens per second
-        self._capacity = capacity    # Max burst
+        self._rate = rate  # Tokens per second
+        self._capacity = capacity  # Max burst
         self._tokens = capacity
         self._last_refill = time.monotonic()
 
@@ -208,7 +209,7 @@ class TollBooth:
 
             # Rate limit check — skip when tier is uncapped (inf)
             rps = _TIER_RPS[tier]
-            if rps != float('inf'):
+            if rps != float("inf"):
                 bucket = self._buckets.get(validator_id)
                 if bucket is None:
                     bucket = _TokenBucket(rate=rps, capacity=rps * 2)
@@ -218,7 +219,8 @@ class TollBooth:
                     self._total_denied += 1
                     logger.warning(
                         "Toll booth: rate limit exceeded for %s (tier=%s)",
-                        validator_id, tier.value,
+                        validator_id,
+                        tier.value,
                     )
                     if self._on_denied:
                         try:
@@ -304,9 +306,7 @@ class TollBooth:
     def cleanup_expired(self) -> int:
         """Remove expired tickets.  Returns count of cleaned tickets."""
         with self._lock:
-            expired_ids = [
-                vid for vid, t in self._tickets.items() if t.expired
-            ]
+            expired_ids = [vid for vid, t in self._tickets.items() if t.expired]
             for vid in expired_ids:
                 del self._tickets[vid]
                 self._buckets.pop(vid, None)
@@ -326,9 +326,7 @@ class TollBooth:
                 "registered_validators": len(self._tier_overrides),
                 "tier_distribution": {
                     tier.value: sum(
-                        1
-                        for v, t in self._tier_overrides.items()
-                        if t == tier
+                        1 for v, t in self._tier_overrides.items() if t == tier
                     )
                     for tier in AccessTier
                 },

@@ -6,6 +6,7 @@ Invariants tested:
   - INV-SWAP-002: Rollback on failure restores pre-swap state
   - INV-SWAP-003: GPU-accelerated signature verification matches CPU reference
 """
+
 import os
 import sys
 import time
@@ -81,9 +82,9 @@ class TestGpuSigVerificationConsistency(unittest.TestCase):
     def test_secp256k1_known_vector(self):
         """Verify a known secp256k1 test vector produces expected result."""
         try:
-            from cryptography.hazmat.primitives.asymmetric import ec
-            from cryptography.hazmat.primitives import hashes
             from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.asymmetric import ec
 
             private_key = ec.generate_private_key(ec.SECP256K1(), default_backend())
             data = b"x3-chain-test-vector"
@@ -119,8 +120,9 @@ class TestGpuSigVerificationConsistency(unittest.TestCase):
         h2 = hashlib.sha256(data).hexdigest()
         self.assertEqual(h1, h2)
         self.assertEqual(
-            h1, "fbc39b tried to compute but let's use real value"[0:0]
-            or hashlib.sha256(data).hexdigest()
+            h1,
+            "fbc39b tried to compute but let's use real value"[0:0]
+            or hashlib.sha256(data).hexdigest(),
         )
 
     def test_keccak256_deterministic(self):
@@ -142,6 +144,175 @@ class TestGpuSigVerificationConsistency(unittest.TestCase):
                 self.assertEqual(h1, h2)
             except ImportError:
                 self.skipTest("No keccak library available")
+
+    def test_keccak256_known_vector_is_not_sha3(self):
+        """The CPU reference must use Keccak-256 padding, not SHA3-256."""
+        from cross_chain_gpu_validator.gpu.keccak_gpu import _keccak256
+
+        self.assertEqual(
+            _keccak256(b"").hex(),
+            "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+        )
+
+    def test_keccak_required_mode_refuses_cpu_fallback(self):
+        """GPU-required callers must not silently use the CPU hash path."""
+        from cross_chain_gpu_validator.gpu import CudaRuntime, KeccakBatchHasher
+
+        with self.assertRaises(RuntimeError):
+            KeccakBatchHasher(
+                CudaRuntime(available=False, nvcc_path=None, visible_devices=""),
+                os.path.join(os.path.dirname(__file__), "..", "kernels"),
+                parity_check=True,
+                allow_failover=False,
+            )
+
+    def test_ed25519_batch_verifier_cpu_fallback(self):
+        """Ed25519BatchVerifier must verify real signatures on CPU fallback."""
+        import hashlib
+
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        from cross_chain_gpu_validator.gpu import CudaRuntime, Ed25519BatchVerifier
+
+        runtime = CudaRuntime.detect()
+        verifier = Ed25519BatchVerifier(
+            runtime,
+            os.path.join(os.path.dirname(__file__), "..", "kernels"),
+            parity_check=True,
+            allow_failover=True,
+        )
+
+        signing_key = Ed25519PrivateKey.generate()
+        message = hashlib.sha256(b"x3-chain-ed25519-fallback-test").digest()
+        signature = signing_key.sign(message)
+        pubkey = signing_key.public_key().public_bytes_raw()
+
+        self.assertEqual(
+            verifier.verify_batch([signature], [message], [pubkey]),
+            [True],
+        )
+        tampered = bytearray(signature)
+        tampered[-1] ^= 1
+        self.assertEqual(
+            verifier.verify_batch(
+                [bytes(tampered), signature],
+                [message, message],
+                [pubkey, pubkey],
+            ),
+            [False, True],
+        )
+
+    def test_gpu_required_mode_refuses_cpu_fallback(self):
+        """A caller that requires GPU execution must never silently use CPU."""
+        from cross_chain_gpu_validator.gpu import CudaRuntime, Ed25519BatchVerifier
+
+        runtime = CudaRuntime(available=False, nvcc_path=None, visible_devices="")
+        with self.assertRaises(RuntimeError):
+            Ed25519BatchVerifier(
+                runtime,
+                os.path.join(os.path.dirname(__file__), "..", "kernels"),
+                parity_check=True,
+                allow_failover=False,
+            )
+
+    def test_secp256k1_batch_verifier_cpu_parity(self):
+        """Secp256k1 CPU verification must accept valid and reject invalid signatures."""
+        import hashlib
+
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec, utils
+
+        from cross_chain_gpu_validator.gpu import CudaRuntime, Secp256k1BatchVerifier
+
+        message = hashlib.sha256(b"x3-chain-secp256k1-fallback-test").digest()
+        private_key = ec.generate_private_key(ec.SECP256K1())
+        der_signature = private_key.sign(
+            message, ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+        )
+        r, s = utils.decode_dss_signature(der_signature)
+        signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+        numbers = private_key.public_key().public_numbers()
+        pubkey = numbers.x.to_bytes(32, "big") + numbers.y.to_bytes(32, "big")
+
+        verifier = Secp256k1BatchVerifier(
+            CudaRuntime(available=False, nvcc_path=None, visible_devices=""),
+            os.path.join(os.path.dirname(__file__), "..", "kernels"),
+            parity_check=True,
+            allow_failover=True,
+        )
+        self.assertEqual(
+            verifier.verify_batch([signature], [message], [pubkey]), [True]
+        )
+
+        bad_pubkey = bytearray(pubkey)
+        bad_pubkey[-1] ^= 1
+        self.assertEqual(
+            verifier.verify_batch([signature], [message], [bytes(bad_pubkey)]),
+            [False],
+        )
+
+        compressed_pubkey = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.CompressedPoint,
+        )
+        self.assertEqual(
+            verifier.verify_batch([signature], [message], [compressed_pubkey]),
+            [True],
+        )
+
+    def test_svm_validator_uses_ed25519(self):
+        """SVM validation must verify Ed25519, never Secp256k1."""
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        from cross_chain_gpu_validator.chain_adapter import (
+            ChainConfig,
+            ChainTransaction,
+            HashAlgorithm,
+            SignatureAlgorithm,
+        )
+        from cross_chain_gpu_validator.gpu import CudaRuntime, Ed25519BatchVerifier
+        from cross_chain_gpu_validator.svm import SvmValidator
+
+        config = ChainConfig(
+            chain_id="solana",
+            chain_name="Solana",
+            rpc_url="http://127.0.0.1:8899",
+            sig_algorithm=SignatureAlgorithm.ED25519,
+            hash_algorithm=HashAlgorithm.SHA256,
+            sig_pubkey_size=32,
+            sig_signature_size=64,
+            hash_output_size=32,
+        )
+        verifier = Ed25519BatchVerifier(
+            CudaRuntime(available=False, nvcc_path=None, visible_devices=""),
+            os.path.join(os.path.dirname(__file__), "..", "kernels"),
+            parity_check=True,
+            allow_failover=True,
+        )
+        validator = SvmValidator(config, verifier)
+
+        payload = b"x3-svm-atomic-swap"
+        signing_key = Ed25519PrivateKey.generate()
+        signature = signing_key.sign(payload)
+        pubkey = signing_key.public_key().public_bytes_raw()
+        transaction = ChainTransaction(
+            chain_id="solana",
+            signature=signature,
+            pubkey=pubkey,
+            payload=payload,
+        )
+        assert validator.validate_transactions([transaction]) == [True]
+
+        malformed = ChainTransaction(
+            chain_id="solana",
+            signature=signature,
+            pubkey=b"\x00" * 33,
+            payload=payload,
+        )
+        assert validator.validate_transactions([malformed, transaction]) == [
+            False,
+            True,
+        ]
 
 
 class TestCrossChainSwapE2E(unittest.TestCase):

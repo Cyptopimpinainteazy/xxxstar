@@ -3,32 +3,45 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import time
-import json
 
+from cross_chain_gpu_validator.benchmark import run_benchmark, write_report
+from cross_chain_gpu_validator.chain_adapter import HashAlgorithm, SignatureAlgorithm
+from cross_chain_gpu_validator.chain_registry import (
+    ChainRegistry,
+    load_default_chain_configs,
+)
 from cross_chain_gpu_validator.config import load_settings
+from cross_chain_gpu_validator.cosmos import CosmosValidator
 from cross_chain_gpu_validator.dashboard.server import run_dashboard
 from cross_chain_gpu_validator.evm import EvmValidator
-from cross_chain_gpu_validator.svm import SvmValidator
-from cross_chain_gpu_validator.cosmos import CosmosValidator
-from cross_chain_gpu_validator.substrate import SubstrateValidator
-from cross_chain_gpu_validator.gpu import CudaRuntime, KeccakBatchHasher, Secp256k1BatchVerifier
+from cross_chain_gpu_validator.gpu import (
+    CudaRuntime,
+    Ed25519BatchVerifier,
+    KeccakBatchHasher,
+    Secp256k1BatchVerifier,
+)
 from cross_chain_gpu_validator.logging_utils import configure_logging, get_logger
 from cross_chain_gpu_validator.metrics import MetricsStore
-from cross_chain_gpu_validator.orchestrator import AtomicSwapRegistry, MultiChainOrchestrator
-from cross_chain_gpu_validator.chain_registry import ChainRegistry, load_default_chain_configs
-from cross_chain_gpu_validator.chain_adapter import SignatureAlgorithm, HashAlgorithm
-from cross_chain_gpu_validator.benchmark import run_benchmark, write_report
+from cross_chain_gpu_validator.orchestrator import (
+    AtomicSwapRegistry,
+    MultiChainOrchestrator,
+)
+from cross_chain_gpu_validator.substrate import SubstrateValidator
+from cross_chain_gpu_validator.svm import SvmValidator
 
 
-def _build_chain_registry(settings, sig_verifier, keccak_hasher, logger):
+def _build_chain_registry(
+    settings, sig_verifier, ed25519_verifier, keccak_hasher, logger
+):
     """Build and populate the chain registry with 103+ chains."""
     chain_registry = ChainRegistry()
     all_configs = load_default_chain_configs()
-    
+
     validators_created = 0
-    
+
     for chain_id, config in all_configs.items():
         try:
             # Create appropriate validator based on signature algorithm
@@ -42,31 +55,43 @@ def _build_chain_registry(settings, sig_verifier, keccak_hasher, logger):
             elif config.sig_algorithm == SignatureAlgorithm.ED25519:
                 if chain_id.startswith("solana"):
                     # Solana (SVM)
-                    validator = SvmValidator(config, sig_verifier)
+                    validator = SvmValidator(config, ed25519_verifier)
                 else:
                     # Substrate and other ED25519 chains
-                    validator = SubstrateValidator(config, sig_verifier)
+                    validator = SubstrateValidator(config, ed25519_verifier)
+            elif config.sig_algorithm == SignatureAlgorithm.SR25519:
+                # Routing these through the Ed25519 verifier would check the
+                # wrong equation; with no SR25519 verifier the chain is not
+                # served at all rather than served wrongly.
+                logger.warning(
+                    "SR25519 chain skipped: no SR25519 verifier is implemented",
+                    extra={"chain_id": chain_id},
+                )
+                continue
             else:
                 logger.warning(
                     "unsupported signature algorithm",
-                    extra={"chain_id": chain_id, "algorithm": config.sig_algorithm.value}
+                    extra={
+                        "chain_id": chain_id,
+                        "algorithm": config.sig_algorithm.value,
+                    },
                 )
                 continue
-            
+
             chain_registry.register_chain(config, validator)
             validators_created += 1
-            
+
         except Exception as e:
             logger.error(
                 "failed to register chain",
-                extra={"chain_id": chain_id, "error": str(e)}
+                extra={"chain_id": chain_id, "error": str(e)},
             )
-    
+
     logger.info(
         "chain registry initialized",
-        extra={"chain_count": validators_created, "total_available": len(all_configs)}
+        extra={"chain_count": validators_created, "total_available": len(all_configs)},
     )
-    
+
     return chain_registry
 
 
@@ -97,6 +122,12 @@ def _run_orchestrator() -> None:
         parity_check=settings.gpu_parity_check,
         allow_failover=not settings.require_gpu,
     )
+    ed25519_verifier = Ed25519BatchVerifier(
+        runtime,
+        settings.kernel_dir,
+        parity_check=settings.gpu_parity_check,
+        allow_failover=not settings.require_gpu,
+    )
     keccak_hasher = KeccakBatchHasher(
         runtime,
         settings.kernel_dir,
@@ -105,13 +136,18 @@ def _run_orchestrator() -> None:
     )
 
     # Build chain registry with all 103+ chains
-    chain_registry = _build_chain_registry(settings, sig_verifier, keccak_hasher, logger)
+    chain_registry = _build_chain_registry(
+        settings, sig_verifier, ed25519_verifier, keccak_hasher, logger
+    )
 
     registry = AtomicSwapRegistry(settings.redis_url)
     metrics = MetricsStore()
 
     orchestrator = MultiChainOrchestrator(registry, chain_registry, metrics)
-    logger.info("multi-chain orchestrator started", extra={"trace_id": "bootstrap", "span_id": "n/a"})
+    logger.info(
+        "multi-chain orchestrator started",
+        extra={"trace_id": "bootstrap", "span_id": "n/a"},
+    )
 
     while True:
         orchestrator.process_pending()
@@ -122,7 +158,9 @@ def _run_dashboard() -> None:
     settings = load_settings()
     configure_logging(settings.log_level)
     metrics = MetricsStore()
-    static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "dashboard"))
+    static_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "dashboard")
+    )
     run_dashboard(settings.dashboard_host, settings.dashboard_port, metrics, static_dir)
 
 
@@ -135,16 +173,16 @@ def _run_benchmark(output: str) -> None:
 def _list_chains() -> None:
     """List all 103+ available chains with their configurations."""
     all_configs = load_default_chain_configs()
-    
+
     print(f"\n{'Chain ID':<25} {'Name':<30} {'Algorithm':<15} {'Hash':<15}")
     print("-" * 85)
-    
+
     for chain_id, config in sorted(all_configs.items()):
         print(
             f"{chain_id:<25} {config.chain_name:<30} "
             f"{config.sig_algorithm.value:<15} {config.hash_algorithm.value:<15}"
         )
-    
+
     print(f"\nTotal chains: {len(all_configs)}")
 
 
@@ -152,11 +190,11 @@ def _chain_info(chain_id: str) -> None:
     """Get detailed info for a specific chain."""
     all_configs = load_default_chain_configs()
     config = all_configs.get(chain_id)
-    
+
     if config is None:
         print(f"Chain '{chain_id}' not found")
         return
-    
+
     info = {
         "chain_id": config.chain_id,
         "chain_name": config.chain_name,
@@ -168,7 +206,7 @@ def _chain_info(chain_id: str) -> None:
         "hash_output_size": config.hash_output_size,
         "supports_gpu": config.supports_gpu,
     }
-    
+
     print(json.dumps(info, indent=2))
 
 
@@ -180,9 +218,9 @@ def main() -> None:
     sub.add_parser("dashboard", help="Run the dashboard server")
     bench = sub.add_parser("benchmark", help="Run benchmark and emit report")
     bench.add_argument("--output", default="benchmark_report.json")
-    
+
     list_cmd = sub.add_parser("list-chains", help="List all 103+ available chains")
-    
+
     info_cmd = sub.add_parser("chain-info", help="Get detailed info for a chain")
     info_cmd.add_argument("chain_id", help="Chain ID to query")
 

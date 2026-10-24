@@ -170,6 +170,23 @@ pub mod pallet {
     #[pallet::getter(fn viral_memes)]
     pub type ViralMemes<T: Config> = StorageValue<_, BoundedVec<MemeId, ConstU32<50>>, ValueQuery>;
 
+    /// Accounts that have already liked a meme.
+    ///
+    /// Engagement drives "viral" status and achievement issuance, so a like
+    /// must be attributable to one account exactly once. Keeping this state
+    /// on-chain also makes the `AlreadyLiked` error enforceable rather than
+    /// advisory.
+    #[pallet::storage]
+    pub type MemeLikes<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        MemeId,
+        Blake2_128Concat,
+        T::AccountId,
+        (),
+        OptionQuery,
+    >;
+
     // ========== TYPES ==========
 
     /// Template ID type
@@ -444,6 +461,8 @@ pub mod pallet {
         TemplateInactive,
         /// Not authorized
         NotAuthorized,
+        /// An identifier sequence is exhausted
+        IdOverflow,
     }
 
     // ========== EXTRINSICS ==========
@@ -471,7 +490,7 @@ pub mod pallet {
                 .map_err(|_| Error::<T>::MemeDataTooLong)?;
 
             let template_id = NextTemplateId::<T>::get();
-            NextTemplateId::<T>::put(template_id + 1);
+            NextTemplateId::<T>::put(template_id.checked_add(1).ok_or(Error::<T>::IdOverflow)?);
 
             let template = MemeTemplate {
                 id: template_id,
@@ -541,13 +560,18 @@ pub mod pallet {
             let liker = ensure_signed(origin)?;
 
             ensure!(Memes::<T>::contains_key(meme_id), Error::<T>::MemeNotFound);
+            ensure!(
+                !MemeLikes::<T>::contains_key(meme_id, &liker),
+                Error::<T>::AlreadyLiked
+            );
 
             MemeEngagement::<T>::mutate(meme_id, |engagement| {
-                engagement.likes += 1;
+                engagement.likes = engagement.likes.saturating_add(1);
             });
 
             // Check if went viral
             Self::check_viral_status(meme_id)?;
+            MemeLikes::<T>::insert(meme_id, &liker, ());
 
             Self::deposit_event(Event::MemeLiked { meme_id, liker });
 
@@ -563,7 +587,7 @@ pub mod pallet {
             ensure!(Memes::<T>::contains_key(meme_id), Error::<T>::MemeNotFound);
 
             MemeEngagement::<T>::mutate(meme_id, |engagement| {
-                engagement.shares += 1;
+                engagement.shares = engagement.shares.saturating_add(1);
             });
 
             // Check if went viral
@@ -641,7 +665,7 @@ pub mod pallet {
             ensure!(template.is_active, Error::<T>::TemplateInactive);
 
             let meme_id = NextMemeId::<T>::get();
-            NextMemeId::<T>::put(meme_id + 1);
+            NextMemeId::<T>::put(meme_id.checked_add(1).ok_or(Error::<T>::IdOverflow)?);
 
             // Generate meme image CID (would be done off-chain in production)
             let image_cid = template.image_cid.clone();
@@ -793,7 +817,7 @@ pub mod pallet {
             let engagement = MemeEngagement::<T>::get(meme_id);
             let threshold = T::ViralThreshold::get();
 
-            if engagement.likes + engagement.shares >= threshold {
+            if engagement.likes.saturating_add(engagement.shares) >= threshold {
                 Memes::<T>::try_mutate(meme_id, |maybe_meme| -> DispatchResult {
                     if let Some(meme) = maybe_meme {
                         if !meme.is_viral {

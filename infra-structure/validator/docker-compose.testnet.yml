@@ -90,26 +90,43 @@ services:
       # RPC Endpoints (internal Docker network)
       CCGV_EVM_RPC: "http://ethereum-testnet:8545"
       CCGV_SVM_RPC: "http://solana-testnet:8899"
-      
+
       # Redis Configuration
-       # Use unified Redis URL as expected by validator code
-       CCGV_REDIS_URL: "redis://redis:6379"
-      
+      CCGV_REDIS_URL: "redis://redis:6379/0"
+
       # GPU Configuration
       CCGV_REQUIRE_GPU: "false"  # Disabled for containerized testing
       CCGV_GPU_PARITY_CHECK: "false"
-      
+
       # Logging
       CCGV_LOG_LEVEL: "DEBUG"
       RUST_LOG: "debug"
       RUST_BACKTRACE: "1"
-    ports:
-      - "127.0.0.1:8000:8000"  # Metrics endpoint
-      - "127.0.0.1:9000:9000"  # RPC server endpoint
     volumes:
       - ./src:/app/src
       - ./tests:/app/tests
       - ccgv_logs:/app/logs
+    networks:
+      - ccgv-testnet
+
+  ccgv-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.testnet
+    container_name: ccgv-dashboard
+    command: ["ccgv", "dashboard"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      CCGV_DASHBOARD_HOST: "0.0.0.0"
+      CCGV_DASHBOARD_PORT: "8000"
+      CCGV_REDIS_URL: "redis://redis:6379/0"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./dashboard:/app/dashboard
     networks:
       - ccgv-testnet
     healthcheck:
@@ -128,13 +145,15 @@ services:
       dockerfile: Dockerfile.test
     container_name: ccgv-test-runner
     depends_on:
-      ccgv-validator:
+      ccgv-dashboard:
         condition: service_healthy
+      ccgv-validator:
+        condition: service_started
     environment:
       CCGV_EVM_RPC: "http://ethereum-testnet:8545"
       CCGV_SVM_RPC: "http://solana-testnet:8899"
-       CCGV_REDIS_URL: "redis://redis:6379"
-      CCGV_VALIDATOR_HOST: "ccgv-validator"
+      CCGV_REDIS_URL: "redis://redis:6379/0"
+      CCGV_VALIDATOR_HOST: "ccgv-dashboard"
       CCGV_VALIDATOR_PORT: "8000"
     volumes:
       - ./tests:/tests
@@ -158,12 +177,6 @@ services:
       - "127.0.0.1:9090:9090"
     networks:
       - ccgv-testnet
-    healthcheck:
-       # Updated healthcheck to probe the /health endpoint which returns 200 when ready
-       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 5s
-      timeout: 2s
-      retries: 3
 
 volumes:
   ethereum_data:
