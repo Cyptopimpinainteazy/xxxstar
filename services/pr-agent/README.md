@@ -145,6 +145,30 @@ inputs are `pr_number`, `command`, `model`, `via_router`, `use_local` and `dry_r
 Status: `workflow schema` and `workflow wiring` pass; the job itself is **NOT RUN** — dispatch needs
 the file on the default branch, and it is not pushed yet.
 
+## Automatic reviews
+
+[.github/workflows/pr-agent-auto.yml](../../.github/workflows/pr-agent-auto.yml) publishes on its own,
+on the same `x3` runner:
+
+| event | runs |
+| --- | --- |
+| PR opened, reopened, or marked ready for review | `describe`, `review`, `improve` |
+| new commits pushed | `review`, `improve` (the same comments are updated, not added) |
+| comment `/review`, `/improve`, `/describe` | that command |
+| comment `/ask <question>` | `ask` |
+
+Drafts, fork PRs and Dependabot PRs are skipped, and only OWNER, MEMBER or COLLABORATOR comments run
+a command. The runner is self-hosted, so nothing from the PR executes on it: `pull_request_target`
+runs the workflow and scripts from the default branch, the checkout pins that branch, and PR-Agent
+reads the diff through the API. [on-comment.sh](on-comment.sh) parses the comment: first line only,
+four commands, words after `/review` `/improve` `/describe` dropped, and an `/ask` question that
+starts with `-` rejected, because PR-Agent reads `--x=y` arguments as settings overrides.
+
+It needs the `DEEPSEEK_API_KEY` repository secret, and like every `pull_request_target` workflow it
+only fires once the file is on the default branch. Cost is roughly 30 s to 3 min and a few cents of
+DeepSeek per push. `gemma4:26b` was measured as a free alternative and is not one: 417 s on #671 for
+"No major issues detected", where `deepseek-v4-pro` took 49 s and flagged the `f64` rate comparison.
+
 ## Notes
 
 - `PR_AGENT_VENV`, `PR_AGENT_LOCAL_MODEL`, `PR_AGENT_LOCAL_TIMEOUT`, `PR_AGENT_ROUTER_MODEL`,

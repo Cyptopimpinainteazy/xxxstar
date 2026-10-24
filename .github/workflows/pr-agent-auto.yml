@@ -1,0 +1,117 @@
+name: pr-agent-auto
+
+# Automatic PR-Agent on the local x3 runner. pr-agent.yml stays the manual,
+# dry-run-by-default entry point; this one publishes.
+#
+#   PR opened / reopened / ready for review  -> describe, review, improve
+#   new commits pushed                       -> review, improve
+#   comment /review /improve /describe       -> that command
+#   comment /ask <question>                  -> ask
+#
+# The runner is self-hosted, so nothing from the PR is ever executed here:
+# - pull_request_target runs this file and the scripts from the default
+#   branch, never the PR's copy. PR-Agent reads the diff through the API.
+# - The checkout pins the default branch explicitly, so a later edit that adds
+#   `ref: <pr head>` has to delete that line on purpose.
+# - Only same-repository PRs run automatically, and only OWNER, MEMBER or
+#   COLLABORATOR comments run a command. A fork cannot spend the DeepSeek key.
+# - Comment text reaches the shell through an environment variable and is
+#   parsed by services/pr-agent/on-comment.sh, never interpolated.
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  # A push supersedes the review of the previous push. Each comment gets its own
+  # group: GitHub keeps one pending run per group, so a shared group would drop
+  # the middle one of three quick comments.
+  group: pr-agent-auto-${{ github.event.pull_request.number || format('comment-{0}', github.event.comment.id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  on-pr:
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout the default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Install pr-agent
+        run: services/pr-agent/install.sh
+
+      - name: Require the DeepSeek key
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+            echo "DEEPSEEK_API_KEY repository secret is not set" >&2
+            exit 1
+          fi
+
+      # describe rewrites the PR body (it keeps the author's text as "User
+      # description"), so it runs once when the PR becomes reviewable, not on
+      # every push.
+      - name: Describe
+        if: github.event.action != 'synchronize'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: services/pr-agent/review.sh "$PR" describe
+
+      # persistent_comment in .pr_agent.toml makes each push update the same
+      # review and suggestions comments instead of adding new ones.
+      - name: Review
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: services/pr-agent/review.sh "$PR" review
+
+      - name: Improve
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: services/pr-agent/review.sh "$PR" improve
+
+  on-comment:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Install pr-agent
+        run: services/pr-agent/install.sh
+
+      - name: Run the commented command
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR: ${{ github.event.issue.number }}
+        run: services/pr-agent/on-comment.sh "$PR"

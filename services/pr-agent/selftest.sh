@@ -195,6 +195,48 @@ expect_dies "--local and --via-router are rejected together" --local --via-route
 expect_dies "a non-numeric target is rejected" not-a-pr
 expect_dies "a wrapper flag after the target is rejected, not run as a command" 672 --dry-run
 
+# ── on-comment.sh: PR comment -> review.sh, against the same shim ──────────
+run_comment() { # <comment body> -> argv log; status in $comment_status
+  : > "$argv_log"
+  comment_status=0
+  COMMENT_BODY="$1" PR_AGENT_VENV="$fake_venv" PR_AGENT_ARGV_LOG="$argv_log" \
+    GITHUB_TOKEN="test-token" \
+    bash "$ROOT_DIR/services/pr-agent/on-comment.sh" 672 >"$tmp/out" 2>&1 || comment_status=$?
+}
+
+expect_comment() { # <label> <comment body> <expected argv, empty = no run>
+  local label="$1" body="$2" expected="$3"
+  run_comment "$body"
+  local actual
+  actual="$(tr '\n' ' ' < "$argv_log" | sed 's/ $//')"
+  if [ "$comment_status" = 0 ] && [ "$actual" = "$expected" ]; then
+    pass "$label"
+  else
+    fail "$label (status $comment_status)"
+    printf '        expected: %s\n        actual:   %s\n' "$expected" "$actual"
+  fi
+}
+
+expect_comment_dies() { # <label> <comment body>
+  local label="$1" body="$2"
+  run_comment "$body"
+  if [ "$comment_status" != 0 ] && [ ! -s "$argv_log" ] && grep -q 'error:' "$tmp/out"; then
+    pass "$label"
+  else
+    fail "$label (status $comment_status, argv '$(tr '\n' ' ' < "$argv_log")')"
+  fi
+}
+
+pr_args="--pr_url=https://github.com/$repo_slug/pull/672 --extra_config_url=$CONFIG"
+expect_comment "/review comment runs a review" "/review" "$pr_args review"
+expect_comment "/improve drops trailing words instead of forwarding overrides" \
+  "/improve --config.model=evil/model" "$pr_args improve"
+expect_comment "/ask passes the question as one argument, first line only" \
+  $'/ask does every leg roll back?\nsecond line is ignored' "$pr_args ask does every leg roll back?"
+expect_comment "an unknown slash command is ignored without a model call" "/lgtm" ""
+expect_comment_dies "/ask with no question is rejected" "/ask"
+expect_comment_dies "/ask shaped like a settings override is rejected" "/ask --config.openai.api_base=http://x"
+
 # ── --via-router overrides and router authentication ──────────────────────
 # A one-shot HTTP server stands in for x3-ai-router: it answers /health and
 # records the Authorization header it received, so both the argv and the auth
