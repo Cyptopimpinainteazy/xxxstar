@@ -94,6 +94,14 @@ case "$command_name" in
   -*) die "'$command_name' is not a command; put wrapper flags before the PR or diff (review.sh --dry-run 672 review)" ;;
 esac
 [ $# -gt 0 ] && shift
+# Nor after the command: pr-agent drops an argument without "=", so
+# `672 review --dry-run` would publish while looking like a dry run.
+for arg in "$@"; do
+  case "$arg" in
+    --local|--via-router|--dry-run|--model|--model=*|--diff|--stdin)
+      die "'$arg' is a wrapper flag; put it before the PR or diff (review.sh $arg 672 $command_name)" ;;
+  esac
+done
 
 # The secrets file is a fallback, never an override. install.sh writes empty
 # `DEEPSEEK_API_KEY=` / `GITHUB_TOKEN=` placeholders, and a plain `. file` would

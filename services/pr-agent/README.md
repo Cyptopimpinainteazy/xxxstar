@@ -65,8 +65,9 @@ services/pr-agent/review.sh --via-router --model x3-code 672 review
 services/pr-agent/usage.sh                                # what that router run cost
 ```
 
-Wrapper flags (`--dry-run`, `--local`, `--model`, …) go before the PR or diff; after it they are
-rejected. `--dry-run` on a PR prints what would have been posted: with publishing off PR-Agent keeps
+Wrapper flags (`--dry-run`, `--local`, `--model`, …) go before the PR or diff. Anywhere after it,
+including after the command, they are rejected: PR-Agent silently drops an argument without `=`, so
+`672 review --dry-run` used to publish. `--dry-run` on a PR prints what would have been posted: with publishing off PR-Agent keeps
 the result in memory and prints nothing, so [dry_run.py](dry_run.py) runs the CLI and prints it.
 `review`, `describe`, `improve` and `ask` are covered.
 
@@ -164,8 +165,18 @@ reads the diff through the API. [on-comment.sh](on-comment.sh) parses the commen
 four commands, words after `/review` `/improve` `/describe` dropped, and an `/ask` question that
 starts with `-` rejected, because PR-Agent reads `--x=y` arguments as settings overrides.
 
-It needs the `DEEPSEEK_API_KEY` repository secret, and like every `pull_request_target` workflow it
-only fires once the file is on the default branch. Cost is roughly 30 s to 3 min and a few cents of
+Both jobs check for the `DEEPSEEK_API_KEY` secret first, set up Python 3.12 (the runners'
+`/usr/bin/python3` is 3.10, older than PR-Agent needs), and install the pinned `pr-agent` 0.48.0
+that [dry_run.py](dry_run.py) is written against. CI sets `CONFIG__FALLBACK_MODELS` to
+`deepseek-flash` only, so a DeepSeek outage fails the job instead of publishing a `qwen3:8b` review
+under the same comment. `review` and `improve` still run when `describe` fails. A comment run and a
+push run on one PR can overlap; the last to finish owns the persistent comment, and the next push
+rewrites it.
+
+Status (2026-10-24): merged in #673. The first live run, `/review` on #668, failed at install on
+the runners' Python 3.10, which this change fixes. A successful live run has **not** happened yet.
+
+Cost is roughly 30 s to 3 min and a few cents of
 DeepSeek per push. `gemma4:26b` was measured as a free alternative and is not one: 417 s on #671 for
 "No major issues detected", where `deepseek-v4-pro` took 49 s and flagged the `f64` rate comparison.
 

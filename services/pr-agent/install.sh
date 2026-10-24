@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Installs PR-Agent into an isolated venv and prepares the secrets file.
-# Idempotent: re-running upgrades the package and leaves an existing env file alone.
+# Idempotent: re-running installs the pinned version and leaves an existing env
+# file alone. The pin matters: dry_run.py reads pr-agent internals.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -8,12 +9,23 @@ VENV_DIR="${PR_AGENT_VENV:-$HOME/.venvs/pr-agent}"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/pr-agent"
 ENV_FILE="$CONFIG_DIR/env"
 PYTHON_BIN="${PYTHON:-/usr/bin/python3}"
+# dry_run.py depends on this release's internals; bump both together.
+PR_AGENT_VERSION="0.48.0"
 
 log() { printf '==> %s\n' "$*"; }
 
-if ! "$PYTHON_BIN" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)'; then
+is_py312() { "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' 2>/dev/null; }
+
+if ! is_py312 "$PYTHON_BIN"; then
   echo "error: pr-agent requires Python >= 3.12, $PYTHON_BIN reports $("$PYTHON_BIN" -V 2>&1)" >&2
   exit 1
+fi
+
+# A venv left by an older interpreter would pass the check above and still run
+# pr-agent on that older Python; rebuild it rather than reuse it.
+if [ -x "$VENV_DIR/bin/python" ] && ! is_py312 "$VENV_DIR/bin/python"; then
+  log "venv at $VENV_DIR is $("$VENV_DIR/bin/python" -V 2>&1); recreating"
+  rm -rf -- "$VENV_DIR"
 fi
 
 if [ ! -x "$VENV_DIR/bin/python" ]; then
@@ -23,7 +35,7 @@ fi
 
 log "installing pr-agent[github] into $VENV_DIR"
 "$VENV_DIR/bin/python" -m pip install --quiet --upgrade pip
-"$VENV_DIR/bin/python" -m pip install --quiet --upgrade "pr-agent[github]"
+"$VENV_DIR/bin/python" -m pip install --quiet "pr-agent[github]==$PR_AGENT_VERSION"
 
 mkdir -p "$CONFIG_DIR"
 if [ -f "$ENV_FILE" ]; then
