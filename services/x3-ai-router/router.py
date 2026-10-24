@@ -20,6 +20,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 CRITICAL = ("consensus", "finality", "settlement", "atomic", "cryptograph", "supply", "runtime upgrade", "slashing", "cross-vm")
 MAX_BODY = 2_000_000
+# A Responses stream echoes the request's instructions and tools in its
+# created/completed events, so one SSE line can be as large as the request.
+MAX_SSE_LINE = 64 * 1024 * 1024
 # A single completion may not ask for more output than this. The bound exists so
 # the per-request reservation is an upper bound on what the provider can bill.
 MAX_OUTPUT_TOKENS = 32_768
@@ -2039,7 +2042,7 @@ class Router:
         finish_reason = None
         saw_done = False
         for line in response:
-            if len(line) > 1_000_000:
+            if len(line) > MAX_SSE_LINE:
                 raise ValueError("Oversized SSE line")
             if not line.startswith(b"data: "):
                 if started:
@@ -2077,7 +2080,7 @@ class Router:
         reader = ResponsesEventReader()
         held = []
         for line in response:
-            if len(line) > 1_000_000:
+            if len(line) > MAX_SSE_LINE:
                 raise ValueError("Oversized SSE line")
             stripped = line.rstrip(b"\r\n")
             if not started:
