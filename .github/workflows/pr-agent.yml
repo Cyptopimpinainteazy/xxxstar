@@ -1,0 +1,104 @@
+name: pr-agent
+
+# GitHub-hosted CI is disabled for this repo (billing lock), so this runs on the
+# local x3 runner like every other gate here — see .github/workflows/README.md.
+# It is manual because a review costs a paid DeepSeek call and publishes a
+# comment: neither should happen on every push without someone asking for it.
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to review"
+        required: true
+        type: string
+      command:
+        description: "PR-Agent command"
+        required: true
+        default: review
+        type: choice
+        options: [review, describe, improve, ask]
+      model:
+        description: "Model or router policy (blank = .pr_agent.toml default)"
+        required: false
+        default: ""
+        type: string
+      via_router:
+        description: "Route through services/x3-ai-router so spend lands in /v1/usage"
+        required: false
+        default: false
+        type: boolean
+      use_local:
+        description: "Run on this runner's GPUs (Ollama). No API key needed; slower and shallower"
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: "Build the review without publishing a comment"
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.pr_number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pr-agent
+        run: services/pr-agent/install.sh
+
+      # check.sh reports a missing key as BLOCKED and still exits 0, which is
+      # right for an operator report and wrong for a job: fail before spending a
+      # checkout's worth of time on a review that cannot authenticate. A
+      # --local run needs no key, so the requirement is conditional.
+      - name: Require the DeepSeek key
+        if: ${{ !inputs.use_local }}
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+            echo "DEEPSEEK_API_KEY repository secret is not set" >&2
+            echo "Either add the secret, or re-dispatch with use_local=true to run on this runner's GPUs." >&2
+            exit 1
+          fi
+
+      - name: Report dependencies
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: services/pr-agent/check.sh
+
+      - name: Run the command
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_AGENT_LOCAL_MODEL: ${{ vars.PR_AGENT_LOCAL_MODEL }}
+          INPUT_PR: ${{ inputs.pr_number }}
+          INPUT_COMMAND: ${{ inputs.command }}
+          INPUT_MODEL: ${{ inputs.model }}
+          INPUT_VIA_ROUTER: ${{ inputs.via_router }}
+          INPUT_USE_LOCAL: ${{ inputs.use_local }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          args=()
+          [ "$INPUT_VIA_ROUTER" = "true" ] && args+=(--via-router)
+          [ "$INPUT_USE_LOCAL" = "true" ] && args+=(--local)
+          [ "$INPUT_DRY_RUN" = "true" ] && args+=(--dry-run)
+          [ -n "$INPUT_MODEL" ] && args+=(--model "$INPUT_MODEL")
+          services/pr-agent/review.sh "${args[@]}" "$INPUT_PR" "$INPUT_COMMAND"
+
+      # The self-test is offline and needs no model, so it runs after the paid
+      # call to prove the wiring that produced that call was not broken.
+      - name: Self-test
+        run: services/pr-agent/selftest.sh
