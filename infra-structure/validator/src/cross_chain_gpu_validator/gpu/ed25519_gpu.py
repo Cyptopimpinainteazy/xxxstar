@@ -92,9 +92,10 @@ class Ed25519BatchVerifier:
 
         seed = b"x3-chain-ed25519-selftest-seed-0000000000"[:32]
         message = b"x3-chain-ed25519-selftest".ljust(32, b"\x00")[:32]
-        self_test_signer = Ed25519PrivateKey.from_private_bytes(seed)
-        signature = self_test_signer.sign(message)
-        pubkey = self_test_signer.public_key().public_bytes_raw()
+        # A fixed, public test vector, not a secret.
+        selftest_signer = Ed25519PrivateKey.from_private_bytes(seed)
+        signature = selftest_signer.sign(message)
+        pubkey = selftest_signer.public_key().public_bytes_raw()
 
         cpu_ok = self._verify_cpu([signature], [message], [pubkey])[0]
         try:
