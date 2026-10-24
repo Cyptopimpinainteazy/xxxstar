@@ -23,6 +23,8 @@
 
 pub use pallet::*;
 
+pub mod weights;
+
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
@@ -434,35 +436,6 @@ pub mod pallet {
         fn start_session(_start_index: u32) {
             // Clear pending set once the session pallet has activated it.
             NextValidators::<T>::kill();
-        }
-    }
-}
-
-/// Weight information for the consensus pallet
-pub mod weights {
-    use frame_support::weights::Weight;
-
-    /// Weight functions for pallet_x3_consensus
-    pub trait WeightInfo {
-        fn set_validators() -> Weight;
-        fn report_misbehavior() -> Weight;
-        fn on_initialize() -> Weight;
-    }
-
-    /// Default weight implementation
-    pub struct SubstrateWeight<T>(core::marker::PhantomData<T>);
-
-    impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
-        fn set_validators() -> Weight {
-            Weight::from_parts(10_000_000, 0)
-        }
-
-        fn report_misbehavior() -> Weight {
-            Weight::from_parts(5_000_000, 0)
-        }
-
-        fn on_initialize() -> Weight {
-            Weight::from_parts(1_000_000, 0)
         }
     }
 }
