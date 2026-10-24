@@ -70,9 +70,9 @@ class LaunchRecord(unittest.TestCase):
         self.spec.write_text(json.dumps(spec(**kwargs)), encoding="utf-8")
 
     def write_evidence_fixture(self) -> None:
-        matrix_rows = []
-        for index in range(82):
-            matrix_rows.append(
+        capability_rows = []
+        for index in range(79):
+            capability_rows.append(
                 "\n".join(
                     (
                         "[[feature]]",
@@ -92,9 +92,31 @@ class LaunchRecord(unittest.TestCase):
                     )
                 )
             )
+        claim_rows = []
+        for index in range(3):
+            claim_rows.append(
+                "\n".join(
+                    (
+                        "[[feature]]",
+                        f'id = "X3-CLAIM-{index:03d}"',
+                        f'name = "Retracted claim {index}"',
+                        'subsystem = "claims_hygiene"',
+                        'source = "claim_risk"',
+                        "implemented = 55",
+                        "tested = 25",
+                        "mainnet_ready = 35",
+                        'priority = "P0"',
+                        'confidence = "medium"',
+                        "claim_risk = true",
+                        'blockers = ["historical claim remains capped"]',
+                        'evidence = ["evidence.md"]',
+                        'launch_scope = "research"',
+                    )
+                )
+            )
         (self.root / "FEATURE_MATRIX.toml").write_text(
             "[meta]\nversion = 1\nfeature_count_expected = 82\n\n"
-            + "\n\n".join(matrix_rows)
+            + "\n\n".join(capability_rows + claim_rows)
             + "\n",
             encoding="utf-8",
         )
@@ -287,11 +309,78 @@ class LaunchRecord(unittest.TestCase):
         self.assertTrue(record["artifacts"][0]["sha256"])
         self.assertEqual(record["rc_gate"]["passed_marker"], MARKER)
         self.assertEqual(record["feature_matrix"]["p0_count"], 82)
+        self.assertEqual(record["feature_matrix"]["capability_count"], 79)
+        self.assertEqual(record["feature_matrix"]["claim_hygiene_count"], 3)
         self.assertEqual(len(record["p0_snapshot"]["rows"]), 82)
+        self.assertEqual(record["p0_snapshot"]["capability_count"], 79)
+        self.assertEqual(record["p0_snapshot"]["claim_hygiene_count"], 3)
         self.assertEqual(len(record["audits"]), 2)
         self.assertEqual(len(record["validators"]["entries"]), 7)
         self.assertEqual(len(record["approvals"]), 3)
         self.assertEqual(len(record["record_sha256"]), 64)
+
+    def test_a_capability_at_94_is_refused(self) -> None:
+        matrix = self.root / "FEATURE_MATRIX.toml"
+        matrix.write_text(
+            matrix.read_text(encoding="utf-8").replace(
+                'id = "X3-P0-001"\n'
+                'name = "P0 feature 1"\n'
+                'subsystem = "runtime_core"\n'
+                'source = "master"\n'
+                "implemented = 95",
+                'id = "X3-P0-001"\n'
+                'name = "P0 feature 1"\n'
+                'subsystem = "runtime_core"\n'
+                'source = "master"\n'
+                "implemented = 94",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_record()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("X3-P0-001.implemented is 94", result.stderr)
+
+    def test_capability_and_claim_hygiene_counts_cannot_drift(self) -> None:
+        matrix = self.root / "FEATURE_MATRIX.toml"
+        matrix.write_text(
+            matrix.read_text(encoding="utf-8").replace(
+                'subsystem = "runtime_core"',
+                'subsystem = "claims_hygiene"',
+                1,
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_record()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("78 capability P0 rows", result.stderr)
+
+    def test_one_audit_report_cannot_pool_both_scope_groups(self) -> None:
+        self.edit_pack(
+            lambda data: (
+                data["audits"][0].update(
+                    {
+                        "scope": [
+                            "runtime",
+                            "consensus",
+                            "atomic",
+                            "bridges",
+                            "contracts",
+                            "operations",
+                        ]
+                    }
+                ),
+                data["audits"][1].update(
+                    {"scope": ["bridges", "contracts", "operations"]}
+                ),
+            )
+        )
+        result = self.run_record()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "independent scope groups cannot be pooled into one report",
+            result.stderr,
+        )
 
     def test_a_spec_for_a_different_validator_set_is_refused(self) -> None:
         self.write_spec(authorities=3)

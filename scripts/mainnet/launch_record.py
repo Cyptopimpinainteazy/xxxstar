@@ -41,6 +41,9 @@ DEFAULT_RC_MARKER = "== X3 MAINNET RC GATE PASSED =="
 SCHEMA = 2
 P0_RELEASE_FLOOR = 95
 P0_BASELINE_COUNT = 82
+P0_CAPABILITY_COUNT = 79
+P0_CLAIM_HYGIENE_COUNT = 3
+CLAIM_HYGIENE_SUBSYSTEM = "claims_hygiene"
 BOUNTY_MIN_POOL_USD = 100_000
 BOUNTY_MIN_AGE = dt.timedelta(days=28)
 PUBLIC_TESTNET_MIN_DURATION = dt.timedelta(weeks=8)
@@ -212,8 +215,38 @@ def feature_snapshot(root: Path, raw_path: Any) -> tuple[dict[str, Any], dict[st
         f"feature_matrix: contains {len(p0)} P0 rows; launch requires "
         f"{P0_BASELINE_COUNT}",
     )
+    capability_rows = [
+        feature
+        for feature in p0
+        if feature.get("subsystem") != CLAIM_HYGIENE_SUBSYSTEM
+    ]
+    hygiene_rows = [
+        feature
+        for feature in p0
+        if feature.get("subsystem") == CLAIM_HYGIENE_SUBSYSTEM
+    ]
+    require(
+        len(capability_rows) == P0_CAPABILITY_COUNT,
+        f"feature_matrix: contains {len(capability_rows)} capability P0 rows; "
+        f"launch requires {P0_CAPABILITY_COUNT}",
+    )
+    require(
+        len(hygiene_rows) == P0_CLAIM_HYGIENE_COUNT,
+        f"feature_matrix: contains {len(hygiene_rows)} claim-hygiene P0 rows; "
+        f"launch requires {P0_CLAIM_HYGIENE_COUNT}",
+    )
+    for feature in hygiene_rows:
+        label = str(feature.get("id") or feature.get("name") or "<unknown claim row>")
+        require(
+            feature.get("claim_risk") is True,
+            f"feature_matrix: {label} claim-hygiene row must set claim_risk = true",
+        )
+        require(
+            feature.get("launch_scope") == "research",
+            f"feature_matrix: {label} claim-hygiene row must remain research scope",
+        )
     rows: list[dict[str, Any]] = []
-    for feature in p0:
+    for feature in capability_rows:
         label = str(feature.get("id") or feature.get("name") or "<unknown P0>")
         for field in ("implemented", "tested", "mainnet_ready"):
             score = feature.get(field)
@@ -239,9 +272,21 @@ def feature_snapshot(root: Path, raw_path: Any) -> tuple[dict[str, Any], dict[st
                 "mainnet_ready": feature["mainnet_ready"],
             }
         )
+    for feature in hygiene_rows:
+        rows.append(
+            {
+                "id": str(feature.get("id") or feature.get("name")),
+                "implemented": feature.get("implemented"),
+                "tested": feature.get("tested"),
+                "mainnet_ready": feature.get("mainnet_ready"),
+            }
+        )
+    rows.sort(key=lambda row: row["id"])
 
     snapshot = {
         "count": len(rows),
+        "capability_count": len(capability_rows),
+        "claim_hygiene_count": len(hygiene_rows),
         "rows": rows,
         "sha256": digest_value(rows),
     }
@@ -250,6 +295,8 @@ def feature_snapshot(root: Path, raw_path: Any) -> tuple[dict[str, Any], dict[st
         "source_digest": source_digest,
         "sources": sources,
         "p0_count": len(rows),
+        "capability_count": len(capability_rows),
+        "claim_hygiene_count": len(hygiene_rows),
         "p0_snapshot_sha256": snapshot["sha256"],
     }
     return matrix_record, snapshot
@@ -299,7 +346,7 @@ def compile_audits(root: Path, raw: Any) -> list[dict[str, Any]]:
     require(len(raw) >= 2, "audits: two independent audit reports are required")
     rows: list[dict[str, Any]] = []
     providers: set[str] = set()
-    all_scopes: set[str] = set()
+    scope_groups: list[set[str]] = []
     for index, audit in enumerate(raw):
         require(isinstance(audit, dict), f"audits[{index}]: not an object")
         provider = str(audit.get("provider", "")).strip()
@@ -316,7 +363,19 @@ def compile_audits(root: Path, raw: Any) -> list[dict[str, Any]]:
             f"audits: provider {provider} has no scope",
         )
         normalized_scopes = sorted({scope.strip().lower() for scope in scopes})
-        all_scopes.update(normalized_scopes)
+        known_scopes = {
+            "runtime",
+            "consensus",
+            "atomic",
+            "bridges",
+            "contracts",
+            "operations",
+        }
+        require(
+            set(normalized_scopes) <= known_scopes,
+            f"audits: provider {provider} has an unknown scope",
+        )
+        scope_groups.append(set(normalized_scopes))
         for field in ("critical_open", "high_open"):
             value = audit.get(field)
             require(
@@ -336,13 +395,22 @@ def compile_audits(root: Path, raw: Any) -> list[dict[str, Any]]:
                 "sha256": sha256(report),
             }
         )
+    runtime_scopes = {"runtime", "consensus", "atomic"}
+    bridge_scopes = {"bridges", "contracts", "operations"}
     require(
-        bool(all_scopes & {"runtime", "consensus", "atomic"}),
-        "audits: runtime/consensus scope is not covered",
+        any(runtime_scopes <= scopes for scopes in scope_groups),
+        "audits: one report must cover runtime, consensus and atomic execution",
     )
     require(
-        bool(all_scopes & {"bridges", "contracts", "operations"}),
-        "audits: bridges/contracts/operations scope is not covered",
+        any(bridge_scopes <= scopes for scopes in scope_groups),
+        "audits: one report must cover bridges, contracts and operations",
+    )
+    require(
+        not any(
+            runtime_scopes <= scopes and bridge_scopes <= scopes
+            for scopes in scope_groups
+        ),
+        "audits: independent scope groups cannot be pooled into one report",
     )
     return rows
 

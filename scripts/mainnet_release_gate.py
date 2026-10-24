@@ -78,6 +78,8 @@ def path_exists(rel: str) -> pathlib.Path:
 
 P0_RELEASE_FLOOR = 95
 P0_BASELINE_COUNT = 82
+P0_CAPABILITY_COUNT = 79
+P0_CLAIM_HYGIENE_COUNT = 3
 CLAIM_HYGIENE_SUBSYSTEM = "claims_hygiene"
 LAUNCH_RECORD_PATH = ROOT / "reports" / "launch" / "promotion.json"
 LAUNCH_RECORD_SCHEMA = 2
@@ -191,6 +193,16 @@ def evaluate_p0_scope(matrix: dict, repo_root: pathlib.Path | str) -> list[str]:
         for feature in p0
         if feature.get("subsystem") == CLAIM_HYGIENE_SUBSYSTEM
     ]
+    if len(capability_rows) != P0_CAPABILITY_COUNT:
+        errors.append(
+            f"P0 release scope has {len(capability_rows)} capability rows; the "
+            f"approved baseline is {P0_CAPABILITY_COUNT}"
+        )
+    if len(hygiene_rows) != P0_CLAIM_HYGIENE_COUNT:
+        errors.append(
+            f"P0 release scope has {len(hygiene_rows)} claim-hygiene rows; the "
+            f"approved baseline is {P0_CLAIM_HYGIENE_COUNT}"
+        )
 
     for feature in hygiene_rows:
         label = str(feature.get("id") or feature.get("name") or "<unknown claim row>")
@@ -410,6 +422,47 @@ def _record_matrix_errors(
                 f"launch record: feature_matrix source does not match: {raw_path}"
             )
 
+    p0_rows = [
+        feature
+        for feature in matrix.get("feature", [])
+        if isinstance(feature, dict) and feature.get("priority") == "P0"
+    ]
+    capability_rows = [
+        feature
+        for feature in p0_rows
+        if feature.get("subsystem") != CLAIM_HYGIENE_SUBSYSTEM
+    ]
+    hygiene_rows = [
+        feature
+        for feature in p0_rows
+        if feature.get("subsystem") == CLAIM_HYGIENE_SUBSYSTEM
+    ]
+    if len(p0_rows) != P0_BASELINE_COUNT:
+        errors.append(
+            f"launch record: matrix has {len(p0_rows)} P0 rows; expected "
+            f"{P0_BASELINE_COUNT}"
+        )
+    if len(capability_rows) != P0_CAPABILITY_COUNT:
+        errors.append(
+            f"launch record: matrix has {len(capability_rows)} capability P0 rows; "
+            f"expected {P0_CAPABILITY_COUNT}"
+        )
+    if len(hygiene_rows) != P0_CLAIM_HYGIENE_COUNT:
+        errors.append(
+            f"launch record: matrix has {len(hygiene_rows)} claim-hygiene P0 rows; "
+            f"expected {P0_CLAIM_HYGIENE_COUNT}"
+        )
+    for feature in hygiene_rows:
+        label = str(feature.get("id") or feature.get("name") or "<unknown claim row>")
+        if feature.get("claim_risk") is not True:
+            errors.append(
+                f"launch record: {label} claim-hygiene row must set claim_risk = true"
+            )
+        if feature.get("launch_scope") != "research":
+            errors.append(
+                f"launch record: {label} claim-hygiene row must remain research scope"
+            )
+
     current_rows = sorted(
         (
             {
@@ -418,8 +471,7 @@ def _record_matrix_errors(
                 "tested": feature.get("tested"),
                 "mainnet_ready": feature.get("mainnet_ready"),
             }
-            for feature in matrix.get("feature", [])
-            if isinstance(feature, dict) and feature.get("priority") == "P0"
+            for feature in p0_rows
         ),
         key=lambda row: row["id"],
     )
@@ -589,10 +641,18 @@ def evaluate_launch_record(
                 errors.append(problem)
         if len(providers) < 2:
             errors.append("launch record: audit providers are not independent")
-        if not any(scope.intersection(AUDIT_SCOPES_A) for scope in scopes):
+        if not any(AUDIT_SCOPES_A <= scope for scope in scopes):
             errors.append("launch record: runtime/consensus audit scope is missing")
-        if not any(scope.intersection(AUDIT_SCOPES_B) for scope in scopes):
+        if not any(AUDIT_SCOPES_B <= scope for scope in scopes):
             errors.append("launch record: bridges/contracts/operations audit scope is missing")
+        if any(
+            AUDIT_SCOPES_A <= scope and AUDIT_SCOPES_B <= scope
+            for scope in scopes
+        ):
+            errors.append(
+                "launch record: independent audit scope groups cannot be pooled "
+                "into one report"
+            )
 
     bounty = record.get("bounty_window")
     if not isinstance(bounty, dict):

@@ -118,7 +118,7 @@ def scope_errors(matrix_path: Path, repo_root: Path):
     return gate.evaluate_p0_scope(matrix, repo_root)
 
 
-def test_all_82_p0_rows_pass_with_current_local_evidence(tmp_path, monkeypatch):
+def test_79_capabilities_and_3_claim_hygiene_rows_pass(tmp_path, monkeypatch):
     matrix, count = matrix_fixture(tmp_path)
     monkeypatch.setattr(gate, "claims_hygiene_errors", lambda root: [])
 
@@ -129,7 +129,20 @@ def test_all_82_p0_rows_pass_with_current_local_evidence(tmp_path, monkeypatch):
 def test_p0_scope_count_drift_fails(tmp_path):
     matrix, _ = matrix_fixture(tmp_path, count=80)
     assert scope_errors(matrix, tmp_path) == [
-        "P0 release scope has 83 rows; the approved baseline is 82"
+        "P0 release scope has 83 rows; the approved baseline is 82",
+        "P0 release scope has 80 capability rows; the approved baseline is 79",
+    ]
+
+
+def test_p0_capability_and_claim_hygiene_counts_cannot_drift(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    features = gate.load_matrix(matrix)["feature"]
+    features[0]["subsystem"] = "claims_hygiene"
+    assert gate.evaluate_p0_scope({"feature": features}, tmp_path) == [
+        "P0 release scope has 78 capability rows; the approved baseline is 79",
+        "P0 release scope has 4 claim-hygiene rows; the approved baseline is 3",
+        "X3-P0-000: claim-hygiene row must set claim_risk = true",
+        "X3-P0-000: claim-hygiene row must remain research scope",
     ]
 
 
@@ -488,6 +501,29 @@ def test_both_audits_in_one_scope_group_do_not_satisfy_the_other(tmp_path):
 
     assert (
         "launch record: bridges/contracts/operations audit scope is missing"
+    ) in errors
+
+
+def test_one_report_cannot_pool_both_audit_scope_groups(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    record = launch_record_fixture(tmp_path, matrix, "abc123")
+    record["audits"][0]["scope"] = [
+        "runtime",
+        "consensus",
+        "atomic",
+        "bridges",
+        "contracts",
+        "operations",
+    ]
+    record["audits"][1]["scope"] = sorted(gate.AUDIT_SCOPES_B)
+    record["record_sha256"] = gate._record_digest(record)
+
+    errors = gate.evaluate_launch_record(
+        record, tmp_path, "abc123", gate.load_matrix(matrix)
+    )
+
+    assert (
+        "launch record: independent audit scope groups cannot be pooled into one report"
     ) in errors
 
 
