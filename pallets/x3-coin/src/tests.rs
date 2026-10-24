@@ -145,16 +145,10 @@ fn validator_payout_moves_reserve_without_changing_supply() {
         ));
 
         assert_eq!(
-            pallet_x3_kernel::CanonicalLedger::<Test>::get(
-                VALIDATOR_OPERATOR,
-                X3_ASSET_ID,
-            ),
+            pallet_x3_kernel::CanonicalLedger::<Test>::get(VALIDATOR_OPERATOR, X3_ASSET_ID,),
             amount
         );
-        assert_eq!(
-            X3Coin::validator_reserve_balance(),
-            reserve_before - amount
-        );
+        assert_eq!(X3Coin::validator_reserve_balance(), reserve_before - amount);
         assert_eq!(X3Coin::total_supply(), supply_before);
     });
 }
@@ -188,10 +182,7 @@ fn validator_payout_cannot_overdraw_the_security_reserve() {
         );
         assert_eq!(X3Coin::validator_reserve_balance(), reserve_before);
         assert_eq!(
-            pallet_x3_kernel::CanonicalLedger::<Test>::get(
-                VALIDATOR_OPERATOR,
-                X3_ASSET_ID,
-            ),
+            pallet_x3_kernel::CanonicalLedger::<Test>::get(VALIDATOR_OPERATOR, X3_ASSET_ID,),
             0
         );
     });

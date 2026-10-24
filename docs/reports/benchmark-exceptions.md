@@ -18,7 +18,7 @@ The decisions live in `UNMEASURABLE_CALL_WEIGHTS`, keyed `<pallet entry>::<extri
 
 | Pallet | Call | Why no benchmark can reach it |
 | --- | --- | --- |
-| `pallet-x3-cross-vm-router` | `register_external_root` | The runtime wires `RefuseExternalRoots` as `ExternalRootVerifier` **by policy**: nothing in this repository can bind a foreign chain's block root to that chain's consensus, and the value written here is later trusted by the bridge surface. Every call therefore fails at the verifier before the stores the weight describes. It becomes measurable when a per-chain light client verifier is wired. |
+| `pallet-x3-cross-vm-router` | `register_external_root` | The pallet benchmark mock still wires `RefuseExternalRoots`, so a benchmark cannot reach the stores the weight describes. The production runtime now binds EVM/SVM roots to attested headers and Bitcoin roots to admitted best-chain headers; the exception should be removed after the benchmark fixture provisions matching header state and a valid binding proof. |
 | `pallet-x3-cross-vm-router` | `xvm_transfer` | Gated on `X3LangOrigin = pallet_x3_custody::EnsureAuthorizedGateway`, whose `try_successful_origin` returns `Err` deliberately — no account is *always* authorized, membership lives in genesis-configured storage. The router's `Config` requires no custody bound, so its benchmark has no way to authorize one. |
 | `pallet-x3-cross-vm-router` | `xvm_transfer_from_vm` | Same custody-backed gateway origin, checked twice (VM-adapter gate and x3-lang gate). |
 | `pallet-x3-cross-vm-router` | `complete_xvm_transfer` | Same custody-backed gateway origin. |

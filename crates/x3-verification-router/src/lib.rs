@@ -22,6 +22,7 @@ use core::result::Result::{Err, Ok};
 
 pub mod bitcoin_spv;
 pub mod evm_receipt;
+pub mod external_root;
 pub mod gateway_types;
 
 pub use evm_receipt::{

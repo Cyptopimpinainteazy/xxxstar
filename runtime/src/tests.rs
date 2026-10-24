@@ -68,6 +68,154 @@ fn settlement_intent_creation_is_wired_through_the_runtime() {
     });
 }
 
+#[test]
+fn external_root_verifier_binds_evm_svm_and_bitcoin_to_stored_headers() {
+    use x3_verification_router::external_root::{
+        encode_root_proof, RootKind, EXTERNAL_ROOT_BITCOIN, EXTERNAL_ROOT_ETHEREUM,
+        EXTERNAL_ROOT_SOLANA,
+    };
+
+    sp_io::TestExternalities::default().execute_with(|| {
+        let evm_block = H256::repeat_byte(0x11);
+        let evm_root = H256::repeat_byte(0x22);
+        pallet_cross_chain_validator::LastEvmHeader::<Runtime>::put(
+            pallet_cross_chain_validator::EvmHeaderInfo {
+                block_number: 42,
+                block_hash: evm_block,
+                state_root: evm_root,
+                merkle_root: H256::repeat_byte(0x33),
+                validator_set_hash: H256::repeat_byte(0x34),
+                verified_at_block: 1,
+                validation_proof: Vec::new(),
+            },
+        );
+        let evm_proof = encode_root_proof(EXTERNAL_ROOT_ETHEREUM, RootKind::StateRoot, evm_block.0);
+        assert_ok!(
+            <RuntimeExternalRootVerifier as pallet_x3_cross_vm_router::ExternalRootVerifier<
+                Runtime,
+            >>::verify_root(EXTERNAL_ROOT_ETHEREUM, evm_root, 42, &evm_proof)
+        );
+        let wrong_evm_proof = encode_root_proof(
+            EXTERNAL_ROOT_ETHEREUM,
+            RootKind::StateRoot,
+            H256::repeat_byte(0x12).0,
+        );
+        assert!(
+            <RuntimeExternalRootVerifier as pallet_x3_cross_vm_router::ExternalRootVerifier<
+                Runtime,
+            >>::verify_root(EXTERNAL_ROOT_ETHEREUM, evm_root, 42, &wrong_evm_proof)
+            .is_err()
+        );
+
+        let svm_block = H256::repeat_byte(0x44);
+        let svm_root = H256::repeat_byte(0x55);
+        pallet_cross_chain_validator::LastSvmHeader::<Runtime>::put(
+            pallet_cross_chain_validator::SvmHeaderInfo {
+                slot: 7,
+                block_hash: svm_block,
+                state_root: svm_root,
+                validator_set_hash: H256::repeat_byte(0x56),
+                verified_at_block: 1,
+                validation_proof: Vec::new(),
+                parent_slot_hashes: Vec::new(),
+            },
+        );
+        let svm_proof = encode_root_proof(EXTERNAL_ROOT_SOLANA, RootKind::StateRoot, svm_block.0);
+        assert_ok!(
+            <RuntimeExternalRootVerifier as pallet_x3_cross_vm_router::ExternalRootVerifier<
+                Runtime,
+            >>::verify_root(EXTERNAL_ROOT_SOLANA, svm_root, 7, &svm_proof)
+        );
+
+        let btc_block = H256::repeat_byte(0x77);
+        pallet_x3_settlement_engine::BtcHeaderMetaStore::<Runtime>::insert(
+            btc_block,
+            pallet_x3_settlement_engine::BtcHeaderMeta {
+                height: 120_000,
+                anchored: true,
+            },
+        );
+        let btc_proof = encode_root_proof(EXTERNAL_ROOT_BITCOIN, RootKind::BlockHash, btc_block.0);
+        assert_ok!(
+            <RuntimeExternalRootVerifier as pallet_x3_cross_vm_router::ExternalRootVerifier<
+                Runtime,
+            >>::verify_root(EXTERNAL_ROOT_BITCOIN, btc_block, 120_000, &btc_proof)
+        );
+    });
+}
+
+#[test]
+fn register_external_root_uses_the_runtime_verifier_and_stores_only_verified_roots() {
+    use x3_verification_router::external_root::{
+        encode_root_proof, RootKind, EXTERNAL_ROOT_ETHEREUM,
+    };
+
+    sp_io::TestExternalities::default().execute_with(|| {
+        let block_hash = H256::repeat_byte(0x11);
+        let state_root = H256::repeat_byte(0x22);
+        pallet_cross_chain_validator::LastEvmHeader::<Runtime>::put(
+            pallet_cross_chain_validator::EvmHeaderInfo {
+                block_number: 42,
+                block_hash,
+                state_root,
+                merkle_root: H256::repeat_byte(0x33),
+                validator_set_hash: H256::repeat_byte(0x34),
+                verified_at_block: 1,
+                validation_proof: Vec::new(),
+            },
+        );
+        assert_ok!(
+            pallet_x3_cross_vm_router::Pallet::<Runtime>::set_external_bridge_audit_gate(
+                RuntimeOrigin::root(),
+                true,
+            )
+        );
+        assert_ok!(
+            pallet_x3_cross_vm_router::Pallet::<Runtime>::set_external_bridges_enabled(
+                RuntimeOrigin::root(),
+                true,
+            )
+        );
+
+        let proof = encode_root_proof(EXTERNAL_ROOT_ETHEREUM, RootKind::StateRoot, block_hash.0);
+        assert_ok!(
+            pallet_x3_cross_vm_router::Pallet::<Runtime>::register_external_root(
+                RuntimeOrigin::root(),
+                EXTERNAL_ROOT_ETHEREUM,
+                state_root,
+                42,
+                proof,
+            )
+        );
+        assert_eq!(
+            pallet_x3_cross_vm_router::BridgeRoots::<Runtime>::get(EXTERNAL_ROOT_ETHEREUM)
+                .map(|root| root.0),
+            Some(state_root)
+        );
+
+        let wrong = encode_root_proof(
+            EXTERNAL_ROOT_ETHEREUM,
+            RootKind::StateRoot,
+            H256::repeat_byte(0x44).0,
+        );
+        assert!(
+            pallet_x3_cross_vm_router::Pallet::<Runtime>::register_external_root(
+                RuntimeOrigin::root(),
+                EXTERNAL_ROOT_ETHEREUM,
+                state_root,
+                42,
+                wrong,
+            )
+            .is_err()
+        );
+        assert_eq!(
+            pallet_x3_cross_vm_router::BridgeRoots::<Runtime>::get(EXTERNAL_ROOT_ETHEREUM)
+                .map(|root| root.0),
+            Some(state_root)
+        );
+    });
+}
+
 /// A window the chain can open must also be a window it can *settle*, in one block, as one
 /// transaction.
 ///
