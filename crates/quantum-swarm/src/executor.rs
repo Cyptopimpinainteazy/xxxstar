@@ -7,7 +7,7 @@
 //! - Strategy execution (arbitrage, portfolio, etc.)
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -18,6 +18,9 @@ use crate::evolution::{EvolutionConfig, EvolutionEngine, EvolutionStats, Genome}
 use crate::quantum::{LocalSimulator, QaoaOptimizer, QuantumBackend, QuboSolver, VqeOptimizer};
 use crate::strategy::{MarketData, Signal, Strategy, StrategyFactory, StrategyMetrics};
 use crate::types::{OptimizationProblem, QuantumJob, QuantumResult, StrategyId};
+
+/// Creates the evaluator for a genome. The returned strategy must use the genome's ID.
+pub type StrategyBuilder = Arc<dyn Fn(&Genome) -> SwarmResult<Box<dyn Strategy>> + Send + Sync>;
 
 /// Executor operating mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -99,6 +102,8 @@ pub struct QuantumSwarmExecutor {
     qubo: QuboSolver,
     /// Active strategies
     strategies: HashMap<StrategyId, Box<dyn Strategy>>,
+    /// Builds evaluators for initial and newly bred genomes.
+    strategy_builder: Option<StrategyBuilder>,
     /// Statistics
     stats: ExecutorStats,
     /// Start time
@@ -124,6 +129,7 @@ impl QuantumSwarmExecutor {
             vqe: VqeOptimizer::new(crate::quantum::VqeConfig::default()),
             qubo: QuboSolver::new(),
             strategies: HashMap::new(),
+            strategy_builder: None,
             stats: ExecutorStats::default(),
             start_time: std::time::Instant::now(),
             config,
@@ -133,6 +139,23 @@ impl QuantumSwarmExecutor {
     /// Set operating mode
     pub fn set_mode(&mut self, mode: ExecutorMode) {
         self.mode = mode;
+    }
+
+    /// Install the evaluator factory used for every active and newly bred genome.
+    pub fn set_strategy_builder<F>(&mut self, builder: F)
+    where
+        F: Fn(&Genome) -> SwarmResult<Box<dyn Strategy>> + Send + Sync + 'static,
+    {
+        self.strategy_builder = Some(Arc::new(builder));
+    }
+
+    /// Builder-style variant of [`Self::set_strategy_builder`].
+    pub fn with_strategy_builder<F>(mut self, builder: F) -> Self
+    where
+        F: Fn(&Genome) -> SwarmResult<Box<dyn Strategy>> + Send + Sync + 'static,
+    {
+        self.set_strategy_builder(builder);
+        self
     }
 
     /// Get current state
@@ -151,6 +174,7 @@ impl QuantumSwarmExecutor {
         for genome in self.evolution.population().iter() {
             self.arena.register(genome.clone())?;
         }
+        self.hydrate_strategies()?;
 
         self.state = ExecutorState::Idle;
         Ok(())
@@ -162,6 +186,7 @@ impl QuantumSwarmExecutor {
 
         // 1. Evaluate strategies on market data
         self.state = ExecutorState::Executing;
+        self.hydrate_strategies()?;
         let fitness_scores = self.evaluate_strategies(market_data)?;
         result.strategies_evaluated = fitness_scores.len();
 
@@ -176,6 +201,7 @@ impl QuantumSwarmExecutor {
         let tournament_result = self.arena.run_tournament()?;
         result.tournament_result = Some(tournament_result.clone());
         self.stats.tournaments += 1;
+        self.hydrate_strategies()?;
 
         // Update stats
         self.stats.best_fitness = self.stats.best_fitness.max(self.evolution.best_fitness());
@@ -184,6 +210,39 @@ impl QuantumSwarmExecutor {
 
         self.state = ExecutorState::Idle;
         Ok(result)
+    }
+
+    /// Create evaluators for active genomes and discard evaluators for retired genomes.
+    fn hydrate_strategies(&mut self) -> SwarmResult<()> {
+        let active_genomes: Vec<Genome> = self
+            .arena
+            .active_combatants()
+            .into_iter()
+            .map(|combatant| combatant.genome.clone())
+            .collect();
+        let active_ids: HashSet<StrategyId> =
+            active_genomes.iter().map(|genome| genome.id).collect();
+
+        if let Some(builder) = self.strategy_builder.clone() {
+            for genome in &active_genomes {
+                if self.strategies.contains_key(&genome.id) {
+                    continue;
+                }
+                let strategy = builder(genome)?;
+                if strategy.id() != genome.id {
+                    return Err(SwarmError::Strategy(format!(
+                        "strategy builder returned {} for genome {}",
+                        strategy.id(),
+                        genome.id
+                    )));
+                }
+                self.strategies.insert(genome.id, strategy);
+            }
+        }
+
+        self.strategies
+            .retain(|strategy_id, _| active_ids.contains(strategy_id));
+        Ok(())
     }
 
     /// Evaluate all strategies on market data
@@ -338,6 +397,15 @@ impl AsyncQuantumSwarmExecutor {
         executor.initialize(template_genome)
     }
 
+    /// Install the evaluator factory before initialization.
+    pub async fn set_strategy_builder<F>(&self, builder: F)
+    where
+        F: Fn(&Genome) -> SwarmResult<Box<dyn Strategy>> + Send + Sync + 'static,
+    {
+        let mut executor = self.inner.write().await;
+        executor.set_strategy_builder(builder);
+    }
+
     /// Run step
     pub async fn step(&self, market_data: &MarketData) -> SwarmResult<StepResult> {
         let mut executor = self.inner.write().await;
@@ -383,27 +451,23 @@ mod tests {
 
     #[test]
     fn test_executor_step() {
-        // Use default config - the actual module defaults handle population size
         let config = QuantumSwarmConfig::default();
-
         let mut executor = QuantumSwarmExecutor::new(config);
+        let arbitrage = ArbitrageConfig {
+            min_profit_bps: 10,
+            max_position: 100_000,
+            venues: vec!["Uniswap".into(), "Sushiswap".into()],
+            cross_chain: false,
+        };
+        executor.set_strategy_builder(move |genome| {
+            Ok(Box::new(ArbitrageStrategy::new(
+                genome.clone(),
+                arbitrage.clone(),
+            )))
+        });
 
         let template = Genome::new_float(5, 0.0, 1.0);
         executor.initialize(&template).unwrap();
-        let genomes: Vec<_> = executor.evolution.population().iter().cloned().collect();
-        for genome in genomes {
-            executor
-                .register_strategy(Box::new(ArbitrageStrategy::new(
-                    genome,
-                    ArbitrageConfig {
-                        min_profit_bps: 10,
-                        max_position: 100_000,
-                        venues: vec!["Uniswap".into(), "Sushiswap".into()],
-                        cross_chain: false,
-                    },
-                )))
-                .unwrap();
-        }
 
         let mut market_data = MarketData::default();
         market_data.prices.insert("ETH".to_string(), 2000.0);
@@ -421,10 +485,18 @@ mod tests {
                 .collect(),
         );
 
-        let result = executor.step(&market_data).unwrap();
+        let first = executor.step(&market_data).unwrap();
+        let second = executor
+            .step(&market_data)
+            .expect("newly bred genomes must be hydrated");
 
-        assert!(result.strategies_evaluated > 0);
-        assert!(result.evolution_stats.is_some());
+        assert!(first.strategies_evaluated > 0);
+        assert!(first.evolution_stats.is_some());
+        assert!(first
+            .tournament_result
+            .as_ref()
+            .is_some_and(|tournament| tournament.new_births > 0));
+        assert_eq!(second.strategies_evaluated, first.strategies_evaluated);
         assert!(executor.stats.best_fitness > 0.0);
     }
 
@@ -443,6 +515,30 @@ mod tests {
             error
                 .to_string()
                 .contains("no registered strategy evaluator"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn strategy_builder_must_preserve_the_genome_identity() {
+        let mut executor = QuantumSwarmExecutor::new(QuantumSwarmConfig::default());
+        executor.set_strategy_builder(|_| {
+            let wrong_genome = Genome::new_float(5, 0.0, 1.0);
+            Ok(Box::new(ArbitrageStrategy::new(
+                wrong_genome,
+                ArbitrageConfig {
+                    min_profit_bps: 10,
+                    max_position: 100_000,
+                    venues: vec!["Uniswap".into(), "Sushiswap".into()],
+                    cross_chain: false,
+                },
+            )))
+        });
+        let error = executor
+            .initialize(&Genome::new_float(5, 0.0, 1.0))
+            .expect_err("identity mismatch must fail");
+        assert!(
+            error.to_string().contains("strategy builder returned"),
             "{error}"
         );
     }
