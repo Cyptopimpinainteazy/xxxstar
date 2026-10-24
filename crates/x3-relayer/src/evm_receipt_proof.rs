@@ -29,7 +29,7 @@ use crate::types::EvmProof;
 use serde_json::{json, Value};
 use x3_verification_router::evm_receipt::{
     encode_proof_payload, keccak256_32, receipt_trie_key, receipts_trie_proof, receipts_trie_root,
-    verify_merkle_patricia_proof, EvmBlockHeader,
+    verify_merkle_patricia_proof, EvmBlockHeader, EvmReceipt,
 };
 
 /// A receipt's inclusion in a block's receipts trie, as the settlement engine
@@ -165,6 +165,41 @@ impl ReceiptInclusion {
             expected_beneficiary: binding.expected_beneficiary,
             expected_nonce: binding.expected_nonce,
             expected_amount: binding.expected_amount,
+        })
+    }
+
+    /// Derive a proof directly from the receipt's one matching
+    /// `DepositLocked` event. This is the production constructor: none of the
+    /// event fields are supplied by the caller except the configured gateway.
+    pub fn evm_proof_for_deposit(
+        &self,
+        source_domain: u32,
+        proof_nonce: u32,
+        min_confirmations: u64,
+        expected_gateway: [u8; 20],
+    ) -> Result<EvmProof, ProducerError> {
+        let receipt = EvmReceipt::decode(&self.receipt_rlp)
+            .map_err(|error| ProducerError::Malformed(error.to_string()))?;
+        let event = receipt
+            .deposit_locked_event(expected_gateway)
+            .map_err(|error| ProducerError::Malformed(error.to_string()))?;
+        if event.chain_id != u64::from(source_domain) {
+            return Err(ProducerError::Malformed(format!(
+                "DepositLocked chain id {} does not match source domain {}",
+                event.chain_id, source_domain
+            )));
+        }
+        self.evm_proof(EvmProofBinding {
+            source_domain,
+            proof_id: event.message_id,
+            source_asset: event.token,
+            expected_sender: event.depositor,
+            expected_contract: event.gateway,
+            expected_beneficiary: event.beneficiary,
+            expected_nonce: event.nonce,
+            proof_nonce,
+            expected_amount: event.amount,
+            min_confirmations,
         })
     }
 }
@@ -807,6 +842,54 @@ mod tests {
             confirmations: 12,
             header_rlp: vec![0xC0],
         }
+    }
+
+    #[test]
+    fn a_deposit_proof_takes_every_event_field_from_the_receipt() {
+        use x3_verification_router::evm_receipt::deposit_locked_selector;
+
+        let gateway = [0xA1; 20];
+        let token = [0xA2; 20];
+        let depositor = [0xA3; 20];
+        let beneficiary = [0xA4; 32];
+        let message_id = [0xA5; 32];
+        let nonce = 17u64;
+        let chain_id = 84_532u64;
+        let amount = 123_456u128;
+
+        let mut data = vec![0u8; 192];
+        data[31] = 128;
+        data[48..64].copy_from_slice(&amount.to_be_bytes());
+        data[88..96].copy_from_slice(&nonce.to_be_bytes());
+        data[120..128].copy_from_slice(&chain_id.to_be_bytes());
+        data[159] = beneficiary.len() as u8;
+        data[160..].copy_from_slice(&beneficiary);
+        let mut token_topic = [0u8; 32];
+        token_topic[12..].copy_from_slice(&token);
+        let mut depositor_topic = [0u8; 32];
+        depositor_topic[12..].copy_from_slice(&depositor);
+        let deposit = rlp_list(&[
+            rlp_value(&gateway),
+            rlp_list(&[
+                rlp_value(&deposit_locked_selector()),
+                rlp_value(&message_id),
+                rlp_value(&token_topic),
+                rlp_value(&depositor_topic),
+            ]),
+            rlp_value(&data),
+        ]);
+        let receipt = rlp_list(&[rlp_value(&[0x01]), rlp_value(&[]), rlp_list(&[deposit])]);
+
+        let proof = inclusion(receipt, 4)
+            .evm_proof_for_deposit(chain_id as u32, 7, 12, gateway)
+            .expect("the receipt contains one gateway deposit");
+        assert_eq!(proof.proof_id, message_id);
+        assert_eq!(proof.source_asset, token);
+        assert_eq!(proof.expected_sender, depositor);
+        assert_eq!(proof.expected_contract, gateway);
+        assert_eq!(proof.expected_beneficiary, beneficiary);
+        assert_eq!(proof.expected_nonce, nonce);
+        assert_eq!(proof.expected_amount, amount);
     }
 
     #[test]

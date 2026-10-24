@@ -70,7 +70,7 @@ pub enum EvmReceiptError {
     /// The header this proof is about is not one the chain has attested, so the
     /// proof is about a block of the prover's own choosing.
     UnanchoredHeader,
-    /// The receipt did not contain exactly one log.
+    /// The receipt did not contain exactly one matching gateway event.
     WrongLogCount,
     /// The receipt status is not successful.
     FailedReceipt,
@@ -118,7 +118,9 @@ impl Display for EvmReceiptError {
             EvmReceiptError::InclusionFailed => {
                 f.write_str("evm proof: receipt not in asserted receipts root")
             }
-            EvmReceiptError::WrongLogCount => f.write_str("evm proof: receipt must have 1 log"),
+            EvmReceiptError::WrongLogCount => {
+                f.write_str("evm proof: receipt must have exactly 1 matching gateway event")
+            }
             EvmReceiptError::FailedReceipt => f.write_str("evm proof: receipt did not succeed"),
             EvmReceiptError::BadSelector => {
                 f.write_str("evm proof: log topic[0] does not match selector")
@@ -251,6 +253,19 @@ pub struct EvmReceipt {
     pub logs: Vec<EvmLog>,
 }
 
+/// Canonical fields of one `DepositLocked` event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepositLockedEvent {
+    pub gateway: [u8; 20],
+    pub message_id: [u8; 32],
+    pub token: [u8; 20],
+    pub depositor: [u8; 20],
+    pub beneficiary: Vec<u8>,
+    pub amount: u128,
+    pub nonce: u64,
+    pub chain_id: u64,
+}
+
 /// Single EVM log entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvmLog {
@@ -296,6 +311,30 @@ impl EvmReceipt {
             cumulative_gas_used: decode_u64(&cumulative),
             logs,
         })
+    }
+
+    /// Extract the single `DepositLocked` event emitted by `gateway`.
+    ///
+    /// ERC-20 deposits also emit a `Transfer` from the token contract, so a
+    /// receipt may contain several unrelated logs. Exactly one matching
+    /// gateway event is required; zero or multiple matching events fail closed.
+    pub fn deposit_locked_event(
+        &self,
+        gateway: [u8; 20],
+    ) -> Result<DepositLockedEvent, EvmReceiptError> {
+        if !self.status {
+            return Err(EvmReceiptError::FailedReceipt);
+        }
+        let selector = deposit_locked_selector();
+        let matching = self
+            .logs
+            .iter()
+            .filter(|log| log.address == gateway && log.topics.first().copied() == Some(selector))
+            .collect::<Vec<_>>();
+        if matching.len() != 1 {
+            return Err(EvmReceiptError::WrongLogCount);
+        }
+        parse_deposit_locked_log(matching[0])
     }
 }
 
@@ -892,10 +931,16 @@ impl DecodedProof {
         if !self.receipt.status {
             return Err(EvmReceiptError::FailedReceipt);
         }
-        if self.receipt.logs.len() != 1 {
+        let matching_logs = self
+            .receipt
+            .logs
+            .iter()
+            .filter(|log| log.topics.first() == Some(&self.expected.selector))
+            .collect::<Vec<_>>();
+        if matching_logs.len() != 1 {
             return Err(EvmReceiptError::WrongLogCount);
         }
-        let log = &self.receipt.logs[0];
+        let log = matching_logs[0];
         if log.address != self.expected.contract {
             return Err(EvmReceiptError::BadContract);
         }
@@ -951,17 +996,17 @@ impl DecodedProof {
             .expected
             .nonce
             .ok_or(EvmReceiptError::MissingExpectation)?;
-        let (recipient, amount, event_nonce, chain_id) = decode_deposit_data(&log.data)?;
-        if amount != self.expected.amount {
+        let event = parse_deposit_locked_log(log)?;
+        if event.amount != self.expected.amount {
             return Err(EvmReceiptError::BadAmount);
         }
-        if event_nonce != nonce {
+        if event.nonce != nonce {
             return Err(EvmReceiptError::BadNonce);
         }
-        if chain_id != self.expected.chain_id {
+        if event.chain_id != self.expected.chain_id {
             return Err(EvmReceiptError::BadChainId);
         }
-        if recipient != self.expected.beneficiary {
+        if event.beneficiary != self.expected.beneficiary {
             return Err(EvmReceiptError::BadParty);
         }
         Ok(())
@@ -1034,6 +1079,32 @@ fn word_u128(data: &[u8], word_index: usize) -> Result<u128, EvmReceiptError> {
 
 fn address_topic_eq(topic: &[u8; 32], address: &[u8]) -> bool {
     address.len() == 20 && topic[..12].iter().all(|byte| *byte == 0) && topic[12..] == *address
+}
+
+fn address_from_topic(topic: &[u8; 32]) -> Result<[u8; 20], EvmReceiptError> {
+    if topic[..12].iter().any(|byte| *byte != 0) {
+        return Err(EvmReceiptError::BadTopics);
+    }
+    let mut address = [0u8; 20];
+    address.copy_from_slice(&topic[12..]);
+    Ok(address)
+}
+
+fn parse_deposit_locked_log(log: &EvmLog) -> Result<DepositLockedEvent, EvmReceiptError> {
+    if log.topics.len() != 4 || log.topics[0] != deposit_locked_selector() {
+        return Err(EvmReceiptError::BadTopics);
+    }
+    let (beneficiary, amount, nonce, chain_id) = decode_deposit_data(&log.data)?;
+    Ok(DepositLockedEvent {
+        gateway: log.address,
+        message_id: log.topics[1],
+        token: address_from_topic(&log.topics[2])?,
+        depositor: address_from_topic(&log.topics[3])?,
+        beneficiary,
+        amount,
+        nonce,
+        chain_id,
+    })
 }
 
 fn word_u64(data: &[u8], word_index: usize) -> Result<u64, EvmReceiptError> {
@@ -1550,6 +1621,28 @@ mod tests {
         ])
     }
 
+    fn erc20_transfer_log(token: [u8; 20]) -> Vec<u8> {
+        let mut data = [0u8; 32];
+        data[16..].copy_from_slice(&TRANSFER_AMOUNT.to_be_bytes());
+        rlp_list(&[
+            rlp_bytes(&token),
+            rlp_list(&[rlp_bytes(&[0x99u8; 32])]),
+            rlp_bytes(&data),
+        ])
+    }
+
+    fn receipt_with_extra_logs(contract: [u8; 20]) -> Vec<u8> {
+        rlp_list(&[
+            rlp_bytes(&[0x01]),
+            rlp_bytes(&[0x00]),
+            rlp_list(&[
+                erc20_transfer_log(PREPROOF_TOKEN),
+                deposit_log(contract),
+                erc20_transfer_log(PREPROOF_TOKEN),
+            ]),
+        ])
+    }
+
     fn withdrawal_log(address: [u8; 20]) -> Vec<u8> {
         let mut data = [0u8; 32];
         data[16..].copy_from_slice(&TRANSFER_AMOUNT.to_be_bytes());
@@ -1757,6 +1850,41 @@ mod tests {
         let wrong_nonce =
             anchored_verifier(12, receipts_root, 100, 120).with_expected_nonce(PREPROOF_NONCE + 1);
         assert!(wrong_nonce.verify(&envelope).is_err());
+    }
+
+    #[test]
+    fn unrelated_receipt_logs_do_not_hide_the_gateway_event() {
+        let contract = [0x11u8; 20];
+        let receipt = receipt_with_extra_logs(contract);
+        let key = receipt_trie_key(1);
+        let (receipts_root, proof) = single_leaf_trie(&key, &receipt);
+        let header = header_with_receipts_root(receipts_root, 100);
+        let envelope = envelope_for(&header, &receipt, &[0x01], &proof, contract, 120);
+        assert!(anchored_verifier(12, receipts_root, 100, 120)
+            .verify(&envelope)
+            .is_ok());
+
+        let duplicate = rlp_list(&[
+            rlp_bytes(&[0x01]),
+            rlp_bytes(&[0x00]),
+            rlp_list(&[deposit_log(contract), deposit_log(contract)]),
+        ]);
+        let (duplicate_root, duplicate_proof) = single_leaf_trie(&key, &duplicate);
+        let duplicate_header = header_with_receipts_root(duplicate_root, 100);
+        let duplicate_envelope = envelope_for(
+            &duplicate_header,
+            &duplicate,
+            &[0x01],
+            &duplicate_proof,
+            contract,
+            120,
+        );
+        assert!(
+            anchored_verifier(12, duplicate_root, 100, 120)
+                .verify(&duplicate_envelope)
+                .is_err(),
+            "two matching gateway events are ambiguous"
+        );
     }
 
     #[test]
