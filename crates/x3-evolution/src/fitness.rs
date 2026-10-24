@@ -31,6 +31,12 @@ pub struct FitnessScore {
     pub volatility: f64,
     /// Custom score component
     pub custom: f64,
+    /// VM gas consumed by the evaluated strategy.
+    pub execution_gas: u64,
+    /// VM instructions executed by the evaluated strategy.
+    pub execution_instructions: u64,
+    /// Wall-clock time spent evaluating the strategy, in milliseconds.
+    pub execution_latency_ms: f64,
 }
 
 impl FitnessScore {
@@ -79,6 +85,9 @@ impl FitnessScore {
             avg_trade: 0.0,
             volatility: 0.0,
             custom: 0.0,
+            execution_gas: 0,
+            execution_instructions: 0,
+            execution_latency_ms: 0.0,
         }
     }
 
@@ -269,6 +278,9 @@ impl PnLFitness {
             avg_trade: 0.0,
             volatility: 0.0,
             custom: 0.0,
+            execution_gas: 0,
+            execution_instructions: 0,
+            execution_latency_ms: 0.0,
         }
     }
 }
@@ -418,6 +430,9 @@ impl FitnessEvaluator for MockFitness {
             avg_trade: score * 0.01,
             volatility: 0.15,
             custom: 0.0,
+            execution_gas: 0,
+            execution_instructions: 0,
+            execution_latency_ms: 0.0,
         })
     }
 
@@ -445,6 +460,9 @@ mod tests {
             avg_trade: 0.05,
             volatility: 0.15,
             custom: 0.0,
+            execution_gas: 0,
+            execution_instructions: 0,
+            execution_latency_ms: 0.0,
         };
 
         let total = score.total_score();

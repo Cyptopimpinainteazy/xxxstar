@@ -6872,6 +6872,7 @@ dependencies = [
  "uuid 1.21.0",
  "wgpu 23.0.1",
  "x3-backend",
+ "x3-evolution",
  "x3-gpu-validator-swarm",
  "x3-mir",
  "x3-vm",
@@ -26617,6 +26618,7 @@ dependencies = [
  "x3-backend",
  "x3-verifier",
  "x3-vm",
+ "x3bc-core",
 ]
 
 [[package]]

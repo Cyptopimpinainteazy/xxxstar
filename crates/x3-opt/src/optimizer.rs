@@ -50,9 +50,9 @@ pub trait PassObserver {
     fn after_pass(&mut self, pass: &str, module: &MirModule) -> OptResult<()>;
 }
 
-struct NoopObserver;
+struct NoObserver;
 
-impl PassObserver for NoopObserver {
+impl PassObserver for NoObserver {
     fn after_pass(&mut self, _pass: &str, _module: &MirModule) -> OptResult<()> {
         Ok(())
     }
@@ -169,7 +169,7 @@ impl Optimizer {
 
     /// Run all passes until fixpoint or max iterations.
     pub fn run(&self, module: &mut MirModule) -> OptResult<OptStats> {
-        let mut observer = NoopObserver;
+        let mut observer = NoObserver;
         self.run_with_observer(module, &mut observer)
     }
 

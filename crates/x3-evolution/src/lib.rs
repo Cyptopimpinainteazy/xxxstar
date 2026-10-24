@@ -60,11 +60,12 @@ pub use selection::{
     StochasticUniversalSampling, TournamentSelection, TruncationSelection,
 };
 pub use simulator::{
-    generate_synthetic_data, MarketTick, PortfolioState, SimulationConfig, SimulationResult,
-    Simulator, SimulatorFitness, Trade, TradeAction,
+    generate_synthetic_data, generate_synthetic_data_seeded, MarketTick, PortfolioState,
+    SimulationConfig, SimulationResult, Simulator, SimulatorFitness, Trade, TradeAction,
+    STRATEGY_ENTRYPOINT, STRATEGY_PARAM_COUNT, STRATEGY_VALUE_SCALE,
 };
 
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use tracing::{debug, info};
 
@@ -161,7 +162,16 @@ impl EvolutionEngine {
         }
 
         // Fill remaining slots with mutations of seeds
+        let mut attempts = 0usize;
+        let max_attempts = self.config.population_size.saturating_mul(1_000);
         while self.population.len() < self.config.population_size {
+            if attempts >= max_attempts {
+                return Err(EvolutionError::ResourceExhausted(format!(
+                    "could not generate {} unique strategy genomes after {attempts} mutation attempts",
+                    self.config.population_size
+                )));
+            }
+            attempts += 1;
             let parent = self.population.random_individual(&mut self.rng)?;
             let mut child = parent.chromosome.clone();
 
@@ -212,14 +222,23 @@ impl EvolutionEngine {
         }
 
         // 4. Crossover and mutation to fill rest
+        let mut attempts = 0usize;
+        let max_attempts = self.config.population_size.saturating_mul(1_000);
         while next_gen.len() < self.config.population_size {
+            if attempts >= max_attempts {
+                return Err(EvolutionError::ResourceExhausted(format!(
+                    "could not generate {} unique next-generation strategies after {attempts} attempts",
+                    self.config.population_size
+                )));
+            }
+            attempts += 1;
             // Select parents
             let parents = tournament.select(&self.population, 2, &mut self.rng)?;
             let parent1 = &parents[0];
             let parent2 = &parents[1];
 
             // Crossover
-            let mut child = if rand::random::<f64>() < self.config.crossover_rate {
+            let mut child = if self.rng.gen::<f64>() < self.config.crossover_rate {
                 let crossover = UniformCrossover::new(0.5);
                 crossover.crossover(&parent1.chromosome, &parent2.chromosome, &mut self.rng)?
             } else {
@@ -227,7 +246,7 @@ impl EvolutionEngine {
             };
 
             // Mutation
-            if rand::random::<f64>() < self.config.mutation_rate {
+            if self.rng.gen::<f64>() < self.config.mutation_rate {
                 let mutation = ParameterMutation::new(self.config.mutation_rate);
                 mutation.mutate(&mut child, &mut self.rng)?;
             }
@@ -238,7 +257,12 @@ impl EvolutionEngine {
             }
         }
 
-        self.population = next_gen;
+        // The final generation is returned as the evaluated population. Replacing it with
+        // unevaluated children would erase every ranking exactly when callers need to package the
+        // winning strategies.
+        if self.generation < self.config.generations {
+            self.population = next_gen;
+        }
 
         Ok(stats)
     }
@@ -252,9 +276,16 @@ impl EvolutionEngine {
         );
 
         let mut all_stats = Vec::new();
+        let mut total_execution_gas = 0u64;
+        let mut total_execution_instructions = 0u64;
+        let mut total_execution_latency_ms = 0.0f64;
 
         for _ in 0..self.config.generations {
             let stats = self.evolve_generation(evaluator)?;
+            total_execution_gas = total_execution_gas.saturating_add(stats.total_execution_gas);
+            total_execution_instructions =
+                total_execution_instructions.saturating_add(stats.total_execution_instructions);
+            total_execution_latency_ms += stats.total_execution_latency_ms;
             all_stats.push(stats);
 
             // Early termination check
@@ -276,6 +307,9 @@ impl EvolutionEngine {
             generations_run: self.generation,
             fitness_history: self.fitness_history.clone(),
             generation_stats: all_stats,
+            total_execution_gas,
+            total_execution_instructions,
+            total_execution_latency_ms,
         })
     }
 
@@ -288,20 +322,29 @@ impl EvolutionEngine {
                     .individuals_mut()
                     .par_iter_mut()
                     .for_each(|ind| {
-                        if let Ok(fitness) = evaluator.evaluate(&ind.chromosome) {
-                            ind.fitness = Some(fitness);
-                        }
+                        ind.fitness =
+                            Some(evaluator.evaluate(&ind.chromosome).unwrap_or_else(|error| {
+                                debug!(?error, "strategy evaluation failed; scored as failure");
+                                FitnessScore::failure()
+                            }));
                     });
             }
             #[cfg(not(feature = "parallel"))]
             {
                 for ind in self.population.individuals_mut() {
-                    ind.fitness = Some(evaluator.evaluate(&ind.chromosome)?);
+                    ind.fitness =
+                        Some(evaluator.evaluate(&ind.chromosome).unwrap_or_else(|error| {
+                            debug!(?error, "strategy evaluation failed; scored as failure");
+                            FitnessScore::failure()
+                        }));
                 }
             }
         } else {
             for ind in self.population.individuals_mut() {
-                ind.fitness = Some(evaluator.evaluate(&ind.chromosome)?);
+                ind.fitness = Some(evaluator.evaluate(&ind.chromosome).unwrap_or_else(|error| {
+                    debug!(?error, "strategy evaluation failed; scored as failure");
+                    FitnessScore::failure()
+                }));
             }
         }
         Ok(())
@@ -328,6 +371,29 @@ impl EvolutionEngine {
             average_fitness: avg,
             fitness_variance: variance,
             population_size: self.population.len(),
+            total_execution_gas: self
+                .population
+                .individuals()
+                .iter()
+                .filter_map(|individual| individual.fitness.as_ref())
+                .fold(0u64, |total, fitness| {
+                    total.saturating_add(fitness.execution_gas)
+                }),
+            total_execution_instructions: self
+                .population
+                .individuals()
+                .iter()
+                .filter_map(|individual| individual.fitness.as_ref())
+                .fold(0u64, |total, fitness| {
+                    total.saturating_add(fitness.execution_instructions)
+                }),
+            total_execution_latency_ms: self
+                .population
+                .individuals()
+                .iter()
+                .filter_map(|individual| individual.fitness.as_ref())
+                .map(|fitness| fitness.execution_latency_ms)
+                .sum(),
         }
     }
 
@@ -356,6 +422,14 @@ impl EvolutionEngine {
         self.population.best_individual()
     }
 
+    /// Clone the current population's best `n` individuals in descending fitness order.
+    ///
+    /// This is the stable handoff point for distributed simulation jobs: evaluation remains in
+    /// this crate, while result packaging can report the complete ranked candidates.
+    pub fn ranked(&self, n: usize) -> Vec<Individual> {
+        self.population.top_n(n).into_iter().cloned().collect()
+    }
+
     /// Get current generation number
     pub fn generation(&self) -> usize {
         self.generation
@@ -376,6 +450,9 @@ pub struct GenerationStats {
     pub average_fitness: f64,
     pub fitness_variance: f64,
     pub population_size: usize,
+    pub total_execution_gas: u64,
+    pub total_execution_instructions: u64,
+    pub total_execution_latency_ms: f64,
 }
 
 /// Result of a complete evolution run
@@ -386,6 +463,9 @@ pub struct EvolutionResult {
     pub generations_run: usize,
     pub fitness_history: Vec<f64>,
     pub generation_stats: Vec<GenerationStats>,
+    pub total_execution_gas: u64,
+    pub total_execution_instructions: u64,
+    pub total_execution_latency_ms: f64,
 }
 
 impl EvolutionResult {
@@ -404,6 +484,25 @@ impl EvolutionResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use x3_backend::bc_format::FunctionEntry;
+    use x3_backend::opcode::Opcode;
+
+    fn strategy_module(decision: i64) -> Vec<u8> {
+        let mut module = x3_backend::bc_format::BytecodeModule::new();
+        let constant = module.const_pool.add_integer(decision).expect("constant");
+        module.functions.push(FunctionEntry {
+            name: STRATEGY_ENTRYPOINT.into(),
+            entry_point: 0,
+            param_count: STRATEGY_PARAM_COUNT as u8,
+            local_count: STRATEGY_PARAM_COUNT,
+            max_stack: 16,
+            return_type_tag: 1,
+        });
+        module.code = vec![Opcode::LoadConst.to_byte(), 0];
+        module.code.extend_from_slice(&constant.0.to_le_bytes());
+        module.code.extend_from_slice(&[Opcode::Ret.to_byte(), 0]);
+        module.to_bytes()
+    }
 
     #[test]
     fn test_evolution_config_default() {
@@ -421,5 +520,33 @@ mod tests {
         };
         let engine = EvolutionEngine::new(config);
         assert_eq!(engine.generation(), 0);
+    }
+
+    #[test]
+    fn seeded_evolution_is_reproducible() {
+        let config = EvolutionConfig {
+            population_size: 8,
+            generations: 3,
+            seed: Some(42),
+            parallel: false,
+            ..Default::default()
+        };
+        let market = generate_synthetic_data_seeded("ETH", 32, 2_000.0, 0.01, 99);
+
+        let run = || {
+            let mut engine = EvolutionEngine::new(config.clone());
+            engine
+                .seed_population(vec![strategy_module(1), strategy_module(0)])
+                .expect("seed population");
+            let evaluator = SimulatorFitness::new(SimulationConfig::default(), market.clone());
+            let result = engine.evolve(&evaluator).expect("evolution");
+            (
+                result.best_bytecode(),
+                result.best_fitness.to_bits(),
+                result.fitness_history,
+            )
+        };
+
+        assert_eq!(run(), run());
     }
 }

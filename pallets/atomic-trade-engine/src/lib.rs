@@ -102,24 +102,6 @@ pub trait SettlementBridge<AccountId> {
         secret_hash: H256,
         legs: &[(VmType, u128)], // (vm_type, amount_out) per leg
     ) -> Result<H256, DispatchError>; // returns intent_id
-
-    /// Release / refund escrow for a failed or rolled-back batch.
-    fn release_batch(_batch_id: H256) -> Result<(), DispatchError> {
-        Ok(())
-    }
-}
-
-/// No-op settlement bridge — used in tests or when settlement is disabled.
-pub struct NoOpSettlementBridge;
-impl<AccountId> SettlementBridge<AccountId> for NoOpSettlementBridge {
-    fn register_completed_batch(
-        _maker: &AccountId,
-        _batch_id: H256,
-        _secret_hash: H256,
-        _legs: &[(VmType, u128)],
-    ) -> Result<H256, DispatchError> {
-        Ok(H256::zero())
-    }
 }
 
 /// Maximum number of legs in a single trade batch
@@ -204,7 +186,10 @@ pub mod pallet {
         type AmmRegistrarOrigin: EnsureOrigin<<Self as frame_system::Config>::RuntimeOrigin>;
 
         /// Settlement bridge for post-execution settlement intent creation.
-        /// Use `NoOpSettlementBridge` in tests or when settlement is not needed.
+        ///
+        /// A runtime must wire an implementation that creates real settlement
+        /// state. There is no accepting default: a missing backend fails before
+        /// the pallet can report success.
         type Settlement: SettlementBridge<<Self as frame_system::Config>::AccountId>;
 
         /// Security event hook. Called on trade leg and batch failures to notify the security

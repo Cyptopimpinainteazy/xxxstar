@@ -5,6 +5,18 @@ use crate::error::{EvolutionError, Result};
 use crate::fitness::{FitnessEvaluator, FitnessScore};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+use x3_vm::{BytecodeModule, VMConfig, Value, Verifier, VerifyOptions, VM};
+
+/// Versioned entrypoint every strategy module must expose as function 0.
+pub const STRATEGY_ENTRYPOINT: &str = "x3_strategy_decide_v1";
+
+/// Number of fixed-point arguments in strategy ABI v1.
+///
+/// Order: timestamp_ms, price, volume, bid, ask, cash, position, total_value.
+pub const STRATEGY_PARAM_COUNT: u16 = 8;
+
+/// Scale for every monetary and quantity argument in strategy ABI v1.
+pub const STRATEGY_VALUE_SCALE: u64 = 100_000_000;
 
 /// Market data point for simulation
 #[derive(Debug, Clone)]
@@ -54,6 +66,19 @@ pub enum TradeAction {
     Buy,
     Sell,
     Hold,
+}
+
+impl TradeAction {
+    fn from_abi_decision(value: i64) -> Result<Self> {
+        match value {
+            1 => Ok(Self::Buy),
+            0 => Ok(Self::Hold),
+            -1 => Ok(Self::Sell),
+            other => Err(EvolutionError::SimulationFailed(format!(
+                "strategy ABI decision must be -1, 0, or 1, got {other}"
+            ))),
+        }
+    }
 }
 
 /// Trade execution result
@@ -177,6 +202,8 @@ pub struct SimulationConfig {
     pub risk_free_rate: f64,
     /// Maximum simulation time
     pub timeout: Duration,
+    /// Maximum VM gas one strategy decision may consume.
+    pub gas_limit_per_tick: u64,
     /// Use realistic execution (delays, partial fills)
     pub realistic_execution: bool,
 }
@@ -190,6 +217,7 @@ impl Default for SimulationConfig {
             max_position_size: 0.25,
             risk_free_rate: 0.02,
             timeout: Duration::from_secs(30),
+            gas_limit_per_tick: 100_000,
             realistic_execution: false,
         }
     }
@@ -204,6 +232,10 @@ pub struct SimulationResult {
     pub fitness: FitnessScore,
     /// Total number of ticks processed
     pub ticks_processed: usize,
+    /// Total VM gas consumed across strategy decisions.
+    pub gas_used: u64,
+    /// Total VM instructions executed across strategy decisions.
+    pub instructions_executed: u64,
     /// Simulation duration
     pub duration: Duration,
     /// Errors encountered
@@ -213,6 +245,100 @@ pub struct SimulationResult {
 /// Strategy simulator
 pub struct Simulator {
     config: SimulationConfig,
+}
+
+/// A verified strategy module bound to simulator ABI v1.
+struct StrategyProgram {
+    module: BytecodeModule,
+}
+
+impl StrategyProgram {
+    fn verify(bytecode: &[u8]) -> Result<Self> {
+        let options = VerifyOptions::deterministic_simulation(STRATEGY_PARAM_COUNT);
+        let module = Verifier::verify_module_bytes(bytecode, &options).map_err(|error| {
+            EvolutionError::SimulationFailed(format!(
+                "strategy failed deterministic verification: {error}"
+            ))
+        })?;
+        let entry = module.functions.first().ok_or_else(|| {
+            EvolutionError::SimulationFailed("strategy module has no entry function".into())
+        })?;
+        if entry.name != STRATEGY_ENTRYPOINT {
+            return Err(EvolutionError::SimulationFailed(format!(
+                "strategy function 0 must be named {STRATEGY_ENTRYPOINT}, found {}",
+                entry.name
+            )));
+        }
+        Ok(Self { module })
+    }
+
+    fn decide(
+        &self,
+        tick: &MarketTick,
+        portfolio: &PortfolioState,
+        gas_limit: u64,
+    ) -> Result<(TradeAction, u64, u64)> {
+        let args = strategy_args(tick, portfolio)?;
+        let mut vm = VM::with_config(
+            self.module.clone(),
+            VMConfig {
+                gas_limit,
+                ..VMConfig::default()
+            },
+        );
+        let execution = vm.call_function(0, &args).map_err(|error| {
+            EvolutionError::SimulationFailed(format!("strategy VM execution failed: {error:?}"))
+        })?;
+        let decision = match execution.value {
+            Some(Value::I64(value)) => value,
+            other => {
+                return Err(EvolutionError::SimulationFailed(format!(
+                    "strategy must return I64 -1, 0, or 1, got {other:?}"
+                )))
+            }
+        };
+        Ok((
+            TradeAction::from_abi_decision(decision)?,
+            execution.gas_used,
+            execution.instruction_count,
+        ))
+    }
+}
+
+fn fixed_value(value: f64, name: &str) -> Result<i64> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(EvolutionError::SimulationFailed(format!(
+            "strategy input {name} must be finite and non-negative, got {value}"
+        )));
+    }
+    let scaled = (value * STRATEGY_VALUE_SCALE as f64).round();
+    if scaled > i64::MAX as f64 {
+        return Err(EvolutionError::SimulationFailed(format!(
+            "strategy input {name} exceeds the ABI range"
+        )));
+    }
+    Ok(scaled as i64)
+}
+
+fn strategy_args(tick: &MarketTick, portfolio: &PortfolioState) -> Result<Vec<Value>> {
+    let timestamp = i64::try_from(tick.timestamp).map_err(|_| {
+        EvolutionError::SimulationFailed("strategy timestamp exceeds the ABI range".into())
+    })?;
+    let position = portfolio
+        .positions
+        .get(&tick.symbol)
+        .copied()
+        .unwrap_or(0.0);
+    Ok(vec![
+        Value::I64(timestamp),
+        Value::I64(fixed_value(tick.price, "price")?),
+        Value::I64(fixed_value(tick.volume, "volume")?),
+        Value::I64(fixed_value(tick.bid, "bid")?),
+        Value::I64(fixed_value(tick.ask, "ask")?),
+        Value::I64(fixed_value(portfolio.cash, "cash")?),
+        Value::I64(fixed_value(position, "position")?),
+        Value::I64(fixed_value(portfolio.total_value, "total_value")?),
+    ])
 }
 
 impl Simulator {
@@ -227,9 +353,12 @@ impl Simulator {
         market_data: &[MarketTick],
     ) -> Result<SimulationResult> {
         let start = Instant::now();
+        let strategy = StrategyProgram::verify(&chromosome.to_bytecode())?;
         let mut portfolio = PortfolioState::new(self.config.initial_capital);
         let mut errors = Vec::new();
         let mut ticks_processed = 0;
+        let mut gas_used = 0u64;
+        let mut instructions_executed = 0u64;
         let mut previous_value = self.config.initial_capital;
         let mut last_day: Option<u64> = None;
 
@@ -252,8 +381,11 @@ impl Simulator {
             }
             last_day = Some(current_day);
 
-            // Execute strategy bytecode to get action
-            let action = self.execute_strategy(chromosome, tick, &portfolio)?;
+            // Execute the verified strategy module through the deterministic X3 VM ABI.
+            let (action, tick_gas, tick_instructions) =
+                strategy.decide(tick, &portfolio, self.config.gas_limit_per_tick)?;
+            gas_used = gas_used.saturating_add(tick_gas);
+            instructions_executed = instructions_executed.saturating_add(tick_instructions);
 
             // Apply action
             if let Some(trade) = self.execute_trade(action, tick, &mut portfolio)? {
@@ -269,31 +401,18 @@ impl Simulator {
         }
 
         // Calculate final fitness
-        let fitness = self.calculate_fitness(&portfolio);
+        let duration = start.elapsed();
+        let fitness = self.calculate_fitness(&portfolio, gas_used, instructions_executed, duration);
 
         Ok(SimulationResult {
             portfolio,
             fitness,
             ticks_processed,
-            duration: start.elapsed(),
+            gas_used,
+            instructions_executed,
+            duration,
             errors,
         })
-    }
-
-    /// Execute strategy bytecode to determine action
-    fn execute_strategy(
-        &self,
-        chromosome: &Chromosome,
-        _tick: &MarketTick,
-        _portfolio: &PortfolioState,
-    ) -> Result<TradeAction> {
-        let bytecode = chromosome.to_bytecode();
-        if bytecode.is_empty() {
-            return Ok(TradeAction::Hold);
-        }
-        Err(EvolutionError::SimulationFailed(
-            "strategy simulation not yet implemented; X3 VM integration pending".into(),
-        ))
     }
 
     /// Execute a trade based on action
@@ -374,7 +493,13 @@ impl Simulator {
     }
 
     /// Calculate fitness from simulation results
-    fn calculate_fitness(&self, portfolio: &PortfolioState) -> FitnessScore {
+    fn calculate_fitness(
+        &self,
+        portfolio: &PortfolioState,
+        gas_used: u64,
+        instructions_executed: u64,
+        duration: Duration,
+    ) -> FitnessScore {
         let pnl = portfolio.pnl(self.config.initial_capital);
         let return_pct = portfolio.return_pct(self.config.initial_capital);
 
@@ -414,6 +539,9 @@ impl Simulator {
             },
             volatility: self.calculate_volatility(&portfolio.daily_returns),
             custom: 0.0,
+            execution_gas: gas_used,
+            execution_instructions: instructions_executed,
+            execution_latency_ms: duration.as_secs_f64() * 1_000.0,
         }
     }
 
@@ -572,11 +700,31 @@ pub fn generate_synthetic_data(
     initial_price: f64,
     volatility: f64,
 ) -> Vec<MarketTick> {
+    let seed_bytes = blake3::hash(symbol.as_bytes());
+    let mut seed = [0u8; 8];
+    seed.copy_from_slice(&seed_bytes.as_bytes()[..8]);
+    generate_synthetic_data_seeded(
+        symbol,
+        num_ticks,
+        initial_price,
+        volatility,
+        u64::from_le_bytes(seed),
+    )
+}
+
+/// Generate deterministic synthetic market data from an explicit seed.
+pub fn generate_synthetic_data_seeded(
+    symbol: &str,
+    num_ticks: usize,
+    initial_price: f64,
+    volatility: f64,
+    seed: u64,
+) -> Vec<MarketTick> {
     use rand::Rng;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
-    let mut rng = ChaCha20Rng::from_entropy();
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
     let mut ticks = Vec::with_capacity(num_ticks);
     let mut price = initial_price;
     let mut timestamp = 1704067200000u64; // 2024-01-01 00:00:00 UTC
@@ -614,6 +762,31 @@ pub fn generate_synthetic_data(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use x3_backend::bc_format::FunctionEntry;
+    use x3_backend::opcode::Opcode;
+
+    fn strategy_module(name: &str, decision: i64) -> Vec<u8> {
+        let mut module = BytecodeModule::new();
+        let constant = module.const_pool.add_integer(decision).expect("constant");
+        module.functions.push(FunctionEntry {
+            name: name.to_string(),
+            entry_point: 0,
+            param_count: STRATEGY_PARAM_COUNT as u8,
+            local_count: STRATEGY_PARAM_COUNT,
+            max_stack: 16,
+            return_type_tag: 1,
+        });
+        module.code = vec![Opcode::LoadConst.to_byte(), 0];
+        module.code.extend_from_slice(&constant.0.to_le_bytes());
+        module.code.extend_from_slice(&[Opcode::Ret.to_byte(), 0]);
+        let bytes = module.to_bytes();
+        Verifier::verify_module_bytes(
+            &bytes,
+            &VerifyOptions::deterministic_simulation(STRATEGY_PARAM_COUNT),
+        )
+        .expect("test strategy module must verify before chromosome wrapping");
+        bytes
+    }
 
     #[test]
     fn test_portfolio_state() {
@@ -642,35 +815,85 @@ mod tests {
         }
     }
 
-    /// The strategy interpreter is a **fail-closed stub**: `execute_strategy`
-    /// holds for an empty strategy and returns an explicit
-    /// `SimulationFailed("… X3 VM integration pending")` for any real bytecode.
-    ///
-    /// This test pins that contract rather than the aspiration: the simulator
-    /// must never fabricate a result for a strategy it cannot execute. It needs
-    /// updating — in the direction of accepting the simulation — when the X3 VM
-    /// interpreter lands.
     #[test]
-    fn test_simulation() {
-        let config = SimulationConfig::default();
+    fn simulation_executes_a_verified_strategy_through_the_vm() {
+        let config = SimulationConfig {
+            timeout: Duration::from_secs(5),
+            ..Default::default()
+        };
         let simulator = Simulator::new(config);
+        let data = vec![MarketTick::new(1_000, "ETH", 2_000.0)];
+        let bytecode = strategy_module(STRATEGY_ENTRYPOINT, 1);
+        let chromosome = Chromosome::from_bytecode(bytecode.clone()).expect("canonical chromosome");
+        assert_eq!(chromosome.to_bytecode(), bytecode);
 
-        let data = generate_synthetic_data("ETH", 100, 2000.0, 0.02);
+        let result = simulator.simulate(&chromosome, &data).expect("simulation");
 
-        // Every constructible chromosome carries non-empty bytecode —
-        // `Chromosome::from_bytecode` rejects empty input, so the `Hold` branch in
-        // `execute_strategy` is unreachable from here — and the interpreter for
-        // that bytecode is not implemented. The simulator must refuse rather than
-        // fabricate a result.
-        let bytecode = vec![0x20, 128, 128, 0x00];
-        let chromosome = Chromosome::from_bytecode(bytecode).expect("chromosome");
-        let err = simulator
-            .simulate(&chromosome, &data)
-            .expect_err("the interpreter is unimplemented; it must fail closed");
+        assert_eq!(result.ticks_processed, 1);
+        assert_eq!(result.portfolio.trades.len(), 1);
+        assert_eq!(result.portfolio.trades[0].action, TradeAction::Buy);
+        assert!(result.portfolio.cash < 100_000.0);
+        assert!(result.portfolio.positions.contains_key("ETH"));
+    }
+
+    #[test]
+    fn simulation_rejects_a_wrong_abi_name() {
+        let simulator = Simulator::new(SimulationConfig::default());
+        let chromosome = Chromosome::from_bytecode(strategy_module("main", 0)).expect("chromosome");
+        let error = simulator
+            .simulate(&chromosome, &[MarketTick::new(1, "ETH", 2_000.0)])
+            .expect_err("wrong ABI name must fail");
+        assert!(error.to_string().contains(STRATEGY_ENTRYPOINT), "{error}");
+    }
+
+    #[test]
+    fn simulation_rejects_an_invalid_decision() {
+        let simulator = Simulator::new(SimulationConfig::default());
+        let chromosome =
+            Chromosome::from_bytecode(strategy_module(STRATEGY_ENTRYPOINT, 2)).expect("chromosome");
+        let error = simulator
+            .simulate(&chromosome, &[MarketTick::new(1, "ETH", 2_000.0)])
+            .expect_err("invalid decisions must fail");
+        assert!(error.to_string().contains("must be -1, 0, or 1"), "{error}");
+    }
+
+    #[test]
+    fn simulation_rejects_gas_exhaustion_instead_of_holding() {
+        let simulator = Simulator::new(SimulationConfig {
+            gas_limit_per_tick: 1,
+            ..Default::default()
+        });
+        let chromosome =
+            Chromosome::from_bytecode(strategy_module(STRATEGY_ENTRYPOINT, 0)).expect("chromosome");
+        let error = simulator
+            .simulate(&chromosome, &[MarketTick::new(1, "ETH", 2_000.0)])
+            .expect_err("gas exhaustion must fail closed");
+        assert!(error.to_string().contains("GasLimitExceeded"), "{error}");
+    }
+
+    #[test]
+    fn simulation_rejects_malformed_bytecode() {
+        let simulator = Simulator::new(SimulationConfig::default());
+        let chromosome = Chromosome::from_bytecode(vec![0x20, 0x64, 0, 0]).expect("legacy genes");
+        let error = simulator
+            .simulate(&chromosome, &[MarketTick::new(1, "ETH", 2_000.0)])
+            .expect_err("non-canonical bytecode must fail verification");
         assert!(
-            matches!(&err, EvolutionError::SimulationFailed(msg) if msg.contains("not yet implemented")),
-            "expected the documented fail-closed error, got {err:?}"
+            error.to_string().contains("deterministic verification"),
+            "{error}"
         );
+    }
+
+    #[test]
+    fn synthetic_data_is_reproducible_from_its_seed() {
+        let first = generate_synthetic_data_seeded("ETH", 32, 2_000.0, 0.02, 42);
+        let second = generate_synthetic_data_seeded("ETH", 32, 2_000.0, 0.02, 42);
+        assert_eq!(first.len(), second.len());
+        for (a, b) in first.iter().zip(second.iter()) {
+            assert_eq!(a.timestamp, b.timestamp);
+            assert_eq!(a.price.to_bits(), b.price.to_bits());
+            assert_eq!(a.volume.to_bits(), b.volume.to_bits());
+        }
     }
 
     #[test]

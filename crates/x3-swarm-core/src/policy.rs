@@ -27,18 +27,14 @@ pub trait GovernanceChecker {
     /// Check whether the given proposal is in `Approved` or `Executed` state
     /// and references `action_hash`.  Returns `true` if the proposal authorizes
     /// this action.
-    fn is_proposal_authorized(
-        &self,
-        proposal_id: &[u8; 32],
-        action_hash: &[u8; 32],
-    ) -> bool;
+    fn is_proposal_authorized(&self, proposal_id: &[u8; 32], action_hash: &[u8; 32]) -> bool;
 }
 
-/// Dummy implementations for contexts where real verification isn't wired.
+/// Fail-closed implementations for contexts where real verification is not wired.
 /// These ALWAYS fail authorization — they never return `true` so no unsafe
 /// fallthrough is possible.
-pub struct NoopRegistry;
-impl ReviewerRegistry for NoopRegistry {
+pub struct DenyAllRegistry;
+impl ReviewerRegistry for DenyAllRegistry {
     fn human_reviewer_keys(&self) -> &[VerifyingKey] {
         &[]
     }
@@ -47,13 +43,9 @@ impl ReviewerRegistry for NoopRegistry {
     }
 }
 
-pub struct NoopGovernance;
-impl GovernanceChecker for NoopGovernance {
-    fn is_proposal_authorized(
-        &self,
-        _proposal_id: &[u8; 32],
-        _action_hash: &[u8; 32],
-    ) -> bool {
+pub struct DenyAllGovernance;
+impl GovernanceChecker for DenyAllGovernance {
+    fn is_proposal_authorized(&self, _proposal_id: &[u8; 32], _action_hash: &[u8; 32]) -> bool {
         false
     }
 }
@@ -114,27 +106,21 @@ impl ApprovalRequirement {
                 if token_bytes.len() < 96 {
                     return false;
                 }
-                let pubkey_bytes: [u8; 32] =
-                    match token_bytes[..32].try_into() {
-                        Ok(b) => b,
-                        Err(_) => return false,
-                    };
-                let sig_bytes: [u8; 64] =
-                    match token_bytes[32..96].try_into() {
-                        Ok(b) => b,
-                        Err(_) => return false,
-                    };
+                let pubkey_bytes: [u8; 32] = match token_bytes[..32].try_into() {
+                    Ok(b) => b,
+                    Err(_) => return false,
+                };
+                let sig_bytes: [u8; 64] = match token_bytes[32..96].try_into() {
+                    Ok(b) => b,
+                    Err(_) => return false,
+                };
                 let vk = VerifyingKey::from_bytes(&pubkey_bytes).ok();
                 let signature = Signature::from_bytes(&sig_bytes);
 
                 match (vk, signature) {
                     (Some(key), sig) => {
                         // Require the key to be in the authorized set
-                        if !registry
-                            .human_reviewer_keys()
-                            .iter()
-                            .any(|k| k == &key)
-                        {
+                        if !registry.human_reviewer_keys().iter().any(|k| k == &key) {
                             return false;
                         }
                         key.verify(&action_hash[..], &sig).is_ok()
@@ -180,8 +166,7 @@ impl ApprovalRequirement {
                 let mut seen_keys: Vec<VerifyingKey> = Vec::new();
 
                 for chunk in sig_bytes_vec.chunks_exact(entry_len) {
-                    let pubkey_bytes: [u8; 32] = match chunk[..32].try_into()
-                    {
+                    let pubkey_bytes: [u8; 32] = match chunk[..32].try_into() {
                         Ok(b) => b,
                         Err(_) => continue,
                     };
@@ -341,10 +326,7 @@ mod tests {
     use rand::rngs::OsRng;
 
     /// Generates a valid signed token (pubkey || signature) over action_hash.
-    fn make_human_token(
-        signing_key: &SigningKey,
-        action_hash: &[u8; 32],
-    ) -> Vec<u8> {
+    fn make_human_token(signing_key: &SigningKey, action_hash: &[u8; 32]) -> Vec<u8> {
         let vk: VerifyingKey = signing_key.verifying_key();
         let sig: Signature = signing_key.sign(&action_hash[..]);
         let mut token = Vec::with_capacity(96);
@@ -354,10 +336,7 @@ mod tests {
     }
 
     /// Generates quorum sig bytes: each entry is [pubkey || sig].
-    fn make_quorum_sig(
-        signers: &[&SigningKey],
-        action_hash: &[u8; 32],
-    ) -> Vec<u8> {
+    fn make_quorum_sig(signers: &[&SigningKey], action_hash: &[u8; 32]) -> Vec<u8> {
         let mut buf = Vec::with_capacity(signers.len() * 96);
         for sk in signers {
             let vk: VerifyingKey = sk.verifying_key();
@@ -386,11 +365,7 @@ mod tests {
         authorized: Vec<([u8; 32], [u8; 32])>,
     }
     impl GovernanceChecker for TestGovernance {
-        fn is_proposal_authorized(
-            &self,
-            proposal_id: &[u8; 32],
-            action_hash: &[u8; 32],
-        ) -> bool {
+        fn is_proposal_authorized(&self, proposal_id: &[u8; 32], action_hash: &[u8; 32]) -> bool {
             self.authorized
                 .iter()
                 .any(|(pid, ah)| pid == proposal_id && ah == action_hash)
@@ -426,11 +401,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(ApprovalRequirement::HumanReview.is_satisfied(
-            Some(&ctx),
-            Some(&registry),
-            None,
-        ));
+        assert!(ApprovalRequirement::HumanReview.is_satisfied(Some(&ctx), Some(&registry), None,));
     }
 
     #[test]
@@ -454,11 +425,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(!ApprovalRequirement::HumanReview.is_satisfied(
-            Some(&ctx),
-            Some(&registry),
-            None,
-        ));
+        assert!(!ApprovalRequirement::HumanReview.is_satisfied(Some(&ctx), Some(&registry), None,));
     }
 
     #[test]
@@ -484,11 +451,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(!ApprovalRequirement::HumanReview.is_satisfied(
-            Some(&ctx),
-            Some(&registry),
-            None,
-        ));
+        assert!(!ApprovalRequirement::HumanReview.is_satisfied(Some(&ctx), Some(&registry), None,));
     }
 
     #[test]
@@ -500,11 +463,7 @@ mod tests {
             human_approval_token: Some(vec![0u8; 96]),
             ..Default::default()
         };
-        assert!(!ApprovalRequirement::HumanReview.is_satisfied(
-            Some(&ctx_no_hash),
-            None,
-            None,
-        ));
+        assert!(!ApprovalRequirement::HumanReview.is_satisfied(Some(&ctx_no_hash), None, None,));
     }
 
     #[test]
@@ -630,7 +589,7 @@ mod tests {
 
         assert!(!ApprovalRequirement::HumanReview.is_satisfied(
             Some(&ctx),
-            Some(&NoopRegistry),
+            Some(&DenyAllRegistry),
             None,
         ));
     }
@@ -646,7 +605,7 @@ mod tests {
         assert!(!ApprovalRequirement::GovernanceReview.is_satisfied(
             Some(&ctx),
             None,
-            Some(&NoopGovernance),
+            Some(&DenyAllGovernance),
         ));
     }
 
@@ -691,11 +650,7 @@ mod tests {
 
         // Must fail: same signer replayed cannot satisfy distinct-member quorum.
         assert!(
-            !ApprovalRequirement::SecurityReview.is_satisfied(
-                Some(&ctx),
-                Some(&registry),
-                None,
-            ),
+            !ApprovalRequirement::SecurityReview.is_satisfied(Some(&ctx), Some(&registry), None,),
             "duplicate signer replay must not satisfy quorum"
         );
     }
