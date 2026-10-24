@@ -79,6 +79,19 @@ pub struct ValidatorSetConfig {
     /// refused at startup rather than silently dropped.
     #[serde(default)]
     pub svm_validator_pubkeys: Vec<String>,
+    /// Optional stake weights for the same validator set. Mainnet Solana proofs
+    /// require these; the V1 signer-count path is never registered by production.
+    #[serde(default)]
+    pub svm_validator_stakes: Vec<SvmValidatorStakeConfig>,
+}
+
+/// One governance-authorized Solana validator stake entry.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SvmValidatorStakeConfig {
+    /// Hex-encoded Ed25519 public key, with or without `0x`.
+    pub pubkey: String,
+    /// Effective stake weight.
+    pub stake: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

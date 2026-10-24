@@ -19,8 +19,8 @@ use x3_gateway_risk_engine::{GatewayRiskEngine, RiskPolicy, RouteRiskInput};
 use x3_proof_dispute::{DisputeStatus, DisputeTracker};
 use x3_validator_attestation::{Attestation, AttestationSet, ValidatorId};
 use x3_verification_router::{
-    ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, VerificationRouter,
-    VerificationStrategy,
+    ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, SolanaCluster,
+    SolanaStakeWeightedVerifier, SolanaValidatorStake, VerificationRouter, VerificationStrategy,
 };
 
 pub struct RelayerService {
@@ -66,6 +66,62 @@ struct RelayerInternalState {
     pending_submissions: u32,
     shutdown_signal: bool,
     pause_reason: Option<String>,
+}
+
+fn configured_solana_cluster(clusters: &[SvmClusterConfig]) -> Result<SolanaCluster, String> {
+    let mut selected = None;
+    for cluster in clusters {
+        let name = cluster.cluster_name.to_ascii_lowercase();
+        let candidate = if name.contains("mainnet") {
+            SolanaCluster::MainnetBeta
+        } else if name.contains("testnet") {
+            SolanaCluster::Testnet
+        } else if name.contains("devnet") {
+            SolanaCluster::Devnet
+        } else {
+            return Err(format!("unknown Solana cluster `{}`", cluster.cluster_name));
+        };
+        if let Some(previous) = selected {
+            if previous != candidate {
+                return Err("multiple Solana clusters need separate relayer instances".into());
+            }
+        } else {
+            selected = Some(candidate);
+        }
+    }
+    Ok(selected.unwrap_or(SolanaCluster::MainnetBeta))
+}
+
+fn configured_solana_stakes(
+    config: &RelayerConfig,
+    quorum: &AuthorizedValidatorSet,
+) -> Result<Vec<SolanaValidatorStake>, String> {
+    if config.validator_set.svm_validator_stakes.is_empty() {
+        return Err("stake table is empty".into());
+    }
+    let mut stakes = Vec::with_capacity(config.validator_set.svm_validator_stakes.len());
+    for entry in &config.validator_set.svm_validator_stakes {
+        let trimmed = entry.pubkey.trim();
+        let trimmed = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+        let bytes = hex::decode(trimmed)
+            .map_err(|error| format!("invalid validator pubkey {}: {error}", entry.pubkey))?;
+        let pubkey: [u8; 32] = bytes
+            .try_into()
+            .map_err(|_| format!("validator pubkey {} is not 32 bytes", entry.pubkey))?;
+        stakes.push(SolanaValidatorStake {
+            pubkey,
+            stake: entry.stake,
+        });
+    }
+    stakes.sort_by_key(|entry| entry.pubkey);
+
+    let mut authorized = quorum.keys().to_vec();
+    authorized.sort();
+    let stake_keys: Vec<[u8; 32]> = stakes.iter().map(|entry| entry.pubkey).collect();
+    if stake_keys != authorized {
+        return Err("stake table and authorized validator keys disagree".into());
+    }
+    Ok(stakes)
 }
 
 impl RelayerService {
@@ -628,20 +684,28 @@ impl RelayerSafetyPipeline {
             }
         };
 
-        // Production: register the real Solana finalized-proof verifier
-        // (issue #351 — this used to be a permissive stub,
-        // `SolanaFinalizationVerifier`, that accepted any non-empty payload).
-        // With no validators configured the set is empty and the verifier fails
-        // closed on every SVM proof; with a configured set, the threshold is the
-        // supermajority of that set — the same rule the attestation stage below
-        // applies, so the two checks cannot disagree about how many signatures
-        // are enough.
-        verification_router.register_verifier(Arc::new(
-            x3_verification_router::SolanaFinalizedVerifier::new(
-                svm_quorum.keys().to_vec(),
-                svm_quorum.required_signatures(),
-            ),
-        ));
+        // Production uses only V2 stake-weighted evidence. If the stake table is
+        // absent, malformed or disagrees with the authorized signer list, register
+        // the empty verifier so every SVM proof fails closed rather than falling
+        // back to the legacy signer-count V1 path.
+        let cluster = configured_solana_cluster(&config.svm_clusters);
+        let stake_result = cluster.and_then(|cluster| {
+            let stakes = configured_solana_stakes(config, &svm_quorum)?;
+            SolanaStakeWeightedVerifier::new(cluster, stakes, 2, 3, 0)
+                .map_err(|error| format!("{error:?}"))
+        });
+        match stake_result {
+            Ok(verifier) => verification_router.register_verifier(Arc::new(verifier)),
+            Err(error) => {
+                warn!("refusing every SVM proof: no valid V2 stake table: {error}");
+                verification_router.register_verifier(Arc::new(
+                    SolanaStakeWeightedVerifier::empty(
+                        configured_solana_cluster(&config.svm_clusters)
+                            .unwrap_or(SolanaCluster::MainnetBeta),
+                    ),
+                ));
+            }
+        }
 
         Self {
             finality_oracle,
@@ -1047,6 +1111,36 @@ mod tests {
             governance: GovernanceConfig::default(),
             logging: LoggingConfig::default(),
         }
+    }
+
+    #[test]
+    fn solana_v2_stake_configuration_must_match_authorized_keys() {
+        let mut config = test_config();
+        config.svm_clusters[0].cluster_name = "mainnet-beta".into();
+        let key = [3u8; 32];
+        config.validator_set.svm_validator_pubkeys = vec![hex::encode(key)];
+        config.validator_set.svm_validator_stakes = vec![SvmValidatorStakeConfig {
+            pubkey: hex::encode(key),
+            stake: 100,
+        }];
+        let quorum =
+            AuthorizedValidatorSet::from_hex_keys(&config.validator_set.svm_validator_pubkeys)
+                .unwrap();
+
+        assert_eq!(
+            configured_solana_cluster(&config.svm_clusters),
+            Ok(SolanaCluster::MainnetBeta)
+        );
+        assert_eq!(
+            configured_solana_stakes(&config, &quorum)
+                .unwrap()
+                .first()
+                .map(|entry| (entry.pubkey, entry.stake)),
+            Some((key, 100))
+        );
+
+        config.validator_set.svm_validator_stakes[0].pubkey = hex::encode([4u8; 32]);
+        assert!(configured_solana_stakes(&config, &quorum).is_err());
     }
 
     #[tokio::test]
