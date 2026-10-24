@@ -1,0 +1,4 @@
+# Runtime state written by validator_registry.py / admin_api.py and the
+# start scripts. validators.json holds live API keys and secrets: never commit it.
+validators.json
+.inferstructor.pids
