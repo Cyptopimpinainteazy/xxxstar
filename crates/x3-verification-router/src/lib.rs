@@ -26,6 +26,7 @@ pub mod evm_receipt;
 pub mod external_root;
 pub mod gateway_types;
 pub mod header_finality;
+pub mod solana_finality;
 
 pub use evm_receipt::{
     deposit_locked_selector, withdrawal_released_selector, ProductionEvmReceiptVerifier,
@@ -33,6 +34,12 @@ pub use evm_receipt::{
 };
 pub use gateway_types::{
     ExternalAssetRef, ExternalChainId, VerificationRequest, VerificationResult,
+};
+pub use solana_finality::{
+    encode_solana_finality_v2, solana_stake_table_digest, SolanaCluster,
+    SolanaStakeWeightedVerifier, SolanaValidatorStake, SolanaVerifierConfigError,
+    MAX_SOLANA_FINALITY_VOTES, SOLANA_FINALITY_V2_HEADER_LEN, SOLANA_FINALITY_VOTE_LEN,
+    SOLANA_FINALIZED_FORMAT_V2,
 };
 
 use alloc::collections::btree_map::BTreeMap;
@@ -127,6 +134,18 @@ pub enum VerificationError {
     NoAuthorizedValidators,
     /// Fewer distinct authorized validators signed than the threshold requires.
     InsufficientValidSignatures,
+    /// A proof named a validator that is not in the configured stake table.
+    UnauthorizedSvmValidator,
+    /// The proof's stake-table digest does not match the trusted stake table.
+    StakeTableMismatch,
+    /// The signed stake was below the configured supermajority.
+    InsufficientStake,
+    /// The proof names a different Solana cluster than the verifier.
+    WrongCluster,
+    /// The signed stake could not be represented without overflow.
+    StakeWeightOverflow,
+    /// The proof's finalized slot is below the persisted finalized-slot floor.
+    StaleFinality,
     /// The proof names a block this chain's header store does not hold on its best chain.
     UnanchoredBlock,
     /// The block is not buried deep enough.
@@ -168,6 +187,24 @@ impl Display for VerificationError {
             }
             VerificationError::InsufficientValidSignatures => {
                 write!(f, "insufficient valid validator attestations")
+            }
+            VerificationError::UnauthorizedSvmValidator => {
+                write!(f, "unauthorized SVM validator in proof")
+            }
+            VerificationError::StakeTableMismatch => {
+                write!(f, "SVM stake-table digest does not match the trusted table")
+            }
+            VerificationError::InsufficientStake => {
+                write!(f, "signed SVM stake is below the required supermajority")
+            }
+            VerificationError::WrongCluster => {
+                write!(f, "SVM proof names the wrong cluster")
+            }
+            VerificationError::StakeWeightOverflow => {
+                write!(f, "SVM stake weight overflow")
+            }
+            VerificationError::StaleFinality => {
+                write!(f, "SVM finalized slot is below the persisted floor")
             }
         }
     }
@@ -435,12 +472,16 @@ pub const SOLANA_FINALIZED_FORMAT_V1: u8 = 1;
 pub const SOLANA_ATTESTATION_LEN: usize = 96;
 pub const SOLANA_PAYLOAD_HEADER_LEN: usize = 45;
 
-/// Verification of Solana finalized-commitment attestations.
+/// Legacy verification of Solana finalized-commitment attestations.
 ///
 /// Construct with the authorized validator set and the required threshold. There
 /// is deliberately no default constructor that trusts the payload's own key
 /// list: an empty set verifies nothing, so a caller that has not been wired to a
 /// governance-controlled set fails closed.
+///
+/// This V1 format does not carry a stake table, cluster id, parent bank hash, or
+/// the X3 transfer intent in its signed message. New mainnet integrations must
+/// use [`SolanaStakeWeightedVerifier`] with the V2 envelope instead.
 pub struct SolanaFinalizedVerifier {
     validators: Vec<[u8; 32]>,
     threshold: u32,
