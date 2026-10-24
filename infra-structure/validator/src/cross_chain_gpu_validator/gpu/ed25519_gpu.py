@@ -218,8 +218,13 @@ class Ed25519BatchVerifier:
             from cryptography.hazmat.primitives.asymmetric.ed25519 import (
                 Ed25519PublicKey,
             )
-        except ImportError:
-            return [False] * len(signature_list)
+        except ImportError as exc:
+            # cryptography is a declared dependency. Without it every signature
+            # would read as invalid, which looks like an attack, not a broken
+            # install; fail loudly instead.
+            raise RuntimeError(
+                "CPU signature verification needs the 'cryptography' package"
+            ) from exc
 
         results: list[bool] = []
         for signature, message, pubkey in zip(

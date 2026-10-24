@@ -310,7 +310,7 @@ def load_default_chain_configs() -> dict[str, ChainConfig]:
             chain_id=chain_id,
             chain_name=name,
             rpc_url=rpc,
-            sig_algorithm=SignatureAlgorithm.ED25519,  # Substrate uses SR25519 (variant of Ed25519)
+            sig_algorithm=SignatureAlgorithm.SR25519,
             hash_algorithm=HashAlgorithm.SHA256,
             sig_pubkey_size=32,
             sig_signature_size=64,

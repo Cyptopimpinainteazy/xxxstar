@@ -59,6 +59,15 @@ def _build_chain_registry(
                 else:
                     # Substrate and other ED25519 chains
                     validator = SubstrateValidator(config, ed25519_verifier)
+            elif config.sig_algorithm == SignatureAlgorithm.SR25519:
+                # Routing these through the Ed25519 verifier would check the
+                # wrong equation; with no SR25519 verifier the chain is not
+                # served at all rather than served wrongly.
+                logger.warning(
+                    "SR25519 chain skipped: no SR25519 verifier is implemented",
+                    extra={"chain_id": chain_id},
+                )
+                continue
             else:
                 logger.warning(
                     "unsupported signature algorithm",

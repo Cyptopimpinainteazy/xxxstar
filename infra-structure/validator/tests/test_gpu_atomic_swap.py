@@ -10,14 +10,14 @@ import unittest
 
 class TestGpuAtomicSwapKernel(unittest.TestCase):
     def setUp(self):
-        self.repo_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..")
-        )
+        self.repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         self.kernel_build_dir = os.path.join(self.repo_root, "kernels", "build")
         self.lib_path = os.path.join(self.kernel_build_dir, "libatomic_swap.so")
 
         if shutil.which("nvcc") is None:
-            self.skipTest("nvcc is not available; cannot validate GPU atomic-swap kernels")
+            self.skipTest(
+                "nvcc is not available; cannot validate GPU atomic-swap kernels"
+            )
 
         if not os.path.exists(self.lib_path):
             subprocess.run(
@@ -53,23 +53,27 @@ class TestGpuAtomicSwapKernel(unittest.TestCase):
         )
 
         ec_private = ec.generate_private_key(ec.SECP256K1())
-        der_signature = ec_private.sign(msg_hash, ec.ECDSA(hashes.SHA256()))
+        # msg_hash is already the digest the kernel verifies; Prehashed stops
+        # cryptography from hashing it a second time.
+        der_signature = ec_private.sign(
+            msg_hash, ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+        )
         r, s = utils.decode_dss_signature(der_signature)
         secp_signature = (
-            int.to_bytes(r, 32, "big")
-            + int.to_bytes(s, 32, "big")
-            + b"\x00"
+            int.to_bytes(r, 32, "big") + int.to_bytes(s, 32, "big") + b"\x00"
         )
         public_numbers = ec_private.public_key().public_numbers()
-        secp_public = (
-            int.to_bytes(public_numbers.x, 32, "big")
-            + int.to_bytes(public_numbers.y, 32, "big")
+        secp_public = int.to_bytes(public_numbers.x, 32, "big") + int.to_bytes(
+            public_numbers.y, 32, "big"
         )
 
         if not valid:
             ed_signature[-1] ^= 1
 
-        return bytes(ed_signature) + ed_public + msg_hash, secp_signature + secp_public + msg_hash
+        return (
+            bytes(ed_signature) + ed_public + msg_hash,
+            secp_signature + secp_public + msg_hash,
+        )
 
     def test_atomic_verify_host_requires_both_valid_signatures(self):
         svm_entry, evm_entry = self._make_atomic_input(valid=True)
@@ -77,9 +81,7 @@ class TestGpuAtomicSwapKernel(unittest.TestCase):
         evm_buffer = (ctypes.c_uint8 * len(evm_entry)).from_buffer_copy(evm_entry)
         status = (ctypes.c_uint8 * 1)()
 
-        return_code = self._lib.atomic_verify_host(
-            svm_buffer, evm_buffer, 1, status
-        )
+        return_code = self._lib.atomic_verify_host(svm_buffer, evm_buffer, 1, status)
         self.assertEqual(return_code, 0)
         self.assertEqual(status[0], 1)
 
@@ -89,9 +91,7 @@ class TestGpuAtomicSwapKernel(unittest.TestCase):
         evm_buffer = (ctypes.c_uint8 * len(evm_entry)).from_buffer_copy(evm_entry)
         status = (ctypes.c_uint8 * 1)()
 
-        return_code = self._lib.atomic_verify_host(
-            svm_buffer, evm_buffer, 1, status
-        )
+        return_code = self._lib.atomic_verify_host(svm_buffer, evm_buffer, 1, status)
         self.assertEqual(return_code, 0)
         self.assertEqual(status[0], 0)
 

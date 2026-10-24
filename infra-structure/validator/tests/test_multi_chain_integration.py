@@ -370,7 +370,7 @@ class TestChainAdapterInterface(unittest.TestCase):
         configs = load_default_chain_configs()
         if "polkadot" in configs:
             substrate_config = configs["polkadot"]
-            self.assertEqual(substrate_config.sig_algorithm, SignatureAlgorithm.ED25519)
+            self.assertEqual(substrate_config.sig_algorithm, SignatureAlgorithm.SR25519)
             self.assertEqual(substrate_config.hash_algorithm, HashAlgorithm.SHA256)
         else:
             self.skipTest("Polkadot not in default chain registry")
