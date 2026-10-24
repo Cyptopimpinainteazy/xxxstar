@@ -362,7 +362,7 @@ pub struct ProtectedRoute {
 }
 
 /// Route information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Route {
     pub hops: Vec<Hop>,
     pub amount_in: U256,
@@ -371,7 +371,7 @@ pub struct Route {
 }
 
 /// Individual hop in a route
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Hop {
     pub dex_address: H160,
     pub amount: U256,

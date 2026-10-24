@@ -25,11 +25,15 @@ export function SwapInterface({ walletConnected, walletId, rpcEndpoint }: SwapIn
   const [slippage, setSlippage] = useState('1.0');
   const [estimating, setEstimating] = useState(false);
   const [swapping, setSwapping] = useState(false);
+  // Set when no executable quote could be obtained. The output field is cleared
+  // and the swap button disabled: a price the chain did not quote is not a price.
+  const [estimateError, setEstimateError] = useState<string | null>(null);
 
   // Estimate swap when amount changes
   useEffect(() => {
     if (!amountIn || parseFloat(amountIn) <= 0) {
       setAmountOut('');
+      setEstimateError(null);
       return;
     }
 
@@ -56,11 +60,18 @@ export function SwapInterface({ walletConnected, walletId, rpcEndpoint }: SwapIn
         const response = await rpcClient.estimateSwap(request);
         const estimatedOut = parseFloat(response.amount_out) / (10 ** tokenOut.decimals);
         setAmountOut(estimatedOut.toFixed(6));
+        setEstimateError(null);
       } catch (error) {
         console.error('Failed to estimate swap:', error);
-        // Fallback to mock calculation
-        const estimatedOut = parseFloat(amountIn) * 0.95; // 5% fee simulation
-        setAmountOut(estimatedOut.toFixed(6));
+        // No fallback price. This used to multiply the input by 0.95 and show
+        // the result as a quote, so an RPC outage produced a number the chain
+        // had never agreed to and the user could swap against it.
+        setAmountOut('');
+        setEstimateError(
+          error instanceof Error
+            ? `No executable quote: ${error.message}`
+            : 'No executable quote: the router did not respond'
+        );
       } finally {
         setEstimating(false);
       }
@@ -204,6 +215,11 @@ export function SwapInterface({ walletConnected, walletId, rpcEndpoint }: SwapIn
         {estimating && (
           <div className="text-xs text-gray-500 mt-2">Estimating...</div>
         )}
+        {estimateError && !estimating && (
+          <div className="text-xs text-red-400 mt-2" role="alert">
+            {estimateError}
+          </div>
+        )}
       </div>
 
       {/* Swap Info */}
@@ -214,8 +230,10 @@ export function SwapInterface({ walletConnected, walletId, rpcEndpoint }: SwapIn
             <span>1 {tokenIn.symbol} = {(parseFloat(amountOut) / parseFloat(amountIn)).toFixed(6)} {tokenOut.symbol}</span>
           </div>
           <div className="flex justify-between mb-1">
-            <span className="text-gray-400">Fee (0.3%)</span>
-            <span>{(parseFloat(amountIn) * 0.003).toFixed(6)} {tokenIn.symbol}</span>
+            <span className="text-gray-400">Est. fee</span>
+            {/* Only the quote can state the fee. A hard-coded 0.3% is a claim
+                about the venue the router never made. */}
+            <span className="text-gray-500">from quote</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-400">Min. received</span>
@@ -227,7 +245,7 @@ export function SwapInterface({ walletConnected, walletId, rpcEndpoint }: SwapIn
       {/* Swap Button */}
       <button
         onClick={handleSwap}
-        disabled={!walletConnected || !amountIn || swapping || estimating}
+        disabled={!walletConnected || !amountIn || !amountOut || swapping || estimating || estimateError !== null}
         className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl font-bold text-lg hover:from-blue-700 hover:to-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {!walletConnected ? 'Connect Wallet' : swapping ? 'Swapping...' : 'Swap'}
