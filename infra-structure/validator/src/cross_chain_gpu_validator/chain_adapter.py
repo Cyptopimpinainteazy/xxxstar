@@ -13,6 +13,9 @@ class SignatureAlgorithm(Enum):
 
     SECP256K1 = "secp256k1"
     ED25519 = "ed25519"
+    # Schnorrkel over Ristretto25519: not Ed25519, and not verifiable by the
+    # Ed25519 kernel. No verifier for it exists here yet.
+    SR25519 = "sr25519"
     BLS = "bls"
 
 

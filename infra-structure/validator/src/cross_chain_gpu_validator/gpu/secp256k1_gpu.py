@@ -378,8 +378,13 @@ class Secp256k1BatchVerifier:
             from cryptography.exceptions import InvalidSignature
             from cryptography.hazmat.primitives import hashes
             from cryptography.hazmat.primitives.asymmetric import ec, utils
-        except ImportError:
-            return [False] * len(signature_list)
+        except ImportError as exc:
+            # cryptography is a declared dependency. Without it every signature
+            # would read as invalid, which looks like an attack, not a broken
+            # install; fail loudly instead.
+            raise RuntimeError(
+                "CPU signature verification needs the 'cryptography' package"
+            ) from exc
 
         results: list[bool] = []
 
