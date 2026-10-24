@@ -18,7 +18,7 @@ async function connectRedis() {
     if (process.env.START_REDIS_ON_STARTUP === 'true') {
       try {
         console.log('🔧 Attempting to start Redis via docker compose...');
-        execSync('docker compose -f infra/blockchain-tps/docker-compose.yml up -d', { stdio: 'inherit' });
+        execSync('docker compose -f infra-structure/services/blockchain-tps/docker-compose.yml up -d', { stdio: 'inherit' });
         await new Promise(r => setTimeout(r, 1500));
         await client.connect();
         console.log('✅ Connected to Redis after docker compose');
