@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 src/cross_chain_gpu_validator/__init__.py
 src/cross_chain_gpu_validator/benchmark.py
@@ -23,6 +24,7 @@ src/cross_chain_gpu_validator/evm/evm_validator.py
 src/cross_chain_gpu_validator/evm/state_root.py
 src/cross_chain_gpu_validator/gpu/__init__.py
 src/cross_chain_gpu_validator/gpu/cuda_loader.py
+src/cross_chain_gpu_validator/gpu/ed25519_gpu.py
 src/cross_chain_gpu_validator/gpu/keccak_gpu.py
 src/cross_chain_gpu_validator/gpu/kernel_profiles.py
 src/cross_chain_gpu_validator/gpu/kernels.py
@@ -49,6 +51,7 @@ src/cross_chain_gpu_validator/svm/svm_validator.py
 tests/test_atomic_swap_validation.py
 tests/test_chain_registry.py
 tests/test_dashboard_e2e.py
+tests/test_gpu_atomic_swap.py
 tests/test_multi_chain_integration.py
 tests/test_multi_gpu_integration.py
 tests/test_resilience.py

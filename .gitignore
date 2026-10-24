@@ -11,6 +11,7 @@ target/
 *.rlib
 **/__pycache__/
 *.pyc
+*.egg-info/
 
 # Large packs
 launch-gates/packs/
