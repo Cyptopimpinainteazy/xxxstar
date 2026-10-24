@@ -25,9 +25,11 @@
 //! block — the same requirement `crates/external-chains/tests/send_message_broadcasts.rs`
 //! and the `EVM contract lifecycle` gate already carry.
 
+use crate::types::EvmProof;
 use serde_json::{json, Value};
 use x3_verification_router::evm_receipt::{
-    receipt_trie_key, receipts_trie_proof, receipts_trie_root, verify_merkle_patricia_proof,
+    encode_proof_payload, keccak256_32, receipt_trie_key, receipts_trie_proof, receipts_trie_root,
+    verify_merkle_patricia_proof, EvmBlockHeader,
 };
 
 /// A receipt's inclusion in a block's receipts trie, as the settlement engine
@@ -47,6 +49,8 @@ pub struct ReceiptInclusion {
     pub trie_proof: Vec<u8>,
     /// Blocks between this one and the head when the proof was built.
     pub confirmations: u64,
+    /// The raw consensus header whose roots this proof is bound to.
+    pub header_rlp: Vec<u8>,
 }
 
 impl ReceiptInclusion {
@@ -115,6 +119,54 @@ impl ReceiptInclusion {
             receipt_data,
             receipt_index: Some(self.receipt_index),
             trie_proof: Some(trie_proof),
+        })
+    }
+
+    /// Build the payload consumed by `ProductionEvmReceiptVerifier`.
+    pub fn verification_payload(&self, min_confirmations: u64) -> Result<Vec<u8>, ProducerError> {
+        let current_block = self
+            .block_number
+            .checked_add(self.confirmations)
+            .ok_or_else(|| ProducerError::Malformed("block head overflow".into()))?;
+        let index = self.receipt_index.to_be_bytes();
+        let first = index
+            .iter()
+            .position(|byte| *byte != 0)
+            .unwrap_or(index.len());
+        Ok(encode_proof_payload(
+            current_block,
+            min_confirmations,
+            &self.header_rlp,
+            &self.receipt_rlp,
+            &index[first..],
+            &self.trie_proof,
+        ))
+    }
+
+    /// Bind this inclusion to a specific X3 deposit and relayer nonce.
+    pub fn evm_proof(
+        &self,
+        source_domain: u32,
+        expected_recipient: Vec<u8>,
+        expected_amount: u128,
+        proof_nonce: u32,
+        min_confirmations: u64,
+    ) -> Result<EvmProof, ProducerError> {
+        if expected_recipient.len() != 20 {
+            return Err(ProducerError::Malformed(format!(
+                "X3 EVM recipient is {} bytes, expected 20",
+                expected_recipient.len()
+            )));
+        }
+        Ok(EvmProof {
+            source_domain,
+            block_hash: self.block_hash,
+            state_root: self.state_root,
+            finalized_block: self.block_number,
+            proof_nonce,
+            proof_payload: self.verification_payload(min_confirmations)?,
+            expected_recipient,
+            expected_amount,
         })
     }
 }
@@ -462,6 +514,20 @@ pub async fn prove_evm_receipt(
             .ok_or_else(|| ProducerError::Malformed("header has no stateRoot".to_string()))?,
         "stateRoot",
     )?;
+    let raw_header = rpc(&client, rpc_url, "debug_getRawHeader", json!([block_tag])).await?;
+    let header_rlp = hex_bytes(&raw_header, "raw block header")?;
+    let decoded_header = EvmBlockHeader::decode(&header_rlp)
+        .map_err(|error| ProducerError::Malformed(format!("raw header: {error}")))?;
+    let header_hash = keccak256_32(&header_rlp);
+    if decoded_header.number != block_number
+        || header_hash != block_hash
+        || decoded_header.state_root != state_root
+        || decoded_header.receipts_root != header_receipts_root
+    {
+        return Err(ProducerError::Malformed(
+            "raw header does not match the JSON block hash and roots".into(),
+        ));
+    }
     let built_root = receipts_trie_root(&receipts)
         .map_err(|e| ProducerError::Malformed(format!("could not build the receipts trie: {e}")))?;
     if built_root != header_receipts_root {
@@ -496,6 +562,7 @@ pub async fn prove_evm_receipt(
         receipt_rlp,
         trie_proof,
         confirmations: head.saturating_sub(block_number),
+        header_rlp,
     })
 }
 
@@ -596,7 +663,23 @@ mod tests {
             .expect("the producer builds a proof");
         assert_ne!(inclusion.receipts_root, [0u8; 32], "the header's root");
         assert_ne!(inclusion.trie_proof, Vec::<u8>::new(), "the path");
+        assert_ne!(
+            inclusion.header_rlp,
+            Vec::<u8>::new(),
+            "the consensus header"
+        );
         assert_eq!(inclusion.confirmations, 0, "the transaction is in the head");
+        assert!(!inclusion
+            .verification_payload(12)
+            .expect("router payload")
+            .is_empty());
+        let proof = inclusion
+            .evm_proof(100, vec![0x42; 20], 1_000, 7, 12)
+            .expect("event-bound EVM proof");
+        assert_eq!(proof.finalized_block, inclusion.block_number);
+        assert_eq!(proof.proof_nonce, 7);
+        assert_eq!(proof.expected_recipient, vec![0x42; 20]);
+        assert!(!proof.proof_payload.is_empty());
         // The producer already checks both of these internally; asserting them
         // here keeps the test honest about what it is relying on.
         assert_eq!(
@@ -697,6 +780,7 @@ mod tests {
             receipt_rlp,
             trie_proof: vec![0xAB; trie_proof_len],
             confirmations: 12,
+            header_rlp: vec![0xC0],
         }
     }
 

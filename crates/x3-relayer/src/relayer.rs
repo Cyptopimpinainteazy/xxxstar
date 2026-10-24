@@ -19,8 +19,10 @@ use x3_gateway_risk_engine::{GatewayRiskEngine, RiskPolicy, RouteRiskInput};
 use x3_proof_dispute::{DisputeStatus, DisputeTracker};
 use x3_validator_attestation::{Attestation, AttestationSet, ValidatorId};
 use x3_verification_router::{
+    evm_receipt::{AnchoredEvmHeader, EvmHeaderAnchorSource},
     ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, SolanaCluster,
     SolanaStakeWeightedVerifier, SolanaValidatorStake, VerificationRouter, VerificationStrategy,
+    Verifier,
 };
 
 pub struct RelayerService {
@@ -62,10 +64,19 @@ struct RelayerInternalState {
     finalized_svm_headers: BTreeMap<u32, u64>, // domain_id -> finalized slot
     finalized_evm_data: BTreeMap<u32, HeaderInfo>, // domain_id -> finalized header (block_hash + state_root)
     finalized_svm_data: BTreeMap<u32, HeaderInfo>, // domain_id -> finalized header (blockhash)
-    proof_cache: BTreeSet<[u8; 32]>,               // Submitted proof hashes (replay protection)
+    pending_evm_receipts: BTreeMap<u32, Vec<PendingEvmReceipt>>,
+    proof_cache: BTreeSet<[u8; 32]>, // Submitted proof hashes (replay protection)
     pending_submissions: u32,
     shutdown_signal: bool,
     pause_reason: Option<String>,
+}
+
+#[derive(Clone)]
+struct PendingEvmReceipt {
+    finalized_block: u64,
+    proof_payload: Vec<u8>,
+    expected_recipient: Vec<u8>,
+    expected_amount: u128,
 }
 
 fn configured_solana_cluster(clusters: &[SvmClusterConfig]) -> Result<SolanaCluster, String> {
@@ -172,6 +183,7 @@ impl RelayerService {
             finalized_svm_headers: BTreeMap::new(),
             finalized_evm_data: BTreeMap::new(),
             finalized_svm_data: BTreeMap::new(),
+            pending_evm_receipts: BTreeMap::new(),
             proof_cache: BTreeSet::new(),
             pending_submissions: 0,
             shutdown_signal: false,
@@ -197,6 +209,37 @@ impl RelayerService {
             evm_concurrency_limiter: Arc::new(Semaphore::new(10)), // Max 10 concurrent EVM polls
             svm_concurrency_limiter: Arc::new(Semaphore::new(20)), // Max 20 concurrent SVM polls
         })
+    }
+
+    /// Attach the event-specific receipt proof that finality polling alone cannot
+    /// derive. The proof is consumed only after the matching block is finalized.
+    pub async fn queue_evm_receipt_proof(
+        &self,
+        domain_id: u32,
+        finalized_block: u64,
+        proof_payload: Vec<u8>,
+        expected_recipient: Vec<u8>,
+        expected_amount: u128,
+    ) -> Result<()> {
+        if proof_payload.is_empty() {
+            anyhow::bail!("EVM receipt proof payload must not be empty");
+        }
+        if expected_recipient.len() != 20 {
+            anyhow::bail!("EVM deposit recipient must be 20 bytes");
+        }
+        self.state
+            .write()
+            .await
+            .pending_evm_receipts
+            .entry(domain_id)
+            .or_default()
+            .push(PendingEvmReceipt {
+                finalized_block,
+                proof_payload,
+                expected_recipient,
+                expected_amount,
+            });
+        Ok(())
     }
 
     /// Main relay loop - runs indefinitely until shutdown
@@ -443,11 +486,38 @@ impl RelayerService {
                 // Acquire proof from finalized block.
                 // block_hash and state_root come from the header stored when
                 // this block crossed the finality threshold in poll_evm_headers.
-                let (block_hash, state_root) = match state.finalized_evm_data.get(&domain_id) {
-                    Some(h) => (h.block_hash, h.state_root),
+                let (block_hash, state_root, receipts_root) =
+                    match state.finalized_evm_data.get(&domain_id) {
+                        Some(h) => (h.block_hash, h.state_root, h.receipts_root),
+                        None => {
+                            warn!(
+                                "No header data for finalized EVM domain {}; skipping proof",
+                                domain_id
+                            );
+                            continue;
+                        }
+                    };
+                let attested_head = match state.evm_heads.get(&domain_id) {
+                    Some(head) => *head,
                     None => {
-                        warn!(
-                            "No header data for finalized EVM domain {}; skipping proof",
+                        warn!("No chain head for finalized EVM domain {}", domain_id);
+                        continue;
+                    }
+                };
+                let pending_index =
+                    state
+                        .pending_evm_receipts
+                        .get(&domain_id)
+                        .and_then(|pending| {
+                            pending
+                                .iter()
+                                .position(|entry| entry.finalized_block == block_number)
+                        });
+                let pending = match pending_index {
+                    Some(index) => state.pending_evm_receipts[&domain_id][index].clone(),
+                    None => {
+                        debug!(
+                            "No event-bound receipt proof queued for finalized EVM domain {}",
                             domain_id
                         );
                         continue;
@@ -456,19 +526,37 @@ impl RelayerService {
 
                 if let Ok(proof) = self
                     .submitter
-                    .acquire_evm_proof(domain_id, block_number, block_hash, state_root)
+                    .acquire_evm_proof(EvmProofRequest {
+                        source_domain: domain_id,
+                        finalized_block: block_number,
+                        block_hash,
+                        state_root,
+                        proof_payload: pending.proof_payload,
+                        expected_recipient: pending.expected_recipient,
+                        expected_amount: pending.expected_amount,
+                    })
                     .await
                 {
+                    if let Some(pending) = state.pending_evm_receipts.get_mut(&domain_id) {
+                        pending.remove(pending_index.expect("selected pending index"));
+                    }
                     let recent_failures = self
                         .metrics
                         .read()
                         .await
                         .proofs_failed
                         .min(u64::from(u32::MAX)) as u32;
-                    if let Err(reason) = self
-                        .safety_pipeline
-                        .evaluate_evm_proof(&proof, recent_failures)
-                    {
+                    if let Err(reason) = self.safety_pipeline.evaluate_evm_proof_against_header(
+                        &proof,
+                        AnchoredEvmHeader {
+                            number: block_number,
+                            receipts_root,
+                            state_root,
+                            block_hash,
+                        },
+                        attested_head,
+                        recent_failures,
+                    ) {
                         warn!(
                             "Skipping EVM proof submission for domain {} block {}: {}",
                             domain_id, block_number, reason
@@ -596,18 +684,21 @@ impl RelayerService {
 
     /// Calculate hash of EVM proof for deduplication
     fn calculate_proof_hash_evm(&self, proof: &crate::types::EvmProof) -> [u8; 32] {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+        use sha2::{Digest, Sha256};
 
-        let mut hasher = DefaultHasher::new();
-        proof.source_domain.hash(&mut hasher);
-        proof.finalized_block.hash(&mut hasher);
-        proof.block_hash.hash(&mut hasher);
-
-        let hash_u64 = hasher.finish();
-        let mut result = [0u8; 32];
-        result[0..8].copy_from_slice(&hash_u64.to_le_bytes());
-        result
+        let mut hasher = Sha256::new();
+        hasher.update(b"x3-relayer-evm-proof-v2");
+        hasher.update(proof.source_domain.to_le_bytes());
+        hasher.update(proof.finalized_block.to_le_bytes());
+        hasher.update(proof.block_hash);
+        hasher.update(proof.state_root);
+        hasher.update(proof.proof_nonce.to_le_bytes());
+        hasher.update((proof.expected_recipient.len() as u64).to_le_bytes());
+        hasher.update(&proof.expected_recipient);
+        hasher.update(proof.expected_amount.to_le_bytes());
+        hasher.update((proof.proof_payload.len() as u64).to_le_bytes());
+        hasher.update(&proof.proof_payload);
+        hasher.finalize().into()
     }
 
     /// Calculate hash of SVM proof for deduplication
@@ -765,6 +856,7 @@ impl RelayerSafetyPipeline {
         }
     }
 
+    #[cfg(test)]
     fn evaluate_evm_proof(&self, proof: &EvmProof, recent_failures: u32) -> Result<(), String> {
         let proof_id = proof.block_hash;
         let required_confirmations = self
@@ -781,11 +873,12 @@ impl RelayerSafetyPipeline {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
         }
 
-        let payload = [proof.block_hash.as_slice(), proof.state_root.as_slice()].concat();
         if let Err(reason) = self.evaluate_verification(
             VerificationStrategy::EvmReceiptProof,
-            payload,
+            proof.proof_payload.clone(),
             proof.source_domain,
+            proof.expected_recipient.clone(),
+            proof.expected_amount,
         ) {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
         }
@@ -802,6 +895,72 @@ impl RelayerSafetyPipeline {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
         }
 
+        Ok(())
+    }
+
+    fn evaluate_evm_proof_against_header(
+        &self,
+        proof: &EvmProof,
+        anchor: AnchoredEvmHeader,
+        attested_head: u64,
+        recent_failures: u32,
+    ) -> Result<(), String> {
+        let proof_id = proof.block_hash;
+        let required_confirmations = self
+            .evm_finality_thresholds
+            .get(&proof.source_domain)
+            .copied()
+            .unwrap_or(0) as u64;
+
+        if proof.finalized_block != anchor.number
+            || proof.block_hash != anchor.block_hash
+            || proof.state_root != anchor.state_root
+        {
+            return self.raise_dispute(
+                proof_id,
+                proof.finalized_block,
+                "evm proof does not match the finalized header".into(),
+            );
+        }
+        if let Err(reason) = self.evaluate_finality(
+            proof.source_domain,
+            proof.finalized_block,
+            required_confirmations,
+        ) {
+            return self.raise_dispute(proof_id, proof.finalized_block, reason);
+        }
+
+        let verifier = ProductionEvmReceiptVerifier::with_anchor(
+            required_confirmations,
+            EvmHeaderAnchorSource::Fixed {
+                header: anchor,
+                head: attested_head,
+            },
+        );
+        let envelope = ProofEnvelope {
+            proof_id,
+            strategy: VerificationStrategy::EvmReceiptProof,
+            source_chain: ChainKind::Evm {
+                chain_id: proof.source_domain as u64,
+            },
+            destination_chain: ChainKind::X3,
+            payload: proof.proof_payload.clone(),
+            expected_asset_id: [0u8; 32],
+            expected_amount: proof.expected_amount,
+            expected_sender: Vec::new(),
+            expected_recipient: proof.expected_recipient.clone(),
+            expected_beneficiary: Vec::new(),
+        };
+        if let Err(reason) = verifier.verify(&envelope) {
+            return self.raise_dispute(
+                proof_id,
+                proof.finalized_block,
+                format!("verification_error: {reason}"),
+            );
+        }
+        if let Err(reason) = self.evaluate_risk(true, recent_failures) {
+            return self.raise_dispute(proof_id, proof.finalized_block, reason);
+        }
         Ok(())
     }
 
@@ -824,6 +983,8 @@ impl RelayerSafetyPipeline {
             VerificationStrategy::SolanaFinalizedProof,
             payload,
             proof.source_domain,
+            Vec::new(),
+            0,
         ) {
             return self.raise_dispute(proof_id, proof.slot, reason);
         }
@@ -943,6 +1104,8 @@ impl RelayerSafetyPipeline {
         kind: VerificationStrategy,
         payload: Vec<u8>,
         source_domain: u32,
+        expected_recipient: Vec<u8>,
+        expected_amount: u128,
     ) -> Result<(), String> {
         let source_chain = match kind {
             VerificationStrategy::EvmReceiptProof => ChainKind::Evm {
@@ -959,9 +1122,9 @@ impl RelayerSafetyPipeline {
             destination_chain: ChainKind::X3,
             payload,
             expected_asset_id: [0u8; 32],
-            expected_amount: 0,
+            expected_amount,
             expected_sender: Vec::new(),
-            expected_recipient: Vec::new(),
+            expected_recipient,
             expected_beneficiary: Vec::new(),
         };
 
@@ -1232,6 +1395,7 @@ mod tests {
             finalized_svm_headers: BTreeMap::new(),
             finalized_evm_data: BTreeMap::new(),
             finalized_svm_data: BTreeMap::new(),
+            pending_evm_receipts: BTreeMap::new(),
             proof_cache: BTreeSet::new(),
             pending_submissions: 0,
             shutdown_signal: false,
@@ -1320,6 +1484,9 @@ mod tests {
             state_root: [2u8; 32],
             finalized_block: 1_000,
             proof_nonce: 1,
+            proof_payload: vec![1u8; 96],
+            expected_recipient: vec![2u8; 20],
+            expected_amount: 1_000,
         };
 
         assert!(pipeline.evaluate_evm_proof(&proof, 0).is_ok());
@@ -1335,6 +1502,9 @@ mod tests {
             state_root: [4u8; 32],
             finalized_block: 55,
             proof_nonce: 9,
+            proof_payload: vec![1u8; 96],
+            expected_recipient: vec![2u8; 20],
+            expected_amount: 1_000,
         };
 
         let err = pipeline
@@ -1342,6 +1512,39 @@ mod tests {
             .expect_err("unknown domain should fail finality check");
         assert!(err.contains("finality_rejected"));
         assert!(err.contains("dispute_status=Accepted"));
+    }
+
+    #[test]
+    fn evm_proof_must_match_the_attested_header() {
+        let config = test_config();
+        let pipeline = RelayerSafetyPipeline::new(&config);
+        let proof = EvmProof {
+            source_domain: 100,
+            block_hash: [3u8; 32],
+            state_root: [4u8; 32],
+            finalized_block: 55,
+            proof_nonce: 9,
+            proof_payload: vec![1u8; 96],
+            expected_recipient: vec![2u8; 20],
+            expected_amount: 1_000,
+        };
+        let error = pipeline
+            .evaluate_evm_proof_against_header(
+                &proof,
+                AnchoredEvmHeader {
+                    number: 55,
+                    receipts_root: [5u8; 32],
+                    state_root: [6u8; 32],
+                    block_hash: [7u8; 32],
+                },
+                60,
+                0,
+            )
+            .expect_err("a proof cannot choose its own header");
+        assert!(
+            error.contains("does not match the finalized header"),
+            "{error}"
+        );
     }
 
     /// A router-level quorum of 1 (one authorized signer is enough to pass

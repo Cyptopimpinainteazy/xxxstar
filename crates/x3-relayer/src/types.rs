@@ -128,6 +128,7 @@ pub struct HeaderInfo {
     pub block_number: u64,
     pub block_hash: [u8; 32],
     pub state_root: [u8; 32],
+    pub receipts_root: [u8; 32],
     pub timestamp: u64,
     pub chain_id: u32,
 }
@@ -139,6 +140,24 @@ pub struct EvmProof {
     pub state_root: [u8; 32],
     pub finalized_block: u64,
     pub proof_nonce: u32,
+    /// Canonical payload for `ProductionEvmReceiptVerifier`.
+    pub proof_payload: Vec<u8>,
+    /// Exact X3 recipient encoded in the deposit log.
+    pub expected_recipient: Vec<u8>,
+    /// Exact deposit amount encoded in the deposit log.
+    pub expected_amount: u128,
+}
+
+/// Inputs required to bind a finalized EVM header to an event-specific receipt proof.
+#[derive(Clone, Debug)]
+pub struct EvmProofRequest {
+    pub source_domain: u32,
+    pub finalized_block: u64,
+    pub block_hash: [u8; 32],
+    pub state_root: [u8; 32],
+    pub proof_payload: Vec<u8>,
+    pub expected_recipient: Vec<u8>,
+    pub expected_amount: u128,
 }
 
 /// A single validator attestation: identity key and its Ed25519 signature
